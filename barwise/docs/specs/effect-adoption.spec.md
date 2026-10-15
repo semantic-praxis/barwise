@@ -204,12 +204,18 @@ on one machine, with the same definitions.
   hand-written JSON Schema accepts, through core's existing
   `SchemaValidator`. This is the only measure whose answer key does not
   come from the Schema under test. `SchemaValidator` validates whole
-  documents, so each encoded element is checked inside a minimal document:
-  the root fields the document requires (`orm_version`, `model.name`), with
-  the element in its collection. A fact type's roles name object types, so
-  the document also carries those object types, from the same generator
-  run. The generated fields are kept unchanged; the wrapper adds only what
-  the root requires, so it cannot hide a defect in the element.
+  documents, so each encoded element is checked inside the smallest valid
+  document around it. The root requires `orm_version` and `model`.
+  - An object type sits in `model.object_types` and needs no enclosing
+    element.
+  - A fact type sits in `model.fact_types`. Its roles name object types,
+    so the document also carries those, from the same generator run.
+  - A role, a constraint, or a join-path operand is not valid alone. It is
+    checked inside an enclosing fact type, which must itself be valid: an
+    `id`, a `name`, nonempty `roles` and nonempty `readings`, which the
+    JSON Schema requires. The wrapper supplies those fields and no others.
+    Every generated field is kept unchanged, so the wrapper cannot hide a
+    defect in the element it encloses.
 - **M5, replaced lines.** The lines of hand-written generator in
   `core/tests/arbitraries/model.ts` that a demonstrated derived generator
   replaces, by kind. A replacement counts only if it keeps reference
@@ -244,22 +250,22 @@ nowhere else:
 
 ## Inventory
 
-| Area                                                  | Today on `main`                                    | Verdict                                           |
-| ----------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------- |
-| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema          |
-| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run            |
-| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                               |
-| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                          |
-| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                          |
-| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; boundaries provide `IdSource` from it      |
-| `core/schemas/orm-model.schema.json`                  | hand-written                                       | stays hand-written, drift-tested per kind         |
-| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                         |
-| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases     |
-| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`              |
-| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6       |
-| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4) |
-| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig   |
-| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use |
+| Area                                                  | Today on `main`                                    | Verdict                                                       |
+| ----------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------- |
+| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema                      |
+| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run                        |
+| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                                           |
+| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                                      |
+| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                      |
+| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; decoders take `newId` as a parameter (Open decision 2) |
+| `core/schemas/orm-model.schema.json`                  | hand-written                                       | stays hand-written, drift-tested per kind                     |
+| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                                     |
+| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                 |
+| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                          |
+| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                   |
+| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4)             |
+| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig               |
+| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use             |
 
 `core/tests/arbitraries/model.ts` (1,010 lines) is the suite's hand-written
 whole-model generator. Lines 242 to 319, 78 lines, are the candidate
@@ -284,20 +290,19 @@ is the claim S3 exists to check rather than assume.
 //   ConstraintSchema = Schema.Union([InternalUniqueness, Mandatory, ...16])
 //   FactTypeYamlCodec: snake_case YAML <-> FactType record
 //
-// Exported from core's root, both forms for every kind:
-//   decodeFactType(doc: unknown):
-//     Effect<FactType, FactTypeProblems, IdSource>
-//   runFactTypeDecode(decoded, newId): FactType   // throws FactTypeError
-//   IdSource                                       // Context.Service
+// Exported from core's root, both forms for every kind. newId is a plain
+// parameter (Open decision 2); no Effect service is exported.
+//   decodeFactType(doc: unknown, newId: () => string):
+//     Effect<FactType, FactTypeProblems>
+//   runFactTypeDecode(doc, newId): FactType       // throws FactTypeError
 //
 // OrmModel and OrmYamlSerializer keep their signatures until barwise-973's
-// ModelBuilder replaces them; each boundary provides IdSource from the
-// installed generator, as the Effect arm's addObjectType does.
+// ModelBuilder replaces them; each boundary passes the installed generator
+// as newId, as the Effect arm's addObjectType does.
 ```
 
-A consumer that wants Effect composes the `decode*` functions and
-provides `IdSource`; a consumer that does not calls the synchronous
-boundary and never imports `effect`. Both are exported because the owner
+A consumer that wants Effect composes the `decode*` functions; a consumer
+that does not calls the synchronous boundary and never imports `effect`. Both are exported because the owner
 chose Effect in the public API (Open decision 1) and because the 84
 consumer sites barwise-973 counts should not all have to learn Effect
 to keep compiling.
@@ -557,8 +562,9 @@ entry only records that it follows.
 ## API and migration impact
 
 - **Core's public API gains Effect types**: `decode*` functions
-  returning `Effect<Record, Problems, IdSource>`, the `IdSource` service,
-  and the problem classes, beside a synchronous boundary for each.
+  returning `Effect<Record, Problems>` and taking `newId` as a plain
+  parameter, and the problem classes, beside a synchronous boundary for
+  each. No service is exported.
 - **Downstream packages** do not depend on `effect` until they import
   from it; when one does, it declares `effect` at core's exact version,
   checked by WS2's test. A package that only calls synchronous
