@@ -672,6 +672,30 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
   }
 });
 
+test("the trial prompt names every scripts/lib module the scorer protects", () => {
+  // The prompt's list is a copy of the scorer's INSTRUMENT_LIBS -- every lib
+  // module it imports, and the hook it loads by path -- so a module added to
+  // one and not the other is a protected file a run is not told about
+  // (Copilot, PR #662). Read both the way the scorer does.
+  const source = readFileSync(SCRIPT, "utf8");
+  const protectedLibs = new Set([
+    ...[...source.matchAll(/from "\.\/lib\/([\w-]+\.mjs)"/g)].map((m) => m[1]),
+    "module-count-hook.mjs",
+  ]);
+  assert.match(source, /scripts\/lib\/module-count-hook\.mjs/, "the hook the scorer loads by path");
+  const spec = readFileSync(
+    join(dirname(SCRIPT), "../docs/specs/effect-comparison.spec.md"),
+    "utf8",
+  );
+  const prompt = spec.slice(spec.indexOf("## Appendix D"), spec.indexOf("The two style lines"));
+  const listed = prompt.slice(
+    prompt.indexOf("under `barwise/scripts/lib/`:"),
+    prompt.indexOf(". Read"),
+  );
+  const named = new Set([...listed.matchAll(/`([\w-]+\.mjs)`/g)].map((m) => m[1]));
+  assert.deepEqual([...named].sort(), [...protectedLibs].sort());
+});
+
 test("the schema case generator refuses a schema it cannot account for", async () => {
   const { refusals, preservations, keeps } = await import("../lib/schema-cases.mjs");
   const schema = (prop) => ({

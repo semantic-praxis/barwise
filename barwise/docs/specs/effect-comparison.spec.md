@@ -895,7 +895,7 @@ How T2 runs:
   `additionalProperties: false` yields no case: the arms already differ
   on an unknown config key for `ObjectType` (the Effect arm refuses it,
   the plain arm accepts it), so a case would be a requirement neither was
-  asked for. Each arm's head passes 30 and fails 18: the four record cases
+  asked for, and Appendix C's task text says so. Each arm's head passes 30 and fails 18: the four record cases
   and 14 of the 20 refusals (the six it passes are the endpoint ones,
   which its absent-type check already refuses).
 - **The rule the task adds is a defect the base has.** `addSubtypeFact`
@@ -1035,7 +1035,9 @@ common future change to this slice, and its diff is D1's measurement.
 > immutable record with no class, no methods and no derived name, where an
 > optional field is absent rather than undefined. `OrmModel.addSubtypeFact`
 > builds it and keeps its refusals, and a subtype fact built in code is
-> refused exactly when the same subtype fact in a file would be. Keep the
+> refused exactly when the same subtype fact in a file would be, apart from
+> a key the file format does not know, which stays as this code base
+> already treats one for `ObjectType`. Keep the
 > YAML layout. Done when the full suite, `validate:examples` and the
 > promptlab drift test pass.
 
@@ -1068,8 +1070,10 @@ this one. The list is the trial scorer's protected set, path for path.
 > law test (anything under a package's `tests/laws/`, or named
 > `*.law.test.ts`), any golden file (anything under a package's `tests/`
 > whose path contains "golden"), `barwise/packages/promptlab/tests/referenceDrift.test.ts`,
-> any `*.reference.orm.yaml`, and `barwise/scripts/measure-comparison.mjs`
-> with its test and the `barwise/scripts/lib` modules it imports. Read
+> any `*.reference.orm.yaml`, `barwise/scripts/measure-comparison.mjs`,
+> `barwise/scripts/tests/measure-comparison.test.mjs`, and these modules
+> under `barwise/scripts/lib/`: `changed-class.mjs`, `malformed-score.mjs`,
+> `median.mjs`, `module-count-hook.mjs`, `schema-cases.mjs`, `tracked.mjs`. Read
 > the root `CLAUDE.md` and `barwise/packages/core/CLAUDE.md` first.
 > Commit your work on the branch when you are done; do not push. Report
 > what you changed and which of the done checks you ran and how they
