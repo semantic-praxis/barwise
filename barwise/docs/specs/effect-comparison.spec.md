@@ -851,7 +851,8 @@ How T2 runs:
   rule.
 - **The rule the task adds is a defect the base has.** `addSubtypeFact`
   accepts a defining rule with `storage: "nope"`, no `expression`, or a
-  missing or unknown `kind`,
+  missing or unknown `kind`, a non-string `expression`, a non-boolean
+  `isFormal`, or a non-boolean subtype flag,
   writes it, and the file it wrote is refused on load. The task states
   the rule (code refuses what a file refuses) so a correct run is not
   judged against something it was never asked, and T1's empty unit,

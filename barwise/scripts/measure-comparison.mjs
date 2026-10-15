@@ -735,19 +735,25 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
       "the diff reports nothing for an unchanged subtype fact",
       () => subtypeDelta({ is_exclusive: true }, { is_exclusive: true })?.kind === "unchanged",
     ],
-    // The one rule the task adds. A rule the file format refuses, from code:
-    // refused there too, or the model saves a file it cannot load.
+    // The one rule the task adds. What the file format refuses, from code:
+    // refused there too, or the model saves a file it cannot load. One input
+    // per constraint the file schema places on a subtype fact: the rule's
+    // storage, expression and kind (each required or enumerated, and typed),
+    // its isFormal flag, and the three subtype flags (Copilot, PR #662).
     [
-      "a defining rule a file would refuse is refused from code too",
+      "a subtype fact a file would refuse is refused from code too",
       () =>
-        // Each field the file schema constrains: storage, expression, kind
-        // (required, and one of two values).
         [
-          { kind: "derived", storage: "nope", expression: "e" },
-          { kind: "derived" },
-          { expression: "e" },
-          { kind: "nope", expression: "e" },
-        ].every((definingRule) => throws(() => built({ definingRule }))),
+          { definingRule: { kind: "derived", storage: "nope", expression: "e" } },
+          { definingRule: { kind: "derived" } },
+          { definingRule: { expression: "e" } },
+          { definingRule: { kind: "nope", expression: "e" } },
+          { definingRule: { kind: "derived", expression: 42 } },
+          { definingRule: { kind: "derived", expression: "e", isFormal: "nope" } },
+          { providesIdentification: "nope" },
+          { isExclusive: "nope" },
+          { isExhaustive: "nope" },
+        ].every((config) => throws(() => built(config))),
     ],
   ];
 }
