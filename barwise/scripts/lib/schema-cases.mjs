@@ -8,7 +8,8 @@
  * mirrored (storage, kind, isFormal, the flags, ids, a dropped derived rule).
  * The schema is the authority for both, so the cases are generated from it:
  * one refusal per constraint it places on a field, one preservation per value
- * a field can take that differs from its absence.
+ * a field can take (every enum member, both booleans, a string and, where
+ * allowed, the empty one).
  *
  * What this cannot see is stated rather than guessed:
  * - `additionalProperties: false` is not turned into a case. The arms
@@ -73,6 +74,11 @@ function checkKeywords(node, allowed, where) {
  */
 function fields(schema, def, keys, where) {
   checkKeywords(def, OBJECT_KEYWORDS, where);
+  // A nullable or untyped definition would make the null and "not an object"
+  // refusals wrong (Copilot, PR #662).
+  if (def.type !== "object") {
+    throw new Error(`schema-cases: ${where} has type ${JSON.stringify(def.type)}, not "object"`);
+  }
   const props = Object.keys(def.properties ?? {}).sort();
   const mapped = Object.keys(keys).sort();
   if (props.join() !== mapped.join()) {
@@ -157,8 +163,7 @@ export function refusals(schema, defName, keys, { base, codeOptional = [], root 
 }
 
 /**
- * Configs that set one field to a value its absence does not stand for, each
- * to be kept on the record and through a save and a load. A field whose valid
+ * Configs that set one field to each value it can take, each to be kept on the record and through a save and a load. A field whose valid
  * values come from the model (no enum, no type the generator can invent, and
  * named in `fromBase`) keeps the base value every config carries.
  */
@@ -188,12 +193,11 @@ export function preservations(
       if (fromBase.includes(f.path)) continue;
       if (f.node.enum) { for (const v of f.node.enum) put(v); }
       else if (f.node.type === "boolean") {
-        // With no default, neither value is what absence stands for, so both
-        // are kept (Copilot, PR #662).
-        if (f.node.default === undefined) {
-          put(true);
-          put(false);
-        } else put(!f.node.default);
+        // Both values, default or not: code must take an explicit default as
+        // a file does, not only the value that differs from it (Copilot,
+        // PR #662).
+        put(true);
+        put(false);
       } else if (f.node.type === "string") {
         put(`kept ${f.yamlKey}`);
         // The empty string, where the schema allows it, is a value too: code

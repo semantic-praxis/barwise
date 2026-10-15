@@ -410,6 +410,7 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * code, and `hiddenName` keeps a derived name as a non-enumerable property.
  * `nullAsAbsent` reads a null flag from code as absent, and `unfrozenBare`
  * ("code" or "file") leaves a record with no defining rule unfrozen.
+ * `rejectExplicitDefault` refuses from code a flag set to its own default.
  * With none, it is a correct conversion.
  */
 function fakeSubtypeCore(
@@ -431,6 +432,7 @@ function fakeSubtypeCore(
     dropFalseFormal = false,
     hiddenName = false,
     nullAsAbsent = false,
+    rejectExplicitDefault = false,
     unfrozenBare = false,
   } = {},
 ) {
@@ -450,6 +452,10 @@ const flagsOk = (c) => ["providesIdentification", "isExclusive", "isExhaustive"]
   .every((k) => [undefined, true, false].includes(c[k]));
 class Legacy { constructor(c) { Object.assign(this, c); this._name = "subtype:" + c.subtypeId; } }
 const make = (c, checkRule, fromFile = false) => {
+  if (${rejectExplicitDefault} && !fromFile
+    && (c.providesIdentification === true || c.isExclusive === false || c.isExhaustive === false)) {
+    throw new Error("a flag set to its default");
+  }
   if (${nullAsAbsent} && !fromFile) {
     c = { ...c };
     for (const k of ["providesIdentification", "isExclusive", "isExhaustive"]) if (c[k] === null) delete c[k];
@@ -646,7 +652,10 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       K + '.defining_rule.storage = "derived_and_stored"',
       K + '.id = "kept id"',
       K + ".is_exclusive = true",
+      K + ".is_exclusive = false",
       K + ".is_exhaustive = true",
+      K + ".is_exhaustive = false",
+      K + ".provides_identification = true",
       K + ".provides_identification = false",
     ]],
     [{ ignoreFlags: true }, [
@@ -688,6 +697,11 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       R + "is_exhaustive is null",
       R + "provides_identification is null",
     ]],
+    [{ rejectExplicitDefault: true }, [
+      K + ".is_exclusive = false",
+      K + ".is_exhaustive = false",
+      K + ".provides_identification = true",
+    ]],
     [{ unfrozenBare: "code" }, [
       "a subtype fact built in code is a plain, frozen record of its fields",
     ]],
@@ -711,7 +725,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
   try {
     const r = run(good);
     assert.equal(r.status, 0, JSON.stringify(failedNames(r)));
-    assert.equal(r.report.cases.length, 61);
+    assert.equal(r.report.cases.length, 64);
     for (const [defect, expected] of DEFECTS) {
       const dir = fakeSubtypeCore(defect);
       dirs.push(dir);
@@ -805,6 +819,23 @@ test("the schema case generator refuses a schema it cannot account for", async (
     () => refusals(schema({ type: "string", pattern: "^x" }), "thing", KEYS, { base }),
     /pattern/,
   );
+  // An object definition must be one: a nullable reference would make the
+  // null refusal wrong (Copilot, PR #662).
+  const nullable = {
+    definitions: {
+      thing: { type: "object", properties: { inner: { $ref: "#/definitions/inner" } } },
+      inner: { type: ["object", "null"], properties: {} },
+    },
+  };
+  for (const gen of [refusals, preservations]) {
+    assert.throws(
+      () =>
+        gen(nullable, "thing", { inner: ["inner", {}] }, {
+          base: { thing: {}, "thing.inner": {} },
+        }),
+      /thing\.inner has type/,
+    );
+  }
   // So does a handled keyword whose value no case is made for: a type with
   // no sample, or a minLength the samples would break (Copilot, PR #662).
   for (const gen of [refusals, preservations]) {
@@ -881,12 +912,15 @@ test("the schema case generator refuses a schema it cannot account for", async (
     }).map((c) => c.value),
     ["(the base config)", {}, "kept v", ""],
   );
-  // A boolean is kept at the value its absence does not stand for.
+  // A boolean is kept at both values, its default included.
   const p = preservations(schema({ type: "boolean", default: false }), "thing", KEYS, { base });
-  assert.deepEqual(p.map((c) => c.config), [{ name: "n" }, { name: "n", flag: true }, {
-    name: "kept name",
-  }]);
-  // A boolean with no default is kept at both values.
+  assert.deepEqual(p.map((c) => c.config), [
+    { name: "n" },
+    { name: "n", flag: true },
+    { name: "n", flag: false },
+    { name: "kept name" },
+  ]);
+  // So is one with no default.
   assert.deepEqual(
     preservations(schema({ type: "boolean" }), "thing", KEYS, { base }).map((c) => c.value),
     ["(the base config)", true, false, "kept name"],
