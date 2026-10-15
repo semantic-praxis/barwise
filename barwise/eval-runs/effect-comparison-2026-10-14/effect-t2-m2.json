@@ -1,0 +1,110 @@
+{
+  "run": "effect-t2-m2",
+  "arm": "effect",
+  "task": "T2",
+  "phase": "t2",
+  "pair": "m2",
+  "start": "8d36e4fc",
+  "head": "8ea74dcc",
+  "startedAt": "2026-10-15T06:34:22Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": false,
+  "readSpecNote": "one grep over docs/specs/*.md for files naming effect-comparison printed three unrelated lines from its arm-head copy; it never opened the spec",
+  "usage": {
+    "inputProcessed": 9426053,
+    "turns": 68,
+    "finalContext": 181215,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 68,
+        "inputProcessed": 9426053
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in effect-t2-m2.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "8ea74dcc",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 64,
+        "of": 64
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 183928,
+        "toolCalls": 73,
+        "wallMs": 1186164
+      }
+    }
+  ],
+  "diff": {
+    "files": 12,
+    "hunks": 53,
+    "added": 584,
+    "removed": 264,
+    "consumerFiles": [
+      "barwise/packages/core/src/diff/ModelMerge.ts",
+      "barwise/packages/core/src/index.ts"
+    ],
+    "sliceLines": 1967
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (4 times)"
+    },
+    {
+      "class": "type",
+      "command": "npx tsc --noEmit (packages/core)",
+      "firstError": "src/diff/ModelMerge.ts(24,10): error TS2724: '\"../model/SubtypeFact.js\"' has no exported member named 'toSubtypeFactConfig'",
+      "note": "a caller of the deleted helper; ModelMerge now spreads the record"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/model/SubtypeFact.test.ts > construction > creates with required properties",
+      "note": "an existing test still built the old class shape; updated"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run tests/model/subtypeFactDecoder.test.ts",
+      "firstError": "subtypeFactDecoder.test.ts (11 tests | 2 failed)",
+      "note": "its own new tests, fixed before commit"
+    },
+    {
+      "class": "environment",
+      "command": "git commit (pre-commit hook)",
+      "firstError": "three slow cli tests timed out at 30 s while the hook ran everything in parallel",
+      "note": "passed alone and on the hook's retry; the session full suite passed"
+    }
+  ],
+  "observations": [
+    "passed every held-out case in round 1, as effect-t2-m1 did: one Effect Schema serves code and file, so refusal parity came with the design",
+    "did not edit a protected file and did not open the experiment spec",
+    "extracted the issue-tree-to-problems walk into src/model/schemaProblems.ts, shared by both decoders",
+    "named its own limit: the self-subtype check spans two fields, so Effect runs it only once every field decodes; a test pins this",
+    "added a JSON Schema drift test for subtype_fact and a 300-run property test of code/file refusal parity"
+  ],
+  "agentJudgmentCalls": [
+    "one schema with two spellings (model and YAML) via encodeKeys",
+    "unknown keys refused in code (as ObjectType on this arm)",
+    "shared schemaProblems.ts extracted from the object type decoder",
+    "a refused config uses no id: the model checks run before the record is built"
+  ]
+}
