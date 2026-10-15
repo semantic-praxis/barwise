@@ -241,6 +241,12 @@
       "caught_by": "execution",
       "note": "Re-reading the live API after the merge. The first draft asserted GitHub's releases-list sort key was 'measurably neither created_at nor published_at', on the pre-merge reading alone. Running it again after the tag moved showed created_at DID follow the tag (2026-06-14T21:45:35Z -> 2026-09-22T18:40:50Z) while published_at stayed frozen, and the position changed with it -- so the causal chain does run through created_at and the original phrasing overstated the negative. The correction narrows the claim to the chain rather than the full sort rule, because the historical ordering still is not explained by created_at desc alone. Caught by executing the same query twice, not by rethinking it."
     },
+    "effect-adoption::8f82ddd00c0b": {
+      "spec": "effect-adoption.spec.md",
+      "excerpt": "- s3 names two narrowings, not three. the draft listed valueconstraintdef.ranges among the narrowings to constraint. valueconstraintdef is the object type's val",
+      "caught_by": "reasoning",
+      "note": "Grounding WS0: reading Constraint.ts and ObjectType.ts to write ConstraintRecord showed ValueConstraintDef is the object type's value constraint, not a member of the Constraint union, so S3 has two narrowings, not three. Found before any code depended on it."
+    },
     "effect-comparison::149864007d79": {
       "spec": "effect-comparison.spec.md",
       "excerpt": "the table above is what survived testing; this is the log of that testing. each criterion stands in for a property through some mechanism, and diverges from it ",

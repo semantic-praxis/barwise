@@ -1,5 +1,5 @@
 {
-  "$comment": "One malformed object type per file, each carrying exactly one problem, scored by `measure-comparison.mjs malformed` (docs/specs/effect-comparison.spec.md, D2). The combined case is built in memory from these files, so it cannot drift from them. Each object type's id and name are read from its file; only the field at fault is declared here, and `absent` marks a case whose problem is a missing field. scripts/tests/measure-comparison.test.mjs checks each declared field against its file.",
+  "$comment": "One malformed element per file, each carrying exactly one problem, scored by `measure-comparison.mjs malformed` (docs/specs/effect-comparison.spec.md, D2; docs/specs/effect-adoption.spec.md, S4). An object type case (no `kind`) holds one object type. A fact type case (`kind: \"fact_type\"`) holds one fact type and the well-formed object types its roles need; `at` is the field's path inside the fact type when the field is below its top level, and `constraint` is the position of the constraint the problem sits in. The combined case is built in memory from these files, so it cannot drift from them. Each element's id and name are read from its file; only the field at fault is declared here, and `absent` marks a case whose problem is a missing field. scripts/tests/measure-comparison.test.mjs checks each declared field against its file. Problems that need another element to see -- a constraint naming a role outside its fact type, a role naming an object type that does not exist -- are not cases: they belong to the model builder, not to decoding one element (effect-adoption.spec.md, S4).",
   "cases": [
     {
       "file": "value-with-reference-mode.orm.yaml",
@@ -45,6 +45,118 @@
     {
       "file": "excess-property.orm.yaml",
       "field": "colour"
+    },
+    {
+      "file": "fact-type-without-roles.orm.yaml",
+      "kind": "fact_type",
+      "field": "roles"
+    },
+    {
+      "file": "fact-type-without-readings.orm.yaml",
+      "kind": "fact_type",
+      "field": "readings",
+      "absent": true
+    },
+    {
+      "file": "fact-type-bad-placeholder.orm.yaml",
+      "kind": "fact_type",
+      "field": "readings"
+    },
+    {
+      "file": "fact-type-excess-property.orm.yaml",
+      "kind": "fact_type",
+      "field": "colour"
+    },
+    {
+      "file": "role-without-player.orm.yaml",
+      "kind": "fact_type",
+      "field": "player",
+      "at": "roles.0.player",
+      "absent": true
+    },
+    {
+      "file": "role-excess-property.orm.yaml",
+      "kind": "fact_type",
+      "field": "colour",
+      "at": "roles.0.colour"
+    },
+    {
+      "file": "constraint-unknown-type.orm.yaml",
+      "kind": "fact_type",
+      "field": "type",
+      "constraint": 0,
+      "at": "constraints.0.type"
+    },
+    {
+      "file": "constraint-empty-roles.orm.yaml",
+      "kind": "fact_type",
+      "field": "roles",
+      "constraint": 0,
+      "at": "constraints.0.roles"
+    },
+    {
+      "file": "mandatory-without-role.orm.yaml",
+      "kind": "fact_type",
+      "field": "role",
+      "constraint": 0,
+      "at": "constraints.0.role",
+      "absent": true
+    },
+    {
+      "file": "ring-unknown-ring-type.orm.yaml",
+      "kind": "fact_type",
+      "field": "ring_type",
+      "constraint": 0,
+      "at": "constraints.0.ring_type"
+    },
+    {
+      "file": "frequency-max-below-min.orm.yaml",
+      "kind": "fact_type",
+      "field": "max",
+      "constraint": 0,
+      "at": "constraints.0.max"
+    },
+    {
+      "file": "frequency-negative-min.orm.yaml",
+      "kind": "fact_type",
+      "field": "min",
+      "constraint": 0,
+      "at": "constraints.0.min"
+    },
+    {
+      "file": "value-comparison-unknown-operator.orm.yaml",
+      "kind": "fact_type",
+      "field": "operator",
+      "constraint": 0,
+      "at": "constraints.0.operator"
+    },
+    {
+      "file": "constraint-unknown-modality.orm.yaml",
+      "kind": "fact_type",
+      "field": "modality",
+      "constraint": 0,
+      "at": "constraints.0.modality"
+    },
+    {
+      "file": "constraint-excess-property.orm.yaml",
+      "kind": "fact_type",
+      "field": "weight",
+      "constraint": 0,
+      "at": "constraints.0.weight"
+    },
+    {
+      "file": "join-equality-one-operand.orm.yaml",
+      "kind": "fact_type",
+      "field": "operands",
+      "constraint": 0,
+      "at": "constraints.0.operands"
+    },
+    {
+      "file": "value-constraint-empty-values.orm.yaml",
+      "kind": "fact_type",
+      "field": "values",
+      "constraint": 0,
+      "at": "constraints.0.values"
     }
   ]
 }
