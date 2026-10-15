@@ -398,8 +398,9 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * as the base does. `dropRule` loses a defining rule built in code, and
  * `mutableFileRule` leaves a loaded one unfrozen. `kindUnchecked` checks a
  * rule's storage and expression from code but not its kind, and
- * `valueEndpoint` lets a value type stand at either end. With none, it is a
- * correct conversion.
+ * `valueEndpoint` lets a value type stand at either end. `swapEndpoints` and
+ * `ignoreFlags` lose what code was given: the endpoints reversed, the flags
+ * replaced by their defaults. With none, it is a correct conversion.
  */
 function fakeSubtypeCore(
   {
@@ -409,6 +410,8 @@ function fakeSubtypeCore(
     mutableFileRule = false,
     kindUnchecked = false,
     valueEndpoint = false,
+    swapEndpoints = false,
+    ignoreFlags = false,
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
@@ -428,11 +431,11 @@ const make = (c, checkRule, fromFile = false) => {
   if (checkRule && !ruleOk(c.definingRule, fromFile || !${kindUnchecked})) throw new Error("bad defining rule");
   const r = {
     id: c.id ?? "sf-" + ++next,
-    subtypeId: c.subtypeId,
-    supertypeId: c.supertypeId,
-    providesIdentification: c.providesIdentification ?? true,
-    isExclusive: c.isExclusive ?? false,
-    isExhaustive: c.isExhaustive ?? false,
+    subtypeId: ${swapEndpoints} && !fromFile ? c.supertypeId : c.subtypeId,
+    supertypeId: ${swapEndpoints} && !fromFile ? c.subtypeId : c.supertypeId,
+    providesIdentification: (${ignoreFlags} && !fromFile ? undefined : c.providesIdentification) ?? true,
+    isExclusive: (${ignoreFlags} && !fromFile ? undefined : c.isExclusive) ?? false,
+    isExhaustive: (${ignoreFlags} && !fromFile ? undefined : c.isExhaustive) ?? false,
   };
   if (${asClass}) return new Legacy({ ...r, definingRule: c.definingRule });
   if (c.definingRule && !(${dropRule} && !fromFile)) {
@@ -530,11 +533,13 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
     fakeSubtypeCore({ mutableFileRule: true }),
     fakeSubtypeCore({ kindUnchecked: true }),
     fakeSubtypeCore({ valueEndpoint: true }),
+    fakeSubtypeCore({ swapEndpoints: true }),
+    fakeSubtypeCore({ ignoreFlags: true }),
   ];
   try {
     const good = run(dirs[0]);
     assert.equal(good.status, 0, JSON.stringify(failedNames(good)));
-    assert.equal(good.report.cases.length, 17);
+    assert.equal(good.report.cases.length, 18);
     // The base's shape: not a plain record, a derived name, a rule key set to
     // undefined. Each record case fails; the behaviour it kept still passes.
     const legacy = run(dirs[1]);
@@ -565,6 +570,16 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
       "construction refuses a value type as the subtype",
       "construction refuses a value type as the supertype",
     ]);
+    // Flags ignored from code fail the keeps case alone. Endpoints stored
+    // reversed fail it too, and the duplicate check, which then compares
+    // the wrong ends.
+    const KEEPS =
+      "a subtype fact built in code keeps its endpoints and flags, through a save and a load";
+    assert.deepEqual(failedNames(run(dirs[7])), [
+      KEEPS,
+      "construction refuses a duplicate subtype fact",
+    ]);
+    assert.deepEqual(failedNames(run(dirs[8])), [KEEPS]);
     // A task with no cases is refused, not read as zero cases passed -- and
     // so is an inherited name, which a plain lookup would accept.
     for (const task of ["t3", "toString", "constructor"]) {

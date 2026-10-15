@@ -636,6 +636,30 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
       "a subtype fact without a defining rule carries no definingRule key",
       () => !("definingRule" in built()) && !("definingRule" in load().subtypeFacts[0]),
     ],
+    // What code was given, kept: the endpoints and every non-default flag,
+    // on the record and again after a save and a load. Without it a
+    // constructor that swaps or drops the endpoints, or ignores the flags,
+    // passed every other case (Copilot, PR #662).
+    [
+      "a subtype fact built in code keeps its endpoints and flags, through a save and a load",
+      () => {
+        const { m, a, b } = twoTypes();
+        const given = {
+          subtypeId: b.id,
+          supertypeId: a.id,
+          providesIdentification: false,
+          isExclusive: true,
+          isExhaustive: true,
+          definingRule: RULE,
+        };
+        const keeps = (sf) =>
+          sf.subtypeId === given.subtypeId && sf.supertypeId === given.supertypeId
+          && sf.providesIdentification === false && sf.isExclusive === true
+          && sf.isExhaustive === true;
+        const sf = m.addSubtypeFact(given);
+        return keeps(sf) && keeps(yaml.deserialize(yaml.serialize(m)).subtypeFacts[0]);
+      },
+    ],
     ["defaults: provides identification, not exclusive, not exhaustive", () => {
       const fromCode = built();
       const fromFile = load().subtypeFacts[0];

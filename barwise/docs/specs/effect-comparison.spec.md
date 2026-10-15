@@ -837,16 +837,17 @@ How T2 runs:
   promptlab drift test, up to two feedback rounds in the same wording,
   and `measure:comparison -- heldout --task t2`. Records, patches and
   per-turn usage go in the same directory.
-- **Held-out cases (17).** "Sealed record" is checked as both arms
+- **Held-out cases (18).** "Sealed record" is checked as both arms
   already built `ObjectType`: a plain object, frozen, carrying only its
   declared fields, an absent optional field absent rather than
   `undefined`, from code and from a file. The rest holds what the base
-  does -- the defaults, the five refusals in `addSubtypeFact` (a subtype
+  does -- the endpoints and flags code was given, kept through a save
+  and a load, the defaults, the five refusals in `addSubtypeFact` (a subtype
   of itself, an absent type, a duplicate, a value type at either end), a file's
   self-subtype refused, the round trip, the diff, and the YAML text both
   heads write for a fully populated subtype fact (the layout, which G2's
   object-type test does not cover) -- plus the one rule the task adds.
-  Each arm's head passes 12 and fails 5: the four record cases and that
+  Each arm's head passes 13 and fails 5: the four record cases and that
   rule.
 - **The rule the task adds is a defect the base has.** `addSubtypeFact`
   accepts a defining rule with `storage: "nope"`, no `expression`, or a
