@@ -25,11 +25,14 @@
  *
  * Any keyword outside the handled set throws: a schema that grows a
  * constraint this file does not turn into a case must fail loudly, not
- * produce fewer cases.
+ * produce fewer cases. So does a handled keyword with a value no case is made
+ * for -- a leaf type other than string or boolean, or a `minLength` above 1,
+ * which the generated samples ("", "kept id") would not respect.
  */
 
 const PROPERTY_KEYWORDS = new Set(["type", "enum", "minLength", "default", "description", "$ref"]);
 const OBJECT_KEYWORDS = new Set(["type", "required", "additionalProperties", "properties"]);
+const LEAF_TYPES = new Set(["string", "boolean"]);
 
 function resolve(schema, node) {
   if (!node.$ref) return node;
@@ -65,6 +68,19 @@ function fields(schema, def, keys, where) {
   return props.map((yamlKey) => {
     const node = def.properties[yamlKey];
     checkKeywords(node, PROPERTY_KEYWORDS, `${where}.${yamlKey}`);
+    // A keyword's name is not enough: its value has to be one a case is made
+    // for, or the field yields no cases or a sample a correct run fails
+    // (Copilot, PR #662).
+    if (!node.$ref && !LEAF_TYPES.has(node.type)) {
+      throw new Error(
+        `schema-cases: ${where}.${yamlKey} has type ${node.type}, which no case covers`,
+      );
+    }
+    if (node.minLength !== undefined && !(node.minLength === 0 || node.minLength === 1)) {
+      throw new Error(
+        `schema-cases: ${where}.${yamlKey} has minLength ${node.minLength}, which no sample respects`,
+      );
+    }
     const [configKey, nestedKeys] = Array.isArray(keys[yamlKey])
       ? keys[yamlKey]
       : [keys[yamlKey]];
@@ -153,7 +169,12 @@ export function preservations(
       if (fromBase.includes(f.path)) continue;
       if (f.node.enum) { for (const v of f.node.enum) put(v); }
       else if (f.node.type === "boolean") {
-        put(f.node.default === undefined ? true : !f.node.default);
+        // With no default, neither value is what absence stands for, so both
+        // are kept (Copilot, PR #662).
+        if (f.node.default === undefined) {
+          put(true);
+          put(false);
+        } else put(!f.node.default);
       } else if (f.node.type === "string") {
         put(`kept ${f.yamlKey}`);
         // The empty string, where the schema allows it, is a value too: code

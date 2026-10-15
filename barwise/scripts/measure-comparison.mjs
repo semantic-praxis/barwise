@@ -640,7 +640,9 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels, schema }) {
     && r.storage === want.storage && r.isFormal === want.isFormal;
   const isRecord = (sf) =>
     Object.getPrototypeOf(sf) === Object.prototype && Object.isFrozen(sf)
-    && Object.keys(sf).every((k) => FIELDS.has(k));
+    // Every own key, not only the enumerable ones: a derived name or a method
+    // hidden with defineProperty is still on the record (Copilot, PR #662).
+    && Reflect.ownKeys(sf).every((k) => FIELDS.has(k));
   const subtypeDelta = (a, b) =>
     diffModels(load(a), load(b)).deltas.find((d) => d.elementType === "subtype_fact");
   // Endpoint ids come from the model each case builds, so the generated
@@ -676,7 +678,10 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels, schema }) {
       () => {
         const { m, a, b } = twoTypes();
         const given = withIds(config, a, b);
-        const absent = { "definingRule.storage": "derive_on_request" };
+        const absent = {
+          "definingRule.storage": "derive_on_request",
+          "definingRule.isFormal": false,
+        };
         const sf = m.addSubtypeFact(given);
         // Exact on the record; the serializer's omissions apply only after a
         // save and a load (Copilot, PR #662).

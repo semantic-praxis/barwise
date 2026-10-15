@@ -867,7 +867,7 @@ How T2 runs:
   promptlab drift test, up to two feedback rounds in the same wording,
   and `measure:comparison -- heldout --task t2`. Records, patches and
   per-turn usage go in the same directory.
-- **Held-out cases (49): 16 written, 33 generated from the file schema.**
+- **Held-out cases (50): 16 written, 34 generated from the file schema.**
   Written, for what the schema cannot state: "sealed record" checked as
   both arms already built `ObjectType` (a plain object, frozen, carrying
   only its declared fields, an absent optional field absent rather than
@@ -881,24 +881,27 @@ How T2 runs:
   `subtype_fact` and `derivation_rule_def`: 20 cases of the one rule the
   task adds, code refuses what a file refuses -- one per constraint the
   schema places on a field (a required field missing, a wrong type, a
-  value outside an enum, an empty string) -- and 13 cases of what code
+  value outside an enum, an empty string) -- and 14 cases of what code
   was given kept on the record and through a save and a load, one per
   value a field can take that its absence does not stand for (the empty
-  string included, where the schema allows it), exact on the record and
+  string included, where the schema allows it, and both values of a
+  boolean with no default), exact on the record and
   with the serializer's declared omission allowed only after the save.
   Each review
   of PR #662 found another field a hand list of these had not mirrored;
   generated, a new constraint in the schema is a new case, and a keyword
-  the generator does not handle, or a key map that disagrees with the
+  the generator does not handle (or a type or `minLength` it makes no
+  sample for), or a key map that disagrees with the
   schema's properties, refuses (exit 2) rather than yielding fewer cases.
   The schema is this checkout's, fixed at grounding, not the run's. Three
   things are declared, not inferred: the YAML-to-config key map; the id,
   which code may omit because the model makes one; and `storage:
-  derive_on_request`, which the serializer writes as absent.
+  derive_on_request` and `is_formal: false`, which the serializer
+  writes as absent.
   `additionalProperties: false` yields no case: the arms already differ
   on an unknown config key for `ObjectType` (the Effect arm refuses it,
   the plain arm accepts it), so a case would be a requirement neither was
-  asked for, and Appendix C's task text says so. Each arm's head passes 31 and fails 18: the four record cases
+  asked for, and Appendix C's task text says so. Each arm's head passes 32 and fails 18: the four record cases
   and 14 of the 20 refusals (the six it passes are the endpoint ones,
   which its absent-type check already refuses).
 - **The rule the task adds is a defect the base has.** `addSubtypeFact`

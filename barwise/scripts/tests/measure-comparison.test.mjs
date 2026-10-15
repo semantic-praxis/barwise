@@ -406,7 +406,9 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * isFormal from code, and `idUnchecked` accepts from code an id a file
  * refuses. `rejectEmptyExpression` refuses from code an empty expression the
  * schema allows, and `dropDefaultStorage` drops `storage: derive_on_request`
- * at construction. With none, it is a correct conversion.
+ * at construction. `dropFalseFormal` drops an explicit `isFormal: false` from
+ * code, and `hiddenName` keeps a derived name as a non-enumerable property.
+ * With none, it is a correct conversion.
  */
 function fakeSubtypeCore(
   {
@@ -424,6 +426,8 @@ function fakeSubtypeCore(
     idUnchecked = false,
     rejectEmptyExpression = false,
     dropDefaultStorage = false,
+    dropFalseFormal = false,
+    hiddenName = false,
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
@@ -463,8 +467,12 @@ const make = (c, checkRule, fromFile = false) => {
   if (c.definingRule && !(${dropRule} && !fromFile)) {
     const rule = { ...c.definingRule };
     if (${dropFormal} && !fromFile) delete rule.isFormal;
+    if (${dropFalseFormal} && !fromFile && rule.isFormal === false) delete rule.isFormal;
     if (${dropDefaultStorage} && !fromFile && rule.storage === "derive_on_request") delete rule.storage;
     r.definingRule = ${mutableFileRule} && fromFile ? rule : Object.freeze(rule);
+  }
+  if (${hiddenName} && !fromFile) {
+    Object.defineProperty(r, "name", { get: () => "subtype:" + r.subtypeId, enumerable: false });
   }
   return Object.freeze(r);
 };
@@ -591,6 +599,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       K + '.defining_rule.expression = "kept expression"',
       K + '.defining_rule.expression = ""',
       K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
       K + '.defining_rule.kind = "derived"',
       K + '.defining_rule.kind = "semiderived"',
       K + '.defining_rule.storage = "derive_on_request"',
@@ -615,6 +624,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       K + '.defining_rule.expression = "kept expression"',
       K + '.defining_rule.expression = ""',
       K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
       K + '.defining_rule.kind = "derived"',
       K + '.defining_rule.kind = "semiderived"',
       K + '.defining_rule.storage = "derive_on_request"',
@@ -639,6 +649,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       K + '.defining_rule.expression = "kept expression"',
       K + '.defining_rule.expression = ""',
       K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
       K + '.defining_rule.kind = "derived"',
       K + '.defining_rule.storage = "derive_on_request"',
       K + '.defining_rule.storage = "derived_and_stored"',
@@ -646,6 +657,13 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
     [{ dropFormal: true }, [
       "a subtype fact's defining rule is kept and frozen, from code and from a file",
       K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
+    ]],
+    [{ dropFalseFormal: true }, [
+      K + ".defining_rule.is_formal = false",
+    ]],
+    [{ hiddenName: true }, [
+      "a subtype fact built in code is a plain, frozen record of its fields",
     ]],
     [{ idUnchecked: true }, [
       R + "id is not a string",
@@ -663,7 +681,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
   try {
     const r = run(good);
     assert.equal(r.status, 0, JSON.stringify(failedNames(r)));
-    assert.equal(r.report.cases.length, 49);
+    assert.equal(r.report.cases.length, 50);
     for (const [defect, expected] of DEFECTS) {
       const dir = fakeSubtypeCore(defect);
       dirs.push(dir);
@@ -732,6 +750,15 @@ test("the schema case generator refuses a schema it cannot account for", async (
     () => refusals(schema({ type: "string", pattern: "^x" }), "thing", KEYS, { base }),
     /pattern/,
   );
+  // So does a handled keyword whose value no case is made for: a type with
+  // no sample, or a minLength the samples would break (Copilot, PR #662).
+  for (const gen of [refusals, preservations]) {
+    assert.throws(() => gen(schema({ type: "integer" }), "thing", KEYS, { base }), /type integer/);
+    assert.throws(
+      () => gen(schema({ type: "string", minLength: 8 }), "thing", KEYS, { base }),
+      /minLength 8/,
+    );
+  }
   // A key map that names a property the schema lacks, or misses one, throws.
   assert.throws(
     () => refusals(schema({ type: "boolean" }), "thing", { name: "name" }, { base }),
@@ -785,6 +812,11 @@ test("the schema case generator refuses a schema it cannot account for", async (
   assert.deepEqual(p.map((c) => c.config), [{ name: "n" }, { name: "n", flag: true }, {
     name: "kept name",
   }]);
+  // A boolean with no default is kept at both values.
+  assert.deepEqual(
+    preservations(schema({ type: "boolean" }), "thing", KEYS, { base }).map((c) => c.value),
+    ["(the base config)", true, false, "kept name"],
+  );
   // keeps: nested values, and a value the serializer writes as absent.
   assert.equal(keeps({ a: { b: 1 } }, { a: { b: 1 } }), true);
   assert.equal(keeps({ a: {} }, { a: { b: 1 } }), false);
