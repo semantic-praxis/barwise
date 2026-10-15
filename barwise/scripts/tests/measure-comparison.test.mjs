@@ -1022,6 +1022,36 @@ test("usage sums each turn's input once, and reports the last turn's context", (
       perTurn.reduce((n, p) => n + p.input + p.cacheRead + p.cacheCreation, 0),
       got.inputProcessed,
     );
+    // Feedback that reaches a run still busy arrives as a queued attachment
+    // carrying the same origin; it starts a round too. A queued attachment
+    // from anyone else does not.
+    const queued = (kind) =>
+      JSON.stringify({
+        type: "attachment",
+        attachment: {
+          type: "queued_command",
+          prompt: "Scoring found failures",
+          ...(kind ? { origin: { kind } } : {}),
+        },
+      });
+    writeFileSync(
+      file,
+      [
+        turn("m1", 10, 0, 1000),
+        queued(undefined),
+        turn("m2", 5, 1000, 200),
+        queued("coordinator"),
+        turn("m3", 1, 2000, 0),
+      ].join("\n"),
+    );
+    assert.deepEqual(
+      JSON.parse(spawnSync(process.execPath, [SCRIPT, "usage", file], { encoding: "utf8" }).stdout)
+        .rounds,
+      [
+        { round: 1, turns: 2, inputProcessed: 2215 },
+        { round: 2, turns: 1, inputProcessed: 2001 },
+      ],
+    );
     const two = spawnSync(process.execPath, [SCRIPT, "usage", file, file]);
     assert.equal(two.status, 2, "two transcripts");
 
