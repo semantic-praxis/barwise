@@ -103,6 +103,12 @@
       "command": "npx vitest run (packages/core)",
       "firstError": "FAIL tests/laws/counterexample.law.test.ts (3 failed): the seeded sample moved",
       "note": "a newly drawn unit in tests/arbitraries/model.ts shifted the seeded samples; the unit is now derived from the drawn data type (kg for decimal or money), so the stream did not move"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout",
+      "firstError": "empty-unit cases (file and code) failed: accepted, diffed as absent (the diff compared units with ?? \"\")",
+      "note": "round 2 refused an empty unit in the value-type schema and the JSON Schema (minLength 1)"
     }
   ],
   "observations": [
