@@ -24,6 +24,7 @@ model:
       readings:
         - "{0} has {1}"
       constraints:
-        - type: mandatory
+        - id: c-fine-mandatory
+          type: mandatory
           role: r-fine-person
           modality: optional

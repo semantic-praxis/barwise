@@ -289,19 +289,23 @@ workstream's tests and scripts added -- WS0 changes no file under
 `core/src`, so these are main's readings -- on Node v26.7.0 and an Intel
 Xeon 2.10 GHz x4 (not the comparison's machine):
 
-| Gate | Reading on `main`                                                                                                                    |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| S1   | full suite, `validate:examples`, `referenceDrift.test.ts` green (`ci:local` on the WS0 head)                                         |
-| S2   | `factTypeLayout.test.ts` green                                                                                                       |
-| S3   | 10 type tests green; today's union does not match the frozen record, and does once the two narrowings are applied                    |
-| S4   | singly: object types 10/11 (9 named), fact types 13/17 (13 named; constraint named 9/11); combined 19/28 (19 named); 0 silent losses |
-| S5   | `validate` 341 ms npm, 387 ms bundle, 302 modules and 1.47 MB loaded                                                                 |
-| S6   | 2,410 ms median (2,300-2,790), 25,382 instantiations                                                                                 |
+| Gate | Reading on `main`                                                                                                                   |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| S1   | full suite, `validate:examples`, `referenceDrift.test.ts` green (`ci:local` on the WS0 head)                                        |
+| S2   | `factTypeLayout.test.ts` green                                                                                                      |
+| S3   | 10 type tests green; today's union does not match the frozen record, and does once the two narrowings are applied                   |
+| S4   | singly: object types 10/11 (9 named), fact types 13/17 (13 named; constraint named 4/11); combined 19/28 (19 named; 4/11); 0 losses |
+| S5   | `validate` 341 ms npm, 387 ms bundle, 302 modules and 1.47 MB loaded                                                                |
+| S6   | 2,410 ms median (2,300-2,790), 25,382 instantiations                                                                                |
 
 What S4 leaves for the spike, singly: the four unknown-field cases (a
 fact type's, a role's, a constraint's, and the object type's from the
-comparison) are refused with a message that never names the field, and
-`frequency-max-below-min` loads without a word. In the combined file
+comparison) are refused with a message that never names the field;
+`frequency-max-below-min` loads without a word; and five of the eleven
+constraint cases give their constraint an id, which today's loader never
+names -- it reports a position, which S4 accepts only for a constraint
+without one. The other six have no id, so positional naming is measured
+too. In the combined file
 the schema check stops before the reading check, so a bad placeholder
 reported singly goes unreported there.
 
@@ -328,10 +332,11 @@ reported singly goes unreported there.
   it is now frozen. `namesField` matched a field as a substring, so
   `type` was found inside `fact_types` and a message naming no field was
   credited; it now matches whole words. And a constraint with an id
-  could be credited for its position, which S4 does not allow. None of
-  the three changed a baseline reading: today's fixtures carry no
-  constraint ids, and no message today names a field only inside a
-  longer word. The first `wiring.test.ts` matched include patterns as
+  could be credited for its position, which S4 does not allow. The
+  first two changed no baseline reading. The third could not have,
+  because no fixture gave its constraint an id -- so the id rule was
+  never measured, which a second review caught. Five constraint cases
+  now carry ids, and constraint naming reads 4/11 where it read 9/11. The first `wiring.test.ts` matched include patterns as
   written, so an inherited exclusion could drop the type tests unseen;
   it now reads TypeScript's resolved file list.
 - **S4's cases stop at the element.** A problem that needs another

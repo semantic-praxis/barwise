@@ -24,7 +24,8 @@ model:
       readings:
         - "{0} has {1}"
       constraints:
-        - type: frequency
+        - id: c-levy-frequency
+          type: frequency
           role: r-levy-person
           min: -1
           max: 2

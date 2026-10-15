@@ -24,7 +24,8 @@ model:
       readings:
         - "{0} has {1}"
       constraints:
-        - type: ring
+        - id: c-quota-ring
+          type: ring
           role_1: r-quota-person
           role_2: r-quota-age
           ring_type: sideways

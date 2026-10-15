@@ -24,7 +24,8 @@ model:
       readings:
         - "{0} has {1}"
       constraints:
-        - type: value_comparison
+        - id: c-toll-comparison
+          type: value_comparison
           role_1: r-toll-person
           role_2: r-toll-age
           operator: "~"

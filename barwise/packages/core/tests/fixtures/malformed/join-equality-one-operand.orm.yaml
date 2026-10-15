@@ -24,7 +24,8 @@ model:
       readings:
         - "{0} has {1}"
       constraints:
-        - type: join_equality
+        - id: c-rent-join
+          type: join_equality
           operands:
             - path:
                 root: ot-person
