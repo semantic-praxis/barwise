@@ -1,6 +1,7 @@
 # Adopting Effect Schema for the rest of the sealed-record metamodel
 
-Status: Draft -- no workstream implemented
+Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
+see WS0); the spike (WS1) and the workstreams after it not started
 Created: 2026-10-15
 Last-updated: 2026-10-15
 Tracking: barwise-jo5 (this spec); barwise-973 (WS1 of
@@ -113,13 +114,17 @@ whether the choice survives the union.
 - **S3.** A compile-time test that the Schema-derived `Constraint` is
   mutually assignable, kind by kind, with `ConstraintRecord`: the record
   type barwise-973 targets (`core-branching-load.spec.md`, Target
-  architecture), which is today's union with three narrowings -- `id` and
-  `modality` required, a join constraint's `operands` a tuple of at
-  least two, and `ValueConstraintDef.ranges` required. Comparing against
+  architecture), which is today's union with two narrowings -- `id` and
+  `modality` required, and a join constraint's `operands` a tuple of at
+  least two. (That spec's third, `ValueConstraintDef.ranges` required,
+  is on an object type's value constraint, not on a member of this
+  union; see WS0's implementation notes.) Comparing against
   today's union instead would fail a correct conversion, because the
   spike makes those narrowings too. `ConstraintRecord` is written in
-  WS0 as a mapped type over today's union, so it compiles on `main` and
-  cannot drift from the kinds. This is the union-specific gate:
+  WS0 as a mapped type over today's union
+  (`core/tests/types/constraintRecord.ts`), so it compiles on `main` and
+  cannot drift from the kinds; the spike adds one assertion, that
+  `KindsMatch<Derived>` is `AllKindsMatch`. This is the union-specific gate:
   consumers switch on `c.type` with `assertNever`
   (`core-branching-load.spec.md`, WS4), and a derived type that widens
   a field or loses a discriminant breaks them silently at the type
@@ -143,7 +148,8 @@ whether the choice survives the union.
   the comparison's Open decision 3: about 1 second is where a wait
   starts to interrupt a train of thought. The Effect arm read 564 ms; the
   headroom is what the remaining schemas may spend.
-- **S6.** `tsc --noEmit --incremental false` in `core`, median of three.
+- **S6.** `measure:comparison -- typecheck`: `tsc --noEmit --incremental
+  false` in `core`, median of three.
   The limit is 10 seconds because the pre-commit hook builds every
   package a change touches and a developer waits on it at every commit,
   and about 10 seconds is where a wait stops being a pause in the task
@@ -155,7 +161,9 @@ whether the choice survives the union.
 **The outcome where everything goes as intended passes every gate.** A
 Schema union that decodes today's corpus to today's records, through
 today's serializer, is S1-S3 by construction; S4 is the brief; S5 and S6
-have headroom of 436 ms and 6.7 s at the arm's readings.
+have headroom of 436 ms and 6.7 s at the arm's readings (taken on the
+comparison's machine; WS0's baselines below are from another, which is
+why the spike reads both heads back to back).
 
 ## How this spec weighs D1
 
@@ -184,10 +192,11 @@ nowhere else:
 | `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; boundaries provide `IdSource` from it      |
 | `core/schemas/orm-model.schema.json`                  | hand-written                                       | stays hand-written, drift-tested per kind         |
 | `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                         |
-| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0: fact type and constraint cases               |
-| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0: fact type and constraint layout test         |
-| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0: a `typecheck` subcommand for S6              |
-| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0: fact types, constraints, nested fields (S4)  |
+| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases     |
+| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`              |
+| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6       |
+| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4) |
+| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig   |
 | Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use |
 
 `ModelGraph`, validation, verbalization and mapping read records, not
@@ -241,23 +250,82 @@ to keep compiling.
 
 ## Workstreams (each independently shippable)
 
-### 0. Instruments and baselines, on `main`
+### 0. Instruments and baselines, on `main` (done 2026-10-15)
 
-The fact type and constraint layout test (S2); the malformed fixtures
-for fact types and constraints with their `cases.json` entries, and the
-scorer extended to read them (S4): `caseProblem` attributes a problem
-to the fact type and constraint it names, `combine` carries fact types
-and the object types they reference, and `lostKeys` compares fact type,
-role and constraint fields at every depth, each extension with a
-stand-in defect in `measure-comparison.test.mjs` that it catches; the
-`Constraint` type-equality harness with `ConstraintRecord` (S3, which
-compiles on `main` against a hand-written check and bites on the
-branch); and a
-`typecheck` subcommand in `measure-comparison.mjs` for S6 that refuses
-(exit 2) when it cannot run `tsc`. Each is shown to detect its failure
-by a deliberate break; baselines go into this spec. These land and stay
-whatever the spike finds: like the comparison's WS0 tests, they guard
-today's behaviour.
+Shipped: `core/tests/serialization/factTypeLayout.test.ts` (S2); the
+`ConstraintRecord` target, `KindsMatch` and their type tests in
+`core/tests/types/`, run by vitest's typecheck with a tsconfig of their
+own (S3); 17 fact type and constraint cases in
+`core/tests/fixtures/malformed/`, and `malformed-score.mjs` extended to
+attribute a problem to a fact type and the constraint it sits in, carry
+fact types and their object types into the combined file, and find a
+field lost at any depth (S4); and `measure-comparison typecheck` (S6).
+Each was shown to catch the failure it measures by a deliberate break:
+
+- S2: swapping `definition` and `note` in `serializeFactType` fails the
+  layout test and none of the other 209 serialization tests.
+- S3: dropping the operands narrowing from `ConstraintRecord` fails
+  exactly the two operand checks; `wiring.test.ts` fails when a type
+  test falls outside the tsconfig that compiles it.
+- S4: four stand-in scorer defects -- a fact type position read as an
+  object type's, a `combine` that drops fact types, a `lostKeys` that
+  stops at the top level, a constraint credited whatever it names --
+  each fail their test in `measure-comparison.test.mjs`.
+- S6: a stand-in `tsc` in a throwaway tree drives each exit: a reading,
+  over the limit, no totals printed, and a tree that does not compile.
+
+**Baselines**, taken 2026-10-15 on `main` at `2704da6a` with this
+workstream's tests and scripts added -- WS0 changes no file under
+`core/src`, so these are main's readings -- on Node v26.7.0 and an Intel
+Xeon 2.10 GHz x4 (not the comparison's machine):
+
+| Gate | Reading on `main`                                                                                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| S1   | full suite, `validate:examples`, `referenceDrift.test.ts` green (`ci:local` on the WS0 head)                                         |
+| S2   | `factTypeLayout.test.ts` green                                                                                                       |
+| S3   | 7 type tests green; `KindsMatch<Constraint>` is false for every kind, as it must be                                                  |
+| S4   | singly: object types 10/11 (9 named), fact types 13/17 (13 named; constraint named 9/11); combined 19/28 (19 named); 0 silent losses |
+| S5   | `validate` 341 ms npm, 387 ms bundle, 302 modules and 1.47 MB loaded                                                                 |
+| S6   | 2,410 ms median (2,300-2,790), 25,382 instantiations                                                                                 |
+
+What S4 leaves for the spike, singly: the four unknown-field cases (a
+fact type's, a role's, a constraint's, and the object type's from the
+comparison) are refused with a message that never names the field, and
+`frequency-max-below-min` loads without a word. In the combined file
+the schema check stops before the reading check, so a bad placeholder
+reported singly goes unreported there.
+
+**Implementation notes** (what grounding WS0 changed in the draft):
+
+- **S3 names two narrowings, not three.** The draft listed
+  `ValueConstraintDef.ranges` among the narrowings to `Constraint`.
+  `ValueConstraintDef` is the object type's value constraint
+  (`model/ObjectType.ts`); the `value_constraint` constraint kind has
+  its own optional `ranges` and `core-branching-load.spec.md` leaves it
+  as today. Found writing the mapped type against `Constraint.ts`.
+- **A type test outside its tsconfig passes.** Core's tsconfig excludes
+  `tests/`, and vitest's typecheck given it reported a deliberately false
+  assertion as "no errors": the compiler never saw the file. The type
+  tests get `tests/types/tsconfig.json`, `PackageTestShape` gains a
+  `typecheck` option that requires one, and `wiring.test.ts` checks
+  every type test is inside it. knip names the `*.test-d.ts` files as
+  core entries, since its vitest plugin reads only `test.include`.
+- **S4's cases stop at the element.** A problem that needs another
+  element to see -- a constraint naming a role outside its fact type, a
+  role naming an object type that does not exist -- is not a case: the
+  validator reports all six such problems tried today, and barwise-973
+  moves those reference checks into the model builder, not into decoding
+  one element. A value check inside one constraint (frequency max below
+  min) is a case, as cardinality's was for object types in the
+  comparison. Two cases first carried a second problem (a ring and a
+  value comparison across a Person role and an Age role); every
+  constraint case was then checked by fixing its one problem and
+  confirming the model loads and validates clean.
+- **The object type half of the combined reading moved from 4 to 7 of
+  11** against the six messages `measure-comparison.test.mjs` holds from
+  `78b52f5b`. The loader's messages have improved since (each now names
+  its field), and each credited message was checked to be an object
+  type's own; the test's text stays as the record of that commit.
 
 ### 1. The spike: `FactType`, `Role` and `Constraint` in Effect (experiment branch)
 
@@ -349,8 +417,10 @@ entry only records that it follows.
 - The spike is measured, not merged. Every gate is read on one machine,
   the spike head and `main` back to back, with `--force` builds
   (barwise-r7j).
-- S3 is a compile-time test; it is shown to fail by widening one field
-  of one constraint kind in the derived type.
+- S3 is a compile-time test, run by vitest's typecheck; WS0 showed it
+  fails when a candidate widens the join operands, lacks a kind, or adds
+  a field, and that `wiring.test.ts` fails when a type test is not
+  compiled at all.
 - Each landing workstream re-reads S1, S2, S5 and S6 on its own head;
   the full monorepo build and tests run after each, since every
   workstream changes core's public API.
