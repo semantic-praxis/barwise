@@ -1,0 +1,126 @@
+{
+  "run": "effect-t1-r2",
+  "arm": "effect",
+  "task": "T1",
+  "phase": "second-series",
+  "pair": "r2",
+  "start": "8d36e4fc",
+  "head": "66e66e4f",
+  "startedAt": "2026-10-15T04:36:19Z",
+  "rounds": 2,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": false,
+  "usage": {
+    "inputProcessed": 3676815,
+    "turns": 37,
+    "finalContext": 120093,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 24,
+        "inputProcessed": 2182932
+      },
+      {
+        "round": 2,
+        "turns": 13,
+        "inputProcessed": 1493883
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in effect-t1-r2.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "e81cc8e5",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 11,
+        "of": 13,
+        "failed": [
+          "an empty unit in a file is refused, or kept and diffed like any value",
+          "an empty unit from code is refused, or kept and diffed like any value"
+        ]
+      },
+      "harnessAfterRound": {
+        "tokens": 108371,
+        "toolCalls": 30,
+        "wallMs": 602113
+      },
+      "sentBack": "held-out empty-unit cases"
+    },
+    {
+      "round": 2,
+      "head": "66e66e4f",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 120964,
+        "toolCalls": 53,
+        "wallMs": 954640,
+        "note": "cumulative over both rounds, as the harness reported it on resume this time (effect-t1-r1's round-2 figures were for that round alone)"
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 12,
+    "added": 38,
+    "removed": 2,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 636
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (1 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts (3 failed): the seeded sample moved",
+      "note": "a newly drawn unit in tests/arbitraries/model.ts shifted the seeded samples; the unit is now derived from the data type's scale, so the stream did not move"
+    },
+    {
+      "class": "task logic",
+      "command": "session scoring: measure:comparison -- heldout",
+      "firstError": "empty-unit cases (file and code) failed: accepted, diffed as absent (the diff compared units with ?? \"\")",
+      "note": "round 2 refused an empty unit in the value-type schema and the JSON Schema (minLength 1)"
+    }
+  ],
+  "observations": [
+    "did not edit the protected layout test, under the amended prompt and without reading the experiment spec",
+    "missed both empty-unit cases in round 1, as every Effect T1 run so far has",
+    "the cheapest T1 round 1 so far (2,182,932 input processed, 24 turns)",
+    "wrote unit after default_value, where the other second-series runs wrote it after data_type"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (round 2), matching how an empty reference mode is treated",
+    "unit written after default_value",
+    "unit change is breaking level caution",
+    "unit derived from the data type's scale in the random model generator, so the seeded law samples did not move"
+  ]
+}
