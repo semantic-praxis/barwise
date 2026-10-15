@@ -45,6 +45,13 @@ const words = (s) =>
   );
 
 /**
+ * The names of element kinds a message uses as labels ("Fact type
+ * \"Permit\"", "object_types/2"). Their `type` is part of the label, not
+ * the `type` field a constraint case is about.
+ */
+const KIND_LABELS = ["fact", "object", "entity", "value"];
+
+/**
  * Whether a message names a field, in any spelling: `reference_mode`,
  * `referenceMode`, "reference mode".
  *
@@ -52,11 +59,18 @@ const words = (s) =>
  * message that held it inside a longer word: `type` inside the
  * `fact_types` of every fact type path, `role` inside `roles`, so a
  * generic message about a constraint was scored as naming the field.
+ * Whole words alone still credited `type` to a message that says "Fact
+ * type \"Permit has Age\"", so a `type` that completes an element-kind
+ * label is not a match, unless the field itself is that label
+ * (`value_type`).
  */
 export function namesField(message, field) {
   const said = words(message);
   const name = words(field);
-  return said.some((_, i) => name.every((w, j) => said[i + j] === w));
+  return said.some((_, i) =>
+    name.every((w, j) => said[i + j] === w)
+    && !(name[0] === "type" && KIND_LABELS.includes(said[i - 1]))
+  );
 }
 
 /** The document collection each element kind lives in. */

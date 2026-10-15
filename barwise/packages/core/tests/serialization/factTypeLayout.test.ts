@@ -70,6 +70,7 @@ model:
             - min: "1"
               max: "5"
               min_inclusive: false
+              max_inclusive: false
           role: r-known
           id: c-value
         - type: disjunctive_mandatory

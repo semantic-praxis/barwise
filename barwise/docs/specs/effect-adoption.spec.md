@@ -336,7 +336,11 @@ reported singly goes unreported there.
   first two changed no baseline reading. The third could not have,
   because no fixture gave its constraint an id -- so the id rule was
   never measured, which a second review caught. Five constraint cases
-  now carry ids, and constraint naming reads 4/11 where it read 9/11. The first `wiring.test.ts` matched include patterns as
+  now carry ids, and constraint naming reads 4/11 where it read 9/11. A
+  third review found two more, also fixed: whole-word matching still
+  read the `type` in "Fact type" as the field, and the S2 layout pinned
+  only one of a range's two inclusive flags, so swapping their order in
+  the serializer passed. Neither changed a reading. The first `wiring.test.ts` matched include patterns as
   written, so an inherited exclusion could drop the type tests unseen;
   it now reads TypeScript's resolved file list.
 - **S4's cases stop at the element.** A problem that needs another

@@ -308,6 +308,14 @@ test("a field is named only as a whole word, not inside a longer one", () => {
   assert.equal(namesField("Entity type Customer needs a referenceMode.", "reference_mode"), true);
   assert.equal(namesField("the reference mode is missing", "reference_mode"), true);
   assert.equal(namesField("ring_type: must be one of", "ring_type"), true);
+  // A whole word is still not the field when it completes an element label.
+  assert.equal(
+    namesField('Fact type "Permit has Age", constraints[0]: invalid constraint', "type"),
+    false,
+  );
+  assert.equal(namesField('Entity type "Customer" needs one', "type"), false);
+  assert.equal(namesField("constraints[0].type: unknown kind", "type"), true);
+  assert.equal(namesField("value_type is not allowed", "value_type"), true);
 });
 
 test("typecheck reads tsc's own totals, fails over the limit, and refuses what it cannot read", () => {
