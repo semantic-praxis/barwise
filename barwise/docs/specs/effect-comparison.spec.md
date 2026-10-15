@@ -5,7 +5,8 @@ barwise-5fg prerequisite implemented 2026-10-14; WS1 and WS2 built
 2026-10-14 on their branches (see Arms as built); WS3 grounded
 2026-10-14, pilot run 2026-10-14 (see WS3), five main T1 pairs run
 2026-10-14; the primer check (barwise-hno) run 2026-10-14, inconclusive
-(see WS3); WS4 not started
+(see WS3); T2 re-scoped to `SubtypeFact` and grounded 2026-10-15, not yet run;
+WS4 not started
 Created: 2026-10-13
 Last-updated: 2026-10-14
 Tracking: barwise-cu0 (this spec); barwise-973 (WS1 of
@@ -539,7 +540,7 @@ the slice as one Schema definition, decoded with `errors: "all"`, the id
 source a declared requirement, messages customized to clear the D2 bar.
 Merges only if the rule adopts, and then through an adoption spec.
 
-### 3. Agent trials (grounded 2026-10-14 for T1; T2 still provisional)
+### 3. Agent trials (grounded 2026-10-14 for T1, 2026-10-15 for T2)
 
 Claude Code subagents, each in its own worktree, one model for every
 run, the same prompt (Appendix D) but for the style line and a primer of
@@ -794,6 +795,129 @@ What the four runs show besides the reading:
   depends on the other's logs. The prompt names a directory; it does not
   stop a run writing beside it.
 
+**Prompt amended and T1 rerun (2026-10-15).** The prompt said a run
+"may not edit the WS0 tests" without saying which files those are; only
+this spec defines the term. A run that wanted to know had to find out,
+and 14 of 17 runs did, by searching this spec for "WS0". Among the ten
+plain runs the split is exact: the seven that searched (the pilot,
+main pairs 4 and 5, both primer-check runs) never edited the protected
+layout test, and the three that did not (main pairs 1 to 3) all did. So
+the primer phrase is not the likeliest cause of those edits -- the
+missing definition is -- and three of the five plain runs in the first
+series paid a second round for a fact the prompt left out. The search
+also showed runs parts of this spec, which states what the comparison is
+for; how much each saw is in its transcript. What is done about it,
+fixed before any run under the new prompt:
+
+- **The prompt names the protected files** (Appendix D), path for path
+  as the trial scorer checks them, and no longer says "WS0".
+- **T1 runs again: a second series of five pairs**, `plain-t1-r1` to
+  `-r5` and `effect-t1-r1` to `-r5`, under the amended prompt and
+  otherwise exactly as the first: the same primers (Appendices E and F
+  as written), heads, scoring, feedback wording and records.
+- **D3's verdict comes from the second series.** The first series
+  (`m1` to `m5`) is reported beside it and not pooled, since its two
+  arms faced a prompt that cost them differently. The pilot and the
+  primer check stay as recorded; the primer check's reading
+  (inconclusive) is left as it was computed, with this confound named
+  beside it.
+- **WS4 records, per run, whether the run read this spec**, counted from
+  its transcript, and reports D3 with that split for both series.
+- **T2 runs under the amended prompt.**
+
+**T2, grounded 2026-10-15: re-scoped to `SubtypeFact`.** The first
+premortem tripwire fired for `FactType`, so T2 takes Appendix C's
+fallback, as the maintainer chose. The evidence, read from both arm
+heads:
+
+- **`FactType` is not the same task in both arms.** A fact type's
+  constraints are stored inside it (`OrmYamlFactType.constraints`),
+  decoded per fact type through the 16-kind `deserializeConstraint`. In
+  the Effect arm's style the record type is the schema's decoded type, so
+  a `FactType` schema needs either 16 constraint schemas or an escape
+  hatch around the existing decoder; the plain arm can type the field as
+  the existing `Constraint` interface and is not pushed to write 16
+  decoders.
+- **A faithful `FactType` conversion edits a protected file.**
+  `tests/laws/serialization.law.test.ts` imports and calls
+  `toFactTypeConfig` and reads `arity`; WS1 step 1 deleted the
+  equivalent `toObjectTypeConfig` and edited this same file. A run would
+  have to edit a law test or keep shims, the T1 collision made certain.
+- **Its radius is several times T1's.** `addConstraint` alone has 136
+  calls in 34 files across five packages; an estimate of 40 to 80 files
+  against 11 to 13 for `ObjectType`.
+- **`SubtypeFact` is symmetric and collides with nothing.** Stored at
+  model level, decoded with one nested `DerivationRule` (four fields),
+  no constraints, roles or readings; 11 importing files, `new
+  SubtypeFact(` only in `OrmModel` and two test files. The law test reads
+  only `supertypeId`, which survives.
+
+What the re-scope gives up: `SubtypeFact` has no nested union, so T2 no
+longer tests the premortem's first story, that the slice does not
+predict the rest. WS4 says that question is still open.
+
+How T2 runs:
+
+- **Task.** Appendix C, verbatim, in Appendix D's prompt with the same
+  primers as the main T1 trials (Appendices E and F as written). Two runs
+  per arm, in pairs, named `plain-t2-m1`, `plain-t2-m2`,
+  `effect-t2-m1`, `effect-t2-m2`, each with its own scratch directory.
+- **Scoring.** As T1: the trial scorer's protected list unchanged, the
+  full suite after both runs in a pair stop, `validate:examples`, the
+  promptlab drift test, up to two feedback rounds in the same wording,
+  and `measure:comparison -- heldout --task t2`. Records, patches and
+  per-turn usage go in the same directory.
+- **Held-out cases (64): 16 written, 48 generated from the file schema.**
+  Written, for what the schema cannot state: "sealed record" checked as
+  both arms already built `ObjectType` (a plain object, frozen, carrying
+  only its declared fields, an absent optional field absent rather than
+  `undefined`, a defining rule kept and frozen, from code and from a
+  file); the defaults; the five refusals in `addSubtypeFact` that span
+  the model (a subtype of itself, an absent type, a duplicate, a value
+  type at either end); a file's self-subtype refused; the round trip; the
+  diff; and the YAML text both heads write for a fully populated subtype
+  fact (the layout, which G2's object-type test does not cover).
+  Generated (`scripts/lib/schema-cases.mjs`) from the schema's
+  `subtype_fact` and `derivation_rule_def`: 31 cases of the one rule the
+  task adds, code refuses what a file refuses -- one per constraint the
+  schema places on a field (a required field missing, a null, a wrong
+  type, a value outside an enum, an empty string) -- and 17 cases of what code
+  was given kept on the record and through a save and a load, one per
+  value a field can take (every enum member, both values of every
+  boolean, defaults included, and the empty string where the schema
+  allows it), exact on the record and
+  with the serializer's declared omission allowed only after the save.
+  Each review
+  of PR #662 found another field a hand list of these had not mirrored;
+  generated, a new constraint in the schema is a new case, and a keyword
+  the generator does not handle (or a type or `minLength` it makes no
+  sample for), or a key map that disagrees with the
+  schema's properties, refuses (exit 2) rather than yielding fewer cases.
+  The schema is this checkout's, fixed at grounding, not the run's,
+  and is found from the scorer's own path, so running the scorer from
+  inside a trial worktree still reads it. Three
+  things are declared, not inferred: the YAML-to-config key map; the id,
+  which code may omit because the model makes one; and `storage:
+  derive_on_request` and `is_formal: false`, which the serializer
+  writes as absent.
+  `additionalProperties: false` yields no case: the arms already differ
+  on an unknown config key for `ObjectType` (the Effect arm refuses it,
+  the plain arm accepts it), so a case would be a requirement neither was
+  asked for, and Appendix C's task text says so. Each arm's head passes 37 and fails 27: the four record cases
+  and 23 of the 31 refusals (the eight it passes are the endpoint ones,
+  which its absent-type check already refuses).
+- **The rule the task adds is a defect the base has.** `addSubtypeFact`
+  accepts a defining rule with `storage: "nope"`, no `expression`, or a
+  missing or unknown `kind`, a non-string `expression`, a non-boolean
+  `isFormal`, a non-boolean subtype flag, or an empty or non-string `id`,
+  writes it, and the file it wrote is refused on load. The task states
+  the rule (code refuses what a file refuses) so a correct run is not
+  judged against something it was never asked, and T1's empty unit,
+  which the task left open, is not repeated.
+- **D3 for T2.** Reported per run as for T1. With two runs per arm it
+  will seldom resolve a difference (Open decision 4), and WS4 says so
+  rather than reading it as a vote.
+
 ### 4. Measure, decide, record
 
 Fill the criteria table, apply the rule as written, record the result
@@ -912,19 +1036,32 @@ Given to both arms verbatim, with one line differing.
 Synthetic and never merged; chosen because adding a field is the most
 common future change to this slice, and its diff is D1's measurement.
 
-## Appendix C: agent task T2, convert `FactType` (provisional)
+## Appendix C: agent task T2, convert `SubtypeFact`
 
-> Convert `FactType` to a sealed record as `core-branching-load.spec.md`
-> WS1 describes, keeping `OrmModel.addFactType` and the YAML layout.
+> Convert `SubtypeFact` to a sealed record, as `ObjectType` already is
+> here and `core-branching-load.spec.md` WS1 describes: a plain,
+> immutable record with no class, no methods and no derived name, where an
+> optional field is absent rather than undefined. `OrmModel.addSubtypeFact`
+> builds it and keeps its refusals, and a subtype fact built in code is
+> refused exactly when the same subtype fact in a file would be, apart from
+> a key the file format does not know, which stays as this code base
+> already treats one for `ObjectType`. Keep the
+> YAML layout. Done when the full suite, `validate:examples` and the
+> promptlab drift test pass.
 
-Re-scope before running if the Effect arm would need a schema for every
-constraint kind (the first premortem tripwire); `SubtypeFact` (114 lines,
-10 importing files) is the fallback.
+Re-scoped 2026-10-15 from "convert `FactType`, keeping
+`OrmModel.addFactType` and the YAML layout", because the first premortem
+tripwire fired; the evidence is in WS3.
 
 ## Appendix D: the trial prompt
 
 Given to every run verbatim, with `<arm>`, `<head>`, `<scratch>`, the
 task text (Appendix B or C), the style line and the primer filled in.
+Amended 2026-10-15 (see WS3): until then the protected-files sentence
+read "You may not edit the WS0 tests, the law tests or any golden file."
+The pilot, the first T1 series (`m1` to `m5`) and the primer check ran
+with that sentence; the second T1 series (`r1` to `r5`) and T2 run with
+this one. The list is the trial scorer's protected set, path for path.
 
 > You are working in a git worktree of the barwise monorepo. First run
 > `git checkout -b trial/<arm>-<task>-<n> <head>`, then `npm ci` and
@@ -935,7 +1072,16 @@ task text (Appendix B or C), the style line and the primer filled in.
 >
 > <style line>
 >
-> You may not edit the WS0 tests, the law tests or any golden file. Read
+> You may not edit these files: `barwise/packages/core/tests/serialization/objectTypeLayout.test.ts`,
+> `barwise/packages/core/tests/serialization/schemaDataTypes.test.ts`,
+> anything under `barwise/packages/core/tests/fixtures/malformed/`, any
+> law test (anything under a package's `tests/laws/`, or named
+> `*.law.test.ts`), any golden file (anything under a package's `tests/`
+> whose path contains "golden"), `barwise/packages/promptlab/tests/referenceDrift.test.ts`,
+> any `*.reference.orm.yaml`, `barwise/scripts/measure-comparison.mjs`,
+> `barwise/scripts/tests/measure-comparison.test.mjs`, and these modules
+> under `barwise/scripts/lib/`: `changed-class.mjs`, `malformed-score.mjs`,
+> `median.mjs`, `module-count-hook.mjs`, `schema-cases.mjs`, `tracked.mjs`. Read
 > the root `CLAUDE.md` and `barwise/packages/core/CLAUDE.md` first.
 > Commit your work on the branch when you are done; do not push. Report
 > what you changed and which of the done checks you ran and how they

@@ -391,6 +391,558 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
   }
 });
 
+/**
+ * A stand-in core for T2's cases: subtype facts only. `asClass` returns the
+ * base's shape (a class instance carrying a derived name and an undefined
+ * rule); `ruleUnchecked` accepts from code a defining rule the file refuses,
+ * as the base does. `dropRule` loses a defining rule built in code, and
+ * `mutableFileRule` leaves a loaded one unfrozen. `kindUnchecked` checks a
+ * rule's storage and expression from code but not its kind, and
+ * `valueEndpoint` lets a value type stand at either end. `swapEndpoints` and
+ * `ignoreFlags` lose what code was given: the endpoints reversed, the flags
+ * replaced by their defaults. `typesUnchecked` skips, from code only, the
+ * type checks a file gets (expression a string, the flags booleans).
+ * `dropDerivedOnSave` writes no derived rule, `dropFormal` loses a rule's
+ * isFormal from code, and `idUnchecked` accepts from code an id a file
+ * refuses. `rejectEmptyExpression` refuses from code an empty expression the
+ * schema allows, and `dropDefaultStorage` drops `storage: derive_on_request`
+ * at construction. `dropFalseFormal` drops an explicit `isFormal: false` from
+ * code, and `hiddenName` keeps a derived name as a non-enumerable property.
+ * `nullAsAbsent` reads a null flag from code as absent, and `unfrozenBare`
+ * ("code" or "file") leaves a record with no defining rule unfrozen.
+ * `rejectExplicitDefault` refuses from code a flag set to its own default.
+ * `inPlace` makes `dropFormal` and `dropDefaultStorage` delete from the
+ * caller's own rule object rather than from a copy.
+ * With none, it is a correct conversion.
+ */
+function fakeSubtypeCore(
+  {
+    asClass = false,
+    ruleUnchecked = false,
+    dropRule = false,
+    mutableFileRule = false,
+    kindUnchecked = false,
+    valueEndpoint = false,
+    swapEndpoints = false,
+    ignoreFlags = false,
+    typesUnchecked = false,
+    dropDerivedOnSave = false,
+    dropFormal = false,
+    idUnchecked = false,
+    rejectEmptyExpression = false,
+    dropDefaultStorage = false,
+    dropFalseFormal = false,
+    hiddenName = false,
+    nullAsAbsent = false,
+    rejectExplicitDefault = false,
+    inPlace = false,
+    unfrozenBare = false,
+  } = {},
+) {
+  const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
+  const core = join(dir, "barwise", "packages", "core");
+  mkdirSync(join(core, "dist", "diff"), { recursive: true });
+  writeFileSync(join(core, "package.json"), JSON.stringify({ type: "module" }));
+  writeFileSync(
+    join(core, "dist", "index.js"),
+    `
+let next = 0;
+const ruleOk = (r, checkKind = true) => r === undefined
+  || (typeof r.expression === "string" && ["derive_on_request", "derived_and_stored", undefined].includes(r.storage)
+    && (!checkKind || ["derived", "semiderived"].includes(r.kind))
+    && [undefined, true, false].includes(r.isFormal));
+const flagsOk = (c) => ["providesIdentification", "isExclusive", "isExhaustive"]
+  .every((k) => [undefined, true, false].includes(c[k]));
+class Legacy { constructor(c) { Object.assign(this, c); this._name = "subtype:" + c.subtypeId; } }
+const make = (c, checkRule, fromFile = false) => {
+  if (${rejectExplicitDefault} && !fromFile
+    && (c.providesIdentification === true || c.isExclusive === false || c.isExhaustive === false)) {
+    throw new Error("a flag set to its default");
+  }
+  if (${nullAsAbsent} && !fromFile) {
+    c = { ...c };
+    for (const k of ["providesIdentification", "isExclusive", "isExhaustive"]) if (c[k] === null) delete c[k];
+  }
+  if (c.subtypeId === c.supertypeId) throw new Error("subtype of itself");
+  if (checkRule && !ruleOk(c.definingRule, fromFile || !${kindUnchecked})) throw new Error("bad defining rule");
+  if ((fromFile || !${typesUnchecked}) && !flagsOk(c)) throw new Error("a flag is not a boolean");
+  if (!fromFile && ${rejectEmptyExpression} && c.definingRule?.expression === "") {
+    throw new Error("an empty expression");
+  }
+  if ((fromFile || !${idUnchecked}) && c.id !== undefined && !(typeof c.id === "string" && c.id.length > 0)) {
+    throw new Error("an id is a non-empty string");
+  }
+  const r = {
+    id: c.id ?? "sf-" + ++next,
+    subtypeId: ${swapEndpoints} && !fromFile ? c.supertypeId : c.subtypeId,
+    supertypeId: ${swapEndpoints} && !fromFile ? c.subtypeId : c.supertypeId,
+    providesIdentification: (${ignoreFlags} && !fromFile ? undefined : c.providesIdentification) ?? true,
+    isExclusive: (${ignoreFlags} && !fromFile ? undefined : c.isExclusive) ?? false,
+    isExhaustive: (${ignoreFlags} && !fromFile ? undefined : c.isExhaustive) ?? false,
+  };
+  if (${asClass}) return new Legacy({ ...r, definingRule: c.definingRule });
+  if (c.definingRule && !(${dropRule} && !fromFile)) {
+    const rule = ${inPlace} && !fromFile ? c.definingRule : { ...c.definingRule };
+    if (${dropFormal} && !fromFile) delete rule.isFormal;
+    if (${dropFalseFormal} && !fromFile && rule.isFormal === false) delete rule.isFormal;
+    if (${dropDefaultStorage} && !fromFile && rule.storage === "derive_on_request") delete rule.storage;
+    r.definingRule = ${mutableFileRule} && fromFile ? rule : Object.freeze(rule);
+  }
+  if (${hiddenName} && !fromFile) {
+    Object.defineProperty(r, "name", { get: () => "subtype:" + r.subtypeId, enumerable: false });
+  }
+  if (!r.definingRule && ${JSON.stringify(unfrozenBare)} === (fromFile ? "file" : "code")) return r;
+  return Object.freeze(r);
+};
+export class OrmModel {
+  constructor(c) { this.name = c.name; this.objectTypes = []; this.subtypeFacts = []; }
+  addObjectType(c) { const o = { id: "ot-" + ++next, ...c }; this.objectTypes.push(o); return o; }
+  addSubtypeFact(c) {
+    const ids = this.objectTypes.map((o) => o.id);
+    if (!ids.includes(c.subtypeId) || !ids.includes(c.supertypeId)) throw new Error("absent type");
+    const kindOf = (id) => this.objectTypes.find((o) => o.id === id).kind;
+    if (!${valueEndpoint} && (kindOf(c.subtypeId) === "value" || kindOf(c.supertypeId) === "value")) {
+      throw new Error("a subtype fact relates entity types");
+    }
+    if (this.subtypeFacts.some((s) => s.subtypeId === c.subtypeId && s.supertypeId === c.supertypeId)) {
+      throw new Error("duplicate");
+    }
+    const sf = make(c, !${ruleUnchecked});
+    this.subtypeFacts.push(sf);
+    return sf;
+  }
+}
+export class OrmYamlSerializer {
+  deserialize(text) {
+    const d = JSON.parse(text.split("\\n#\\n")[0]).model;
+    const m = new OrmModel({ name: d.name });
+    m.objectTypes = d.object_types;
+    m.subtypeFacts = (d.subtype_facts ?? []).map((s) => {
+      const y = s.defining_rule;
+      const r = y && Object.fromEntries(Object.entries({
+        kind: y.kind, expression: y.expression, storage: y.storage, isFormal: y.is_formal,
+      }).filter(([, v]) => v !== undefined));
+      if (!ruleOk(r)) throw new Error("bad defining rule");
+      return make({
+        id: s.id, subtypeId: s.subtype, supertypeId: s.supertype,
+        providesIdentification: s.provides_identification, isExclusive: s.is_exclusive,
+        isExhaustive: s.is_exhaustive, definingRule: r,
+      }, true, true);
+    });
+    return m;
+  }
+  serialize(m) {
+    const subtype_facts = m.subtypeFacts.map((s) => ({
+      id: s.id, subtype: s.subtypeId, supertype: s.supertypeId,
+      ...(s.providesIdentification ? {} : { provides_identification: false }),
+      ...(s.isExclusive ? { is_exclusive: true } : {}),
+      ...(s.isExhaustive ? { is_exhaustive: true } : {}),
+      ...(s.definingRule && !(${dropDerivedOnSave} && s.definingRule.kind === "derived")
+        ? { defining_rule: Object.fromEntries(Object.entries({
+          kind: s.definingRule.kind, expression: s.definingRule.expression,
+          storage: s.definingRule.storage, is_formal: s.definingRule.isFormal,
+        }).filter(([, v]) => v !== undefined)) }
+        : {}),
+    }));
+    // JSON to load back, then the subtype facts as YAML lines, the part the
+    // layout case reads.
+    const lines = ["subtype_facts:"];
+    for (const f of subtype_facts) {
+      const { defining_rule, ...flat } = f;
+      Object.entries(flat).forEach(([k, v], i) => lines.push((i === 0 ? "    - " : "      ") + k + ": " + v));
+      if (defining_rule) {
+        lines.push("      defining_rule:");
+        for (const [k, v] of Object.entries(defining_rule)) lines.push("        " + k + ": " + v);
+      }
+    }
+    return JSON.stringify({ orm_version: "2.0", model: { name: m.name, object_types: m.objectTypes, subtype_facts } })
+      + "\\n#\\n" + lines.join("\\n") + "\\n";
+  }
+}
+`,
+  );
+  writeFileSync(
+    join(core, "dist", "diff", "index.js"),
+    `
+export function diffModels(a, b) {
+  return {
+    deltas: a.subtypeFacts.map((s, i) => ({
+      elementType: "subtype_fact",
+      kind: JSON.stringify(s) === JSON.stringify(b.subtypeFacts[i]) ? "unchanged" : "modified",
+    })),
+  };
+}
+`,
+  );
+  return dir;
+}
+
+test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly its own cases", () => {
+  const run = (dir) => {
+    const r = spawnSync(process.execPath, [SCRIPT, "heldout", "--task", "t2", "--path", dir], {
+      encoding: "utf8",
+    });
+    return { status: r.status, stderr: r.stderr, report: JSON.parse(r.stdout) };
+  };
+  // Generated case names: a refusal per schema constraint, a preservation
+  // per value (scripts/lib/schema-cases.mjs).
+  const R = "code refuses what a file refuses: subtype_fact.";
+  const K = "code keeps what it was given, through a save and a load: subtype_fact";
+  // Each stand-in defect, and the cases that must catch it -- no more. The
+  // generated cases carry every input the hand list had (storage, kind,
+  // expression, isFormal, the flags, ids, a derived rule lost on save), so
+  // each defect a review of PR #662 found is still caught, now by the case
+  // the schema yields rather than one written for it.
+  const DEFECTS = [
+    [{ asClass: true }, [
+      "a subtype fact built in code is a plain, frozen record of its fields",
+      "a subtype fact loaded from a file is a plain, frozen record of its fields",
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      "a subtype fact without a defining rule carries no definingRule key",
+    ]],
+    [{ ruleUnchecked: true }, [
+      R + "defining_rule is null",
+      R + "defining_rule is not an object",
+      R + "defining_rule.expression is missing",
+      R + "defining_rule.expression is null",
+      R + "defining_rule.expression is not a string",
+      R + "defining_rule.is_formal is null",
+      R + "defining_rule.is_formal is not a boolean",
+      R + "defining_rule.kind is missing",
+      R + "defining_rule.kind is null",
+      R + "defining_rule.kind is not a string",
+      R + "defining_rule.kind is outside its enum",
+      R + "defining_rule.storage is null",
+      R + "defining_rule.storage is not a string",
+      R + "defining_rule.storage is outside its enum",
+    ]],
+    [{ dropRule: true }, [
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      K + '.defining_rule = {"kind":"derived","expression":"e"}',
+      K + '.defining_rule.expression = "kept expression"',
+      K + '.defining_rule.expression = ""',
+      K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
+      K + '.defining_rule.kind = "derived"',
+      K + '.defining_rule.kind = "semiderived"',
+      K + '.defining_rule.storage = "derive_on_request"',
+      K + '.defining_rule.storage = "derived_and_stored"',
+    ]],
+    [{ mutableFileRule: true }, [
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+    ]],
+    [{ kindUnchecked: true }, [
+      R + "defining_rule.kind is missing",
+      R + "defining_rule.kind is null",
+      R + "defining_rule.kind is not a string",
+      R + "defining_rule.kind is outside its enum",
+    ]],
+    [{ valueEndpoint: true }, [
+      "construction refuses a value type as the subtype",
+      "construction refuses a value type as the supertype",
+    ]],
+    [{ swapEndpoints: true }, [
+      "construction refuses a duplicate subtype fact",
+      K + ' = "(the base config)"',
+      K + '.defining_rule = {"kind":"derived","expression":"e"}',
+      K + '.defining_rule.expression = "kept expression"',
+      K + '.defining_rule.expression = ""',
+      K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
+      K + '.defining_rule.kind = "derived"',
+      K + '.defining_rule.kind = "semiderived"',
+      K + '.defining_rule.storage = "derive_on_request"',
+      K + '.defining_rule.storage = "derived_and_stored"',
+      K + '.id = "kept id"',
+      K + ".is_exclusive = true",
+      K + ".is_exclusive = false",
+      K + ".is_exhaustive = true",
+      K + ".is_exhaustive = false",
+      K + ".provides_identification = true",
+      K + ".provides_identification = false",
+    ]],
+    [{ ignoreFlags: true }, [
+      K + ".is_exclusive = true",
+      K + ".is_exhaustive = true",
+      K + ".provides_identification = false",
+    ]],
+    [{ typesUnchecked: true }, [
+      R + "is_exclusive is null",
+      R + "is_exclusive is not a boolean",
+      R + "is_exhaustive is null",
+      R + "is_exhaustive is not a boolean",
+      R + "provides_identification is null",
+      R + "provides_identification is not a boolean",
+    ]],
+    [{ dropDerivedOnSave: true }, [
+      K + '.defining_rule = {"kind":"derived","expression":"e"}',
+      K + '.defining_rule.expression = "kept expression"',
+      K + '.defining_rule.expression = ""',
+      K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
+      K + '.defining_rule.kind = "derived"',
+      K + '.defining_rule.storage = "derive_on_request"',
+      K + '.defining_rule.storage = "derived_and_stored"',
+    ]],
+    [{ dropFormal: true }, [
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
+    ]],
+    [{ dropFormal: true, inPlace: true }, [
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
+    ]],
+    [{ dropFalseFormal: true }, [
+      K + ".defining_rule.is_formal = false",
+    ]],
+    [{ hiddenName: true }, [
+      "a subtype fact built in code is a plain, frozen record of its fields",
+    ]],
+    [{ nullAsAbsent: true }, [
+      R + "is_exclusive is null",
+      R + "is_exhaustive is null",
+      R + "provides_identification is null",
+    ]],
+    [{ rejectExplicitDefault: true }, [
+      K + ".is_exclusive = false",
+      K + ".is_exhaustive = false",
+      K + ".provides_identification = true",
+    ]],
+    [{ unfrozenBare: "code" }, [
+      "a subtype fact built in code is a plain, frozen record of its fields",
+    ]],
+    [{ unfrozenBare: "file" }, [
+      "a subtype fact loaded from a file is a plain, frozen record of its fields",
+    ]],
+    [{ idUnchecked: true }, [
+      R + "id is null",
+      R + "id is not a string",
+      R + "id is empty",
+    ]],
+    [{ rejectEmptyExpression: true }, [
+      K + '.defining_rule.expression = ""',
+    ]],
+    [{ dropDefaultStorage: true }, [
+      K + '.defining_rule.storage = "derive_on_request"',
+    ]],
+    [{ dropDefaultStorage: true, inPlace: true }, [
+      K + '.defining_rule.storage = "derive_on_request"',
+    ]],
+  ];
+  const good = fakeSubtypeCore();
+  const dirs = [good];
+  try {
+    const r = run(good);
+    assert.equal(r.status, 0, JSON.stringify(failedNames(r)));
+    assert.equal(r.report.cases.length, 64);
+    for (const [defect, expected] of DEFECTS) {
+      const dir = fakeSubtypeCore(defect);
+      dirs.push(dir);
+      const got = run(dir);
+      assert.equal(got.status, 1, JSON.stringify(defect));
+      assert.deepEqual(failedNames(got), expected, JSON.stringify(defect));
+    }
+    // The schema is the scorer's own, whatever the cwd: run from inside a
+    // checkout whose schema drops a required field, the case list is the
+    // same (Copilot, PR #662).
+    const other = mkdtempSync(join(tmpdir(), "heldout-cwd-"));
+    dirs.push(other);
+    spawnSync("git", ["init", "-q", other]);
+    const schemaPath = join(SCRIPT, "../../packages/core/schemas/orm-model.schema.json");
+    const edited = JSON.parse(readFileSync(schemaPath, "utf8"));
+    edited.definitions.subtype_fact.required = edited.definitions.subtype_fact.required
+      .filter((k) => k !== "subtype");
+    mkdirSync(join(other, "barwise/packages/core/schemas"), { recursive: true });
+    writeFileSync(
+      join(other, "barwise/packages/core/schemas/orm-model.schema.json"),
+      JSON.stringify(edited),
+    );
+    const fromOther = spawnSync(
+      process.execPath,
+      [SCRIPT, "heldout", "--task", "t2", "--path", good],
+      { cwd: other, encoding: "utf8" },
+    );
+    assert.equal(fromOther.status, 0, fromOther.stderr);
+    assert.deepEqual(
+      JSON.parse(fromOther.stdout).cases.map((c) => c.name),
+      r.report.cases.map((c) => c.name),
+    );
+    // A task with no cases is refused, not read as zero cases passed -- and
+    // so is an inherited name, which a plain lookup would accept.
+    for (const task of ["t3", "toString", "constructor"]) {
+      const none = spawnSync(
+        process.execPath,
+        [SCRIPT, "heldout", "--task", task, "--path", good],
+        {
+          encoding: "utf8",
+        },
+      );
+      assert.equal(none.status, 2, task + ": " + none.stdout);
+      assert.match(none.stderr, /t1 or t2/);
+    }
+  } finally {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("the trial prompt names every scripts/lib module the scorer protects", () => {
+  // The prompt's list is a copy of the scorer's INSTRUMENT_LIBS -- every lib
+  // module it imports, and the hook it loads by path -- so a module added to
+  // one and not the other is a protected file a run is not told about
+  // (Copilot, PR #662). Read both the way the scorer does.
+  const source = readFileSync(SCRIPT, "utf8");
+  const protectedLibs = new Set([
+    ...[...source.matchAll(/from "\.\/lib\/([\w-]+\.mjs)"/g)].map((m) => m[1]),
+    "module-count-hook.mjs",
+  ]);
+  assert.match(source, /scripts\/lib\/module-count-hook\.mjs/, "the hook the scorer loads by path");
+  const spec = readFileSync(
+    join(dirname(SCRIPT), "../docs/specs/effect-comparison.spec.md"),
+    "utf8",
+  );
+  const prompt = spec.slice(spec.indexOf("## Appendix D"), spec.indexOf("The two style lines"));
+  const listed = prompt.slice(
+    prompt.indexOf("under `barwise/scripts/lib/`:"),
+    prompt.indexOf(". Read"),
+  );
+  const named = new Set([...listed.matchAll(/`([\w-]+\.mjs)`/g)].map((m) => m[1]));
+  assert.deepEqual([...named].sort(), [...protectedLibs].sort());
+});
+
+test("the schema case generator refuses a schema it cannot account for", async () => {
+  const { refusals, preservations, keeps } = await import("../lib/schema-cases.mjs");
+  const schema = (prop) => ({
+    definitions: {
+      thing: {
+        type: "object",
+        required: ["name"],
+        additionalProperties: false,
+        properties: { name: { type: "string", minLength: 1 }, flag: prop },
+      },
+    },
+  });
+  const KEYS = { name: "name", flag: "flag" };
+  const base = { thing: { name: "n" } };
+  // A constraint no case is made for throws, rather than yielding fewer cases.
+  assert.throws(
+    () => refusals(schema({ type: "string", pattern: "^x" }), "thing", KEYS, { base }),
+    /pattern/,
+  );
+  // An object definition must be one: a nullable reference would make the
+  // null refusal wrong (Copilot, PR #662).
+  const nullable = {
+    definitions: {
+      thing: { type: "object", properties: { inner: { $ref: "#/definitions/inner" } } },
+      inner: { type: ["object", "null"], properties: {} },
+    },
+  };
+  for (const gen of [refusals, preservations]) {
+    assert.throws(
+      () =>
+        gen(nullable, "thing", { inner: ["inner", {}] }, {
+          base: { thing: {}, "thing.inner": {} },
+        }),
+      /thing\.inner has type/,
+    );
+  }
+  // So does a handled keyword whose value no case is made for: a type with
+  // no sample, or a minLength the samples would break (Copilot, PR #662).
+  for (const gen of [refusals, preservations]) {
+    assert.throws(() => gen(schema({ type: "integer" }), "thing", KEYS, { base }), /type integer/);
+    assert.throws(
+      () => gen(schema({ type: "string", minLength: 8 }), "thing", KEYS, { base }),
+      /minLength 8/,
+    );
+  }
+  // An enum refusal uses a value of the field's own type outside the enum:
+  // not one the enum admits, and not one the type check already refuses.
+  const outside = (prop) =>
+    refusals(schema(prop), "thing", KEYS, { base }).find((c) => c.why === "is outside its enum")
+      .config.flag;
+  assert.equal(outside({ type: "string", enum: ["nope", "nope!"] }), "nope!!");
+  assert.equal(outside({ type: "boolean", enum: [true] }), false);
+  assert.throws(
+    () => refusals(schema({ type: "boolean", enum: [true, false] }), "thing", KEYS, { base }),
+    /every boolean/,
+  );
+  // A key map that names a property the schema lacks, or misses one, throws.
+  assert.throws(
+    () => refusals(schema({ type: "boolean" }), "thing", { name: "name" }, { base }),
+    /key map/,
+  );
+  assert.throws(
+    () =>
+      preservations(schema({ type: "boolean" }), "thing", { ...KEYS, extra: "extra" }, { base }),
+    /key map/,
+  );
+  // One refusal per constraint, and none for a field code may omit.
+  const r = refusals(schema({ type: "boolean", default: false }), "thing", KEYS, { base });
+  assert.deepEqual(r.map((c) => `${c.path} ${c.why}`), [
+    "thing.flag is null",
+    "thing.flag is not a boolean",
+    "thing.name is missing",
+    "thing.name is null",
+    "thing.name is not a string",
+    "thing.name is empty",
+  ]);
+  assert.deepEqual(
+    refusals(schema({ type: "boolean" }), "thing", KEYS, { base, codeOptional: ["thing.name"] })
+      .map((c) => c.why),
+    ["is null", "is not a boolean", "is null", "is not a string", "is empty"],
+  );
+  // A required nested object is a constraint too: making one required adds
+  // a "missing" case rather than nothing (Copilot, PR #662).
+  const nested = {
+    definitions: {
+      thing: {
+        type: "object",
+        required: ["inner"],
+        properties: { inner: { $ref: "#/definitions/inner" } },
+      },
+      inner: { type: "object", properties: { v: { type: "string" } } },
+    },
+  };
+  assert.deepEqual(
+    refusals(nested, "thing", { inner: ["inner", { v: "v" }] }, {
+      base: { thing: { inner: {} }, "thing.inner": {} },
+    }).map((c) => `${c.path} ${c.why}`),
+    [
+      "thing.inner is missing",
+      "thing.inner is null",
+      "thing.inner is not an object",
+      "thing.inner.v is null",
+      "thing.inner.v is not a string",
+    ],
+  );
+  // A string with no minLength is kept empty as well as not.
+  assert.deepEqual(
+    preservations(nested, "thing", { inner: ["inner", { v: "v" }] }, {
+      base: { thing: { inner: {} }, "thing.inner": {} },
+    }).map((c) => c.value),
+    ["(the base config)", {}, "kept v", ""],
+  );
+  // A boolean is kept at both values, its default included.
+  const p = preservations(schema({ type: "boolean", default: false }), "thing", KEYS, { base });
+  assert.deepEqual(p.map((c) => c.config), [
+    { name: "n" },
+    { name: "n", flag: true },
+    { name: "n", flag: false },
+    { name: "kept name" },
+  ]);
+  // So is one with no default.
+  assert.deepEqual(
+    preservations(schema({ type: "boolean" }), "thing", KEYS, { base }).map((c) => c.value),
+    ["(the base config)", true, false, "kept name"],
+  );
+  // keeps: nested values, and a value the serializer writes as absent.
+  assert.equal(keeps({ a: { b: 1 } }, { a: { b: 1 } }), true);
+  assert.equal(keeps({ a: {} }, { a: { b: 1 } }), false);
+  assert.equal(keeps({ a: {} }, { a: { b: 1 } }, { "a.b": 1 }), true);
+  assert.equal(keeps(undefined, { a: 1 }), false);
+});
+
 test("usage sums each turn's input once, and reports the last turn's context", () => {
   // Two records share one message id, as a turn streamed in parts does; a
   // tool result carries no usage and a blank line nothing, so both are skipped.
