@@ -1,0 +1,92 @@
+{
+  "run": "effect-t1-r4",
+  "arm": "effect",
+  "task": "T1",
+  "phase": "second-series",
+  "pair": "r4",
+  "start": "8d36e4fc",
+  "head": "a66241d0",
+  "startedAt": "2026-10-15T05:23:20Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": false,
+  "usage": {
+    "inputProcessed": 2636259,
+    "turns": 28,
+    "finalContext": 108511,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 28,
+        "inputProcessed": 2636259
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in effect-t1-r4.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "a66241d0",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 109970,
+        "toolCalls": 30,
+        "wallMs": 497712
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 12,
+    "added": 31,
+    "removed": 3,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 628
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (1 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/diff/changeDescription.test.ts > has a golden for every kind of change the diff can emit",
+      "note": "the new unit change had no rendering example yet; added"
+    }
+  ],
+  "observations": [
+    "the first Effect T1 run in either series to pass in round 1: it refused an empty unit unprompted, in the value-type schema and the JSON Schema (minLength 1)",
+    "did not edit the protected layout test, under the amended prompt and without reading the experiment spec",
+    "did not add unit to the random model generator (tests/arbitraries/model.ts), so the serialization law does not exercise it; the task did not require it. Of the ten second-series runs, this one and effect-t1-r5 (which tried and reverted) are the two whose final generator leaves unit out",
+    "wrote unit after default_value"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused (round 1)",
+    "unit written after default_value",
+    "unit change is breaking level caution",
+    "unit not added to the random model generator"
+  ]
+}
