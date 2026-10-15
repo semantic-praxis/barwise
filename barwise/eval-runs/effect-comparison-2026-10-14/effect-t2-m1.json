@@ -1,0 +1,102 @@
+{
+  "run": "effect-t2-m1",
+  "arm": "effect",
+  "task": "T2",
+  "phase": "t2",
+  "pair": "m1",
+  "start": "8d36e4fc",
+  "head": "c7edb8f7",
+  "startedAt": "2026-10-15T06:03:15Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": false,
+  "usage": {
+    "inputProcessed": 14368715,
+    "turns": 87,
+    "finalContext": 216434,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 87,
+        "inputProcessed": 14368715
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in effect-t2-m1.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "c7edb8f7",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 64,
+        "of": 64
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 220384,
+        "toolCalls": 101,
+        "wallMs": 1173440
+      }
+    }
+  ],
+  "diff": {
+    "files": 15,
+    "hunks": 73,
+    "added": 713,
+    "removed": 355,
+    "consumerFiles": [
+      "barwise/packages/core/src/diff/ModelMerge.ts",
+      "barwise/packages/core/src/index.ts"
+    ],
+    "sliceLines": 2602
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (2 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx tsc --noEmit (packages/core)",
+      "firstError": "src/diff/ModelMerge.ts(24,10): error TS2724: '\"../model/SubtypeFact.js\"' has no exported member named 'toSubtypeFactConfig'",
+      "note": "a caller of the deleted helper; ModelMerge now spreads the record"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run tests/model/subtypeFactDecoder.test.ts",
+      "firstError": "subtypeFactDecoder.test.ts (23 tests | 2 failed)",
+      "note": "its own new tests, fixed before commit"
+    },
+    {
+      "class": "environment",
+      "command": "npm run test (parallel)",
+      "firstError": "30 s timeouts in two or three cli tests, a different set each run (prompt score, prompt eval offline, import sql)",
+      "note": "passed with --concurrency=1 and cli alone 463/463; the session full suite, run in parallel, passed"
+    }
+  ],
+  "observations": [
+    "passed every held-out case in round 1, refusal parity included: the decoder that serves code and file enforces the JSON Schema's shape rules, and unknown keys are refused in code as ObjectType does on this arm",
+    "did not edit a protected file and did not read the experiment spec",
+    "moved the shared decoding pieces (the problem walk, IdSource, KeysAgree, runWithIds, parse options) out of the object type modules into src/model/decoding.ts, and the JSON Schema comparison helpers into tests/helpers; more restructuring than the task named, which accounts for much of its larger diff",
+    "made DerivationRule a schema of its own and added a JSON Schema drift test for subtype_fact"
+  ],
+  "agentJudgmentCalls": [
+    "shared decoding module extracted from the object type code",
+    "DerivationRule as its own schema",
+    "loader message head names every malformed section",
+    "unknown keys refused in code (as ObjectType on this arm)"
+  ]
+}
