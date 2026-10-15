@@ -5,8 +5,9 @@
  *   startup   [--runs N] [--no-build]   G4: `barwise validate` on the reference
  *                                       model, npm build and release bundle
  *   bundles   [--no-build]              R2: vscode and CLI bundle sizes
- *   malformed [--json]                  D2: how the loader reports malformed
- *                                       object types
+ *   malformed [--json]                  D2 (and effect-adoption S4): how the
+ *                                       loader reports malformed object
+ *                                       types, fact types and constraints
  *   diff      <base> [<head>]           D1, R1, R3: what a change touched
  *   trial     --base <ref> [--path P]   D3: a trial branch left the held-out
  *                                       oracle alone
@@ -285,9 +286,12 @@ async function malformed(args) {
   }
   const one = (r) => {
     const s = summarize(r);
+    const constraint = s.inConstraint > 0
+      ? `  constraint named ${s.namesConstraint}/${s.inConstraint}`
+      : "";
     return `${
       s.outcome.padEnd(8)
-    } reported ${s.reported}/${s.problems}  named ${s.namesElement}  silent losses ${s.silentLosses}`;
+    } reported ${s.reported}/${s.problems}  named ${s.namesElement}${constraint}  silent losses ${s.silentLosses}`;
   };
   for (const r of results) process.stdout.write(`${r.file.padEnd(40)} ${one(r)}\n`);
   process.stdout.write(`${"combined (every case in one file)".padEnd(40)} ${one(combined)}\n`);

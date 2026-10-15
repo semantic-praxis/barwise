@@ -137,10 +137,11 @@ test("a bracketed path credits the object type at that index, as a JSON pointer 
 });
 
 test("today's loader reports one problem per message, so its reading is not refused", () => {
-  // The six messages today's loader gives for the combined file, as
-  // recorded by `measure-comparison malformed --json` on 78b52f5b. Held as
-  // text because script tests run before the build in CI, so @barwise/core
-  // cannot be loaded here.
+  // The six messages today's loader gave for the combined file's object
+  // types, as recorded by `measure-comparison malformed --json` on
+  // 78b52f5b, before fact type cases joined it. Held as text because script
+  // tests run before the build in CI, so @barwise/core cannot be loaded
+  // here.
   const messages = [
     "/model/object_types/1: must have required property 'reference_mode'",
     '/model/object_types/1: must match "then" schema',
@@ -177,6 +178,101 @@ test("an object type missing after the round trip is reported field by field", (
     "reference_mode",
     "data_type",
   ]);
+});
+
+const FT_OTS =
+  `  object_types:\n    - id: ot-person\n      name: Person\n      kind: entity\n      reference_mode: person_id\n`;
+const ftDoc = (tag, constraints = "") =>
+  `orm_version: "2.0"\nmodel:\n  name: M\n${FT_OTS}  fact_types:\n    - id: ft-${tag}\n      name: ${tag} knows Person\n      roles:\n        - id: r-${tag}-1\n          player: ot-person\n          role_name: knows\n        - id: r-${tag}-2\n          player: ot-person\n          role_name: is known by\n      readings:\n        - "{0} knows {1}"\n${constraints}`;
+
+test("a fact type path credits the fact type at that index, never the object type there", () => {
+  // Stand-in defect: a scorer that read every position as an object type
+  // would credit ot-a for a fact type's problem at the same index.
+  const files = {
+    a: `orm_version: "2.0"\nmodel:\n  name: M\n  object_types:\n    - id: ot-a\n      name: Alpha\n      kind: value\n`,
+    b: ftDoc("Bravo"),
+  };
+  const cases = [
+    { file: "a", field: "roles" },
+    { file: "b", kind: "fact_type", field: "roles" },
+  ];
+  const { problems } = combine(cases, (f) => files[f]);
+  assert.deepEqual(problems.map((p) => [p.kind, p.index]), [["object_type", 0], ["fact_type", 0]]);
+  const ftFailure = {
+    deserialize: () => {
+      throw Object.assign(new Error("schema"), {
+        validationResult: { errors: [{ path: "/model/fact_types/0/roles", message: "too few" }] },
+      });
+    },
+    serialize: () => "",
+  };
+  const r = scoreDocument("unused", problems, ftFailure);
+  assert.deepEqual(r.problems.map((p) => [p.id, p.reported]), [["ot-a", false], [
+    "ft-Bravo",
+    true,
+  ]]);
+});
+
+test("the combined file carries every fact type and each supporting object type once", () => {
+  // Stand-in defect: a combine that copied only object_types would drop
+  // every fact type case from the combined reading.
+  const files = { b: ftDoc("Bravo"), c: ftDoc("Charlie") };
+  const cases = [
+    { file: "b", kind: "fact_type", field: "roles" },
+    { file: "c", kind: "fact_type", field: "roles" },
+  ];
+  const { yaml, problems } = combine(cases, (f) => files[f]);
+  const model = parse(yaml).model;
+  assert.deepEqual(model.fact_types.map((ft) => ft.id), ["ft-Bravo", "ft-Charlie"]);
+  assert.deepEqual(model.object_types.map((ot) => ot.id), ["ot-person"]);
+  assert.deepEqual(problems.map((p) => p.index), [0, 1]);
+  const clash = {
+    ...files,
+    c: files.c.replace("reference_mode: person_id", "reference_mode: code"),
+  };
+  assert.throws(() => combine(cases, (f) => clash[f]), /ot-person differs/);
+});
+
+test("a field lost inside a constraint is reported at its path; a reordered list is not a loss", () => {
+  // Stand-in defect: a lostKeys that compared only top-level fields would
+  // see the constraint still there and report nothing.
+  const doc = ftDoc(
+    "Bravo",
+    "      constraints:\n        - type: ring\n          role_1: r-Bravo-1\n          role_2: r-Bravo-2\n          ring_type: irreflexive\n",
+  );
+  const dropsRingType = doc.replace(/\n {10}ring_type: irreflexive/, "");
+  assert.deepEqual(lostKeys(doc, dropsRingType), [{
+    id: "ft-Bravo",
+    key: "constraints.0.ring_type",
+  }]);
+  const reordered = doc.replace(
+    /( {8}- id: r-Bravo-1\n.*\n.*\n)( {8}- id: r-Bravo-2\n.*\n.*\n)/,
+    "$2$1",
+  );
+  assert.notEqual(reordered, doc);
+  assert.deepEqual(lostKeys(doc, reordered), []);
+});
+
+test("a problem inside a constraint is credited for naming that constraint, not another", () => {
+  const doc = ftDoc(
+    "Bravo",
+    "      constraints:\n        - type: mandatory\n          role: r-Bravo-1\n        - id: c-ring\n          type: ring\n          role_1: r-Bravo-1\n          role_2: r-Bravo-2\n          ring_type: sideways\n",
+  );
+  const cases = [{ file: "b", kind: "fact_type", field: "ring_type", constraint: 1 }];
+  const { problems } = combine(cases, () => doc);
+  assert.deepEqual(problems[0].constraint, { index: 1, id: "c-ring" });
+  const failing = (path) => ({
+    deserialize: () => {
+      throw Object.assign(new Error("schema"), {
+        validationResult: { errors: [{ path, message: "unknown ring_type" }] },
+      });
+    },
+    serialize: () => "",
+  });
+  const at = (path) => scoreDocument("unused", problems, failing(path)).problems[0].namesConstraint;
+  assert.equal(at("/model/fact_types/0/constraints/1/ring_type"), true);
+  assert.equal(at("/model/fact_types/0/constraints/0/ring_type"), false);
+  assert.equal(at('["fact_types"][0]["constraints"][1]["ring_type"]'), true);
 });
 
 test("an unknown subcommand and an unresolvable ref are refusals, not readings", () => {
@@ -1230,14 +1326,24 @@ test("a build tool that cannot start is a refusal, not a crash", () => {
 
 test("each malformed case declares the field its fixture actually gets wrong", () => {
   const { cases } = JSON.parse(readFileSync(join(FIXTURES, "cases.json"), "utf8"));
-  assert.ok(cases.length > 0);
+  assert.ok(cases.some((c) => !c.kind) && cases.some((c) => c.kind === "fact_type"));
   for (const c of cases) {
-    const ots = parse(readFileSync(join(FIXTURES, c.file), "utf8"))?.model?.object_types ?? [];
-    assert.equal(ots.length, 1, `${c.file} holds one object type`);
+    const model = parse(readFileSync(join(FIXTURES, c.file), "utf8"))?.model ?? {};
+    const elements = (c.kind === "fact_type" ? model.fact_types : model.object_types) ?? [];
+    assert.equal(elements.length, 1, `${c.file} holds one ${c.kind ?? "object_type"}`);
+    // `at` is the field's path inside the element, for a field below its
+    // top level (`constraints.0.ring_type`); the field itself otherwise.
+    const path = (c.at ?? c.field).split(".");
+    const parent = path.slice(0, -1).reduce((o, k) => o?.[k], elements[0]);
+    assert.equal(path.at(-1), c.field, `${c.file}: at ends in the field`);
     assert.equal(
-      c.field in ots[0],
+      parent !== undefined && c.field in parent,
       !c.absent,
-      `${c.file}: ${c.field} is ${c.absent ? "absent" : "present"}`,
+      `${c.file}: ${c.at ?? c.field} is ${c.absent ? "absent" : "present"}`,
     );
+    if (c.constraint !== undefined) {
+      assert.equal(path[0], "constraints", `${c.file}: a constraint case points into constraints`);
+      assert.equal(Number(path[1]), c.constraint, `${c.file}: at names the declared constraint`);
+    }
   }
 });
