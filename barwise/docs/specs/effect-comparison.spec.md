@@ -867,18 +867,37 @@ How T2 runs:
   promptlab drift test, up to two feedback rounds in the same wording,
   and `measure:comparison -- heldout --task t2`. Records, patches and
   per-turn usage go in the same directory.
-- **Held-out cases (18).** "Sealed record" is checked as both arms
-  already built `ObjectType`: a plain object, frozen, carrying only its
-  declared fields, an absent optional field absent rather than
-  `undefined`, from code and from a file. The rest holds what the base
-  does -- the endpoints, flags and defining rule (with `isFormal`) code
-  was given, kept through a save and a load, the defaults, the five refusals in `addSubtypeFact` (a subtype
-  of itself, an absent type, a duplicate, a value type at either end), a file's
-  self-subtype refused, the round trip, the diff, and the YAML text both
-  heads write for a fully populated subtype fact (the layout, which G2's
-  object-type test does not cover) -- plus the one rule the task adds.
-  Each arm's head passes 13 and fails 5: the four record cases and that
-  rule.
+- **Held-out cases (48): 16 written, 32 generated from the file schema.**
+  Written, for what the schema cannot state: "sealed record" checked as
+  both arms already built `ObjectType` (a plain object, frozen, carrying
+  only its declared fields, an absent optional field absent rather than
+  `undefined`, a defining rule kept and frozen, from code and from a
+  file); the defaults; the five refusals in `addSubtypeFact` that span
+  the model (a subtype of itself, an absent type, a duplicate, a value
+  type at either end); a file's self-subtype refused; the round trip; the
+  diff; and the YAML text both heads write for a fully populated subtype
+  fact (the layout, which G2's object-type test does not cover).
+  Generated (`scripts/lib/schema-cases.mjs`) from the schema's
+  `subtype_fact` and `derivation_rule_def`: 20 cases of the one rule the
+  task adds, code refuses what a file refuses -- one per constraint the
+  schema places on a field (a required field missing, a wrong type, a
+  value outside an enum, an empty string) -- and 12 cases of what code
+  was given kept on the record and through a save and a load, one per
+  value a field can take that its absence does not stand for. Each review
+  of PR #662 found another field a hand list of these had not mirrored;
+  generated, a new constraint in the schema is a new case, and a keyword
+  the generator does not handle, or a key map that disagrees with the
+  schema's properties, refuses (exit 2) rather than yielding fewer cases.
+  The schema is this checkout's, fixed at grounding, not the run's. Three
+  things are declared, not inferred: the YAML-to-config key map; the id,
+  which code may omit because the model makes one; and `storage:
+  derive_on_request`, which the serializer writes as absent.
+  `additionalProperties: false` yields no case: the arms already differ
+  on an unknown config key for `ObjectType` (the Effect arm refuses it,
+  the plain arm accepts it), so a case would be a requirement neither was
+  asked for. Each arm's head passes 30 and fails 18: the four record cases
+  and 14 of the 20 refusals (the six it passes are the endpoint ones,
+  which its absent-type check already refuses).
 - **The rule the task adds is a defect the base has.** `addSubtypeFact`
   accepts a defining rule with `storage: "nope"`, no `expression`, or a
   missing or unknown `kind`, a non-string `expression`, a non-boolean

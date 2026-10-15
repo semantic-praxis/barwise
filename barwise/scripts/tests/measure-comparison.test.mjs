@@ -543,110 +543,187 @@ export function diffModels(a, b) {
   return dir;
 }
 
-test("heldout t2 passes a converted SubtypeFact and fails the base's class and its unchecked rule", () => {
+test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly its own cases", () => {
   const run = (dir) => {
     const r = spawnSync(process.execPath, [SCRIPT, "heldout", "--task", "t2", "--path", dir], {
       encoding: "utf8",
     });
     return { status: r.status, stderr: r.stderr, report: JSON.parse(r.stdout) };
   };
-  const dirs = [
-    fakeSubtypeCore(),
-    fakeSubtypeCore({ asClass: true }),
-    fakeSubtypeCore({ ruleUnchecked: true }),
-    fakeSubtypeCore({ dropRule: true }),
-    fakeSubtypeCore({ mutableFileRule: true }),
-    fakeSubtypeCore({ kindUnchecked: true }),
-    fakeSubtypeCore({ valueEndpoint: true }),
-    fakeSubtypeCore({ swapEndpoints: true }),
-    fakeSubtypeCore({ ignoreFlags: true }),
-    fakeSubtypeCore({ typesUnchecked: true }),
-    fakeSubtypeCore({ dropDerivedOnSave: true }),
-    fakeSubtypeCore({ dropFormal: true }),
-    fakeSubtypeCore({ idUnchecked: true }),
-  ];
-  try {
-    const good = run(dirs[0]);
-    assert.equal(good.status, 0, JSON.stringify(failedNames(good)));
-    assert.equal(good.report.cases.length, 18);
-    // The base's shape: not a plain record, a derived name, a rule key set to
-    // undefined. Each record case fails; the behaviour it kept still passes.
-    const legacy = run(dirs[1]);
-    assert.equal(legacy.status, 1);
-    assert.deepEqual(failedNames(legacy), [
+  // Generated case names: a refusal per schema constraint, a preservation
+  // per value (scripts/lib/schema-cases.mjs).
+  const R = "code refuses what a file refuses: subtype_fact.";
+  const K = "code keeps what it was given, through a save and a load: subtype_fact";
+  // Each stand-in defect, and the cases that must catch it -- no more. The
+  // generated cases carry every input the hand list had (storage, kind,
+  // expression, isFormal, the flags, ids, a derived rule lost on save), so
+  // each defect a review of PR #662 found is still caught, now by the case
+  // the schema yields rather than one written for it.
+  const DEFECTS = [
+    [{ asClass: true }, [
       "a subtype fact built in code is a plain, frozen record of its fields",
       "a subtype fact loaded from a file is a plain, frozen record of its fields",
       "a subtype fact's defining rule is kept and frozen, from code and from a file",
       "a subtype fact without a defining rule carries no definingRule key",
-    ]);
-    const unchecked = run(dirs[2]);
-    assert.deepEqual(failedNames(unchecked), [
-      "a subtype fact a file would refuse is refused from code too",
-    ]);
-    // A rule dropped from code, or loaded and left mutable, fails the rule
-    // case alone: a freeze check alone passed both (Copilot, PR #662).
-    // A rule dropped from code also fails the keeps case, which checks the
-    // rule it was given after a save and a load.
-    assert.deepEqual(failedNames(run(dirs[3])), [
+    ]],
+    [{ ruleUnchecked: true }, [
+      R + "defining_rule is not an object",
+      R + "defining_rule.expression is missing",
+      R + "defining_rule.expression is not a string",
+      R + "defining_rule.is_formal is not a boolean",
+      R + "defining_rule.kind is missing",
+      R + "defining_rule.kind is not a string",
+      R + "defining_rule.kind is outside its enum",
+      R + "defining_rule.storage is not a string",
+      R + "defining_rule.storage is outside its enum",
+    ]],
+    [{ dropRule: true }, [
       "a subtype fact's defining rule is kept and frozen, from code and from a file",
-      "a subtype fact built in code keeps its endpoints, flags and rule, through a save and a load",
-    ]);
-    assert.deepEqual(failedNames(run(dirs[4])), [
+      K + '.defining_rule = {"kind":"derived","expression":"e"}',
+      K + '.defining_rule.expression = "kept expression"',
+      K + ".defining_rule.is_formal = true",
+      K + '.defining_rule.kind = "derived"',
+      K + '.defining_rule.kind = "semiderived"',
+      K + '.defining_rule.storage = "derive_on_request"',
+      K + '.defining_rule.storage = "derived_and_stored"',
+    ]],
+    [{ mutableFileRule: true }, [
       "a subtype fact's defining rule is kept and frozen, from code and from a file",
-    ]);
-    // A rule kind left unchecked from code, and a value type at either end,
-    // each fail their own case and nothing else (Copilot, PR #662).
-    assert.deepEqual(failedNames(run(dirs[5])), [
-      "a subtype fact a file would refuse is refused from code too",
-    ]);
-    assert.deepEqual(failedNames(run(dirs[6])), [
+    ]],
+    [{ kindUnchecked: true }, [
+      R + "defining_rule.kind is missing",
+      R + "defining_rule.kind is not a string",
+      R + "defining_rule.kind is outside its enum",
+    ]],
+    [{ valueEndpoint: true }, [
       "construction refuses a value type as the subtype",
       "construction refuses a value type as the supertype",
-    ]);
-    // Flags ignored from code fail the keeps case alone. Endpoints stored
-    // reversed fail it too, and the duplicate check, which then compares
-    // the wrong ends.
-    const KEEPS =
-      "a subtype fact built in code keeps its endpoints, flags and rule, through a save and a load";
-    assert.deepEqual(failedNames(run(dirs[7])), [
-      KEEPS,
+    ]],
+    [{ swapEndpoints: true }, [
       "construction refuses a duplicate subtype fact",
-    ]);
-    assert.deepEqual(failedNames(run(dirs[8])), [KEEPS]);
-    // A flag of the wrong type accepted from code, refused from a file.
-    assert.deepEqual(failedNames(run(dirs[9])), [
-      "a subtype fact a file would refuse is refused from code too",
-    ]);
-    // A derived rule lost on save fails the keeps case; isFormal lost from
-    // code fails it and the rule case; an id accepted from code that a file
-    // refuses fails the parity case (Copilot, PR #662).
-    assert.deepEqual(failedNames(run(dirs[10])), [KEEPS]);
-    assert.deepEqual(failedNames(run(dirs[11])), [
+      K + ' = "(the base config)"',
+      K + '.defining_rule = {"kind":"derived","expression":"e"}',
+      K + '.defining_rule.expression = "kept expression"',
+      K + ".defining_rule.is_formal = true",
+      K + '.defining_rule.kind = "derived"',
+      K + '.defining_rule.kind = "semiderived"',
+      K + '.defining_rule.storage = "derive_on_request"',
+      K + '.defining_rule.storage = "derived_and_stored"',
+      K + '.id = "kept id"',
+      K + ".is_exclusive = true",
+      K + ".is_exhaustive = true",
+      K + ".provides_identification = false",
+    ]],
+    [{ ignoreFlags: true }, [
+      K + ".is_exclusive = true",
+      K + ".is_exhaustive = true",
+      K + ".provides_identification = false",
+    ]],
+    [{ typesUnchecked: true }, [
+      R + "is_exclusive is not a boolean",
+      R + "is_exhaustive is not a boolean",
+      R + "provides_identification is not a boolean",
+    ]],
+    [{ dropDerivedOnSave: true }, [
+      K + '.defining_rule = {"kind":"derived","expression":"e"}',
+      K + '.defining_rule.expression = "kept expression"',
+      K + ".defining_rule.is_formal = true",
+      K + '.defining_rule.kind = "derived"',
+      K + '.defining_rule.storage = "derive_on_request"',
+      K + '.defining_rule.storage = "derived_and_stored"',
+    ]],
+    [{ dropFormal: true }, [
       "a subtype fact's defining rule is kept and frozen, from code and from a file",
-      KEEPS,
-    ]);
-    assert.deepEqual(failedNames(run(dirs[12])), [
-      "a subtype fact a file would refuse is refused from code too",
-    ]);
+      K + ".defining_rule.is_formal = true",
+    ]],
+    [{ idUnchecked: true }, [
+      R + "id is not a string",
+      R + "id is empty",
+    ]],
+  ];
+  const good = fakeSubtypeCore();
+  const dirs = [good];
+  try {
+    const r = run(good);
+    assert.equal(r.status, 0, JSON.stringify(failedNames(r)));
+    assert.equal(r.report.cases.length, 48);
+    for (const [defect, expected] of DEFECTS) {
+      const dir = fakeSubtypeCore(defect);
+      dirs.push(dir);
+      const got = run(dir);
+      assert.equal(got.status, 1, JSON.stringify(defect));
+      assert.deepEqual(failedNames(got), expected, JSON.stringify(defect));
+    }
     // A task with no cases is refused, not read as zero cases passed -- and
     // so is an inherited name, which a plain lookup would accept.
     for (const task of ["t3", "toString", "constructor"]) {
-      const none = spawnSync(process.execPath, [
-        SCRIPT,
-        "heldout",
-        "--task",
-        task,
-        "--path",
-        dirs[0],
-      ], {
-        encoding: "utf8",
-      });
+      const none = spawnSync(
+        process.execPath,
+        [SCRIPT, "heldout", "--task", task, "--path", good],
+        {
+          encoding: "utf8",
+        },
+      );
       assert.equal(none.status, 2, task + ": " + none.stdout);
       assert.match(none.stderr, /t1 or t2/);
     }
   } finally {
     for (const d of dirs) rmSync(d, { recursive: true, force: true });
   }
+});
+
+test("the schema case generator refuses a schema it cannot account for", async () => {
+  const { refusals, preservations, keeps } = await import("../lib/schema-cases.mjs");
+  const schema = (prop) => ({
+    definitions: {
+      thing: {
+        type: "object",
+        required: ["name"],
+        additionalProperties: false,
+        properties: { name: { type: "string", minLength: 1 }, flag: prop },
+      },
+    },
+  });
+  const KEYS = { name: "name", flag: "flag" };
+  const base = { thing: { name: "n" } };
+  // A constraint no case is made for throws, rather than yielding fewer cases.
+  assert.throws(
+    () => refusals(schema({ type: "string", pattern: "^x" }), "thing", KEYS, { base }),
+    /pattern/,
+  );
+  // A key map that names a property the schema lacks, or misses one, throws.
+  assert.throws(
+    () => refusals(schema({ type: "boolean" }), "thing", { name: "name" }, { base }),
+    /key map/,
+  );
+  assert.throws(
+    () =>
+      preservations(schema({ type: "boolean" }), "thing", { ...KEYS, extra: "extra" }, { base }),
+    /key map/,
+  );
+  // One refusal per constraint, and none for a field code may omit.
+  const r = refusals(schema({ type: "boolean", default: false }), "thing", KEYS, { base });
+  assert.deepEqual(r.map((c) => `${c.path} ${c.why}`), [
+    "thing.flag is not a boolean",
+    "thing.name is missing",
+    "thing.name is not a string",
+    "thing.name is empty",
+  ]);
+  assert.deepEqual(
+    refusals(schema({ type: "boolean" }), "thing", KEYS, { base, codeOptional: ["thing.name"] })
+      .map((c) => c.why),
+    ["is not a boolean", "is not a string", "is empty"],
+  );
+  // A boolean is kept at the value its absence does not stand for.
+  const p = preservations(schema({ type: "boolean", default: false }), "thing", KEYS, { base });
+  assert.deepEqual(p.map((c) => c.config), [{ name: "n" }, { name: "n", flag: true }, {
+    name: "kept name",
+  }]);
+  // keeps: nested values, and a value the serializer writes as absent.
+  assert.equal(keeps({ a: { b: 1 } }, { a: { b: 1 } }), true);
+  assert.equal(keeps({ a: {} }, { a: { b: 1 } }), false);
+  assert.equal(keeps({ a: {} }, { a: { b: 1 } }, { "a.b": 1 }), true);
+  assert.equal(keeps(undefined, { a: 1 }), false);
 });
 
 test("usage sums each turn's input once, and reports the last turn's context", () => {
