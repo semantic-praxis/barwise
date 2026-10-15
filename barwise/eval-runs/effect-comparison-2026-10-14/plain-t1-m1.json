@@ -10,6 +10,8 @@
   "rounds": 2,
   "leftoverCommit": false,
   "outcome": "pass",
+  "readSpec": false,
+  "readSpecNote": "no tool call of its own opened, grepped or printed effect-comparison.spec.md (classified from the transcript in WS4)",
   "usage": {
     "inputProcessed": 4090466,
     "turns": 38,

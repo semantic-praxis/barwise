@@ -5,17 +5,20 @@ barwise-5fg prerequisite implemented 2026-10-14; WS1 and WS2 built
 2026-10-14 on their branches (see Arms as built); WS3 grounded
 2026-10-14, pilot run 2026-10-14 (see WS3), five main T1 pairs run
 2026-10-14; the primer check (barwise-hno) run 2026-10-14, inconclusive
-(see WS3); T2 re-scoped to `SubtypeFact` and grounded 2026-10-15, not yet run;
-WS4 not started
+(see WS3); T2 re-scoped to `SubtypeFact` and grounded 2026-10-15; the
+second T1 series and both T2 pairs run 2026-10-15; WS4 done 2026-10-15:
+the rule recommends Effect, with D1's unit chosen after the data (see
+Result)
 Created: 2026-10-13
-Last-updated: 2026-10-14
-Tracking: barwise-cu0 (this spec); barwise-973 (WS1 of
-`core-branching-load.spec.md`, held until WS4 here decides its style);
-barwise-5fg (a regression the grounding found, fixed before either arm
-starts); barwise-0lf (an unchecked copy WS0 closes); barwise-r7j (a
-build-cache hazard every measurement here must avoid); barwise-e8m (the
-core-purity commitment, Open decision 1); barwise-933 (the ReScript
-experiment, whose method this borrows)
+Last-updated: 2026-10-15
+Tracking: barwise-cu0 (this spec; closed after WS4 merges); barwise-jo5
+(the adoption spec WS4 opens); barwise-jsi (an instrument defect WS4
+found); barwise-973 (WS1 of `core-branching-load.spec.md`, held until
+the adoption spec decides); barwise-5fg (a regression the grounding
+found, fixed before either arm starts); barwise-0lf (an unchecked copy
+WS0 closes); barwise-r7j (a build-cache hazard every measurement here
+must avoid); barwise-e8m (the core-purity commitment, Open decision 1);
+barwise-933 (the ReScript experiment, whose method this borrows)
 
 In one sentence: before writing the remaining four element kinds and the
 builder of barwise-973, build the already-converted `ObjectType` slice to
@@ -346,6 +349,121 @@ only if a controlled reproduction shows it there and not elsewhere: the
 CLI package's full coverage run on an idle machine, alternating the plain
 arm, the Effect arm and main, three runs each. Otherwise it is recorded
 as environment noise.
+
+## Result (WS4, 2026-10-15)
+
+**The rule recommends Effect for the rest of barwise-973.** Both arms
+clear G1-G4 and the D2 bar; D3 does not resolve in the series that
+decides it, so it casts no vote; and Effect is better on D1 under the
+reading of "better" the owner chose after seeing the data, because the
+spec never named D1's unit (see D1 below). So, as Workstream 4 says,
+nothing is merged: the next step is the adoption spec -- core's
+dependency rule, barwise-e8m, and the remaining kinds. Under a
+files-only reading of D1 the arms tie and the tie would have gone to
+TypeScript; that is the one place this result rests on a judgment
+rather than a measurement, and it is stated here so the adoption spec
+can weigh it.
+
+Every reading below was taken on one machine (Node v26.7.0, Intel Xeon
+2.80 GHz x4), the two arm heads back to back on 2026-10-15, with
+`--force` builds: plain `8398a193`, Effect `8d36e4fc`, both from
+`4f7b447d`. The trial readings come from the records in
+`barwise/eval-runs/effect-comparison-2026-10-14/`.
+
+| #  | Plain arm                                               | Effect arm                                              | Reading                                         |
+| -- | ------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
+| G1 | full suite, `validate:examples`, drift test 15/15 green | full suite, `validate:examples`, drift test 15/15 green | both pass                                       |
+| G2 | byte-layout test green                                  | byte-layout test green                                  | both pass                                       |
+| G3 | enum drift test, `audit:duplication`, `check:parity` OK | enum drift test, `audit:duplication`, `check:parity` OK | both pass                                       |
+| G4 | `validate` 410 ms npm, 472 ms bundle                    | `validate` 564 ms npm, 549 ms bundle                    | both pass the 1 s limit; Effect +154 ms npm     |
+| D1 | median 7 files, 16 hunks, +42 lines                     | median 7 files, 12 hunks, +34 lines                     | Effect better (no worse on any unit)            |
+| D2 | 11/11 singly and combined, all named, no losses         | 11/11 singly and combined, all named, no losses         | both clear the bar                              |
+| D3 | 5,460,843 mean input processed                          | 4,310,596                                               | -21.1%, under the 1,911,232 resolvable; no vote |
+| R1 | arm: 1 consumer file; T1 median 4                       | arm: 1 consumer file; T1 median 4                       | equal                                           |
+| R2 | CLI bundle 8,024,888 bytes                              | 8,237,114 (+212,226)                                    | Effect +0.2 MB in each bundle that loads core   |
+| R3 | object type slice 958 lines (3 files)                   | 901 lines (4 files)                                     | Effect 57 lines smaller                         |
+
+**G4.** Effect's `validate` loads 420 modules and 4.06 MB, against 303
+and 1.48 MB for the plain arm (1.46 MB on the WS0 baseline), and
+`--version` follows it (550 ms against 382 ms). Both stay well inside
+the limit Open decision 3 set; the slowdown is reported and judges
+nothing.
+
+**D1, and the choice it needed.** D1 is `measure:comparison -- diff <arm
+head> <run head>` over the passing T1 runs, median, and the spec named
+the instrument but never which of its counts is the measure. The counts
+disagree: files tie (7 and 7), hunks (12 against 16) and lines added (34
+against 42) favour Effect, with no overlap between the arms' runs (plain
+15-17 hunks, Effect 11-12, in both series). The owner chose, after
+seeing these numbers, to read "better on D1" as no worse on every count
+and better on at least one; Effect is better by that reading and by
+hunks alone, and ties by files alone. The two arms edit the same seven
+files, and the diff, JSON Schema and serializer hunks are nearly the
+same; the difference is in the model. A plain run edits `ObjectType.ts`
+in five places (the record and config types, the value-only list, the
+rule) and the decoder's YAML field table in two; an Effect run edits the
+schema struct in two or three and the config type, which a compile-time
+check holds to the schema's keys, in one. The first series reads the
+same (plain 7, 16, +42; Effect 7, 11, +34).
+
+**D2.** Each arm's own copy of `measure-comparison.mjs` reads 11 of 11
+reported, singly and in the combined file, every message naming the
+object type and the field, no silent loss -- the reading the arms were
+delivered with. Main's copy of the same script, run from an arm's
+directory, reads the base instead (10 of 11 singly, 7 of 11 combined),
+because `malformed` imports `@barwise/core` from where the script lives
+while `startup` and `bundles` build the tree they are run in. That is a
+gate answering about something it did not see, filed as barwise-jsi.
+
+**D3, pre-registered.** The second series decides it (see "Prompt
+amended and T1 rerun"): plain 4,869,419, 8,178,600, 4,514,634,
+5,636,837, 4,104,723; Effect 5,135,476, 3,676,815, 6,230,603, 2,636,259,
+3,873,827. The difference, -1,150,247 (Effect 21.1% lower), is under
+twice its standard error (1,911,232), so D3 casts no vote. Reported
+beside it and not pooled: the first series, plain 6,440,719 against
+Effect 4,912,522 on average, a difference of -1,528,197 (23.7%) that
+does exceed its 1,435,025 -- a series whose two arms faced a prompt that
+cost them differently, which is why it does not decide. T2, two pairs:
+plain 13,801,520 and 13,897,084 (two rounds each), Effect 14,368,715 and
+9,426,053 (one round each).
+
+**What the second rounds were.** Every Effect T1 run in the first series
+and the first three of the second missed the empty-unit cases in round 1;
+effect-t1-r4 and -r5 did not, and every plain run of the second series
+refused an empty unit unprompted. In T2 both plain runs failed refusal
+parity in round 1 and both Effect runs passed it: the plain runs put the
+file's type checks in the file decoder, as the plain arm's `ObjectType`
+does, and a config can carry a value of the wrong type through a cast,
+while one Effect Schema checks code and file alike. Two pairs, so a
+pattern rather than a finding.
+
+**The familiarity tripwire did not fire.** None of the Effect arm's 60
+red checks across every trial run is API misuse (32 task logic, 28
+environment); the plain arm's 57 are 37 and 20. D3 keeps its vote, and
+it had none to give.
+
+**Who read this spec.** In the first series 7 of 10 runs did, all in
+round 1 and all by searching for "WS0": 2 of 5 plain runs and 5 of 5
+Effect runs. In the second series none of the 10 did. The three plain
+runs of the first series that did not search were the three that edited
+the protected layout test. Of the T2 runs, plain-t2-m2 read its arm
+head's copy, which predates the T2 grounding and says nothing about how
+T2 is scored; the other three did not. The first series' records gain
+`readSpec` here.
+
+**The primer check (barwise-hno), answered.** None of the plain arm's
+round-1 layout-test edits is attributed to the primer. With the primer
+unchanged and the protected files named in the prompt, no plain run in
+the second series touched the layout test and all five passed in
+round 1; the edits followed the undefined "WS0" in the old prompt, not
+the primer's phrase.
+
+**What this does not settle.** T2 ran on `SubtypeFact`, which has no
+nested union, so the risk the first premortem story names -- the
+16-kind `Constraint` union inside `FactType` -- is untested, and the
+adoption spec has to start there. D3's spread was close to the
+pilot's: five runs per arm resolve about a fifth of a run's cost, and
+the second series' difference sits just under that.
 
 ## Competing frames
 
@@ -921,7 +1039,7 @@ How T2 runs:
   will seldom resolve a difference (Open decision 4), and WS4 says so
   rather than reading it as a vote.
 
-### 4. Measure, decide, record
+### 4. Measure, decide, record (done 2026-10-15; see Result)
 
 Fill the criteria table, apply the rule as written, record the result
 here and on barwise-973 and barwise-cu0. If TypeScript wins, merge the

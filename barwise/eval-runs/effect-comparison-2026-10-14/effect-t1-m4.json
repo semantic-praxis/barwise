@@ -10,6 +10,8 @@
   "rounds": 2,
   "leftoverCommit": false,
   "outcome": "pass",
+  "readSpec": true,
+  "readSpecNote": "searched effect-comparison.spec.md for \"WS0\" in round 1, the term the first prompt left undefined (classified from the transcript in WS4)",
   "usage": {
     "inputProcessed": 5178981,
     "turns": 47,
