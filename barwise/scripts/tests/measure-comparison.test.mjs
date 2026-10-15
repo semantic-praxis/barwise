@@ -404,7 +404,9 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * type checks a file gets (expression a string, the flags booleans).
  * `dropDerivedOnSave` writes no derived rule, `dropFormal` loses a rule's
  * isFormal from code, and `idUnchecked` accepts from code an id a file
- * refuses. With none, it is a correct conversion.
+ * refuses. `rejectEmptyExpression` refuses from code an empty expression the
+ * schema allows, and `dropDefaultStorage` drops `storage: derive_on_request`
+ * at construction. With none, it is a correct conversion.
  */
 function fakeSubtypeCore(
   {
@@ -420,6 +422,8 @@ function fakeSubtypeCore(
     dropDerivedOnSave = false,
     dropFormal = false,
     idUnchecked = false,
+    rejectEmptyExpression = false,
+    dropDefaultStorage = false,
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
@@ -441,6 +445,9 @@ const make = (c, checkRule, fromFile = false) => {
   if (c.subtypeId === c.supertypeId) throw new Error("subtype of itself");
   if (checkRule && !ruleOk(c.definingRule, fromFile || !${kindUnchecked})) throw new Error("bad defining rule");
   if ((fromFile || !${typesUnchecked}) && !flagsOk(c)) throw new Error("a flag is not a boolean");
+  if (!fromFile && ${rejectEmptyExpression} && c.definingRule?.expression === "") {
+    throw new Error("an empty expression");
+  }
   if ((fromFile || !${idUnchecked}) && c.id !== undefined && !(typeof c.id === "string" && c.id.length > 0)) {
     throw new Error("an id is a non-empty string");
   }
@@ -456,6 +463,7 @@ const make = (c, checkRule, fromFile = false) => {
   if (c.definingRule && !(${dropRule} && !fromFile)) {
     const rule = { ...c.definingRule };
     if (${dropFormal} && !fromFile) delete rule.isFormal;
+    if (${dropDefaultStorage} && !fromFile && rule.storage === "derive_on_request") delete rule.storage;
     r.definingRule = ${mutableFileRule} && fromFile ? rule : Object.freeze(rule);
   }
   return Object.freeze(r);
@@ -581,6 +589,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       "a subtype fact's defining rule is kept and frozen, from code and from a file",
       K + '.defining_rule = {"kind":"derived","expression":"e"}',
       K + '.defining_rule.expression = "kept expression"',
+      K + '.defining_rule.expression = ""',
       K + ".defining_rule.is_formal = true",
       K + '.defining_rule.kind = "derived"',
       K + '.defining_rule.kind = "semiderived"',
@@ -604,6 +613,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       K + ' = "(the base config)"',
       K + '.defining_rule = {"kind":"derived","expression":"e"}',
       K + '.defining_rule.expression = "kept expression"',
+      K + '.defining_rule.expression = ""',
       K + ".defining_rule.is_formal = true",
       K + '.defining_rule.kind = "derived"',
       K + '.defining_rule.kind = "semiderived"',
@@ -627,6 +637,7 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
     [{ dropDerivedOnSave: true }, [
       K + '.defining_rule = {"kind":"derived","expression":"e"}',
       K + '.defining_rule.expression = "kept expression"',
+      K + '.defining_rule.expression = ""',
       K + ".defining_rule.is_formal = true",
       K + '.defining_rule.kind = "derived"',
       K + '.defining_rule.storage = "derive_on_request"',
@@ -640,13 +651,19 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       R + "id is not a string",
       R + "id is empty",
     ]],
+    [{ rejectEmptyExpression: true }, [
+      K + '.defining_rule.expression = ""',
+    ]],
+    [{ dropDefaultStorage: true }, [
+      K + '.defining_rule.storage = "derive_on_request"',
+    ]],
   ];
   const good = fakeSubtypeCore();
   const dirs = [good];
   try {
     const r = run(good);
     assert.equal(r.status, 0, JSON.stringify(failedNames(r)));
-    assert.equal(r.report.cases.length, 48);
+    assert.equal(r.report.cases.length, 49);
     for (const [defect, expected] of DEFECTS) {
       const dir = fakeSubtypeCore(defect);
       dirs.push(dir);
@@ -737,6 +754,31 @@ test("the schema case generator refuses a schema it cannot account for", async (
     refusals(schema({ type: "boolean" }), "thing", KEYS, { base, codeOptional: ["thing.name"] })
       .map((c) => c.why),
     ["is not a boolean", "is not a string", "is empty"],
+  );
+  // A required nested object is a constraint too: making one required adds
+  // a "missing" case rather than nothing (Copilot, PR #662).
+  const nested = {
+    definitions: {
+      thing: {
+        type: "object",
+        required: ["inner"],
+        properties: { inner: { $ref: "#/definitions/inner" } },
+      },
+      inner: { type: "object", properties: { v: { type: "string" } } },
+    },
+  };
+  assert.deepEqual(
+    refusals(nested, "thing", { inner: ["inner", { v: "v" }] }, {
+      base: { thing: { inner: {} }, "thing.inner": {} },
+    }).map((c) => `${c.path} ${c.why}`),
+    ["thing.inner is missing", "thing.inner is not an object", "thing.inner.v is not a string"],
+  );
+  // A string with no minLength is kept empty as well as not.
+  assert.deepEqual(
+    preservations(nested, "thing", { inner: ["inner", { v: "v" }] }, {
+      base: { thing: { inner: {} }, "thing.inner": {} },
+    }).map((c) => c.value),
+    ["(the base config)", {}, "kept v", ""],
   );
   // A boolean is kept at the value its absence does not stand for.
   const p = preservations(schema({ type: "boolean", default: false }), "thing", KEYS, { base });

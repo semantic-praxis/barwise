@@ -91,6 +91,13 @@ export function refusals(schema, defName, keys, { base, codeOptional = [], root 
     for (const f of fields(schema, def, keyMap, where)) {
       const put = (value, why) =>
         out.push({ path: f.path, why, config: wrap({ ...levelBase, [f.configKey]: value }) });
+      // Before the $ref branch: a required nested object is a constraint
+      // too, and skipping it would let the schema grow one without a case
+      // (Copilot, PR #662).
+      if (f.required && !codeOptional.includes(f.path)) {
+        const { [f.configKey]: _omitted, ...rest } = levelBase;
+        out.push({ path: f.path, why: "is missing", config: wrap(rest) });
+      }
       if (f.isRef) {
         put("nope", "is not an object");
         const nestedBase = base[f.path];
@@ -103,10 +110,6 @@ export function refusals(schema, defName, keys, { base, codeOptional = [], root 
           nestedBase,
         );
         continue;
-      }
-      if (f.required && !codeOptional.includes(f.path)) {
-        const { [f.configKey]: _omitted, ...rest } = levelBase;
-        out.push({ path: f.path, why: "is missing", config: wrap(rest) });
       }
       if (f.node.type === "string") put(42, "is not a string");
       if (f.node.type === "boolean") put("nope", "is not a boolean");
@@ -151,7 +154,12 @@ export function preservations(
       if (f.node.enum) { for (const v of f.node.enum) put(v); }
       else if (f.node.type === "boolean") {
         put(f.node.default === undefined ? true : !f.node.default);
-      } else if (f.node.type === "string") put(`kept ${f.yamlKey}`);
+      } else if (f.node.type === "string") {
+        put(`kept ${f.yamlKey}`);
+        // The empty string, where the schema allows it, is a value too: code
+        // must take it as a file does (Copilot, PR #662).
+        if (!(f.node.minLength >= 1)) put("");
+      }
     }
   };
   walk(schema.definitions[defName], keys, root, (c) => c, base[root]);

@@ -678,7 +678,9 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels, schema }) {
         const given = withIds(config, a, b);
         const absent = { "definingRule.storage": "derive_on_request" };
         const sf = m.addSubtypeFact(given);
-        return keeps(sf, given, absent)
+        // Exact on the record; the serializer's omissions apply only after a
+        // save and a load (Copilot, PR #662).
+        return keeps(sf, given)
           && keeps(yaml.deserialize(yaml.serialize(m)).subtypeFacts[0], given, absent);
       },
     ]);
