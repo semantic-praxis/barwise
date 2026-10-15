@@ -1,0 +1,97 @@
+{
+  "run": "plain-t1-r5",
+  "arm": "plain",
+  "task": "T1",
+  "phase": "second-series",
+  "pair": "r5",
+  "start": "8398a193",
+  "head": "dc507338",
+  "startedAt": "2026-10-15T05:45:09Z",
+  "rounds": 1,
+  "leftoverCommit": false,
+  "outcome": "pass",
+  "readSpec": false,
+  "usage": {
+    "inputProcessed": 4104723,
+    "turns": 37,
+    "finalContext": 137199,
+    "rounds": [
+      {
+        "round": 1,
+        "turns": 37,
+        "inputProcessed": 4104723
+      }
+    ],
+    "source": "measure:comparison -- usage over the run's transcript; per turn in plain-t1-r5.usage.json"
+  },
+  "scoring": [
+    {
+      "round": 1,
+      "head": "dc507338",
+      "trial": {
+        "exit": 0,
+        "protectedTouched": []
+      },
+      "heldout": {
+        "passed": 13,
+        "of": 13
+      },
+      "build": 0,
+      "test": 0,
+      "validateExamples": 0,
+      "promptlabDrift": {
+        "exit": 0,
+        "tests": "15 passed"
+      },
+      "harness": {
+        "tokens": 138979,
+        "toolCalls": 44,
+        "wallMs": 575714
+      }
+    }
+  ],
+  "diff": {
+    "files": 7,
+    "hunks": 16,
+    "added": 38,
+    "removed": 2,
+    "consumerFiles": [
+      "barwise/packages/core/schemas/orm-model.schema.json",
+      "barwise/packages/core/src/diff/breakingLevel.ts",
+      "barwise/packages/core/src/diff/changeDescription.ts",
+      "barwise/packages/core/src/diff/elementDiff.ts"
+    ],
+    "sliceLines": 980
+  },
+  "redChecks": [
+    {
+      "class": "environment",
+      "command": "git ... / compound shell command",
+      "firstError": "the worktree sandbox refused a command it could not verify stayed inside the worktree",
+      "note": "harness isolation, not the code (2 times)"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (packages/core)",
+      "firstError": "FAIL tests/laws/counterexample.law.test.ts > coverage: the law reaches every constraint kind that has a generator (3 failed)",
+      "note": "a newly drawn unit in tests/arbitraries/model.ts shifted the seeded samples; the unit is now derived from the drawn data type's scale, so the stream did not move"
+    },
+    {
+      "class": "task logic",
+      "command": "npx vitest run (a throwaway probe)",
+      "firstError": "AssertionError: expected 'units 194 of 277' to be 'x'",
+      "note": "a deliberately failing probe the run wrote to count how many generated value types carry a unit; not a defect"
+    }
+  ],
+  "observations": [
+    "did not edit the protected layout test, under the amended prompt and without reading the experiment spec",
+    "refused an empty unit in round 1, in the shared rule",
+    "named its own trade-off: a unit derived from the data type's scale appears only on a value type with a scale, so the serialization law never sees a unit without one"
+  ],
+  "agentJudgmentCalls": [
+    "empty unit refused, in the shared rule (round 1)",
+    "unit written after data_type",
+    "unit change is breaking level caution",
+    "unit derived from the data type's scale in the random model generator, so the seeded law samples did not move"
+  ]
+}
