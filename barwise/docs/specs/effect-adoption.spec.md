@@ -1,7 +1,9 @@
 # Adopting Effect Schema for the rest of the sealed-record metamodel
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
-see WS0); the spike (WS1) and the workstreams after it not started
+see WS0); the spike (WS1) amended 2026-10-15 to measure derived test
+generators and property tests (see WS1 and Reported measures); the spike
+and the workstreams after it not started
 Created: 2026-10-15
 Last-updated: 2026-10-15
 Tracking: barwise-jo5 (this spec); barwise-973 (WS1 of
@@ -168,6 +170,35 @@ have headroom of 436 ms and 6.7 s at the arm's readings (taken on the
 comparison's machine; WS0's baselines below are from another, which is
 why the spike reads both heads back to back).
 
+### Reported measures for the spike (added 2026-10-15; not gates)
+
+Added after the gates above were fixed, so they change no pass or fail
+rule. They inform the adoption decision as the comparison's R-measures
+did. Each is taken on the spike's own head and on `main`, on one
+machine, with the same definitions.
+
+- **M1, derivation.** `Arbitrary.schema` returns a generator for the
+  kind's Schema, and for the whole union. Reads yes or no, and on a no,
+  the construct it names. Derivation is marked unstable in the pinned
+  Effect version, so each yes is reported with that version.
+- **M2, validity.** The share of derived values that the same Schema
+  encodes. A generator that produces values the class refuses tests the
+  wrong class.
+- **M3, round trip.** The share of derived values for which encoding and
+  then decoding gives back the same value, with object keys compared
+  unordered. Key order is pinned separately, by S2.
+- **M4, independent acceptance.** The share of encoded values that the
+  hand-written JSON Schema accepts, through core's existing
+  `SchemaValidator`. This is the only measure whose answer key does not
+  come from the Schema under test.
+- **M5, replaced lines.** The lines of hand-written generator in
+  `core/tests/arbitraries/model.ts` that derived generators replace, by
+  kind. See the Inventory paragraph for which lines count.
+
+Refusal cases stay out of M2 to M4. A derived generator produces valid
+values. The refusal cases come from the S4 fixtures and the frozen
+reference, not from the Schema being measured.
+
 ## How this spec weighs D1
 
 The comparison's Result asks the adoption spec to weigh the files-only
@@ -201,6 +232,14 @@ nowhere else:
 | `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4) |
 | `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig   |
 | Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use |
+
+`core/tests/arbitraries/model.ts` (1,010 lines) is the suite's hand-written
+whole-model generator. Lines 242 to 319, 78 lines of element-level
+generators, are the part a Schema could describe, and they are what M5
+counts. The whole-model generator wires cross-references between elements
+(a role's player must exist, a constraint's roles must belong to its fact
+type), and no single element's Schema describes that, so M5 does not count
+it. Nothing in it changes on `main` before the spike passes.
 
 `ModelGraph`, validation, verbalization and mapping read records, not
 decoders, so they are untouched by the style as long as S3 holds; that
@@ -372,6 +411,55 @@ closed with the reading, barwise-973 resumes in plain TypeScript from
 `experiment/effect-comparison-plain`, and the branch stays as the
 evidence. Nothing merges from this workstream.
 
+**Property tests (added 2026-10-15).** On the spike branch, each kind's
+Schema gets derived generators, and three properties run over them, with
+the run count and seed recorded:
+
+- P1, every derived value encodes (M2).
+- P2, encoding then decoding returns the same value, with object keys
+  compared unordered (M3).
+- P3, every encoded value passes the hand-written JSON Schema (M4).
+
+P3 is the independent check. P1 and P2 test the Schema against itself,
+so a Schema that is wrong the same way on both sides passes them. The
+spike adds no property whose expected answer comes from the Schema alone.
+A refusal property would be that kind, so refusals stay with the fixtures.
+
+Two constraints from the grounding below. A derived schema may not
+contain `Schema.declare` unless the declaration carries an arbitrary
+(M1). And a property must encode a derived value before decoding it,
+because derived values are the decoded type, with camelCase keys.
+
+The spike deletes no hand-written generator. Deletion happens in WS2 to
+WS4, one kind at a time, and only for a kind whose M2 to M4 pass on its
+own head.
+
+**Grounding (2026-10-15, before the spike).** Probes ran on the Effect
+arm's `ObjectType` schema, at `8d36e4fc`, because `main` has no Effect.
+None is committed.
+
+- `Arbitrary.schema(ObjectTypeYamlCodec)` derives. 1,000 of 1,000
+  generated values encode (M2), and 1,000 of 1,000 round trip with keys
+  unordered (M3). That is the file-facing codec, whose data type names
+  are literals.
+- `Arbitrary.schema(ObjectTypeModelCodec)` throws `Unable to derive an
+  arbitrary for an unsupported Declaration` at `dataType.name`. The
+  cause is `Schema.declare` in `CONFIG_LEAVES`, the lenient leaf the model
+  codec uses so that a config may name a data type outside the list.
+  Open decision 6 covers the options.
+- Effect 4 has its own runner, `Arbitrary.sampleEffect` and
+  `Arbitrary.checkEffect`. Passing an Effect arbitrary to fast-check fails
+  with `this.arb.generate is not a function`.
+- A first run decoded derived values directly. It rejected all 484
+  entity values among its 1,000 samples. That was the probe's error, not a finding
+  about the generator: derived values are the decoded type, so they must
+  be encoded first. A property written that way fails every value and
+  tests nothing.
+
+Not yet measured: M1 on the 16-kind union, M4 on any kind, M5 for the
+spike's derived generators, and whether the union needs `Schema.suspend`
+to derive. Those are the spike's first readings.
+
 ### 2. Effect in core: the dependency and the `ObjectType` slice (provisional: not yet grounded)
 
 The Effect arm (`8d36e4fc`) rebased onto `main`: `effect` pinned exact
@@ -445,7 +533,28 @@ entry only records that it follows.
    barwise-973 resumes from the plain arm (`8398a193`), the comparison's
    fallback.
 
+5. **The lenient config leaf, so that derivation works -- open.** The
+   model codec reads a data type name through `Schema.declare`, which
+   accepts any string at runtime, while its TypeScript type is the strict
+   list. Derivation cannot describe a declaration (M1). Options: (a)
+   annotate the declaration with an arbitrary, if the pinned Effect
+   accepts one (not yet checked); (b) replace it with a derivable string
+   leaf that accepts the same values, and keep the strict list only in the
+   TypeScript type at the boundary, where `ObjectTypeConfig` already holds
+   callers to it. Option (b) changes what the decoded type says, so it is
+   a reviewer's call. Recommend (a) if the pinned Effect supports it;
+   otherwise (b), with the spike measuring whether any caller relies on
+   the narrower decoded type.
+
 ## Risks and testing
+
+- Derivation is unstable in the pinned Effect version. The spike records
+  the version with each reading, and an Effect upgrade re-reads M1 to M4
+  before it lands.
+- Derivation generates values the Schema's own checks may refuse. M2
+  measures that rate for each kind. A kind with a low rate needs its
+  generator constrained through the options `Arbitrary.schema` accepts,
+  not filtered in each test. The spike checks which constraints it accepts.
 
 - The spike is measured, not merged. Every gate is read on one machine,
   the spike head and `main` back to back, with `--force` builds
@@ -465,3 +574,5 @@ entry only records that it follows.
   dependency where a package imports a core decoder.
 - No new capability: this restyles how core holds and decodes a model,
   not what it accepts or serializes.
+- The spike deletes no hand-written generator and adds no property whose
+  expected answer comes from the Schema under test alone.
