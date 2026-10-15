@@ -42,6 +42,22 @@ function resolve(schema, node) {
   return target;
 }
 
+/**
+ * A value of the field's own type outside its enum, so the case tests the
+ * enum and not the type check before it -- or a throw where none exists
+ * (Copilot, PR #662).
+ */
+function outsideEnum(node, where) {
+  if (node.type === "boolean") {
+    const v = [true, false].find((b) => !node.enum.includes(b));
+    if (v === undefined) throw new Error(`schema-cases: ${where} enum admits every boolean`);
+    return v;
+  }
+  let v = "nope";
+  while (node.enum.includes(v)) v += "!";
+  return v;
+}
+
 function checkKeywords(node, allowed, where) {
   for (const k of Object.keys(node)) {
     if (!allowed.has(k)) {
@@ -132,7 +148,7 @@ export function refusals(schema, defName, keys, { base, codeOptional = [], root 
       }
       if (f.node.type === "string") put(42, "is not a string");
       if (f.node.type === "boolean") put("nope", "is not a boolean");
-      if (f.node.enum) put("nope", "is outside its enum");
+      if (f.node.enum) put(outsideEnum(f.node, f.path), "is outside its enum");
       if (f.node.minLength >= 1) put("", "is empty");
     }
   };

@@ -814,6 +814,17 @@ test("the schema case generator refuses a schema it cannot account for", async (
       /minLength 8/,
     );
   }
+  // An enum refusal uses a value of the field's own type outside the enum:
+  // not one the enum admits, and not one the type check already refuses.
+  const outside = (prop) =>
+    refusals(schema(prop), "thing", KEYS, { base }).find((c) => c.why === "is outside its enum")
+      .config.flag;
+  assert.equal(outside({ type: "string", enum: ["nope", "nope!"] }), "nope!!");
+  assert.equal(outside({ type: "boolean", enum: [true] }), false);
+  assert.throws(
+    () => refusals(schema({ type: "boolean", enum: [true, false] }), "thing", KEYS, { base }),
+    /every boolean/,
+  );
   // A key map that names a property the schema lacks, or misses one, throws.
   assert.throws(
     () => refusals(schema({ type: "boolean" }), "thing", { name: "name" }, { base }),
