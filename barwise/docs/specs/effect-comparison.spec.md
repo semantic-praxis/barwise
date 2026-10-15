@@ -871,8 +871,8 @@ How T2 runs:
   already built `ObjectType`: a plain object, frozen, carrying only its
   declared fields, an absent optional field absent rather than
   `undefined`, from code and from a file. The rest holds what the base
-  does -- the endpoints and flags code was given, kept through a save
-  and a load, the defaults, the five refusals in `addSubtypeFact` (a subtype
+  does -- the endpoints, flags and defining rule (with `isFormal`) code
+  was given, kept through a save and a load, the defaults, the five refusals in `addSubtypeFact` (a subtype
   of itself, an absent type, a duplicate, a value type at either end), a file's
   self-subtype refused, the round trip, the diff, and the YAML text both
   heads write for a fully populated subtype fact (the layout, which G2's
@@ -882,7 +882,7 @@ How T2 runs:
 - **The rule the task adds is a defect the base has.** `addSubtypeFact`
   accepts a defining rule with `storage: "nope"`, no `expression`, or a
   missing or unknown `kind`, a non-string `expression`, a non-boolean
-  `isFormal`, or a non-boolean subtype flag,
+  `isFormal`, a non-boolean subtype flag, or an empty or non-string `id`,
   writes it, and the file it wrote is refused on load. The task states
   the rule (code refuses what a file refuses) so a correct run is not
   judged against something it was never asked, and T1's empty unit,

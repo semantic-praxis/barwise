@@ -603,7 +603,12 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
     kind: "derived",
     storage: "derived_and_stored",
     expression: "each Employee is a Person who is employed",
+    isFormal: true,
   };
+  /** A defining rule's four fields, compared with what was given. */
+  const sameRule = (r, want) =>
+    r !== undefined && r.kind === want.kind && r.expression === want.expression
+    && r.storage === want.storage && r.isFormal === want.isFormal;
   const isRecord = (sf) =>
     Object.getPrototypeOf(sf) === Object.prototype && Object.isFrozen(sf)
     && Object.keys(sf).every((k) => FIELDS.has(k));
@@ -624,12 +629,21 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
     [
       "a subtype fact's defining rule is kept and frozen, from code and from a file",
       () => {
-        const fileRule = { kind: "derived", expression: "e", storage: "derived_and_stored" };
-        const keptFrozen = (r, want) =>
-          r !== undefined && Object.isFrozen(r) && r.kind === want.kind
-          && r.expression === want.expression && r.storage === want.storage;
+        const fileRule = {
+          kind: "derived",
+          expression: "e",
+          storage: "derived_and_stored",
+          is_formal: true,
+        };
+        const fromFile = {
+          kind: "derived",
+          expression: "e",
+          storage: "derived_and_stored",
+          isFormal: true,
+        };
+        const keptFrozen = (r, want) => sameRule(r, want) && Object.isFrozen(r);
         return keptFrozen(built({ definingRule: RULE }).definingRule, RULE)
-          && keptFrozen(load({ defining_rule: fileRule }).subtypeFacts[0].definingRule, fileRule);
+          && keptFrozen(load({ defining_rule: fileRule }).subtypeFacts[0].definingRule, fromFile);
       },
     ],
     [
@@ -641,7 +655,7 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
     // constructor that swaps or drops the endpoints, or ignores the flags,
     // passed every other case (Copilot, PR #662).
     [
-      "a subtype fact built in code keeps its endpoints and flags, through a save and a load",
+      "a subtype fact built in code keeps its endpoints, flags and rule, through a save and a load",
       () => {
         const { m, a, b } = twoTypes();
         const given = {
@@ -655,7 +669,7 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
         const keeps = (sf) =>
           sf.subtypeId === given.subtypeId && sf.supertypeId === given.supertypeId
           && sf.providesIdentification === false && sf.isExclusive === true
-          && sf.isExhaustive === true;
+          && sf.isExhaustive === true && sameRule(sf.definingRule, RULE);
         const sf = m.addSubtypeFact(given);
         return keeps(sf) && keeps(yaml.deserialize(yaml.serialize(m)).subtypeFacts[0]);
       },
@@ -753,6 +767,8 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels }) {
           { providesIdentification: "nope" },
           { isExclusive: "nope" },
           { isExhaustive: "nope" },
+          { id: "" },
+          { id: 42 },
         ].every((config) => throws(() => built(config))),
     ],
   ];

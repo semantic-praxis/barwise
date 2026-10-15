@@ -401,8 +401,10 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * `valueEndpoint` lets a value type stand at either end. `swapEndpoints` and
  * `ignoreFlags` lose what code was given: the endpoints reversed, the flags
  * replaced by their defaults. `typesUnchecked` skips, from code only, the
- * type checks a file gets (expression a string, the flags booleans). With
- * none, it is a correct conversion.
+ * type checks a file gets (expression a string, the flags booleans).
+ * `dropDerivedOnSave` writes no derived rule, `dropFormal` loses a rule's
+ * isFormal from code, and `idUnchecked` accepts from code an id a file
+ * refuses. With none, it is a correct conversion.
  */
 function fakeSubtypeCore(
   {
@@ -415,6 +417,9 @@ function fakeSubtypeCore(
     swapEndpoints = false,
     ignoreFlags = false,
     typesUnchecked = false,
+    dropDerivedOnSave = false,
+    dropFormal = false,
+    idUnchecked = false,
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), "heldout-t2-"));
@@ -436,6 +441,9 @@ const make = (c, checkRule, fromFile = false) => {
   if (c.subtypeId === c.supertypeId) throw new Error("subtype of itself");
   if (checkRule && !ruleOk(c.definingRule, fromFile || !${kindUnchecked})) throw new Error("bad defining rule");
   if ((fromFile || !${typesUnchecked}) && !flagsOk(c)) throw new Error("a flag is not a boolean");
+  if ((fromFile || !${idUnchecked}) && c.id !== undefined && !(typeof c.id === "string" && c.id.length > 0)) {
+    throw new Error("an id is a non-empty string");
+  }
   const r = {
     id: c.id ?? "sf-" + ++next,
     subtypeId: ${swapEndpoints} && !fromFile ? c.supertypeId : c.subtypeId,
@@ -446,7 +454,9 @@ const make = (c, checkRule, fromFile = false) => {
   };
   if (${asClass}) return new Legacy({ ...r, definingRule: c.definingRule });
   if (c.definingRule && !(${dropRule} && !fromFile)) {
-    r.definingRule = ${mutableFileRule} && fromFile ? { ...c.definingRule } : Object.freeze({ ...c.definingRule });
+    const rule = { ...c.definingRule };
+    if (${dropFormal} && !fromFile) delete rule.isFormal;
+    r.definingRule = ${mutableFileRule} && fromFile ? rule : Object.freeze(rule);
   }
   return Object.freeze(r);
 };
@@ -474,7 +484,10 @@ export class OrmYamlSerializer {
     const m = new OrmModel({ name: d.name });
     m.objectTypes = d.object_types;
     m.subtypeFacts = (d.subtype_facts ?? []).map((s) => {
-      const r = s.defining_rule;
+      const y = s.defining_rule;
+      const r = y && Object.fromEntries(Object.entries({
+        kind: y.kind, expression: y.expression, storage: y.storage, isFormal: y.is_formal,
+      }).filter(([, v]) => v !== undefined));
       if (!ruleOk(r)) throw new Error("bad defining rule");
       return make({
         id: s.id, subtypeId: s.subtype, supertypeId: s.supertype,
@@ -490,7 +503,12 @@ export class OrmYamlSerializer {
       ...(s.providesIdentification ? {} : { provides_identification: false }),
       ...(s.isExclusive ? { is_exclusive: true } : {}),
       ...(s.isExhaustive ? { is_exhaustive: true } : {}),
-      ...(s.definingRule ? { defining_rule: s.definingRule } : {}),
+      ...(s.definingRule && !(${dropDerivedOnSave} && s.definingRule.kind === "derived")
+        ? { defining_rule: Object.fromEntries(Object.entries({
+          kind: s.definingRule.kind, expression: s.definingRule.expression,
+          storage: s.definingRule.storage, is_formal: s.definingRule.isFormal,
+        }).filter(([, v]) => v !== undefined)) }
+        : {}),
     }));
     // JSON to load back, then the subtype facts as YAML lines, the part the
     // layout case reads.
@@ -543,6 +561,9 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
     fakeSubtypeCore({ swapEndpoints: true }),
     fakeSubtypeCore({ ignoreFlags: true }),
     fakeSubtypeCore({ typesUnchecked: true }),
+    fakeSubtypeCore({ dropDerivedOnSave: true }),
+    fakeSubtypeCore({ dropFormal: true }),
+    fakeSubtypeCore({ idUnchecked: true }),
   ];
   try {
     const good = run(dirs[0]);
@@ -564,11 +585,15 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
     ]);
     // A rule dropped from code, or loaded and left mutable, fails the rule
     // case alone: a freeze check alone passed both (Copilot, PR #662).
-    for (const dir of [dirs[3], dirs[4]]) {
-      assert.deepEqual(failedNames(run(dir)), [
-        "a subtype fact's defining rule is kept and frozen, from code and from a file",
-      ]);
-    }
+    // A rule dropped from code also fails the keeps case, which checks the
+    // rule it was given after a save and a load.
+    assert.deepEqual(failedNames(run(dirs[3])), [
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      "a subtype fact built in code keeps its endpoints, flags and rule, through a save and a load",
+    ]);
+    assert.deepEqual(failedNames(run(dirs[4])), [
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+    ]);
     // A rule kind left unchecked from code, and a value type at either end,
     // each fail their own case and nothing else (Copilot, PR #662).
     assert.deepEqual(failedNames(run(dirs[5])), [
@@ -582,7 +607,7 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
     // reversed fail it too, and the duplicate check, which then compares
     // the wrong ends.
     const KEEPS =
-      "a subtype fact built in code keeps its endpoints and flags, through a save and a load";
+      "a subtype fact built in code keeps its endpoints, flags and rule, through a save and a load";
     assert.deepEqual(failedNames(run(dirs[7])), [
       KEEPS,
       "construction refuses a duplicate subtype fact",
@@ -590,6 +615,17 @@ test("heldout t2 passes a converted SubtypeFact and fails the base's class and i
     assert.deepEqual(failedNames(run(dirs[8])), [KEEPS]);
     // A flag of the wrong type accepted from code, refused from a file.
     assert.deepEqual(failedNames(run(dirs[9])), [
+      "a subtype fact a file would refuse is refused from code too",
+    ]);
+    // A derived rule lost on save fails the keeps case; isFormal lost from
+    // code fails it and the rule case; an id accepted from code that a file
+    // refuses fails the parity case (Copilot, PR #662).
+    assert.deepEqual(failedNames(run(dirs[10])), [KEEPS]);
+    assert.deepEqual(failedNames(run(dirs[11])), [
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      KEEPS,
+    ]);
+    assert.deepEqual(failedNames(run(dirs[12])), [
       "a subtype fact a file would refuse is refused from code too",
     ]);
     // A task with no cases is refused, not read as zero cases passed -- and
