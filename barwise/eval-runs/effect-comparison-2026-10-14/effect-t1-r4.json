@@ -80,7 +80,7 @@
   "observations": [
     "the first Effect T1 run in either series to pass in round 1: it refused an empty unit unprompted, in the value-type schema and the JSON Schema (minLength 1)",
     "did not edit the protected layout test, under the amended prompt and without reading the experiment spec",
-    "did not add unit to the random model generator (tests/arbitraries/model.ts), so the serialization law does not exercise it; the task did not require it, and every other second-series run added it",
+    "did not add unit to the random model generator (tests/arbitraries/model.ts), so the serialization law does not exercise it; the task did not require it. Of the ten second-series runs, this one and effect-t1-r5 (which tried and reverted) are the two whose final generator leaves unit out",
     "wrote unit after default_value"
   ],
   "agentJudgmentCalls": [
