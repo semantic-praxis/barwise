@@ -15,7 +15,13 @@ import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
-import { ambiguityReport, combine, lostKeys, scoreDocument } from "../lib/malformed-score.mjs";
+import {
+  ambiguityReport,
+  combine,
+  lostKeys,
+  namesField,
+  scoreDocument,
+} from "../lib/malformed-score.mjs";
 import { median } from "../lib/median.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -270,9 +276,38 @@ test("a problem inside a constraint is credited for naming that constraint, not 
     serialize: () => "",
   });
   const at = (path) => scoreDocument("unused", problems, failing(path)).problems[0].namesConstraint;
-  assert.equal(at("/model/fact_types/0/constraints/1/ring_type"), true);
-  assert.equal(at("/model/fact_types/0/constraints/0/ring_type"), false);
-  assert.equal(at('["fact_types"][0]["constraints"][1]["ring_type"]'), true);
+  // The constraint has an id, so only the id names it.
+  assert.equal(at("/model/fact_types/0/constraints/1/ring_type (c-ring)"), true);
+  assert.equal(at("/model/fact_types/0/constraints/1/ring_type"), false);
+
+  // Without one, its position does, in either path spelling.
+  const anonymous = doc.replace(
+    "        - id: c-ring\n          type: ring",
+    "        - type: ring",
+  );
+  const { problems: positional } = combine(cases, () => anonymous);
+  const atPos = (path) =>
+    scoreDocument("unused", positional, failing(path)).problems[0].namesConstraint;
+  assert.equal(atPos("/model/fact_types/0/constraints/1/ring_type"), true);
+  assert.equal(atPos("/model/fact_types/0/constraints/0/ring_type"), false);
+  assert.equal(atPos('["fact_types"][0]["constraints"][1]["ring_type"]'), true);
+});
+
+test("a field is named only as a whole word, not inside a longer one", () => {
+  // Stand-in defect: a substring match found `type` in every `fact_types`
+  // path, so a message naming no field was credited with the case's field.
+  assert.equal(
+    namesField("/model/fact_types/6/constraints/0: invalid constraint on Permit has Age", "type"),
+    false,
+  );
+  assert.equal(namesField("must have required property 'roles'", "role"), false);
+  assert.equal(
+    namesField("/model/fact_types/6/constraints/0/type: must be equal to constant", "type"),
+    true,
+  );
+  assert.equal(namesField("Entity type Customer needs a referenceMode.", "reference_mode"), true);
+  assert.equal(namesField("the reference mode is missing", "reference_mode"), true);
+  assert.equal(namesField("ring_type: must be one of", "ring_type"), true);
 });
 
 test("typecheck reads tsc's own totals, fails over the limit, and refuses what it cannot read", () => {

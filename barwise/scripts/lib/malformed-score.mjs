@@ -34,11 +34,29 @@ export function messagesOf(err) {
   return [String(err?.message ?? err)];
 }
 
-const squash = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+/**
+ * The words of a text: camelCase split at its humps, everything lowercased,
+ * anything not a letter or digit a separator. `referenceMode`,
+ * `reference_mode` and "reference mode" all read as `reference mode`.
+ */
+const words = (s) =>
+  String(s).replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(
+    Boolean,
+  );
 
-/** Whether a message names a field, in any spelling: `reference_mode`, `referenceMode`, "reference mode". */
+/**
+ * Whether a message names a field, in any spelling: `reference_mode`,
+ * `referenceMode`, "reference mode".
+ *
+ * Whole words, in sequence. A substring match credited a field to any
+ * message that held it inside a longer word: `type` inside the
+ * `fact_types` of every fact type path, `role` inside `roles`, so a
+ * generic message about a constraint was scored as naming the field.
+ */
 export function namesField(message, field) {
-  return squash(message).includes(squash(field));
+  const said = words(message);
+  const name = words(field);
+  return said.some((_, i) => name.every((w, j) => said[i + j] === w));
 }
 
 /** The document collection each element kind lives in. */
@@ -70,9 +88,11 @@ export function identifies(message, { id, name, index, kind = "object_type" }) {
 /**
  * Whether a message identifies the constraint a problem sits in: by its id
  * when it has one, else by its position in the fact type's `constraints`.
+ * A constraint with an id is named only by the id, as S4 asks; its
+ * position does not stand in for it.
  */
 export function identifiesConstraint(message, constraint) {
-  if (constraint.id && message.includes(constraint.id)) return true;
+  if (constraint.id) return message.includes(constraint.id);
   return atPosition(message, "constraints", constraint.index);
 }
 

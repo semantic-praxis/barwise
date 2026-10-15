@@ -120,11 +120,14 @@ whether the choice survives the union.
   is on an object type's value constraint, not on a member of this
   union; see WS0's implementation notes.) Comparing against
   today's union instead would fail a correct conversion, because the
-  spike makes those narrowings too. `ConstraintRecord` is written in
-  WS0 as a mapped type over today's union
-  (`core/tests/types/constraintRecord.ts`), so it compiles on `main` and
-  cannot drift from the kinds; the spike adds one assertion, that
-  `KindsMatch<Derived>` is `AllKindsMatch`. This is the union-specific gate:
+  spike makes those narrowings too. `ConstraintRecord` is frozen in
+  WS0 (`core/tests/types/constraintRecord.ts`): written out kind by kind,
+  importing nothing from `src/`, because the spike replaces `Constraint`
+  and a reference computed from it would move with it. On `main` a type
+  test holds the frozen copy to today's union with the two narrowings
+  applied, so it cannot have drifted before the spike starts; on the
+  spike the same comparison, made against the derived `Constraint`, is
+  S3. This is the union-specific gate:
   consumers switch on `c.type` with `assertNever`
   (`core-branching-load.spec.md`, WS4), and a derived type that widens
   a field or loses a discriminant breaks them silently at the type
@@ -264,13 +267,20 @@ Each was shown to catch the failure it measures by a deliberate break:
 
 - S2: swapping `definition` and `note` in `serializeFactType` fails the
   layout test and none of the other 209 serialization tests.
-- S3: dropping the operands narrowing from `ConstraintRecord` fails
-  exactly the two operand checks; `wiring.test.ts` fails when a type
-  test falls outside the tsconfig that compiles it.
-- S4: four stand-in scorer defects -- a fact type position read as an
+- S3: adding a member to `RingType` in `src/model/Constraint.ts` fails
+  exactly the check that holds the frozen record to `src/` -- the
+  assertion that is S3 on the spike; `KindsMatch` rejects a widened
+  field, array join operands, a missing kind, an extra kind and an extra
+  field; and `wiring.test.ts`, which reads the files TypeScript resolves
+  for the type tests' tsconfig, fails when that tsconfig stops
+  compiling them (dropping its `exclude: []` lets core's inherited
+  `tests/` exclusion back in).
+- S4: six stand-in scorer defects -- a fact type position read as an
   object type's, a `combine` that drops fact types, a `lostKeys` that
-  stops at the top level, a constraint credited whatever it names --
-  each fail their test in `measure-comparison.test.mjs`.
+  stops at the top level, a constraint credited whatever it names, a
+  field matched inside a longer word, and a constraint with an id
+  credited for its position -- each fail their test in
+  `measure-comparison.test.mjs`.
 - S6: a stand-in `tsc` in a throwaway tree drives each exit: a reading,
   over the limit, no totals printed, and a tree that does not compile.
 
@@ -283,7 +293,7 @@ Xeon 2.10 GHz x4 (not the comparison's machine):
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | S1   | full suite, `validate:examples`, `referenceDrift.test.ts` green (`ci:local` on the WS0 head)                                         |
 | S2   | `factTypeLayout.test.ts` green                                                                                                       |
-| S3   | 7 type tests green; `KindsMatch<Constraint>` is false for every kind, as it must be                                                  |
+| S3   | 10 type tests green; today's union does not match the frozen record, and does once the two narrowings are applied                    |
 | S4   | singly: object types 10/11 (9 named), fact types 13/17 (13 named; constraint named 9/11); combined 19/28 (19 named); 0 silent losses |
 | S5   | `validate` 341 ms npm, 387 ms bundle, 302 modules and 1.47 MB loaded                                                                 |
 | S6   | 2,410 ms median (2,300-2,790), 25,382 instantiations                                                                                 |
@@ -308,8 +318,22 @@ reported singly goes unreported there.
   assertion as "no errors": the compiler never saw the file. The type
   tests get `tests/types/tsconfig.json`, `PackageTestShape` gains a
   `typecheck` option that requires one, and `wiring.test.ts` checks
-  every type test is inside it. knip names the `*.test-d.ts` files as
-  core entries, since its vitest plugin reads only `test.include`.
+  every type test is among the files TypeScript resolves for it. knip
+  names the `*.test-d.ts` files as core entries, since its vitest plugin
+  reads only `test.include`.
+- **Review found three ways the instruments could pass what they
+  measure** (Copilot on PR #670, all fixed before merge). The first
+  `ConstraintRecord` was a mapped type over `Constraint`, so once the
+  spike replaced `Constraint` the reference would have moved with it;
+  it is now frozen. `namesField` matched a field as a substring, so
+  `type` was found inside `fact_types` and a message naming no field was
+  credited; it now matches whole words. And a constraint with an id
+  could be credited for its position, which S4 does not allow. None of
+  the three changed a baseline reading: today's fixtures carry no
+  constraint ids, and no message today names a field only inside a
+  longer word. The first `wiring.test.ts` matched include patterns as
+  written, so an inherited exclusion could drop the type tests unseen;
+  it now reads TypeScript's resolved file list.
 - **S4's cases stop at the element.** A problem that needs another
   element to see -- a constraint naming a role outside its fact type, a
   role naming an object type that does not exist -- is not a case: the
