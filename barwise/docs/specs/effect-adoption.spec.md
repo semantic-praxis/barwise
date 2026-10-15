@@ -93,7 +93,7 @@ whether the choice survives the union.
 | -- | ------------------------------------- | -------------------------------------------------- |
 | S1 | Valid input unchanged                 | Nothing changes for a model that loads today       |
 | S2 | Fact type and constraint YAML layout  | Users' model diffs stay quiet                      |
-| S3 | `Constraint` type unchanged           | Every consumer of the union compiles without edits |
+| S3 | `Constraint` type is the target       | Code that switches on a kind keeps compiling       |
 | S4 | Every problem, named, in one pass     | Time to fix a bad model; no silent loss            |
 | S5 | Startup under 1 second                | Responsiveness of every CLI command                |
 | S6 | Core cold type-check under 10 seconds | A commit or a save stays a pause, not a task break |
@@ -111,17 +111,33 @@ whether the choice survives the union.
   trip, not key order; G2 in the comparison found the same gap for
   object types (5 of 10 optional fields pinned).
 - **S3.** A compile-time test that the Schema-derived `Constraint` is
-  mutually assignable with today's hand-written union, kind by kind.
-  This is the union-specific gate: consumers switch on `c.type` with
-  `assertNever` (`core-branching-load.spec.md`, WS4), and a derived type
-  that widens a field or loses a discriminant breaks them silently at
-  the type level, not at run time.
+  mutually assignable, kind by kind, with `ConstraintRecord`: the record
+  type barwise-973 targets (`core-branching-load.spec.md`, Target
+  architecture), which is today's union with three narrowings -- `id` and
+  `modality` required, a join constraint's `operands` a tuple of at
+  least two, and `ValueConstraintDef.ranges` required. Comparing against
+  today's union instead would fail a correct conversion, because the
+  spike makes those narrowings too. `ConstraintRecord` is written in
+  WS0 as a mapped type over today's union, so it compiles on `main` and
+  cannot drift from the kinds. This is the union-specific gate:
+  consumers switch on `c.type` with `assertNever`
+  (`core-branching-load.spec.md`, WS4), and a derived type that widens
+  a field or loses a discriminant breaks them silently at the type
+  level, not at run time. Sites that build a constraint without an `id`
+  or `modality` change, as barwise-973 already plans; the spike counts
+  them and they do not fail the gate.
 - **S4.** Malformed-input fixtures for fact types and constraints in
   `core/tests/fixtures/malformed/`, scored by the same `malformed`
   subcommand. The completion bar is the comparison's D2: every case
   reported, every message naming the element and the field, no silent
   loss, singly and in one combined file. WS0 writes the cases; the
-  plain decoder they are baselined against is today's loader.
+  plain decoder they are baselined against is today's loader. The
+  scorer must be extended first: `scripts/lib/malformed-score.mjs`
+  reads only `object_types` -- `caseProblem` picks the failing object
+  type, `combine` copies only object types into the combined file, and
+  `lostKeys` compares only their top-level fields -- so a fact type case
+  today would be blamed on its supporting object type, vanish from the
+  combined file, and lose a nested constraint field unseen.
 - **S5.** `measure:comparison -- startup`, median of 15, npm package and
   release bundle, on one machine. The 1-second limit and its reason are
   the comparison's Open decision 3: about 1 second is where a wait
@@ -171,6 +187,7 @@ nowhere else:
 | `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0: fact type and constraint cases               |
 | `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0: fact type and constraint layout test         |
 | `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0: a `typecheck` subcommand for S6              |
+| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0: fact types, constraints, nested fields (S4)  |
 | Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use |
 
 `ModelGraph`, validation, verbalization and mapping read records, not
@@ -226,10 +243,16 @@ to keep compiling.
 
 ### 0. Instruments and baselines, on `main`
 
-The fact type and constraint layout test (S2), the malformed fixtures
-for fact types and constraints with their `cases.json` entries (S4), the
-`Constraint` type-equality test's harness (S3, written against today's
-union so it compiles trivially on `main` and bites on the branch), and a
+The fact type and constraint layout test (S2); the malformed fixtures
+for fact types and constraints with their `cases.json` entries, and the
+scorer extended to read them (S4): `caseProblem` attributes a problem
+to the fact type and constraint it names, `combine` carries fact types
+and the object types they reference, and `lostKeys` compares fact type,
+role and constraint fields at every depth, each extension with a
+stand-in defect in `measure-comparison.test.mjs` that it catches; the
+`Constraint` type-equality harness with `ConstraintRecord` (S3, which
+compiles on `main` against a hand-written check and bites on the
+branch); and a
 `typecheck` subcommand in `measure-comparison.mjs` for S6 that refuses
 (exit 2) when it cannot run `tsc`. Each is shown to detect its failure
 by a deliberate break; baselines go into this spec. These land and stay
