@@ -8,6 +8,8 @@
  *   malformed [--json]                  D2 (and effect-adoption S4): how the
  *                                       loader reports malformed object
  *                                       types, fact types and constraints
+ *   typecheck [--runs N]                effect-adoption S6: core's cold
+ *                                       type-check time and instantiations
  *   diff      <base> [<head>]           D1, R1, R3: what a change touched
  *   trial     --base <ref> [--path P]   D3: a trial branch left the held-out
  *                                       oracle alone
@@ -23,6 +25,7 @@
  * (docs/specs/gate-refusal-contract.spec.md): 0 measured (and, for
  * `startup` and `trial`, passed), 1 measured and failed, 2 could not
  * answer -- the build is missing, a ref does not resolve, git is absent.
+ * `typecheck` exits 1 when the median is over its limit, like `startup`.
  * `malformed`, `bundles` and `diff` report and never fail: what they
  * measure is compared in WS4, not judged here.
  *
@@ -58,6 +61,15 @@ const MALFORMED_DIR = join(BARWISE, "packages/core/tests/fixtures/malformed");
 const COUNT_HOOK = join(BARWISE, "scripts/lib/module-count-hook.mjs");
 /** G4: the limit, and why -- about where a wait starts to break a train of thought. */
 const LIMIT_MS = 1000;
+/**
+ * S6 (docs/specs/effect-adoption.spec.md): the limit, and why -- about where
+ * a wait stops being a pause in the task and becomes a switch away from it,
+ * and a developer waits on the pre-commit build at every commit.
+ */
+const TYPECHECK_LIMIT_MS = 10_000;
+/** The tree's own compiler: a reading taken with another tree's tsc is not this tree's. */
+const TSC = join(BARWISE, "node_modules/typescript/bin/tsc");
+const CORE_DIR = join(BARWISE, "packages/core");
 
 /**
  * Paths a trial branch may not change: the oracle it is scored against,
@@ -162,14 +174,21 @@ function timeOnce(args, env = process.env) {
   return ms;
 }
 
-function startup(args) {
-  const given = args.includes("--runs") ? flag(args, "--runs") : "15";
-  // Exit 1 means a measurement over the limit, so a count that measures
-  // nothing has to refuse rather than report a median of no samples.
+/**
+ * `--runs`, or `fallback`. Exit 1 means a measurement over a limit, so a
+ * count that measures nothing has to refuse rather than report a median of
+ * no samples.
+ */
+function runsFlag(args, fallback) {
+  const given = args.includes("--runs") ? flag(args, "--runs") : fallback;
   if (!/^[1-9][0-9]*$/.test(given ?? "")) {
     refuse(`--runs takes a positive integer, not ${given ?? "nothing"}.`);
   }
-  const runs = Number(given);
+  return Number(given);
+}
+
+function startup(args) {
+  const runs = runsFlag(args, "15");
   if (!args.includes("--no-build")) {
     run("npx", [
       "turbo",
@@ -222,6 +241,56 @@ function startup(args) {
       : "fail";
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return result.g4 === "pass" ? 0 : 1;
+}
+
+// -- typecheck -------------------------------------------------------------
+
+/**
+ * One cold type-check of core: `--incremental false`, because core's
+ * tsconfig is incremental and a warm `.tsbuildinfo` makes the second run
+ * of anything fast. Reads tsc's own `--extendedDiagnostics` totals rather
+ * than timing the process, so node's start-up is not in the number.
+ */
+function typecheckOnce() {
+  const r = spawnSync(
+    process.execPath,
+    [TSC, "--noEmit", "--incremental", "false", "--extendedDiagnostics", "-p", "tsconfig.json"],
+    { cwd: CORE_DIR, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" },
+  );
+  if (r.error) refuse(`tsc could not be started: ${r.error.message}`);
+  if (r.status !== 0) {
+    refuse(
+      `core does not type-check, and a failing type-check has no time:\n${
+        (r.stdout + r.stderr).slice(-2000)
+      }`,
+    );
+  }
+  const seconds = /^Total time:\s+([0-9.]+)s$/m.exec(r.stdout)?.[1];
+  const instantiations = /^Instantiations:\s+([0-9]+)$/m.exec(r.stdout)?.[1];
+  if (seconds === undefined || instantiations === undefined) {
+    refuse("tsc ran but printed no Total time or Instantiations, so there is nothing to read.");
+  }
+  return { ms: Number(seconds) * 1000, instantiations: Number(instantiations) };
+}
+
+function typecheck(args) {
+  const runs = runsFlag(args, "3");
+  if (!existsSync(TSC)) refuse(`${TSC} is missing; run npm ci in this tree first.`);
+  if (!existsSync(join(CORE_DIR, "tsconfig.json"))) refuse(`${CORE_DIR}/tsconfig.json is missing.`);
+  const readings = Array.from({ length: runs }, typecheckOnce);
+  const times = readings.map((r) => r.ms);
+  const result = {
+    environment: environment(),
+    runs,
+    medianMs: Math.round(median(times)),
+    rangeMs: [Math.round(Math.min(...times)), Math.round(Math.max(...times))],
+    // Deterministic for one tree: reported to explain a time, never judged.
+    instantiations: median(readings.map((r) => r.instantiations)),
+    limitMs: TYPECHECK_LIMIT_MS,
+  };
+  result.s6 = result.medianMs < TYPECHECK_LIMIT_MS ? "pass" : "fail";
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  return result.s6 === "pass" ? 0 : 1;
 }
 
 // -- bundles ---------------------------------------------------------------
@@ -956,7 +1025,7 @@ function usage(args) {
 }
 
 const [command, ...rest] = process.argv.slice(2);
-const commands = { startup, bundles, malformed, diff, trial, heldout, usage };
+const commands = { startup, typecheck, bundles, malformed, diff, trial, heldout, usage };
 if (!commands[command]) {
   refuse(`unknown subcommand ${command ?? "(none)"}; one of ${Object.keys(commands).join(", ")}.`);
 }

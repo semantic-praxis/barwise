@@ -275,6 +275,68 @@ test("a problem inside a constraint is credited for naming that constraint, not 
   assert.equal(at('["fact_types"][0]["constraints"][1]["ring_type"]'), true);
 });
 
+test("typecheck reads tsc's own totals, fails over the limit, and refuses what it cannot read", () => {
+  // A stand-in tsc in a throwaway tree, because the instrument has to read
+  // the tree it is run in (barwise-jsi) and a real tsc cannot be made to
+  // print a chosen time.
+  const repo = mkdtempSync(join(tmpdir(), "measure-typecheck-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: repo });
+    const run = () =>
+      spawnSync(process.execPath, [SCRIPT, "typecheck", "--runs", "1"], {
+        cwd: repo,
+        encoding: "utf8",
+      });
+    assert.match(run().stderr, /typescript.*missing/);
+    assert.equal(run().status, 2, "no tsc in this tree");
+
+    mkdirSync(join(repo, "barwise/packages/core"), { recursive: true });
+    writeFileSync(join(repo, "barwise/packages/core/tsconfig.json"), "{}\n");
+    const bin = join(repo, "barwise/node_modules/typescript/bin");
+    mkdirSync(bin, { recursive: true });
+    const tsc = (body) => writeFileSync(join(bin, "tsc"), body);
+
+    tsc('console.log("Instantiations:    25382\\nTotal time:    2.41s");');
+    // A reading names its commit; a tree with none is refused, not read.
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.email=t@example.com",
+        "-c",
+        "user.name=t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "x",
+      ],
+      { cwd: repo },
+    );
+    const ok = run();
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.deepEqual(
+      (({ medianMs, instantiations, s6 }) => ({ medianMs, instantiations, s6 }))(
+        JSON.parse(ok.stdout),
+      ),
+      { medianMs: 2410, instantiations: 25382, s6: "pass" },
+    );
+
+    tsc('console.log("Instantiations:    90000\\nTotal time:    12.00s");');
+    assert.equal(run().status, 1, "over the 10-second limit");
+
+    tsc('console.log("Files: 1");');
+    assert.equal(run().status, 2, "no totals printed");
+
+    tsc('console.log("error TS2322"); process.exit(2);');
+    const broken = run();
+    assert.equal(broken.status, 2, "a tree that does not compile has no time");
+    assert.match(broken.stderr, /does not type-check/);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 test("an unknown subcommand and an unresolvable ref are refusals, not readings", () => {
   assert.equal(spawnSync(process.execPath, [SCRIPT, "nonesuch"]).status, 2);
   assert.equal(spawnSync(process.execPath, [SCRIPT, "diff", "no-such-ref-anywhere"]).status, 2);
