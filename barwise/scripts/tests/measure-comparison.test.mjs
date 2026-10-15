@@ -411,6 +411,8 @@ test("heldout counts a case that throws as failed, with the error, not as a cras
  * `nullAsAbsent` reads a null flag from code as absent, and `unfrozenBare`
  * ("code" or "file") leaves a record with no defining rule unfrozen.
  * `rejectExplicitDefault` refuses from code a flag set to its own default.
+ * `inPlace` makes `dropFormal` and `dropDefaultStorage` delete from the
+ * caller's own rule object rather than from a copy.
  * With none, it is a correct conversion.
  */
 function fakeSubtypeCore(
@@ -433,6 +435,7 @@ function fakeSubtypeCore(
     hiddenName = false,
     nullAsAbsent = false,
     rejectExplicitDefault = false,
+    inPlace = false,
     unfrozenBare = false,
   } = {},
 ) {
@@ -479,7 +482,7 @@ const make = (c, checkRule, fromFile = false) => {
   };
   if (${asClass}) return new Legacy({ ...r, definingRule: c.definingRule });
   if (c.definingRule && !(${dropRule} && !fromFile)) {
-    const rule = { ...c.definingRule };
+    const rule = ${inPlace} && !fromFile ? c.definingRule : { ...c.definingRule };
     if (${dropFormal} && !fromFile) delete rule.isFormal;
     if (${dropFalseFormal} && !fromFile && rule.isFormal === false) delete rule.isFormal;
     if (${dropDefaultStorage} && !fromFile && rule.storage === "derive_on_request") delete rule.storage;
@@ -686,6 +689,11 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       K + ".defining_rule.is_formal = true",
       K + ".defining_rule.is_formal = false",
     ]],
+    [{ dropFormal: true, inPlace: true }, [
+      "a subtype fact's defining rule is kept and frozen, from code and from a file",
+      K + ".defining_rule.is_formal = true",
+      K + ".defining_rule.is_formal = false",
+    ]],
     [{ dropFalseFormal: true }, [
       K + ".defining_rule.is_formal = false",
     ]],
@@ -717,6 +725,9 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
       K + '.defining_rule.expression = ""',
     ]],
     [{ dropDefaultStorage: true }, [
+      K + '.defining_rule.storage = "derive_on_request"',
+    ]],
+    [{ dropDefaultStorage: true, inPlace: true }, [
       K + '.defining_rule.storage = "derive_on_request"',
     ]],
   ];

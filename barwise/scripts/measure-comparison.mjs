@@ -631,7 +631,9 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels, schema }) {
   };
   const built = (config = {}) => {
     const { m, a, b } = twoTypes();
-    return m.addSubtypeFact({ subtypeId: b.id, supertypeId: a.id, ...config });
+    // A copy, so a run that edits its input in place cannot edit the fixture
+    // the case later compares against (Copilot, PR #662).
+    return m.addSubtypeFact({ subtypeId: b.id, supertypeId: a.id, ...structuredClone(config) });
   };
   const RULE = {
     kind: "derived",
@@ -687,7 +689,9 @@ function t2Cases({ OrmModel, OrmYamlSerializer, diffModels, schema }) {
           "definingRule.storage": "derive_on_request",
           "definingRule.isFormal": false,
         };
-        const sf = m.addSubtypeFact(given);
+        // A copy: `given` is the expected value, and a constructor that
+        // deletes from its input would otherwise delete from it too.
+        const sf = m.addSubtypeFact(structuredClone(given));
         // Exact on the record; the serializer's omissions apply only after a
         // save and a load (Copilot, PR #662).
         return keeps(sf, given)
