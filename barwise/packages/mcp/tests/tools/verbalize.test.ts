@@ -1,30 +1,30 @@
 /**
  * Tests for the verbalize_model tool.
  */
-import { existsSync, rmSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { executeVerbalize } from "../../src/tools/verbalize.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixtures = resolve(__dirname, "../fixtures");
+// A file-based model spills into a cache dir next to it, so each test
+// works on its own copy of the fixture.
+const ws = usePrivateCwd();
 
 afterEach(() => {
-  rmSync(resolve(fixtures, ".barwise"), { recursive: true, force: true });
   delete process.env.BARWISE_MCP_INLINE_LIMIT;
 });
 
 describe("verbalize_model tool", () => {
   it("returns verbalizations for a model file", () => {
-    const result = executeVerbalize(`${fixtures}/simple.orm.yaml`);
+    const result = executeVerbalize(ws.fixture("simple.orm.yaml"));
     expect(result.content[0]!.text).toContain("Customer");
     expect(result.content[0]!.text).toContain("Name");
   });
 
   it("filters by fact type name", () => {
     const result = executeVerbalize(
-      `${fixtures}/simple.orm.yaml`,
+      ws.fixture("simple.orm.yaml"),
       "Customer has Name",
     );
     expect(result.content[0]!.text).toContain("Customer");
@@ -32,21 +32,21 @@ describe("verbalize_model tool", () => {
 
   it("returns message for nonexistent fact type", () => {
     const result = executeVerbalize(
-      `${fixtures}/simple.orm.yaml`,
+      ws.fixture("simple.orm.yaml"),
       "Nonexistent Fact Type",
     );
     expect(result.content[0]!.text).toContain("No fact type found");
   });
 
   it("returns content in MCP format", () => {
-    const result = executeVerbalize(`${fixtures}/simple.orm.yaml`);
+    const result = executeVerbalize(ws.fixture("simple.orm.yaml"));
     expect(result.content).toHaveLength(1);
     expect(result.content[0]!.type).toBe("text");
   });
 
   it("returns category counts in summary mode", () => {
     const result = executeVerbalize(
-      `${fixtures}/simple.orm.yaml`,
+      ws.fixture("simple.orm.yaml"),
       undefined,
       "summary",
     );
@@ -59,7 +59,7 @@ describe("verbalize_model tool", () => {
 
   it("appends counterexamples when requested", () => {
     const result = executeVerbalize(
-      `${fixtures}/simple.orm.yaml`,
+      ws.fixture("simple.orm.yaml"),
       undefined,
       "full",
       true,
@@ -70,13 +70,13 @@ describe("verbalize_model tool", () => {
   });
 
   it("omits counterexamples by default", () => {
-    const result = executeVerbalize(`${fixtures}/simple.orm.yaml`);
+    const result = executeVerbalize(ws.fixture("simple.orm.yaml"));
     expect(result.content[0]!.text).not.toContain("Counterexamples (");
   });
 
   it("spills full output to a file when large", () => {
     process.env.BARWISE_MCP_INLINE_LIMIT = "50";
-    const result = executeVerbalize(`${fixtures}/simple.orm.yaml`);
+    const result = executeVerbalize(ws.fixture("simple.orm.yaml"));
     const text = result.content[0]!.text;
     expect(text).toContain("Full content written to:");
 
@@ -89,12 +89,12 @@ describe("verbalize_model tool", () => {
     const dirOf = (r: { content: Array<{ text: string; }>; }) =>
       dirname(r.content[0]!.text.match(/Full content written to: (.+)/)![1]!.trim());
 
-    const asString = dirOf(executeVerbalize(`${fixtures}/simple.orm.yaml`));
-    const asObject = dirOf(executeVerbalize({ path: `${fixtures}/simple.orm.yaml` }));
+    const asString = dirOf(executeVerbalize(ws.fixture("simple.orm.yaml")));
+    const asObject = dirOf(executeVerbalize({ path: ws.fixture("simple.orm.yaml") }));
 
     // The object form spills into the same cache dir next to the model file.
     expect(asObject).toBe(asString);
-    expect(asObject).toContain(resolve(fixtures, ".barwise"));
+    expect(asObject).toContain(resolve(ws.dir(), ".barwise"));
   });
 
   it("omits an empty counterexamples section for a fact type with no constraints", () => {
@@ -160,14 +160,10 @@ model:
   });
 
   describe("project source", () => {
-    const project = `${fixtures}/project/project.orm-project.yaml`;
-
-    afterEach(() => {
-      rmSync(resolve(fixtures, "project", ".barwise"), { recursive: true, force: true });
-    });
+    const project = () => join(ws.fixture("project"), "project.orm-project.yaml");
 
     it("verbalizes every domain under a header when no domain is given", () => {
-      const result = executeVerbalize(project);
+      const result = executeVerbalize(project());
       const text = result.content[0]!.text;
       expect(text).toContain("== crm ==");
       expect(text).toContain("== billing ==");
@@ -176,7 +172,7 @@ model:
     });
 
     it("verbalizes only the chosen domain", () => {
-      const result = executeVerbalize(project, undefined, "full", false, "crm");
+      const result = executeVerbalize(project(), undefined, "full", false, "crm");
       const text = result.content[0]!.text;
       expect(text).toContain("Customer");
       expect(text).not.toContain("Account");
@@ -186,20 +182,20 @@ model:
     it("filters by a fact type that exists in only one domain", () => {
       // crm has "Customer has Email"; billing does not -- the multi-model
       // path formats a not-found message for the domain lacking it.
-      const result = executeVerbalize(project, "Customer has Email");
+      const result = executeVerbalize(project(), "Customer has Email");
       const text = result.content[0]!.text;
       expect(text).toContain("has Email");
       expect(text).toContain('No fact type found matching "Customer has Email"');
     });
 
     it("summarizes each domain when mode is summary", () => {
-      const result = executeVerbalize(project, undefined, "summary");
+      const result = executeVerbalize(project(), undefined, "summary");
       const text = result.content[0]!.text;
       expect(text).toContain("Verbalization summary");
     });
 
     it("carries assembly warnings alongside the resolved domain's output", () => {
-      const broken = `${fixtures}/project/broken.orm-project.yaml`;
+      const broken = join(ws.fixture("project"), "broken.orm-project.yaml");
       const result = executeVerbalize(broken);
       const text = result.content[0]!.text;
       expect(text).toContain("Warning:");

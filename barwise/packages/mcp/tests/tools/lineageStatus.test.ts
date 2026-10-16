@@ -18,7 +18,7 @@ const fixtures = resolve(__dirname, "../fixtures");
 
 // The inline-source fallback reads the cwd; an empty private one, so "no
 // manifest" does not depend on what the shared package directory holds.
-usePrivateCwd();
+const ws = usePrivateCwd();
 
 describe("lineage_status tool", () => {
   let tempDir: string;
@@ -111,8 +111,15 @@ describe("lineage_status tool", () => {
 
   it("falls back to the current working directory for inline content (no path)", () => {
     const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
-    const result = executeLineageStatus(yaml);
-    const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed.manifestFound).toBe(false);
+    expect(JSON.parse(executeLineageStatus(yaml).content[0]!.text).manifestFound).toBe(false);
+
+    // And it is the working directory that is read: a manifest put there is found.
+    writeManifest(ws.dir(), {
+      version: 1,
+      sourceModel: "inline.orm.yaml",
+      sourceModelHash: "x",
+      exports: [],
+    });
+    expect(JSON.parse(executeLineageStatus(yaml).content[0]!.text).manifestFound).toBe(true);
   });
 });

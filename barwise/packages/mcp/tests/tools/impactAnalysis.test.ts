@@ -18,7 +18,7 @@ const fixtures = resolve(__dirname, "../fixtures");
 
 // The inline-source fallback reads the cwd: a private one, so another test
 // file cleaning up the shared package directory cannot remove this manifest.
-usePrivateCwd();
+const ws = usePrivateCwd();
 
 describe("impact_analysis tool", () => {
   let tempDir: string;
@@ -172,7 +172,7 @@ describe("impact_analysis tool", () => {
       ],
     };
 
-    writeManifest(process.cwd(), manifest);
+    writeManifest(ws.dir(), manifest);
 
     const result = executeImpactAnalysis(yaml, elementId);
     const parsed = JSON.parse(result.content[0]!.text);
