@@ -70,6 +70,15 @@ describe("constraint problems on load", () => {
     }]);
   });
 
+  it("reports an unknown key holding a slash once, at its escaped pointer", () => {
+    const errors = loadErrors(withConstraints(`        - id: c-1
+          type: mandatory
+          role: r-1
+          "a/b": 1
+`));
+    expect(errors.map((e) => e.path)).toEqual(["/model/fact_types/0/constraints/0/a~1b"]);
+  });
+
   it("keeps the schema's errors where the decoder has nothing to own", () => {
     // A `constraints` that is not a list is never decoded, so the schema's
     // error on it is the only report and must survive the merge.

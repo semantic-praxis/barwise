@@ -3,13 +3,14 @@ import * as Effect from "effect/Effect";
 import { parse, stringify } from "yaml";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import type { Constraint } from "../model/Constraint.js";
-import { constraintLabel, decodeConstraints } from "../model/constraintDecoder.js";
+import { decodeConstraints } from "../model/constraintDecoder.js";
 import { generateId } from "../model/id.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
 import { OrmModel } from "../model/OrmModel.js";
 import {
   type SchemaError,
+  schemaErrorOf,
   type SchemaValidationResult,
   SchemaValidator,
 } from "./SchemaValidator.js";
@@ -110,7 +111,6 @@ interface DecodedConstraints {
 
 interface RefusedConstraint {
   readonly raw: unknown;
-  readonly label: string;
   /** Where the decoder reported, as JSON pointers below the constraint. */
   readonly reported: ReadonlySet<string>;
 }
@@ -142,7 +142,6 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
   decodedLists.forEach((results, f) => {
     if (results === undefined) return;
     const docs = (list[f] as { constraints: readonly unknown[]; }).constraints;
-    const factType = factTypeLabel(list[f] as object, f);
     const decoded: Constraint[] = [];
     results.forEach((result, c) => {
       if (result._tag === "Success") {
@@ -151,22 +150,23 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
       }
       const reported = new Set<string>();
       for (const problem of result.failure) {
-        const below = problem.path.map((k) => `/${String(k)}`).join("");
+        const below = problem.path.map((k) => `/${pointerSegment(k)}`).join("");
         reported.add(below);
         problems.push({
           path: `/model/fact_types/${f}/constraints/${c}${below}`,
           message: problem.message,
         });
       }
-      refused.set(`${f}/${c}`, {
-        raw: docs[c],
-        label: constraintLabel(docs[c], c, factType),
-        reported,
-      });
+      refused.set(`${f}/${c}`, { raw: docs[c], reported });
     });
     if (decoded.length === results.length) byFactType.set(f, decoded);
   });
   return { byFactType, problems, refused };
+}
+
+/** A JSON Pointer segment, escaped as ajv's `instancePath` escapes it. */
+function pointerSegment(key: PropertyKey): string {
+  return String(key).replace(/~/g, "~0").replace(/\//g, "~1");
 }
 
 /** What a constraint's problem calls its fact type: name, id, or position. */
@@ -186,15 +186,20 @@ function factTypeLabel(ft: object, index: number): string {
  * kind it was meant to be. So on a constraint the decoder refused, those are
  * dropped, and the constraint is checked again against its own kind's branch
  * of the schema alone. Every error from that check the decoder did not report
- * at the same place is kept, worded as ajv words it. The decoder states every
- * rule it knows of and this keeps any it does not, so no rule the schema
- * states is lost, however the two drift apart; the decoder's tests check its
- * wording, not this. A constraint the decoder accepted keeps every schema
- * error on it. The load is refused either way.
+ * at the same place is kept, through the same mapping the whole-document
+ * check uses. A constraint the decoder accepted keeps every schema error on
+ * it. The load is refused either way.
+ *
+ * "Reported at the same place" does not compare rules, because the decoder's
+ * problems do not carry one: an error at a place the decoder reported is
+ * taken as said. So a schema rule is lost only if the decoder stops stating
+ * it AND reports something else at that same place. The first half is what
+ * the decoder's field-by-field test against this schema fails on.
  */
 function mergeConstraintProblems(
   schemaErrors: readonly SchemaError[],
   decoded: DecodedConstraints,
+  document: unknown,
 ): SchemaError[] {
   const owned = (e: SchemaError) => {
     const match = CONSTRAINT_PATH.exec(e.path);
@@ -204,11 +209,7 @@ function mergeConstraintProblems(
   for (const [key, refused] of decoded.refused) {
     const [f, c] = key.split("/");
     for (const error of unreportedBranchErrors(refused)) {
-      kept.push({
-        path: `/model/fact_types/${f}/constraints/${c}${error.instancePath}`,
-        message: `${refused.label} ${error.message ?? "is invalid"}.`,
-        rule: { keyword: error.keyword },
-      });
+      kept.push(schemaErrorOf(error, document, `/model/fact_types/${f}/constraints/${c}`));
     }
   }
   return [...schemaErrors.filter((e) => !owned(e)), ...decoded.problems, ...kept];
@@ -227,12 +228,20 @@ let branchValidators: ReadonlyMap<string, ValidateFunction> | undefined;
 function branchValidator(type: unknown): ValidateFunction | undefined {
   if (typeof type !== "string") return undefined;
   branchValidators ??= (() => {
-    const ajv = new Ajv({ allErrors: true });
+    // strictTypes off: each branch takes `type: object` from the constraint
+    // level through allOf, as the whole schema intends, and strict mode would
+    // otherwise print a warning per branch to the user's console.
+    const ajv = new Ajv({ allErrors: true, strictTypes: false });
     const { definitions } = constraintSchemas;
+    const constraintLevel = Object.fromEntries(
+      Object.entries(definitions.constraint).filter(([keyword]) => keyword !== "oneOf"),
+    );
     return new Map(
       definitions.constraint.oneOf.map((branch) => [
         branch.properties.type.const,
-        ajv.compile({ definitions, type: "object", ...branch }),
+        // The constraint definition's own keywords beside `oneOf` apply to
+        // every kind, so they are checked with the branch, not restated.
+        ajv.compile({ definitions, allOf: [constraintLevel, branch] }),
       ]),
     );
   })();
@@ -273,13 +282,15 @@ function unreportedBranchErrors(refused: RefusedConstraint): ErrorObject[] {
     const group = groupOf(e);
     if (group !== undefined) {
       return at.has(e.instancePath)
-        || (groupKeys.get(group) ?? []).some((k) => at.has(`${e.instancePath}/${k}`));
+        || (groupKeys.get(group) ?? []).some((k) =>
+          at.has(`${e.instancePath}/${pointerSegment(k)}`)
+        );
     }
     if (params.missingProperty !== undefined) {
-      return at.has(`${e.instancePath}/${params.missingProperty}`);
+      return at.has(`${e.instancePath}/${pointerSegment(params.missingProperty)}`);
     }
     if (params.additionalProperty !== undefined) {
-      return at.has(`${e.instancePath}/${params.additionalProperty}`);
+      return at.has(`${e.instancePath}/${pointerSegment(params.additionalProperty)}`);
     }
     return at.has(e.instancePath);
   };
@@ -427,6 +438,7 @@ export class OrmYamlSerializer {
     const errors = mergeConstraintProblems(
       mergeObjectTypeProblems(result.errors, objectTypes.problems),
       constraints,
+      migrated,
     );
     if (errors.length > 0) {
       const head = result.valid

@@ -59,41 +59,46 @@ export class SchemaValidator {
       return { valid: true, errors: [] };
     }
 
-    const errors: SchemaError[] = (this.validate.errors ?? []).map(
-      (err: ErrorObject) => {
-        // A `false` property schema forbids a field outright (an entity
-        // type's `data_type`); ajv's own wording, "boolean schema is false",
-        // describes the schema rather than the document.
-        const message = err.keyword === "false schema"
-          ? "is not allowed here"
-          : (err.message ?? "Unknown validation error");
-        const name = nearestName(data, err.instancePath);
-        const params = err.params as {
-          missingProperty?: string;
-          additionalProperty?: string;
-          failingKeyword?: string;
-        };
-        return {
-          path: err.instancePath || "/",
-          message: name === undefined ? message : `${message} (in "${name}")`,
-          rule: {
-            keyword: err.keyword,
-            ...(params.missingProperty !== undefined
-              ? { missingProperty: params.missingProperty }
-              : {}),
-            ...(params.additionalProperty !== undefined
-              ? { additionalProperty: params.additionalProperty }
-              : {}),
-            ...(params.failingKeyword !== undefined
-              ? { failingKeyword: params.failingKeyword }
-              : {}),
-          },
-        };
-      },
-    );
+    const errors = (this.validate.errors ?? []).map((err) => schemaErrorOf(err, data));
 
     return { valid: false, errors };
   }
+}
+
+/**
+ * One ajv error as a `SchemaError`: the one mapping, shared by the whole-
+ * document check and the loader's re-check of a single constraint.
+ *
+ * @param data The whole document, so the message can name the element.
+ * @param prefix Where in `data` the validated value sits, when ajv was given
+ *   a part of it; prepended to ajv's `instancePath`.
+ */
+export function schemaErrorOf(err: ErrorObject, data: unknown, prefix = ""): SchemaError {
+  // A `false` property schema forbids a field outright (an entity type's
+  // `data_type`); ajv's own wording, "boolean schema is false", describes
+  // the schema rather than the document.
+  const message = err.keyword === "false schema"
+    ? "is not allowed here"
+    : (err.message ?? "Unknown validation error");
+  const path = prefix + err.instancePath;
+  const name = nearestName(data, path);
+  const params = err.params as {
+    missingProperty?: string;
+    additionalProperty?: string;
+    failingKeyword?: string;
+  };
+  return {
+    path: path || "/",
+    message: name === undefined ? message : `${message} (in "${name}")`,
+    rule: {
+      keyword: err.keyword,
+      ...(params.missingProperty !== undefined ? { missingProperty: params.missingProperty } : {}),
+      ...(params.additionalProperty !== undefined
+        ? { additionalProperty: params.additionalProperty }
+        : {}),
+      ...(params.failingKeyword !== undefined ? { failingKeyword: params.failingKeyword } : {}),
+    },
+  };
 }
 
 /**

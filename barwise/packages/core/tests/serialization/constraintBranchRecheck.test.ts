@@ -14,6 +14,7 @@ import {
   DeserializationError,
   OrmYamlSerializer,
 } from "../../src/serialization/OrmYamlSerializer.js";
+import type { SchemaError } from "../../src/serialization/SchemaValidator.js";
 
 vi.mock("../../src/model/constraintDecoder.js", async (importOriginal) => {
   const real = await importOriginal<typeof Decoder>();
@@ -44,11 +45,27 @@ model:
       readings: ["{0} exists"]
       constraints:
         - {id: c-1, type: mandatory, role: "", weight: 3}
+        - {id: c-2, type: mandatory, weight: 3}
 `;
 
 describe("a rule the decoder does not report", () => {
+  it("is checked without printing anything", () => {
+    // ajv's strict mode logs to the console when it compiles a branch it
+    // reads as untyped; a load must not write to the user's terminal.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      expect(() => new OrmYamlSerializer().deserialize(YAML)).toThrow();
+      expect(warn).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      log.mockRestore();
+    }
+  });
+
   it("is kept from the constraint's own schema branch, and nothing else is", () => {
-    let errors: readonly { path: string; message: string; }[] = [];
+    let errors: readonly SchemaError[] = [];
     try {
       new OrmYamlSerializer().deserialize(YAML);
     } catch (e) {
@@ -57,9 +74,19 @@ describe("a rule the decoder does not report", () => {
     expect(errors.map((e) => e.path).sort()).toEqual([
       "/model/fact_types/0/constraints/0/role",
       "/model/fact_types/0/constraints/0/weight",
+      "/model/fact_types/0/constraints/1",
+      "/model/fact_types/0/constraints/1/weight",
     ]);
-    expect(errors.find((e) => e.path.endsWith("/role"))!.message).toBe(
-      'Constraint "c-1" in Fact type "Person exists" must NOT have fewer than 1 characters.',
-    );
+    // Kept in the words and with the rule the whole-document check gives.
+    expect(errors.find((e) => e.path.endsWith("/0/role"))).toEqual({
+      path: "/model/fact_types/0/constraints/0/role",
+      message: 'must NOT have fewer than 1 characters (in "Person exists")',
+      rule: { keyword: "minLength" },
+    });
+    expect(errors.find((e) => e.path.endsWith("/constraints/1"))).toEqual({
+      path: "/model/fact_types/0/constraints/1",
+      message: "must have required property 'role' (in \"Person exists\")",
+      rule: { keyword: "required", missingProperty: "role" },
+    });
   });
 });
