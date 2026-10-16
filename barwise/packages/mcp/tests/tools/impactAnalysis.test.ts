@@ -8,7 +8,7 @@ import * as os from "node:os";
 import { dirname, resolve } from "node:path";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { executeImpactAnalysis } from "../../src/tools/impactAnalysis.js";
 import { writeManifest } from "../workspace/manifestFixture.js";
 
@@ -167,7 +167,14 @@ describe("impact_analysis tool", () => {
       ],
     };
 
-    writeManifest(process.cwd(), manifest);
+    // The inline-source fallback reads the working directory. The real one
+    // is shared with every other test file running in parallel, and
+    // exportModel.test.ts deletes its `.barwise` after each test, which
+    // removed this manifest mid-test (seen in CI on #672). So the working
+    // directory is a private one here.
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "impact-inline-"));
+    const spy = vi.spyOn(process, "cwd").mockReturnValue(cwd);
+    writeManifest(cwd, manifest);
 
     try {
       const result = executeImpactAnalysis(yaml, elementId);
@@ -176,15 +183,8 @@ describe("impact_analysis tool", () => {
       expect(parsed.changedElement).toBe(elementId);
       expect(parsed.affectedArtifacts).toHaveLength(1);
     } finally {
-      // Clean up manifest in cwd
-      const manifestPath = path.join(process.cwd(), ".barwise", "lineage.yaml");
-      if (fs.existsSync(manifestPath)) {
-        fs.unlinkSync(manifestPath);
-        const dir = path.dirname(manifestPath);
-        if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) {
-          fs.rmdirSync(dir);
-        }
-      }
+      spy.mockRestore();
+      fs.rmSync(cwd, { recursive: true, force: true });
     }
   });
 
