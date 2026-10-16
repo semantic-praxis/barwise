@@ -170,3 +170,15 @@ describe("the file schema reads as two variants only under the conditions the gu
     expect(() => fileVariant("entity", edited)).toThrow();
   });
 });
+
+describe("the required entries are compared field by field", () => {
+  it("sees a required field the file schema adds to an entity", () => {
+    const edited = structuredClone(fileSchema);
+    edited.definitions.object_type.then.required = [
+      ...edited.definitions.object_type.then.required,
+      "bogus",
+    ];
+    const found = differences(fileVariant("entity", edited), decoderVariant("entity"), "entity");
+    expect(found).toContain("entity.required.bogus");
+  });
+});
