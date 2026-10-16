@@ -125,7 +125,7 @@ describe("one rule, one sentence, whichever side reports it", () => {
       real.decodeConstraints([doc], 'Fact type "Person exists"', () => "x"),
     );
     if (result === undefined || !Result.isFailure(result)) throw new Error("expected a failure");
-    const fromDecoder = result.failure.problems.find((p) => p.path.join("/") === "ranges/0")!;
+    const fromDecoder = result.failure.problems.find((p) => p.path.join("/") === "ranges/0");
 
     let errors: readonly SchemaError[] = [];
     try {
@@ -134,9 +134,9 @@ describe("one rule, one sentence, whichever side reports it", () => {
       errors = (e as DeserializationError).validationResult!.errors;
     }
     // c-5 is the fifth constraint; the wrapped decoder forgot its range, so
-    // this one came from the schema re-check. Same input, same sentence,
-    // except the position the decoder was given (0 here, 4 in the file).
-    const fromLoader = errors.find((e) => e.path.endsWith("/constraints/4/ranges/0"))!;
-    expect(fromLoader.message.replace("constraints/4", "constraints/0")).toBe(fromDecoder.message);
+    // this one came from the schema re-check. Same input, same sentence.
+    const fromLoader = errors.find((e) => e.path.endsWith("/constraints/4/ranges/0"));
+    expect(fromDecoder?.message).toBeDefined();
+    expect(fromLoader?.message).toBe(fromDecoder?.message);
   });
 });

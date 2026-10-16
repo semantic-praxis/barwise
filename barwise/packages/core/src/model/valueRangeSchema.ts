@@ -37,12 +37,21 @@ const ExclusiveFlag = Schema.Boolean.check(
  * Effect reports it at (`schemaIssues.ts`), so every holder of a range names
  * which one: `is missing "value_constraint.ranges.2.min" or ...`.
  */
-export const RANGE_BOUND_KEYS: readonly string[] = (
-  (ormModelSchema as {
-    definitions: { value_range_def: { anyOf?: { required?: string[]; }[]; }; };
-  })
-    .definitions.value_range_def.anyOf ?? []
-).flatMap((alternative) => alternative.required ?? []);
+export const RANGE_BOUND_KEYS: readonly string[] = anyOfKeys(
+  (ormModelSchema as { definitions: { value_range_def: { anyOf?: unknown; }; }; })
+    .definitions.value_range_def.anyOf,
+);
+
+/**
+ * The keys of a JSON Schema `anyOf` of `required` alternatives: any one of
+ * them would do. The one reader of that shape, for both decoders; the shape
+ * itself is pinned by `constraintDecoder.test.ts`.
+ */
+export function anyOfKeys(anyOf: unknown): readonly string[] {
+  return Array.isArray(anyOf)
+    ? anyOf.flatMap((alternative: { required?: readonly string[]; }) => alternative.required ?? [])
+    : [];
+}
 
 /** For a reader that formats the check without its path (Effect's default formatter). */
 const RANGE_BOUND_MESSAGE = "has a range with neither a min nor a max.";
