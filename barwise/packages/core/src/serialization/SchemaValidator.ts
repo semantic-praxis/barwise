@@ -18,7 +18,10 @@ export interface SchemaError {
   /**
    * The schema rule that failed, as ajv reports it. For a program that has
    * to tell one error from another; the message is for people, and its
-   * wording is ajv's to change.
+   * wording is ajv's to change. Absent on a problem the Effect decoder
+   * reported (an object type's or a constraint's): its rule is the decoder's,
+   * not one of ajv's keywords, and inventing a keyword would let a program
+   * match it as if it were.
    */
   readonly rule?: SchemaRule;
 }
@@ -72,8 +75,16 @@ export class SchemaValidator {
  * @param data The whole document, so the message can name the element.
  * @param prefix Where in `data` the validated value sits, when ajv was given
  *   a part of it; prepended to ajv's `instancePath`.
+ * @param subject What to call the element, when the caller words it better
+ *   than the nearest name can (a constraint has none of its own); replaces
+ *   the `(in "name")` suffix.
  */
-export function schemaErrorOf(err: ErrorObject, data: unknown, prefix = ""): SchemaError {
+export function schemaErrorOf(
+  err: ErrorObject,
+  data: unknown,
+  prefix = "",
+  subject?: string,
+): SchemaError {
   // A `false` property schema forbids a field outright (an entity type's
   // `data_type`); ajv's own wording, "boolean schema is false", describes
   // the schema rather than the document.
@@ -89,7 +100,11 @@ export function schemaErrorOf(err: ErrorObject, data: unknown, prefix = ""): Sch
   };
   return {
     path: path || "/",
-    message: name === undefined ? message : `${message} (in "${name}")`,
+    message: subject !== undefined
+      ? `${subject} ${message}.`
+      : name === undefined
+      ? message
+      : `${message} (in "${name}")`,
     rule: {
       keyword: err.keyword,
       ...(params.missingProperty !== undefined ? { missingProperty: params.missingProperty } : {}),

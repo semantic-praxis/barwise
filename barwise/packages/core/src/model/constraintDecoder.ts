@@ -204,7 +204,8 @@ function unknownType(raw: Record<string, unknown>): string {
  * position when it gave none. The position is spelled as a path
  * (`constraints/2`), which is how the rest of a load error spells one.
  */
-function constraintLabel(raw: unknown, index: number, factType: string): string {
+/** Exported for the loader, whose kept schema errors name the constraint the same way. */
+export function constraintLabel(raw: unknown, index: number, factType: string): string {
   const id = raw !== null && typeof raw === "object"
     ? (raw as Record<string, unknown>).id
     : undefined;

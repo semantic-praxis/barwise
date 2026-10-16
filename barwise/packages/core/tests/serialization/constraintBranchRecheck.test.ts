@@ -49,13 +49,17 @@ model:
 `;
 
 describe("a rule the decoder does not report", () => {
-  it("is checked without printing anything", () => {
+  it("is checked without printing anything", async () => {
     // ajv's strict mode logs to the console when it compiles a branch it
-    // reads as untyped; a load must not write to the user's terminal.
+    // reads as untyped; a load must not write to the user's terminal. The
+    // validators are cached per module, so a fresh module is loaded here,
+    // whatever ran before, and the spies are in place for its first compile.
+    vi.resetModules();
+    const fresh = await import("../../src/serialization/OrmYamlSerializer.js");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     try {
-      expect(() => new OrmYamlSerializer().deserialize(YAML)).toThrow();
+      expect(() => new fresh.OrmYamlSerializer().deserialize(YAML)).toThrow();
       expect(warn).not.toHaveBeenCalled();
       expect(log).not.toHaveBeenCalled();
     } finally {
@@ -80,12 +84,14 @@ describe("a rule the decoder does not report", () => {
     // Kept in the words and with the rule the whole-document check gives.
     expect(errors.find((e) => e.path.endsWith("/0/role"))).toEqual({
       path: "/model/fact_types/0/constraints/0/role",
-      message: 'must NOT have fewer than 1 characters (in "Person exists")',
+      message:
+        'Constraint "c-1" in Fact type "Person exists" must NOT have fewer than 1 characters.',
       rule: { keyword: "minLength" },
     });
     expect(errors.find((e) => e.path.endsWith("/constraints/1"))).toEqual({
       path: "/model/fact_types/0/constraints/1",
-      message: "must have required property 'role' (in \"Person exists\")",
+      message:
+        'Constraint "c-2" in Fact type "Person exists" must have required property \'role\'.',
       rule: { keyword: "required", missingProperty: "role" },
     });
   });

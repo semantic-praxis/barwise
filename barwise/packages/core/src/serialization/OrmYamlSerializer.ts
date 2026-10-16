@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import { parse, stringify } from "yaml";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import type { Constraint } from "../model/Constraint.js";
-import { decodeConstraints } from "../model/constraintDecoder.js";
+import { constraintLabel, decodeConstraints } from "../model/constraintDecoder.js";
 import { generateId } from "../model/id.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
@@ -111,6 +111,8 @@ interface DecodedConstraints {
 
 interface RefusedConstraint {
   readonly raw: unknown;
+  /** What the decoder's problems call this constraint; kept errors say it too. */
+  readonly label: string;
   /** Where the decoder reported, as JSON pointers below the constraint. */
   readonly reported: ReadonlySet<string>;
 }
@@ -157,7 +159,11 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
           message: problem.message,
         });
       }
-      refused.set(`${f}/${c}`, { raw: docs[c], reported });
+      refused.set(`${f}/${c}`, {
+        raw: docs[c],
+        label: constraintLabel(docs[c], c, factTypeLabel(list[f] as object, f)),
+        reported,
+      });
     });
     if (decoded.length === results.length) byFactType.set(f, decoded);
   });
@@ -209,7 +215,9 @@ function mergeConstraintProblems(
   for (const [key, refused] of decoded.refused) {
     const [f, c] = key.split("/");
     for (const error of unreportedBranchErrors(refused)) {
-      kept.push(schemaErrorOf(error, document, `/model/fact_types/${f}/constraints/${c}`));
+      kept.push(
+        schemaErrorOf(error, document, `/model/fact_types/${f}/constraints/${c}`, refused.label),
+      );
     }
   }
   return [...schemaErrors.filter((e) => !owned(e)), ...decoded.problems, ...kept];
@@ -228,10 +236,7 @@ let branchValidators: ReadonlyMap<string, ValidateFunction> | undefined;
 function branchValidator(type: unknown): ValidateFunction | undefined {
   if (typeof type !== "string") return undefined;
   branchValidators ??= (() => {
-    // strictTypes off: each branch takes `type: object` from the constraint
-    // level through allOf, as the whole schema intends, and strict mode would
-    // otherwise print a warning per branch to the user's console.
-    const ajv = new Ajv({ allErrors: true, strictTypes: false });
+    const ajv = new Ajv({ allErrors: true });
     const { definitions } = constraintSchemas;
     const constraintLevel = Object.fromEntries(
       Object.entries(definitions.constraint).filter(([keyword]) => keyword !== "oneOf"),
@@ -241,7 +246,9 @@ function branchValidator(type: unknown): ValidateFunction | undefined {
         branch.properties.type.const,
         // The constraint definition's own keywords beside `oneOf` apply to
         // every kind, so they are checked with the branch, not restated.
-        ajv.compile({ definitions, allOf: [constraintLevel, branch] }),
+        // `type: object` at the root as well: strict mode reads each allOf
+        // member on its own and printed a warning per branch to the console.
+        ajv.compile({ definitions, type: "object", allOf: [constraintLevel, branch] }),
       ]),
     );
   })();
