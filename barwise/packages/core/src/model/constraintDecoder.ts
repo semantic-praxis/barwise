@@ -17,8 +17,9 @@ import type * as SchemaIssue from "effect/SchemaIssue";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import { type ConstraintFromSchema, ConstraintYamlCodec } from "./constraintSchema.js";
 import { missingField, missingOneOf } from "./problemWording.js";
+import { anyOfKeys } from "./schemaAnyOf.js";
 import { locate, predicateOf, spelledAs } from "./schemaIssues.js";
-import { anyOfKeys, RANGE_BOUND_KEYS, RANGE_YAML_KEYS } from "./valueRangeSchema.js";
+import { RANGE_BOUND_KEYS, RANGE_YAML_KEYS } from "./valueRangeSchema.js";
 
 /** One thing wrong with one constraint. */
 export interface ConstraintProblem {
@@ -156,8 +157,11 @@ function withPresence(
       if (isMapping(range) && !RANGE_BOUND_KEYS.some((k) => k in range)) {
         // Pushed for every range without a bound, and kept below only where
         // Effect skipped the range's own check (another of its fields failed):
-        // where that check ran, its report is at the same path, in the same
-        // words, and the `seen` filter drops this one.
+        // where that check ran, its report is at the same path and the `seen`
+        // filter, which compares paths only, drops this one. The two read the
+        // same because both are worded by `missingOneOf` from the same keys;
+        // the loader-level cross-check in constraintBranchRecheck.test.ts
+        // holds the wording, not this filter.
         const message = `${label} ${missingOneOf(["ranges", i], RANGE_BOUND_KEYS)}`;
         found.push({ index, path: ["ranges", i], message });
       }
