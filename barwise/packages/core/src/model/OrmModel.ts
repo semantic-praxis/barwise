@@ -4,7 +4,7 @@ import { FactType, type FactTypeConfig } from "./FactType.js";
 import { generateId } from "./id.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import type { ObjectType, ObjectTypeConfig } from "./ObjectType.js";
-import { decodeObjectTypeConfig, runObjectTypeDecode } from "./objectTypeDecoder.js";
+import { runObjectTypeConfigDecode } from "./objectTypeDecoder.js";
 import { Population, type PopulationConfig } from "./Population.js";
 import type { Role } from "./Role.js";
 import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
@@ -102,7 +102,7 @@ export class OrmModel {
    * @throws {ObjectTypeError} Listing every problem with the config.
    */
   addObjectType(config: ObjectTypeConfig): ObjectType {
-    const ot = runObjectTypeDecode(decodeObjectTypeConfig(config), generateId);
+    const ot = runObjectTypeConfigDecode(config, generateId);
     // The name is checked once decoded: the decoder trims it, and a padded
     // duplicate must not pass the check the trimmed name would fail.
     if (this.getObjectTypeByName(ot.name)) {

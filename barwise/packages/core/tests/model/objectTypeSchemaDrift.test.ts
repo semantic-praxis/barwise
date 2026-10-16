@@ -123,9 +123,6 @@ function differences(a: unknown, b: unknown, path: string): string[] {
  * one that closes fails the test until it is removed here.
  */
 const KNOWN: Record<string, string> = {
-  "entity.required.id":
-    "a file must carry an id; the decoder mints a missing one from IdSource, and the loader keeps the schema's refusal",
-  "value.required.id": "as for an entity",
   "value.properties.reference_mode":
     "the file schema allows a reference mode on a value type and the decoder refuses it, as createObjectType always did",
 };

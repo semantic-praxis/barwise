@@ -1,7 +1,8 @@
 /**
  * The object type decoder (docs/specs/effect-comparison.spec.md, the Effect
  * arm): every problem in one pass, each naming the object type and the
- * field, and fresh ids only from the `IdSource` it declares.
+ * field, and every id required, none minted (effect-adoption.spec.md,
+ * decision 8).
  */
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
@@ -18,7 +19,6 @@ import {
   type ObjectTypeProblems,
   runObjectTypeDecode,
 } from "../../src/model/objectTypeDecoder.js";
-import { IdSource } from "../../src/model/objectTypeSchema.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import {
   DeserializationError,
@@ -29,21 +29,14 @@ afterEach(() => {
   setIdGenerator(undefined);
 });
 
-/** Run a decode with a counter for ids, returning the record or the problems. */
+/** Run a decode, returning the record or the problems. */
 function run(
-  decoded: Effect.Effect<ObjectType, ObjectTypeProblems, IdSource>,
+  decoded: Effect.Effect<ObjectType, ObjectTypeProblems>,
 ): Result.Result<ObjectType, readonly ObjectTypeProblem[]> {
-  let n = 0;
-  return Effect.runSync(
-    decoded.pipe(
-      Effect.mapError((e) => e.problems),
-      Effect.result,
-      Effect.provideService(IdSource, { newId: () => `minted-${++n}` }),
-    ),
-  );
+  return Effect.runSync(decoded.pipe(Effect.mapError((e) => e.problems), Effect.result));
 }
 
-function problems(decoded: Effect.Effect<ObjectType, ObjectTypeProblems, IdSource>) {
+function problems(decoded: Effect.Effect<ObjectType, ObjectTypeProblems>) {
   const result = run(decoded);
   if (Result.isSuccess(result)) throw new Error("expected the decode to fail");
   return result.failure;
@@ -134,27 +127,26 @@ describe("decodeObjectType", () => {
   });
 });
 
-describe("the id source", () => {
-  it("supplies the id of an object type without one, and only from the requirement", () => {
-    // An installed generator that would be noticed: the decoder must not
-    // reach it, whatever a caller has installed.
+describe("ids", () => {
+  // An installed generator that would be noticed: the decoder must not reach
+  // it, whatever a caller has installed.
+  const refuseGenerator = () =>
     setIdGenerator(() => {
       throw new Error("the decoder reached the installed generator");
     });
-    const result = run(decodeObjectTypeConfig({ name: "Rating", kind: "value" }));
-    expect(Result.isSuccess(result) && result.success.id).toBe("minted-1");
+
+  it("are required: the decoder refuses a config without one, and mints none", () => {
+    refuseGenerator();
+    expect(problems(decodeObjectTypeConfig({ name: "Rating", kind: "value" }))).toEqual([{
+      objectType: "Rating",
+      field: "id",
+      message: 'Value type "Rating" is missing "id".',
+    }]);
   });
 
-  it("is not consulted for an object type that has an id", () => {
-    const decoded = decodeObjectType({ id: "ot-1", name: "Rating", kind: "value" });
-    const result = Effect.runSync(decoded.pipe(
-      Effect.result,
-      Effect.provideService(IdSource, {
-        newId: () => {
-          throw new Error("asked for an id it did not need");
-        },
-      }),
-    ));
+  it("are read from the input when present, without the generator", () => {
+    refuseGenerator();
+    const result = run(decodeObjectType({ id: "ot-1", name: "Rating", kind: "value" }));
     expect(Result.isSuccess(result) && result.success.id).toBe("ot-1");
   });
 
@@ -170,11 +162,12 @@ describe("decodeObjectTypeConfig", () => {
     const result = run(decodeObjectTypeConfig({
       name: "Rating",
       kind: "value",
+      id: "ot-1",
       referenceMode: undefined,
       dataType: { name: "text", length: undefined },
     }));
     expect(Result.isSuccess(result) && result.success).toEqual({
-      id: "minted-1",
+      id: "ot-1",
       name: "Rating",
       kind: "value",
       aliases: [],
@@ -185,8 +178,7 @@ describe("decodeObjectTypeConfig", () => {
 
   it("returns a frozen record", () => {
     const ot = runObjectTypeDecode(
-      decodeObjectTypeConfig({ name: "Rating", kind: "value", aliases: ["Grade"] }),
-      () => "x",
+      decodeObjectTypeConfig({ id: "ot-1", name: "Rating", kind: "value", aliases: ["Grade"] }),
     );
     expect(Object.isFrozen(ot)).toBe(true);
     expect(Object.isFrozen(ot.aliases)).toBe(true);
@@ -224,7 +216,7 @@ describe("the naming rule", () => {
           } catch {
             expected = undefined;
           }
-          const result = run(decodeObjectTypeConfig({ name, kind: "value" }));
+          const result = run(decodeObjectTypeConfig({ id: "ot-1", name, kind: "value" }));
           expect(Result.isSuccess(result) ? result.success.name : undefined).toBe(expected);
         },
       ),
@@ -263,8 +255,8 @@ model:
     expect(errors.some((e) => e.path.startsWith("/model/fact_types/0"))).toBe(true);
   });
 
-  it("keeps the file format's own refusals for an object type the decoder accepts", () => {
-    // The decoder mints a missing id; a file must still carry one.
+  it("reports a file's missing id once, as the decoder's problem", () => {
+    // The decoder requires every id, so its problem replaces the schema's.
     const errors = errorsOf(`
 orm_version: "2.0"
 model:
@@ -274,7 +266,7 @@ model:
       kind: value
 `);
     expect(errors).toHaveLength(1);
-    expect(errors[0]!.path).toBe("/model/object_types/0");
+    expect(errors[0]!.path).toBe("/model/object_types/0/id");
     expect(errors[0]!.message).toContain("id");
   });
 });

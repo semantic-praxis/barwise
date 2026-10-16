@@ -36,14 +36,14 @@ function loadErrors(body: string): readonly SchemaError[] {
 }
 
 describe("schema errors and decoder problems on one object type", () => {
-  it("keeps a missing id when the decoder refuses the same object type for cardinality", () => {
+  it("reports a missing id beside a cardinality problem on the same object type", () => {
     const message = loadError(`    - name: Size
       kind: value
       cardinality:
         min: 5
         max: 2
 `);
-    expect(message).toContain("must have required property 'id'");
+    expect(message).toContain('is missing "id"');
     expect(message).toContain("must have a cardinality max >= min");
   });
 

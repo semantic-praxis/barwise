@@ -7,9 +7,10 @@
  * One per problem, not one block of text: a caller -- and the D2 scorer of
  * docs/specs/effect-comparison.spec.md -- reads them as a list.
  *
- * The id source is the `IdSource` requirement in each decode's type. Only the
- * boundaries (`createObjectType`, `OrmModel.addObjectType`, the YAML loader)
- * provide it, with the installed generator.
+ * Every id is required, and the decoder mints none (effect-adoption.spec.md,
+ * decision 8). The boundary for configs, `runObjectTypeConfigDecode`, fills a
+ * missing id before decoding; `createObjectType` and `OrmModel.addObjectType`
+ * call it. A file must carry its ids, so the loader fills nothing.
  */
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
@@ -17,8 +18,6 @@ import * as Schema from "effect/Schema";
 import type * as SchemaAST from "effect/SchemaAST";
 import * as SchemaIssue from "effect/SchemaIssue";
 import {
-  type IdSource,
-  IdSource as IdSourceKey,
   type ObjectType,
   ObjectTypeModelCodec,
   ObjectTypeYamlCodec,
@@ -62,18 +61,10 @@ const decodeModel = Schema.decodeUnknownEffect(ObjectTypeModelCodec, PARSE_OPTIO
 /** Decode one object type as an `.orm.yaml` file spells it. */
 export function decodeObjectType(
   doc: unknown,
-): Effect.Effect<ObjectType, ObjectTypeProblems, IdSource> {
+): Effect.Effect<ObjectType, ObjectTypeProblems> {
   return decodeWith(decodeYaml, doc);
 }
 
-/**
- * Decode one object type as `ObjectTypeConfig` spells it.
- *
- * A key holding `undefined` is treated as absent first, because that is what
- * it has always meant to a caller: configs are routinely built as
- * `{ referenceMode: other.referenceMode, ... }`, and the schema's optional
- * keys refuse an explicit `undefined`.
- */
 /**
  * main's createObjectType tested the reference mode for truth, so a value
  * type's empty one was absent, not refused. The schema refuses any reference
@@ -86,11 +77,18 @@ function withoutEmptyValueReferenceMode(config: unknown): unknown {
   return Object.fromEntries(Object.entries(fields).filter(([key]) => key !== "referenceMode"));
 }
 
+/**
+ * Decode one object type as `ObjectTypeConfig` spells it.
+ *
+ * A key holding `undefined` is treated as absent first, because that is what
+ * it has always meant to a caller: configs are routinely built as
+ * `{ referenceMode: other.referenceMode, ... }`, and the schema's optional
+ * keys refuse an explicit `undefined`.
+ */
 export function decodeObjectTypeConfig(
   config: unknown,
-): Effect.Effect<ObjectType, ObjectTypeProblems, IdSource> {
-  const input = withoutUndefined(withoutEmptyValueReferenceMode(config));
-  return decodeWith(decodeModel, input);
+): Effect.Effect<ObjectType, ObjectTypeProblems> {
+  return decodeWith(decodeModel, prepareConfig(config));
 }
 
 /**
@@ -100,38 +98,58 @@ export function decodeObjectTypeConfig(
  */
 export function decodeObjectTypes(
   docs: readonly unknown[],
-): Effect.Effect<readonly Result.Result<ObjectType, ObjectTypeProblems>[], never, IdSource> {
+): Effect.Effect<readonly Result.Result<ObjectType, ObjectTypeProblems>[]> {
   return Effect.forEach(docs, (doc) => Effect.result(decodeObjectType(doc)));
 }
 
-/**
- * Run a decode that cannot fail, with ids from `newId`. For the synchronous
- * boundaries; the decoder itself never runs anything.
- */
-export function runWithIds<A>(effect: Effect.Effect<A, never, IdSource>, newId: () => string): A {
-  return Effect.runSync(Effect.provideService(effect, IdSourceKey, { newId }));
+function prepareConfig(config: unknown): unknown {
+  return withoutUndefined(withoutEmptyValueReferenceMode(config));
 }
 
 /**
- * Run one decode with ids from `newId`, returning the record or throwing
- * every problem at once as an `ObjectTypeError`.
+ * A config with its missing id filled from `newId`. The one step that mints
+ * an id; it runs before the decode, never in it. A key holding `undefined`
+ * counts as missing.
+ */
+function withId(config: unknown, newId: () => string): unknown {
+  if (typeof config !== "object" || config === null || Array.isArray(config)) return config;
+  const fields = config as Record<string, unknown>;
+  return fields.id === undefined ? { ...fields, id: newId() } : config;
+}
+
+/**
+ * Run one decode, returning the record or throwing every problem at once as
+ * an `ObjectTypeError`. The synchronous boundary: a caller that stays out of
+ * Effect calls this.
  */
 export function runObjectTypeDecode(
-  decoded: Effect.Effect<ObjectType, ObjectTypeProblems, IdSource>,
-  newId: () => string,
+  decoded: Effect.Effect<ObjectType, ObjectTypeProblems>,
 ): ObjectType {
-  const result = runWithIds(Effect.result(decoded), newId);
+  const result = Effect.runSync(Effect.result(decoded));
   if (Result.isFailure(result)) throw new ObjectTypeError(result.failure.problems);
   return result.success;
 }
 
+/**
+ * The synchronous boundary for a config whose caller may omit the id: fill it
+ * from `newId`, decode, and return the record or throw every problem. The
+ * problems name the object type as the caller wrote it, so a message never
+ * cites an id the caller did not choose.
+ */
+export function runObjectTypeConfigDecode(config: unknown, newId: () => string): ObjectType {
+  const input = prepareConfig(withId(config, newId));
+  return runObjectTypeDecode(decodeWith(decodeModel, input, prepareConfig(config)));
+}
+
+/** `label` is the input as its author wrote it, which the problems name. */
 function decodeWith(
-  decode: (input: unknown) => Effect.Effect<ObjectType, Schema.SchemaError, IdSource>,
+  decode: (input: unknown) => Effect.Effect<ObjectType, Schema.SchemaError>,
   input: unknown,
-): Effect.Effect<ObjectType, ObjectTypeProblems, IdSource> {
+  label: unknown = input,
+): Effect.Effect<ObjectType, ObjectTypeProblems> {
   return decode(input).pipe(
     Effect.map(seal),
-    Effect.mapError((error) => new ObjectTypeProblems(problemsOf(error.issue, input))),
+    Effect.mapError((error) => new ObjectTypeProblems(problemsOf(error.issue, label))),
   );
 }
 

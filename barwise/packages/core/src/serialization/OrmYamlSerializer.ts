@@ -1,7 +1,7 @@
+import * as Effect from "effect/Effect";
 import { parse, stringify } from "yaml";
-import { generateId } from "../model/id.js";
 import type { ObjectType } from "../model/ObjectType.js";
-import { decodeObjectTypes, runWithIds } from "../model/objectTypeDecoder.js";
+import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
 import { OrmModel } from "../model/OrmModel.js";
 import {
   type SchemaError,
@@ -81,7 +81,7 @@ function decodeObjectTypesOf(
   if (!Array.isArray(list)) return { decoded: [], problems: [] };
   const decoded: ObjectType[] = [];
   const problems: LocatedProblem[] = [];
-  runWithIds(decodeObjectTypes(list), generateId).forEach((result, index) => {
+  Effect.runSync(decodeObjectTypes(list)).forEach((result, index) => {
     if (result._tag === "Success") {
       decoded.push(result.success);
       return;
@@ -113,9 +113,9 @@ const THEN_BRANCH = /must match "then" schema/;
  * or an entity's failed `then` branch, which requires only reference_mode.
  * Deeper errors inside a field are kept, because the decoder cannot say which
  * nested rule it replaced: a duplicate costs a line, a dropped rule is silent.
- * Everything else at an object type's root stands. So a bare list entry keeps
- * the schema's "must be object", and a missing `id` survives, because the
- * decoder mints ids.
+ * Everything else at an object type's root stands, so a bare list entry keeps
+ * the schema's "must be object". A missing `id` is the decoder's to report,
+ * since it requires every id, and its problem replaces the schema's.
  */
 function mergeObjectTypeProblems(
   schemaErrors: readonly SchemaError[],

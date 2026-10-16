@@ -12,26 +12,15 @@
  * `tests/model/objectTypeSchemaDrift.test.ts` compares it with this one.
  *
  * Decoding is where the record's defaults are applied (an empty alias list,
- * `independent: false`, a fresh id), so a decoded value is a finished record.
- * The fresh id is read from `IdSource`, a declared requirement: nothing here
- * reaches the process-wide generator, and the type of every decode says so.
+ * `independent: false`), so a decoded value is a finished record. The id is
+ * required, not defaulted: a caller whose input may lack one fills it at the
+ * boundary before decoding (effect-adoption.spec.md, decision 8), so nothing
+ * here mints an id.
  */
-import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
 import * as SchemaTransformation from "effect/SchemaTransformation";
-
-/**
- * Where a decoded object type without an id gets one.
- *
- * A requirement rather than a call to `generateId()`, so the decoder's type
- * names the effect it has and a caller decides what supplies it: `OrmModel`
- * supplies the installed generator, a test supplies a counter.
- */
-export class IdSource extends Context.Service<IdSource, { readonly newId: () => string; }>()(
-  "@barwise/core/IdSource",
-) {}
 
 /**
  * Portable conceptual data type names, independent of any specific tool
@@ -251,10 +240,8 @@ function emptyList() {
 
 function baseFields(leaves: Leaves) {
   return {
-    /** Minted from `IdSource` when absent. */
-    id: Schema.String.pipe(
-      Schema.withDecodingDefaultKey(IdSource.useSync((ids) => ids.newId())),
-    ),
+    /** Required: a boundary whose caller may omit it fills it first. */
+    id: Schema.String,
     /** Trimmed and non-empty. */
     name: NameSchema,
     definition: Schema.optionalKey(Schema.String),

@@ -1,5 +1,5 @@
 import { generateId } from "./id.js";
-import { decodeObjectTypeConfig, runObjectTypeDecode } from "./objectTypeDecoder.js";
+import { runObjectTypeConfigDecode } from "./objectTypeDecoder.js";
 import type {
   CardinalityRange,
   DataTypeDef,
@@ -105,7 +105,7 @@ export function isValueType(ot: ObjectType): ot is ValueType {
  * here because the decoder does not reach it.
  */
 export function createObjectType(config: ObjectTypeConfig): ObjectType {
-  return runObjectTypeDecode(decodeObjectTypeConfig(config), generateId);
+  return runObjectTypeConfigDecode(config, generateId);
 }
 
 /**
