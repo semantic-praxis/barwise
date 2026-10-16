@@ -111,6 +111,14 @@ type ValueOnlyField = (typeof VALUE_ONLY_FIELDS)[number][0];
 const NonNegativeInt = Schema.Int.check(
   Schema.isGreaterThanOrEqualTo(0, { message: "must not be negative." }),
 );
+// length and scale each get their own sentence, so two problems on one data
+// type name the field they are about.
+const NonNegativeLength = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0, { message: "must have a non-negative length." }),
+);
+const NonNegativeScale = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0, { message: "must have a non-negative scale." }),
+);
 
 /**
  * The element-naming rule of `requireName` (`name.ts`): stored trimmed,
@@ -159,6 +167,8 @@ const FILE_LEAVES = {
     message: `must name a known data type (one of ${CONCEPTUAL_DATA_TYPE_NAMES.join(", ")}).`,
   }),
   size: NonNegativeInt,
+  length: NonNegativeLength,
+  scale: NonNegativeScale,
   count: Schema.Int,
   range: ValueRangeSchema.pipe(Schema.encodeKeys(RANGE_YAML_KEYS)),
 };
@@ -176,6 +186,8 @@ const CONFIG_LEAVES = {
       }) as SchemaAST.Link,
   }),
   size: Schema.Number,
+  length: Schema.Number,
+  scale: Schema.Number,
   count: Schema.Number,
   range: ValueRangeSchema,
 };
@@ -186,8 +198,8 @@ type Leaves = typeof FILE_LEAVES | typeof CONFIG_LEAVES;
 function dataTypeDefSchema(leaves: Leaves) {
   return Schema.Struct({
     name: leaves.dataTypeName,
-    length: Schema.optionalKey(leaves.size),
-    scale: Schema.optionalKey(leaves.size),
+    length: Schema.optionalKey(leaves.length),
+    scale: Schema.optionalKey(leaves.scale),
   });
 }
 

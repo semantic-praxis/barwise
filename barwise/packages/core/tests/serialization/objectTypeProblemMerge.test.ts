@@ -66,6 +66,16 @@ describe("schema errors and decoder problems on one object type", () => {
     expect(message).toContain("must be object");
   });
 
+  it("keeps an additional-property error beside an invalid kind", () => {
+    const message = loadError(`    - id: ot-1
+      name: Thing
+      kind: both
+      colour: red
+`);
+    expect(message).toContain("additional properties");
+    expect(message).toContain("kind");
+  });
+
   it("reports an entity without a reference mode once", () => {
     const errors = loadErrors(`    - id: ot-p
       name: Person
