@@ -37,7 +37,7 @@ The next piece of evidence is the `Constraint` union. `ObjectType` and
 unions. `FactType` carries 16 constraint kinds, three of which nest a
 join-path operand, and the first premortem story in the comparison --
 "the slice did not predict the rest" -- names exactly this. Determinism
-in core is at stake only through the id source (Open decision 8): decoding is deterministic given its inputs, one of which is the function that mints ids.
+in core is kept by Open decision 8: the decoder requires ids and takes no id source, so decoding is a pure function of its input. Ids are minted only at the synchronous boundary.
 
 ## Should the adoption start with a spike? (resolved: yes, owner's call)
 
@@ -250,22 +250,22 @@ nowhere else:
 
 ## Inventory
 
-| Area                                                  | Today on `main`                                    | Verdict                                                       |
-| ----------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------- |
-| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema                      |
-| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run                        |
-| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                                           |
-| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                                      |
-| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                      |
-| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; decoders take `newId` as a parameter (Open decision 2) |
-| `core/schemas/orm-model.schema.json`                  | hand-written                                       | stays hand-written, drift-tested per kind                     |
-| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                                     |
-| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                 |
-| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                          |
-| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                   |
-| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4)             |
-| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig               |
-| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use             |
+| Area                                                  | Today on `main`                                    | Verdict                                                        |
+| ----------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------- |
+| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema                       |
+| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run                         |
+| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                                            |
+| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                                       |
+| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                       |
+| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; read only at the synchronous boundary (Open decision 8) |
+| `core/schemas/orm-model.schema.json`                  | hand-written                                       | stays hand-written, drift-tested per kind                      |
+| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                                      |
+| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                  |
+| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                           |
+| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                    |
+| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4)              |
+| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig                |
+| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use              |
 
 `core/tests/arbitraries/model.ts` (1,010 lines) is the suite's hand-written
 whole-model generator. Lines 242 to 319, 78 lines, are the candidate
@@ -290,15 +290,16 @@ is the claim S3 exists to check rather than assume.
 //   ConstraintSchema = Schema.Union([InternalUniqueness, Mandatory, ...16])
 //   FactTypeYamlCodec: snake_case YAML <-> FactType record
 //
-// Exported from core's root, both forms for every kind. newId is a plain
-// parameter (Open decisions 2 and 8); no Effect service is exported.
-//   decodeFactType(doc: unknown, newId: () => string):
-//     Effect<FactType, FactTypeProblems>
-//   runFactTypeDecode(doc, newId): FactType       // throws FactTypeError
+// Exported from core's root, both forms for every kind. The decoder
+// requires every id and takes no id source (Open decision 8); no Effect
+// service is exported.
+//   decodeFactType(doc: unknown): Effect<FactType, FactTypeProblems>
+//   runFactTypeDecode(doc): FactType              // throws FactTypeError
 //
 // OrmModel and OrmYamlSerializer keep their signatures until barwise-973's
-// ModelBuilder replaces them; each boundary passes the installed generator
-// as newId, as the Effect arm's addObjectType does.
+// ModelBuilder replaces them. Where a caller's config may lack ids (an
+// importer, the LLM, createObjectType), the boundary fills them from the
+// installed generator, then decodes.
 ```
 
 A consumer that wants Effect composes the `decode*` functions; a consumer
@@ -562,8 +563,8 @@ entry only records that it follows.
 ## API and migration impact
 
 - **Core's public API gains Effect types**: `decode*` functions
-  returning `Effect<Record, Problems>` and taking `newId` as a plain
-  parameter, and the problem classes, beside a synchronous boundary for
+  returning `Effect<Record, Problems>` and requiring every id in their
+  input, and the problem classes, beside a synchronous boundary for
   each. No service is exported.
 - **Downstream packages** do not depend on `effect` until they import
   from it; when one does, it declares `effect` at core's exact version,
@@ -582,7 +583,7 @@ entry only records that it follows.
    considered. Consequence carried here: a future Effect major is a
    breaking change to core's API, not an internal upgrade, so it needs
    its own spec.
-2. **`IdSource` -- the API shape is resolved 2026-10-15; its purity claim is withdrawn 2026-10-16.** The decoder takes `newId` as a plain parameter, not an Effect service, and `IdSource` is removed from the exported surface. The owner asked what the service buys when ids are UUIDv7. The format does not matter. What matters is whether the decoder can reach a process-wide generator, which would make its output depend on state outside its inputs. Core's `generateId()` does reach one, so a decoder that called it directly would not be pure. Passing `newId` in avoids that, but it does not make decoding pure: a `newId` that mints random ids is an injected source of randomness. The earlier reasoning that a plain parameter "performs no effect" and so "adds no port" was wrong, and barwise-e8m names that kind of port. What the parameter does buy is repeatable tests. A counter-based `newId` gives the same output for the same input, provided each decode is given a fresh counter. Whether the parameter is allowed at all is open: see item 8.
+2. **`IdSource` -- the API shape is resolved 2026-10-15; its purity claim is withdrawn 2026-10-16.** The decoder takes `newId` as a plain parameter, not an Effect service, and `IdSource` is removed from the exported surface. The owner asked what the service buys when ids are UUIDv7. The format does not matter. What matters is whether the decoder can reach a process-wide generator, which would make its output depend on state outside its inputs. Core's `generateId()` does reach one, so a decoder that called it directly would not be pure. Passing `newId` in avoids that, but it does not make decoding pure: a `newId` that mints random ids is an injected source of randomness. The earlier reasoning that a plain parameter "performs no effect" and so "adds no port" was wrong, and barwise-e8m names that kind of port. What the parameter does buy is repeatable tests. A counter-based `newId` gives the same output for the same input, provided each decode is given a fresh counter. Whether the parameter is allowed at all is open: see item 8. Superseded 2026-10-16 by item 8, option (d): the decoder takes no `newId`.
 3. **JSON Schema: hand-written or generated -- resolved 2026-10-15: hand
    written, with a drift test per kind.** The Effect arm's generated
    object type definition differed from the hand-written one in three
@@ -613,12 +614,13 @@ entry only records that it follows.
    dependency with no import would be an unused dependency, which the
    dependency checker reports.
 
-8. **Is `newId` an effect port? Open for the owner (2026-10-16).** Copilot's review of this spec pointed out that item 2's claim does not hold, and barwise-e8m forbids injected effect ports in core. Three options:
-   - **(a)** Keep `newId` as a parameter and record it as a named exception to barwise-e8m, scoped to the decoders. The e8m issue gets a note saying so. Cost: the commitment is qualified in writing, and "pure" in this spec becomes "deterministic given its inputs."
-   - **(b)** Derive an id for an element that has none from its position in the document, so decoding is a pure function of the document and needs no `newId`. Cost: the ids minted for id-less documents change. A position-derived id would be a name-based UUID (a hash of the path), not a UUIDv7, because a v7 needs a clock. This is a behavior change to measure, not assume.
-   - **(c)** An Effect service for the id source. Rejected in item 2 for the public API; choosing it reopens that decision.
+8. **Where ids come from -- resolved 2026-10-16 by the owner: option (d), the decoder requires ids and only the boundary mints them.** Copilot's review showed that item 2's `newId` parameter is an injected source of randomness, which barwise-e8m forbids in core. Four options were weighed:
+   - **(a)** Keep `newId` as a parameter, as a named exception to barwise-e8m. Rejected by the owner: it writes an exception into the commitment.
+   - **(b)** Derive ids from position in the document. Rejected: ids for id-less elements stop being UUIDv7, reordering changes them, and two id-less inputs collide at the same positions when models merge.
+   - **(c)** An Effect service (`IdSource`, what the Effect arm built). Rejected: still a port, now in core's public types.
+   - **(d)** Chosen. The decoder requires every id and refuses an element without one, as the file format already does. The synchronous boundary (`createObjectType`, `addObjectType`, and the loader for configs that may lack ids) fills missing ids from the installed generator, then decodes.
 
-   Recommendation: (b) if the id change is acceptable; otherwise (a), with the exception recorded in barwise-e8m. The spike does not wait on this. It keeps `newId` as a parameter under either option.
+   Consequences. The decoder is a pure function of its input, with no parameter or service for ids. The one place that mints ids is the global generator core already has (`setIdGenerator`, 2026-07-25), now confined to the boundary; barwise-e8m gets a note saying so. The serializer no longer needs to recognise ajv's missing-`id` message, because the decoder reports a missing id itself (barwise-k8y). The spike converts the brought-forward ObjectType slice from `IdSource` to this shape before it builds the constraint decoder. If core should later hold no generator at all, minting moves out to the callers in the outer packages; the decoder does not change for that.
 
 ## Risks and testing
 
