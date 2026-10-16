@@ -904,8 +904,10 @@ entry only records that it follows.
       loader accepts.
 
 11. **The whole-model generator: Effect's `Arbitrary`, or fast-check
-    with a bridge (added 2026-10-16).** Effect's derived generators are
-    not fast-check arbitraries (WS1b, part D).
+    with a bridge (added 2026-10-16) -- resolved 2026-10-16 by the owner:
+    option (a).** Effect's derived generators are not fast-check
+    arbitraries (WS1b, part D). The move counts only once part D has read
+    shrinking and run time on Effect's runner, as (a) says.
     - **(a)** Move `core/tests/arbitraries/model.ts`, wiring included,
       to Effect's combinators and runner, and move the six files that
       use it from `fc.assert` to `Arbitrary.checkEffect`. Recommended on
