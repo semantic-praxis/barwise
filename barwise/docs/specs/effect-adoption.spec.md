@@ -254,22 +254,22 @@ nowhere else:
 
 ## Inventory
 
-| Area                                                  | Today on `main`                                    | Verdict                                                        |
-| ----------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------- |
-| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema                       |
-| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run                         |
-| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                                            |
-| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                                       |
-| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                       |
-| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; read only at the synchronous boundary (Open decision 8) |
-| `core/schemas/orm-model.schema.json`                  | hand-written                                       | generated from Effect, draft 2020-12 (Open decision 9)         |
-| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact; `ajv` to dev (Open decision 10)     |
-| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                  |
-| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                           |
-| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                    |
-| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4)              |
-| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig                |
-| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use              |
+| Area                                                  | Today on `main`                                    | Verdict                                                                               |
+| ----------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema                                              |
+| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run                                                |
+| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                                                                   |
+| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                                                              |
+| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                                              |
+| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; read only at the synchronous boundary (Open decision 8)                        |
+| `core/schemas/orm-model.schema.json`                  | hand-written                                       | generated from Effect, draft 2020-12 (Open decision 9)                                |
+| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact; `ajv` to dev once nothing loads with it (Open decision 10) |
+| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                                         |
+| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                                                  |
+| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                                           |
+| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4)                                     |
+| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig                                       |
+| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use                                     |
 
 `core/tests/arbitraries/model.ts` (1,010 lines) is the suite's hand-written
 whole-model generator. Lines 242 to 319, 78 lines, are the candidate
@@ -670,12 +670,15 @@ S1 and S4 green on its own head and re-reads S5 and S6.
   covers three of these for `main`; on the spike they are needed for
   the load path to drop ajv at all.
 - **B3, the other two file formats.** `ProjectSerializer` and
-  `MappingSerializer` validate through `SchemaValidator` today, against
-  `orm-project.schema.json` (143 lines) and
-  `context-mapping.schema.json` (95 lines). Each gets a decoder.
+  `MappingSerializer` validate against `orm-project.schema.json` (143 lines)
+  and `context-mapping.schema.json` (95 lines) with Ajv instances of their
+  own (`ProjectSerializer.ts` line 48, `MappingSerializer.ts` line 42), not
+  through `SchemaValidator`. Each gets a decoder, and B4 removes both Ajv
+  imports.
 - **B4, removal.** `mergeConstraintProblems`, `mergeFactTypeProblems`,
-  `elementRecheck.ts`, `branchValidator`, `factTypeValidator` and
-  `schemaErrorOf` leave the load path; the header "YAML holds
+  `elementRecheck.ts`, `branchValidator`, `factTypeValidator`,
+  `schemaErrorOf`, and the Ajv instances in `ProjectSerializer` and
+  `MappingSerializer` leave the load path; the header "YAML holds
   malformed model elements" becomes the only error shape. Where ajv
   goes afterwards is Open decision 10: a dev dependency of core, used
   only by P3. `SchemaValidator` is exported
@@ -742,6 +745,18 @@ no schema with the editor, and no LLM provider in `@barwise/llm` sends
 the schema as an output constraint. The draft change therefore reaches
 users through the MCP resource and through hand-configured editors
 only; the release notes say so.
+
+Four more readers depend on the hand-written file's draft-07 layout and
+definition names, and C rewrites each against the generated file or core's
+plain-data lists (part E): `scripts/lib/schema-cases.mjs` (lines 161 and
+209 index `schema.definitions` by name), and through it
+`scripts/measure-comparison.mjs`'s malformed-input scorer;
+`core/tests/serialization/schemaDataTypes.test.ts`; and
+`core/tests/model/valueOnlyFields.test.ts`, which reads an `if`/`then`
+branch. The scorer is a measuring instrument for the Effect comparison's two
+arms, and its answer key must not be generated from one of them, so it keeps
+the last hand-written schema as a frozen fixture instead of reading the live
+file.
 
 What replaces the independence the hand-written file gave. P3 checked
 derived values against a file the Schemas did not write; with the file
@@ -849,8 +864,8 @@ makes the first three read from that definition:
   same pattern inside `@barwise/llm` -- its own Effect Schema, with the
   tool's input schema generated from it and the model's response
   decoded by it -- which is separate work with its own spec.
-- **Not done: registering the generated file with Red Hat's YAML
-  extension** (`contributes.yamlValidation`). It would give as-you-type
+- **Not planned, pending Open decision 12: registering the generated file
+  with Red Hat's YAML extension** (`contributes.yamlValidation`). It would give as-you-type
   JSON Schema errors to users who have that extension, but the language
   server already reports every problem in the decoder's words, and a
   second source would report the same problem twice in different

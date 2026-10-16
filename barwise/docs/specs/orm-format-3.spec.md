@@ -197,16 +197,17 @@ type InternalConstraint =
   | ValueComparisonConstraint
   | CardinalityConstraint;
 type ExternalConstraint = Exclude<Constraint, InternalConstraint>;
-// FactType.constraints: readonly InternalConstraint[]
+// FactType.internalConstraints: readonly InternalConstraint[]
+// (FactType.constraints is removed, so every reader must be revisited)
 // OrmModel.constraints: readonly ExternalConstraint[]
 // OrmModel.constraintsTouching(factTypeId): readonly Constraint[]
 ```
 
-A consumer that switches over `factType.constraints` and handles `subset`
-stops compiling, because `"subset"` is no longer a member of that union. 52
-source files across nine packages read `.constraints` today; the type
-split turns each one that needs the model-level list into a compile error
-rather than a silent omission.
+52 source files across nine packages read `factType.constraints` today.
+Removing the property, rather than narrowing its type, makes every one of
+them a compile error: a narrowed type would catch a `switch` that handles
+`subset`, but a plain `for (const c of ft.constraints)` would keep compiling
+and silently stop seeing external constraints (Risks).
 
 **The migration (2.0 to 3.0)** is pure, runs on the raw document before
 validation like `diagramReferencesToIds.ts`, and registers in
@@ -215,7 +216,11 @@ validation like `diagramReferencesToIds.ts`, and registers in
 1. Every constraint without an id gets one derived from its position: a hash
    of the fact type id, the constraint's index in that fact type, and its
    kind. The same unmigrated file always yields the same ids. Open decision 4
-   sets the shape.
+   sets the shape. Every derived id hashes a domain tag first
+   (`barwise.constraint` here, `barwise.subtype-constraint` in step 3) and
+   then each input with its length in front, so no two different inputs give
+   the same bytes: without that, fact type `ft-1` at index 0 and supertype
+   `ft-10` would concatenate identically.
 2. Every external-kind constraint moves from its fact type to
    `model.constraints`, keeping its id and fields.
 3. For each supertype, let E be its subtype facts flagged `is_exclusive` and
@@ -253,7 +258,7 @@ every time until then.
 | `core/src/serialization/schemaVersion.ts`                 | migrations 1.0 to 1.1 to 2.0                      | adds 2.0 to 3.0                                                           |
 | `core/src/serialization/migrations/`                      | `diagramReferencesToIds.ts`                       | adds the 3.0 migration                                                    |
 | `core/src/serialization/yaml/constraint.ts`, `subtype.ts` | nested constraints; subtype flags                 | model-level constraints; subtype flags gone                               |
-| `core/src/model/FactType.ts`                              | mints missing constraint ids (line 108)           | requires ids; holds internal kinds only                                   |
+| `core/src/model/FactType.ts`                              | mints missing constraint ids (line 108)           | requires ids; `constraints` removed; `internalConstraints`                |
 | `core/src/model/OrmModel.ts`                              | no constraint list                                | `constraints`, `constraintsTouching`                                      |
 | `core/src/model/Constraint.ts`                            | one 16-kind union                                 | `InternalConstraint` / `ExternalConstraint`; subtype operands             |
 | `core/src/model/SubtypeFact.ts`                           | `isExclusive`, `isExhaustive`                     | removed                                                                   |
@@ -264,11 +269,11 @@ every time until then.
 | `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags    | keeps ids; places by kind; partition constraints 1:1; preferred both ways |
 | `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`             | node id = constraint id                                                   |
 | `llm/src/parse/`                                          | attaches constraints to fact types                | places by kind through the model API                                      |
-| tracked `.orm.yaml` files (113)                           | 2.0                                               | rewritten as 3.0 by the migration, in WS6                                 |
-| `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)          | corrected in WS6                                                          |
+| tracked `.orm.yaml` files (113)                           | 2.0                                               | rewritten as 3.0 by the migration, in WS5                                 |
+| `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)          | corrected in WS5                                                          |
 | `docs/adr/`                                               | ADR 0001 "inline and local"                       | ADR 0003 amends it for external constraints                               |
 
-Not in the table because they need no design decision, but in WS3 to WS5's
+Not in the table because they need no design decision, but in WS3 and WS4's
 scope: the programmatic builders that create constraints without ids or set
 `isPreferred` -- `llm/src/parse/constraints.ts` and `ModelContext.ts`,
 `dbt/src/dbtMapping/identifierTypes.ts`, the DDL and OpenAPI importers,
@@ -283,7 +288,7 @@ and it is stated in the file from its first save. The extraction format in
 `isExclusive` and `isExhaustive` per subtype fact
 (`formats/src/ddl/barwiseAnnotation.ts`: declared at lines 51-52, written
 at 165-166, checked by the reader at 335-336), under a
-`-- barwise:v1` prefix whose reader already matches any version. WS5 moves
+`-- barwise:v1` prefix whose reader already matches any version. WS4 moves
 it to v2, writing the partition constraints, and keeps a v1 reader that
 converts the flags with the migration's step 3, so DDL already exported
 still imports.
@@ -307,15 +312,19 @@ still imports.
 
 ## Workstreams (each independently shippable)
 
-**The format changes in one workstream, WS5; everything before it keeps
-reading and writing 2.0.** ADR 0001 allows a shared version bump across
-several PRs only for additive minor changes; a breaking change bumps the
-major version "with a real migration". Bumping to 3.0 in an early workstream
-and adding to it later would let any build in between save a file stamped
-3.0 that later 3.0 readers refuse, and no migration would ever run on it,
-because it already claims the current version. So WS2 to WS4 change the
-in-memory model behind the 2.0 file format, and WS5 bumps the version, adds
-the one migration and changes the schema and serializer in a single PR.
+**The format changes in one workstream, WS4; everything before it keeps
+reading and writing 2.0 without loss.** ADR 0001 allows a shared version
+bump across several PRs only for additive minor changes; a breaking change
+bumps the major version "with a real migration". Bumping to 3.0 in an early
+workstream and adding to it later would let any build in between save a file
+stamped 3.0 that later 3.0 readers refuse, and no migration would ever run on
+it, because it already claims the current version. So WS2 and WS3 change only
+what a 2.0 file can carry without loss, and WS4 changes the version, the
+schema, the serializer, the migration and the in-memory pieces 2.0 cannot
+represent, in one PR. Subtype constraints and the preferred-identifier
+reference are in WS4 for that reason: a 2.0 serializer would have to convert
+them back to flags on save, and steps 3 and 4 drop what the flags cannot
+hold, so a 2.0 save between workstreams would silently lose data.
 
 ### 1. ADR 0003 and this spec
 
@@ -339,52 +348,56 @@ The type split, `OrmModel.constraints`, and every consumer of the old
 list. `FactType.constraints` is removed rather than narrowed, and the
 internal list gets a new name (`internalConstraints`), so every one of the
 52 reading files stops compiling and is decided one by one -- not only the
-ones that switch on `type`. Largest radius. The 2.0 serializer keeps the file's nesting: on load
-it lifts external kinds into the model list, and on save it writes each one
-under the first fact type that holds one of its roles (the NORMA importer's
-rule today). External constraints come after a host's internal ones in
-every tracked file, so order within a host is kept; but 27 of the 73 sit on
-a host other than the first holder (in 18 files), and those move to the
-first holder on the next 2.0 save. That churn is accepted rather than
-carried as a hidden host field on the model: it touches only files saved
-between WS3 and WS5, on unreleased builds, and WS6 rewrites the corpus as
-3.0 anyway. Verbalization gains a section for constraints across fact
-types (Open decision 7). The diagram's constraint nodes take the
-constraint's id.
+ones that switch on `type`. Largest radius.
 
-### 4. Subtype constraints and the preferred identifier, in memory (provisional: not yet grounded)
+The 2.0 serializer keeps the file's nesting: on load it lifts external kinds
+into the model list, and on save it writes each one under the first fact
+type that holds one of its roles (the NORMA importer's rule today). External
+constraints come after a host's internal ones in every tracked file, so
+order within a host is kept; but 27 of the 73 sit on a host other than the
+first holder (in 18 files), and those move to the first holder on the next
+2.0 save. That is a change of placement, not of meaning -- the host in 2.0 is
+arbitrary by definition -- so it is accepted rather than carried as a hidden
+host field on the model. If a release is cut while 2.0 is still current, its
+notes say that a save may move a cross-fact-type constraint to the first
+fact type it references.
 
-`exclusion`, `disjunctive_mandatory` and `exclusive_or` accept subtype
-facts in place of roles (Open decision 2), with the validation in the
-migration's step 3; `ObjectType` gains its preferred-identifier reference
-(Open decision 3), read by the mapper and `identification.ts`. The 2.0
-serializer converts to and from the flags by steps 3 and 4. A model that 2.0
-cannot express -- two partitions of one supertype, or a preferred external
-uniqueness -- is refused on save with a message saying format 3.0 is needed;
-nothing creates one before WS5, so no user meets it.
+Verbalization gains a section for constraints across fact types (Open
+decision 7). The diagram's constraint nodes take the constraint's id.
 
-### 5. Format 3.0 (provisional: not yet grounded)
+### 4. Format 3.0 (provisional: not yet grounded)
 
-One PR: `orm_version` 3.0, the schema (ids required, the two `oneOf`s,
-`model.constraints`, `subtype_facts` operands, `preferred_identifier`,
-flags removed), the 2.0-to-3.0 migration (steps 1 to 5), the 3.0 serializer,
-and NORMA import and export placing by kind and mapping partition
-constraints one to one. Closes barwise-loo and barwise-alg.
+One PR:
 
-### 6. Corpus, docs, release notes (provisional: not yet grounded)
+- `orm_version` 3.0 and the schema: ids required, the two `oneOf`s,
+  `model.constraints`, `subtype_facts` operands, `preferred_identifier`,
+  the flags removed;
+- the 2.0-to-3.0 migration, steps 1 to 5, and the 3.0 serializer;
+- subtype constraints in memory: `exclusion`, `disjunctive_mandatory` and
+  `exclusive_or` accept subtype facts in place of roles (Open decision 2),
+  with the validation in step 3;
+- the preferred-identifier reference in memory (Open decisions 3 and 8),
+  read by the mapper and `identification.ts`, which closes barwise-971 by
+  giving the five rules one answer to read;
+- NORMA import and export placing by kind and mapping partition constraints
+  one to one; the DDL annotation's v1 to v2 move.
+
+Closes barwise-loo and barwise-alg.
+
+### 5. Corpus, docs, release notes (provisional: not yet grounded)
 
 The tracked 113 files rewritten by the migration (a script under `scripts/`,
 or the CLI command of Open decision 5); `docs/NORMA_VS_ORM_YAML.md` corrected
-(barwise-hnb); CLI and format docs; release notes naming the migration. It
-can share WS5's PR if the radius allows.
+(barwise-hnb); CLI and format docs; release notes naming the migration and
+listing what step 4 drops. It can share WS4's PR if the radius allows.
 
 ## API and migration impact
 
 - **Every 2.0 file loads unchanged**, migrated in memory, and is written as
   3.0 on its next save. A 2.x build refuses a 3.0 file by version, as the
   schema `const` already makes it.
-- **Core's public API changes**: `FactType.constraints` narrows to internal
-  kinds, `OrmModel.constraints` is new, `SubtypeFact.isExclusive` and
+- **Core's public API changes**: `FactType.constraints` is removed and
+  `FactType.internalConstraints` holds the internal kinds, `OrmModel.constraints` is new, `SubtypeFact.isExclusive` and
   `isExhaustive` and `isPreferred` are removed. Downstream packages follow in
   the same workstreams; the full monorepo build gates each.
 - **Diff output** names constraints by id where both sides are 3.0 files.
@@ -453,11 +466,12 @@ can share WS5's PR if the radius allows.
      role is covered (the mapper's rule, `preferredIdentifyingBinary`, which
      decides primary keys today, so no table's key moves); otherwise, when
      one entity type plays every uncovered role, that entity. Anything else
-     is dropped, as step 4 says. On the corpus this places 374 of the 376
-     flags and drops 2 (one ternary, `WonItemHasSoldPriceAtTimestamp`, in
-     two copies of the auction model). When two flags land on one entity (4
-     entities in the corpus), the first in document order wins and the rest
-     are dropped; validation already reports an entity with two identifiers.
+     is dropped, as step 4 says. When two or more flags land on one entity,
+     the first in document order wins and the rest are dropped; validation
+     already reports an entity with two identifiers. On the corpus this
+     keeps 366 of the 376 flags and drops 10: 2 that identify no single
+     entity (one ternary, `WonItemHasSoldPriceAtTimestamp`, in two copies of
+     the auction model) and 8 second-or-later flags on 4 entities.
    - **(b)** Use `collectPreferredIdentifiers`'s rule alone. Matches NORMA
      export today, and drops 286 flags the mapper currently honours.
    - **(c)** Keep `is_preferred` in 3.0 alongside the reference. No
