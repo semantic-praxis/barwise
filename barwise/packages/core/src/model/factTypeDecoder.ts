@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type * as SchemaAST from "effect/SchemaAST";
-import { type FactTypeRecord, FactTypeYamlCodec } from "./factTypeSchema.js";
+import { type FactTypeRecord, FactTypeYamlCodec, readingProblems } from "./factTypeSchema.js";
 import { locate, predicateOf } from "./schemaIssues.js";
 
 /** One thing wrong with one fact type. */
@@ -63,14 +63,35 @@ export function decodeFactTypes(
     return Effect.result(
       decodeFile(doc).pipe(
         Effect.map((record) => record as FactTypeRecord),
-        Effect.mapError((error): FactTypeFailure => ({
-          subject,
-          problems: locate(error.issue).map(({ path, issue }) => ({
+        Effect.mapError((error): FactTypeFailure => {
+          const problems = locate(error.issue).map(({ path, issue }) => ({
             path,
             message: `${subject} ${predicateOf(issue, path, "is not a fact type.")}`,
-          })),
-        })),
+          }));
+          return { subject, problems: [...problems, ...readingsSkipped(doc, problems, subject)] };
+        }),
       ),
     );
   });
+}
+
+/**
+ * The reading rule, run on the raw fact type when Effect did not run it.
+ * It is a check on the whole fact type, and Effect runs such a check only
+ * once every field has passed, so beside an unknown field a bad reading went
+ * unreported until the next load. Only where the roles and readings are
+ * well-formed enough to judge, and only at a reading no other problem names.
+ */
+function readingsSkipped(
+  doc: object,
+  problems: readonly FactTypeProblem[],
+  subject: string,
+): FactTypeProblem[] {
+  const { roles, readings } = doc as { roles?: unknown; readings?: unknown; };
+  if (!Array.isArray(roles) || roles.length === 0) return [];
+  if (!Array.isArray(readings) || !readings.every((r) => typeof r === "string")) return [];
+  const seen = new Set(problems.map((p) => p.path.join("/")));
+  return readingProblems(roles.length, readings)
+    .filter((p) => !seen.has(p.path.join("/")))
+    .map((p) => ({ path: p.path, message: `${subject} ${p.issue}` }));
 }

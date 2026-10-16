@@ -135,7 +135,8 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
   const refused = new Map<string, RefusedElement>();
   const list = (doc as { model?: { fact_types?: unknown; }; } | null)?.model?.fact_types;
   if (!Array.isArray(list)) return { byFactType, problems, refused };
-  // Every fact type in one run, so a load starts one fiber, not one per fact type.
+  // Every fact type's constraints in one run, so a load starts one fiber for
+  // them, not one per fact type.
   const decodedLists = Effect.runSync(
     Effect.forEach(list, (ft: unknown, f) => {
       const docs = ft !== null && typeof ft === "object"
@@ -486,7 +487,7 @@ export class OrmYamlSerializer {
     );
     if (errors.length > 0) {
       const head = result.valid
-        ? "YAML holds malformed object types or constraints"
+        ? "YAML holds malformed model elements"
         : "YAML does not conform to orm-model schema";
       throw new DeserializationError(
         `${head}: ${errors.map((e) => `${e.path}: ${e.message}`).join("; ")}`,

@@ -16,6 +16,7 @@
  */
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import { deserializeDerivation } from "../serialization/yaml/derivation.js";
 import type { DerivationRule } from "./FactType.js";
 import { invalidField } from "./problemWording.js";
 import { validateReadingTemplate } from "./ReadingOrder.js";
@@ -31,15 +32,27 @@ const DerivationFile = Schema.Struct({
   is_formal: Schema.optionalKey(Schema.Boolean),
 });
 
-/** Each reading names every role, and no role the fact type lacks. */
+/**
+ * Each reading names every role, and no role the fact type lacks: one
+ * problem per reading at fault, as a path and a predicate. The fact type's
+ * check, and the decoder's own run of it on the raw input when Effect
+ * skipped the check because another field failed.
+ */
+export function readingProblems(
+  roleCount: number,
+  readings: readonly string[],
+): { readonly path: readonly PropertyKey[]; readonly issue: string; }[] {
+  return readings.flatMap((template, i) => {
+    const errors = validateReadingTemplate(template, roleCount);
+    if (errors.length === 0) return [];
+    const detail = errors.map((e) => e.replace(/\.$/, "")).join("; ");
+    return [{ path: ["readings", i], issue: invalidField(["readings", i], detail) }];
+  });
+}
+
 const readingsFitRoles = Schema.makeFilter(
   (ft: { readonly roles: readonly unknown[]; readonly readings: readonly string[]; }) =>
-    ft.readings.flatMap((template, i) => {
-      const errors = validateReadingTemplate(template, ft.roles.length);
-      if (errors.length === 0) return [];
-      const detail = errors.map((e) => e.replace(/\.$/, "")).join("; ");
-      return [{ path: ["readings", i], issue: invalidField(["readings", i], detail) }];
-    }),
+    readingProblems(ft.roles.length, ft.readings),
 );
 
 const FactTypeFile = Schema.Struct({
@@ -71,15 +84,6 @@ export type FactTypeRecord = Omit<typeof FactTypeRecord.Type, "derivation"> & {
   readonly derivation?: DerivationRule;
 };
 
-function readDerivation(d: typeof DerivationFile.Type): DerivationRule {
-  return {
-    kind: d.kind,
-    expression: d.expression,
-    ...(d.storage ? { storage: d.storage } : {}),
-    ...(d.is_formal ? { isFormal: true } : {}),
-  };
-}
-
 /**
  * A fact type as a file spells it, read into its record. Its `constraints`
  * are dropped here: the loader decodes them separately and adds them back.
@@ -94,7 +98,7 @@ const read = (f: typeof FactTypeFile.Type): typeof FactTypeRecord.Encoded => ({
   ...(f.note !== undefined ? { note: f.note } : {}),
   roles: f.roles.map((r) => ({ id: r.id, name: r.role_name, playerId: r.player })),
   readings: f.readings,
-  ...(f.derivation !== undefined ? { derivation: readDerivation(f.derivation) } : {}),
+  ...(f.derivation !== undefined ? { derivation: deserializeDerivation(f.derivation) } : {}),
 });
 
 const write = (r: typeof FactTypeRecord.Encoded): typeof FactTypeFile.Type => ({

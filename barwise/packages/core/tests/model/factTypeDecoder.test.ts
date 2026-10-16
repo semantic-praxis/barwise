@@ -8,6 +8,7 @@ import * as Result from "effect/Result";
 import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 import { decodeFactTypes, type FactTypeProblem } from "../../src/model/factTypeDecoder.js";
+import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import {
   deserializeFactType,
   type OrmYamlFactType,
@@ -56,6 +57,27 @@ describe("a fact type's problems", () => {
   it("reports every problem in one pass", () => {
     const found = problems({ ...VALID, roles: [], readings: [], colour: 1 });
     expect(found.map((p) => String(p.path[0])).sort()).toEqual(["colour", "readings", "roles"]);
+  });
+
+  it("reports a bad reading beside an unknown field, not on the next load", () => {
+    // Effect runs the fact type's reading check only once every field has
+    // passed; the decoder runs the rule itself when Effect did not.
+    const found = problems({ ...VALID, colour: 1, readings: ["{0} has {5}"] });
+    expect(found.map((p) => p.path)).toEqual([["colour"], ["readings", 0]]);
+  });
+
+  it("is named as a model element problem when only the decoder refuses", () => {
+    const yaml = `orm_version: "2.0"
+model:
+  name: M
+  object_types:
+    - {id: ot-p, name: Person, kind: entity, reference_mode: id}
+  fact_types:
+    - {id: ft-1, name: Person exists, roles: [{id: r-1, player: ot-p, role_name: exists}], readings: ["{0} exists {1}"]}
+`;
+    expect(() => new OrmYamlSerializer().deserialize(yaml)).toThrow(
+      /^YAML holds malformed model elements: \/model\/fact_types\/0\/readings\/0: Fact type "Person exists" /,
+    );
   });
 
   it("names a fact type with no name by its id, then by its position", () => {
