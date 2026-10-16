@@ -78,9 +78,10 @@ function fileVariant(kind: "entity" | "value", schema: typeof fileSchema = fileS
   expect((ot.if as { properties: { kind: { const: string; }; }; }).properties.kind.const).toBe(
     "entity",
   );
-  expect((ot.properties as { kind: { enum: string[]; }; }).kind.enum).toEqual(
-    expect.arrayContaining(["entity", "value"]),
-  );
+  expect([...(ot.properties as { kind: { enum: string[]; }; }).kind.enum].sort()).toEqual([
+    "entity",
+    "value",
+  ]);
   const then = ot.then as { required: string[]; properties: Record<string, Node>; };
   const properties = { ...(ot.properties as Record<string, Node>) };
   let required = [...(ot.required as string[])];
@@ -161,6 +162,12 @@ describe("the file schema reads as two variants only under the conditions the gu
   it("refuses a kind enum that drops a kind", () => {
     const edited = structuredClone(fileSchema);
     edited.definitions.object_type.properties.kind.enum = ["entity"];
+    expect(() => fileVariant("value", edited)).toThrow();
+  });
+
+  it("refuses a kind enum that adds a kind", () => {
+    const edited = structuredClone(fileSchema);
+    edited.definitions.object_type.properties.kind.enum = ["entity", "value", "both"];
     expect(() => fileVariant("value", edited)).toThrow();
   });
 
