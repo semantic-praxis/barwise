@@ -27,16 +27,18 @@ export interface ConstraintProblem {
   readonly path: readonly PropertyKey[];
   /** A sentence naming the fact type, the constraint and the field. */
   readonly message: string;
+}
+
+/** Everything wrong with one constraint. */
+export interface ConstraintFailure {
   /**
-   * What the message calls the constraint (`Constraint "c-1" in Fact type
+   * What the messages call the constraint (`Constraint "c-1" in Fact type
    * "Person has Age"`), for a caller that reports more about the same
    * constraint and must name it the same way.
    */
   readonly subject: string;
+  readonly problems: readonly ConstraintProblem[];
 }
-
-/** A problem before the decoder attaches its constraint's subject. */
-type Unnamed = Omit<ConstraintProblem, "subject">;
 
 const FILE_OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "error" };
 const decodeFile = Schema.decodeUnknownEffect(ConstraintYamlCodec, FILE_OPTIONS);
@@ -73,19 +75,22 @@ export function decodeConstraints(
   docs: readonly unknown[],
   factType: string,
   newId: () => string,
-): Effect.Effect<readonly Result.Result<ConstraintFromSchema, readonly ConstraintProblem[]>[]> {
+): Effect.Effect<readonly Result.Result<ConstraintFromSchema, ConstraintFailure>[]> {
   return Effect.forEach(docs, (doc, index) => {
     const label = constraintLabel(doc, index, factType);
-    const named = (found: readonly Unnamed[]) => found.map((p) => ({ ...p, subject: label }));
+    const failure = (problems: readonly ConstraintProblem[]): ConstraintFailure => ({
+      subject: label,
+      problems,
+    });
     if (!isMapping(doc)) {
       return Effect.succeed(
-        Result.fail(named([{ index, path: [], message: `${label} must be a mapping.` }])),
+        Result.fail(failure([{ index, path: [], message: `${label} must be a mapping.` }])),
       );
     }
     return Effect.result(
       decodeFile(withId(doc, newId)).pipe(
         Effect.mapError((error) =>
-          named(withPresence(problemsOf(error.issue, doc, index, label), doc, index, label))
+          failure(withPresence(problemsOf(error.issue, doc, index, label), doc, index, label))
         ),
       ),
     );
@@ -144,12 +149,12 @@ const RANGE_PRESENCE = anyOfKeys(schemaDefinitions.value_range_def.anyOf);
 const either = (keys: readonly string[]) => keys.map((k) => `"${k}"`).join(" or ");
 
 function withPresence(
-  problems: Unnamed[],
+  problems: ConstraintProblem[],
   raw: Record<string, unknown>,
   index: number,
   label: string,
-): Unnamed[] {
-  const found: Unnamed[] = [];
+): ConstraintProblem[] {
+  const found: ConstraintProblem[] = [];
   const type = typeof raw.type === "string" ? raw.type : undefined;
   const keys = type === undefined ? undefined : PRESENCE_BY_TYPE.get(type);
   const missingOneOf = keys !== undefined && !keys.some((k) => k in raw);
@@ -186,7 +191,7 @@ function problemsOf(
   raw: Record<string, unknown>,
   index: number,
   label: string,
-): Unnamed[] {
+): ConstraintProblem[] {
   const problems = locate(issue).map(({ path: decodedPath, issue: leaf }) => {
     // A union that matched no kind fails at the constraint itself; the field
     // at fault is its `type`.

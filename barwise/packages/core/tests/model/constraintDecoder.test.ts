@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CONSTRAINT_FILE_SPELLINGS,
+  type ConstraintFailure,
   type ConstraintProblem,
   decodeConstraints,
 } from "../../src/model/constraintDecoder.js";
@@ -28,7 +29,7 @@ function run(docs: readonly unknown[]) {
 function problems(doc: unknown): readonly ConstraintProblem[] {
   const [result] = run([doc]);
   if (result === undefined || Result.isSuccess(result)) throw new Error("expected problems");
-  return result.failure;
+  return result.failure.problems;
 }
 
 describe("a constraint's problems", () => {
@@ -144,7 +145,6 @@ describe("a constraint's problems", () => {
       index: 0,
       path: [],
       message: `Constraint at constraints/0 in ${FT} must be a mapping.`,
-      subject: `Constraint at constraints/0 in ${FT}`,
     }]);
   });
 
@@ -154,12 +154,11 @@ describe("a constraint's problems", () => {
       { type: "mandatory" },
     ]);
     expect(second !== undefined && Result.isFailure(second)).toBe(true);
-    const [problem] = (second as Result.Failure<unknown, readonly ConstraintProblem[]>).failure;
+    const [problem] = (second as Result.Failure<unknown, ConstraintFailure>).failure.problems;
     expect(problem).toEqual({
       index: 1,
       path: ["role"],
       message: `Constraint at constraints/1 in ${FT} is missing "role".`,
-      subject: `Constraint at constraints/1 in ${FT}`,
     });
   });
 
@@ -323,7 +322,7 @@ describe("the decoder refuses what the schema refuses, field by field", () => {
       const schemaRefuses = !validator.validateModel(documentWith(doc)).valid;
       const [result] = run([doc]);
       const named = result !== undefined && Result.isFailure(result)
-        && result.failure.some((p) => p.path[0] === field);
+        && result.failure.problems.some((p) => p.path[0] === field);
       return schemaRefuses && named ? [] : [{ type, field, bad, schemaRefuses, named }];
     });
     expect(missed).toEqual([]);

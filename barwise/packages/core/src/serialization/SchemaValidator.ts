@@ -1,5 +1,6 @@
 import { Ajv, type ErrorObject } from "ajv";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import { fieldPath, invalidField, missingField, unknownField } from "../model/problemWording.js";
 
 /**
  * Result of validating a parsed YAML document against the JSON Schema.
@@ -125,17 +126,22 @@ export function schemaErrorOf(
  * the whole value the subject of a rule about one of its fields.
  */
 function predicateBelow(err: ErrorObject, message: string): string {
-  const field = err.instancePath.split("/").slice(1).map((s) =>
-    s.replace(/~1/g, "/").replace(/~0/g, "~")
-  );
-  const at = (...more: string[]) => [...field, ...more].join(".");
-  const params = err.params as { additionalProperty?: string; };
+  const field = pointerSegments(err.instancePath);
+  const params = err.params as { additionalProperty?: string; missingProperty?: string; };
   if (params.additionalProperty !== undefined) {
-    return `has an unknown field "${at(params.additionalProperty)}".`;
+    return unknownField([...field, params.additionalProperty]);
   }
+  if (params.missingProperty !== undefined) return missingField([...field, params.missingProperty]);
   if (field.length === 0) return `${message}.`;
-  if (err.keyword === "false schema") return `has a field "${at()}" that is not allowed here.`;
-  return `has an invalid ${at()}: ${message}.`;
+  if (err.keyword === "false schema") {
+    return `has a field "${fieldPath(field)}" that is not allowed here.`;
+  }
+  return invalidField(field, message);
+}
+
+/** A JSON Pointer's segments, unescaped (RFC 6901: `~1` is `/`, then `~0` is `~`). */
+function pointerSegments(pointer: string): string[] {
+  return pointer.split("/").slice(1).map((s) => s.replace(/~1/g, "/").replace(/~0/g, "~"));
 }
 
 /**
@@ -150,9 +156,7 @@ function predicateBelow(err: ErrorObject, message: string): string {
  * array entry, so its name, which every path is under, is never used.
  */
 function nearestName(data: unknown, pointer: string): string | undefined {
-  const segments = pointer.split("/").slice(1).map((s) =>
-    s.replace(/~1/g, "/").replace(/~0/g, "~")
-  );
+  const segments = pointerSegments(pointer);
   // Only array entries are elements: `object_types[3]` is an object type,
   // while `data_type` is a field whose own `name` is a type name, and
   // "(in "integer")" would point the reader at the wrong thing.

@@ -52,7 +52,22 @@ describe("schemaErrorOf with a subject", () => {
     expect(e.message).toBe(`${SUBJECT} has a field "role" that is not allowed here.`);
   });
 
-  it("states a rule on the element itself plainly", () => {
+  it("names a missing key below the subject by its path", () => {
+    const e = schemaErrorOf(
+      error({
+        instancePath: "/ranges/0",
+        keyword: "required",
+        params: { missingProperty: "min" },
+        message: "must have required property 'min'",
+      }),
+      {},
+      PREFIX,
+      SUBJECT,
+    );
+    expect(e.message).toBe(`${SUBJECT} is missing "ranges.0.min".`);
+  });
+
+  it("names a missing key at the subject as the decoder does", () => {
     const e = schemaErrorOf(
       error({
         keyword: "required",
@@ -63,6 +78,6 @@ describe("schemaErrorOf with a subject", () => {
       PREFIX,
       SUBJECT,
     );
-    expect(e.message).toBe(`${SUBJECT} must have required property 'role'.`);
+    expect(e.message).toBe(`${SUBJECT} is missing "role".`);
   });
 });

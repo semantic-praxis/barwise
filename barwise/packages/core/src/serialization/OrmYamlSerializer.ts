@@ -151,7 +151,7 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
         return;
       }
       const reported = new Set<string>();
-      for (const problem of result.failure) {
+      for (const problem of result.failure.problems) {
         const below = problem.path.map((k) => `/${pointerSegment(k)}`).join("");
         reported.add(below);
         problems.push({
@@ -161,7 +161,7 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
       }
       refused.set(`${f}/${c}`, {
         raw: docs[c],
-        subject: result.failure[0]!.subject,
+        subject: result.failure.subject,
         reported,
       });
     });
@@ -194,8 +194,11 @@ function factTypeLabel(ft: object, index: number): string {
  * of the schema alone. Every error from that check the decoder did not report
  * at the same place is kept: through the mapping the whole-document check
  * uses, so with the same rule, but worded with the subject the decoder gave
- * the constraint and the field below it, as the decoder words its own. A constraint the decoder accepted keeps every schema error on
- * it. The load is refused either way.
+ * the constraint and the field below it, in the words the decoder uses
+ * (`problemWording.ts`).
+ *
+ * A constraint the decoder accepted keeps every schema error on it. The load
+ * is refused either way.
  *
  * "Reported at the same place" does not compare rules, because the decoder's
  * problems do not carry one: an error at a place the decoder reported is

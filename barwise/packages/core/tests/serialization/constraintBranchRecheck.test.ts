@@ -26,7 +26,10 @@ vi.mock("../../src/model/constraintDecoder.js", async (importOriginal) => {
         (results) =>
           results.map((r) =>
             Result.isFailure(r)
-              ? Result.fail(r.failure.filter((p) => p.path[0] !== "role"))
+              ? Result.fail({
+                ...r.failure,
+                problems: r.failure.problems.filter((p) => p.path[0] !== "role"),
+              })
               : r
           ),
       ),
@@ -46,6 +49,7 @@ model:
       constraints:
         - {id: c-1, type: mandatory, role: "", weight: 3}
         - {id: c-2, type: mandatory, weight: 3}
+        - {id: c-3, type: mandatory, role: ""}
 `;
 
 describe("a rule the decoder does not report", () => {
@@ -80,6 +84,9 @@ describe("a rule the decoder does not report", () => {
       "/model/fact_types/0/constraints/0/weight",
       "/model/fact_types/0/constraints/1",
       "/model/fact_types/0/constraints/1/weight",
+      // c-3's only problem is the one the wrapped decoder forgets, so its
+      // refusal carries no problems at all; the schema's report still comes.
+      "/model/fact_types/0/constraints/2/role",
     ]);
     // Kept with the rule the whole-document check gives, worded as the
     // decoder words its own: the constraint, then the field at fault.
@@ -91,8 +98,7 @@ describe("a rule the decoder does not report", () => {
     });
     expect(errors.find((e) => e.path.endsWith("/constraints/1"))).toEqual({
       path: "/model/fact_types/0/constraints/1",
-      message:
-        'Constraint "c-2" in Fact type "Person exists" must have required property \'role\'.',
+      message: 'Constraint "c-2" in Fact type "Person exists" is missing "role".',
       rule: { keyword: "required", missingProperty: "role" },
     });
   });

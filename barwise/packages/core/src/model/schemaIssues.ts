@@ -6,6 +6,7 @@
  * tree and the wording of Effect's own structural refusals are the same.
  */
 import * as SchemaIssue from "effect/SchemaIssue";
+import { invalidField, missingField, unknownField } from "./problemWording.js";
 
 /** One failure in the issue tree, with the path that leads to it. */
 export interface Located {
@@ -69,12 +70,11 @@ export function predicateOf(
   path: readonly PropertyKey[],
   atRoot: string,
 ): string {
-  const at = path.map(String).join(".");
   switch (issue._tag) {
     case "UnexpectedKey":
-      return `has an unknown field "${at}".`;
+      return unknownField(path);
     case "MissingKey":
-      return issue.annotations?.messageMissingKey ?? `is missing "${at}".`;
+      return issue.annotations?.messageMissingKey ?? missingField(path);
     case "AnyOf": {
       if (path.length === 0) return atRoot;
       const message = issue.ast.annotations?.message;
@@ -95,7 +95,7 @@ export function predicateOf(
       break;
     }
   }
-  return `has an invalid ${at}: ${defaultFormat(issue)}.`;
+  return invalidField(path, defaultFormat(issue));
 }
 
 /**
