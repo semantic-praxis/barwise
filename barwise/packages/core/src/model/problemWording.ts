@@ -22,3 +22,12 @@ export function missingField(path: readonly PropertyKey[]): string {
 export function invalidField(path: readonly PropertyKey[], detail: string): string {
   return `has an invalid ${fieldPath(path)}: ${detail}.`;
 }
+
+/** A "one of these keys" rule with none of them present. */
+export function missingOneOf(path: readonly PropertyKey[], keys: readonly string[]): string {
+  return `is missing ${keys.map((k) => `"${fieldPath([...path, k])}"`).join(" or ")}.`;
+}
+
+export function forbiddenField(path: readonly PropertyKey[]): string {
+  return `has a field "${fieldPath(path)}" that is not allowed here.`;
+}

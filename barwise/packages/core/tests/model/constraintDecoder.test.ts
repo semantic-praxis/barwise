@@ -79,9 +79,9 @@ describe("a constraint's problems", () => {
     [
       { id: "c-1", type: "value_constraint", role: "a" },
       ["values"],
-      'must have "values" or "ranges".',
+      'is missing "values" or "ranges".',
     ],
-    [{ id: "c-1", type: "frequency", min: 1, max: 2 }, ["role"], 'must have "role" or "roles".'],
+    [{ id: "c-1", type: "frequency", min: 1, max: 2 }, ["role"], 'is missing "role" or "roles".'],
   ])("%j is reported at %j", (doc, path, predicate) => {
     const found = problems(doc);
     expect(found).toHaveLength(1);
@@ -110,7 +110,7 @@ describe("a constraint's problems", () => {
     const found = problems({ id: "c-1", type: "frequency", min: 1, max: 2, w: 1 });
     expect(found.map((p) => p.message)).toEqual([
       `Constraint "c-1" in ${FT} has an unknown field "w".`,
-      `Constraint "c-1" in ${FT} must have "role" or "roles".`,
+      `Constraint "c-1" in ${FT} is missing "role" or "roles".`,
     ]);
   });
 

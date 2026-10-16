@@ -16,6 +16,7 @@ import type * as SchemaAST from "effect/SchemaAST";
 import type * as SchemaIssue from "effect/SchemaIssue";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import { type ConstraintFromSchema, ConstraintYamlCodec } from "./constraintSchema.js";
+import { missingField, missingOneOf } from "./problemWording.js";
 import { locate, predicateOf, spelledAs } from "./schemaIssues.js";
 import { RANGE_BOUND_MESSAGE, RANGE_YAML_KEYS } from "./valueRangeSchema.js";
 
@@ -145,9 +146,6 @@ const TYPES_WITH_RANGES: ReadonlySet<string> = new Set(
 );
 const RANGE_PRESENCE = anyOfKeys(schemaDefinitions.value_range_def.anyOf);
 
-/** `"a" or "b"`. */
-const either = (keys: readonly string[]) => keys.map((k) => `"${k}"`).join(" or ");
-
 function withPresence(
   problems: ConstraintProblem[],
   raw: Record<string, unknown>,
@@ -157,9 +155,9 @@ function withPresence(
   const found: ConstraintProblem[] = [];
   const type = typeof raw.type === "string" ? raw.type : undefined;
   const keys = type === undefined ? undefined : PRESENCE_BY_TYPE.get(type);
-  const missingOneOf = keys !== undefined && !keys.some((k) => k in raw);
-  if (keys !== undefined && missingOneOf) {
-    found.push({ index, path: [keys[0]!], message: `${label} must have ${either(keys)}.` });
+  const noneOfKeys = keys !== undefined && !keys.some((k) => k in raw);
+  if (keys !== undefined && noneOfKeys) {
+    found.push({ index, path: [keys[0]!], message: `${label} ${missingOneOf([], keys)}` });
   }
   if (type !== undefined && TYPES_WITH_RANGES.has(type) && Array.isArray(raw.ranges)) {
     raw.ranges.forEach((range: unknown, i) => {
@@ -173,7 +171,7 @@ function withPresence(
   // A missing "one of" replaces what the record's rules said about the same
   // keys: a frequency with neither `role` nor `roles` is told that, not that
   // its (empty) role list is too short.
-  const covered = new Set(missingOneOf ? keys : []);
+  const covered = new Set(noneOfKeys ? keys : []);
   const rest = problems.filter((p) => !covered.has(String(p.path[0])));
   const seen = new Set(rest.map((p) => p.path.join("/")));
   return [...rest, ...found.filter((p) => !seen.has(p.path.join("/")))];
@@ -210,7 +208,7 @@ function problemsOf(
 function unknownType(raw: Record<string, unknown>): string {
   const type = raw.type;
   return type === undefined
-    ? `is missing "type".`
+    ? missingField(["type"])
     : `has an unknown type ${JSON.stringify(type)}.`;
 }
 

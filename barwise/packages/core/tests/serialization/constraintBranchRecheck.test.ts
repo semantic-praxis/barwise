@@ -50,6 +50,7 @@ model:
         - {id: c-1, type: mandatory, role: "", weight: 3}
         - {id: c-2, type: mandatory, weight: 3}
         - {id: c-3, type: mandatory, role: ""}
+        - {id: c-4, type: frequency, min: 1, max: 2}
 `;
 
 describe("a rule the decoder does not report", () => {
@@ -87,6 +88,7 @@ describe("a rule the decoder does not report", () => {
       // c-3's only problem is the one the wrapped decoder forgets, so its
       // refusal carries no problems at all; the schema's report still comes.
       "/model/fact_types/0/constraints/2/role",
+      "/model/fact_types/0/constraints/3",
     ]);
     // Kept with the rule the whole-document check gives, worded as the
     // decoder words its own: the constraint, then the field at fault.
@@ -96,6 +98,10 @@ describe("a rule the decoder does not report", () => {
         'Constraint "c-1" in Fact type "Person exists" has an invalid role: must NOT have fewer than 1 characters.',
       rule: { keyword: "minLength" },
     });
+    // A "one of these keys" rule is one line, not one "required" per key.
+    expect(errors.find((e) => e.path.endsWith("/constraints/3"))!.message).toBe(
+      'Constraint "c-4" in Fact type "Person exists" is missing "role" or "roles".',
+    );
     expect(errors.find((e) => e.path.endsWith("/constraints/1"))).toEqual({
       path: "/model/fact_types/0/constraints/1",
       message: 'Constraint "c-2" in Fact type "Person exists" is missing "role".',

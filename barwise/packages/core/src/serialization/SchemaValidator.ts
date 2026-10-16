@@ -1,6 +1,13 @@
 import { Ajv, type ErrorObject } from "ajv";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
-import { fieldPath, invalidField, missingField, unknownField } from "../model/problemWording.js";
+import {
+  forbiddenField,
+  invalidField,
+  missingField,
+  missingOneOf,
+  unknownField,
+} from "../model/problemWording.js";
+import { pointerSegments } from "./jsonPointer.js";
 
 /**
  * Result of validating a parsed YAML document against the JSON Schema.
@@ -127,21 +134,19 @@ export function schemaErrorOf(
  */
 function predicateBelow(err: ErrorObject, message: string): string {
   const field = pointerSegments(err.instancePath);
-  const params = err.params as { additionalProperty?: string; missingProperty?: string; };
+  const params = err.params as {
+    additionalProperty?: string;
+    missingProperty?: string;
+    anyOfKeys?: readonly string[];
+  };
+  if (params.anyOfKeys !== undefined) return missingOneOf(field, params.anyOfKeys);
   if (params.additionalProperty !== undefined) {
     return unknownField([...field, params.additionalProperty]);
   }
   if (params.missingProperty !== undefined) return missingField([...field, params.missingProperty]);
   if (field.length === 0) return `${message}.`;
-  if (err.keyword === "false schema") {
-    return `has a field "${fieldPath(field)}" that is not allowed here.`;
-  }
+  if (err.keyword === "false schema") return forbiddenField(field);
   return invalidField(field, message);
-}
-
-/** A JSON Pointer's segments, unescaped (RFC 6901: `~1` is `/`, then `~0` is `~`). */
-function pointerSegments(pointer: string): string[] {
-  return pointer.split("/").slice(1).map((s) => s.replace(/~1/g, "/").replace(/~0/g, "~"));
 }
 
 /**

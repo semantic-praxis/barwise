@@ -8,6 +8,7 @@ import { generateId } from "../model/id.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
 import { OrmModel } from "../model/OrmModel.js";
+import { pointerSegment } from "./jsonPointer.js";
 import {
   type SchemaError,
   schemaErrorOf,
@@ -170,11 +171,6 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
   return { byFactType, problems, refused };
 }
 
-/** A JSON Pointer segment, escaped as ajv's `instancePath` escapes it. */
-function pointerSegment(key: PropertyKey): string {
-  return String(key).replace(/~/g, "~0").replace(/\//g, "~1");
-}
-
 /** What a constraint's problem calls its fact type: name, id, or position. */
 function factTypeLabel(ft: object, index: number): string {
   const { name, id } = ft as { name?: unknown; id?: unknown; };
@@ -266,7 +262,9 @@ function branchValidator(type: unknown): ValidateFunction | undefined {
  *
  * Covered means reported at the same place: at the error's own path; for a
  * missing or unknown key, at that key; and for a "one of these keys" rule,
- * at the place itself or at any of its keys.
+ * at the place itself or at any of its keys. (Its anyOf error's own
+ * `schemaPath` ends in `/anyOf`, its members' in `/anyOf/<n>/required`;
+ * both are cut at the last `/anyOf` to group them.)
  */
 function unreportedBranchErrors(refused: RefusedConstraint): ErrorObject[] {
   const raw = refused.raw;
@@ -305,7 +303,16 @@ function unreportedBranchErrors(refused: RefusedConstraint): ErrorObject[] {
     }
     return at.has(e.instancePath);
   };
-  return errors.filter((e) => !covered(e));
+  // An uncovered "one of these keys" group is one rule: kept as its anyOf
+  // error carrying the group's keys, not as one "required" per key, which
+  // would tell the reader to add every one of them.
+  return errors
+    .filter((e) => !covered(e))
+    .filter((e) => groupOf(e) === undefined || e.keyword === "anyOf")
+    .map((e) => {
+      const keys = e.keyword === "anyOf" ? groupKeys.get(groupOf(e)!) : undefined;
+      return keys === undefined ? e : { ...e, params: { ...e.params, anyOfKeys: keys } };
+    });
 }
 
 /**
