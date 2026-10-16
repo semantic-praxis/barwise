@@ -638,7 +638,11 @@ corpus document (`tests/helpers/modelCorpus.ts`) and every derived
 valid element (part D), plants one defect at a time from a fixed list
 (drop a required key, add an unknown key, change a type, empty a list,
 break each cross-field rule), and requires that the decoder report a
-problem at the planted path and at no other. A single cross-field
+problem at the planted path. Each plant also declares the other problems
+it correctly causes -- emptying a fact type's `roles` also breaks its
+readings' placeholders; changing a constraint's `type` fails the element's
+union -- and the decoder must report exactly the declared set, no more and no
+fewer. A single cross-field
 plant does not exercise the blind spot -- its fields still decode, so
 Effect runs the check with or without the harness -- and those cases
 are kept as controls. The cases that do are pairs: each cross-field
@@ -730,10 +734,12 @@ with `onExcessProperty: "error"`, and what C does about each:
   approximating branch and removes the approximation if it can, and
   otherwise ships `anyOf`.
 
-Draft 2020-12 also gives the format keywords the draft-07 file had to
-spell around: `$defs`, `dependentRequired` (a key that is only allowed
-beside another, such as `min_inclusive` beside `min`), `prefixItems`,
-and `unevaluatedProperties`. Which of these Effect emits is its own
+Draft 2020-12 is mostly a renaming of what draft-07 already had
+(`definitions` becomes `$defs`; draft-07's `dependencies` splits into
+`dependentRequired` and `dependentSchemas`), plus two real additions:
+`prefixItems` and `unevaluatedProperties`, the latter able to close an
+object across `allOf` branches, which draft-07's `additionalProperties`
+cannot. Which of these Effect emits is its own
 choice; a `toJsonSchema` annotation can state any of them where a
 check needs one.
 
@@ -754,9 +760,13 @@ plain-data lists (part E): `scripts/lib/schema-cases.mjs` (lines 161 and
 `core/tests/serialization/schemaDataTypes.test.ts`; and
 `core/tests/model/valueOnlyFields.test.ts`, which reads an `if`/`then`
 branch. The scorer is a measuring instrument for the Effect comparison's two
-arms, and its answer key must not be generated from one of them, so it keeps
-the last hand-written schema as a frozen fixture instead of reading the live
-file.
+arms, and its answer key must not be generated from one of them. It scores
+the comparison's and the spike's 2.0 fixtures, so it keeps the last
+hand-written 2.0 schema as a fixture of its own, scoped to those 2.0 inputs.
+That is not Open decision 9's rejected option (c), which would have kept a
+frozen copy as the oracle for the shipped, growing format: this copy is
+never compared with the current format, and when S4 is next read on a 3.0
+head the scorer is re-baselined against that head's fixtures.
 
 What replaces the independence the hand-written file gave. P3 checked
 derived values against a file the Schemas did not write; with the file

@@ -8,7 +8,8 @@ partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
 decision 8); barwise-hnb (NORMA comparison doc correction)
 
-In one sentence: every constraint gets a required, stable id; a constraint
+In one sentence: every constraint in a constraint list gets a required,
+stable id; a constraint
 lives where its kind says it lives -- the internal kinds nested in their fact
 type, the external kinds in one model-level list -- and subtype exclusion and
 totality become model-level constraints instead of flags; all of it ships as
@@ -213,14 +214,24 @@ and silently stop seeing external constraints (Risks).
 validation like `diagramReferencesToIds.ts`, and registers in
 `schemaVersion.ts`:
 
-1. Every constraint without an id gets one derived from its position: a hash
-   of the fact type id, the constraint's index in that fact type, and its
-   kind. The same unmigrated file always yields the same ids. Open decision 4
-   sets the shape. Every derived id hashes a domain tag first
-   (`barwise.constraint` here, `barwise.subtype-constraint` in step 3) and
-   then each input with its length in front, so no two different inputs give
-   the same bytes: without that, fact type `ft-1` at index 0 and supertype
-   `ft-10` would concatenate identically.
+1. Every constraint without an id gets one derived from its content: a hash
+   of the fact type id, the kind, and the constraint's fields (roles in
+   their written order, bounds, values, flags), with an occurrence number
+   only to tell apart identical constraints in one fact type. Content, not
+   position: inserting a constraint before others changes no other
+   constraint's id, so two revisions of one 2.0 file migrated separately
+   give the same id to the same constraint, and diff and merge can match by
+   id. An id is derived once, at migration, and is stated in the file from
+   the first save; editing a constraint afterwards does not change it.
+   Every derived id hashes a domain tag first (`barwise.constraint` here,
+   `barwise.subtype-constraint` in step 3), then each input with its length
+   in front. The tag keeps the two steps apart; the length prefix keeps
+   inputs within a step apart (`ft-1` with role `r-10` against `ft-11` with
+   role `r-0` would otherwise concatenate identically). Open decision 4 sets
+   the shape. Constraints in a constraint list are what step 1 covers; an
+   object type's value constraint and object cardinality stay properties of
+   their object type, identified by it, and NORMA export derives their
+   NORMA ids from the object type's id.
 2. Every external-kind constraint moves from its fact type to
    `model.constraints`, keeping its id and fields.
 3. For each supertype, let E be its subtype facts flagged `is_exclusive` and
@@ -264,8 +275,8 @@ every time until then.
 | `core/src/model/SubtypeFact.ts`                           | `isExclusive`, `isExhaustive`                     | removed                                                                   |
 | `core/src/model/identification.ts`                        | preferred = internal uniqueness flag              | preferred = the entity's referenced constraint                            |
 | `core/src/validation/`, `verbalization/`, `mapping/`      | read external kinds from `ft.constraints`         | read `model.constraints`; compiler-guided                                 |
-| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | by id where both files state it (3.0); content key otherwise              |
-| `core/src/project/splitModel.ts`                          | detects cross-domain constraints under hosts      | reads the model-level list                                                |
+| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | by id (ids are content-derived where the file omitted them)               |
+| `core/src/project/splitModel.ts`                          | detects cross-domain constraints under hosts      | migrates the raw document to 3.0 before splitting; reads the model list   |
 | `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags    | keeps ids; places by kind; partition constraints 1:1; preferred both ways |
 | `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`             | node id = constraint id                                                   |
 | `llm/src/parse/`                                          | attaches constraints to fact types                | places by kind through the model API                                      |
@@ -303,9 +314,10 @@ still imports.
   of 73.
 - **Placement by each constraint's span.** Rejected above: location would
   change when roles are edited.
-- **Keep ids optional and derive a stable id from content when missing.**
-  No migration, but an id that changes whenever the constraint is edited is
-  not an identity, and two identical constraints collide.
+- **Keep ids optional and derive a stable id from content on every load.**
+  No migration, but an id recomputed on every load changes whenever the
+  constraint is edited, so it is not an identity. The migration derives from
+  content too, but once, and the file keeps the id from then on.
 - **Keep the host, and fix only the host rule.** Smallest change; the
   constraint still dies with an arbitrary host, and subtype exclusion still has
   nowhere to live.
@@ -400,7 +412,7 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
   `FactType.internalConstraints` holds the internal kinds, `OrmModel.constraints` is new, `SubtypeFact.isExclusive` and
   `isExhaustive` and `isPreferred` are removed. Downstream packages follow in
   the same workstreams; the full monorepo build gates each.
-- **Diff output** names constraints by id where both sides are 3.0 files.
+- **Diff output** names constraints by id.
 - **Verbalization output** moves external constraints into their own section;
   golden files change in WS3.
 
@@ -429,14 +441,11 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
    `<fact-type-id>-c0`, is easier to read in a diff and collides with any
    author id spelled the same way.
 
-   **Derived ids are not for matching across revisions.** They come from
-   position, so two revisions of an unsaved 2.0 file can give one id to
-   different constraints. A model migrated in memory claims 3.0 and cannot
-   tell its ids' origin, so the decision is made where the version is
-   still visible: core's diff and merge take an explicit option to match
-   constraints by id, and the callers that read files (CLI, MCP, the
-   editor) set it only when both files were 3.0 on disk. Otherwise they
-   keep today's content-key matching.
+   Because derived ids come from content (step 1), two revisions of one
+   2.0 file give the same constraint the same id, and diff and merge match
+   constraints by id whatever the files' versions. An edited constraint
+   gets a different id, which diff reports as a removal and an addition,
+   the same as today's content-key matching.
 5. **A `barwise migrate` command.** Recommend: yes, CLI-only, rewriting files
    in place to the current version; it serves the 113 tracked files and every
    user's repository, and gets a deliberate capability-matrix row. The
@@ -452,26 +461,38 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 8. **What 2.0's `is_preferred` meant, for the migration's step 4.** Five
    modules answer "which constraint is this entity's preferred identifier"
    with five different rules today (barwise-971), and the corpus does not
-   follow any one of them: of the 376 preferred uniquenesses, 286 cover the
-   entity's own role in an entity-value binary, 68 cover the value's role in
-   one, 12 span every role of an objectified fact type, and 10 sit on
-   n-ary fact types (8 with one uncovered entity player, 2 with an uncovered
-   value player). `NormaXmlWriter.collectPreferredIdentifiers` -- the rule an
-   earlier draft of this spec used -- finds no entity for the 286. Format
-   3.0 ends the ambiguity for new files, because the entity names its
-   identifier; the migration has to read the old flag once.
-   - **(a)** Recommended, in order: an objectified fact type whose
-     uniqueness spans every role identifies its objectifying type; a binary
-     between one entity and one value type identifies the entity, whichever
-     role is covered (the mapper's rule, `preferredIdentifyingBinary`, which
-     decides primary keys today, so no table's key moves); otherwise, when
-     one entity type plays every uncovered role, that entity. Anything else
-     is dropped, as step 4 says. When two or more flags land on one entity,
-     the first in document order wins and the rest are dropped; validation
-     already reports an entity with two identifiers. On the corpus this
-     keeps 366 of the 376 flags and drops 10: 2 that identify no single
-     entity (one ternary, `WonItemHasSoldPriceAtTimestamp`, in two copies of
-     the auction model) and 8 second-or-later flags on 4 entities.
+   follow any one of them: of the 376 preferred uniquenesses, 286 sit on the
+   entity's own role in an entity-value binary ("each Customer has at most
+   one number"), 68 on the value's role ("each number belongs to at most one
+   Customer"), 12 span every role of an objectified fact type, and 10 sit on
+   n-ary fact types. In ORM, and in NORMA's `PreferredIdentifier`, the
+   reference scheme is the second kind: the uniqueness over the roles played
+   opposite the entity. `NormaXmlWriter.collectPreferredIdentifiers` finds
+   no entity for the 286 for that reason. Format 3.0 ends the ambiguity for
+   new files, because the entity names its identifier; the migration has to
+   read the old flag once.
+   - **(a)** Recommended. The flag marks which fact type identifies which
+     entity, and the reference points at the constraint ORM means:
+     - an objectified fact type whose flagged uniqueness spans every role:
+       the objectifying type, identified by that uniqueness;
+     - a binary between one entity and one value type, whichever role the
+       flag is on: the entity, identified by the uniqueness on the value's
+       role. 284 of the 286 entity-role flags have one; the mapper's primary
+       key is chosen by fact type (`preferredIdentifyingBinary`), so no
+       table's key moves, and NORMA export receives a valid reference;
+     - otherwise, when one entity type plays every uncovered role: that
+       entity, identified by the flagged uniqueness;
+     - anything else is dropped, as step 4 says.
+
+     When flags name two or more different constraints for one entity, the
+     first in document order wins. That resolves, and so hides, a modeling
+     error the 2.0 validator reports (an entity with two identifiers). The
+     4 such entities in the corpus are fixed by hand in WS5 before their
+     files are migrated, and the release notes tell users to run
+     `barwise validate` on 2.0 files first. On the corpus this rule places
+     372 of the 376 flags and drops 4: one ternary
+     (`WonItemHasSoldPriceAtTimestamp`, in two copies of the auction model)
+     and 2 entity-value binaries with no uniqueness on the value's role.
    - **(b)** Use `collectPreferredIdentifiers`'s rule alone. Matches NORMA
      export today, and drops 286 flags the mapper currently honours.
    - **(c)** Keep `is_preferred` in 3.0 alongside the reference. No
