@@ -34,6 +34,19 @@ describe("schema errors and decoder problems on one object type", () => {
     expect(message).toContain("must have a cardinality max >= min");
   });
 
+  it("keeps a schema error inside a field the decoder also refuses", () => {
+    // The decoder names the field (aliases); the schema also flags the empty
+    // string, which the decoder accepts. That error must survive.
+    const message = loadError(`    - id: ot-a
+      name: Size
+      kind: value
+      data_type:
+        name: text
+      aliases: ["", 3]
+`);
+    expect(message).toContain("fewer than 1 characters");
+  });
+
   it("reports an entity without a reference mode once", () => {
     const message = loadError(`    - id: ot-p
       name: Person

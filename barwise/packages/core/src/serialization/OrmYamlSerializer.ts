@@ -94,23 +94,28 @@ function decodeObjectTypesOf(
   return { decoded, problems };
 }
 
-/** An object type's path: its index, then the first field under it, if any. */
-const OBJECT_TYPE_PATH = /^\/model\/object_types\/(\d+)(?:\/([^/]+))?(?:\/|$)/;
+/**
+ * An object type's path: its index, the field under it if any, and whatever
+ * sits below that field.
+ */
+const OBJECT_TYPE_PATH = /^\/model\/object_types\/(\d+)(?:\/([^/]+)(\/.*)?)?$/;
 /** ajv names the property in a required-property error. */
 const MISSING_PROPERTY = /must have required property '([^']+)'/;
 
 /**
  * The schema's errors and the decoder's problems as one list.
  *
- * A schema error is dropped only when the decoder reports the same thing: a
- * field-level error on a field the decoder names, or a required-property error
- * for a property the decoder names. Where the schema reports an entity without
- * a reference mode three times (the missing property, the failed `if`, the
- * failed `then`), the decoder's one problem replaces all three. The rest of
- * the schema's errors stand, because the file format asks things the decoder
- * does not: an `id` in every object type, a bound in every range. The decoder
- * mints a missing id, so a missing id is always the schema's to report, even
- * on an object type the decoder refused for another reason.
+ * The decoder names top-level fields only, so it can say which field it
+ * refused but not which rule inside the field it replaced. A schema error is
+ * therefore dropped only when it sits exactly at a field the decoder names, or
+ * is a required-property error for a property the decoder names. Anything
+ * deeper in a field is kept: a duplicate costs a line, a dropped rule is
+ * silent. Where the schema reports an entity without a reference mode three
+ * times (the missing property, the failed `if`, the failed `then`), the
+ * decoder's one problem replaces all three. The schema's other errors stand,
+ * because the file format asks things the decoder does not: an `id` in every
+ * object type, a bound in every range. The decoder mints a missing id, so a
+ * missing id is always the schema's to report.
  */
 function mergeObjectTypeProblems(
   schemaErrors: readonly SchemaError[],
@@ -125,9 +130,11 @@ function mergeObjectTypeProblems(
   }
   const covered = (error: SchemaError) => {
     const match = OBJECT_TYPE_PATH.exec(error.path);
-    if (match === null || !refused.has(Number(match[1]))) return false;
+    if (match === null) return false;
     const index = Number(match[1]);
-    if (match[2] !== undefined) return named.has(`${index}/${match[2]}`);
+    if (!refused.has(index)) return false;
+    const [, , field, below] = match;
+    if (field !== undefined) return below === undefined && named.has(`${index}/${field}`);
     const missing = MISSING_PROPERTY.exec(error.message);
     return missing === null || named.has(`${index}/${missing[1]}`);
   };
