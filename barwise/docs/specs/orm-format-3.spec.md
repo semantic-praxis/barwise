@@ -107,8 +107,11 @@ Out of scope:
   external frequency would be a model-level kind.
 - **The Effect adoption spike** (`effect-adoption.spec.md`). Its schemas
   follow whatever format `main` has when its workstreams land; Open decision 6.
-- **The LLM extraction format**, which has no ids or placement of its own;
-  the parser builds the model through the API, which places by kind.
+- **The LLM extraction format's shape.** It has no ids or placement of its
+  own and keeps its `is_preferred` flag; the parser
+  (`llm/src/parse/constraints.ts`) builds the model through the API and, in
+  WS4, translates `is_preferred` into the entity's preferred-identifier
+  reference with the migration's step 4 rule, refusing the same cases.
 
 ## Placement by kind
 
@@ -173,7 +176,7 @@ model:
   constraints: # external kinds only
     - id: c-room-key
       type: external_uniqueness
-      roles: [r-1, r-4] # building and room number
+      roles: [r-2, r-4] # the roles Building and RoomNumber play opposite Room
     - id: c-sex-partition
       type: exclusive_or
       subtype_facts: [sf-1, sf-2]
@@ -232,9 +235,13 @@ validation like `diagramReferencesToIds.ts`, and registers in
    above gets its own fixture.
 4. Each `is_preferred: true` becomes `preferred_identifier` on the entity it
    identifies:
-   - when the uniqueness leaves a role of its fact type uncovered, the entity
-     is the player of those roles (the rule
-     `NormaXmlWriter.collectPreferredIdentifiers` already uses);
+   - when the uniqueness leaves roles of its fact type uncovered and one
+     entity type plays all of them, the entity is that player (the rule
+     `NormaXmlWriter.collectPreferredIdentifiers` uses);
+   - when the uncovered roles are played by different entity types, as in a
+     ternary whose uniqueness covers one role, the constraint identifies no
+     single entity. `collectPreferredIdentifiers` assigns it to every such
+     player; the migration refuses the file instead, naming the constraint;
    - when it spans every role, the fact type must be objectified, and the
      entity is the objectifying object type. All 12 such constraints in the
      corpus (of 376 preferred) are on objectified fact types;
@@ -262,7 +269,7 @@ every time until then.
 | `core/src/model/SubtypeFact.ts`                           | `isExclusive`, `isExhaustive`                     | removed                                                                   |
 | `core/src/model/identification.ts`                        | preferred = internal uniqueness flag              | preferred = the entity's referenced constraint                            |
 | `core/src/validation/`, `verbalization/`, `mapping/`      | read external kinds from `ft.constraints`         | read `model.constraints`; compiler-guided                                 |
-| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | match by id first, content key as fallback                                |
+| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | by id where both files state it (3.0); content key otherwise              |
 | `core/src/project/splitModel.ts`                          | detects cross-domain constraints under hosts      | reads the model-level list                                                |
 | `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags    | keeps ids; places by kind; partition constraints 1:1; preferred both ways |
 | `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`             | node id = constraint id                                                   |
@@ -271,8 +278,24 @@ every time until then.
 | `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)          | corrected in WS6                                                          |
 | `docs/adr/`                                               | ADR 0001 "inline and local"                       | ADR 0003 amends it for external constraints                               |
 
-The extraction format in `llm/src/prompt/responseSchema.ts` is untouched: it
-has no constraint ids and no placement.
+Not in the table because they need no design decision, but in WS3 to WS5's
+scope: the programmatic builders that create constraints without ids or set
+`isPreferred` -- `llm/src/parse/constraints.ts` and `ModelContext.ts`,
+`dbt/src/dbtMapping/identifierTypes.ts`, the DDL and OpenAPI importers,
+NORMA mapping -- and the core readers of `isPreferred` (22 files across
+core, dbt, formats, llm and vscode read it today). A constraint built in
+code gets its id at the construction boundary from the installed generator
+(`effect-adoption.spec.md` decision 8): it is new, so a fresh id is right,
+and it is stated in the file from its first save. The extraction format in
+`llm/src/prompt/responseSchema.ts` keeps its shape (see Scope).
+
+**The DDL `barwise` annotation is a second persisted format.** It writes
+`isExclusive` and `isExhaustive` per subtype fact
+(`formats/src/ddl/barwiseAnnotation.ts`, lines 51 and 165), under a
+`-- barwise:v1` prefix whose reader already matches any version. WS5 moves
+it to v2, writing the partition constraints, and keeps a v1 reader that
+converts the flags with the migration's step 3, so DDL already exported
+still imports.
 
 ## Alternatives considered
 
@@ -325,8 +348,13 @@ The type split, `OrmModel.constraints`, and every consumer the compiler
 names. Largest radius. The 2.0 serializer keeps the file's nesting: on load
 it lifts external kinds into the model list, and on save it writes each one
 under the first fact type that holds one of its roles (the NORMA importer's
-rule today), so a 2.0 file's bytes move only where the author had chosen a
-different host. Verbalization gains a section for constraints across fact
+rule today). External constraints come after a host's internal ones in
+every tracked file, so order within a host is kept; but 27 of the 73 sit on
+a host other than the first holder (in 18 files), and those move to the
+first holder on the next 2.0 save. That churn is accepted rather than
+carried as a hidden host field on the model: it touches only files saved
+between WS3 and WS5, on unreleased builds, and WS6 rewrites the corpus as
+3.0 anyway. Verbalization gains a section for constraints across fact
 types (Open decision 7). The diagram's constraint nodes take the
 constraint's id.
 
@@ -365,7 +393,7 @@ can share WS5's PR if the radius allows.
   kinds, `OrmModel.constraints` is new, `SubtypeFact.isExclusive` and
   `isExhaustive` and `isPreferred` are removed. Downstream packages follow in
   the same workstreams; the full monorepo build gates each.
-- **Diff output** names constraints by id where both sides have one.
+- **Diff output** names constraints by id where both sides are 3.0 files.
 - **Verbalization output** moves external constraints into their own section;
   golden files change in WS3.
 
@@ -386,10 +414,19 @@ can share WS5's PR if the radius allows.
    it closes barwise-alg. The alternative, `is_preferred` added to
    `external_uniqueness`, keeps a flag the entity cannot see.
 4. **Shape of migration-derived ids.** Recommend: a UUIDv8 built from a
-   SHA-256 of the inputs, so derived ids look like every other id and cannot
-   collide with an author's. The alternative, readable ids such as
-   `<fact-type-id>-c0`, is easier to read in a diff but collides with any
+   SHA-256 of the inputs, so derived ids look like every other id and a
+   collision with an author's id is improbable. Improbable is not
+   impossible, so the loader refuses two constraints with the same id in
+   one model, whatever their origin; that check, not the id shape, is what
+   guarantees uniqueness. The alternative, readable ids such as
+   `<fact-type-id>-c0`, is easier to read in a diff and collides with any
    author id spelled the same way.
+
+   **Derived ids are not for matching across revisions.** They come from
+   position, so two revisions of an unsaved 2.0 file can give one id to
+   different constraints. Diff and merge therefore match by id only when
+   both sides are 3.0 files, whose ids were stated; for 2.0 input they keep
+   today's content-key matching.
 5. **A `barwise migrate` command.** Recommend: yes, CLI-only, rewriting files
    in place to the current version; it serves the 113 tracked files and every
    user's repository, and gets a deliberate capability-matrix row. The

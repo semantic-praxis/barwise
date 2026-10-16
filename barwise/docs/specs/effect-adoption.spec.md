@@ -820,8 +820,9 @@ definition, and the JSON Schema is one rendering of it (part C). Part E
 makes the first three read from that definition:
 
 - **E1, core exports the definition.** Core exports the file-side
-  Schemas and the generated JSON Schema documents through a subpath
-  export, so no package reaches into core's directories. The subpath's
+  Schemas, the generated JSON Schema documents, and plain-data lists
+  derived from the Schemas (kinds, fields, descriptions, enumerated values)
+  through a subpath export, so no package reaches into core's directories. The subpath's
   name is settled in E's grounding; `@barwise/core/format` is the
   working name.
 - **E2, MCP.** The `orm-schema://json-schema` resource serves core's
@@ -855,9 +856,13 @@ makes the first three read from that definition:
   words. Open decision 12.
 
 E changes `@barwise/mcp` and `barwise-vscode` on the spike branch,
-neither of which depends on `effect` itself: they import Schemas and a
-JSON document from core, and the bundles carry Effect through core
-already. The capability matrix in the root `CLAUDE.md` does not change;
+neither of which depends on `effect` itself. Reading discriminator values,
+per-kind fields, literals and `description` annotations needs Effect's AST
+API, so E1's export is plain data computed in core from the Schemas -- the
+constraint kinds, each kind's fields with their descriptions, each
+enumerated field's values -- beside the JSON Schema document. The editor
+and the MCP server read those lists and never import `effect`; the bundles
+carry Effect through core already. The capability matrix in the root `CLAUDE.md` does not change;
 no surface gains or loses a capability.
 
 ### 2. Effect in core: the dependency and the `ObjectType` slice (provisional: not yet grounded)
@@ -973,11 +978,13 @@ entry only records that it follows.
 
    Consequence for P3: it no longer tests independence. It is kept as a
    check that Effect's two outputs agree -- every file-side input the
-   loader accepts passes the generated JSON Schema as written, before
-   ids or defaults are filled (every corpus document and
-   `examples/getting-started/shop.orm.yaml`, which omits constraint ids;
-   a re-encoded value alone would hide a schema that wrongly requires
-   them), every value the decoder accepts, encoded, passes too, and every
+   loader accepts at the current format version passes the generated JSON
+   Schema as written, before ids or defaults are filled (a re-encoded value
+   alone would hide a schema that wrongly requires a field the format lets
+   a file omit). A file at an older version is accepted only through its
+   migration, so P3 checks the migrated document, not the original: under
+   format 3.0 (`orm-format-3.spec.md`) that is every 2.0 corpus file,
+   `examples/getting-started/shop.orm.yaml` included, every value the decoder accepts, encoded, passes too, and every
    planted defect the decoder refuses, the generated JSON Schema refuses
    too, except the rules marked as having no JSON Schema form. That is
    the property a user of the MCP resource depends on: the schema they
