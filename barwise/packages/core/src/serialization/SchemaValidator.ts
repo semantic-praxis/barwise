@@ -75,9 +75,10 @@ export class SchemaValidator {
  * @param data The whole document, so the message can name the element.
  * @param prefix Where in `data` the validated value sits, when ajv was given
  *   a part of it; prepended to ajv's `instancePath`.
- * @param subject What to call the element, when the caller words it better
- *   than the nearest name can (a constraint has none of its own); replaces
- *   the `(in "name")` suffix.
+ * @param subject What to call the element at `prefix`, when the caller words
+ *   it better than the nearest name can (a constraint has no name of its
+ *   own). The message then reads as the decoder's do: the subject, then the
+ *   field below it that is at fault, in place of the `(in "name")` suffix.
  */
 export function schemaErrorOf(
   err: ErrorObject,
@@ -101,7 +102,7 @@ export function schemaErrorOf(
   return {
     path: path || "/",
     message: subject !== undefined
-      ? `${subject} ${message}.`
+      ? `${subject} ${predicateBelow(err, message)}`
       : name === undefined
       ? message
       : `${message} (in "${name}")`,
@@ -114,6 +115,27 @@ export function schemaErrorOf(
       ...(params.failingKeyword !== undefined ? { failingKeyword: params.failingKeyword } : {}),
     },
   };
+}
+
+/**
+ * An ajv error as the rest of a sentence about the value it validated,
+ * naming the field below that value: `has an invalid role: must NOT have
+ * fewer than 1 characters.`, `has an unknown field "ranges.0.foo".`. The
+ * field is what a person must change; without it the sentence would make
+ * the whole value the subject of a rule about one of its fields.
+ */
+function predicateBelow(err: ErrorObject, message: string): string {
+  const field = err.instancePath.split("/").slice(1).map((s) =>
+    s.replace(/~1/g, "/").replace(/~0/g, "~")
+  );
+  const at = (...more: string[]) => [...field, ...more].join(".");
+  const params = err.params as { additionalProperty?: string; };
+  if (params.additionalProperty !== undefined) {
+    return `has an unknown field "${at(params.additionalProperty)}".`;
+  }
+  if (field.length === 0) return `${message}.`;
+  if (err.keyword === "false schema") return `has a field "${at()}" that is not allowed here.`;
+  return `has an invalid ${at()}: ${message}.`;
 }
 
 /**

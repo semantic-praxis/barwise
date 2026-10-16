@@ -144,6 +144,7 @@ describe("a constraint's problems", () => {
       index: 0,
       path: [],
       message: `Constraint at constraints/0 in ${FT} must be a mapping.`,
+      subject: `Constraint at constraints/0 in ${FT}`,
     }]);
   });
 
@@ -158,6 +159,7 @@ describe("a constraint's problems", () => {
       index: 1,
       path: ["role"],
       message: `Constraint at constraints/1 in ${FT} is missing "role".`,
+      subject: `Constraint at constraints/1 in ${FT}`,
     });
   });
 

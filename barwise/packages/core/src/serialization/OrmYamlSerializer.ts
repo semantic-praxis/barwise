@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import { parse, stringify } from "yaml";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import type { Constraint } from "../model/Constraint.js";
-import { constraintLabel, decodeConstraints } from "../model/constraintDecoder.js";
+import { decodeConstraints } from "../model/constraintDecoder.js";
 import { generateId } from "../model/id.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
@@ -112,7 +112,7 @@ interface DecodedConstraints {
 interface RefusedConstraint {
   readonly raw: unknown;
   /** What the decoder's problems call this constraint; kept errors say it too. */
-  readonly label: string;
+  readonly subject: string;
   /** Where the decoder reported, as JSON pointers below the constraint. */
   readonly reported: ReadonlySet<string>;
 }
@@ -161,7 +161,7 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
       }
       refused.set(`${f}/${c}`, {
         raw: docs[c],
-        label: constraintLabel(docs[c], c, factTypeLabel(list[f] as object, f)),
+        subject: result.failure[0]!.subject,
         reported,
       });
     });
@@ -192,8 +192,9 @@ function factTypeLabel(ft: object, index: number): string {
  * kind it was meant to be. So on a constraint the decoder refused, those are
  * dropped, and the constraint is checked again against its own kind's branch
  * of the schema alone. Every error from that check the decoder did not report
- * at the same place is kept, through the same mapping the whole-document
- * check uses. A constraint the decoder accepted keeps every schema error on
+ * at the same place is kept: through the mapping the whole-document check
+ * uses, so with the same rule, but worded with the subject the decoder gave
+ * the constraint and the field below it, as the decoder words its own. A constraint the decoder accepted keeps every schema error on
  * it. The load is refused either way.
  *
  * "Reported at the same place" does not compare rules, because the decoder's
@@ -216,7 +217,7 @@ function mergeConstraintProblems(
     const [f, c] = key.split("/");
     for (const error of unreportedBranchErrors(refused)) {
       kept.push(
-        schemaErrorOf(error, document, `/model/fact_types/${f}/constraints/${c}`, refused.label),
+        schemaErrorOf(error, document, `/model/fact_types/${f}/constraints/${c}`, refused.subject),
       );
     }
   }

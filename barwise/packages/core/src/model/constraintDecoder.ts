@@ -27,7 +27,16 @@ export interface ConstraintProblem {
   readonly path: readonly PropertyKey[];
   /** A sentence naming the fact type, the constraint and the field. */
   readonly message: string;
+  /**
+   * What the message calls the constraint (`Constraint "c-1" in Fact type
+   * "Person has Age"`), for a caller that reports more about the same
+   * constraint and must name it the same way.
+   */
+  readonly subject: string;
 }
+
+/** A problem before the decoder attaches its constraint's subject. */
+type Unnamed = Omit<ConstraintProblem, "subject">;
 
 const FILE_OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "error" };
 const decodeFile = Schema.decodeUnknownEffect(ConstraintYamlCodec, FILE_OPTIONS);
@@ -67,15 +76,16 @@ export function decodeConstraints(
 ): Effect.Effect<readonly Result.Result<ConstraintFromSchema, readonly ConstraintProblem[]>[]> {
   return Effect.forEach(docs, (doc, index) => {
     const label = constraintLabel(doc, index, factType);
+    const named = (found: readonly Unnamed[]) => found.map((p) => ({ ...p, subject: label }));
     if (!isMapping(doc)) {
       return Effect.succeed(
-        Result.fail([{ index, path: [], message: `${label} must be a mapping.` }]),
+        Result.fail(named([{ index, path: [], message: `${label} must be a mapping.` }])),
       );
     }
     return Effect.result(
       decodeFile(withId(doc, newId)).pipe(
         Effect.mapError((error) =>
-          withPresence(problemsOf(error.issue, doc, index, label), doc, index, label)
+          named(withPresence(problemsOf(error.issue, doc, index, label), doc, index, label))
         ),
       ),
     );
@@ -134,12 +144,12 @@ const RANGE_PRESENCE = anyOfKeys(schemaDefinitions.value_range_def.anyOf);
 const either = (keys: readonly string[]) => keys.map((k) => `"${k}"`).join(" or ");
 
 function withPresence(
-  problems: ConstraintProblem[],
+  problems: Unnamed[],
   raw: Record<string, unknown>,
   index: number,
   label: string,
-): ConstraintProblem[] {
-  const found: ConstraintProblem[] = [];
+): Unnamed[] {
+  const found: Unnamed[] = [];
   const type = typeof raw.type === "string" ? raw.type : undefined;
   const keys = type === undefined ? undefined : PRESENCE_BY_TYPE.get(type);
   const missingOneOf = keys !== undefined && !keys.some((k) => k in raw);
@@ -176,7 +186,7 @@ function problemsOf(
   raw: Record<string, unknown>,
   index: number,
   label: string,
-): ConstraintProblem[] {
+): Unnamed[] {
   const problems = locate(issue).map(({ path: decodedPath, issue: leaf }) => {
     // A union that matched no kind fails at the constraint itself; the field
     // at fault is its `type`.
@@ -204,8 +214,7 @@ function unknownType(raw: Record<string, unknown>): string {
  * position when it gave none. The position is spelled as a path
  * (`constraints/2`), which is how the rest of a load error spells one.
  */
-/** Exported for the loader, whose kept schema errors name the constraint the same way. */
-export function constraintLabel(raw: unknown, index: number, factType: string): string {
+function constraintLabel(raw: unknown, index: number, factType: string): string {
   const id = raw !== null && typeof raw === "object"
     ? (raw as Record<string, unknown>).id
     : undefined;

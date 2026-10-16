@@ -81,11 +81,12 @@ describe("a rule the decoder does not report", () => {
       "/model/fact_types/0/constraints/1",
       "/model/fact_types/0/constraints/1/weight",
     ]);
-    // Kept in the words and with the rule the whole-document check gives.
+    // Kept with the rule the whole-document check gives, worded as the
+    // decoder words its own: the constraint, then the field at fault.
     expect(errors.find((e) => e.path.endsWith("/0/role"))).toEqual({
       path: "/model/fact_types/0/constraints/0/role",
       message:
-        'Constraint "c-1" in Fact type "Person exists" must NOT have fewer than 1 characters.',
+        'Constraint "c-1" in Fact type "Person exists" has an invalid role: must NOT have fewer than 1 characters.',
       rule: { keyword: "minLength" },
     });
     expect(errors.find((e) => e.path.endsWith("/constraints/1"))).toEqual({
