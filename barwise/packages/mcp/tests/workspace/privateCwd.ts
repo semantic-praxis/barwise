@@ -32,9 +32,9 @@ export interface PrivateWorkspace {
    * Copy `tests/fixtures/<relative>` (a file or a directory) into
    * `<dir>/fixtures/`; its new path. A subdirectory, not `dir` itself, so
    * a fixture's own directory is never the cwd and a test can still tell
-   * "spilled beside the file" from "spilled under the cwd". Any `.barwise`
-   * left in the source tree by an older run is not copied, so the copy is
-   * the tracked fixture.
+   * "spilled beside the file" from "spilled under the cwd". A spill cache
+   * (`mcp-cache`) left in the source tree by an older run is not copied; a
+   * tracked `.barwise/` file, such as a lineage manifest, is.
    */
   readonly fixture: (relative: string) => string;
 }
@@ -57,7 +57,7 @@ export function usePrivateCwd(): PrivateWorkspace {
       const to = join(dir, "fixtures", relative);
       cpSync(join(FIXTURES, relative), to, {
         recursive: true,
-        filter: (source) => basename(source) !== ".barwise",
+        filter: (source) => basename(source) !== "mcp-cache",
       });
       return to;
     },

@@ -2,7 +2,7 @@
  * Tests for the verbalize_model tool.
  */
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { executeVerbalize } from "../../src/tools/verbalize.js";
 import { usePrivateCwd } from "../workspace/privateCwd.js";
@@ -93,11 +93,10 @@ describe("verbalize_model tool", () => {
     const asString = dirOf(executeVerbalize(model));
     const asObject = dirOf(executeVerbalize({ path: model }));
 
-    // The object form spills into the same cache dir next to the model file,
-    // which is not the cwd's (the fixture sits in a subdirectory of it).
+    // The object form spills into the same cache dir next to the model file.
+    // That is not the cwd's: the fixture sits in a subdirectory of it.
     expect(asObject).toBe(asString);
-    expect(asObject.startsWith(resolve(dirname(model), ".barwise"))).toBe(true);
-    expect(asObject.startsWith(resolve(ws.dir(), ".barwise"))).toBe(false);
+    expect(asObject).toBe(join(dirname(model), ".barwise", "mcp-cache"));
   });
 
   it("omits an empty counterexamples section for a fact type with no constraints", () => {
