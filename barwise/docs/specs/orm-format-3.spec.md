@@ -5,7 +5,8 @@ Created: 2026-10-16
 Last-updated: 2026-10-16
 Tracking: barwise-n9n (constraint ids and placement); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
-identifier); barwise-hnb (NORMA comparison doc correction)
+identifier); barwise-971 (five rules for "the preferred identifier", Open
+decision 8); barwise-hnb (NORMA comparison doc correction)
 
 In one sentence: every constraint gets a required, stable id; a constraint
 lives where its kind says it lives -- the internal kinds nested in their fact
@@ -111,7 +112,7 @@ Out of scope:
   own and keeps its `is_preferred` flag; the parser
   (`llm/src/parse/constraints.ts`) builds the model through the API and, in
   WS4, translates `is_preferred` into the entity's preferred-identifier
-  reference with the migration's step 4 rule, refusing the same cases.
+  reference with the migration's step 4 rule.
 
 ## Placement by kind
 
@@ -233,23 +234,12 @@ validation like `diagramReferencesToIds.ts`, and registers in
    The corpus has no partly overlapping or one-member group today (32
    exclusive and 13 exhaustive flags, every group consistent), so each case
    above gets its own fixture.
-4. Each `is_preferred: true` becomes `preferred_identifier` on the entity it
-   identifies:
-   - when the uniqueness leaves roles of its fact type uncovered and one
-     entity type plays all of them, the entity is that player (the rule
-     `NormaXmlWriter.collectPreferredIdentifiers` uses);
-   - when the uncovered roles are played by different entity types, as in a
-     ternary whose uniqueness covers one role, the constraint identifies no
-     single entity. `collectPreferredIdentifiers` assigns it to every such
-     player; the migration refuses the file instead, naming the constraint;
-   - when it spans every role, the fact type must be objectified, and the
-     entity is the objectifying object type. All 12 such constraints in the
-     corpus (of 376 preferred) are on objectified fact types;
-   - a preferred uniqueness spanning every role of a fact type that is not
-     objectified identifies nothing, and the migration refuses the file,
-     naming the constraint, rather than drop the flag. The corpus has none.
-
-   The flag is removed.
+4. Each `is_preferred: true` becomes `preferred_identifier` on the entity
+   it identifies, by the rule Open decision 8 settles. The migration never
+   refuses a file over this step: a flag the rule cannot place on a single
+   entity is dropped, the uniqueness constraint itself is kept, and a
+   corpus test lists every dropped flag by constraint id so each drop is
+   deliberate. The flag is removed.
 5. `orm_version` becomes `"3.0"`.
 
 A file stays 2.0 on disk until it is saved, and it loads to the same model
@@ -291,7 +281,8 @@ and it is stated in the file from its first save. The extraction format in
 
 **The DDL `barwise` annotation is a second persisted format.** It writes
 `isExclusive` and `isExhaustive` per subtype fact
-(`formats/src/ddl/barwiseAnnotation.ts`, lines 51 and 165), under a
+(`formats/src/ddl/barwiseAnnotation.ts`: declared at lines 51-52, written
+at 165-166, checked by the reader at 335-336), under a
 `-- barwise:v1` prefix whose reader already matches any version. WS5 moves
 it to v2, writing the partition constraints, and keeps a v1 reader that
 converts the flags with the migration's step 3, so DDL already exported
@@ -344,8 +335,11 @@ two NORMA exports of it are byte-identical.
 
 ### 3. Placement by kind, in memory (provisional: not yet grounded)
 
-The type split, `OrmModel.constraints`, and every consumer the compiler
-names. Largest radius. The 2.0 serializer keeps the file's nesting: on load
+The type split, `OrmModel.constraints`, and every consumer of the old
+list. `FactType.constraints` is removed rather than narrowed, and the
+internal list gets a new name (`internalConstraints`), so every one of the
+52 reading files stops compiling and is decided one by one -- not only the
+ones that switch on `type`. Largest radius. The 2.0 serializer keeps the file's nesting: on load
 it lifts external kinds into the model list, and on save it writes each one
 under the first fact type that holds one of its roles (the NORMA importer's
 rule today). External constraints come after a host's internal ones in
@@ -424,9 +418,12 @@ can share WS5's PR if the radius allows.
 
    **Derived ids are not for matching across revisions.** They come from
    position, so two revisions of an unsaved 2.0 file can give one id to
-   different constraints. Diff and merge therefore match by id only when
-   both sides are 3.0 files, whose ids were stated; for 2.0 input they keep
-   today's content-key matching.
+   different constraints. A model migrated in memory claims 3.0 and cannot
+   tell its ids' origin, so the decision is made where the version is
+   still visible: core's diff and merge take an explicit option to match
+   constraints by id, and the callers that read files (CLI, MCP, the
+   editor) set it only when both files were 3.0 on disk. Otherwise they
+   keep today's content-key matching.
 5. **A `barwise migrate` command.** Recommend: yes, CLI-only, rewriting files
    in place to the current version; it serves the 113 tracked files and every
    user's repository, and gets a deliberate capability-matrix row. The
@@ -439,6 +436,32 @@ can share WS5's PR if the radius allows.
    constraints across fact types, each verbalized once. The alternative,
    repeating each under every fact type it touches, reads well per fact type
    and states every rule two or more times.
+8. **What 2.0's `is_preferred` meant, for the migration's step 4.** Five
+   modules answer "which constraint is this entity's preferred identifier"
+   with five different rules today (barwise-971), and the corpus does not
+   follow any one of them: of the 376 preferred uniquenesses, 286 cover the
+   entity's own role in an entity-value binary, 68 cover the value's role in
+   one, 12 span every role of an objectified fact type, and 10 sit on
+   n-ary fact types (8 with one uncovered entity player, 2 with an uncovered
+   value player). `NormaXmlWriter.collectPreferredIdentifiers` -- the rule an
+   earlier draft of this spec used -- finds no entity for the 286. Format
+   3.0 ends the ambiguity for new files, because the entity names its
+   identifier; the migration has to read the old flag once.
+   - **(a)** Recommended, in order: an objectified fact type whose
+     uniqueness spans every role identifies its objectifying type; a binary
+     between one entity and one value type identifies the entity, whichever
+     role is covered (the mapper's rule, `preferredIdentifyingBinary`, which
+     decides primary keys today, so no table's key moves); otherwise, when
+     one entity type plays every uncovered role, that entity. Anything else
+     is dropped, as step 4 says. On the corpus this places 374 of the 376
+     flags and drops 2 (one ternary, `WonItemHasSoldPriceAtTimestamp`, in
+     two copies of the auction model). When two flags land on one entity (4
+     entities in the corpus), the first in document order wins and the rest
+     are dropped; validation already reports an entity with two identifiers.
+   - **(b)** Use `collectPreferredIdentifiers`'s rule alone. Matches NORMA
+     export today, and drops 286 flags the mapper currently honours.
+   - **(c)** Keep `is_preferred` in 3.0 alongside the reference. No
+     migration judgment, and barwise-971 stays open in the new format.
 
 ## Risks and testing
 
@@ -455,9 +478,13 @@ can share WS5's PR if the radius allows.
 - **NORMA**: the existing fixtures round-trip with constraint ids, partition
   constraints and preferred identifiers intact; a fixture with two partitions
   of one supertype is added.
-- **Risk: the consumer sweep in WS3 is wide.** The type split is what bounds
-  it; a consumer the compiler does not flag reads only internal kinds and is
-  correct as it stands.
+- **Risk: the consumer sweep in WS3 is wide.** A narrowed type alone would
+  not bound it: a plain loop such as `for (const c of ft.constraints)` in
+  `graph.ts`, `OrmYamlAnnotator.ts`, `query/evaluate.ts` and
+  `RelationalMapper.ts` would still compile and silently stop seeing
+  external constraints. Removing `FactType.constraints` (WS3) makes every
+  reader fail to compile, and the WS3 PR lists each of the 52 files with its
+  decision.
 
 ## Non-goals
 

@@ -759,7 +759,8 @@ remains is the whole-model generator, `core/tests/arbitraries/model.ts`
 generator, `diagram/tests/arbitraries/layout.ts`, deliberately does not
 reuse it: it varies name widths, which core's uniform `T0`/`F0` names
 cannot, so it is out of D's scope and any conversion of it is separate
-work that keeps its layout-specific inputs. It does two jobs, and only one
+work that keeps its layout-specific inputs. The core generator does two
+jobs, and only one
 is a Schema's:
 
 - Element fields -- names, ranges, derivations, constraint fields,
@@ -977,18 +978,20 @@ entry only records that it follows.
    VS Code extension and the LLM providers do not (WS1b, part C).
 
    Consequence for P3: it no longer tests independence. It is kept as a
-   check that Effect's two outputs agree -- every file-side input the
-   loader accepts at the current format version passes the generated JSON
-   Schema as written, before ids or defaults are filled (a re-encoded value
-   alone would hide a schema that wrongly requires a field the format lets
-   a file omit). A file at an older version is accepted only through its
-   migration, so P3 checks the migrated document, not the original: under
-   format 3.0 (`orm-format-3.spec.md`) that is every 2.0 corpus file,
-   `examples/getting-started/shop.orm.yaml` included, every value the decoder accepts, encoded, passes too, and every
-   planted defect the decoder refuses, the generated JSON Schema refuses
-   too, except the rules marked as having no JSON Schema form. That is
-   the property a user of the MCP resource depends on: the schema they
-   read accepts what the loader accepts.
+   check that Effect's two outputs agree, as three properties:
+   - Every file-side input the loader accepts at the current format version
+     passes the generated JSON Schema as written, before ids or defaults are
+     filled. A re-encoded value alone would hide a schema that wrongly
+     requires a field the format lets a file omit. A file at an older
+     version is accepted only through its migration, so P3 checks the
+     migrated document: under format 3.0 (`orm-format-3.spec.md`), every
+     2.0 corpus file, `examples/getting-started/shop.orm.yaml` included.
+   - Every value the decoder accepts, encoded, passes the generated schema.
+   - Every planted defect the decoder refuses, the generated schema refuses
+     too, except rules marked as having no JSON Schema form.
+
+   Together they are the property a user of the MCP resource depends on:
+   the schema they read accepts what the loader accepts.
 
 10. **Where ajv goes when it leaves the load path (added 2026-10-16) --
     resolved 2026-10-16 by the owner: option (a), test-only, for now.**
