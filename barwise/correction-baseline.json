@@ -268,7 +268,7 @@
     "effect-adoption::abd77cb8a186": {
       "spec": "effect-adoption.spec.md",
       "excerpt": "9. the shipped json schema: generated from effect, or hand-written and drift-tested (revisits item 3; added 2026-10-16) -- resolved 2026-10-16 by the owner: gen",
-      "caught_by": "reasoning",
+      "caught_by": "not-a-correction",
       "note": "Reopens item 3 after a probe of Schema.toJsonSchemaDocument on the spike codecs showed generation works; the owner then chose generation on 2026-10-16, reasoning that a test stating its expected answer directly is a better check than a hand-written schema. Item 3 was a judgement revisited, not an error."
     },
     "effect-comparison::149864007d79": {

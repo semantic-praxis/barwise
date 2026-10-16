@@ -67,7 +67,8 @@ role outside its fact type except one deliberate validation-error fixture
 The owner first chose NORMA's approach outright, then asked for placement by
 kind once ADR 0001's "inline and local" filter was on the table. Internal
 constraints have exactly one element to sit beside, so nesting them keeps the
-filter for 3,012 of 3,085 constraints and keeps a fact type readable with its
+filter for 3,011 of the 3,085 constraints in the corpus (73 are
+external; the last is an unknown kind in a fixture, refused as it is today) and keeps a fact type readable with its
 own uniqueness and mandatory rules. External constraints have no single
 element to be local to; the model-level list is the honest home for them.
 NORMA's split is the same, expressed by reference instead of by nesting.
@@ -213,14 +214,35 @@ validation like `diagramReferencesToIds.ts`, and registers in
    sets the shape.
 2. Every external-kind constraint moves from its fact type to
    `model.constraints`, keeping its id and fields.
-3. Each supertype's `is_exclusive` group becomes one `exclusion` over its
-   subtype facts and each `is_exhaustive` group one `disjunctive_mandatory`;
-   a group that is both becomes one `exclusive_or`. Ids are derived from the
-   supertype id and the kind. The flags are removed.
+3. For each supertype, let E be its subtype facts flagged `is_exclusive` and
+   X those flagged `is_exhaustive`. In 2.0 the two flag sets are independent,
+   so they are converted independently, with one merge:
+   - E and X equal, with two or more members: one `exclusive_or` over them.
+   - Otherwise, E with two or more members: one `exclusion` over E; and X
+     with one or more members: one `disjunctive_mandatory` over X.
+   - E with a single member is dropped: exclusion within a one-member group
+     always holds, so it states nothing. X with a single member is kept, since
+     "every Person is a Male" is a real (if odd) rule; WS4's validation
+     therefore allows one subtype fact in `disjunctive_mandatory` and requires
+     two in `exclusion` and `exclusive_or`.
+
+   Ids are derived from the supertype id and the kind. The flags are removed.
+   The corpus has no partly overlapping or one-member group today (32
+   exclusive and 13 exhaustive flags, every group consistent), so each case
+   above gets its own fixture.
 4. Each `is_preferred: true` becomes `preferred_identifier` on the entity it
-   identifies, the entity being the player of the fact type's roles outside
-   the uniqueness (the rule `NormaXmlWriter.collectPreferredIdentifiers`
-   already uses). The flag is removed.
+   identifies:
+   - when the uniqueness leaves a role of its fact type uncovered, the entity
+     is the player of those roles (the rule
+     `NormaXmlWriter.collectPreferredIdentifiers` already uses);
+   - when it spans every role, the fact type must be objectified, and the
+     entity is the objectifying object type. All 12 such constraints in the
+     corpus (of 376 preferred) are on objectified fact types;
+   - a preferred uniqueness spanning every role of a fact type that is not
+     objectified identifies nothing, and the migration refuses the file,
+     naming the constraint, rather than drop the flag. The corpus has none.
+
+   The flag is removed.
 5. `orm_version` becomes `"3.0"`.
 
 A file stays 2.0 on disk until it is saved, and it loads to the same model
@@ -256,7 +278,7 @@ has no constraint ids and no placement.
 
 - **Every constraint at model level, as NORMA does.** One rule, closest to
   NORMA. Rejected by the owner once placement by kind was on the table: it
-  moves 3,012 internal constraints away from the fact type they describe,
+  moves 3,011 internal constraints away from the fact type they describe,
   breaks ADR 0001's "inline and local" for every kind, and makes a hand author
   or an LLM editing through MCP keep 3,085 cross-references consistent instead
   of 73.
@@ -271,10 +293,15 @@ has no constraint ids and no placement.
 
 ## Workstreams (each independently shippable)
 
-The 3.0 bump is shared by every workstream before release, as ADR 0001
-prescribes for an unreleased cycle: WS2 performs it and WS3 to WS5 add to the
-already-bumped schema. **No release is cut between WS2 and WS6**, so no
-published build writes a partial 3.0.
+**The format changes in one workstream, WS5; everything before it keeps
+reading and writing 2.0.** ADR 0001 allows a shared version bump across
+several PRs only for additive minor changes; a breaking change bumps the
+major version "with a real migration". Bumping to 3.0 in an early workstream
+and adding to it later would let any build in between save a file stamped
+3.0 that later 3.0 readers refuse, and no migration would ever run on it,
+because it already claims the current version. So WS2 to WS4 change the
+in-memory model behind the 2.0 file format, and WS5 bumps the version, adds
+the one migration and changes the schema and serializer in a single PR.
 
 ### 1. ADR 0003 and this spec
 
@@ -283,41 +310,51 @@ lives inline on its fact type; an external constraint, which has no single
 element to be local to, lives in the model's constraint list and refers to
 roles and subtype facts by id. Records the owner's two decisions above.
 
-### 2. Required ids and the deterministic migration (provisional: not yet grounded)
+### 2. Stable ids under 2.0 (provisional: not yet grounded)
 
-`orm_version` 3.0; constraint `id` required in the schema; the migration's
-step 1 and step 5; `FactType` stops minting on load (construction from code
-still fills ids, per `effect-adoption.spec.md` decision 8's boundary rule);
-the NORMA importer keeps NORMA's constraint ids. The test that would fail
-today: loading one 2.0 file twice yields the same constraint ids, and two
-NORMA exports of it are byte-identical.
+The user-visible defect, fixed without a format change: when a 2.0 file
+omits a constraint id, the loader derives one with the migration's step 1
+rule instead of minting a random one, so the same file always loads to the
+same ids. The NORMA importer keeps NORMA's constraint ids. The test that
+fails today: loading one 2.0 file twice yields the same constraint ids, and
+two NORMA exports of it are byte-identical.
 
-### 3. Placement by kind (provisional: not yet grounded)
+### 3. Placement by kind, in memory (provisional: not yet grounded)
 
-The type split, `OrmModel.constraints`, the schema's two `oneOf`s, the
-migration's step 2, and every consumer the compiler names. Largest radius.
-Verbalization gains a section for constraints across fact types (Open
-decision 7). The diagram's constraint nodes take the constraint's id.
+The type split, `OrmModel.constraints`, and every consumer the compiler
+names. Largest radius. The 2.0 serializer keeps the file's nesting: on load
+it lifts external kinds into the model list, and on save it writes each one
+under the first fact type that holds one of its roles (the NORMA importer's
+rule today), so a 2.0 file's bytes move only where the author had chosen a
+different host. Verbalization gains a section for constraints across fact
+types (Open decision 7). The diagram's constraint nodes take the
+constraint's id.
 
-### 4. Subtype exclusion and totality (provisional: not yet grounded)
+### 4. Subtype constraints and the preferred identifier, in memory (provisional: not yet grounded)
 
-`exclusion`, `disjunctive_mandatory` and `exclusive_or` accept
-`subtype_facts` in place of `roles` (Open decision 2); validation requires
-two or more subtype facts sharing one supertype; the migration's step 3;
-NORMA maps each partition constraint one to one. Closes barwise-loo.
+`exclusion`, `disjunctive_mandatory` and `exclusive_or` accept subtype
+facts in place of roles (Open decision 2), with the validation in the
+migration's step 3; `ObjectType` gains its preferred-identifier reference
+(Open decision 3), read by the mapper and `identification.ts`. The 2.0
+serializer converts to and from the flags by steps 3 and 4. A model that 2.0
+cannot express -- two partitions of one supertype, or a preferred external
+uniqueness -- is refused on save with a message saying format 3.0 is needed;
+nothing creates one before WS5, so no user meets it.
 
-### 5. Preferred identifier by reference (provisional: not yet grounded)
+### 5. Format 3.0 (provisional: not yet grounded)
 
-`preferred_identifier` on entity types, naming an internal or external
-uniqueness; validation checks it identifies that entity; the migration's
-step 4; mapper and identification read it; NORMA carries it both ways.
-Closes barwise-alg.
+One PR: `orm_version` 3.0, the schema (ids required, the two `oneOf`s,
+`model.constraints`, `subtype_facts` operands, `preferred_identifier`,
+flags removed), the 2.0-to-3.0 migration (steps 1 to 5), the 3.0 serializer,
+and NORMA import and export placing by kind and mapping partition
+constraints one to one. Closes barwise-loo and barwise-alg.
 
 ### 6. Corpus, docs, release notes (provisional: not yet grounded)
 
 The tracked 113 files rewritten by the migration (a script under `scripts/`,
 or the CLI command of Open decision 5); `docs/NORMA_VS_ORM_YAML.md` corrected
-(barwise-hnb); CLI and format docs; release notes naming the migration.
+(barwise-hnb); CLI and format docs; release notes naming the migration. It
+can share WS5's PR if the radius allows.
 
 ## API and migration impact
 

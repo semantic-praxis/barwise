@@ -263,7 +263,7 @@ nowhere else:
 | `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                       |
 | `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; read only at the synchronous boundary (Open decision 8) |
 | `core/schemas/orm-model.schema.json`                  | hand-written                                       | generated from Effect, draft 2020-12 (Open decision 9)         |
-| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                                      |
+| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact; `ajv` to dev (Open decision 10)     |
 | `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                  |
 | `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                           |
 | `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                    |
@@ -468,7 +468,9 @@ the run count and seed recorded:
   From WS1b the file is generated, and P3 is restated under Open
   decision 9.
 
-P3 is the only independent check. P1 and P2 are self-consistency checks:
+P3 was the only independent check while the JSON Schema was hand-written;
+from WS1b the file is generated and P3 checks agreement instead (Open
+decision 9). P1 and P2 are self-consistency checks:
 their expected answer comes from the Schema alone, by design. They show
 the generator and the Schema agree, and they say nothing about validity for
 the class. A Schema that is wrong the same way on both sides passes them.
@@ -711,9 +713,14 @@ with `onExcessProperty: "error"`, and what C does about each:
   with neither.
 - A constraint's `id` comes out required, because the codec decodes the
   file after the loader fills missing ids (Open decision 8). The
-  generated file must accept what the format accepts, such as
-  `examples/getting-started/shop.orm.yaml`, so the file side states
-  `id` optional and the fill sits in a stage in front of the decode.
+  generated file must accept what the format accepts. Under format 2.0,
+  where `examples/getting-started/shop.orm.yaml` omits constraint ids, the
+  file side states `id` optional and the fill sits in a stage in front of
+  the decode. Under format 3.0 (`orm-format-3.spec.md`), ids are required,
+  the file side states them required, and there is no fill stage. Which
+  applies is set by which lands first; that spec recommends 3.0 first (its
+  Open decision 6), and if the owner agrees, this part is built against 3.0
+  and the optional-id stage is never written.
 - The 16-kind union comes out as `anyOf`, not `oneOf`, because Effect
   marks one branch as an approximation. The branches are disjoint by
   their `type` constant, so both accept the same files; C finds the
