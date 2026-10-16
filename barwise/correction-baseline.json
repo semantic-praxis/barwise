@@ -247,6 +247,12 @@
       "caught_by": "reasoning",
       "note": "Caught in PR 671 review on 2026-10-16 by Copilot, on decision 2: the claim that a plain newId parameter performs no effect was disputed by reasoning about process-wide generator state and barwise-e8m. No code was run. Item 2 withdraws the claim; item 8 resolves the id source as option (d), so the decoder takes no newId."
     },
+    "effect-adoption::5953ef71b3fb": {
+      "spec": "effect-adoption.spec.md",
+      "excerpt": "9. the shipped json schema: generated from effect, or hand-written and drift-tested (revisits item 3; added 2026-10-16). effect can generate it (ws1b, part c), ",
+      "caught_by": "execution",
+      "note": "Reopens item 3 because a probe of Schema.toJsonSchemaDocument on the spike codecs (2026-10-16) showed generation works and named five differences; item 3 itself was not wrong."
+    },
     "effect-adoption::8f82ddd00c0b": {
       "spec": "effect-adoption.spec.md",
       "excerpt": "- s3 names two narrowings, not three. the draft listed valueconstraintdef.ranges among the narrowings to constraint. valueconstraintdef is the object type's val",
