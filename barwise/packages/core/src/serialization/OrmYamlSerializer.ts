@@ -1,8 +1,9 @@
+import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
 import * as Effect from "effect/Effect";
 import { parse, stringify } from "yaml";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import type { Constraint } from "../model/Constraint.js";
-import { decodeConstraints } from "../model/constraintDecoder.js";
+import { constraintLabel, decodeConstraints } from "../model/constraintDecoder.js";
 import { generateId } from "../model/id.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
@@ -103,8 +104,15 @@ interface DecodedConstraints {
   /** By fact type position; a fact type with any bad constraint is absent. */
   readonly byFactType: ReadonlyMap<number, readonly Constraint[]>;
   readonly problems: readonly SchemaError[];
-  /** `f/c` for each constraint the decoder found a problem in. */
-  readonly refused: ReadonlySet<string>;
+  /** Each constraint the decoder found a problem in, by `f/c`. */
+  readonly refused: ReadonlyMap<string, RefusedConstraint>;
+}
+
+interface RefusedConstraint {
+  readonly raw: unknown;
+  readonly label: string;
+  /** Where the decoder reported, as JSON pointers below the constraint. */
+  readonly reported: ReadonlySet<string>;
 }
 
 /**
@@ -117,7 +125,7 @@ interface DecodedConstraints {
 function decodeConstraintsOf(doc: unknown): DecodedConstraints {
   const byFactType = new Map<number, readonly Constraint[]>();
   const problems: SchemaError[] = [];
-  const refused = new Set<string>();
+  const refused = new Map<string, RefusedConstraint>();
   const list = (doc as { model?: { fact_types?: unknown; }; } | null)?.model?.fact_types;
   if (!Array.isArray(list)) return { byFactType, problems, refused };
   // Every fact type in one run, so a load starts one fiber, not one per fact type.
@@ -133,18 +141,28 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
   );
   decodedLists.forEach((results, f) => {
     if (results === undefined) return;
+    const docs = (list[f] as { constraints: readonly unknown[]; }).constraints;
+    const factType = factTypeLabel(list[f] as object, f);
     const decoded: Constraint[] = [];
     results.forEach((result, c) => {
       if (result._tag === "Success") {
         decoded.push(result.success as Constraint);
         return;
       }
-      refused.add(`${f}/${c}`);
+      const reported = new Set<string>();
       for (const problem of result.failure) {
         const below = problem.path.map((k) => `/${String(k)}`).join("");
-        const path = `/model/fact_types/${f}/constraints/${c}${below}`;
-        problems.push({ path, message: problem.message });
+        reported.add(below);
+        problems.push({
+          path: `/model/fact_types/${f}/constraints/${c}${below}`,
+          message: problem.message,
+        });
       }
+      refused.set(`${f}/${c}`, {
+        raw: docs[c],
+        label: constraintLabel(docs[c], c, factType),
+        reported,
+      });
     });
     if (decoded.length === results.length) byFactType.set(f, decoded);
   });
@@ -159,23 +177,20 @@ function factTypeLabel(ft: object, index: number): string {
   return `Fact type at fact_types/${index}`;
 }
 
-const CONSTRAINT_PATH = /^\/model\/fact_types\/(\d+)\/constraints\/(\d+)(?:\/|$)/;
-
 /**
- * The schema's errors with the decoder's constraint problems in place of the
- * schema's own on the same constraint. One authority per constraint: where
- * the decoder found a problem, it owns that constraint's errors, and the
- * schema's -- for a constraint, one per `oneOf` branch it failed, none of
- * them naming the kind it was meant to be -- are dropped. A constraint the
- * decoder accepted keeps every schema error on it; the load is refused
- * either way.
+ * The schema's errors with the decoder's constraint problems in their place,
+ * on each constraint the decoder refused.
  *
- * Dropping is sound only because the decoder reports every rule the schema
- * states on a constraint it refuses, whatever else is wrong with it: field
- * rules on the codec's file shape, and the schema's "one of these keys"
- * rules checked on the raw input. `constraintDecoder.test.ts` breaks each
- * of the schema's field rules on each kind and requires the decoder to name
- * the field, so a rule added to the schema alone fails there, not here.
+ * The whole-document check reports a bad constraint once per `oneOf` branch
+ * it failed -- 56 errors for one constraint missing a field, none naming the
+ * kind it was meant to be. So on a constraint the decoder refused, those are
+ * dropped, and the constraint is checked again against its own kind's branch
+ * of the schema alone. Every error from that check the decoder did not report
+ * at the same place is kept, worded as ajv words it. The decoder states every
+ * rule it knows of and this keeps any it does not, so no rule the schema
+ * states is lost, however the two drift apart; the decoder's tests check its
+ * wording, not this. A constraint the decoder accepted keeps every schema
+ * error on it. The load is refused either way.
  */
 function mergeConstraintProblems(
   schemaErrors: readonly SchemaError[],
@@ -185,7 +200,90 @@ function mergeConstraintProblems(
     const match = CONSTRAINT_PATH.exec(e.path);
     return match !== null && decoded.refused.has(`${match[1]}/${match[2]}`);
   };
-  return [...schemaErrors.filter((e) => !owned(e)), ...decoded.problems];
+  const kept: SchemaError[] = [];
+  for (const [key, refused] of decoded.refused) {
+    const [f, c] = key.split("/");
+    for (const error of unreportedBranchErrors(refused)) {
+      kept.push({
+        path: `/model/fact_types/${f}/constraints/${c}${error.instancePath}`,
+        message: `${refused.label} ${error.message ?? "is invalid"}.`,
+        rule: { keyword: error.keyword },
+      });
+    }
+  }
+  return [...schemaErrors.filter((e) => !owned(e)), ...decoded.problems, ...kept];
+}
+
+const CONSTRAINT_PATH = /^\/model\/fact_types\/(\d+)\/constraints\/(\d+)(?:\/|$)/;
+
+type ConstraintBranch = { readonly properties: { readonly type: { readonly const: string; }; }; };
+const constraintSchemas = ormModelSchema as {
+  definitions: { constraint: { oneOf: readonly ConstraintBranch[]; }; };
+};
+
+/** One validator per constraint kind, compiled on first use: most loads refuse nothing. */
+let branchValidators: ReadonlyMap<string, ValidateFunction> | undefined;
+
+function branchValidator(type: unknown): ValidateFunction | undefined {
+  if (typeof type !== "string") return undefined;
+  branchValidators ??= (() => {
+    const ajv = new Ajv({ allErrors: true });
+    const { definitions } = constraintSchemas;
+    return new Map(
+      definitions.constraint.oneOf.map((branch) => [
+        branch.properties.type.const,
+        ajv.compile({ definitions, type: "object", ...branch }),
+      ]),
+    );
+  })();
+  return branchValidators.get(type);
+}
+
+/**
+ * The errors of a refused constraint's own branch that the decoder did not
+ * report. A constraint whose type names no kind, or that is not a mapping,
+ * has no branch: the decoder's report of that is the whole story.
+ *
+ * Covered means reported at the same place: at the error's own path; for a
+ * missing or unknown key, at that key; and for a "one of these keys" rule,
+ * at the place itself or at any of its keys.
+ */
+function unreportedBranchErrors(refused: RefusedConstraint): ErrorObject[] {
+  const raw = refused.raw;
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return [];
+  const validate = branchValidator((raw as { type?: unknown; }).type);
+  if (validate === undefined || validate(raw)) return [];
+  const errors = validate.errors ?? [];
+  const at = refused.reported;
+  // An anyOf's keys, by the place and schema path of the anyOf.
+  const groupOf = (e: ErrorObject) => {
+    const cut = e.schemaPath.lastIndexOf("/anyOf");
+    return cut < 0 ? undefined : `${e.instancePath}|${e.schemaPath.slice(0, cut)}`;
+  };
+  const groupKeys = new Map<string, string[]>();
+  for (const e of errors) {
+    const group = groupOf(e);
+    const missing = (e.params as { missingProperty?: string; }).missingProperty;
+    if (group !== undefined && missing !== undefined) {
+      groupKeys.set(group, [...(groupKeys.get(group) ?? []), missing]);
+    }
+  }
+  const covered = (e: ErrorObject) => {
+    const params = e.params as { missingProperty?: string; additionalProperty?: string; };
+    const group = groupOf(e);
+    if (group !== undefined) {
+      return at.has(e.instancePath)
+        || (groupKeys.get(group) ?? []).some((k) => at.has(`${e.instancePath}/${k}`));
+    }
+    if (params.missingProperty !== undefined) {
+      return at.has(`${e.instancePath}/${params.missingProperty}`);
+    }
+    if (params.additionalProperty !== undefined) {
+      return at.has(`${e.instancePath}/${params.additionalProperty}`);
+    }
+    return at.has(e.instancePath);
+  };
+  return errors.filter((e) => !covered(e));
 }
 
 /**

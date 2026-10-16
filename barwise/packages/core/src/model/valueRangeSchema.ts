@@ -29,6 +29,9 @@ const ExclusiveFlag = Schema.Boolean.check(
   Schema.makeFilter((b: boolean) => b === false, { message: "is inclusive by default." }),
 );
 
+/** What a range with neither bound is told; the constraint decoder says it too. */
+export const RANGE_BOUND_MESSAGE = "must have a min or a max.";
+
 export const ValueRangeSchema = Schema.Struct({
   min: Schema.optionalKey(Schema.String),
   max: Schema.optionalKey(Schema.String),
@@ -38,7 +41,7 @@ export const ValueRangeSchema = Schema.Struct({
   Schema.makeFilter(
     (r: { readonly min?: string; readonly max?: string; }) =>
       r.min !== undefined || r.max !== undefined,
-    { message: "must have a min or a max." },
+    { message: RANGE_BOUND_MESSAGE },
   ),
 );
 

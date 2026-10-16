@@ -30,13 +30,21 @@ export function locate(issue: SchemaIssue.Issue, path: readonly PropertyKey[] = 
       return issue.issues.flatMap((child) => locate(child, path));
     case "Encoding":
       return locate(issue.issue, path);
-    case "Filter":
+    case "Filter": {
       // A filter that points its failure at a field reports it there. One
-      // with an authored message keeps it: that message is the predicate.
-      return issue.filter.annotations?.message === undefined
-          && (issue.issue._tag === "Pointer" || issue.issue._tag === "Composite")
-        ? locate(issue.issue, path)
+      // with an authored message keeps the message, at the field it points
+      // to; one without is reported by what it pointed at.
+      const inner = issue.issue;
+      if (issue.filter.annotations?.message !== undefined) {
+        return inner._tag === "Pointer" ? [{ path: [...path, ...inner.path], issue }] : [{
+          path,
+          issue,
+        }];
+      }
+      return inner._tag === "Pointer" || inner._tag === "Composite"
+        ? locate(inner, path)
         : [{ path, issue }];
+    }
     case "AnyOf":
       return issue.issues.length === 1 ? locate(issue.issues[0]!, path) : [{ path, issue }];
     default:

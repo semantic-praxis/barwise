@@ -17,7 +17,7 @@ import type * as SchemaIssue from "effect/SchemaIssue";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import { type ConstraintFromSchema, ConstraintYamlCodec } from "./constraintSchema.js";
 import { locate, predicateOf, spelledAs } from "./schemaIssues.js";
-import { RANGE_YAML_KEYS } from "./valueRangeSchema.js";
+import { RANGE_BOUND_MESSAGE, RANGE_YAML_KEYS } from "./valueRangeSchema.js";
 
 /** One thing wrong with one constraint. */
 export interface ConstraintProblem {
@@ -66,7 +66,7 @@ export function decodeConstraints(
   newId: () => string,
 ): Effect.Effect<readonly Result.Result<ConstraintFromSchema, readonly ConstraintProblem[]>[]> {
   return Effect.forEach(docs, (doc, index) => {
-    const label = labelOf(doc, index, factType);
+    const label = constraintLabel(doc, index, factType);
     if (!isMapping(doc)) {
       return Effect.succeed(
         Result.fail([{ index, path: [], message: `${label} must be a mapping.` }]),
@@ -75,7 +75,7 @@ export function decodeConstraints(
     return Effect.result(
       decodeFile(withId(doc, newId)).pipe(
         Effect.mapError((error) =>
-          withPresence(problemsOf(error.issue, doc, index, label), doc, label)
+          withPresence(problemsOf(error.issue, doc, index, label), doc, index, label)
         ),
       ),
     );
@@ -92,19 +92,22 @@ function isMapping(doc: unknown): doc is Record<string, unknown> {
  * The schema's "at least one of these keys" rules, read from the schema
  * rather than restated: per constraint type (a frequency's `role` or
  * `roles`, a value constraint's `values` or `ranges`), and a value range's
- * `min` or `max`.
+ * `min` or `max` on the types that have ranges.
  *
  * The codec states them too, but as struct checks, and Effect runs a struct's
- * checks only once every field of it has passed. A constraint with an unknown
- * field and no roles at all was reported for the field alone, and the loader,
- * which lets the decoder's report stand in for the schema's on a constraint
- * it refused, dropped the schema's report of the missing roles. Checked here
- * on the raw input whenever the decode failed, so a refused constraint's
- * problems include every rule the schema states.
+ * checks only once every field of it has passed, so beside any other problem
+ * they went unreported. Checked here on the raw input whenever the decode
+ * failed, so the report says it in the decoder's words. Nothing depends on
+ * this for completeness: the loader keeps every schema error the decoder did
+ * not report (`mergeConstraintProblems`). This is wording.
  */
+interface Branch {
+  readonly properties: { readonly type: { readonly const: string; }; readonly ranges?: unknown; };
+  readonly anyOf?: unknown;
+}
 const schemaDefinitions = (ormModelSchema as {
   definitions: {
-    constraint: { oneOf: { properties: { type: { const: string; }; }; anyOf?: unknown; }[]; };
+    constraint: { oneOf: readonly Branch[]; };
     value_range_def: { anyOf?: unknown; };
   };
 }).definitions;
@@ -120,28 +123,35 @@ const PRESENCE_BY_TYPE: ReadonlyMap<string, readonly string[]> = new Map(
     .map((branch) => [branch.properties.type.const, anyOfKeys(branch.anyOf)] as const)
     .filter(([, keys]) => keys.length > 0),
 );
+const TYPES_WITH_RANGES: ReadonlySet<string> = new Set(
+  schemaDefinitions.constraint.oneOf
+    .filter((branch) => branch.properties.ranges !== undefined)
+    .map((branch) => branch.properties.type.const),
+);
 const RANGE_PRESENCE = anyOfKeys(schemaDefinitions.value_range_def.anyOf);
 
-const oneOf = (keys: readonly string[]) => keys.map((k) => `"${k}"`).join(" or ");
+/** `"a" or "b"`. */
+const either = (keys: readonly string[]) => keys.map((k) => `"${k}"`).join(" or ");
 
 function withPresence(
   problems: ConstraintProblem[],
   raw: Record<string, unknown>,
+  index: number,
   label: string,
 ): ConstraintProblem[] {
-  const index = problems[0]!.index;
   const found: ConstraintProblem[] = [];
-  const keys = typeof raw.type === "string" ? PRESENCE_BY_TYPE.get(raw.type) : undefined;
+  const type = typeof raw.type === "string" ? raw.type : undefined;
+  const keys = type === undefined ? undefined : PRESENCE_BY_TYPE.get(type);
   const missingOneOf = keys !== undefined && !keys.some((k) => k in raw);
   if (keys !== undefined && missingOneOf) {
-    found.push({ index, path: [keys[0]!], message: `${label} must have ${oneOf(keys)}.` });
+    found.push({ index, path: [keys[0]!], message: `${label} must have ${either(keys)}.` });
   }
-  if (Array.isArray(raw.ranges) && RANGE_PRESENCE.length > 0) {
+  if (type !== undefined && TYPES_WITH_RANGES.has(type) && Array.isArray(raw.ranges)) {
     raw.ranges.forEach((range: unknown, i) => {
       if (isMapping(range) && !RANGE_PRESENCE.some((k) => k in range)) {
-        const neither = RANGE_PRESENCE.map((k) => `"${k}"`).join(" nor ");
-        const message = `${label} has a range with neither ${neither}.`;
-        found.push({ index, path: ["ranges", i], message });
+        // The same words the range's own check uses, so the rule reads one way
+        // whichever of the two reported it.
+        found.push({ index, path: ["ranges", i], message: `${label} ${RANGE_BOUND_MESSAGE}` });
       }
     });
   }
@@ -194,7 +204,7 @@ function unknownType(raw: Record<string, unknown>): string {
  * position when it gave none. The position is spelled as a path
  * (`constraints/2`), which is how the rest of a load error spells one.
  */
-function labelOf(raw: unknown, index: number, factType: string): string {
+export function constraintLabel(raw: unknown, index: number, factType: string): string {
   const id = raw !== null && typeof raw === "object"
     ? (raw as Record<string, unknown>).id
     : undefined;

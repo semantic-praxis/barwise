@@ -73,7 +73,7 @@ describe("a constraint's problems", () => {
     [
       { id: "c-1", type: "value_constraint", values: [] },
       ["values"],
-      "has an invalid values: Expected a value with a length of at least 1.",
+      "must not have an empty values list; omit it.",
     ],
     [
       { id: "c-1", type: "value_constraint", role: "a" },
@@ -113,7 +113,7 @@ describe("a constraint's problems", () => {
     ]);
   });
 
-  it("reports a range with neither bound beside an unknown field", () => {
+  it("reports a range with neither bound in the same words however it was found", () => {
     const found = problems({ id: "c-1", type: "value_constraint", ranges: [{}], w: 1 });
     expect(found.map((p) => p.path)).toEqual([["w"], ["ranges", 0]]);
     expect(found[1]!.message).toBe(`Constraint "c-1" in ${FT} must have a min or a max.`);
@@ -123,8 +123,20 @@ describe("a constraint's problems", () => {
     const found = problems({ id: "c-1", type: "value_constraint", ranges: [{ z: 1 }] });
     expect(found.map((p) => p.message)).toEqual([
       `Constraint "c-1" in ${FT} has an unknown field "ranges.0.z".`,
-      `Constraint "c-1" in ${FT} has a range with neither "min" nor "max".`,
+      `Constraint "c-1" in ${FT} must have a min or a max.`,
     ]);
+  });
+
+  it("does not check the ranges of a kind that has none", () => {
+    const found = problems({
+      id: "c-1",
+      type: "frequency",
+      role: "a",
+      min: 1,
+      max: 2,
+      ranges: [{}],
+    });
+    expect(found.map((p) => p.path)).toEqual([["ranges"]]);
   });
 
   it("reports an entry that is not a mapping as one problem at the constraint", () => {
@@ -208,12 +220,11 @@ describe("CONSTRAINT_FILE_SPELLINGS against the codec", () => {
 });
 
 describe("the decoder refuses what the schema refuses, field by field", () => {
-  // The loader lets the decoder's report replace the schema's on a constraint
-  // the decoder refused. That is sound only if the decoder states every rule
-  // the schema does: a rule only the schema states would be dropped whenever
-  // the same constraint also had a problem the decoder saw. So for each rule
-  // the schema states on a field of each kind, a constraint breaking that rule
-  // alone must be refused by both, and the decoder must name the field.
+  // For each rule the schema states on a field of each kind, a constraint
+  // breaking that rule alone must be refused by both, and the decoder must
+  // name the field. Not what keeps a rule from being lost -- the loader keeps
+  // any schema error the decoder did not report (constraintBranchRecheck) --
+  // but what keeps the report in the decoder's words rather than ajv's.
   const schema = JSON.parse(
     readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
   ) as {
@@ -270,9 +281,43 @@ describe("the decoder refuses what the schema refuses, field by field", () => {
     expect(cases.length).toBeGreaterThan(40);
   });
 
+  it("states its one-of-these-keys rules only in the shape the decoder reads", () => {
+    // The decoder reads each anyOf as "at least one of these keys", one key
+    // per alternative. Any other shape, or another combinator on a kind,
+    // would still be kept by the loader from the schema, but in ajv's words,
+    // and the decoder's wording of it would be wrong: revisit both together.
+    const raw = schema as unknown as {
+      definitions: {
+        constraint: { oneOf: Record<string, unknown>[]; };
+        value_range_def: Record<string, unknown>;
+      };
+    };
+    const shapes = [...raw.definitions.constraint.oneOf, raw.definitions.value_range_def];
+    for (const branch of shapes) {
+      for (const k of ["not", "oneOf", "allOf", "if", "dependentRequired", "dependencies"]) {
+        expect(branch[k]).toBeUndefined();
+      }
+      for (const alternative of (branch.anyOf as Record<string, unknown>[] | undefined) ?? []) {
+        expect(Object.keys(alternative)).toEqual(["required"]);
+        expect(alternative.required).toHaveLength(1);
+      }
+    }
+  });
+
+  it("knows how to break every keyword the schema uses on a field", () => {
+    // A keyword violationsOf cannot break would yield no case, and the test
+    // below would pass without looking at that rule.
+    const used = schema.definitions.constraint.oneOf.flatMap((branch) =>
+      Object.values(branch.properties).flatMap(keywordsOf)
+    );
+    expect([...new Set(used)].filter((k) => !BREAKABLE.has(k))).toEqual([]);
+  });
+
   it("refuses each, naming the field", () => {
-    const missed = cases.flatMap(({ type, field, bad, fields }) => {
-      const doc = { ...sampleOf(type, fields), id: "c-1", [field]: bad };
+    const missed = cases.flatMap(({ type, field, bad: violation, fields }) => {
+      const sample = sampleOf(type, fields);
+      const bad = typeof violation === "function" ? violation(sample[field]) : violation;
+      const doc = { ...sample, id: "c-1", [field]: bad };
       const schemaRefuses = !validator.validateModel(documentWith(doc)).valid;
       const [result] = run([doc]);
       const named = result !== undefined && Result.isFailure(result)
@@ -294,7 +339,37 @@ interface PropertyRule {
   readonly $ref?: string;
 }
 
-/** Values that break exactly one rule of a property, one per rule. */
+/**
+ * The keywords violationsOf can break, plus those that state no rule of their
+ * own here (`description`; `const`, which only the `type` field uses and is
+ * the union's tag; `$ref`, whose target's rules are its own definition's).
+ */
+const BREAKABLE: ReadonlySet<string> = new Set([
+  "type",
+  "items",
+  "minItems",
+  "minLength",
+  "minimum",
+  "enum",
+  "oneOf",
+  "$ref",
+  "const",
+  "description",
+]);
+
+function keywordsOf(rule: PropertyRule): string[] {
+  return [
+    ...Object.keys(rule),
+    ...(rule.items ? keywordsOf(rule.items) : []),
+    ...(rule.oneOf ?? []).flatMap(keywordsOf),
+  ];
+}
+
+/**
+ * Values that break exactly one rule of a property, one per rule. A list of
+ * `$ref` items is cut from the sample's own list, so it is one short of its
+ * minimum with every item valid.
+ */
 function violationsOf(rule: PropertyRule): unknown[] {
   if (rule.oneOf) return rule.oneOf.flatMap(violationsOf).filter((v) => typeof v === "number");
   const out: unknown[] = [];
@@ -305,7 +380,10 @@ function violationsOf(rule: PropertyRule): unknown[] {
   if (rule.minItems !== undefined && rule.items?.$ref === undefined) {
     out.push(Array.from({ length: rule.minItems - 1 }, () => "r"));
   }
-  if (rule.minItems !== undefined && rule.items?.$ref !== undefined) out.push([]);
+  if (rule.minItems !== undefined && rule.items?.$ref !== undefined) {
+    const minItems = rule.minItems;
+    out.push((list: unknown) => (list as unknown[]).slice(0, minItems - 1));
+  }
   if (rule.items?.minLength !== undefined) out.push(pad([""]));
   if (rule.minLength !== undefined) out.push("");
   if (rule.enum !== undefined) out.push("zzz");
