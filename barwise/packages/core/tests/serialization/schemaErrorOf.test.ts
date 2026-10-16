@@ -4,10 +4,7 @@
  * about the whole element.
  */
 import type { ErrorObject } from "ajv";
-import * as Effect from "effect/Effect";
-import * as Result from "effect/Result";
 import { describe, expect, it } from "vitest";
-import { decodeConstraints } from "../../src/model/constraintDecoder.js";
 import { schemaErrorOf } from "../../src/serialization/SchemaValidator.js";
 
 const SUBJECT = 'Constraint "c-1" in Fact type "F"';
@@ -82,31 +79,5 @@ describe("schemaErrorOf with a subject", () => {
       SUBJECT,
     );
     expect(e.message).toBe(`${SUBJECT} is missing "role".`);
-  });
-});
-
-describe("one rule, one sentence, whichever side reports it", () => {
-  it("words a range with neither bound as the decoder does", () => {
-    const [result] = Effect.runSync(
-      decodeConstraints(
-        [{ id: "c-1", type: "value_constraint", ranges: [{}] }],
-        'Fact type "F"',
-        () => "x",
-      ),
-    );
-    if (result === undefined || !Result.isFailure(result)) throw new Error("expected a failure");
-    const fromDecoder = result.failure.problems.find((p) => p.path.join("/") === "ranges/0")!;
-    const fromSchema = schemaErrorOf(
-      error({
-        instancePath: "/ranges/0",
-        keyword: "anyOf",
-        params: { anyOfKeys: ["min", "max"] },
-        message: "must match a schema in anyOf",
-      }),
-      {},
-      PREFIX,
-      result.failure.subject,
-    );
-    expect(fromSchema.message).toBe(fromDecoder.message);
   });
 });

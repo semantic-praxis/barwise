@@ -16,6 +16,9 @@ import {
 } from "../../src/serialization/OrmYamlSerializer.js";
 import type { SchemaError } from "../../src/serialization/SchemaValidator.js";
 
+/** The fields whose problems the wrapped decoder forgets. */
+const FORGOTTEN = new Set(["role", "ranges"]);
+
 vi.mock("../../src/model/constraintDecoder.js", async (importOriginal) => {
   const real = await importOriginal<typeof Decoder>();
   return {
@@ -28,7 +31,7 @@ vi.mock("../../src/model/constraintDecoder.js", async (importOriginal) => {
             Result.isFailure(r)
               ? Result.fail({
                 ...r.failure,
-                problems: r.failure.problems.filter((p) => p.path[0] !== "role"),
+                problems: r.failure.problems.filter((p) => !FORGOTTEN.has(String(p.path[0]))),
               })
               : r
           ),
@@ -51,6 +54,7 @@ model:
         - {id: c-2, type: mandatory, weight: 3}
         - {id: c-3, type: mandatory, role: ""}
         - {id: c-4, type: frequency, min: 1, max: 2}
+        - {id: c-5, type: value_constraint, role: r-1, ranges: [{}]}
 `;
 
 describe("a rule the decoder does not report", () => {
@@ -89,6 +93,7 @@ describe("a rule the decoder does not report", () => {
       // refusal carries no problems at all; the schema's report still comes.
       "/model/fact_types/0/constraints/2/role",
       "/model/fact_types/0/constraints/3",
+      "/model/fact_types/0/constraints/4/ranges/0",
     ]);
     // Kept with the rule the whole-document check gives, worded as the
     // decoder words its own: the constraint, then the field at fault.
@@ -109,5 +114,29 @@ describe("a rule the decoder does not report", () => {
       message: 'Constraint "c-2" in Fact type "Person exists" is missing "role".',
       rule: { keyword: "required", missingProperty: "role" },
     });
+  });
+});
+
+describe("one rule, one sentence, whichever side reports it", () => {
+  it("words a range with neither bound in the loader as the decoder does", async () => {
+    const real = await vi.importActual<typeof Decoder>("../../src/model/constraintDecoder.js");
+    const doc = { id: "c-5", type: "value_constraint", role: "r-1", ranges: [{}] };
+    const [result] = Effect.runSync(
+      real.decodeConstraints([doc], 'Fact type "Person exists"', () => "x"),
+    );
+    if (result === undefined || !Result.isFailure(result)) throw new Error("expected a failure");
+    const fromDecoder = result.failure.problems.find((p) => p.path.join("/") === "ranges/0")!;
+
+    let errors: readonly SchemaError[] = [];
+    try {
+      new OrmYamlSerializer().deserialize(YAML);
+    } catch (e) {
+      errors = (e as DeserializationError).validationResult!.errors;
+    }
+    // c-5 is the fifth constraint; the wrapped decoder forgot its range, so
+    // this one came from the schema re-check. Same input, same sentence,
+    // except the position the decoder was given (0 here, 4 in the file).
+    const fromLoader = errors.find((e) => e.path.endsWith("/constraints/4/ranges/0"))!;
+    expect(fromLoader.message.replace("constraints/4", "constraints/0")).toBe(fromDecoder.message);
   });
 });

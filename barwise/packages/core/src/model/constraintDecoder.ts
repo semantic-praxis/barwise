@@ -18,7 +18,7 @@ import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "j
 import { type ConstraintFromSchema, ConstraintYamlCodec } from "./constraintSchema.js";
 import { missingField, missingOneOf } from "./problemWording.js";
 import { locate, predicateOf, spelledAs } from "./schemaIssues.js";
-import { RANGE_YAML_KEYS } from "./valueRangeSchema.js";
+import { RANGE_BOUND_KEYS, RANGE_YAML_KEYS } from "./valueRangeSchema.js";
 
 /** One thing wrong with one constraint. */
 export interface ConstraintProblem {
@@ -124,7 +124,6 @@ interface Branch {
 const schemaDefinitions = (ormModelSchema as {
   definitions: {
     constraint: { oneOf: readonly Branch[]; };
-    value_range_def: { anyOf?: unknown; };
   };
 }).definitions;
 
@@ -144,7 +143,6 @@ const TYPES_WITH_RANGES: ReadonlySet<string> = new Set(
     .filter((branch) => branch.properties.ranges !== undefined)
     .map((branch) => branch.properties.type.const),
 );
-const RANGE_PRESENCE = anyOfKeys(schemaDefinitions.value_range_def.anyOf);
 
 function withPresence(
   problems: ConstraintProblem[],
@@ -161,10 +159,10 @@ function withPresence(
   }
   if (type !== undefined && TYPES_WITH_RANGES.has(type) && Array.isArray(raw.ranges)) {
     raw.ranges.forEach((range: unknown, i) => {
-      if (isMapping(range) && !RANGE_PRESENCE.some((k) => k in range)) {
-        // Said at its path, as the loader's schema re-check says it, so the
-        // rule reads one way whichever of the two reported it.
-        const message = `${label} ${missingOneOf(["ranges", i], RANGE_PRESENCE)}`;
+      if (isMapping(range) && !RANGE_BOUND_KEYS.some((k) => k in range)) {
+        // Only reached when Effect skipped the range's own check (another of
+        // its fields failed), and in the words that check uses too.
+        const message = `${label} ${missingOneOf(["ranges", i], RANGE_BOUND_KEYS)}`;
         found.push({ index, path: ["ranges", i], message });
       }
     });
@@ -172,13 +170,10 @@ function withPresence(
   // A missing "one of" replaces what the record's rules said about the same
   // keys: a frequency with neither `role` nor `roles` is told that, not that
   // its (empty) role list is too short.
-  // And at the same place, the rule read from the schema replaces the
-  // record's own check of it: the range's check can only say "a range", not
-  // which one.
   const covered = new Set(noneOfKeys ? keys : []);
-  const at = new Set(found.map((p) => p.path.join("/")));
-  const rest = problems.filter((p) => !covered.has(String(p.path[0])) && !at.has(p.path.join("/")));
-  return [...rest, ...found];
+  const rest = problems.filter((p) => !covered.has(String(p.path[0])));
+  const seen = new Set(rest.map((p) => p.path.join("/")));
+  return [...rest, ...found.filter((p) => !seen.has(p.path.join("/")))];
 }
 
 /** A constraint with a missing or empty id filled; anything else as it is. */

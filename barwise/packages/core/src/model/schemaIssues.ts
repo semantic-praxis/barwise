@@ -6,7 +6,7 @@
  * tree and the wording of Effect's own structural refusals are the same.
  */
 import * as SchemaIssue from "effect/SchemaIssue";
-import { invalidField, missingField, unknownField } from "./problemWording.js";
+import { invalidField, missingField, missingOneOf, unknownField } from "./problemWording.js";
 
 /** One failure in the issue tree, with the path that leads to it. */
 export interface Located {
@@ -82,6 +82,10 @@ export function predicateOf(
       break;
     }
     case "Filter": {
+      // A "one of these keys" check is worded from where it was found, which
+      // its own message cannot know.
+      const keys = issue.filter.annotations?.missingOneOf;
+      if (Array.isArray(keys)) return missingOneOf(path, keys as readonly string[]);
       const message = issue.filter.annotations?.message;
       if (typeof message === "string") return message;
       break;

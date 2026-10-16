@@ -52,3 +52,32 @@ describe("a value range", () => {
     ).toThrow();
   });
 });
+
+describe("a range with neither bound is named by its path", () => {
+  // The check carries the schema's keys and is worded from where Effect found
+  // it, so a value type with several ranges is told which one.
+  it("at construction, in the config's spelling", () => {
+    expect(() =>
+      createObjectType({
+        name: "Grade",
+        kind: "value",
+        valueConstraint: { values: [], ranges: [{ min: "1" }, { max: "9" }, {}] },
+      })
+    ).toThrow(
+      'Value type "Grade" is missing "valueConstraint.ranges.2.min" or "valueConstraint.ranges.2.max".',
+    );
+  });
+
+  it("on load, in the file's spelling", () => {
+    expect(() =>
+      runObjectTypeDecode(decodeObjectType({
+        id: "ot-1",
+        name: "Grade",
+        kind: "value",
+        value_constraint: { ranges: [{}] },
+      }))
+    ).toThrow(
+      'Value type "Grade" is missing "value_constraint.ranges.0.min" or "value_constraint.ranges.0.max".',
+    );
+  });
+});

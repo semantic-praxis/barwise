@@ -24,16 +24,27 @@
  */
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 
 const ExclusiveFlag = Schema.Boolean.check(
   Schema.makeFilter((b: boolean) => b === false, { message: "is inclusive by default." }),
 );
 
 /**
- * What a range with neither bound is told. Prose, and true of the element
- * that holds the range, because the check cannot see which range it is or
- * where; the constraint decoder names the range by its path instead.
+ * The keys a range must have at least one of, read from the schema's
+ * `value_range_def` anyOf rather than restated. The range check carries them
+ * as its `missingOneOf` annotation, and the decoders word it from the path
+ * Effect reports it at (`schemaIssues.ts`), so every holder of a range names
+ * which one: `is missing "value_constraint.ranges.2.min" or ...`.
  */
+export const RANGE_BOUND_KEYS: readonly string[] = (
+  (ormModelSchema as {
+    definitions: { value_range_def: { anyOf?: { required?: string[]; }[]; }; };
+  })
+    .definitions.value_range_def.anyOf ?? []
+).flatMap((alternative) => alternative.required ?? []);
+
+/** For a reader that formats the check without its path (Effect's default formatter). */
 const RANGE_BOUND_MESSAGE = "has a range with neither a min nor a max.";
 
 export const ValueRangeSchema = Schema.Struct({
@@ -45,7 +56,7 @@ export const ValueRangeSchema = Schema.Struct({
   Schema.makeFilter(
     (r: { readonly min?: string; readonly max?: string; }) =>
       r.min !== undefined || r.max !== undefined,
-    { message: RANGE_BOUND_MESSAGE },
+    { message: RANGE_BOUND_MESSAGE, missingOneOf: RANGE_BOUND_KEYS },
   ),
 );
 
