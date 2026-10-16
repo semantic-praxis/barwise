@@ -82,7 +82,8 @@ export type FactTypeRecord = Omit<typeof FactTypeRecord.Type, "derivation"> & {
 };
 
 /**
- * A derivation as the file spells it, read into its rule. A copy of the
+ * A derivation as the file spells it, read into its rule: a storage the file
+ * gives is kept (the default included), a false `is_formal` dropped. A copy of the
  * serializer's `deserializeDerivation`, kept here so the model does not
  * import from serialization; `factTypeDecoder.test.ts` holds the two
  * together over every combination of the file's fields.

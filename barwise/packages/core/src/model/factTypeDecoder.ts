@@ -68,7 +68,7 @@ export function decodeFactTypes(
             message: `${subject} ${predicateOf(issue, path, "is not a fact type.")}`,
           }))
           : [];
-        const problems = [...fields, ...readingsOf(doc, fields, subject)];
+        const problems = inReadingOrder([...fields, ...readingsOf(doc, fields, subject)]);
         return problems.length === 0 && Result.isSuccess(result)
           ? Result.succeed(result.success as FactTypeRecord)
           : Result.fail({ subject, problems });
@@ -94,4 +94,20 @@ function readingsOf(
   return readingProblems(roles.length, readings)
     .filter((p) => !seen.has(p.path.join("/")))
     .map((p) => ({ path: p.path, message: `${subject} ${p.issue}` }));
+}
+
+/**
+ * The problems with the readings among them put in reading order, where the
+ * first of them stood: the field rules' and the reading rule's reports on
+ * `readings` come from two places and would otherwise read out of order.
+ */
+function inReadingOrder(problems: readonly FactTypeProblem[]): FactTypeProblem[] {
+  const isReading = (p: FactTypeProblem) => p.path[0] === "readings";
+  const readings = problems.filter(isReading).sort((a, b) =>
+    Number(a.path[1] ?? -1) - Number(b.path[1] ?? -1)
+  );
+  const first = problems.findIndex(isReading);
+  if (first < 0) return [...problems];
+  const rest = problems.filter((p) => !isReading(p));
+  return [...rest.slice(0, first), ...readings, ...rest.slice(first)];
 }

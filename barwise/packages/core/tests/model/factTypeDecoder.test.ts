@@ -62,21 +62,26 @@ describe("a fact type's problems", () => {
   });
 
   it("reports a bad reading beside an unknown field, not on the next load", () => {
-    // Effect runs the fact type's reading check only once every field has
-    // passed; the decoder runs the rule itself when Effect did not.
+    // The reading rule is not a Schema check (Effect would skip it beside a
+    // field error); the decoder runs it after every decode.
     const found = problems({ ...VALID, colour: 1, readings: ["{0} has {5}"] });
     expect(found.map((p) => p.path)).toEqual([["colour"], ["readings", 0]]);
   });
 
   it("judges the string readings beside one that is not a string", () => {
     const found = problems({ ...VALID, readings: ["{0} has {5}", 7] });
-    expect(found.map((p) => p.path)).toEqual([["readings", 1], ["readings", 0]]);
+    expect(found.map((p) => p.path)).toEqual([["readings", 0], ["readings", 1]]);
   });
 
   it("reports an empty reading once, as the field rule words it", () => {
     const found = problems({ ...VALID, readings: [""] });
     expect(found).toHaveLength(1);
     expect(found[0]!.message).toMatch(/has an invalid readings\.0: Expected a value with a length/);
+  });
+
+  it("reports readings that are not a list, without judging them", () => {
+    const found = problems({ ...VALID, readings: "{0} has" });
+    expect(found.map((p) => p.path)).toEqual([["readings"]]);
   });
 
   it("does not judge readings when there are no roles to count", () => {
