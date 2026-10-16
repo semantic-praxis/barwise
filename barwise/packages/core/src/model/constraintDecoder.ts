@@ -18,7 +18,7 @@ import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "j
 import { type ConstraintFromSchema, ConstraintYamlCodec } from "./constraintSchema.js";
 import { missingField, missingOneOf } from "./problemWording.js";
 import { locate, predicateOf, spelledAs } from "./schemaIssues.js";
-import { RANGE_BOUND_MESSAGE, RANGE_YAML_KEYS } from "./valueRangeSchema.js";
+import { RANGE_YAML_KEYS } from "./valueRangeSchema.js";
 
 /** One thing wrong with one constraint. */
 export interface ConstraintProblem {
@@ -162,19 +162,23 @@ function withPresence(
   if (type !== undefined && TYPES_WITH_RANGES.has(type) && Array.isArray(raw.ranges)) {
     raw.ranges.forEach((range: unknown, i) => {
       if (isMapping(range) && !RANGE_PRESENCE.some((k) => k in range)) {
-        // The same words the range's own check uses, so the rule reads one way
-        // whichever of the two reported it.
-        found.push({ index, path: ["ranges", i], message: `${label} ${RANGE_BOUND_MESSAGE}` });
+        // Said at its path, as the loader's schema re-check says it, so the
+        // rule reads one way whichever of the two reported it.
+        const message = `${label} ${missingOneOf(["ranges", i], RANGE_PRESENCE)}`;
+        found.push({ index, path: ["ranges", i], message });
       }
     });
   }
   // A missing "one of" replaces what the record's rules said about the same
   // keys: a frequency with neither `role` nor `roles` is told that, not that
   // its (empty) role list is too short.
+  // And at the same place, the rule read from the schema replaces the
+  // record's own check of it: the range's check can only say "a range", not
+  // which one.
   const covered = new Set(noneOfKeys ? keys : []);
-  const rest = problems.filter((p) => !covered.has(String(p.path[0])));
-  const seen = new Set(rest.map((p) => p.path.join("/")));
-  return [...rest, ...found.filter((p) => !seen.has(p.path.join("/")))];
+  const at = new Set(found.map((p) => p.path.join("/")));
+  const rest = problems.filter((p) => !covered.has(String(p.path[0])) && !at.has(p.path.join("/")));
+  return [...rest, ...found];
 }
 
 /** A constraint with a missing or empty id filled; anything else as it is. */

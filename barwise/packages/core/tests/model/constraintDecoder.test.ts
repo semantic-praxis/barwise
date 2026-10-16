@@ -117,14 +117,16 @@ describe("a constraint's problems", () => {
   it("reports a range with neither bound in the same words however it was found", () => {
     const found = problems({ id: "c-1", type: "value_constraint", ranges: [{}], w: 1 });
     expect(found.map((p) => p.path)).toEqual([["w"], ["ranges", 0]]);
-    expect(found[1]!.message).toBe(`Constraint "c-1" in ${FT} is missing "min" or "max".`);
+    expect(found[1]!.message).toBe(
+      `Constraint "c-1" in ${FT} is missing "ranges.0.min" or "ranges.0.max".`,
+    );
   });
 
   it("reports a range with neither bound beside an unknown field in the range", () => {
     const found = problems({ id: "c-1", type: "value_constraint", ranges: [{ z: 1 }] });
     expect(found.map((p) => p.message)).toEqual([
       `Constraint "c-1" in ${FT} has an unknown field "ranges.0.z".`,
-      `Constraint "c-1" in ${FT} is missing "min" or "max".`,
+      `Constraint "c-1" in ${FT} is missing "ranges.0.min" or "ranges.0.max".`,
     ]);
   });
 
