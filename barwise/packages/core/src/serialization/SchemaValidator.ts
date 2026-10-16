@@ -41,6 +41,8 @@ export interface SchemaRule {
   readonly missingProperty?: string;
   /** For `additionalProperties`: the property that is not allowed. */
   readonly additionalProperty?: string;
+  /** For an `anyOf` of required keys, kept as one rule: the keys, any one of which would do. */
+  readonly missingOneOf?: readonly string[];
   /** For `if`: the branch that failed, `then` or `else`. */
   readonly failingKeyword?: string;
 }
@@ -106,6 +108,7 @@ export function schemaErrorOf(
     missingProperty?: string;
     additionalProperty?: string;
     failingKeyword?: string;
+    anyOfKeys?: readonly string[];
   };
   return {
     path: path || "/",
@@ -121,6 +124,7 @@ export function schemaErrorOf(
         ? { additionalProperty: params.additionalProperty }
         : {}),
       ...(params.failingKeyword !== undefined ? { failingKeyword: params.failingKeyword } : {}),
+      ...(params.anyOfKeys !== undefined ? { missingOneOf: params.anyOfKeys } : {}),
     },
   };
 }

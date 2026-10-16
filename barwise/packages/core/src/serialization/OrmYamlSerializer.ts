@@ -308,7 +308,7 @@ function unreportedBranchErrors(refused: RefusedConstraint): ErrorObject[] {
   // would tell the reader to add every one of them.
   return errors
     .filter((e) => !covered(e))
-    .filter((e) => groupOf(e) === undefined || e.keyword === "anyOf")
+    .filter((e) => groupOf(e) === undefined || e.keyword !== "required")
     .map((e) => {
       const keys = e.keyword === "anyOf" ? groupKeys.get(groupOf(e)!) : undefined;
       return keys === undefined ? e : { ...e, params: { ...e.params, anyOfKeys: keys } };

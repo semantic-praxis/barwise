@@ -24,13 +24,14 @@
  */
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import { missingOneOf } from "./problemWording.js";
 
 const ExclusiveFlag = Schema.Boolean.check(
   Schema.makeFilter((b: boolean) => b === false, { message: "is inclusive by default." }),
 );
 
 /** What a range with neither bound is told; the constraint decoder says it too. */
-export const RANGE_BOUND_MESSAGE = "must have a min or a max.";
+export const RANGE_BOUND_MESSAGE = missingOneOf([], ["min", "max"]);
 
 export const ValueRangeSchema = Schema.Struct({
   min: Schema.optionalKey(Schema.String),

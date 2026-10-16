@@ -99,9 +99,11 @@ describe("a rule the decoder does not report", () => {
       rule: { keyword: "minLength" },
     });
     // A "one of these keys" rule is one line, not one "required" per key.
-    expect(errors.find((e) => e.path.endsWith("/constraints/3"))!.message).toBe(
-      'Constraint "c-4" in Fact type "Person exists" is missing "role" or "roles".',
-    );
+    expect(errors.find((e) => e.path.endsWith("/constraints/3"))).toEqual({
+      path: "/model/fact_types/0/constraints/3",
+      message: 'Constraint "c-4" in Fact type "Person exists" is missing "role" or "roles".',
+      rule: { keyword: "anyOf", missingOneOf: ["role", "roles"] },
+    });
     expect(errors.find((e) => e.path.endsWith("/constraints/1"))).toEqual({
       path: "/model/fact_types/0/constraints/1",
       message: 'Constraint "c-2" in Fact type "Person exists" is missing "role".',
