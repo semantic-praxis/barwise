@@ -11,12 +11,16 @@
  * one file deleted another's manifest or spill mid-test (CI on #672). Each
  * test now gets a temporary directory of its own, as its cwd and as the home
  * of any fixture it copies in, removed after it.
+ *
+ * The `process.cwd` mock is confined to the test file that makes it under
+ * either vitest pool: a forked process, or a worker thread, has its own
+ * `process` object. (`process.chdir` would not be, which is why this
+ * mocks rather than changes directory.)
  */
 import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isMainThread } from "node:worker_threads";
 import { afterEach, beforeEach, type MockInstance, vi } from "vitest";
 
 const FIXTURES = resolve(dirname(fileURLToPath(import.meta.url)), "../fixtures");
@@ -24,22 +28,19 @@ const FIXTURES = resolve(dirname(fileURLToPath(import.meta.url)), "../fixtures")
 export interface PrivateWorkspace {
   /** The current test's directory, which `process.cwd()` returns. */
   readonly dir: () => string;
-  /** Copy `tests/fixtures/<relative>` (a file or a directory) into it; its new path. */
+  /**
+   * Copy `tests/fixtures/<relative>` (a file or a directory) into
+   * `<dir>/fixtures/`; its new path. A subdirectory, not `dir` itself, so
+   * a fixture's own directory is never the cwd and a test can still tell
+   * "spilled beside the file" from "spilled under the cwd". Any `.barwise`
+   * left in the source tree by an older run is not copied, so the copy is
+   * the tracked fixture.
+   */
   readonly fixture: (relative: string) => string;
 }
 
 /** Call at the top of a test file, after its constants. */
 export function usePrivateCwd(): PrivateWorkspace {
-  // Mocking process.cwd is per process. Under the forks pool (vitest's
-  // default; no pool is set here) each test file has its own; under worker
-  // threads the files running at once would share the mock and each other's
-  // directory, which is the race this exists to remove. Refuse rather than
-  // reintroduce it quietly.
-  if (!isMainThread) {
-    throw new Error(
-      "usePrivateCwd mocks process.cwd(), which worker threads share; run these tests in the forks pool.",
-    );
-  }
   let dir = "";
   let spy: MockInstance<() => string> | undefined;
   beforeEach(() => {
@@ -53,8 +54,11 @@ export function usePrivateCwd(): PrivateWorkspace {
   return {
     dir: () => dir,
     fixture: (relative) => {
-      const to = join(dir, relative);
-      cpSync(join(FIXTURES, relative), to, { recursive: true });
+      const to = join(dir, "fixtures", relative);
+      cpSync(join(FIXTURES, relative), to, {
+        recursive: true,
+        filter: (source) => basename(source) !== ".barwise",
+      });
       return to;
     },
   };
