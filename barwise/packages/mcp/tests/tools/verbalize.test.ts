@@ -89,12 +89,15 @@ describe("verbalize_model tool", () => {
     const dirOf = (r: { content: Array<{ text: string; }>; }) =>
       dirname(r.content[0]!.text.match(/Full content written to: (.+)/)![1]!.trim());
 
-    const asString = dirOf(executeVerbalize(ws.fixture("simple.orm.yaml")));
-    const asObject = dirOf(executeVerbalize({ path: ws.fixture("simple.orm.yaml") }));
+    const model = ws.fixture("simple.orm.yaml");
+    const asString = dirOf(executeVerbalize(model));
+    const asObject = dirOf(executeVerbalize({ path: model }));
 
-    // The object form spills into the same cache dir next to the model file.
+    // The object form spills into the same cache dir next to the model file,
+    // which is not the cwd's (the fixture sits in a subdirectory of it).
     expect(asObject).toBe(asString);
-    expect(asObject).toContain(resolve(ws.dir(), ".barwise"));
+    expect(asObject.startsWith(resolve(dirname(model), ".barwise"))).toBe(true);
+    expect(asObject.startsWith(resolve(ws.dir(), ".barwise"))).toBe(false);
   });
 
   it("omits an empty counterexamples section for a fact type with no constraints", () => {
