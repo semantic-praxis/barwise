@@ -101,30 +101,28 @@ function decodeObjectTypesOf(
 const OBJECT_TYPE_PATH = /^\/model\/object_types\/(\d+)(?:\/([^/]+)(\/.*)?)?$/;
 /** ajv names the property in a required-property error. */
 const MISSING_PROPERTY = /must have required property '([^']+)'/;
+/** ajv's message for an entity whose `then` branch fails: it requires reference_mode and nothing else. */
+const THEN_BRANCH = /must match "then" schema/;
 
 /**
  * The schema's errors and the decoder's problems as one list.
  *
- * The decoder names top-level fields only, so it can say which field it
- * refused but not which rule inside the field it replaced. A schema error is
- * therefore dropped only when it sits exactly at a field the decoder names, or
- * is a required-property error for a property the decoder names. Anything
- * deeper in a field is kept: a duplicate costs a line, a dropped rule is
- * silent. Where the schema reports an entity without a reference mode three
- * times (the missing property, the failed `if`, the failed `then`), the
- * decoder's one problem replaces all three. The schema's other errors stand,
- * because the file format asks things the decoder does not: an `id` in every
- * object type, a bound in every range. The decoder mints a missing id, so a
- * missing id is always the schema's to report.
+ * The decoder names top-level fields only, so a schema error is dropped only
+ * when the decoder has replaced it: a field-level error at exactly a field the
+ * decoder names, a required-property error for a property the decoder names,
+ * or an entity's failed `then` branch, which requires only reference_mode.
+ * Deeper errors inside a field are kept, because the decoder cannot say which
+ * nested rule it replaced: a duplicate costs a line, a dropped rule is silent.
+ * Everything else at an object type's root stands. So a bare list entry keeps
+ * the schema's "must be object", and a missing `id` survives, because the
+ * decoder mints ids.
  */
 function mergeObjectTypeProblems(
   schemaErrors: readonly SchemaError[],
   problems: readonly LocatedProblem[],
 ): SchemaError[] {
-  const refused = new Set<number>();
   const named = new Set<string>();
   for (const { index, error } of problems) {
-    refused.add(index);
     const field = OBJECT_TYPE_PATH.exec(error.path)?.[2];
     if (field !== undefined) named.add(`${index}/${field}`);
   }
@@ -132,11 +130,11 @@ function mergeObjectTypeProblems(
     const match = OBJECT_TYPE_PATH.exec(error.path);
     if (match === null) return false;
     const index = Number(match[1]);
-    if (!refused.has(index)) return false;
     const [, , field, below] = match;
     if (field !== undefined) return below === undefined && named.has(`${index}/${field}`);
     const missing = MISSING_PROPERTY.exec(error.message);
-    return missing === null || named.has(`${index}/${missing[1]}`);
+    if (missing !== null) return named.has(`${index}/${missing[1]}`);
+    return THEN_BRANCH.test(error.message) && named.has(`${index}/reference_mode`);
   };
   return [...schemaErrors.filter((e) => !covered(e)), ...problems.map((p) => p.error)];
 }

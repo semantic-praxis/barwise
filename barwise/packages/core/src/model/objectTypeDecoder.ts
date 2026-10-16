@@ -74,10 +74,22 @@ export function decodeObjectType(
  * `{ referenceMode: other.referenceMode, ... }`, and the schema's optional
  * keys refuse an explicit `undefined`.
  */
+/**
+ * main's createObjectType tested the reference mode for truth, so a value
+ * type's empty one was absent, not refused. The schema refuses any reference
+ * mode on a value type, so the empty string is dropped before that check.
+ */
+function withoutEmptyValueReferenceMode(config: unknown): unknown {
+  if (typeof config !== "object" || config === null) return config;
+  const fields = config as Record<string, unknown>;
+  if (fields.kind !== "value" || fields.referenceMode !== "") return config;
+  return Object.fromEntries(Object.entries(fields).filter(([key]) => key !== "referenceMode"));
+}
+
 export function decodeObjectTypeConfig(
   config: unknown,
 ): Effect.Effect<ObjectType, ObjectTypeProblems, IdSource> {
-  const input = withoutUndefined(config);
+  const input = withoutUndefined(withoutEmptyValueReferenceMode(config));
   return decodeWith(decodeModel, input);
 }
 

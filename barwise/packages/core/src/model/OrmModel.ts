@@ -102,13 +102,12 @@ export class OrmModel {
    * @throws {ObjectTypeError} Listing every problem with the config.
    */
   addObjectType(config: ObjectTypeConfig): ObjectType {
-    const existing = this.getObjectTypeByName(config.name);
-    if (existing) {
-      throw new Error(
-        `Object type "${config.name}" already exists in model "${this._name}".`,
-      );
-    }
     const ot = runObjectTypeDecode(decodeObjectTypeConfig(config), generateId);
+    // The name is checked once decoded: the decoder trims it, and a padded
+    // duplicate must not pass the check the trimmed name would fail.
+    if (this.getObjectTypeByName(ot.name)) {
+      throw new Error(`Object type "${ot.name}" already exists in model "${this._name}".`);
+    }
     this._objectTypes.set(ot.id, ot);
     return ot;
   }

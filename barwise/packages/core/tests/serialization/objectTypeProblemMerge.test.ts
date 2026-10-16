@@ -5,7 +5,11 @@
  * names replaces the schema's error on that field once, not once per keyword.
  */
 import { describe, expect, it } from "vitest";
-import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
+import {
+  DeserializationError,
+  OrmYamlSerializer,
+} from "../../src/serialization/OrmYamlSerializer.js";
+import type { SchemaError } from "../../src/serialization/SchemaValidator.js";
 
 const HEAD = `orm_version: "2.0"
 model:
@@ -18,6 +22,15 @@ function loadError(body: string): string {
     new OrmYamlSerializer().deserialize(HEAD + body);
   } catch (e) {
     return (e as Error).message;
+  }
+  throw new Error("expected the load to refuse");
+}
+
+function loadErrors(body: string): readonly SchemaError[] {
+  try {
+    new OrmYamlSerializer().deserialize(HEAD + body);
+  } catch (e) {
+    return (e as DeserializationError).validationResult!.errors;
   }
   throw new Error("expected the load to refuse");
 }
@@ -47,11 +60,18 @@ describe("schema errors and decoder problems on one object type", () => {
     expect(message).toContain("fewer than 1 characters");
   });
 
+  it("keeps a bare list entry's schema error, not only the decoder's guess at its kind", () => {
+    const message = loadError(`    - Customer
+`);
+    expect(message).toContain("must be object");
+  });
+
   it("reports an entity without a reference mode once", () => {
-    const message = loadError(`    - id: ot-p
+    const errors = loadErrors(`    - id: ot-p
       name: Person
       kind: entity
 `);
-    expect(message.match(/reference mode/g)).toHaveLength(1);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.path).toBe("/model/object_types/0/reference_mode");
   });
 });
