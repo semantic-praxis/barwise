@@ -19,6 +19,8 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 
 /**
  * Where a decoded object type without an id gets one.
@@ -161,10 +163,18 @@ const FILE_LEAVES = {
   range: ValueRangeSchema.pipe(Schema.encodeKeys(RANGE_YAML_KEYS)),
 };
 
+// A config may name a data type outside the list, so this leaf checks only
+// that the value is a string. The link lets Arbitrary.schema derive over it
+// (without it, derivation throws "unsupported Declaration"); the check and the
+// TypeScript type are unchanged. Spec: effect-adoption.spec.md, open decision 5.
 const CONFIG_LEAVES = {
-  dataTypeName: Schema.declare(
-    (u: unknown): u is ConceptualDataTypeName => typeof u === "string",
-  ),
+  dataTypeName: Schema.declare((u: unknown): u is ConceptualDataTypeName => typeof u === "string", {
+    toCodecArbitrary: () =>
+      ({
+        to: Schema.String.ast,
+        transformation: SchemaTransformation.passthrough<string>(),
+      }) as SchemaAST.Link,
+  }),
   size: Schema.Number,
   count: Schema.Number,
   range: ValueRangeSchema,
