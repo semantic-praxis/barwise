@@ -4,10 +4,13 @@ import { parse, stringify } from "yaml";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import type { Constraint } from "../model/Constraint.js";
 import { decodeConstraints } from "../model/constraintDecoder.js";
+import { decodeFactTypes, factTypeLabel } from "../model/factTypeDecoder.js";
+import type { FactTypeRecord } from "../model/factTypeSchema.js";
 import { generateId } from "../model/id.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
 import { OrmModel } from "../model/OrmModel.js";
+import { unreportedErrors } from "./elementRecheck.js";
 import { pointerSegment } from "./jsonPointer.js";
 import {
   type SchemaError,
@@ -24,7 +27,7 @@ import {
 import { deserializeDefinition, serializeDefinition } from "./yaml/definition.js";
 import { deserializeDiagramLayout, serializeDiagramLayout } from "./yaml/diagram.js";
 import type { OrmYamlDocument } from "./yaml/document.js";
-import { deserializeFactType, serializeFactType } from "./yaml/factType.js";
+import { serializeFactType } from "./yaml/factType.js";
 import {
   deserializeObjectifiedFactType,
   serializeObjectifiedFactType,
@@ -107,14 +110,15 @@ interface DecodedConstraints {
   readonly byFactType: ReadonlyMap<number, readonly Constraint[]>;
   readonly problems: readonly SchemaError[];
   /** Each constraint the decoder found a problem in, by `f/c`. */
-  readonly refused: ReadonlyMap<string, RefusedConstraint>;
+  readonly refused: ReadonlyMap<string, RefusedElement>;
 }
 
-interface RefusedConstraint {
+/** An element the decoder refused: a constraint, or a fact type. */
+interface RefusedElement {
   readonly raw: unknown;
-  /** What the decoder's problems call this constraint; kept errors say it too. */
+  /** What the decoder's problems call this element; kept errors say it too. */
   readonly subject: string;
-  /** Where the decoder reported, as JSON pointers below the constraint. */
+  /** Where the decoder reported, as JSON pointers below the element. */
   readonly reported: ReadonlySet<string>;
 }
 
@@ -128,7 +132,7 @@ interface RefusedConstraint {
 function decodeConstraintsOf(doc: unknown): DecodedConstraints {
   const byFactType = new Map<number, readonly Constraint[]>();
   const problems: SchemaError[] = [];
-  const refused = new Map<string, RefusedConstraint>();
+  const refused = new Map<string, RefusedElement>();
   const list = (doc as { model?: { fact_types?: unknown; }; } | null)?.model?.fact_types;
   if (!Array.isArray(list)) return { byFactType, problems, refused };
   // Every fact type in one run, so a load starts one fiber, not one per fact type.
@@ -138,7 +142,7 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
         ? (ft as { constraints?: unknown; }).constraints
         : undefined;
       return Array.isArray(docs)
-        ? decodeConstraints(docs, factTypeLabel(ft as object, f), generateId)
+        ? decodeConstraints(docs, factTypeLabel(ft, f), generateId)
         : Effect.succeed(undefined);
     }),
   );
@@ -171,12 +175,77 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
   return { byFactType, problems, refused };
 }
 
-/** What a constraint's problem calls its fact type: name, id, or position. */
-function factTypeLabel(ft: object, index: number): string {
-  const { name, id } = ft as { name?: unknown; id?: unknown; };
-  if (typeof name === "string" && name.trim() !== "") return `Fact type "${name.trim()}"`;
-  if (typeof id === "string" && id !== "") return `Fact type with id "${id}"`;
-  return `Fact type at fact_types/${index}`;
+/** Every fact type, decoded without its constraints, and every problem with them. */
+interface DecodedFactTypes {
+  /** By position; a fact type the decoder refused is absent. */
+  readonly records: ReadonlyMap<number, FactTypeRecord>;
+  readonly problems: readonly SchemaError[];
+  readonly refused: ReadonlyMap<number, RefusedElement>;
+}
+
+function decodeFactTypesOf(doc: unknown): DecodedFactTypes {
+  const records = new Map<number, FactTypeRecord>();
+  const problems: SchemaError[] = [];
+  const refused = new Map<number, RefusedElement>();
+  const list = (doc as { model?: { fact_types?: unknown; }; } | null)?.model?.fact_types;
+  if (!Array.isArray(list)) return { records, problems, refused };
+  Effect.runSync(decodeFactTypes(list)).forEach((result, f) => {
+    if (result._tag === "Success") {
+      records.set(f, result.success);
+      return;
+    }
+    const reported = new Set<string>();
+    for (const problem of result.failure.problems) {
+      const below = problem.path.map((k) => `/${pointerSegment(k)}`).join("");
+      reported.add(below);
+      problems.push({ path: `/model/fact_types/${f}${below}`, message: problem.message });
+    }
+    refused.set(f, { raw: list[f], subject: result.failure.subject, reported });
+  });
+  return { records, problems, refused };
+}
+
+/** A fact type's own region: under it, but not under its `constraints` entries. */
+const FACT_TYPE_PATH = /^\/model\/fact_types\/(\d+)(?:$|\/(?!constraints\/\d))/;
+
+/**
+ * The schema's errors with the decoder's fact type problems in their place,
+ * on each fact type the decoder refused, by the same rule as for constraints
+ * (`mergeConstraintProblems`): the whole-document errors in the fact type's
+ * own region are dropped, the fact type is checked again against the schema's
+ * `fact_type` definition alone, with its constraints left out because they
+ * are the constraint merge's, and every error the decoder did not report at
+ * the same place is kept.
+ */
+function mergeFactTypeProblems(
+  schemaErrors: readonly SchemaError[],
+  decoded: DecodedFactTypes,
+  document: unknown,
+): SchemaError[] {
+  const owned = (e: SchemaError) => {
+    const match = FACT_TYPE_PATH.exec(e.path);
+    return match !== null && decoded.refused.has(Number(match[1]));
+  };
+  const kept: SchemaError[] = [];
+  for (const [f, refused] of decoded.refused) {
+    const raw = refused.raw;
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const { constraints: _constraints, ...own } = raw as Record<string, unknown>;
+    for (const error of unreportedErrors(factTypeValidator(), own, refused.reported)) {
+      kept.push(schemaErrorOf(error, document, `/model/fact_types/${f}`, refused.subject));
+    }
+  }
+  return [...schemaErrors.filter((e) => !owned(e)), ...decoded.problems, ...kept];
+}
+
+let factTypeValidatorInstance: ValidateFunction | undefined;
+
+function factTypeValidator(): ValidateFunction {
+  factTypeValidatorInstance ??= new Ajv({ allErrors: true }).compile({
+    definitions: constraintSchemas.definitions,
+    ...(constraintSchemas.definitions as unknown as { fact_type: object; }).fact_type,
+  });
+  return factTypeValidatorInstance;
 }
 
 /**
@@ -259,60 +328,12 @@ function branchValidator(type: unknown): ValidateFunction | undefined {
  * The errors of a refused constraint's own branch that the decoder did not
  * report. A constraint whose type names no kind, or that is not a mapping,
  * has no branch: the decoder's report of that is the whole story.
- *
- * Covered means reported at the same place: at the error's own path; for a
- * missing or unknown key, at that key; and for a "one of these keys" rule,
- * at the place itself or at any of its keys. (Its anyOf error's own
- * `schemaPath` ends in `/anyOf`, its members' in `/anyOf/<n>/required`;
- * both are cut at the last `/anyOf` to group them.)
  */
-function unreportedBranchErrors(refused: RefusedConstraint): ErrorObject[] {
+function unreportedBranchErrors(refused: RefusedElement): ErrorObject[] {
   const raw = refused.raw;
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return [];
   const validate = branchValidator((raw as { type?: unknown; }).type);
-  if (validate === undefined || validate(raw)) return [];
-  const errors = validate.errors ?? [];
-  const at = refused.reported;
-  // An anyOf's keys, by the place and schema path of the anyOf.
-  const groupOf = (e: ErrorObject) => {
-    const cut = e.schemaPath.lastIndexOf("/anyOf");
-    return cut < 0 ? undefined : `${e.instancePath}|${e.schemaPath.slice(0, cut)}`;
-  };
-  const groupKeys = new Map<string, string[]>();
-  for (const e of errors) {
-    const group = groupOf(e);
-    const missing = (e.params as { missingProperty?: string; }).missingProperty;
-    if (group !== undefined && missing !== undefined) {
-      groupKeys.set(group, [...(groupKeys.get(group) ?? []), missing]);
-    }
-  }
-  const covered = (e: ErrorObject) => {
-    const params = e.params as { missingProperty?: string; additionalProperty?: string; };
-    const group = groupOf(e);
-    if (group !== undefined) {
-      return at.has(e.instancePath)
-        || (groupKeys.get(group) ?? []).some((k) =>
-          at.has(`${e.instancePath}/${pointerSegment(k)}`)
-        );
-    }
-    if (params.missingProperty !== undefined) {
-      return at.has(`${e.instancePath}/${pointerSegment(params.missingProperty)}`);
-    }
-    if (params.additionalProperty !== undefined) {
-      return at.has(`${e.instancePath}/${pointerSegment(params.additionalProperty)}`);
-    }
-    return at.has(e.instancePath);
-  };
-  // An uncovered "one of these keys" group is one rule: kept as its anyOf
-  // error carrying the group's keys, not as one "required" per key, which
-  // would tell the reader to add every one of them.
-  return errors
-    .filter((e) => !covered(e))
-    .filter((e) => groupOf(e) === undefined || e.keyword !== "required")
-    .map((e) => {
-      const keys = e.keyword === "anyOf" ? groupKeys.get(groupOf(e)!) : undefined;
-      return keys === undefined ? e : { ...e, params: { ...e.params, anyOfKeys: keys } };
-    });
+  return validate === undefined ? [] : unreportedErrors(validate, raw, refused.reported);
 }
 
 /**
@@ -452,10 +473,15 @@ export class OrmYamlSerializer {
 
     const result = this.validator.validateModel(migrated);
     const objectTypes = decodeObjectTypesOf(migrated);
+    const factTypes = decodeFactTypesOf(migrated);
     const constraints = decodeConstraintsOf(migrated);
-    const errors = mergeConstraintProblems(
-      mergeObjectTypeProblems(result.errors, objectTypes.problems),
-      constraints,
+    const errors = mergeFactTypeProblems(
+      mergeConstraintProblems(
+        mergeObjectTypeProblems(result.errors, objectTypes.problems),
+        constraints,
+        migrated,
+      ),
+      factTypes,
       migrated,
     );
     if (errors.length > 0) {
@@ -469,7 +495,13 @@ export class OrmYamlSerializer {
     }
 
     const doc = migrated as OrmYamlDocument;
-    return this.fromDocument(doc, objectTypes.decoded, constraints.byFactType, options);
+    return this.fromDocument(
+      doc,
+      objectTypes.decoded,
+      factTypes.records,
+      constraints.byFactType,
+      options,
+    );
   }
 
   /**
@@ -560,6 +592,7 @@ export class OrmYamlSerializer {
   private fromDocument(
     doc: OrmYamlDocument,
     objectTypes: readonly ObjectType[],
+    factTypes: ReadonlyMap<number, FactTypeRecord>,
     constraints: ReadonlyMap<number, readonly Constraint[]>,
     options?: { lenient?: boolean; },
   ): OrmModel {
@@ -577,15 +610,14 @@ export class OrmYamlSerializer {
     }
 
     // Add fact types.
-    // Their constraints are already decoded, ids filled, so the fact type is
-    // read without them rather than having `deserializeConstraint` mint a
-    // second set of ids.
-    (doc.model.fact_types ?? []).forEach((ftDoc, f) => {
+    // Fact types and their constraints are already decoded, ids filled; a
+    // load that reaches here had no problem in either, so every fact type
+    // has its record.
+    (doc.model.fact_types ?? []).forEach((_ftDoc, f) => {
+      const record = factTypes.get(f);
+      if (record === undefined) throw new Error(`No decoded record for fact type ${f}.`);
       model.addFactType(
-        {
-          ...deserializeFactType({ ...ftDoc, constraints: [] }),
-          constraints: [...(constraints.get(f) ?? [])],
-        },
+        { ...record, constraints: [...(constraints.get(f) ?? [])] },
         { skipPlayerValidation: options?.lenient },
       );
     });

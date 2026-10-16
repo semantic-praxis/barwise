@@ -12,22 +12,17 @@
 import * as Arbitrary from "effect/Arbitrary";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
-import { parse } from "yaml";
 import type { Constraint } from "../../src/model/Constraint.js";
 import { ConstraintSchema, ConstraintYamlCodec } from "../../src/model/constraintSchema.js";
-import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
 import {
   deserializeConstraint,
   type OrmYamlConstraint,
   serializeConstraint,
 } from "../../src/serialization/yaml/constraint.js";
+import { corpusDocuments } from "../helpers/modelCorpus.js";
 
 const SEED = 1;
 const RUNS = 1000;
@@ -93,21 +88,6 @@ describe("ConstraintYamlCodec over derived records", () => {
   });
 });
 
-/**
- * Every tracked `.orm.yaml` under `dir`. Tracked, not walked: a walk of the
- * disk raced the CLI tests, which create and delete scratch directories in
- * parallel under turbo (ENOENT on a directory listed a moment earlier), and
- * it read whatever a working tree happened to hold rather than the repository.
- */
-function modelFiles(dir: string): string[] {
-  return execFileSync("git", ["-C", dir, "ls-files", "-z", "--", "*.orm.yaml"], {
-    encoding: "utf8",
-  })
-    .split("\0")
-    .filter((f) => f !== "")
-    .map((f) => join(dir, f));
-}
-
 describe("a frequency giving both role and roles", () => {
   // The JSON Schema allows the pair and main's loader keeps `roles`; the
   // codec does the same, so S1 compares like with like. The drop itself is a
@@ -122,29 +102,19 @@ describe("a frequency giving both role and roles", () => {
 });
 
 describe("ConstraintYamlCodec over this repository's model files (S1)", () => {
-  // Files the loader accepts today, version migration included. The S4
-  // malformed fixtures are malformed by design, some in ways the JSON Schema
-  // cannot see (max below min), so they are left to the S4 scorer.
-  const root = fileURLToPath(new URL("../../../..", import.meta.url));
-  const loads = (text: string) => {
-    try {
-      new OrmYamlSerializer().deserialize(text);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  const constraints = modelFiles(root).flatMap((file) => {
-    const text = readFileSync(file, "utf8");
-    if (file.includes("/fixtures/malformed/") || !loads(text)) return [];
-    const doc = parse(text) as {
-      model?: { fact_types?: { constraints?: OrmYamlConstraint[]; }[]; };
-    } | null;
-    return (doc?.model?.fact_types ?? []).flatMap((ft) => ft.constraints ?? [])
-      .map((c, i) => ({ file, c, i }));
-  });
+  // The files main's rules accept (tests/helpers/modelCorpus.ts), not the
+  // files the spike's loader accepts, which would hide a decoder refusing
+  // one. The S4 malformed fixtures are left to the S4 scorer.
+  const corpus = corpusDocuments();
+  const constraints = corpus.flatMap(({ file, doc }) =>
+    ((doc.model as { fact_types?: { constraints?: OrmYamlConstraint[]; }[]; } | undefined)
+      ?.fact_types ?? [])
+      .flatMap((ft) => ft.constraints ?? [])
+      .map((c, i) => ({ file, c, i }))
+  );
 
-  // On 2026-10-16: 77 of 113 files load, holding 3,074 constraints of 12
+  // On 2026-10-16: 85 of 113 tracked files pass main's rules, holding 3,074
+  // constraints of 12
   // kinds. No model here uses cardinality or the three join kinds; those rest
   // on P2 and P3 above and on the S2 layout fixtures, not on this corpus.
   it("finds constraints to read", () => {
