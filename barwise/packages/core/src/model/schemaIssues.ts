@@ -5,8 +5,7 @@
  * name their element and in how the file spells a field; the walk over the
  * tree and the wording of Effect's own structural refusals are the same.
  */
-import type * as SchemaIssue from "effect/SchemaIssue";
-import * as SchemaIssueRuntime from "effect/SchemaIssue";
+import * as SchemaIssue from "effect/SchemaIssue";
 
 /** One failure in the issue tree, with the path that leads to it. */
 export interface Located {
@@ -32,8 +31,10 @@ export function locate(issue: SchemaIssue.Issue, path: readonly PropertyKey[] = 
     case "Encoding":
       return locate(issue.issue, path);
     case "Filter":
-      // A filter that points its failure at a field reports it there.
-      return issue.issue._tag === "Pointer" || issue.issue._tag === "Composite"
+      // A filter that points its failure at a field reports it there. One
+      // with an authored message keeps it: that message is the predicate.
+      return issue.filter.annotations?.message === undefined
+          && (issue.issue._tag === "Pointer" || issue.issue._tag === "Composite")
         ? locate(issue.issue, path)
         : [{ path, issue }];
     case "AnyOf":
@@ -43,7 +44,7 @@ export function locate(issue: SchemaIssue.Issue, path: readonly PropertyKey[] = 
   }
 }
 
-const defaultFormat = SchemaIssueRuntime.makeFormatterDefault();
+const defaultFormat = SchemaIssue.makeFormatterDefault();
 
 /**
  * The rest of the sentence after the element's label.
@@ -87,4 +88,43 @@ export function predicateOf(
     }
   }
   return `has an invalid ${at}: ${defaultFormat(issue)}.`;
+}
+
+/**
+ * A path in the spelling of the input it points into.
+ *
+ * Effect reports a rule stated on a decoded struct at the decoded key, which
+ * the input may spell differently (`roleIds` for a file's `roles`). Each
+ * segment the input lacks is replaced by the first of its spellings the input
+ * has. When it has none -- the key is missing altogether -- `whenAbsent:
+ * "first"` names the first spelling, so a file is never told about a key it
+ * cannot write; a config decoder leaves the segment as it is, because there
+ * the decoded key is the caller's spelling. An unknown key the input does
+ * have is left as written.
+ */
+export function spelledAs(
+  raw: unknown,
+  path: readonly PropertyKey[],
+  spellingsOf: (key: string) => readonly string[],
+  whenAbsent: "first" | "keep" = "keep",
+): PropertyKey[] {
+  const spelled: PropertyKey[] = [];
+  let node = raw;
+  for (const segment of path) {
+    let key = segment;
+    if (node !== null && typeof node === "object") {
+      const record = node as Record<PropertyKey, unknown>;
+      if (typeof segment === "string" && !(segment in record)) {
+        const spellings = spellingsOf(segment);
+        const found = spellings.find((k) => k in record);
+        if (found !== undefined) key = found;
+        else if (whenAbsent === "first" && spellings[0] !== undefined) key = spellings[0];
+      }
+      node = record[key];
+    } else {
+      node = undefined;
+    }
+    spelled.push(key);
+  }
+  return spelled;
 }

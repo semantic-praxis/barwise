@@ -7,6 +7,7 @@ import * as Arbitrary from "effect/Arbitrary";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CONSTRAINT_FILE_SPELLINGS,
@@ -14,6 +15,7 @@ import {
   decodeConstraints,
 } from "../../src/model/constraintDecoder.js";
 import { ConstraintSchema, ConstraintYamlCodec } from "../../src/model/constraintSchema.js";
+import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
 
 const FT = 'Fact type "Person has Age"';
 
@@ -71,8 +73,14 @@ describe("a constraint's problems", () => {
     [
       { id: "c-1", type: "value_constraint", values: [] },
       ["values"],
-      "must have values or ranges.",
+      "has an invalid values: Expected a value with a length of at least 1.",
     ],
+    [
+      { id: "c-1", type: "value_constraint", role: "a" },
+      ["values"],
+      'must have "values" or "ranges".',
+    ],
+    [{ id: "c-1", type: "frequency", min: 1, max: 2 }, ["role"], 'must have "role" or "roles".'],
   ])("%j is reported at %j", (doc, path, predicate) => {
     const found = problems(doc);
     expect(found).toHaveLength(1);
@@ -92,6 +100,39 @@ describe("a constraint's problems", () => {
   it("reports every problem in one constraint", () => {
     const found = problems({ id: "c-1", type: "frequency", roles: [], min: 0, max: 2, w: 1 });
     expect(found.map((p) => String(p.path[0])).sort()).toEqual(["min", "roles", "w"]);
+  });
+
+  // Effect runs a struct's checks only once all its fields pass, so these
+  // "one of" rules would go unreported beside any field error; the decoder
+  // checks them on the raw input from the schema's own anyOf.
+  it("reports a missing role beside an unknown field", () => {
+    const found = problems({ id: "c-1", type: "frequency", min: 1, max: 2, w: 1 });
+    expect(found.map((p) => p.message)).toEqual([
+      `Constraint "c-1" in ${FT} has an unknown field "w".`,
+      `Constraint "c-1" in ${FT} must have "role" or "roles".`,
+    ]);
+  });
+
+  it("reports a range with neither bound beside an unknown field", () => {
+    const found = problems({ id: "c-1", type: "value_constraint", ranges: [{}], w: 1 });
+    expect(found.map((p) => p.path)).toEqual([["w"], ["ranges", 0]]);
+    expect(found[1]!.message).toBe(`Constraint "c-1" in ${FT} must have a min or a max.`);
+  });
+
+  it("reports a range with neither bound beside an unknown field in the range", () => {
+    const found = problems({ id: "c-1", type: "value_constraint", ranges: [{ z: 1 }] });
+    expect(found.map((p) => p.message)).toEqual([
+      `Constraint "c-1" in ${FT} has an unknown field "ranges.0.z".`,
+      `Constraint "c-1" in ${FT} has a range with neither "min" nor "max".`,
+    ]);
+  });
+
+  it("reports an entry that is not a mapping as one problem at the constraint", () => {
+    expect(problems("oops")).toEqual([{
+      index: 0,
+      path: [],
+      message: `Constraint at constraints/0 in ${FT} must be a mapping.`,
+    }]);
   });
 
   it("names a constraint without an id by its position, not by the id it was filled with", () => {
@@ -165,3 +206,129 @@ describe("CONSTRAINT_FILE_SPELLINGS against the codec", () => {
     expect(listed.filter((k) => !written.has(k) && !ranges.includes(k))).toEqual([]);
   });
 });
+
+describe("the decoder refuses what the schema refuses, field by field", () => {
+  // The loader lets the decoder's report replace the schema's on a constraint
+  // the decoder refused. That is sound only if the decoder states every rule
+  // the schema does: a rule only the schema states would be dropped whenever
+  // the same constraint also had a problem the decoder saw. So for each rule
+  // the schema states on a field of each kind, a constraint breaking that rule
+  // alone must be refused by both, and the decoder must name the field.
+  const schema = JSON.parse(
+    readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
+  ) as {
+    definitions: {
+      constraint: {
+        oneOf: { properties: Record<string, PropertyRule> & { type: { const: string; }; }; }[];
+      };
+    };
+  };
+  const validator = new SchemaValidator();
+  const encode = Schema.encodeSync(ConstraintYamlCodec);
+  const samples = Effect.runSync(
+    Arbitrary.sampleEffect(Arbitrary.schema(ConstraintSchema), { count: 500, seed: 2 }),
+  );
+  /** A valid value for each optional field a generated sample may lack. */
+  const OPTIONAL: Record<string, unknown> = {
+    modality: "deontic",
+    role: "r-1",
+    roles: ["r-1"],
+    values: ["a"],
+    ranges: [{ min: "1" }],
+    is_preferred: true,
+  };
+
+  /**
+   * A sample of a kind with every field the schema allows present, so a
+   * broken field is the only thing wrong: with a value constraint's `ranges`
+   * absent, empty `values` would be refused by the "values or ranges" rule
+   * instead, and the test would pass whether or not the decoder states the
+   * field's own rule.
+   */
+  const sampleOf = (type: string, fields: readonly string[]) => {
+    const sample = encode(samples.find((r) => r.type === type)!) as Record<string, unknown>;
+    const filled = fields.filter((f) => !(f in sample) && f in OPTIONAL);
+    return { ...Object.fromEntries(filled.map((f) => [f, OPTIONAL[f]])), ...sample };
+  };
+
+  const cases = schema.definitions.constraint.oneOf.flatMap((branch) => {
+    const type = branch.properties.type.const;
+    return Object.entries(branch.properties)
+      .filter(([field]) => !["type", "id"].includes(field))
+      .flatMap(([field, rule]) =>
+        violationsOf(rule).map((bad) => ({
+          type,
+          field,
+          bad,
+          fields: Object.keys(branch.properties),
+        }))
+      );
+  });
+
+  it("finds rules to break on every kind that states one", () => {
+    expect(new Set(cases.map((c) => c.type)).size).toBeGreaterThanOrEqual(13);
+    expect(cases.length).toBeGreaterThan(40);
+  });
+
+  it("refuses each, naming the field", () => {
+    const missed = cases.flatMap(({ type, field, bad, fields }) => {
+      const doc = { ...sampleOf(type, fields), id: "c-1", [field]: bad };
+      const schemaRefuses = !validator.validateModel(documentWith(doc)).valid;
+      const [result] = run([doc]);
+      const named = result !== undefined && Result.isFailure(result)
+        && result.failure.some((p) => p.path[0] === field);
+      return schemaRefuses && named ? [] : [{ type, field, bad, schemaRefuses, named }];
+    });
+    expect(missed).toEqual([]);
+  });
+});
+
+interface PropertyRule {
+  readonly type?: string;
+  readonly minItems?: number;
+  readonly minLength?: number;
+  readonly minimum?: number;
+  readonly enum?: readonly string[];
+  readonly items?: PropertyRule;
+  readonly oneOf?: readonly PropertyRule[];
+  readonly $ref?: string;
+}
+
+/** Values that break exactly one rule of a property, one per rule. */
+function violationsOf(rule: PropertyRule): unknown[] {
+  if (rule.oneOf) return rule.oneOf.flatMap(violationsOf).filter((v) => typeof v === "number");
+  const out: unknown[] = [];
+  const pad = (items: unknown[]) => {
+    while (items.length < (rule.minItems ?? 0)) items.push("r");
+    return items;
+  };
+  if (rule.minItems !== undefined && rule.items?.$ref === undefined) {
+    out.push(Array.from({ length: rule.minItems - 1 }, () => "r"));
+  }
+  if (rule.minItems !== undefined && rule.items?.$ref !== undefined) out.push([]);
+  if (rule.items?.minLength !== undefined) out.push(pad([""]));
+  if (rule.minLength !== undefined) out.push("");
+  if (rule.enum !== undefined) out.push("zzz");
+  if (rule.minimum !== undefined) out.push(rule.minimum - 1);
+  if (rule.type === "integer") out.push(1.5);
+  if (rule.type === "boolean") out.push("yes");
+  return out;
+}
+
+/** The smallest valid document around one constraint. */
+function documentWith(constraint: unknown) {
+  return {
+    orm_version: "2.0",
+    model: {
+      name: "M",
+      object_types: [{ id: "ot-1", name: "Thing", kind: "entity", reference_mode: "id" }],
+      fact_types: [{
+        id: "ft-1",
+        name: "Thing exists",
+        roles: [{ id: "r-1", player: "ot-1", role_name: "exists" }],
+        readings: ["{0} exists"],
+        constraints: [constraint],
+      }],
+    },
+  };
+}

@@ -30,7 +30,7 @@ import {
   RANGE_YAML_KEYS,
   YAML_KEYS,
 } from "./objectTypeSchema.js";
-import { locate, predicateOf } from "./schemaIssues.js";
+import { locate, predicateOf, spelledAs } from "./schemaIssues.js";
 
 /** One thing wrong with one object type. */
 export interface ObjectTypeProblem {
@@ -175,7 +175,7 @@ function problemsOf(
   const subject = subjectOf(raw);
   const located = locate(issue);
   const problems = located.map(({ path: decodedPath, issue: leaf }) => {
-    const path = spelledAs(raw, decodedPath);
+    const path = spelledAs(raw, decodedPath, fileSpellingOf);
     const field = path.length > 0 ? String(path[0]) : "kind";
     return {
       objectType: subject.identity,
@@ -193,32 +193,13 @@ function problemsOf(
 const FILE_SPELLING: Readonly<Record<string, string>> = { ...YAML_KEYS, ...RANGE_YAML_KEYS };
 
 /**
- * A path in the spelling of the input it points into.
- *
  * Effect reports a check on a decoded struct at the decoded key, so a file's
  * empty value constraint comes back at `valueConstraint` -- a key the file
- * does not have. Each segment the input lacks is replaced by its file
- * spelling when the input has that instead; an unknown key the input does
- * have, even a camelCase one, is left as written.
+ * does not have; this is the file key to report instead.
  */
-function spelledAs(raw: unknown, path: readonly PropertyKey[]): PropertyKey[] {
-  const spelled: PropertyKey[] = [];
-  let node = raw;
-  for (const segment of path) {
-    let key = segment;
-    if (node !== null && typeof node === "object") {
-      const record = node as Record<PropertyKey, unknown>;
-      if (typeof segment === "string" && !(segment in record)) {
-        const fileKey = FILE_SPELLING[segment];
-        if (fileKey !== undefined && fileKey in record) key = fileKey;
-      }
-      node = record[key];
-    } else {
-      node = undefined;
-    }
-    spelled.push(key);
-  }
-  return spelled;
+function fileSpellingOf(key: string): readonly string[] {
+  const fileKey = FILE_SPELLING[key];
+  return fileKey === undefined ? [] : [fileKey];
 }
 
 /**

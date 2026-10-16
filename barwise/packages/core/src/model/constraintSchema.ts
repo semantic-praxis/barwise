@@ -269,8 +269,8 @@ export const ConstraintYamlCodec = Schema.Union([
       ...fileBase,
       type: Schema.Literal("value_constraint"),
       role: Schema.optionalKey(RoleId),
-      values: Schema.optionalKey(Schema.Array(Schema.String)),
-      ranges: Schema.optionalKey(Schema.Array(ValueRangeFromFile)),
+      values: Schema.optionalKey(Schema.Array(Schema.String).check(Schema.isMinLength(1))),
+      ranges: Schema.optionalKey(Schema.Array(ValueRangeFromFile).check(Schema.isMinLength(1))),
     }),
     ValueConstraint,
     (f) => ({

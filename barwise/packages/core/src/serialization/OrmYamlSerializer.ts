@@ -120,11 +120,19 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
   const refused = new Set<string>();
   const list = (doc as { model?: { fact_types?: unknown; }; } | null)?.model?.fact_types;
   if (!Array.isArray(list)) return { byFactType, problems, refused };
-  list.forEach((ft: unknown, f) => {
-    if (ft === null || typeof ft !== "object") return;
-    const docs = (ft as { constraints?: unknown; }).constraints;
-    if (!Array.isArray(docs)) return;
-    const results = Effect.runSync(decodeConstraints(docs, factTypeLabel(ft, f), generateId));
+  // Every fact type in one run, so a load starts one fiber, not one per fact type.
+  const decodedLists = Effect.runSync(
+    Effect.forEach(list, (ft: unknown, f) => {
+      const docs = ft !== null && typeof ft === "object"
+        ? (ft as { constraints?: unknown; }).constraints
+        : undefined;
+      return Array.isArray(docs)
+        ? decodeConstraints(docs, factTypeLabel(ft as object, f), generateId)
+        : Effect.succeed(undefined);
+    }),
+  );
+  decodedLists.forEach((results, f) => {
+    if (results === undefined) return;
     const decoded: Constraint[] = [];
     results.forEach((result, c) => {
       if (result._tag === "Success") {
@@ -138,7 +146,7 @@ function decodeConstraintsOf(doc: unknown): DecodedConstraints {
         problems.push({ path, message: problem.message });
       }
     });
-    if (decoded.length === docs.length) byFactType.set(f, decoded);
+    if (decoded.length === results.length) byFactType.set(f, decoded);
   });
   return { byFactType, problems, refused };
 }
@@ -159,8 +167,15 @@ const CONSTRAINT_PATH = /^\/model\/fact_types\/(\d+)\/constraints\/(\d+)(?:\/|$)
  * the decoder found a problem, it owns that constraint's errors, and the
  * schema's -- for a constraint, one per `oneOf` branch it failed, none of
  * them naming the kind it was meant to be -- are dropped. A constraint the
- * decoder accepted keeps every schema error on it, so a rule only the schema
- * states is never lost; the load is refused either way.
+ * decoder accepted keeps every schema error on it; the load is refused
+ * either way.
+ *
+ * Dropping is sound only because the decoder reports every rule the schema
+ * states on a constraint it refuses, whatever else is wrong with it: field
+ * rules on the codec's file shape, and the schema's "one of these keys"
+ * rules checked on the raw input. `constraintDecoder.test.ts` breaks each
+ * of the schema's field rules on each kind and requires the decoder to name
+ * the field, so a rule added to the schema alone fails there, not here.
  */
 function mergeConstraintProblems(
   schemaErrors: readonly SchemaError[],
