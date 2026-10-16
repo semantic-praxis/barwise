@@ -13,9 +13,14 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeExportModel } from "../../src/tools/exportModel.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
+
+// Exports spill beside their source: an inline one under the cwd, a file one
+// next to the file. Both are private to each test.
+const ws = usePrivateCwd();
 
 const _serializer = new OrmYamlSerializer();
 
@@ -60,11 +65,6 @@ model:
         - type: internal_uniqueness
           roles: [r-order-placed-by]
 `;
-
-  // Inline-source exports spill into a cache dir under the cwd.
-  afterEach(() => {
-    rmSync(join(process.cwd(), ".barwise"), { recursive: true, force: true });
-  });
 
   describe("DDL format", () => {
     it("produces DDL output inline", () => {
@@ -208,26 +208,22 @@ model:
   });
 
   describe("project source", () => {
-    const project = `${fixtures}/project/project.orm-project.yaml`;
-
-    afterEach(() => {
-      rmSync(join(fixtures, "project", ".barwise"), { recursive: true, force: true });
-    });
+    const project = () => join(ws.fixture("project"), "project.orm-project.yaml");
 
     it("exports the chosen domain", () => {
-      const result = executeExportModel(project, "ddl", undefined, undefined, "crm");
+      const result = executeExportModel(project(), "ddl", undefined, undefined, "crm");
       expect(readResult(result)).toContain("CREATE TABLE");
     });
 
     it("requires a domain to disambiguate a multi-domain project", () => {
-      const result = executeExportModel(project, "ddl");
+      const result = executeExportModel(project(), "ddl");
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.error).toContain("domain");
       expect(parsed.error).toContain("crm, billing");
     });
 
     it("reports an error for an unknown domain", () => {
-      const result = executeExportModel(project, "ddl", undefined, undefined, "ghost");
+      const result = executeExportModel(project(), "ddl", undefined, undefined, "ghost");
       const parsed = JSON.parse(result.content[0]!.text);
       expect(parsed.error).toContain("crm, billing");
     });

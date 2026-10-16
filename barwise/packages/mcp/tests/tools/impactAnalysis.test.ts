@@ -8,12 +8,17 @@ import * as os from "node:os";
 import { dirname, resolve } from "node:path";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeImpactAnalysis } from "../../src/tools/impactAnalysis.js";
 import { writeManifest } from "../workspace/manifestFixture.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
+
+// The inline-source fallback reads the cwd: a private one, so another test
+// file cleaning up the shared package directory cannot remove this manifest.
+const ws = usePrivateCwd();
 
 describe("impact_analysis tool", () => {
   let tempDir: string;
@@ -167,25 +172,13 @@ describe("impact_analysis tool", () => {
       ],
     };
 
-    // The inline-source fallback reads the working directory. The real one
-    // is shared with every other test file running in parallel, and
-    // exportModel.test.ts deletes its `.barwise` after each test, which
-    // removed this manifest mid-test (seen in CI on #672). So the working
-    // directory is a private one here.
-    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "impact-inline-"));
-    const spy = vi.spyOn(process, "cwd").mockReturnValue(cwd);
-    writeManifest(cwd, manifest);
+    writeManifest(ws.dir(), manifest);
 
-    try {
-      const result = executeImpactAnalysis(yaml, elementId);
-      const parsed = JSON.parse(result.content[0]!.text);
+    const result = executeImpactAnalysis(yaml, elementId);
+    const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.changedElement).toBe(elementId);
-      expect(parsed.affectedArtifacts).toHaveLength(1);
-    } finally {
-      spy.mockRestore();
-      fs.rmSync(cwd, { recursive: true, force: true });
-    }
+    expect(parsed.changedElement).toBe(elementId);
+    expect(parsed.affectedArtifacts).toHaveLength(1);
   });
 
   it("handles different element types correctly", () => {
