@@ -13,8 +13,12 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeExportModel } from "../../src/tools/exportModel.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Inline-source exports spill into a cache dir under the cwd: a private one.
+usePrivateCwd();
 const fixtures = resolve(__dirname, "../fixtures");
 
 const _serializer = new OrmYamlSerializer();
@@ -60,11 +64,6 @@ model:
         - type: internal_uniqueness
           roles: [r-order-placed-by]
 `;
-
-  // Inline-source exports spill into a cache dir under the cwd.
-  afterEach(() => {
-    rmSync(join(process.cwd(), ".barwise"), { recursive: true, force: true });
-  });
 
   describe("DDL format", () => {
     it("produces DDL output inline", () => {

@@ -11,9 +11,14 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeLineageStatus } from "../../src/tools/lineageStatus.js";
 import { writeManifest } from "../workspace/manifestFixture.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
+
+// The inline-source fallback reads the cwd; an empty private one, so "no
+// manifest" does not depend on what the shared package directory holds.
+usePrivateCwd();
 
 describe("lineage_status tool", () => {
   let tempDir: string;

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { boundedTextResult, INLINE_BYTE_LIMIT } from "../../src/workspace/response.js";
+import { usePrivateCwd } from "./privateCwd.js";
 
 let tmp: string;
 
@@ -22,6 +23,9 @@ function spillPathFrom(text: string): string {
   if (!m) throw new Error(`no spill path in result:\n${text}`);
   return m[1]!.trim();
 }
+
+// A spill with no file path to sit beside goes under the cwd: a private one.
+usePrivateCwd();
 
 describe("boundedTextResult", () => {
   it("exposes a sane default inline limit", () => {
@@ -115,7 +119,6 @@ describe("boundedTextResult", () => {
     });
     const spill = spillPathFrom(result.content[0]!.text);
     expect(spill.startsWith(process.cwd())).toBe(true);
-    rmSync(join(process.cwd(), ".barwise", "mcp-cache"), { recursive: true, force: true });
   });
 
   it("formats a multi-megabyte payload size in MB", () => {
