@@ -599,13 +599,20 @@ retires the fourth.
   annotation.
 - One function runs a decode and, when it fails, walks the codec's
   file-side AST alongside the raw input: struct properties by key,
-  arrays by index, a union by the literal `type` in the raw value. It
+  arrays by index, a union by the discriminator the union itself
+  declares, read from the raw value (`type` for constraints, `kind`
+  for object types, whose value-range presence check sits beneath the
+  entity-or-value union). It
   runs every `crossField` check at a node whose fields are the right
   shape for the check to read, and reports each failure at that node's
   path.
-- A problem the harness finds at a path where Effect already reported
-  the same check is dropped, so a rule is reported once whether or not
-  Effect ran it.
+- A problem the harness finds is dropped when Effect already reported
+  the same check at the same path, matched by path and by a stable
+  identity the check carries, so a rule is reported once whether or not
+  Effect ran it, and two different rules failing at one node are both
+  kept. A frequency constraint with neither `role` nor `roles` and a
+  `max` below its `min`, beside an invalid sibling field, is a test
+  case.
 
 When a decode fails and an element also breaks a cross-field rule, the
 decoder shall report that rule's problem in the same pass, whatever
@@ -615,8 +622,8 @@ fact type's Schema, and `withPresence`, `PRESENCE_BY_TYPE`,
 
 Two points are unverified and are A's first probes. Whether a failed
 decode tells the walker which checks Effect ran: if not, the walker
-runs every marked check and drops duplicates by path, which is what
-`withPresence` does today. And whether a check can be run on a raw
+runs every marked check and drops duplicates by path and check
+identity. And whether a check can be run on a raw
 value whose sibling fields failed: the walker must pass only nodes
 whose fields the check reads have the right type, or the check itself
 throws.
@@ -889,8 +896,12 @@ entry only records that it follows.
    VS Code extension and the LLM providers do not (WS1b, part C).
 
    Consequence for P3: it no longer tests independence. It is kept as a
-   check that Effect's two outputs agree -- every value the decoder
-   accepts, encoded, passes the generated JSON Schema, and every
+   check that Effect's two outputs agree -- every file-side input the
+   loader accepts passes the generated JSON Schema as written, before
+   ids or defaults are filled (every corpus document and
+   `examples/getting-started/shop.orm.yaml`, which omits constraint ids;
+   a re-encoded value alone would hide a schema that wrongly requires
+   them), every value the decoder accepts, encoded, passes too, and every
    planted defect the decoder refuses, the generated JSON Schema refuses
    too, except the rules marked as having no JSON Schema form. That is
    the property a user of the MCP resource depends on: the schema they
