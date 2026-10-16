@@ -15,6 +15,21 @@ export interface SchemaValidationResult {
 export interface SchemaError {
   readonly path: string;
   readonly message: string;
+  /**
+   * The schema rule that failed, as ajv reports it. For a program that has
+   * to tell one error from another; the message is for people, and its
+   * wording is ajv's to change.
+   */
+  readonly rule?: SchemaRule;
+}
+
+/** ajv's keyword, with the parameters a caller can act on. */
+export interface SchemaRule {
+  readonly keyword: string;
+  /** For `required`: the property that is missing. */
+  readonly missingProperty?: string;
+  /** For `if`: the branch that failed, `then` or `else`. */
+  readonly failingKeyword?: string;
 }
 
 /**
@@ -51,9 +66,19 @@ export class SchemaValidator {
           ? "is not allowed here"
           : (err.message ?? "Unknown validation error");
         const name = nearestName(data, err.instancePath);
+        const params = err.params as { missingProperty?: string; failingKeyword?: string; };
         return {
           path: err.instancePath || "/",
           message: name === undefined ? message : `${message} (in "${name}")`,
+          rule: {
+            keyword: err.keyword,
+            ...(params.missingProperty !== undefined
+              ? { missingProperty: params.missingProperty }
+              : {}),
+            ...(params.failingKeyword !== undefined
+              ? { failingKeyword: params.failingKeyword }
+              : {}),
+          },
         };
       },
     );

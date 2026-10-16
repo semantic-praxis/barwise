@@ -21,6 +21,8 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import { ValueRangeFromConfig, ValueRangeFromFile } from "./valueRangeSchema.js";
+export { RANGE_YAML_KEYS } from "./valueRangeSchema.js";
 
 /**
  * Portable conceptual data type names, independent of any specific tool
@@ -97,8 +99,9 @@ type ValueOnlyField = (typeof VALUE_ONLY_FIELDS)[number][0];
 // an annotation is a fixed string, and only the decoder knows which object
 // type it is reporting on.
 
+/** The file's cardinality maximum: the only size leaf left, so its sentence names it. */
 const NonNegativeInt = Schema.Int.check(
-  Schema.isGreaterThanOrEqualTo(0, { message: "must not be negative." }),
+  Schema.isGreaterThanOrEqualTo(0, { message: "must have a non-negative cardinality maximum." }),
 );
 // length and scale each get their own sentence, so two problems on one data
 // type name the field they are about.
@@ -121,24 +124,6 @@ const NameSchema = Schema.Trim.check(
 );
 
 /**
- * A single allowed value range. A missing bound is open-ended. Bounds are
- * inclusive unless the `*Inclusive` flag is `false`, and are strings so the
- * range is data-type agnostic.
- */
-const ValueRangeSchema = Schema.Struct({
-  min: Schema.optionalKey(Schema.String),
-  max: Schema.optionalKey(Schema.String),
-  minInclusive: Schema.optionalKey(Schema.Boolean),
-  maxInclusive: Schema.optionalKey(Schema.Boolean),
-});
-
-/** The YAML key of every value range key that is not spelled the same. */
-export const RANGE_YAML_KEYS = {
-  minInclusive: "min_inclusive",
-  maxInclusive: "max_inclusive",
-} as const;
-
-/**
  * What the two spellings check differently, besides their key names.
  *
  * A file is checked as strictly as the JSON Schema checks it: a data type
@@ -159,7 +144,7 @@ const FILE_LEAVES = {
   length: NonNegativeLength,
   scale: NonNegativeScale,
   count: Schema.Int,
-  range: ValueRangeSchema.pipe(Schema.encodeKeys(RANGE_YAML_KEYS)),
+  range: ValueRangeFromFile,
 };
 
 // A config may name a data type outside the list, so this leaf checks only
@@ -178,7 +163,7 @@ const CONFIG_LEAVES = {
   length: Schema.Number,
   scale: Schema.Number,
   count: Schema.Number,
-  range: ValueRangeSchema,
+  range: ValueRangeFromConfig,
 };
 
 type Leaves = typeof FILE_LEAVES | typeof CONFIG_LEAVES;
@@ -354,8 +339,8 @@ type KeysOf<T> = T extends unknown ? keyof T : never;
 /** Whether the object type is an entity or a value type. */
 export type ObjectTypeKind = "entity" | "value";
 
-/** A single allowed value range; see `ValueRangeSchema`. */
-export type ValueRange = typeof ValueRangeSchema.Type;
+/** A single allowed value range; see `valueRangeSchema.ts`. */
+export type { ValueRange } from "./valueRangeSchema.js";
 
 /** Enumerated values, ranges, or both; see `valueConstraintSchema`. */
 export type ValueConstraintDef = NonNullable<ValueType["valueConstraint"]>;

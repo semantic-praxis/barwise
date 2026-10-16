@@ -18,6 +18,7 @@
  */
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import { ValueRangeFromFile, ValueRangeSchema } from "./valueRangeSchema.js";
 
 // -- Leaves -----------------------------------------------------------------
 
@@ -47,28 +48,6 @@ const minNotAboveMax = Schema.makeFilter(
   { message: "must have max >= min." },
 );
 
-/**
- * A bound is inclusive unless it says otherwise, and a file can only say
- * otherwise: reading drops `min_inclusive: true`. So the record's canonical
- * form writes an inclusive bound as an absent key, and `true` is refused.
- */
-const InclusiveFlag = Schema.Boolean.check(
-  Schema.makeFilter((b: boolean) => b === false, { message: "is inclusive by default." }),
-);
-const ValueRange = Schema.Struct({
-  min: Schema.optionalKey(Schema.String),
-  max: Schema.optionalKey(Schema.String),
-  minInclusive: Schema.optionalKey(InclusiveFlag),
-  maxInclusive: Schema.optionalKey(InclusiveFlag),
-}).check(
-  Schema.makeFilter(
-    (r: { readonly min?: string; readonly max?: string; }) =>
-      r.min !== undefined || r.max !== undefined,
-    { message: "must have a min or a max." },
-  ),
-);
-type ValueRange = typeof ValueRange.Type;
-
 const JoinOperand = Schema.Struct({
   path: Schema.Struct({
     root: RoleId,
@@ -90,7 +69,12 @@ const PreferredFlag = Schema.Boolean.check(
 
 // -- Records ----------------------------------------------------------------
 
-const base = { id: Schema.String, modality: Modality };
+/**
+ * A constraint's id is never empty. Today's reader and writer both treat `""`
+ * as no id (the writer omits it, and the reader mints one), so an empty id
+ * could not survive a save; the loader fills it like a missing one.
+ */
+const base = { id: Schema.String.check(Schema.isMinLength(1)), modality: Modality };
 
 const InternalUniqueness = Schema.Struct({
   ...base,
@@ -109,7 +93,7 @@ const ValueConstraint = Schema.Struct({
   type: Schema.Literal("value_constraint"),
   roleId: Schema.optionalKey(RoleId),
   values: Schema.Array(Schema.String),
-  ranges: Schema.optionalKey(Schema.Array(ValueRange).check(Schema.isMinLength(1))),
+  ranges: Schema.optionalKey(Schema.Array(ValueRangeSchema).check(Schema.isMinLength(1))),
 }).check(
   Schema.makeFilter(
     (c: { readonly values: readonly string[]; readonly ranges?: readonly unknown[]; }) =>
@@ -236,32 +220,6 @@ function kind<F extends Schema.Top, R extends Schema.Top>(
   );
 }
 
-const FileRange = Schema.Struct({
-  min: Schema.optionalKey(Schema.String),
-  max: Schema.optionalKey(Schema.String),
-  min_inclusive: Schema.optionalKey(Schema.Boolean),
-  max_inclusive: Schema.optionalKey(Schema.Boolean),
-});
-type FileRange = typeof FileRange.Type;
-
-/** Only an exclusive bound is kept: an inclusive one is the default. */
-function readRange(r: FileRange): ValueRange {
-  return {
-    ...(r.min !== undefined ? { min: r.min } : {}),
-    ...(r.max !== undefined ? { max: r.max } : {}),
-    ...(r.min_inclusive === false ? { minInclusive: false } : {}),
-    ...(r.max_inclusive === false ? { maxInclusive: false } : {}),
-  };
-}
-function writeRange(r: ValueRange): FileRange {
-  return {
-    ...(r.min !== undefined ? { min: r.min } : {}),
-    ...(r.max !== undefined ? { max: r.max } : {}),
-    ...(r.minInclusive === false ? { min_inclusive: false } : {}),
-    ...(r.maxInclusive === false ? { max_inclusive: false } : {}),
-  };
-}
-
 /** The file shape of a kind that names its roles as `roles`. */
 const roles = <T extends string>(type: T) =>
   Schema.Struct({ ...fileBase, type: Schema.Literal(type), roles: Schema.Array(Schema.String) });
@@ -306,7 +264,7 @@ export const ConstraintYamlCodec = Schema.Union([
       type: Schema.Literal("value_constraint"),
       role: Schema.optionalKey(Schema.String),
       values: Schema.optionalKey(Schema.Array(Schema.String)),
-      ranges: Schema.optionalKey(Schema.Array(FileRange)),
+      ranges: Schema.optionalKey(Schema.Array(ValueRangeFromFile)),
     }),
     ValueConstraint,
     (f) => ({
@@ -314,14 +272,14 @@ export const ConstraintYamlCodec = Schema.Union([
       type: f.type,
       ...(f.role !== undefined ? { roleId: f.role } : {}),
       values: f.values ?? [],
-      ...(f.ranges && f.ranges.length > 0 ? { ranges: f.ranges.map(readRange) } : {}),
+      ...(f.ranges && f.ranges.length > 0 ? { ranges: f.ranges } : {}),
     }),
     (r) => ({
       ...writeBase(r),
       type: r.type,
       ...(r.roleId !== undefined ? { role: r.roleId } : {}),
       ...(r.values.length > 0 ? { values: r.values } : {}),
-      ...(r.ranges && r.ranges.length > 0 ? { ranges: r.ranges.map(writeRange) } : {}),
+      ...(r.ranges && r.ranges.length > 0 ? { ranges: r.ranges } : {}),
     }),
   ),
   kind(

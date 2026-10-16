@@ -1,8 +1,10 @@
 /**
  * Schema errors and decoder problems on one object type, merged by
  * OrmYamlSerializer. A schema error the decoder does not replace must survive
- * (the file format asks for an id the decoder mints), and a field the decoder
- * names replaces the schema's error on that field once, not once per keyword.
+ * (a bare list entry's "must be object", an error nested inside a field), and
+ * a field the decoder names replaces the schema's errors on it once, not once
+ * per keyword. The decoder requires every id (decision 8), so a missing id is
+ * its problem, not the schema's.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -74,6 +76,18 @@ describe("schema errors and decoder problems on one object type", () => {
 `);
     expect(message).toContain("additional properties");
     expect(message).toContain("kind");
+  });
+
+  it("reports an entity's forbidden data type once, not again as a failed then branch", () => {
+    const errors = loadErrors(`    - id: ot-c
+      name: Customer
+      kind: entity
+      reference_mode: id
+      data_type:
+        name: text
+`);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.path).toBe("/model/object_types/0/data_type");
   });
 
   it("reports an entity without a reference mode once", () => {

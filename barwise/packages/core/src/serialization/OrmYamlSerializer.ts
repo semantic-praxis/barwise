@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import { parse, stringify } from "yaml";
+import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import type { ObjectType } from "../model/ObjectType.js";
 import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -99,10 +100,18 @@ function decodeObjectTypesOf(
  * sits below that field.
  */
 const OBJECT_TYPE_PATH = /^\/model\/object_types\/(\d+)(?:\/([^/]+)(\/.*)?)?$/;
-/** ajv names the property in a required-property error. */
-const MISSING_PROPERTY = /must have required property '([^']+)'/;
-/** ajv's message for an entity whose `then` branch fails: it requires reference_mode and nothing else. */
-const THEN_BRANCH = /must match "then" schema/;
+/**
+ * The fields an object type's `then` branch (the entity variant) governs,
+ * read from the schema rather than restated: it requires reference_mode and
+ * forbids the value-only fields. When the decoder names any of them, the
+ * schema's failed `then` says the same thing.
+ */
+const THEN_FIELDS: readonly string[] = (() => {
+  const then = (ormModelSchema as {
+    definitions: { object_type: { then: { required?: string[]; properties?: object; }; }; };
+  }).definitions.object_type.then;
+  return [...(then.required ?? []), ...Object.keys(then.properties ?? {})];
+})();
 
 /**
  * The schema's errors and the decoder's problems as one list.
@@ -110,7 +119,8 @@ const THEN_BRANCH = /must match "then" schema/;
  * The decoder names top-level fields only, so a schema error is dropped only
  * when the decoder has replaced it: a field-level error at exactly a field the
  * decoder names, a required-property error for a property the decoder names,
- * or an entity's failed `then` branch, which requires only reference_mode.
+ * or an entity's failed `then` branch when the decoder names a field that
+ * branch governs. Errors are matched on ajv's rule, not its wording.
  * Deeper errors inside a field are kept, because the decoder cannot say which
  * nested rule it replaced: a duplicate costs a line, a dropped rule is silent.
  * Everything else at an object type's root stands, so a bare list entry keeps
@@ -132,9 +142,14 @@ function mergeObjectTypeProblems(
     const index = Number(match[1]);
     const [, , field, below] = match;
     if (field !== undefined) return below === undefined && named.has(`${index}/${field}`);
-    const missing = MISSING_PROPERTY.exec(error.message);
-    if (missing !== null) return named.has(`${index}/${missing[1]}`);
-    return THEN_BRANCH.test(error.message) && named.has(`${index}/reference_mode`);
+    const rule = error.rule;
+    if (rule?.keyword === "required" && rule.missingProperty !== undefined) {
+      return named.has(`${index}/${rule.missingProperty}`);
+    }
+    if (rule?.keyword === "if" && rule.failingKeyword === "then") {
+      return THEN_FIELDS.some((f) => named.has(`${index}/${f}`));
+    }
+    return false;
   };
   return [...schemaErrors.filter((e) => !covered(e)), ...problems.map((p) => p.error)];
 }

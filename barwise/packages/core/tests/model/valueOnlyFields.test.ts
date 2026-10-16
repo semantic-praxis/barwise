@@ -74,6 +74,7 @@ describe("value-only fields", () => {
       expect(result.errors).toContainEqual({
         path: `/model/object_types/0/${snake(field)}`,
         message: 'is not allowed here (in "Supplier")',
+        rule: { keyword: "false schema" },
       });
     });
   }

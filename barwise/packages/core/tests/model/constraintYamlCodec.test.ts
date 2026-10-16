@@ -18,12 +18,14 @@ import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
+import type { Constraint } from "../../src/model/Constraint.js";
 import { ConstraintSchema, ConstraintYamlCodec } from "../../src/model/constraintSchema.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
 import {
   deserializeConstraint,
   type OrmYamlConstraint,
+  serializeConstraint,
 } from "../../src/serialization/yaml/constraint.js";
 
 const SEED = 1;
@@ -63,6 +65,21 @@ describe("ConstraintYamlCodec over derived records", () => {
     for (const record of records) {
       expect(decode(encode(record))).toEqual(record);
     }
+  });
+
+  // The codec's writer copies serializeConstraint, which is what writes
+  // files. Held to it here, so P3 above measures the real writer too.
+  it("writes what serializeConstraint writes, for every record", () => {
+    const differ = records.filter((record) =>
+      !isDeepStrictEqual({ ...serializeConstraint(record as Constraint) }, { ...encode(record) })
+    );
+    expect(
+      differ.slice(0, 3).map((record) => ({
+        record,
+        serializer: serializeConstraint(record as Constraint),
+        codec: encode(record),
+      })),
+    ).toEqual([]);
   });
 
   it("writes only constraints the hand-written JSON Schema accepts (P3)", () => {
@@ -119,8 +136,9 @@ describe("ConstraintYamlCodec over this repository's model files (S1)", () => {
 
   it("reads every one to the record today's reader gives, modality made explicit", () => {
     const differ = constraints.flatMap(({ file, c, i }) => {
-      // The loader fills a missing id before decoding (decision 8).
-      const withId = { ...c, id: (c as { id?: string; }).id ?? `filled-${i}` };
+      // The loader fills a missing id before decoding (decision 8), and, as
+      // today's reader does, treats an empty one as missing.
+      const withId = { ...c, id: (c as { id?: string; }).id || `filled-${i}` };
       const today = deserializeConstraint(withId as OrmYamlConstraint);
       const expected = { ...today, modality: today.modality ?? "alethic" };
       let actual: unknown;
