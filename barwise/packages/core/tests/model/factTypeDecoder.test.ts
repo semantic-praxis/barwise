@@ -8,7 +8,9 @@ import * as Result from "effect/Result";
 import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 import { decodeFactTypes, type FactTypeProblem } from "../../src/model/factTypeDecoder.js";
+import { readDerivation } from "../../src/model/factTypeSchema.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
+import { deserializeDerivation } from "../../src/serialization/yaml/derivation.js";
 import {
   deserializeFactType,
   type OrmYamlFactType,
@@ -64,6 +66,24 @@ describe("a fact type's problems", () => {
     // passed; the decoder runs the rule itself when Effect did not.
     const found = problems({ ...VALID, colour: 1, readings: ["{0} has {5}"] });
     expect(found.map((p) => p.path)).toEqual([["colour"], ["readings", 0]]);
+  });
+
+  it("judges the string readings beside one that is not a string", () => {
+    const found = problems({ ...VALID, readings: ["{0} has {5}", 7] });
+    expect(found.map((p) => p.path)).toEqual([["readings", 1], ["readings", 0]]);
+  });
+
+  it("reports an empty reading once, as the field rule words it", () => {
+    const found = problems({ ...VALID, readings: [""] });
+    expect(found).toHaveLength(1);
+    expect(found[0]!.message).toMatch(/has an invalid readings\.0: Expected a value with a length/);
+  });
+
+  it("does not judge readings when there are no roles to count", () => {
+    for (const roles of [[], "r-1", undefined]) {
+      const found = problems({ ...VALID, roles, readings: ["{0} has {5}"] });
+      expect(found.some((p) => p.path[0] === "readings")).toBe(false);
+    }
   });
 
   it("is named as a model element problem when only the decoder refuses", () => {
@@ -144,3 +164,25 @@ describe("the fact type decoder over this repository's model files (S1)", () => 
 function withoutUndefined(o: object): object {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 }
+
+describe("readDerivation and the serializer's deserializeDerivation", () => {
+  // A copy kept so the model does not import from serialization; held to the
+  // original over every combination of the file's fields.
+  it("read every derivation the file can spell the same way", () => {
+    const differ = [];
+    for (const kind of ["derived", "semiderived"] as const) {
+      for (const storage of [undefined, "derive_on_request", "derived_and_stored"] as const) {
+        for (const is_formal of [undefined, false, true]) {
+          const d = {
+            kind,
+            expression: "x",
+            ...(storage !== undefined ? { storage } : {}),
+            ...(is_formal !== undefined ? { is_formal } : {}),
+          };
+          if (!isDeepStrictEqual(readDerivation(d), deserializeDerivation(d))) differ.push(d);
+        }
+      }
+    }
+    expect(differ).toEqual([]);
+  });
+});

@@ -9,14 +9,15 @@
  * to a record is WS4's, since it is mutable (`addConstraint`, the
  * `definition` setter) and used across the codebase.
  *
- * Field rules are stated on the file shape, as for constraints, because
- * Effect runs a struct's checks only once all its fields pass. The one rule
- * across fields -- every reading names each role once -- is a check on the
- * fact type, pointed at the reading it is about.
+ * Field rules are stated on the file shape, as for constraints. The one rule
+ * across fields -- every reading names each role once -- is not a Schema
+ * check: Effect runs a struct's checks only once every field passes, so
+ * beside any field error it went unreported until the next load. The
+ * decoder runs `readingProblems` on the raw input after every decode
+ * instead, which is the rule's one call path.
  */
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
-import { deserializeDerivation } from "../serialization/yaml/derivation.js";
 import type { DerivationRule } from "./FactType.js";
 import { invalidField } from "./problemWording.js";
 import { validateReadingTemplate } from "./ReadingOrder.js";
@@ -34,26 +35,22 @@ const DerivationFile = Schema.Struct({
 
 /**
  * Each reading names every role, and no role the fact type lacks: one
- * problem per reading at fault, as a path and a predicate. The fact type's
- * check, and the decoder's own run of it on the raw input when Effect
- * skipped the check because another field failed.
+ * problem per reading at fault, as a path and a predicate. Run by the
+ * decoder on the raw input; an entry that is not a string is skipped by its
+ * index (the field rules report it), so the others are still judged.
  */
 export function readingProblems(
   roleCount: number,
-  readings: readonly string[],
+  readings: readonly unknown[],
 ): { readonly path: readonly PropertyKey[]; readonly issue: string; }[] {
   return readings.flatMap((template, i) => {
+    if (typeof template !== "string") return [];
     const errors = validateReadingTemplate(template, roleCount);
     if (errors.length === 0) return [];
     const detail = errors.map((e) => e.replace(/\.$/, "")).join("; ");
     return [{ path: ["readings", i], issue: invalidField(["readings", i], detail) }];
   });
 }
-
-const readingsFitRoles = Schema.makeFilter(
-  (ft: { readonly roles: readonly unknown[]; readonly readings: readonly string[]; }) =>
-    readingProblems(ft.roles.length, ft.readings),
-);
 
 const FactTypeFile = Schema.Struct({
   id: NonEmpty,
@@ -65,7 +62,7 @@ const FactTypeFile = Schema.Struct({
   // Decoded on their own, by the constraint decoder; here only a list.
   constraints: Schema.optionalKey(Schema.Array(Schema.Unknown)),
   derivation: Schema.optionalKey(DerivationFile),
-}).check(readingsFitRoles);
+});
 
 /** A fact type as decoded: `FactTypeConfig` without its constraints. */
 const FactTypeRecord = Schema.Struct({
@@ -85,6 +82,21 @@ export type FactTypeRecord = Omit<typeof FactTypeRecord.Type, "derivation"> & {
 };
 
 /**
+ * A derivation as the file spells it, read into its rule. A copy of the
+ * serializer's `deserializeDerivation`, kept here so the model does not
+ * import from serialization; `factTypeDecoder.test.ts` holds the two
+ * together over every combination of the file's fields.
+ */
+export function readDerivation(d: typeof DerivationFile.Type): DerivationRule {
+  return {
+    kind: d.kind,
+    expression: d.expression,
+    ...(d.storage ? { storage: d.storage } : {}),
+    ...(d.is_formal ? { isFormal: true } : {}),
+  };
+}
+
+/**
  * A fact type as a file spells it, read into its record. Its `constraints`
  * are dropped here: the loader decodes them separately and adds them back.
  * Encoding is not used (writing stays with the hand-written serializer, so
@@ -98,7 +110,7 @@ const read = (f: typeof FactTypeFile.Type): typeof FactTypeRecord.Encoded => ({
   ...(f.note !== undefined ? { note: f.note } : {}),
   roles: f.roles.map((r) => ({ id: r.id, name: r.role_name, playerId: r.player })),
   readings: f.readings,
-  ...(f.derivation !== undefined ? { derivation: deserializeDerivation(f.derivation) } : {}),
+  ...(f.derivation !== undefined ? { derivation: readDerivation(f.derivation) } : {}),
 });
 
 const write = (r: typeof FactTypeRecord.Encoded): typeof FactTypeFile.Type => ({

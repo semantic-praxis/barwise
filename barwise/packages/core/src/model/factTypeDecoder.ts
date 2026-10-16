@@ -60,36 +60,36 @@ export function decodeFactTypes(
         }),
       );
     }
-    return Effect.result(
-      decodeFile(doc).pipe(
-        Effect.map((record) => record as FactTypeRecord),
-        Effect.mapError((error): FactTypeFailure => {
-          const problems = locate(error.issue).map(({ path, issue }) => ({
+    return Effect.result(decodeFile(doc)).pipe(
+      Effect.map((result): Result.Result<FactTypeRecord, FactTypeFailure> => {
+        const fields = Result.isFailure(result)
+          ? locate(result.failure.issue).map(({ path, issue }) => ({
             path,
             message: `${subject} ${predicateOf(issue, path, "is not a fact type.")}`,
-          }));
-          return { subject, problems: [...problems, ...readingsSkipped(doc, problems, subject)] };
-        }),
-      ),
+          }))
+          : [];
+        const problems = [...fields, ...readingsOf(doc, fields, subject)];
+        return problems.length === 0 && Result.isSuccess(result)
+          ? Result.succeed(result.success as FactTypeRecord)
+          : Result.fail({ subject, problems });
+      }),
     );
   });
 }
 
 /**
- * The reading rule, run on the raw fact type when Effect did not run it.
- * It is a check on the whole fact type, and Effect runs such a check only
- * once every field has passed, so beside an unknown field a bad reading went
- * unreported until the next load. Only where the roles and readings are
- * well-formed enough to judge, and only at a reading no other problem names.
+ * The reading rule, on the raw fact type, after every decode: it is not a
+ * Schema check (see `factTypeSchema.ts`), so this is its one call path.
+ * Judged only when there are roles to count and a list of readings, and
+ * only at a reading no field rule already named (an empty one, say).
  */
-function readingsSkipped(
+function readingsOf(
   doc: object,
   problems: readonly FactTypeProblem[],
   subject: string,
 ): FactTypeProblem[] {
   const { roles, readings } = doc as { roles?: unknown; readings?: unknown; };
-  if (!Array.isArray(roles) || roles.length === 0) return [];
-  if (!Array.isArray(readings) || !readings.every((r) => typeof r === "string")) return [];
+  if (!Array.isArray(roles) || roles.length === 0 || !Array.isArray(readings)) return [];
   const seen = new Set(problems.map((p) => p.path.join("/")));
   return readingProblems(roles.length, readings)
     .filter((p) => !seen.has(p.path.join("/")))
