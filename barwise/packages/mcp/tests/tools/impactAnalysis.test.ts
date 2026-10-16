@@ -11,9 +11,14 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeImpactAnalysis } from "../../src/tools/impactAnalysis.js";
 import { writeManifest } from "../workspace/manifestFixture.js";
+import { usePrivateCwd } from "../workspace/privateCwd.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
+
+// The inline-source fallback reads the cwd: a private one, so another test
+// file cleaning up the shared package directory cannot remove this manifest.
+const ws = usePrivateCwd();
 
 describe("impact_analysis tool", () => {
   let tempDir: string;
@@ -167,25 +172,13 @@ describe("impact_analysis tool", () => {
       ],
     };
 
-    writeManifest(process.cwd(), manifest);
+    writeManifest(ws.dir(), manifest);
 
-    try {
-      const result = executeImpactAnalysis(yaml, elementId);
-      const parsed = JSON.parse(result.content[0]!.text);
+    const result = executeImpactAnalysis(yaml, elementId);
+    const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.changedElement).toBe(elementId);
-      expect(parsed.affectedArtifacts).toHaveLength(1);
-    } finally {
-      // Clean up manifest in cwd
-      const manifestPath = path.join(process.cwd(), ".barwise", "lineage.yaml");
-      if (fs.existsSync(manifestPath)) {
-        fs.unlinkSync(manifestPath);
-        const dir = path.dirname(manifestPath);
-        if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) {
-          fs.rmdirSync(dir);
-        }
-      }
-    }
+    expect(parsed.changedElement).toBe(elementId);
+    expect(parsed.affectedArtifacts).toHaveLength(1);
   });
 
   it("handles different element types correctly", () => {
