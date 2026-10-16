@@ -297,9 +297,11 @@ is the claim S3 exists to check rather than assume.
 //   runFactTypeDecode(doc): FactType              // throws FactTypeError
 //
 // OrmModel and OrmYamlSerializer keep their signatures until barwise-973's
-// ModelBuilder replaces them. Where a caller's config may lack ids (an
-// importer, the LLM, createObjectType), the boundary fills them from the
-// installed generator, then decodes.
+// ModelBuilder replaces them. Two boundaries fill missing ids from the
+// installed generator, then decode: config construction (an importer, the
+// LLM, createObjectType) for any kind, and the file loader only for kinds the
+// file format lets omit an id (every constraint kind today). Where the file
+// format requires an id, a missing one is refused, not filled.
 ```
 
 A consumer that wants Effect composes the `decode*` functions; a consumer
@@ -618,7 +620,9 @@ entry only records that it follows.
    - **(a)** Keep `newId` as a parameter, as a named exception to barwise-e8m. Rejected by the owner: it writes an exception into the commitment.
    - **(b)** Derive ids from position in the document. Rejected: ids for id-less elements stop being UUIDv7, reordering changes them, and two id-less inputs collide at the same positions when models merge.
    - **(c)** An Effect service (`IdSource`, what the Effect arm built). Rejected: still a port, now in core's public types.
-   - **(d)** Chosen. The decoder requires every id and refuses an element without one, as the file format already does. The synchronous boundary (`createObjectType`, `addObjectType`, and the loader for configs that may lack ids) fills missing ids from the installed generator, then decodes.
+   - **(d)** Chosen. The decoder requires every id and refuses an element without one. The synchronous boundaries fill missing ids from the installed generator, then decode, and they differ by source:
+     - **Config construction** (`createObjectType`, `addObjectType`, importers, the LLM) fills a missing id for any kind.
+     - **File loading** fills a missing id only where the file format lets one be omitted. Today that is every constraint kind: `orm-model.schema.json` requires no constraint id, the shipped `examples/getting-started/shop.orm.yaml` omits them, and `FactType` mints them. Filling these keeps gate S1. Where the file format requires an id (object types, roles, fact types, subtype facts, objectifications, populations, instances), a missing one is refused as it is today. Construction-time minting cannot repair it, because the schema and the decoder refuse the file before any object is constructed.
 
    Consequences. The decoder is a pure function of its input, with no parameter or service for ids. The one place that mints ids is the global generator core already has (`setIdGenerator`, 2026-07-25), now confined to the boundary; barwise-e8m gets a note saying so. The serializer no longer needs to recognise ajv's missing-`id` message, because the decoder reports a missing id itself (barwise-k8y). The spike converts the brought-forward ObjectType slice from `IdSource` to this shape before it builds the constraint decoder. If core should later hold no generator at all, minting moves out to the callers in the outer packages; the decoder does not change for that.
 
