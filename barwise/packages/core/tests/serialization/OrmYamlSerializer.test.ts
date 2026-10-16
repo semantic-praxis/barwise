@@ -250,7 +250,9 @@ describe("OrmYamlSerializer", () => {
       const restored = serializer.deserialize(yaml);
       const constraints = restored.getFactTypeByName("Person has Name")!.constraints;
       expect(constraints.find((c) => c.type === "mandatory")!.modality).toBe("deontic");
-      expect(constraints.find((c) => c.type === "internal_uniqueness")!.modality).toBeUndefined();
+      // Explicit on the spike: the record carries the default rather than an
+      // absent key (S3's narrowing), and the file still omits it, above.
+      expect(constraints.find((c) => c.type === "internal_uniqueness")!.modality).toBe("alethic");
     });
 
     it("round-trips object-type and unary-role cardinality", () => {

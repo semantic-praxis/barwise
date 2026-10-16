@@ -13,6 +13,12 @@
  * stays with the hand-written serializer, as for object types, so the bytes
  * (gate S2) cannot move.
  *
+ * Each field's rule is stated on the file shape as well as the record, so a
+ * decode reports every field's problem at once: a rule only on the record
+ * runs after the file shape has passed, and a constraint with an unknown
+ * field never had its other fields checked. Rules across fields (max >= min)
+ * stay on the record, where the fields they compare are known to be valid.
+ *
  * The decoder requires every id (decision 8). A file may omit a constraint's
  * id, so the loader fills it before decoding.
  */
@@ -42,10 +48,10 @@ const TwoOrMoreRoleIds = Schema.Array(RoleId).check(Schema.isMinLength(2));
 
 const AtLeast = (min: number) => Schema.Int.check(Schema.isGreaterThanOrEqualTo(min));
 const Bound = (min: number) => Schema.Union([AtLeast(min), Schema.Literal("unbounded")]);
+/** Reported at `max`, so a problem names the field a reader would change. */
 const minNotAboveMax = Schema.makeFilter(
   (c: { readonly min: number; readonly max: number | "unbounded"; }) =>
-    c.max === "unbounded" || c.min <= c.max,
-  { message: "must have max >= min." },
+    c.max === "unbounded" || c.min <= c.max || { path: ["max"], issue: "must have max >= min." },
 );
 
 const JoinOperand = Schema.Struct({
@@ -97,8 +103,8 @@ const ValueConstraint = Schema.Struct({
 }).check(
   Schema.makeFilter(
     (c: { readonly values: readonly string[]; readonly ranges?: readonly unknown[]; }) =>
-      c.values.length > 0 || c.ranges !== undefined,
-    { message: "must have values or ranges." },
+      c.values.length > 0 || c.ranges !== undefined
+      || { path: ["values"], issue: "must have values or ranges." },
   ),
 );
 const DisjunctiveMandatory = Schema.Struct({
@@ -221,15 +227,15 @@ function kind<F extends Schema.Top, R extends Schema.Top>(
 }
 
 /** The file shape of a kind that names its roles as `roles`. */
-const roles = <T extends string>(type: T) =>
-  Schema.Struct({ ...fileBase, type: Schema.Literal(type), roles: Schema.Array(Schema.String) });
+const roles = <T extends string>(type: T, list: typeof RoleIds = RoleIds) =>
+  Schema.Struct({ ...fileBase, type: Schema.Literal(type), roles: list });
 
 export const ConstraintYamlCodec = Schema.Union([
   kind(
     Schema.Struct({
       ...fileBase,
       type: Schema.Literal("internal_uniqueness"),
-      roles: Schema.Array(Schema.String),
+      roles: RoleIds,
       is_preferred: Schema.optionalKey(Schema.Boolean),
     }),
     InternalUniqueness,
@@ -247,7 +253,7 @@ export const ConstraintYamlCodec = Schema.Union([
     }),
   ),
   kind(
-    Schema.Struct({ ...fileBase, type: Schema.Literal("mandatory"), role: Schema.String }),
+    Schema.Struct({ ...fileBase, type: Schema.Literal("mandatory"), role: RoleId }),
     Mandatory,
     (f) => ({ ...readBase(f), type: f.type, roleId: f.role }),
     (r) => ({ ...writeBase(r), type: r.type, role: r.roleId }),
@@ -262,7 +268,7 @@ export const ConstraintYamlCodec = Schema.Union([
     Schema.Struct({
       ...fileBase,
       type: Schema.Literal("value_constraint"),
-      role: Schema.optionalKey(Schema.String),
+      role: Schema.optionalKey(RoleId),
       values: Schema.optionalKey(Schema.Array(Schema.String)),
       ranges: Schema.optionalKey(Schema.Array(ValueRangeFromFile)),
     }),
@@ -283,19 +289,19 @@ export const ConstraintYamlCodec = Schema.Union([
     }),
   ),
   kind(
-    roles("disjunctive_mandatory"),
+    roles("disjunctive_mandatory", TwoOrMoreRoleIds),
     DisjunctiveMandatory,
     (f) => ({ ...readBase(f), type: f.type, roleIds: f.roles }),
     (r) => ({ ...writeBase(r), type: r.type, roles: r.roleIds }),
   ),
   kind(
-    roles("exclusion"),
+    roles("exclusion", TwoOrMoreRoleIds),
     Exclusion,
     (f) => ({ ...readBase(f), type: f.type, roleIds: f.roles }),
     (r) => ({ ...writeBase(r), type: r.type, roles: r.roleIds }),
   ),
   kind(
-    roles("exclusive_or"),
+    roles("exclusive_or", TwoOrMoreRoleIds),
     ExclusiveOr,
     (f) => ({ ...readBase(f), type: f.type, roleIds: f.roles }),
     (r) => ({ ...writeBase(r), type: r.type, roles: r.roleIds }),
@@ -304,8 +310,8 @@ export const ConstraintYamlCodec = Schema.Union([
     Schema.Struct({
       ...fileBase,
       type: Schema.Literal("subset"),
-      subset_roles: Schema.Array(Schema.String),
-      superset_roles: Schema.Array(Schema.String),
+      subset_roles: RoleIds,
+      superset_roles: RoleIds,
     }),
     Subset,
     (f) => ({
@@ -325,8 +331,8 @@ export const ConstraintYamlCodec = Schema.Union([
     Schema.Struct({
       ...fileBase,
       type: Schema.Literal("equality"),
-      roles_1: Schema.Array(Schema.String),
-      roles_2: Schema.Array(Schema.String),
+      roles_1: RoleIds,
+      roles_2: RoleIds,
     }),
     Equality,
     (f) => ({ ...readBase(f), type: f.type, roleIds1: f.roles_1, roleIds2: f.roles_2 }),
@@ -336,9 +342,9 @@ export const ConstraintYamlCodec = Schema.Union([
     Schema.Struct({
       ...fileBase,
       type: Schema.Literal("ring"),
-      role_1: Schema.String,
-      role_2: Schema.String,
-      ring_type: Schema.String,
+      role_1: RoleId,
+      role_2: RoleId,
+      ring_type: RingType,
     }),
     Ring,
     (f) => ({
@@ -346,7 +352,7 @@ export const ConstraintYamlCodec = Schema.Union([
       type: f.type,
       roleId1: f.role_1,
       roleId2: f.role_2,
-      ringType: f.ring_type as typeof RingType.Type,
+      ringType: f.ring_type,
     }),
     (r) => ({
       ...writeBase(r),
@@ -360,10 +366,10 @@ export const ConstraintYamlCodec = Schema.Union([
     Schema.Struct({
       ...fileBase,
       type: Schema.Literal("frequency"),
-      role: Schema.optionalKey(Schema.String),
-      roles: Schema.optionalKey(Schema.Array(Schema.String)),
-      min: Schema.Number,
-      max: Schema.Union([Schema.Number, Schema.Literal("unbounded")]),
+      role: Schema.optionalKey(RoleId),
+      roles: Schema.optionalKey(RoleIds),
+      min: AtLeast(1),
+      max: Bound(1),
     }),
     Frequency,
     (f) => ({
@@ -388,9 +394,9 @@ export const ConstraintYamlCodec = Schema.Union([
     Schema.Struct({
       ...fileBase,
       type: Schema.Literal("value_comparison"),
-      role_1: Schema.String,
-      role_2: Schema.String,
-      operator: Schema.String,
+      role_1: RoleId,
+      role_2: RoleId,
+      operator: Operator,
     }),
     ValueComparison,
     (f) => ({
@@ -398,7 +404,7 @@ export const ConstraintYamlCodec = Schema.Union([
       type: f.type,
       roleId1: f.role_1,
       roleId2: f.role_2,
-      operator: f.operator as typeof Operator.Type,
+      operator: f.operator,
     }),
     (r) => ({
       ...writeBase(r),
@@ -412,9 +418,9 @@ export const ConstraintYamlCodec = Schema.Union([
     Schema.Struct({
       ...fileBase,
       type: Schema.Literal("cardinality"),
-      role: Schema.String,
-      min: Schema.Number,
-      max: Schema.Union([Schema.Number, Schema.Literal("unbounded")]),
+      role: RoleId,
+      min: AtLeast(0),
+      max: Bound(0),
     }),
     Cardinality,
     (f) => ({ ...readBase(f), type: f.type, roleId: f.role, min: f.min, max: f.max }),

@@ -22,7 +22,7 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type * as SchemaAST from "effect/SchemaAST";
-import * as SchemaIssue from "effect/SchemaIssue";
+import type * as SchemaIssue from "effect/SchemaIssue";
 import {
   type ObjectType,
   ObjectTypeModelCodec,
@@ -30,6 +30,7 @@ import {
   RANGE_YAML_KEYS,
   YAML_KEYS,
 } from "./objectTypeSchema.js";
+import { locate, predicateOf } from "./schemaIssues.js";
 
 /** One thing wrong with one object type. */
 export interface ObjectTypeProblem {
@@ -167,49 +168,19 @@ function seal(ot: ObjectType): ObjectType {
 
 // -- Issues to problems -----------------------------------------------------
 
-/** One failure in the issue tree, with the path that leads to it. */
-interface Located {
-  readonly path: readonly PropertyKey[];
-  readonly issue: SchemaIssue.Issue;
-}
-
-/**
- * The failures in an issue tree, one per problem.
- *
- * A union is descended only when one member was tried: that is the
- * discriminated object-type union picking its variant by `kind`, and the
- * problems are that variant's. A union none of whose members applied, or
- * several, is one problem at its own position -- `max: "lots"` is one bad
- * value, not one per member it failed to match.
- */
-function locate(issue: SchemaIssue.Issue, path: readonly PropertyKey[]): Located[] {
-  switch (issue._tag) {
-    case "Pointer":
-      return locate(issue.issue, [...path, ...issue.path]);
-    case "Composite":
-      return issue.issues.flatMap((child) => locate(child, path));
-    case "Encoding":
-      return locate(issue.issue, path);
-    case "AnyOf":
-      return issue.issues.length === 1 ? locate(issue.issues[0]!, path) : [{ path, issue }];
-    default:
-      return [{ path, issue }];
-  }
-}
-
 function problemsOf(
   issue: SchemaIssue.Issue,
   raw: unknown,
 ): [ObjectTypeProblem, ...ObjectTypeProblem[]] {
   const subject = subjectOf(raw);
-  const located = locate(issue, []);
+  const located = locate(issue);
   const problems = located.map(({ path: decodedPath, issue: leaf }) => {
     const path = spelledAs(raw, decodedPath);
     const field = path.length > 0 ? String(path[0]) : "kind";
     return {
       objectType: subject.identity,
       field,
-      message: `${subject.label} ${predicateOf(leaf, path)}`,
+      message: `${subject.label} ${predicateOf(leaf, path, `must have kind "entity" or "value".`)}`,
     };
   });
   // A decode that failed always carries at least one leaf; the fallback only
@@ -267,47 +238,6 @@ function subjectOf(raw: unknown): { readonly label: string; readonly identity: s
     return { label: `${kind} with id "${doc.id}"`, identity: doc.id };
   }
   return { label: `${kind} with no name or id`, identity: "" };
-}
-
-const defaultFormat = SchemaIssue.makeFormatterDefault();
-
-/**
- * The rest of the sentence after the subject.
- *
- * Every rule the schema states carries its own predicate as a `message`
- * annotation; those are used as they are. What is left is Effect's own
- * structural refusals -- a wrong type, a missing key, an unknown key -- which
- * are phrased here around the path, because Effect's text names neither the
- * object type nor, for a key, the field.
- */
-function predicateOf(issue: SchemaIssue.Issue, path: readonly PropertyKey[]): string {
-  const at = path.map(String).join(".");
-  switch (issue._tag) {
-    case "UnexpectedKey":
-      return `has an unknown field "${at}".`;
-    case "MissingKey":
-      return issue.annotations?.messageMissingKey ?? `is missing "${at}".`;
-    case "AnyOf": {
-      if (path.length === 0) return `must have kind "entity" or "value".`;
-      const message = issue.ast.annotations?.message;
-      if (typeof message === "string") return message;
-      break;
-    }
-    case "Filter": {
-      const message = issue.filter.annotations?.message;
-      if (typeof message === "string") return message;
-      break;
-    }
-    case "InvalidType":
-    case "InvalidValue": {
-      const message = issue._tag === "InvalidType"
-        ? issue.ast.annotations?.message
-        : issue.annotations?.message;
-      if (typeof message === "string") return message;
-      break;
-    }
-  }
-  return `has an invalid ${at}: ${defaultFormat(issue)}.`;
 }
 
 /** A copy with every `undefined`-valued key removed, at any depth. */

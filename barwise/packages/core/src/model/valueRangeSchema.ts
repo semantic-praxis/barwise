@@ -4,12 +4,11 @@
  * so those two cannot drift (on main, the readers they replace had).
  *
  * The sharing reaches only as far as the schemas are wired. On this branch
- * the object type is decoded through it, on load and at construction; a
- * role's value constraint is not yet. `OrmYamlSerializer` still reads
- * constraints with the hand-written `deserializeValueRanges`, and a role's
- * value constraint built in code keeps whatever flags its caller gave,
- * `minInclusive: true` included. Both close when the constraint decoder
- * replaces those paths, which is the spike's next step.
+ * both are decoded through it on load, and the object type at construction
+ * too. A role's value constraint built in code is not: `FactType` takes its
+ * constraints as given, so one keeps whatever flags its caller gave,
+ * `minInclusive: true` included, until fact types are decoded at
+ * construction as object types are.
  *
  * The record has one canonical form. A bound is inclusive unless it says
  * otherwise, and only a file can say otherwise: reading a file drops

@@ -1,6 +1,9 @@
 import * as Effect from "effect/Effect";
 import { parse, stringify } from "yaml";
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import type { Constraint } from "../model/Constraint.js";
+import { decodeConstraints } from "../model/constraintDecoder.js";
+import { generateId } from "../model/id.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -93,6 +96,81 @@ function decodeObjectTypesOf(
     }
   });
   return { decoded, problems };
+}
+
+/** Every fact type's constraints, decoded, and every problem with them. */
+interface DecodedConstraints {
+  /** By fact type position; a fact type with any bad constraint is absent. */
+  readonly byFactType: ReadonlyMap<number, readonly Constraint[]>;
+  readonly problems: readonly SchemaError[];
+  /** `f/c` for each constraint the decoder found a problem in. */
+  readonly refused: ReadonlySet<string>;
+}
+
+/**
+ * Decode every constraint of every fact type, filling a missing or empty id
+ * first: the file format lets a constraint omit its id, and decision 8 puts
+ * the fill at the loader, not in the decoder. Like the object types, this
+ * runs whatever the JSON Schema said, so a file's constraint problems are
+ * reported with everything else.
+ */
+function decodeConstraintsOf(doc: unknown): DecodedConstraints {
+  const byFactType = new Map<number, readonly Constraint[]>();
+  const problems: SchemaError[] = [];
+  const refused = new Set<string>();
+  const list = (doc as { model?: { fact_types?: unknown; }; } | null)?.model?.fact_types;
+  if (!Array.isArray(list)) return { byFactType, problems, refused };
+  list.forEach((ft: unknown, f) => {
+    if (ft === null || typeof ft !== "object") return;
+    const docs = (ft as { constraints?: unknown; }).constraints;
+    if (!Array.isArray(docs)) return;
+    const results = Effect.runSync(decodeConstraints(docs, factTypeLabel(ft, f), generateId));
+    const decoded: Constraint[] = [];
+    results.forEach((result, c) => {
+      if (result._tag === "Success") {
+        decoded.push(result.success as Constraint);
+        return;
+      }
+      refused.add(`${f}/${c}`);
+      for (const problem of result.failure) {
+        const below = problem.path.map((k) => `/${String(k)}`).join("");
+        const path = `/model/fact_types/${f}/constraints/${c}${below}`;
+        problems.push({ path, message: problem.message });
+      }
+    });
+    if (decoded.length === docs.length) byFactType.set(f, decoded);
+  });
+  return { byFactType, problems, refused };
+}
+
+/** What a constraint's problem calls its fact type: name, id, or position. */
+function factTypeLabel(ft: object, index: number): string {
+  const { name, id } = ft as { name?: unknown; id?: unknown; };
+  if (typeof name === "string" && name.trim() !== "") return `Fact type "${name.trim()}"`;
+  if (typeof id === "string" && id !== "") return `Fact type with id "${id}"`;
+  return `Fact type at fact_types/${index}`;
+}
+
+const CONSTRAINT_PATH = /^\/model\/fact_types\/(\d+)\/constraints\/(\d+)(?:\/|$)/;
+
+/**
+ * The schema's errors with the decoder's constraint problems in place of the
+ * schema's own on the same constraint. One authority per constraint: where
+ * the decoder found a problem, it owns that constraint's errors, and the
+ * schema's -- for a constraint, one per `oneOf` branch it failed, none of
+ * them naming the kind it was meant to be -- are dropped. A constraint the
+ * decoder accepted keeps every schema error on it, so a rule only the schema
+ * states is never lost; the load is refused either way.
+ */
+function mergeConstraintProblems(
+  schemaErrors: readonly SchemaError[],
+  decoded: DecodedConstraints,
+): SchemaError[] {
+  const owned = (e: SchemaError) => {
+    const match = CONSTRAINT_PATH.exec(e.path);
+    return match !== null && decoded.refused.has(`${match[1]}/${match[2]}`);
+  };
+  return [...schemaErrors.filter((e) => !owned(e)), ...decoded.problems];
 }
 
 /**
@@ -232,10 +310,14 @@ export class OrmYamlSerializer {
 
     const result = this.validator.validateModel(migrated);
     const objectTypes = decodeObjectTypesOf(migrated);
-    const errors = mergeObjectTypeProblems(result.errors, objectTypes.problems);
+    const constraints = decodeConstraintsOf(migrated);
+    const errors = mergeConstraintProblems(
+      mergeObjectTypeProblems(result.errors, objectTypes.problems),
+      constraints,
+    );
     if (errors.length > 0) {
       const head = result.valid
-        ? "YAML holds malformed object types"
+        ? "YAML holds malformed object types or constraints"
         : "YAML does not conform to orm-model schema";
       throw new DeserializationError(
         `${head}: ${errors.map((e) => `${e.path}: ${e.message}`).join("; ")}`,
@@ -244,7 +326,7 @@ export class OrmYamlSerializer {
     }
 
     const doc = migrated as OrmYamlDocument;
-    return this.fromDocument(doc, objectTypes.decoded, options);
+    return this.fromDocument(doc, objectTypes.decoded, constraints.byFactType, options);
   }
 
   /**
@@ -335,6 +417,7 @@ export class OrmYamlSerializer {
   private fromDocument(
     doc: OrmYamlDocument,
     objectTypes: readonly ObjectType[],
+    constraints: ReadonlyMap<number, readonly Constraint[]>,
     options?: { lenient?: boolean; },
   ): OrmModel {
     const model = new OrmModel({
@@ -351,12 +434,18 @@ export class OrmYamlSerializer {
     }
 
     // Add fact types.
-    for (const ftDoc of doc.model.fact_types ?? []) {
+    // Their constraints are already decoded, ids filled, so the fact type is
+    // read without them rather than having `deserializeConstraint` mint a
+    // second set of ids.
+    (doc.model.fact_types ?? []).forEach((ftDoc, f) => {
       model.addFactType(
-        deserializeFactType(ftDoc),
+        {
+          ...deserializeFactType({ ...ftDoc, constraints: [] }),
+          constraints: [...(constraints.get(f) ?? [])],
+        },
         { skipPlayerValidation: options?.lenient },
       );
-    }
+    });
 
     // Add subtype facts (after object types and fact types).
     for (const sfDoc of doc.model.subtype_facts ?? []) {
