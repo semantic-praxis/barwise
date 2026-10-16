@@ -675,7 +675,8 @@ S1 and S4 green on its own head and re-reads S5 and S6.
   `elementRecheck.ts`, `branchValidator`, `factTypeValidator` and
   `schemaErrorOf` leave the load path; the header "YAML holds
   malformed model elements" becomes the only error shape. Where ajv
-  goes afterwards is Open decision 10. `SchemaValidator` is exported
+  goes afterwards is Open decision 10: a dev dependency of core, used
+  only by P3. `SchemaValidator` is exported
   from core's root, and no other package imports it today (checked
   2026-10-16), so its removal from the load path changes no consumer.
 
@@ -975,7 +976,9 @@ entry only records that it follows.
    the property a user of the MCP resource depends on: the schema they
    read accepts what the loader accepts.
 
-10. **Where ajv goes when it leaves the load path (added 2026-10-16).**
+10. **Where ajv goes when it leaves the load path (added 2026-10-16) --
+    resolved 2026-10-16 by the owner: option (a), test-only, for now.**
+    "For now" leaves (c) open if P3 stops earning its dependency.
     - **(a)** A dev dependency of core, through its draft 2020-12 entry
       point (`ajv/dist/2020`), used only by P3 as restated under item 9.
       Recommended: the generated file is a published artifact, read by
