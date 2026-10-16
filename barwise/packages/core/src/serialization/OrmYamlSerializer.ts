@@ -1,6 +1,13 @@
 import { parse, stringify } from "yaml";
+import { generateId } from "../model/id.js";
+import type { ObjectType } from "../model/ObjectType.js";
+import { decodeObjectTypes, runWithIds } from "../model/objectTypeDecoder.js";
 import { OrmModel } from "../model/OrmModel.js";
-import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
+import {
+  type SchemaError,
+  type SchemaValidationResult,
+  SchemaValidator,
+} from "./SchemaValidator.js";
 import {
   applyMigrations,
   CURRENT_ORM_VERSION,
@@ -15,7 +22,7 @@ import {
   deserializeObjectifiedFactType,
   serializeObjectifiedFactType,
 } from "./yaml/objectified.js";
-import { deserializeObjectType, serializeObjectType } from "./yaml/objectType.js";
+import { serializeObjectType } from "./yaml/objectType.js";
 import {
   deserializeFactInstance,
   deserializePopulation,
@@ -52,6 +59,62 @@ function versionErrorMessage(
   };
   const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
   return `${head} ${advice[plan.reason]}`;
+}
+
+/** One object type's problem, located by its position in the file. */
+interface LocatedProblem {
+  readonly index: number;
+  readonly error: SchemaError;
+}
+
+/**
+ * Decode every object type in a parsed document, whatever the JSON Schema
+ * said about the document. Before, a schema error stopped the load before
+ * any object type was built, so a cardinality with `max < min` was reported
+ * only once the schema errors elsewhere were fixed. A document without an
+ * `object_types` list has nothing to decode, and the schema check says why.
+ */
+function decodeObjectTypesOf(
+  doc: unknown,
+): { readonly decoded: ObjectType[]; readonly problems: LocatedProblem[]; } {
+  const list = (doc as { model?: { object_types?: unknown; }; } | null)?.model?.object_types;
+  if (!Array.isArray(list)) return { decoded: [], problems: [] };
+  const decoded: ObjectType[] = [];
+  const problems: LocatedProblem[] = [];
+  runWithIds(decodeObjectTypes(list), generateId).forEach((result, index) => {
+    if (result._tag === "Success") {
+      decoded.push(result.success);
+      return;
+    }
+    for (const problem of result.failure.problems) {
+      const path = `/model/object_types/${index}${problem.field ? `/${problem.field}` : ""}`;
+      problems.push({ index, error: { path, message: problem.message } });
+    }
+  });
+  return { decoded, problems };
+}
+
+/**
+ * The schema's errors and the decoder's problems as one list.
+ *
+ * For an object type the decoder refused, its problems replace the schema's
+ * errors there: they say the same things, but by name and one per problem,
+ * where the schema reports an entity without a reference mode three times
+ * (the missing property, the failed `if`, the failed `then`). For an object
+ * type the decoder accepted, the schema's errors stand -- the file format
+ * asks a few things the decoder does not (an `id` in every object type, a
+ * bound in every range), and those must still refuse the file.
+ */
+function mergeObjectTypeProblems(
+  schemaErrors: readonly SchemaError[],
+  problems: readonly LocatedProblem[],
+): SchemaError[] {
+  const refused = new Set(problems.map((p) => p.index));
+  const covered = (path: string) => {
+    const match = /^\/model\/object_types\/(\d+)(\/|$)/.exec(path);
+    return match !== null && refused.has(Number(match[1]));
+  };
+  return [...schemaErrors.filter((e) => !covered(e.path)), ...problems.map((p) => p.error)];
 }
 
 /**
@@ -128,17 +191,20 @@ export class OrmYamlSerializer {
     const migrated = this.migrateToCurrentVersion(raw);
 
     const result = this.validator.validateModel(migrated);
-    if (!result.valid) {
+    const objectTypes = decodeObjectTypesOf(migrated);
+    const errors = mergeObjectTypeProblems(result.errors, objectTypes.problems);
+    if (errors.length > 0) {
+      const head = result.valid
+        ? "YAML holds malformed object types"
+        : "YAML does not conform to orm-model schema";
       throw new DeserializationError(
-        `YAML does not conform to orm-model schema: ${
-          result.errors.map((e) => `${e.path}: ${e.message}`).join("; ")
-        }`,
-        result,
+        `${head}: ${errors.map((e) => `${e.path}: ${e.message}`).join("; ")}`,
+        { valid: false, errors },
       );
     }
 
     const doc = migrated as OrmYamlDocument;
-    return this.fromDocument(doc, options);
+    return this.fromDocument(doc, objectTypes.decoded, options);
   }
 
   /**
@@ -228,6 +294,7 @@ export class OrmYamlSerializer {
 
   private fromDocument(
     doc: OrmYamlDocument,
+    objectTypes: readonly ObjectType[],
     options?: { lenient?: boolean; },
   ): OrmModel {
     const model = new OrmModel({
@@ -236,9 +303,11 @@ export class OrmYamlSerializer {
       note: doc.model.note,
     });
 
-    // Add object types first (fact types reference them).
-    for (const otDoc of doc.model.object_types ?? []) {
-      model.addObjectType(deserializeObjectType(otDoc));
+    // Add object types first (fact types reference them). Already decoded, so
+    // every problem in the file was reported together; `addObjectType` takes
+    // the record as its config, which it is.
+    for (const ot of objectTypes) {
+      model.addObjectType(ot);
     }
 
     // Add fact types.

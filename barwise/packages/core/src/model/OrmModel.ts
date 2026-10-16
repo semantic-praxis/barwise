@@ -1,8 +1,10 @@
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
+import { generateId } from "./id.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
-import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
+import type { ObjectType, ObjectTypeConfig } from "./ObjectType.js";
+import { decodeObjectTypeConfig, runObjectTypeDecode } from "./objectTypeDecoder.js";
 import { Population, type PopulationConfig } from "./Population.js";
 import type { Role } from "./Role.js";
 import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
@@ -93,7 +95,11 @@ export class OrmModel {
 
   /**
    * Add an object type to the model.
+   *
+   * The config goes through the object type decoder, with fresh ids from the
+   * installed generator; the decoder itself never reaches it.
    * @throws If an object type with the same name already exists.
+   * @throws {ObjectTypeError} Listing every problem with the config.
    */
   addObjectType(config: ObjectTypeConfig): ObjectType {
     const existing = this.getObjectTypeByName(config.name);
@@ -102,7 +108,7 @@ export class OrmModel {
         `Object type "${config.name}" already exists in model "${this._name}".`,
       );
     }
-    const ot = createObjectType(config);
+    const ot = runObjectTypeDecode(decodeObjectTypeConfig(config), generateId);
     this._objectTypes.set(ot.id, ot);
     return ot;
   }
