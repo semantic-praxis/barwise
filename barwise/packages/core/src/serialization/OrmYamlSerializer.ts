@@ -118,8 +118,8 @@ const THEN_FIELDS: readonly string[] = (() => {
  *
  * The decoder names top-level fields only, so a schema error is dropped only
  * when the decoder has replaced it: a field-level error at exactly a field the
- * decoder names, a required-property error for a property the decoder names,
- * or an entity's failed `then` branch when the decoder names a field that
+ * decoder names, a required-property or unknown-property error for a property the
+ * decoder names, or an entity's failed `then` branch when the decoder names a field that
  * branch governs. Errors are matched on ajv's rule, not its wording.
  * Deeper errors inside a field are kept, because the decoder cannot say which
  * nested rule it replaced: a duplicate costs a line, a dropped rule is silent.
@@ -145,6 +145,9 @@ function mergeObjectTypeProblems(
     const rule = error.rule;
     if (rule?.keyword === "required" && rule.missingProperty !== undefined) {
       return named.has(`${index}/${rule.missingProperty}`);
+    }
+    if (rule?.keyword === "additionalProperties" && rule.additionalProperty !== undefined) {
+      return named.has(`${index}/${rule.additionalProperty}`);
     }
     if (rule?.keyword === "if" && rule.failingKeyword === "then") {
       return THEN_FIELDS.some((f) => named.has(`${index}/${f}`));

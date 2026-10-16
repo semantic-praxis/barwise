@@ -12,7 +12,8 @@
 import * as Arbitrary from "effect/Arbitrary";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
@@ -92,16 +93,33 @@ describe("ConstraintYamlCodec over derived records", () => {
   });
 });
 
-/** Every `.orm.yaml` under the workspace root, build output aside. */
+/**
+ * Every tracked `.orm.yaml` under `dir`. Tracked, not walked: a walk of the
+ * disk raced the CLI tests, which create and delete scratch directories in
+ * parallel under turbo (ENOENT on a directory listed a moment earlier), and
+ * it read whatever a working tree happened to hold rather than the repository.
+ */
 function modelFiles(dir: string): string[] {
-  const skip = new Set(["node_modules", "dist", ".turbo", "coverage", ".git"]);
-  return readdirSync(dir).flatMap((entry) => {
-    if (skip.has(entry)) return [];
-    const path = join(dir, entry);
-    if (statSync(path).isDirectory()) return modelFiles(path);
-    return entry.endsWith(".orm.yaml") ? [path] : [];
-  });
+  return execFileSync("git", ["-C", dir, "ls-files", "-z", "--", "*.orm.yaml"], {
+    encoding: "utf8",
+  })
+    .split("\0")
+    .filter((f) => f !== "")
+    .map((f) => join(dir, f));
 }
+
+describe("a frequency giving both role and roles", () => {
+  // The JSON Schema allows the pair and main's loader keeps `roles`; the
+  // codec does the same, so S1 compares like with like. The drop itself is a
+  // file-format defect, barwise-plc: when that lands, this test flips.
+  it("reads roles and drops role, as main's loader does", () => {
+    const fc = { type: "frequency", id: "c-1", role: "r-1", roles: ["r-2"], min: 1, max: 2 };
+    expect(new SchemaValidator().validateModel(documentWith(fc)).valid).toBe(true);
+    const today = deserializeConstraint(fc as OrmYamlConstraint);
+    expect(today).toMatchObject({ roleIds: ["r-2"] });
+    expect(decode(fc)).toEqual({ ...today, modality: "alethic" });
+  });
+});
 
 describe("ConstraintYamlCodec over this repository's model files (S1)", () => {
   // Files the loader accepts today, version migration included. The S4

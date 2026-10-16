@@ -1,16 +1,22 @@
 /**
  * Decoding one object type into its record, or into every problem with it.
  *
- * The decoder collects (`errors: "all"`) and refuses unknown fields
- * (`onExcessProperty: "error"`), then turns Effect's issue tree into one
+ * The decoder collects (`errors: "all"`), then turns Effect's issue tree into one
  * `ObjectTypeProblem` per problem, each naming the object type and the field.
  * One per problem, not one block of text: a caller -- and the D2 scorer of
  * docs/specs/effect-comparison.spec.md -- reads them as a list.
  *
+ * A file's unknown field is refused (`onExcessProperty: "error"`), as its
+ * JSON Schema refuses it. A config's is ignored, as main's createObjectType
+ * ignored it: a config is often a wider object spread in, and the fields that
+ * matter by their absence -- the value-only fields on an entity -- are
+ * declared in the schema and refused there, not caught as unknown.
+ *
  * Every id is required, and the decoder mints none (effect-adoption.spec.md,
  * decision 8). The boundary for configs, `runObjectTypeConfigDecode`, fills a
  * missing id before decoding; `createObjectType` and `OrmModel.addObjectType`
- * call it. A file must carry its ids, so the loader fills nothing.
+ * call it. An object type in a file must carry its id, so the loader fills
+ * nothing here.
  */
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
@@ -53,10 +59,11 @@ export class ObjectTypeError extends Error {
   }
 }
 
-const PARSE_OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "error" };
+const FILE_OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "error" };
+const CONFIG_OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "ignore" };
 
-const decodeYaml = Schema.decodeUnknownEffect(ObjectTypeYamlCodec, PARSE_OPTIONS);
-const decodeModel = Schema.decodeUnknownEffect(ObjectTypeModelCodec, PARSE_OPTIONS);
+const decodeYaml = Schema.decodeUnknownEffect(ObjectTypeYamlCodec, FILE_OPTIONS);
+const decodeModel = Schema.decodeUnknownEffect(ObjectTypeModelCodec, CONFIG_OPTIONS);
 
 /** Decode one object type as an `.orm.yaml` file spells it. */
 export function decodeObjectType(
@@ -137,8 +144,8 @@ export function runObjectTypeDecode(
  * cites an id the caller did not choose.
  */
 export function runObjectTypeConfigDecode(config: unknown, newId: () => string): ObjectType {
-  const input = prepareConfig(withId(config, newId));
-  return runObjectTypeDecode(decodeWith(decodeModel, input, prepareConfig(config)));
+  const prepared = prepareConfig(config);
+  return runObjectTypeDecode(decodeWith(decodeModel, withId(prepared, newId), prepared));
 }
 
 /** `label` is the input as its author wrote it, which the problems name. */

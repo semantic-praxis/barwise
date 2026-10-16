@@ -203,7 +203,7 @@ describe("SchemaValidator", () => {
         expect(unnamed.errors).toContainEqual({
           path: "/model/object_types/0",
           message: "must NOT have additional properties",
-          rule: { keyword: "additionalProperties" },
+          rule: { keyword: "additionalProperties", additionalProperty: "colour" },
         });
         const top = validator.validateModel({
           orm_version: "2.0",
@@ -212,7 +212,7 @@ describe("SchemaValidator", () => {
         expect(top.errors).toContainEqual({
           path: "/model",
           message: "must NOT have additional properties",
-          rule: { keyword: "additionalProperties" },
+          rule: { keyword: "additionalProperties", additionalProperty: "colour" },
         });
       });
     });

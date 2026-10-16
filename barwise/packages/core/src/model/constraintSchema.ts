@@ -369,6 +369,9 @@ export const ConstraintYamlCodec = Schema.Union([
     (f) => ({
       ...readBase(f),
       type: f.type,
+      // `roles` wins over `role` when a file gives both, as main's loader
+      // reads it; the schema allows the pair, and the silent drop is
+      // barwise-plc. Matching main here is what keeps S1 a comparison.
       roleIds: f.roles ?? (f.role !== undefined ? [f.role] : []),
       min: f.min,
       max: f.max,

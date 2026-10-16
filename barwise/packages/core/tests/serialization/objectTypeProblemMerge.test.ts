@@ -78,6 +78,16 @@ describe("schema errors and decoder problems on one object type", () => {
     expect(message).toContain("kind");
   });
 
+  it("reports an unknown field once, not again as the schema's additional property", () => {
+    const errors = loadErrors(`    - id: ot-1
+      name: Thing
+      kind: value
+      colour: red
+`);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.message).toBe('Value type "Thing" has an unknown field "colour".');
+  });
+
   it("reports an entity's forbidden data type once, not again as a failed then branch", () => {
     const errors = loadErrors(`    - id: ot-c
       name: Customer

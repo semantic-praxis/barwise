@@ -1,6 +1,15 @@
 /**
- * A value range, shared by an object type's value constraint and a value
- * constraint on a role, so the two cannot drift (they had).
+ * A value range, shared by the two schemas that hold one -- an object type's
+ * value constraint and a role's value constraint in `ConstraintYamlCodec` --
+ * so those two cannot drift (on main, the readers they replace had).
+ *
+ * The sharing reaches only as far as the schemas are wired. On this branch
+ * the object type is decoded through it, on load and at construction; a
+ * role's value constraint is not yet. `OrmYamlSerializer` still reads
+ * constraints with the hand-written `deserializeValueRanges`, and a role's
+ * value constraint built in code keeps whatever flags its caller gave,
+ * `minInclusive: true` included. Both close when the constraint decoder
+ * replaces those paths, which is the spike's next step.
  *
  * The record has one canonical form. A bound is inclusive unless it says
  * otherwise, and only a file can say otherwise: reading a file drops
