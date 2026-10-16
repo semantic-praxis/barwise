@@ -14,10 +14,7 @@ import * as Arbitrary from "effect/Arbitrary";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
-import {
-  ObjectTypeModelCodec,
-  ObjectTypeYamlCodec,
-} from "../../src/model/objectTypeSchema.js";
+import { ObjectTypeModelCodec, ObjectTypeYamlCodec } from "../../src/model/objectTypeSchema.js";
 
 const SEED = 1;
 
