@@ -94,27 +94,44 @@ function decodeObjectTypesOf(
   return { decoded, problems };
 }
 
+/** An object type's path: its index, then the first field under it, if any. */
+const OBJECT_TYPE_PATH = /^\/model\/object_types\/(\d+)(?:\/([^/]+))?(?:\/|$)/;
+/** ajv names the property in a required-property error. */
+const MISSING_PROPERTY = /must have required property '([^']+)'/;
+
 /**
  * The schema's errors and the decoder's problems as one list.
  *
- * For an object type the decoder refused, its problems replace the schema's
- * errors there: they say the same things, but by name and one per problem,
- * where the schema reports an entity without a reference mode three times
- * (the missing property, the failed `if`, the failed `then`). For an object
- * type the decoder accepted, the schema's errors stand -- the file format
- * asks a few things the decoder does not (an `id` in every object type, a
- * bound in every range), and those must still refuse the file.
+ * A schema error is dropped only when the decoder reports the same thing: a
+ * field-level error on a field the decoder names, or a required-property error
+ * for a property the decoder names. Where the schema reports an entity without
+ * a reference mode three times (the missing property, the failed `if`, the
+ * failed `then`), the decoder's one problem replaces all three. The rest of
+ * the schema's errors stand, because the file format asks things the decoder
+ * does not: an `id` in every object type, a bound in every range. The decoder
+ * mints a missing id, so a missing id is always the schema's to report, even
+ * on an object type the decoder refused for another reason.
  */
 function mergeObjectTypeProblems(
   schemaErrors: readonly SchemaError[],
   problems: readonly LocatedProblem[],
 ): SchemaError[] {
-  const refused = new Set(problems.map((p) => p.index));
-  const covered = (path: string) => {
-    const match = /^\/model\/object_types\/(\d+)(\/|$)/.exec(path);
-    return match !== null && refused.has(Number(match[1]));
+  const refused = new Set<number>();
+  const named = new Set<string>();
+  for (const { index, error } of problems) {
+    refused.add(index);
+    const field = OBJECT_TYPE_PATH.exec(error.path)?.[2];
+    if (field !== undefined) named.add(`${index}/${field}`);
+  }
+  const covered = (error: SchemaError) => {
+    const match = OBJECT_TYPE_PATH.exec(error.path);
+    if (match === null || !refused.has(Number(match[1]))) return false;
+    const index = Number(match[1]);
+    if (match[2] !== undefined) return named.has(`${index}/${match[2]}`);
+    const missing = MISSING_PROPERTY.exec(error.message);
+    return missing === null || named.has(`${index}/${missing[1]}`);
   };
-  return [...schemaErrors.filter((e) => !covered(e.path)), ...problems.map((p) => p.error)];
+  return [...schemaErrors.filter((e) => !covered(e)), ...problems.map((p) => p.error)];
 }
 
 /**

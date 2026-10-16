@@ -54,7 +54,7 @@ function facts(node: Node, defs: Record<string, Record<string, unknown>>): unkno
       properties: Object.fromEntries(
         Object.keys(properties).sort().map((k) => [k, facts(properties[k]!, defs)]),
       ),
-      required: [...((node.required ?? []) as string[])].sort(),
+      required: Object.fromEntries(((node.required ?? []) as string[]).map((k) => [k, true])),
     };
   }
   if (node.type === "array") return { type: "array", items: facts(node.items as Node, defs) };
@@ -67,9 +67,20 @@ function facts(node: Node, defs: Record<string, Record<string, unknown>>): unkno
 
 const byJson = (a: unknown, b: unknown) => JSON.stringify(a).localeCompare(JSON.stringify(b));
 
-/** The file's object type, as it reads for one kind. */
-function fileVariant(kind: "entity" | "value") {
-  const ot = fileSchema.definitions.object_type!;
+/**
+ * The file's object type, as it reads for one kind. The `then` branch is the
+ * entity variant only if `if` selects entities, and the kind enum must list
+ * both kinds. Both are asserted, so a schema change that breaks either one
+ * fails here instead of passing unseen.
+ */
+function fileVariant(kind: "entity" | "value", schema: typeof fileSchema = fileSchema) {
+  const ot = schema.definitions.object_type!;
+  expect((ot.if as { properties: { kind: { const: string; }; }; }).properties.kind.const).toBe(
+    "entity",
+  );
+  expect((ot.properties as { kind: { enum: string[]; }; }).kind.enum).toEqual(
+    expect.arrayContaining(["entity", "value"]),
+  );
   const then = ot.then as { required: string[]; properties: Record<string, Node>; };
   const properties = { ...(ot.properties as Record<string, Node>) };
   let required = [...(ot.required as string[])];
@@ -78,7 +89,7 @@ function fileVariant(kind: "entity" | "value") {
     required = [...required, ...then.required];
   }
   properties.kind = { type: "string", const: kind };
-  return facts({ type: "object", properties, required }, fileSchema.definitions);
+  return facts({ type: "object", properties, required }, schema.definitions);
 }
 
 /** The decoder's object type, as it reads for one kind. */
@@ -111,9 +122,9 @@ function differences(a: unknown, b: unknown, path: string): string[] {
  * one that closes fails the test until it is removed here.
  */
 const KNOWN: Record<string, string> = {
-  "entity.required":
+  "entity.required.id":
     "a file must carry an id; the decoder mints a missing one from IdSource, and the loader keeps the schema's refusal",
-  "value.required": "as for an entity",
+  "value.required.id": "as for an entity",
   "value.properties.reference_mode":
     "the file schema allows a reference mode on a value type and the decoder refuses it, as createObjectType always did",
 };
@@ -143,5 +154,19 @@ describe("the JSON Schema's object_type and the decoder's", () => {
     } finally {
       dataType.properties.name.enum = original;
     }
+  });
+});
+
+describe("the file schema reads as two variants only under the conditions the guard checks", () => {
+  it("refuses a kind enum that drops a kind", () => {
+    const edited = structuredClone(fileSchema);
+    edited.definitions.object_type.properties.kind.enum = ["entity"];
+    expect(() => fileVariant("value", edited)).toThrow();
+  });
+
+  it("refuses an if that selects the wrong kind", () => {
+    const edited = structuredClone(fileSchema);
+    edited.definitions.object_type.if.properties.kind.const = "value";
+    expect(() => fileVariant("entity", edited)).toThrow();
   });
 });

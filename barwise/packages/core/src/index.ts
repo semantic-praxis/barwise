@@ -117,6 +117,7 @@ export {
   ObjectTypeError,
   type ObjectTypeProblem,
   ObjectTypeProblems,
+  runObjectTypeDecode,
 } from "./model/objectTypeDecoder.js";
 export { IdSource } from "./model/objectTypeSchema.js";
 export { OrmModel, type OrmModelConfig } from "./model/OrmModel.js";
