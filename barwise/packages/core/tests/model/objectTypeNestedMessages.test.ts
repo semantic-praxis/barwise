@@ -3,7 +3,6 @@
  * name, two problems on data_type (length and scale) read the same.
  */
 import { describe, expect, it } from "vitest";
-import { generateId } from "../../src/model/id.js";
 import {
   decodeObjectType,
   ObjectTypeError,
@@ -21,7 +20,6 @@ describe("a nested negative size names its field", () => {
           kind: "value",
           data_type: { name: "text", length: -1, scale: -2 },
         }),
-        generateId,
       );
     } catch (e) {
       messages = (e as ObjectTypeError).problems.map((p) => p.message);
