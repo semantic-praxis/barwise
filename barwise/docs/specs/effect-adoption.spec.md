@@ -10,7 +10,7 @@ Tracking: barwise-jo5 (this spec); barwise-973 (WS1 of
 `core-branching-load.spec.md`, the work this restyles; held until WS1
 here passes or fails); barwise-cu0 (`effect-comparison.spec.md`, whose
 Result opens this spec); barwise-e8m (the core-purity commitment,
-Open decision 2); barwise-elq (experiments on "names the field", Open
+Open decisions 2 and 8); barwise-elq (experiments on "names the field", Open
 decision 6)
 
 In one sentence: build `FactType` and its 16-kind `Constraint` union in
@@ -37,7 +37,7 @@ The next piece of evidence is the `Constraint` union. `ObjectType` and
 unions. `FactType` carries 16 constraint kinds, three of which nest a
 join-path operand, and the first premortem story in the comparison --
 "the slice did not predict the rest" -- names exactly this. Determinism
-in core is not at stake in either style: decoding is pure.
+in core is at stake only through the id source (Open decision 8): decoding is deterministic given its inputs, one of which is the function that mints ids.
 
 ## Should the adoption start with a spike? (resolved: yes, owner's call)
 
@@ -291,7 +291,7 @@ is the claim S3 exists to check rather than assume.
 //   FactTypeYamlCodec: snake_case YAML <-> FactType record
 //
 // Exported from core's root, both forms for every kind. newId is a plain
-// parameter (Open decision 2); no Effect service is exported.
+// parameter (Open decisions 2 and 8); no Effect service is exported.
 //   decodeFactType(doc: unknown, newId: () => string):
 //     Effect<FactType, FactTypeProblems>
 //   runFactTypeDecode(doc, newId): FactType       // throws FactTypeError
@@ -582,19 +582,7 @@ entry only records that it follows.
    considered. Consequence carried here: a future Effect major is a
    breaking change to core's API, not an internal upgrade, so it needs
    its own spec.
-2. **`IdSource` -- resolved 2026-10-15: the decoder takes `newId` as a
-   plain parameter, not an Effect service.** The owner asked what the
-   service buys when ids are UUIDv7. The format does not matter. What
-   matters is that the decoder never reaches a process-wide generator, so
-   that its output depends only on its inputs. Core's UUIDv7 generator
-   already takes the clock and randomness as arguments, so a plain `newId`
-   parameter gives that purity and makes tests deterministic with a
-   counter. It also keeps Effect out of core's public types for ids. Effect
-   types stay in the decoders' signatures, as decided in item 1. The
-   consequence: `IdSource` is removed from the exported surface, which
-   shrinks it by one type. barwise-e8m's "no injected effect ports" is about
-   effects. A pure `newId` parameter performs no effect, so the note should
-   say so, not record a port.
+2. **`IdSource` -- the API shape is resolved 2026-10-15; its purity claim is withdrawn 2026-10-16.** The decoder takes `newId` as a plain parameter, not an Effect service, and `IdSource` is removed from the exported surface. The owner asked what the service buys when ids are UUIDv7. The format does not matter. What matters is whether the decoder can reach a process-wide generator, which would make its output depend on state outside its inputs. Core's `generateId()` does reach one, so a decoder that called it directly would not be pure. Passing `newId` in avoids that, but it does not make decoding pure: a `newId` that mints random ids is an injected source of randomness. The earlier reasoning that a plain parameter "performs no effect" and so "adds no port" was wrong, and barwise-e8m names that kind of port. What the parameter does buy is repeatable tests. A counter-based `newId` gives the same output for the same input, provided each decode is given a fresh counter. Whether the parameter is allowed at all is open: see item 8.
 3. **JSON Schema: hand-written or generated -- resolved 2026-10-15: hand
    written, with a drift test per kind.** The Effect arm's generated
    object type definition differed from the hand-written one in three
@@ -624,6 +612,13 @@ entry only records that it follows.
    lands with its first import, the property tests for the scorer. A
    dependency with no import would be an unused dependency, which the
    dependency checker reports.
+
+8. **Is `newId` an effect port? Open for the owner (2026-10-16).** Copilot's review of this spec pointed out that item 2's claim does not hold, and barwise-e8m forbids injected effect ports in core. Three options:
+   - **(a)** Keep `newId` as a parameter and record it as a named exception to barwise-e8m, scoped to the decoders. The e8m issue gets a note saying so. Cost: the commitment is qualified in writing, and "pure" in this spec becomes "deterministic given its inputs."
+   - **(b)** Derive an id for an element that has none from its position in the document, so decoding is a pure function of the document and needs no `newId`. Cost: the ids minted for id-less documents change. A position-derived id would be a name-based UUID (a hash of the path), not a UUIDv7, because a v7 needs a clock. This is a behavior change to measure, not assume.
+   - **(c)** An Effect service for the id source. Rejected in item 2 for the public API; choosing it reopens that decision.
+
+   Recommendation: (b) if the id change is acceptable; otherwise (a), with the exception recorded in barwise-e8m. The spike does not wait on this. It keeps `newId` as a parameter under either option.
 
 ## Risks and testing
 
