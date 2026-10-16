@@ -627,10 +627,13 @@ corpus document (`tests/helpers/modelCorpus.ts`) and every derived
 valid element (part D), plants one defect at a time from a fixed list
 (drop a required key, add an unknown key, change a type, empty a list,
 break each cross-field rule), and requires that the decoder report a
-problem at the planted path and at no other. Plants are combined in
-pairs as well, one field defect beside one cross-field defect, which is
-exactly the case the blind spot hides. Removing a `crossField`
-annotation from any rule must fail it; the plant is part of the test,
+problem at the planted path and at no other. A single cross-field
+plant does not exercise the blind spot -- its fields still decode, so
+Effect runs the check with or without the harness -- and those cases
+are kept as controls. The cases that do are pairs: each cross-field
+violation beside an unrelated field error in the same struct, with the
+fields the check reads left well-typed. Removing a `crossField`
+annotation from any rule must fail a pair case; the plant is part of the test,
 as every check in this spike has been.
 
 Rejected: stating each cross-field rule as a check on a loose
@@ -735,8 +738,11 @@ the byte-layout tests. P3 is kept in a narrower role, below.
 yes for all 16 constraint kinds and both object type codecs, and
 `Arbitrary.schema` already drives the codec and decoder tests. What
 remains is the whole-model generator, `core/tests/arbitraries/model.ts`
-(1,010 lines, used by five law tests in core and by
-`diagram/tests/arbitraries/layout.ts`). It does two jobs, and only one
+(1,010 lines, used by five law tests in core). Diagram's layout
+generator, `diagram/tests/arbitraries/layout.ts`, deliberately does not
+reuse it: it varies name widths, which core's uniform `T0`/`F0` names
+cannot, so it is out of D's scope and any conversion of it is separate
+work that keeps its layout-specific inputs. It does two jobs, and only one
 is a Schema's:
 
 - Element fields -- names, ranges, derivations, constraint fields,
@@ -909,8 +915,8 @@ entry only records that it follows.
     arbitraries (WS1b, part D). The move counts only once part D has read
     shrinking and run time on Effect's runner, as (a) says.
     - **(a)** Move `core/tests/arbitraries/model.ts`, wiring included,
-      to Effect's combinators and runner, and move the six files that
-      use it from `fc.assert` to `Arbitrary.checkEffect`. Recommended on
+      to Effect's combinators and runner, and move the five core law
+      tests that use it from `fc.assert` to `Arbitrary.checkEffect`. Recommended on
       the spike, because it is the only option that keeps shrinking on
       derived values, and the owner asked for derived generators as far
       as they reach. fast-check stays for properties that do not draw a
