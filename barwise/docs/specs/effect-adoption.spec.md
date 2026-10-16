@@ -1,14 +1,17 @@
 # Adopting Effect Schema for the rest of the sealed-record metamodel
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
-see WS0); the spike (WS1) and the workstreams after it not started
+see WS0); the spike (WS1) amended 2026-10-15 to measure derived test
+generators and property tests (see WS1 and Reported measures); the spike
+and the workstreams after it not started
 Created: 2026-10-15
 Last-updated: 2026-10-15
 Tracking: barwise-jo5 (this spec); barwise-973 (WS1 of
 `core-branching-load.spec.md`, the work this restyles; held until WS1
 here passes or fails); barwise-cu0 (`effect-comparison.spec.md`, whose
 Result opens this spec); barwise-e8m (the core-purity commitment,
-Open decision 2)
+Open decisions 2 and 8); barwise-elq (experiments on "names the field", Open
+decision 6)
 
 In one sentence: build `FactType` and its 16-kind `Constraint` union in
 Effect Schema on a branch first, against gates fixed here, because that
@@ -34,7 +37,7 @@ The next piece of evidence is the `Constraint` union. `ObjectType` and
 unions. `FactType` carries 16 constraint kinds, three of which nest a
 join-path operand, and the first premortem story in the comparison --
 "the slice did not predict the rest" -- names exactly this. Determinism
-in core is not at stake in either style: decoding is pure.
+in core is at stake only through the id source (Open decision 8): decoding is deterministic given its inputs, one of which is the function that mints ids.
 
 ## Should the adoption start with a spike? (resolved: yes, owner's call)
 
@@ -88,16 +91,18 @@ JSON Schema's generation (Open decision 3 keeps it hand-written).
 
 The spike passes only if every gate holds. There is no decider: the
 comparison already chose between the styles, and the spike asks only
-whether the choice survives the union.
+whether the choice survives the union. On 2026-10-15, before the spike was
+built, the owner moved S6 from a gate to a measure: a time limit was not
+one the owner cared about, so no number decides.
 
-| #  | Gate                                  | Stands for                                         |
-| -- | ------------------------------------- | -------------------------------------------------- |
-| S1 | Valid input unchanged                 | Nothing changes for a model that loads today       |
-| S2 | Fact type and constraint YAML layout  | Users' model diffs stay quiet                      |
-| S3 | `Constraint` type is the target       | Code that switches on a kind keeps compiling       |
-| S4 | Every problem, named, in one pass     | Time to fix a bad model; no silent loss            |
-| S5 | Startup under 1 second                | Responsiveness of every CLI command                |
-| S6 | Core cold type-check under 10 seconds | A commit or a save stays a pause, not a task break |
+| #  | Gate                                      | Stands for                                    |
+| -- | ----------------------------------------- | --------------------------------------------- |
+| S1 | Valid input unchanged                     | Nothing changes for a model that loads today  |
+| S2 | Fact type and constraint YAML layout      | Users' model diffs stay quiet                 |
+| S3 | `Constraint` type is the target           | Code that switches on a kind keeps compiling  |
+| S4 | Every problem, named, in one pass         | Time to fix a bad model; no silent loss       |
+| S5 | Startup under 1 second                    | Responsiveness of every CLI command           |
+| S6 | Core cold type-check, reported (no limit) | Recorded with each head; no threshold decides |
 
 **How each is read.**
 
@@ -146,27 +151,87 @@ whether the choice survives the union.
   `lostKeys` compares only their top-level fields -- so a fact type case
   today would be blamed on its supporting object type, vanish from the
   combined file, and lose a nested constraint field unseen.
+
+  **What "names the field" means, for now (accepted 2026-10-15).** A field
+  counts as named when its words appear in sequence as a path segment or a
+  standalone phrase. It does not count inside a longer identifier (`type`
+  inside `fact_types`), or as the kind word of an element label (the
+  `type` in `Fact type "X"`). The best definition is an experiment,
+  tracked as barwise-elq. The scorer's property tests will use
+  `fast-check`, which the owner approved as a dev dependency on 2026-10-15;
+  it lands with its first import, not before.
 - **S5.** `measure:comparison -- startup`, median of 15, npm package and
   release bundle, on one machine. The 1-second limit and its reason are
   the comparison's Open decision 3: about 1 second is where a wait
   starts to interrupt a train of thought. The Effect arm read 564 ms; the
   headroom is what the remaining schemas may spend.
-- **S6.** `measure:comparison -- typecheck`: `tsc --noEmit --incremental
-  false` in `core`, median of three.
-  The limit is 10 seconds because the pre-commit hook builds every
-  package a change touches and a developer waits on it at every commit,
-  and about 10 seconds is where a wait stops being a pause in the task
-  and becomes a switch away from it -- the same response-time research
-  the 1-second limit rests on, at its second threshold. Today 2.5 s; the
-  Effect arm 3.3 s. Instantiations are reported beside it and judge
-  nothing.
+- **S6, reported.** `measure:comparison -- typecheck`: `tsc --noEmit
+  --incremental false` in `core`, median of three. It reports time and
+  instantiations for every head and judges neither, since the owner set no
+  limit. Today 2.5 s and 25,382 instantiations; the Effect arm 3.3 s and
+  38,815. The reading is kept because a slow type-check is what a
+  developer feels at commit time, and the numbers show whether a union
+  makes it worse.
 
 **The outcome where everything goes as intended passes every gate.** A
 Schema union that decodes today's corpus to today's records, through
-today's serializer, is S1-S3 by construction; S4 is the brief; S5 and S6
-have headroom of 436 ms and 6.7 s at the arm's readings (taken on the
-comparison's machine; WS0's baselines below are from another, which is
-why the spike reads both heads back to back).
+today's serializer, is S1-S3 by construction; S4 is the brief; S5 has
+436 ms of headroom at the arm's readings (taken on the comparison's
+machine; WS0's baselines below are from another, which is why the spike
+reads both heads back to back). S6 is reported, not judged.
+
+### Reported measures for the spike (added 2026-10-15; not gates)
+
+Added after the gates above were fixed, so they change no pass or fail
+rule. They inform the adoption decision as the comparison's R-measures
+did. M1 to M4 are read on the spike's own head. `main` has no Effect
+schemas or derived values, so its M1 to M4 baselines are not applicable.
+M5's baseline on `main` is the hand-written count. Every reading is taken
+on one machine, with the same definitions.
+
+- **M1, derivation.** `Arbitrary.schema` returns a generator for the
+  kind's Schema, and for the whole union. Reads yes or no, and on a no,
+  the construct it names. Derivation is marked unstable in the pinned
+  Effect version, so each yes is reported with that version.
+- **M2, encodability (self-consistency).** The share of derived values
+  that the same Schema encodes. It shows the generator stays inside the
+  Schema's own domain. It does not show the values are valid for the
+  class: only M4 does that.
+- **M3, round trip.** The share of derived values for which encoding and
+  then decoding gives back the same value, with object keys compared
+  unordered. Key order is pinned separately, by S2.
+- **M4, independent acceptance.** The share of encoded values that the
+  hand-written JSON Schema accepts, through core's existing
+  `SchemaValidator`. This is the only measure whose answer key does not
+  come from the Schema under test. `SchemaValidator` validates whole
+  documents, so each encoded element is checked inside the smallest valid
+  document around it. The root requires `orm_version` and `model`.
+  - An object type sits in `model.object_types` and needs no enclosing
+    element.
+  - A fact type sits in `model.fact_types`. Its roles name object types,
+    so the document also carries those, from the same generator run.
+  - A role, a constraint, or a join-path operand is not valid alone. It is
+    checked inside an enclosing fact type, which must itself be valid: an
+    `id`, a `name`, nonempty `roles` and nonempty `readings`, which the
+    JSON Schema requires. The wrapper supplies those fields and no others.
+    Every generated field is kept unchanged, so the wrapper cannot hide a
+    defect in the element it encloses.
+- **M5, replaced lines.** The lines of hand-written generator in
+  `core/tests/arbitraries/model.ts` that a demonstrated derived generator
+  replaces, by kind. A replacement counts only if it keeps reference
+  coordination and shrinking (below). Adapter code is reported separately
+  and is not netted against the lines it serves.
+- **Shrinking, reported with M5.** For each replaced generator, whether a
+  failing value still shrinks to a small failing value that the Schema
+  accepts. The hand-written generators depend on this: the `arbRange`
+  default on line 250 exists so the shrinker never produces a range the
+  model would reject. A derived generator's shrinking is unmeasured until
+  the spike reads it.
+
+Refusal cases stay out of M2 to M4, and out of every property. A derived
+generator produces values the Schema accepts. The refusal cases come from
+the S4 fixtures and the frozen reference, not from the Schema being
+measured.
 
 ## How this spec weighs D1
 
@@ -185,22 +250,33 @@ nowhere else:
 
 ## Inventory
 
-| Area                                                  | Today on `main`                                    | Verdict                                           |
-| ----------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------- |
-| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema          |
-| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run            |
-| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                               |
-| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                          |
-| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                          |
-| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; boundaries provide `IdSource` from it      |
-| `core/schemas/orm-model.schema.json`                  | hand-written                                       | stays hand-written, drift-tested per kind         |
-| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                         |
-| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases     |
-| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`              |
-| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6       |
-| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4) |
-| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig   |
-| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use |
+| Area                                                  | Today on `main`                                    | Verdict                                                       |
+| ----------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------- |
+| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema                      |
+| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run                        |
+| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                                           |
+| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                                      |
+| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                      |
+| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; decoders take `newId` as a parameter (Open decision 2) |
+| `core/schemas/orm-model.schema.json`                  | hand-written                                       | stays hand-written, drift-tested per kind                     |
+| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                                     |
+| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                 |
+| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                          |
+| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                   |
+| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4)             |
+| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig               |
+| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use             |
+
+`core/tests/arbitraries/model.ts` (1,010 lines) is the suite's hand-written
+whole-model generator. Lines 242 to 319, 78 lines, are the candidate
+inventory for M5: element-level generators a Schema might describe. The
+range is not all element data. Lines 297 to 308 hold reference-coordination
+fields (`playerPicks`, `ownerPick`, `rolePicks`) that the materializers at
+lines 487 to 552 use to wire roles to object types and fact types. No
+element Schema supplies those, so a replacement must keep them, and any
+adapter code that does is reported separately. Only demonstrated
+replacements count toward M5. Nothing in the file changes on `main` before
+the spike passes.
 
 `ModelGraph`, validation, verbalization and mapping read records, not
 decoders, so they are untouched by the style as long as S3 holds; that
@@ -214,20 +290,19 @@ is the claim S3 exists to check rather than assume.
 //   ConstraintSchema = Schema.Union([InternalUniqueness, Mandatory, ...16])
 //   FactTypeYamlCodec: snake_case YAML <-> FactType record
 //
-// Exported from core's root, both forms for every kind:
-//   decodeFactType(doc: unknown):
-//     Effect<FactType, FactTypeProblems, IdSource>
-//   runFactTypeDecode(decoded, newId): FactType   // throws FactTypeError
-//   IdSource                                       // Context.Service
+// Exported from core's root, both forms for every kind. newId is a plain
+// parameter (Open decisions 2 and 8); no Effect service is exported.
+//   decodeFactType(doc: unknown, newId: () => string):
+//     Effect<FactType, FactTypeProblems>
+//   runFactTypeDecode(doc, newId): FactType       // throws FactTypeError
 //
 // OrmModel and OrmYamlSerializer keep their signatures until barwise-973's
-// ModelBuilder replaces them; each boundary provides IdSource from the
-// installed generator, as the Effect arm's addObjectType does.
+// ModelBuilder replaces them; each boundary passes the installed generator
+// as newId, as the Effect arm's addObjectType does.
 ```
 
-A consumer that wants Effect composes the `decode*` functions and
-provides `IdSource`; a consumer that does not calls the synchronous
-boundary and never imports `effect`. Both are exported because the owner
+A consumer that wants Effect composes the `decode*` functions; a consumer
+that does not calls the synchronous boundary and never imports `effect`. Both are exported because the owner
 chose Effect in the public API (Open decision 1) and because the 84
 consumer sites barwise-973 counts should not all have to learn Effect
 to keep compiling.
@@ -282,7 +357,8 @@ Each was shown to catch the failure it measures by a deliberate break:
   credited for its position -- each fail their test in
   `measure-comparison.test.mjs`.
 - S6: a stand-in `tsc` in a throwaway tree drives each exit: a reading,
-  over the limit, no totals printed, and a tree that does not compile.
+  a slow reading (reported, not failed), no totals printed, and a tree that
+  does not compile.
 
 **Baselines**, taken 2026-10-15 on `main` at `2704da6a` with this
 workstream's tests and scripts added -- WS0 changes no file under
@@ -372,6 +448,88 @@ closed with the reading, barwise-973 resumes in plain TypeScript from
 `experiment/effect-comparison-plain`, and the branch stays as the
 evidence. Nothing merges from this workstream.
 
+**Property tests (added 2026-10-15).** On the spike branch, each kind's
+Schema gets derived generators, and three properties run over them, with
+the run count and seed recorded:
+
+- P1, every derived value encodes (M2).
+- P2, encoding then decoding returns the same value, with object keys
+  compared unordered (M3).
+- P3, every encoded value passes the hand-written JSON Schema (M4).
+
+P3 is the only independent check. P1 and P2 are self-consistency checks:
+their expected answer comes from the Schema alone, by design. They show
+the generator and the Schema agree, and they say nothing about validity for
+the class. A Schema that is wrong the same way on both sides passes them.
+Refusal expectations are never generated from the Schema. They stay with
+the S4 fixtures.
+
+Two constraints from the grounding below. A derived schema may not
+contain `Schema.declare` unless the declaration carries a derivable link
+(Open decision 5, now verified). And a property must encode a derived value
+before decoding it, because derived values are the decoded type, with
+camelCase keys.
+
+A failed derivation is a result, not a blocker. If M1 reads no for a
+kind, M2 to M4 are recorded as not applicable for that kind, and the
+spike still passes if S1 to S5 pass. The declaration link is needed only
+to measure the model codec. The spike takes it as its first step because
+it is verified and cheap, not because a gate needs it.
+
+The spike deletes no hand-written generator. Deletion happens in WS2 to
+WS4, one kind at a time, and only for a kind whose M2 to M4 pass on its
+own head.
+
+**Grounding (2026-10-15, before the spike).** Probes ran on the Effect
+arm's `ObjectType` schema, at `8d36e4fc`, because `main` has no Effect.
+The probes are reproduced below. The spike's first commit turns them into
+tests, so none stays a one-off.
+
+- `Arbitrary.schema(ObjectTypeYamlCodec)` derives. 1,000 of 1,000
+  generated values encode (M2), and 1,000 of 1,000 round trip with keys
+  unordered (M3). That is the file-facing codec, whose data type names
+  are literals.
+- `Arbitrary.schema(ObjectTypeModelCodec)` throws `Unable to derive an
+  arbitrary for an unsupported Declaration` at `dataType.name`. The
+  cause is `Schema.declare` in `CONFIG_LEAVES`, the lenient leaf the model
+  codec uses so that a config may name a data type outside the list.
+  Open decision 5 covers the options, and the probe below verifies one.
+- **Option (a) works.** A declaration whose annotation `toCodecArbitrary`
+  returns a link to `Schema.String`, with a passthrough transformation,
+  derives. Its runtime check and its TypeScript type are unchanged. 200 of
+  200 derived values round-trip. The probe:
+
+  ```ts
+  const leaf = Schema.declare(
+    (u: unknown): u is string => typeof u === "string",
+    {
+      toCodecArbitrary: () =>
+        ({
+          to: Schema.String.ast,
+          transformation: SchemaTransformation.passthrough<string>(),
+        }) as SchemaAST.Link,
+    } as any,
+  );
+  const xs = Effect.runSync(
+    Arbitrary.sampleEffect(Arbitrary.schema(leaf), { count: 200 }),
+  );
+  ```
+
+  Without the annotation, the same call throws `Unable to derive an
+  arbitrary for an unsupported Declaration`.
+- Effect 4 has its own runner, `Arbitrary.sampleEffect` and
+  `Arbitrary.checkEffect`. Passing an Effect arbitrary to fast-check fails
+  with `this.arb.generate is not a function`.
+- A first run decoded derived values directly. It rejected all 484
+  entity values among its 1,000 samples. That was the probe's error, not a finding
+  about the generator: derived values are the decoded type, so they must
+  be encoded first. A property written that way fails every value and
+  tests nothing.
+
+Not yet measured: M1 on the 16-kind union, M4 on any kind, M5 for the
+spike's derived generators, and whether the union needs `Schema.suspend`
+to derive. Those are the spike's first readings.
+
 ### 2. Effect in core: the dependency and the `ObjectType` slice (provisional: not yet grounded)
 
 The Effect arm (`8d36e4fc`) rebased onto `main`: `effect` pinned exact
@@ -404,8 +562,9 @@ entry only records that it follows.
 ## API and migration impact
 
 - **Core's public API gains Effect types**: `decode*` functions
-  returning `Effect<Record, Problems, IdSource>`, the `IdSource` service,
-  and the problem classes, beside a synchronous boundary for each.
+  returning `Effect<Record, Problems>` and taking `newId` as a plain
+  parameter, and the problem classes, beside a synchronous boundary for
+  each. No service is exported.
 - **Downstream packages** do not depend on `effect` until they import
   from it; when one does, it declares `effect` at core's exact version,
   checked by WS2's test. A package that only calls synchronous
@@ -423,29 +582,53 @@ entry only records that it follows.
    considered. Consequence carried here: a future Effect major is a
    breaking change to core's API, not an internal upgrade, so it needs
    its own spec.
-2. **`IdSource` against barwise-e8m.** barwise-e8m commits core to "no
-   injected effect ports". `IdSource` is the existing `setIdGenerator`
-   port named in the type rather than a new one, and it is now public.
-   Options: (a) keep `setIdGenerator` as what each surface installs and
-   have every boundary provide `IdSource` from it, so nothing changes
-   for the surfaces; (b) retire `setIdGenerator` and make every caller
-   provide `IdSource`, which removes the process-wide install but
-   touches every surface. Recommend (a) for this spec, and revisit (b)
-   with `ModelBuilder`, where the edit path is redesigned anyway. Either
-   way, barwise-e8m's note should record that core now names a port it
-   previously hid.
-3. **JSON Schema: hand-written or generated.** Recommend hand-written
-   with a drift test per kind, as the Effect arm did: the Effect
-   arm found three differences between the generated and hand-written
-   object type definition, and the schema
-   is read by the editor and the LLM, where a change is user-visible.
-   Revisit when the drift tests show the two agreeing for every kind.
+2. **`IdSource` -- the API shape is resolved 2026-10-15; its purity claim is withdrawn 2026-10-16.** The decoder takes `newId` as a plain parameter, not an Effect service, and `IdSource` is removed from the exported surface. The owner asked what the service buys when ids are UUIDv7. The format does not matter. What matters is whether the decoder can reach a process-wide generator, which would make its output depend on state outside its inputs. Core's `generateId()` does reach one, so a decoder that called it directly would not be pure. Passing `newId` in avoids that, but it does not make decoding pure: a `newId` that mints random ids is an injected source of randomness. The earlier reasoning that a plain parameter "performs no effect" and so "adds no port" was wrong, and barwise-e8m names that kind of port. What the parameter does buy is repeatable tests. A counter-based `newId` gives the same output for the same input, provided each decode is given a fresh counter. Whether the parameter is allowed at all is open: see item 8.
+3. **JSON Schema: hand-written or generated -- resolved 2026-10-15: hand
+   written, with a drift test per kind.** The Effect arm's generated
+   object type definition differed from the hand-written one in three
+   places, and the schema is read by the editor and the LLM, where a change
+   is user-visible. The property P3 depends on this: the schema must stay
+   separate from the Schema under test, or P3 checks the Schema against
+   itself. Revisit when the drift tests show the two agreeing for every kind.
 4. **What a failed spike leaves behind.** Recommend: the WS0
    instruments stay on `main`, the branch is kept as evidence, and
    barwise-973 resumes from the plain arm (`8398a193`), the comparison's
    fallback.
 
+5. **The lenient config leaf, so that derivation works -- resolved
+   2026-10-15: option (a), verified.** The model codec reads a data type
+   name through `Schema.declare`, which accepts any string at runtime while
+   its TypeScript type is the strict list. Option (a), annotating the
+   declaration with a derivable link, works on the pinned Effect (see the
+   grounding). It changes neither the runtime check nor the TypeScript type.
+   Option (b), a plain string leaf with the strict list moved to the
+   boundary, is kept only as a fallback if (a) breaks under an Effect
+   upgrade.
+6. **"Names the field" -- accepted for now (2026-10-15).** The definition
+   under S4 stands until experiments say otherwise. The experiments are
+   tracked as barwise-elq.
+7. **`fast-check` as a dev dependency -- approved 2026-10-15.** It is
+   already a core dependency at `^4.10.1`. The root adds the same range and
+   lands with its first import, the property tests for the scorer. A
+   dependency with no import would be an unused dependency, which the
+   dependency checker reports.
+
+8. **Is `newId` an effect port? Open for the owner (2026-10-16).** Copilot's review of this spec pointed out that item 2's claim does not hold, and barwise-e8m forbids injected effect ports in core. Three options:
+   - **(a)** Keep `newId` as a parameter and record it as a named exception to barwise-e8m, scoped to the decoders. The e8m issue gets a note saying so. Cost: the commitment is qualified in writing, and "pure" in this spec becomes "deterministic given its inputs."
+   - **(b)** Derive an id for an element that has none from its position in the document, so decoding is a pure function of the document and needs no `newId`. Cost: the ids minted for id-less documents change. A position-derived id would be a name-based UUID (a hash of the path), not a UUIDv7, because a v7 needs a clock. This is a behavior change to measure, not assume.
+   - **(c)** An Effect service for the id source. Rejected in item 2 for the public API; choosing it reopens that decision.
+
+   Recommendation: (b) if the id change is acceptable; otherwise (a), with the exception recorded in barwise-e8m. The spike does not wait on this. It keeps `newId` as a parameter under either option.
+
 ## Risks and testing
+
+- Derivation is unstable in the pinned Effect version. The spike records
+  the version with each reading, and an Effect upgrade re-reads M1 to M4
+  before it lands.
+- Derivation generates values the Schema's own checks may refuse. M2
+  measures that rate for each kind. A kind with a low rate needs its
+  generator constrained through the options `Arbitrary.schema` accepts,
+  not filtered in each test. The spike checks which constraints it accepts.
 
 - The spike is measured, not merged. Every gate is read on one machine,
   the spike head and `main` back to back, with `--force` builds
@@ -465,3 +648,6 @@ entry only records that it follows.
   dependency where a package imports a core decoder.
 - No new capability: this restyles how core holds and decodes a model,
   not what it accepts or serializes.
+- The spike deletes no hand-written generator. Its only properties whose
+  expected answer comes from the Schema alone are the self-consistency
+  checks P1 and P2, and no refusal expectation is generated from the Schema.

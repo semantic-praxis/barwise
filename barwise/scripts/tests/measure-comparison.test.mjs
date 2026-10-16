@@ -318,7 +318,7 @@ test("a field is named only as a whole word, not inside a longer one", () => {
   assert.equal(namesField("value_type is not allowed", "value_type"), true);
 });
 
-test("typecheck reads tsc's own totals, fails over the limit, and refuses what it cannot read", () => {
+test("typecheck reads tsc's own totals and reports them, and refuses what it cannot read", () => {
   // A stand-in tsc in a throwaway tree, because the instrument has to read
   // the tree it is run in (barwise-jsi) and a real tsc cannot be made to
   // print a chosen time.
@@ -359,14 +359,17 @@ test("typecheck reads tsc's own totals, fails over the limit, and refuses what i
     const ok = run();
     assert.equal(ok.status, 0, ok.stderr);
     assert.deepEqual(
-      (({ medianMs, instantiations, s6 }) => ({ medianMs, instantiations, s6 }))(
+      (({ medianMs, instantiations }) => ({ medianMs, instantiations }))(
         JSON.parse(ok.stdout),
       ),
-      { medianMs: 2410, instantiations: 25382, s6: "pass" },
+      { medianMs: 2410, instantiations: 25382 },
     );
 
+    // S6 is a measure: a slow reading is reported, not failed.
     tsc('console.log("Instantiations:    90000\\nTotal time:    12.00s");');
-    assert.equal(run().status, 1, "over the 10-second limit");
+    const slow = run();
+    assert.equal(slow.status, 0, "a slow reading is reported, not failed");
+    assert.equal(JSON.parse(slow.stdout).medianMs, 12000);
 
     tsc('console.log("Files: 1");');
     assert.equal(run().status, 2, "no totals printed");

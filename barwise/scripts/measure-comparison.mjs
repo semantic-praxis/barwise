@@ -25,7 +25,8 @@
  * (docs/specs/gate-refusal-contract.spec.md): 0 measured (and, for
  * `startup` and `trial`, passed), 1 measured and failed, 2 could not
  * answer -- the build is missing, a ref does not resolve, git is absent.
- * `typecheck` exits 1 when the median is over its limit, like `startup`.
+ * `typecheck` reports and never fails on a reading: S6 is a measure, not a
+ * gate (effect-adoption.spec.md, owner decision 2026-10-15).
  * `malformed`, `bundles` and `diff` report and never fail: what they
  * measure is compared in WS4, not judged here.
  *
@@ -61,12 +62,6 @@ const MALFORMED_DIR = join(BARWISE, "packages/core/tests/fixtures/malformed");
 const COUNT_HOOK = join(BARWISE, "scripts/lib/module-count-hook.mjs");
 /** G4: the limit, and why -- about where a wait starts to break a train of thought. */
 const LIMIT_MS = 1000;
-/**
- * S6 (docs/specs/effect-adoption.spec.md): the limit, and why -- about where
- * a wait stops being a pause in the task and becomes a switch away from it,
- * and a developer waits on the pre-commit build at every commit.
- */
-const TYPECHECK_LIMIT_MS = 10_000;
 /** The tree's own compiler: a reading taken with another tree's tsc is not this tree's. */
 const TSC = join(BARWISE, "node_modules/typescript/bin/tsc");
 const CORE_DIR = join(BARWISE, "packages/core");
@@ -286,11 +281,9 @@ function typecheck(args) {
     rangeMs: [Math.round(Math.min(...times)), Math.round(Math.max(...times))],
     // Deterministic for one tree: reported to explain a time, never judged.
     instantiations: median(readings.map((r) => r.instantiations)),
-    limitMs: TYPECHECK_LIMIT_MS,
   };
-  result.s6 = result.medianMs < TYPECHECK_LIMIT_MS ? "pass" : "fail";
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  return result.s6 === "pass" ? 0 : 1;
+  return 0;
 }
 
 // -- bundles ---------------------------------------------------------------
