@@ -1,6 +1,23 @@
+import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
+import * as Effect from "effect/Effect";
 import { parse, stringify } from "yaml";
+import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import type { Constraint } from "../model/Constraint.js";
+import { decodeConstraints } from "../model/constraintDecoder.js";
+import { decodeFactTypes, factTypeLabel } from "../model/factTypeDecoder.js";
+import type { FactTypeRecord } from "../model/factTypeSchema.js";
+import { generateId } from "../model/id.js";
+import type { ObjectType } from "../model/ObjectType.js";
+import { decodeObjectTypes } from "../model/objectTypeDecoder.js";
 import { OrmModel } from "../model/OrmModel.js";
-import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
+import { unreportedErrors } from "./elementRecheck.js";
+import { pointerSegment } from "./jsonPointer.js";
+import {
+  type SchemaError,
+  schemaErrorOf,
+  type SchemaValidationResult,
+  SchemaValidator,
+} from "./SchemaValidator.js";
 import {
   applyMigrations,
   CURRENT_ORM_VERSION,
@@ -10,12 +27,12 @@ import {
 import { deserializeDefinition, serializeDefinition } from "./yaml/definition.js";
 import { deserializeDiagramLayout, serializeDiagramLayout } from "./yaml/diagram.js";
 import type { OrmYamlDocument } from "./yaml/document.js";
-import { deserializeFactType, serializeFactType } from "./yaml/factType.js";
+import { serializeFactType } from "./yaml/factType.js";
 import {
   deserializeObjectifiedFactType,
   serializeObjectifiedFactType,
 } from "./yaml/objectified.js";
-import { deserializeObjectType, serializeObjectType } from "./yaml/objectType.js";
+import { serializeObjectType } from "./yaml/objectType.js";
 import {
   deserializeFactInstance,
   deserializePopulation,
@@ -52,6 +69,334 @@ function versionErrorMessage(
   };
   const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
   return `${head} ${advice[plan.reason]}`;
+}
+
+/** One object type's problem, located by its position in the file. */
+interface LocatedProblem {
+  readonly index: number;
+  readonly error: SchemaError;
+}
+
+/**
+ * Decode every object type in a parsed document, whatever the JSON Schema
+ * said about the document. Before, a schema error stopped the load before
+ * any object type was built, so a cardinality with `max < min` was reported
+ * only once the schema errors elsewhere were fixed. A document without an
+ * `object_types` list has nothing to decode, and the schema check says why.
+ */
+function decodeObjectTypesOf(
+  doc: unknown,
+): { readonly decoded: ObjectType[]; readonly problems: LocatedProblem[]; } {
+  const list = (doc as { model?: { object_types?: unknown; }; } | null)?.model?.object_types;
+  if (!Array.isArray(list)) return { decoded: [], problems: [] };
+  const decoded: ObjectType[] = [];
+  const problems: LocatedProblem[] = [];
+  Effect.runSync(decodeObjectTypes(list)).forEach((result, index) => {
+    if (result._tag === "Success") {
+      decoded.push(result.success);
+      return;
+    }
+    for (const problem of result.failure.problems) {
+      const path = `/model/object_types/${index}${problem.field ? `/${problem.field}` : ""}`;
+      problems.push({ index, error: { path, message: problem.message } });
+    }
+  });
+  return { decoded, problems };
+}
+
+/** Every fact type's constraints, decoded, and every problem with them. */
+interface DecodedConstraints {
+  /** By fact type position; a fact type with any bad constraint is absent. */
+  readonly byFactType: ReadonlyMap<number, readonly Constraint[]>;
+  readonly problems: readonly SchemaError[];
+  /** Each constraint the decoder found a problem in, by `f/c`. */
+  readonly refused: ReadonlyMap<string, RefusedElement>;
+}
+
+/** An element the decoder refused: a constraint, or a fact type. */
+interface RefusedElement {
+  readonly raw: unknown;
+  /** What the decoder's problems call this element; kept errors say it too. */
+  readonly subject: string;
+  /** Where the decoder reported, as JSON pointers below the element. */
+  readonly reported: ReadonlySet<string>;
+}
+
+/**
+ * Decode every constraint of every fact type, filling a missing or empty id
+ * first: the file format lets a constraint omit its id, and decision 8 puts
+ * the fill at the loader, not in the decoder. Like the object types, this
+ * runs whatever the JSON Schema said, so a file's constraint problems are
+ * reported with everything else.
+ */
+function decodeConstraintsOf(doc: unknown): DecodedConstraints {
+  const byFactType = new Map<number, readonly Constraint[]>();
+  const problems: SchemaError[] = [];
+  const refused = new Map<string, RefusedElement>();
+  const list = (doc as { model?: { fact_types?: unknown; }; } | null)?.model?.fact_types;
+  if (!Array.isArray(list)) return { byFactType, problems, refused };
+  // Every fact type's constraints in one run, so a load starts one fiber for
+  // them, not one per fact type.
+  const decodedLists = Effect.runSync(
+    Effect.forEach(list, (ft: unknown, f) => {
+      const docs = ft !== null && typeof ft === "object"
+        ? (ft as { constraints?: unknown; }).constraints
+        : undefined;
+      return Array.isArray(docs)
+        ? decodeConstraints(docs, factTypeLabel(ft, f), generateId)
+        : Effect.succeed(undefined);
+    }),
+  );
+  decodedLists.forEach((results, f) => {
+    if (results === undefined) return;
+    const docs = (list[f] as { constraints: readonly unknown[]; }).constraints;
+    const decoded: Constraint[] = [];
+    results.forEach((result, c) => {
+      if (result._tag === "Success") {
+        decoded.push(result.success as Constraint);
+        return;
+      }
+      const reported = new Set<string>();
+      for (const problem of result.failure.problems) {
+        const below = problem.path.map((k) => `/${pointerSegment(k)}`).join("");
+        reported.add(below);
+        problems.push({
+          path: `/model/fact_types/${f}/constraints/${c}${below}`,
+          message: problem.message,
+        });
+      }
+      refused.set(`${f}/${c}`, {
+        raw: docs[c],
+        subject: result.failure.subject,
+        reported,
+      });
+    });
+    if (decoded.length === results.length) byFactType.set(f, decoded);
+  });
+  return { byFactType, problems, refused };
+}
+
+/** Every fact type, decoded without its constraints, and every problem with them. */
+interface DecodedFactTypes {
+  /** By position; a fact type the decoder refused is absent. */
+  readonly records: ReadonlyMap<number, FactTypeRecord>;
+  readonly problems: readonly SchemaError[];
+  readonly refused: ReadonlyMap<number, RefusedElement>;
+}
+
+function decodeFactTypesOf(doc: unknown): DecodedFactTypes {
+  const records = new Map<number, FactTypeRecord>();
+  const problems: SchemaError[] = [];
+  const refused = new Map<number, RefusedElement>();
+  const list = (doc as { model?: { fact_types?: unknown; }; } | null)?.model?.fact_types;
+  if (!Array.isArray(list)) return { records, problems, refused };
+  Effect.runSync(decodeFactTypes(list)).forEach((result, f) => {
+    if (result._tag === "Success") {
+      records.set(f, result.success);
+      return;
+    }
+    const reported = new Set<string>();
+    for (const problem of result.failure.problems) {
+      const below = problem.path.map((k) => `/${pointerSegment(k)}`).join("");
+      reported.add(below);
+      problems.push({ path: `/model/fact_types/${f}${below}`, message: problem.message });
+    }
+    refused.set(f, { raw: list[f], subject: result.failure.subject, reported });
+  });
+  return { records, problems, refused };
+}
+
+/** A fact type's own region: under it, but not under its `constraints` entries. */
+const FACT_TYPE_PATH = /^\/model\/fact_types\/(\d+)(?:$|\/(?!constraints\/\d))/;
+
+/**
+ * The schema's errors with the decoder's fact type problems in their place,
+ * on each fact type the decoder refused, by the same rule as for constraints
+ * (`mergeConstraintProblems`): the whole-document errors in the fact type's
+ * own region are dropped, the fact type is checked again against the schema's
+ * `fact_type` definition alone, with its constraints left out because they
+ * are the constraint merge's, and every error the decoder did not report at
+ * the same place is kept.
+ */
+function mergeFactTypeProblems(
+  schemaErrors: readonly SchemaError[],
+  decoded: DecodedFactTypes,
+  document: unknown,
+): SchemaError[] {
+  const owned = (e: SchemaError) => {
+    const match = FACT_TYPE_PATH.exec(e.path);
+    return match !== null && decoded.refused.has(Number(match[1]));
+  };
+  const kept: SchemaError[] = [];
+  for (const [f, refused] of decoded.refused) {
+    const raw = refused.raw;
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const { constraints: _constraints, ...own } = raw as Record<string, unknown>;
+    for (const error of unreportedErrors(factTypeValidator(), own, refused.reported)) {
+      kept.push(schemaErrorOf(error, document, `/model/fact_types/${f}`, refused.subject));
+    }
+  }
+  return [...schemaErrors.filter((e) => !owned(e)), ...decoded.problems, ...kept];
+}
+
+let factTypeValidatorInstance: ValidateFunction | undefined;
+
+function factTypeValidator(): ValidateFunction {
+  factTypeValidatorInstance ??= new Ajv({ allErrors: true }).compile({
+    definitions: constraintSchemas.definitions,
+    ...(constraintSchemas.definitions as unknown as { fact_type: object; }).fact_type,
+  });
+  return factTypeValidatorInstance;
+}
+
+/**
+ * The schema's errors with the decoder's constraint problems in their place,
+ * on each constraint the decoder refused.
+ *
+ * The whole-document check reports a bad constraint once per `oneOf` branch
+ * it failed -- 56 errors for one constraint missing a field, none naming the
+ * kind it was meant to be. So on a constraint the decoder refused, those are
+ * dropped, and the constraint is checked again against its own kind's branch
+ * of the schema alone. Every error from that check the decoder did not report
+ * at the same place is kept: through the mapping the whole-document check
+ * uses, so with the same rule, but worded with the subject the decoder gave
+ * the constraint and the field below it, in the words the decoder uses
+ * (`problemWording.ts`).
+ *
+ * A constraint the decoder accepted keeps every schema error on it. The load
+ * is refused either way.
+ *
+ * "Reported at the same place" does not compare rules, because the decoder's
+ * problems do not carry one: an error at a place the decoder reported is
+ * taken as said. So a schema rule is lost only if the decoder stops stating
+ * it AND reports something else at that same place. The first half is what
+ * the decoder's field-by-field test against this schema fails on.
+ */
+function mergeConstraintProblems(
+  schemaErrors: readonly SchemaError[],
+  decoded: DecodedConstraints,
+  document: unknown,
+): SchemaError[] {
+  const owned = (e: SchemaError) => {
+    const match = CONSTRAINT_PATH.exec(e.path);
+    return match !== null && decoded.refused.has(`${match[1]}/${match[2]}`);
+  };
+  const kept: SchemaError[] = [];
+  for (const [key, refused] of decoded.refused) {
+    const [f, c] = key.split("/");
+    for (const error of unreportedBranchErrors(refused)) {
+      kept.push(
+        schemaErrorOf(error, document, `/model/fact_types/${f}/constraints/${c}`, refused.subject),
+      );
+    }
+  }
+  return [...schemaErrors.filter((e) => !owned(e)), ...decoded.problems, ...kept];
+}
+
+const CONSTRAINT_PATH = /^\/model\/fact_types\/(\d+)\/constraints\/(\d+)(?:\/|$)/;
+
+type ConstraintBranch = { readonly properties: { readonly type: { readonly const: string; }; }; };
+const constraintSchemas = ormModelSchema as {
+  definitions: { constraint: { oneOf: readonly ConstraintBranch[]; }; };
+};
+
+/** One validator per constraint kind, compiled on first use: most loads refuse nothing. */
+let branchValidators: ReadonlyMap<string, ValidateFunction> | undefined;
+
+function branchValidator(type: unknown): ValidateFunction | undefined {
+  if (typeof type !== "string") return undefined;
+  branchValidators ??= (() => {
+    const ajv = new Ajv({ allErrors: true });
+    const { definitions } = constraintSchemas;
+    const constraintLevel = Object.fromEntries(
+      Object.entries(definitions.constraint).filter(([keyword]) => keyword !== "oneOf"),
+    );
+    return new Map(
+      definitions.constraint.oneOf.map((branch) => [
+        branch.properties.type.const,
+        // The constraint definition's own keywords beside `oneOf` apply to
+        // every kind, so they are checked with the branch, not restated.
+        // `type: object` at the root as well: strict mode reads each allOf
+        // member on its own and printed a warning per branch to the console.
+        ajv.compile({ definitions, type: "object", allOf: [constraintLevel, branch] }),
+      ]),
+    );
+  })();
+  return branchValidators.get(type);
+}
+
+/**
+ * The errors of a refused constraint's own branch that the decoder did not
+ * report. A constraint whose type names no kind, or that is not a mapping,
+ * has no branch: the decoder's report of that is the whole story.
+ */
+function unreportedBranchErrors(refused: RefusedElement): ErrorObject[] {
+  const raw = refused.raw;
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return [];
+  const validate = branchValidator((raw as { type?: unknown; }).type);
+  return validate === undefined ? [] : unreportedErrors(validate, raw, refused.reported);
+}
+
+/**
+ * An object type's path: its index, the field under it if any, and whatever
+ * sits below that field.
+ */
+const OBJECT_TYPE_PATH = /^\/model\/object_types\/(\d+)(?:\/([^/]+)(\/.*)?)?$/;
+/**
+ * The fields an object type's `then` branch (the entity variant) governs,
+ * read from the schema rather than restated: it requires reference_mode and
+ * forbids the value-only fields. When the decoder names any of them, the
+ * schema's failed `then` says the same thing.
+ */
+const THEN_FIELDS: readonly string[] = (() => {
+  const then = (ormModelSchema as {
+    definitions: { object_type: { then: { required?: string[]; properties?: object; }; }; };
+  }).definitions.object_type.then;
+  return [...(then.required ?? []), ...Object.keys(then.properties ?? {})];
+})();
+
+/**
+ * The schema's errors and the decoder's problems as one list.
+ *
+ * The decoder names top-level fields only, so a schema error is dropped only
+ * when the decoder has replaced it: a field-level error at exactly a field the
+ * decoder names, a required-property or unknown-property error for a property the
+ * decoder names, or an entity's failed `then` branch when the decoder names a field that
+ * branch governs. Errors are matched on ajv's rule, not its wording.
+ * Deeper errors inside a field are kept, because the decoder cannot say which
+ * nested rule it replaced: a duplicate costs a line, a dropped rule is silent.
+ * Everything else at an object type's root stands, so a bare list entry keeps
+ * the schema's "must be object". A missing `id` is the decoder's to report,
+ * since it requires every id, and its problem replaces the schema's.
+ */
+function mergeObjectTypeProblems(
+  schemaErrors: readonly SchemaError[],
+  problems: readonly LocatedProblem[],
+): SchemaError[] {
+  const named = new Set<string>();
+  for (const { index, error } of problems) {
+    const field = OBJECT_TYPE_PATH.exec(error.path)?.[2];
+    if (field !== undefined) named.add(`${index}/${field}`);
+  }
+  const covered = (error: SchemaError) => {
+    const match = OBJECT_TYPE_PATH.exec(error.path);
+    if (match === null) return false;
+    const index = Number(match[1]);
+    const [, , field, below] = match;
+    if (field !== undefined) return below === undefined && named.has(`${index}/${field}`);
+    const rule = error.rule;
+    if (rule?.keyword === "required" && rule.missingProperty !== undefined) {
+      return named.has(`${index}/${rule.missingProperty}`);
+    }
+    if (rule?.keyword === "additionalProperties" && rule.additionalProperty !== undefined) {
+      return named.has(`${index}/${rule.additionalProperty}`);
+    }
+    if (rule?.keyword === "if" && rule.failingKeyword === "then") {
+      return THEN_FIELDS.some((f) => named.has(`${index}/${f}`));
+    }
+    return false;
+  };
+  return [...schemaErrors.filter((e) => !covered(e)), ...problems.map((p) => p.error)];
 }
 
 /**
@@ -128,17 +473,36 @@ export class OrmYamlSerializer {
     const migrated = this.migrateToCurrentVersion(raw);
 
     const result = this.validator.validateModel(migrated);
-    if (!result.valid) {
+    const objectTypes = decodeObjectTypesOf(migrated);
+    const factTypes = decodeFactTypesOf(migrated);
+    const constraints = decodeConstraintsOf(migrated);
+    const errors = mergeFactTypeProblems(
+      mergeConstraintProblems(
+        mergeObjectTypeProblems(result.errors, objectTypes.problems),
+        constraints,
+        migrated,
+      ),
+      factTypes,
+      migrated,
+    );
+    if (errors.length > 0) {
+      const head = result.valid
+        ? "YAML holds malformed model elements"
+        : "YAML does not conform to orm-model schema";
       throw new DeserializationError(
-        `YAML does not conform to orm-model schema: ${
-          result.errors.map((e) => `${e.path}: ${e.message}`).join("; ")
-        }`,
-        result,
+        `${head}: ${errors.map((e) => `${e.path}: ${e.message}`).join("; ")}`,
+        { valid: false, errors },
       );
     }
 
     const doc = migrated as OrmYamlDocument;
-    return this.fromDocument(doc, options);
+    return this.fromDocument(
+      doc,
+      objectTypes.decoded,
+      factTypes.records,
+      constraints.byFactType,
+      options,
+    );
   }
 
   /**
@@ -228,6 +592,9 @@ export class OrmYamlSerializer {
 
   private fromDocument(
     doc: OrmYamlDocument,
+    objectTypes: readonly ObjectType[],
+    factTypes: ReadonlyMap<number, FactTypeRecord>,
+    constraints: ReadonlyMap<number, readonly Constraint[]>,
     options?: { lenient?: boolean; },
   ): OrmModel {
     const model = new OrmModel({
@@ -236,18 +603,25 @@ export class OrmYamlSerializer {
       note: doc.model.note,
     });
 
-    // Add object types first (fact types reference them).
-    for (const otDoc of doc.model.object_types ?? []) {
-      model.addObjectType(deserializeObjectType(otDoc));
+    // Add object types first (fact types reference them). Already decoded, so
+    // every problem in the file was reported together; `addObjectType` takes
+    // the record as its config, which it is.
+    for (const ot of objectTypes) {
+      model.addObjectType(ot);
     }
 
     // Add fact types.
-    for (const ftDoc of doc.model.fact_types ?? []) {
+    // Fact types and their constraints are already decoded, ids filled; a
+    // load that reaches here had no problem in either, so every fact type
+    // has its record.
+    (doc.model.fact_types ?? []).forEach((_ftDoc, f) => {
+      const record = factTypes.get(f);
+      if (record === undefined) throw new Error(`No decoded record for fact type ${f}.`);
       model.addFactType(
-        deserializeFactType(ftDoc),
+        { ...record, constraints: [...(constraints.get(f) ?? [])] },
         { skipPlayerValidation: options?.lenient },
       );
-    }
+    });
 
     // Add subtype facts (after object types and fact types).
     for (const sfDoc of doc.model.subtype_facts ?? []) {

@@ -111,6 +111,14 @@ export {
   type ValueRange,
   type ValueType,
 } from "./model/ObjectType.js";
+export {
+  decodeObjectType,
+  decodeObjectTypeConfig,
+  ObjectTypeError,
+  type ObjectTypeProblem,
+  ObjectTypeProblems,
+  runObjectTypeDecode,
+} from "./model/objectTypeDecoder.js";
 export { OrmModel, type OrmModelConfig } from "./model/OrmModel.js";
 export {
   type ExportFormat,

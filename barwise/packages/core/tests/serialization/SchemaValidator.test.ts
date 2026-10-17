@@ -188,6 +188,7 @@ describe("SchemaValidator", () => {
         expect(result.errors).toContainEqual({
           path: "/model/object_types/0/data_type/name",
           message: 'must be equal to one of the allowed values (in "Weight")',
+          rule: { keyword: "enum" },
         });
       });
 
@@ -202,6 +203,7 @@ describe("SchemaValidator", () => {
         expect(unnamed.errors).toContainEqual({
           path: "/model/object_types/0",
           message: "must NOT have additional properties",
+          rule: { keyword: "additionalProperties", additionalProperty: "colour" },
         });
         const top = validator.validateModel({
           orm_version: "2.0",
@@ -210,6 +212,7 @@ describe("SchemaValidator", () => {
         expect(top.errors).toContainEqual({
           path: "/model",
           message: "must NOT have additional properties",
+          rule: { keyword: "additionalProperties", additionalProperty: "colour" },
         });
       });
     });

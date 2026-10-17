@@ -13,6 +13,12 @@ pipelines, and test harnesses without launching an editor.
 Allowed runtime dependencies: `yaml`, `ajv`. No others without
 discussion.
 
+On the `experiment/effect-adoption-facttype` branch only, core also depends
+on `effect`, pinned exact. That is the FactType spike of
+`docs/specs/effect-adoption.spec.md`, which is the discussion, and nothing
+from the branch merges. Whether `effect` joins this list is the spike's
+outcome, decided in that spec's WS2.
+
 ## Package Layout
 
 ```

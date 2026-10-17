@@ -105,10 +105,11 @@ export class FactType extends ModelElement {
     }
 
     this._readings = config.readings.map((template) => ({ template }));
-    // Assign IDs to constraints that don't have them (for traceability).
-    this._constraints = (config.constraints ?? []).map((c) =>
-      c.id ? c : { ...c, id: generateId() }
-    );
+    // Assign IDs to constraints that don't have them (for traceability), and
+    // make the default modality explicit: the record a file decodes to always
+    // carries one (effect-adoption.spec.md, S3), so a constraint built in code
+    // must too, or a model and its own reload differ by an absent key.
+    this._constraints = (config.constraints ?? []).map(withDefaults);
     this._definition = config.definition;
     this._note = config.note;
     this._derivation = config.derivation;
@@ -167,7 +168,9 @@ export class FactType extends ModelElement {
 
   /** Add a constraint to this fact type. */
   addConstraint(constraint: Constraint): void {
-    this._constraints.push(constraint);
+    // Only the modality: main never filled an id here, and validation, lineage
+    // and mapping each handle a constraint without one.
+    this._constraints.push({ ...constraint, modality: constraint.modality ?? "alethic" });
   }
 
   /** Get all role ids that reference a given object type (by player id). */
@@ -203,4 +206,9 @@ export function toFactTypeConfig(ft: FactType): FactTypeConfig {
     derivation: ft.derivation,
   };
   return config;
+}
+
+/** A constraint with its id and modality filled when the caller left them out. */
+function withDefaults(c: Constraint): Constraint {
+  return { ...c, id: c.id || generateId(), modality: c.modality ?? "alethic" };
 }

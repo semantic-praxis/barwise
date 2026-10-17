@@ -110,7 +110,9 @@ describe("NORMA construct round-trip (WS3)", () => {
     const uc = ft.constraints.find((c) => c.type === "internal_uniqueness")!;
     expect(uc.modality).toBe("deontic");
     const mand = ft.constraints.find((c) => c.type === "mandatory")!;
-    expect(mand.modality).toBeUndefined();
+    // On the effect-adoption spike a constraint carries the default modality
+    // explicitly once built (S3's narrowing); the XML still leaves it implicit.
+    expect(mand.modality).toBe("alethic");
   });
 
   it("round-trips object-type cardinality, bounded and unbounded", () => {
@@ -136,7 +138,7 @@ describe("NORMA construct round-trip (WS3)", () => {
       min: 0,
       max: 10,
     });
-    expect(prefCard.modality).toBeUndefined();
+    expect(prefCard.modality).toBe("alethic"); // explicit on the spike (S3)
 
     const active = back.getFactTypeByName("Customer is active")!;
     const activeCard = active.constraints.find((c) => c.type === "cardinality")!;
