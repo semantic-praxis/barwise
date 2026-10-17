@@ -266,6 +266,9 @@ function parseObjectifiedTypes(
       id: asNormaId(attr(ot, "id") ?? ""),
       name: attr(ot, "Name") ?? "",
       nestedFactTypeRef: nested ? asNormaId(attr(nested, "ref") ?? "") : asNormaId(""),
+      ...(nested && attr(nested, "id")
+        ? { nestedPredicateId: asNormaId(attr(nested, "id")!) }
+        : {}),
       referenceMode: attr(ot, "_ReferenceMode"),
       note: parseNotesText(ot),
       preferredIdentifier: prefId ? attr(prefId, "ref") : undefined,

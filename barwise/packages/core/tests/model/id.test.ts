@@ -9,6 +9,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createUuidv7Generator,
+  formatUuid,
   generateId,
   setIdGenerator,
   uuidv7FromParts,
@@ -55,6 +56,17 @@ describe("uuidv7FromParts", () => {
     expect(() => uuidv7FromParts(2 ** 48, zeros)).toThrow();
     expect(() => uuidv7FromParts(1.5, zeros)).toThrow();
     expect(() => uuidv7FromParts(1000, bytes(0, 0, 0))).toThrow();
+  });
+});
+
+describe("formatUuid", () => {
+  it("writes 16 bytes as 8-4-4-4-12 hex, keeping leading zeros", () => {
+    const bytes = Uint8Array.from({ length: 16 }, (_, i) => i);
+    expect(formatUuid(bytes)).toBe("00010203-0405-0607-0809-0a0b0c0d0e0f");
+  });
+
+  it("refuses anything but 16 bytes", () => {
+    expect(() => formatUuid(new Uint8Array(15))).toThrow(/16 bytes/);
   });
 });
 

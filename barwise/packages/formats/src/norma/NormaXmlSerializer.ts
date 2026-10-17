@@ -139,7 +139,10 @@ function buildObjectifiedType(ot: NormaObjectifiedType): XmlNode {
   if (ot.referenceMode !== undefined) {
     node[`${ATTR}_ReferenceMode`] = ot.referenceMode;
   }
-  node["orm:NestedPredicate"] = { [`${ATTR}ref`]: ot.nestedFactTypeRef };
+  node["orm:NestedPredicate"] = {
+    ...(ot.nestedPredicateId ? { [`${ATTR}id`]: ot.nestedPredicateId } : {}),
+    [`${ATTR}ref`]: ot.nestedFactTypeRef,
+  };
   addCardinality(node, ot.cardinality);
   addPlayedRoles(node, ot.playedRoleRefs);
   addDefinition(node, ot.definition);

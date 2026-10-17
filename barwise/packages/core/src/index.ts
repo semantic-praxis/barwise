@@ -146,6 +146,7 @@ export {
   splitModel,
   type SplitResult,
 } from "./project/index.js";
+export { canonicalJson, derivedId } from "./serialization/derivedId.js";
 export {
   MappingDeserializationError,
   MappingSerializer,

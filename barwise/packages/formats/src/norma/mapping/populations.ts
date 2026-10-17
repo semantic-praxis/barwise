@@ -12,6 +12,7 @@
  * validators consume.
  */
 import type { FactInstanceConfig } from "@barwise/core";
+import { derivedNormaElementId, NORMA_ID_TAGS } from "../normaId.js";
 import type { NormaMappingContext } from "./context.js";
 
 /** Flatten NORMA instance collections into model populations (phase 4). */
@@ -71,7 +72,12 @@ export function mapPopulations(ctx: NormaMappingContext): void {
         const factId = factByRoleId.get(roleRef);
         if (!factId) continue;
         const rows = unaryRowsByFact.get(factId) ?? [];
-        rows.push({ roleValues: { [roleIdMap.get(roleRef) ?? roleRef]: value } });
+        rows.push({
+          // A unary row has no NORMA element of its own: its id comes from
+          // the instance and the role it marks, never the generator.
+          id: derivedNormaElementId(NORMA_ID_TAGS.unaryInstance, [inst.id, roleRef]),
+          roleValues: { [roleIdMap.get(roleRef) ?? roleRef]: value },
+        });
         unaryRowsByFact.set(factId, rows);
       }
     }
@@ -95,11 +101,17 @@ export function mapPopulations(ctx: NormaMappingContext): void {
         roleValues[roleIdMap.get(decl.roleId) ?? decl.roleId] = value;
       }
       if (Object.keys(roleValues).length > 0) {
-        instances.push({ roleValues });
+        instances.push({ id: fi.id, roleValues });
       }
     }
     if (instances.length > 0) {
-      model.addPopulation({ factTypeId, instances });
+      // NORMA has no population element, one per fact type here, so the
+      // id comes from the fact type: one NORMA file, one model.
+      model.addPopulation({
+        id: derivedNormaElementId(NORMA_ID_TAGS.population, [factTypeId]),
+        factTypeId,
+        instances,
+      });
     }
   }
 }

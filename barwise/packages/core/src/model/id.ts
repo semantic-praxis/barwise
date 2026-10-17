@@ -72,7 +72,18 @@ export function uuidv7FromParts(unixMs: number, random: Uint8Array): string {
     b[9 + i] = random[3 + i]!;
   }
 
-  const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return formatUuid(b);
+}
+
+/**
+ * The 8-4-4-4-12 hex form of 16 bytes whose version and variant bits are
+ * already set: the one spelling of the UUIDs core builds itself, v7 here and
+ * the derived v8 in `serialization/derivedId.ts`. The default v4 comes from
+ * `node:crypto` already spelled.
+ */
+export function formatUuid(bytes: Uint8Array): string {
+  if (bytes.length !== 16) throw new Error(`formatUuid: need 16 bytes, got ${bytes.length}`);
+  const hex = Array.from(bytes, (x) => x.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${
     hex.slice(20)
   }`;

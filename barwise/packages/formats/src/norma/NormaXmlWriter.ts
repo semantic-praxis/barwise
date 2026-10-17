@@ -36,7 +36,7 @@ import {
   type ValueType,
   viewMembership,
 } from "@barwise/core";
-import { asNormaId, derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
+import { asNormaId, cardinalityId, derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
 import type {
   NormaCardinality,
   NormaConstraint,
@@ -69,9 +69,13 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   // object-type ids so the entity loop can skip them.
   const objectifiedObjectTypeIds = new Set<string>();
   const objectifiedByObjectType = new Map<string, string>(); // objectTypeId -> factTypeId
+  // objectTypeId -> the link's own id, written on NestedPredicate so a
+  // round trip keeps it.
+  const objectificationIdByObjectType = new Map<string, string>();
   for (const oft of model.objectifiedFactTypes) {
     objectifiedObjectTypeIds.add(oft.objectTypeId);
     objectifiedByObjectType.set(oft.objectTypeId, oft.factTypeId);
+    objectificationIdByObjectType.set(oft.objectTypeId, oft.id);
   }
 
   // Index roles played by each object type (across all fact types) so each
@@ -105,6 +109,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
         id: toNormaId(ot.id),
         name: ot.name,
         nestedFactTypeRef: toNormaId(factTypeId),
+        nestedPredicateId: toNormaId(objectificationIdByObjectType.get(ot.id)!),
         referenceMode: ot.referenceMode,
         preferredIdentifier: preferredIdByEntity.get(ot.id),
         playedRoleRefs: refs,
@@ -296,11 +301,13 @@ function writeFactType(
 
   const internalRefs: NormaId[] = [];
   ft.constraints.forEach((c, i) => {
-    // Constraints attached through the FactType constructor carry an id;
-    // those attached later by the importer (external uniqueness, role-level
-    // value constraints) do not. Derive a deterministic, collision-free id
-    // from the fact type id and the constraint's position so every emitted
-    // constraint has a unique id token.
+    // A model loaded from a file or imported from NORMA gives every
+    // constraint an id (orm-format-3.spec.md, WS2). One added in code
+    // through FactType.addConstraint may have none -- every constraint the
+    // LLM transcript importer builds, until the model is saved -- and gets
+    // an id from the fact type id and its position. That id moves when a
+    // constraint is inserted before it and is not checked against stated
+    // ids (a repeat is dropped by `seen` below): barwise-nkq.
     const fallbackId = derivedNormaId(toNormaId(ft.id), `_c${i}`);
     if (c.type === "exclusive_or") {
       // NORMA has no single xor element: the native encoding is an
@@ -308,7 +315,8 @@ function writeFactType(
       // refs. Both halves are multi-fact, so neither is internal.
       const exclusionId = c.id ? toNormaId(c.id) : fallbackId;
       const mandatoryId = derivedNormaId(exclusionId, "_xormand");
-      if (seen.has(exclusionId)) return;
+      // Either half's id already written makes this a repeat, dropped whole.
+      if (seen.has(exclusionId) || seen.has(mandatoryId)) return;
       seen.add(exclusionId);
       seen.add(mandatoryId);
       const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
@@ -334,10 +342,11 @@ function writeFactType(
     }
     const written = writeConstraint(c, fallbackId);
     if (!written) return;
-    if (!seen.has(written.id)) {
-      seen.add(written.id);
-      constraints.push(written);
-    }
+    // A repeated id is dropped whole: its constraint is not written, so no
+    // InternalConstraints entry may name it a second time either.
+    if (seen.has(written.id)) return;
+    seen.add(written.id);
+    constraints.push(written);
     // Internal (single-fact) constraints are referenced from the fact's
     // InternalConstraints; multi-fact constraints are top-level only.
     if (isInternalConstraint(c)) {
@@ -379,7 +388,7 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
     ...(card
       ? {
         cardinality: {
-          id: card.id ? toNormaId(card.id) : derivedNormaId(toNormaId(role.id), "_card"),
+          id: card.id ? toNormaId(card.id) : cardinalityId(toNormaId(role.id)),
           ranges: [{ from: card.min, ...(card.max !== "unbounded" ? { to: card.max } : {}) }],
           ...(card.modality === "deontic" ? { modality: "deontic" as const } : {}),
         },
@@ -749,7 +758,7 @@ function writeCardinality(ot: ObjectType): NormaCardinality | undefined {
   const c = ot.cardinality;
   if (!c) return undefined;
   return {
-    id: derivedNormaId(toNormaId(ot.id), "_card"),
+    id: cardinalityId(toNormaId(ot.id)),
     ranges: [{ from: c.min, ...(c.max !== "unbounded" ? { to: c.max } : {}) }],
   };
 }
