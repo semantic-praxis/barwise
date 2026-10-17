@@ -6,7 +6,7 @@ generators and property tests (see WS1 and Reported measures); the spike
 in progress on `experiment/effect-adoption-facttype` (#672, never merges);
 WS1b added 2026-10-16 for review, not started; WS2 onward not started
 Created: 2026-10-15
-Last-updated: 2026-10-16
+Last-updated: 2026-10-17
 Tracking: barwise-jo5 (this spec); barwise-4r3 (Effect alone on load,
 WS1b part B); barwise-r27 (the blind-spot harness, part A); barwise-wia (generated JSON
 Schema, part C); barwise-5ly (one format definition, part E); barwise-s6q
@@ -724,10 +724,9 @@ with `onExcessProperty: "error"`, and what C does about each:
   where `examples/getting-started/shop.orm.yaml` omits constraint ids, the
   file side states `id` optional and the fill sits in a stage in front of
   the decode. Under format 3.0 (`orm-format-3.spec.md`), ids are required,
-  the file side states them required, and there is no fill stage. Which
-  applies is set by which lands first; that spec recommends 3.0 first (its
-  Open decision 6), and if the owner agrees, this part is built against 3.0
-  and the optional-id stage is never written.
+  the file side states them required, and there is no fill stage. The owner chose
+  3.0 first (that spec's Open decision 6, resolved 2026-10-17), so this part
+  is built against 3.0 and the optional-id stage is never written.
 - The 16-kind union comes out as `anyOf`, not `oneOf`, because Effect
   marks one branch as an approximation. The branches are disjoint by
   their `type` constant, so both accept the same files; C finds the
@@ -874,8 +873,8 @@ makes the first three read from that definition:
   same pattern inside `@barwise/llm` -- its own Effect Schema, with the
   tool's input schema generated from it and the model's response
   decoded by it -- which is separate work with its own spec.
-- **Not planned, pending Open decision 12: registering the generated file
-  with Red Hat's YAML extension** (`contributes.yamlValidation`). It would give as-you-type
+- **Not done (Open decision 12, resolved: no): registering the generated
+  file with Red Hat's YAML extension** (`contributes.yamlValidation`). It would give as-you-type
   JSON Schema errors to users who have that extension, but the language
   server already reports every problem in the decoder's words, and a
   second source would report the same problem twice in different
@@ -1056,7 +1055,7 @@ entry only records that it follows.
       reads close to zero, which is a result, not a failure.
 
 12. **Register the generated schema with Red Hat's YAML extension
-    (added 2026-10-16).**
+    (added 2026-10-16) -- resolved 2026-10-17 by the owner: option (a), no.**
     - **(a)** No. Recommended: the language server already reports
       every problem in the decoder's words, and a second source reports
       the same problem twice, worded differently.

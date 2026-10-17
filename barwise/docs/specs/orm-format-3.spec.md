@@ -1,8 +1,9 @@
 # `.orm.yaml` format 3.0: constraint identity and placement by kind
 
-Status: Draft -- no workstream implemented
+Status: Draft -- no workstream implemented; every open decision resolved by
+the owner 2026-10-17
 Created: 2026-10-16
-Last-updated: 2026-10-16
+Last-updated: 2026-10-17
 Tracking: barwise-n9n (constraint ids and placement); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
@@ -416,11 +417,13 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 - **Verbalization output** moves external constraints into their own section;
   golden files change in WS3.
 
-## Open decisions (for review)
+## Open decisions (all resolved 2026-10-17)
 
-1. **ADR 0003 amends ADR 0001's "inline and local".** Recommend: yes, as
+1. **ADR 0003 amends ADR 0001's "inline and local" -- resolved 2026-10-17 by the owner: yes,
+   as recommended.** Recommend: yes, as
    WS1 states it -- internal inline, external model-level by reference.
-2. **Shape of subtype constraints.**
+2. **Shape of subtype constraints -- resolved 2026-10-17 by the owner: option (a), reuse
+   the three kinds with a `subtype_facts` operand.**
    - **(a)** Reuse `exclusion`, `disjunctive_mandatory` and `exclusive_or`
      with a `subtype_facts` operand. Recommended: it is NORMA's own
      representation (an exclusion or mandatory constraint over the subtype
@@ -428,11 +431,13 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
      is at most one of: Male, Female".
    - **(b)** Three dedicated kinds (`subtype_exclusion` and so on). Clearer
      in a switch; three more kinds for every consumer to handle.
-3. **Preferred identifier by reference, in 3.0.** Recommend: yes. 3.0 is the
+3. **Preferred identifier by reference, in 3.0 -- resolved 2026-10-17 by the owner: yes.**
+   Recommend: yes. 3.0 is the
    one breaking bump, required ids are what make the reference possible, and
    it closes barwise-alg. The alternative, `is_preferred` added to
    `external_uniqueness`, keeps a flag the entity cannot see.
-4. **Shape of migration-derived ids.** Recommend: a UUIDv8 built from a
+4. **Shape of migration-derived ids -- resolved 2026-10-17 by the owner: UUIDv8 from a
+   hash.** Recommend: a UUIDv8 built from a
    SHA-256 of the inputs, so derived ids look like every other id and a
    collision with an author's id is improbable. Improbable is not
    impossible, so the loader refuses two constraints with the same id in
@@ -446,19 +451,23 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
    constraints by id whatever the files' versions. An edited constraint
    gets a different id, which diff reports as a removal and an addition,
    the same as today's content-key matching.
-5. **A `barwise migrate` command.** Recommend: yes, CLI-only, rewriting files
+5. **A `barwise migrate` command -- resolved 2026-10-17 by the owner: yes, CLI only, with a
+   deliberate capability-matrix row.** Recommend: yes, CLI-only, rewriting files
    in place to the current version; it serves the 113 tracked files and every
    user's repository, and gets a deliberate capability-matrix row. The
    alternative is relying on each file's next save.
-6. **Order against the Effect adoption.** Recommend: format 3.0 on `main`
+6. **Order against the Effect adoption -- resolved 2026-10-17 by the owner: format 3.0
+   first.** Recommend: format 3.0 on `main`
    first, with the hand-written serializers. It fixes user-visible defects
    now, and the Effect spike's schemas then describe 3.0 -- which also removes
    that spec's optional-id complication (its WS1b part C).
-7. **Verbalizing external constraints.** Recommend: one section for
+7. **Verbalizing external constraints -- resolved 2026-10-17 by the owner: their own
+   section.** Recommend: one section for
    constraints across fact types, each verbalized once. The alternative,
    repeating each under every fact type it touches, reads well per fact type
    and states every rule two or more times.
-8. **What 2.0's `is_preferred` meant, for the migration's step 4.** Five
+8. **What 2.0's `is_preferred` meant, for the migration's step 4 --
+   resolved 2026-10-17 by the owner: option (a), the ORM reading.** Five
    modules answer "which constraint is this entity's preferred identifier"
    with five different rules today (barwise-971), and the corpus does not
    follow any one of them: of the 376 preferred uniquenesses, 286 sit on the
