@@ -89,16 +89,19 @@ export function updateManifest(
  * The model is serialized to YAML, its ids are canonicalized, and the
  * result is hashed with SHA-256. Returns the hex digest.
  *
- * Ids are canonicalized because they are not all authored: every
- * constraint without an `id` in the source is minted a fresh UUID on
- * load (`FactType`), so two loads of one file serialize differently on
- * every such line and hashed differently -- and `barwise lineage
- * status` reported every export stale on every run for any model with
- * an id-less constraint (barwise-923). Each id string is replaced by
- * its order of first appearance, and every reference to it follows
- * because a reference is the same string. The cost is that renaming an
- * explicit id, with nothing else changed, does not change the hash;
- * lineage guards content, and ids are identity plumbing.
+ * Ids are canonicalized because they were not all stable: until
+ * orm-format-3 WS2, every constraint without an `id` in the source was
+ * minted a fresh UUID on load, so two loads of one file hashed
+ * differently -- and `barwise lineage status` reported every export
+ * stale on every run for any model with an id-less constraint
+ * (barwise-923). Such ids are now derived from content, so that cause is
+ * gone; the canonicalization stays because every recorded manifest hash
+ * was taken through it, and dropping it would report every existing
+ * export stale once. Each id string is replaced by its order of first
+ * appearance, and every reference to it follows because a reference is
+ * the same string. The cost is that renaming an explicit id, with nothing
+ * else changed, does not change the hash; lineage guards content, and ids
+ * are identity plumbing.
  */
 export function hashModel(model: OrmModel): string {
   const serializer = new OrmYamlSerializer();

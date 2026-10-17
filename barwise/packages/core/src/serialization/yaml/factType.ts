@@ -61,6 +61,11 @@ export function serializeFactType(ft: FactType): OrmYamlFactType {
   return result;
 }
 
+/**
+ * A constraint the file leaves without an id comes back without one; the
+ * model loader derives it (`withDerivedIds`), since constraint ids are
+ * model-wide and one fact type cannot see the others' stated ids.
+ */
 export function deserializeFactType(ftDoc: OrmYamlFactType): FactTypeConfig {
   return {
     id: ftDoc.id,
@@ -73,7 +78,7 @@ export function deserializeFactType(ftDoc: OrmYamlFactType): FactTypeConfig {
       playerId: r.player,
     })),
     readings: ftDoc.readings,
-    constraints: (ftDoc.constraints ?? []).map((c) => deserializeConstraint(c)),
+    constraints: (ftDoc.constraints ?? []).map(deserializeConstraint),
     derivation: ftDoc.derivation ? deserializeDerivation(ftDoc.derivation) : undefined,
   };
 }
