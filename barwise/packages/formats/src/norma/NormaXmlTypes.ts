@@ -153,6 +153,8 @@ export interface NormaObjectifiedType {
   readonly id: NormaId;
   readonly name: string;
   readonly nestedFactTypeRef: NormaId; // ref to Fact id
+  /** The NestedPredicate element's own id, when the file gives it one. */
+  readonly nestedPredicateId?: NormaId;
   readonly referenceMode?: string;
   readonly preferredIdentifier?: string;
   readonly playedRoleRefs: readonly NormaId[];

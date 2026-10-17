@@ -6,6 +6,7 @@
  * supertype meta-roles; objectified types are linked to their nested
  * fact types once both exist.
  */
+import { derivedNormaElementId, NORMA_ID_TAGS } from "../normaId.js";
 import type { NormaDocument } from "../NormaXmlTypes.js";
 import { type NormaMappingContext, NormaMappingError } from "./context.js";
 
@@ -36,6 +37,8 @@ export function mapSubtypeFacts(ctx: NormaMappingContext): void {
 
     const partition = subtypePartition.get(sf.supertypeRoleId);
     model.addSubtypeFact({
+      // NORMA's own id, as for every other element the importer maps.
+      ...(sf.id ? { id: sf.id } : {}),
       subtypeId,
       supertypeId,
       providesIdentification: sf.providesIdentification,
@@ -65,6 +68,11 @@ export function mapObjectifiedTypes(ctx: NormaMappingContext): void {
     }
 
     model.addObjectifiedFactType({
+      // The NestedPredicate's own id when the file gives one; otherwise the
+      // link has no id in the file, and its id comes from the two it links
+      // rather than the generator: one file, one model.
+      id: ot.nestedPredicateId
+        ?? derivedNormaElementId(NORMA_ID_TAGS.objectification, [factTypeId, objectTypeId]),
       factTypeId,
       objectTypeId,
     });

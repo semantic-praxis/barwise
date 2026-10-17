@@ -23,6 +23,8 @@
  * test. A comment is not a check (root `CLAUDE.md`).
  */
 
+import { derivedId } from "@barwise/core";
+
 declare const normaIdBrand: unique symbol;
 
 /** A token in NORMA's id space. Carries the "_" prefix. */
@@ -61,3 +63,46 @@ export function asNormaId(token: string): NormaId {
 export function derivedNormaId(base: NormaId, suffix: string): NormaId {
   return `${base}${suffix}` as NormaId;
 }
+
+/**
+ * The id of a cardinality restriction -- a unary role's or an object
+ * type's -- when the model gives it none, from the element it restricts:
+ * one spelling, shared by the writer and the importer, so a model imported
+ * from a file whose cardinality lacks an id exports the id an in-code model
+ * would.
+ */
+export function cardinalityId(restricted: NormaId): NormaId {
+  return derivedNormaId(restricted, "_card");
+}
+
+/**
+ * An id the NORMA importer derives for an element its file gives none:
+ * core's `derivedId` under one of `NORMA_ID_TAGS`, with NORMA's `_`
+ * prefix, so the writer's `toNormaId` leaves it as is and the next import
+ * reads the same id. The one spelling, so no site can forget the prefix.
+ */
+export function derivedNormaElementId(
+  tag: (typeof NORMA_ID_TAGS)[keyof typeof NORMA_ID_TAGS],
+  inputs: readonly string[],
+): NormaId {
+  return `_${derivedId(tag, inputs)}` as NormaId;
+}
+
+/**
+ * The domain tags for ids the NORMA importer derives (core's `derivedId`)
+ * where a file states none. Each derived id carries NORMA's `_` prefix, as
+ * an id read from a file does, so the writer's `toNormaId` leaves it as is
+ * and the next import gets the same id back. A tag is part of every id derived under it, so
+ * editing one re-keys that element in every model ever imported; the
+ * values are pinned by a test for that reason.
+ */
+export const NORMA_ID_TAGS = {
+  /** A constraint the file gives no id, from its content. */
+  constraint: "barwise.norma-constraint",
+  /** A population, from its fact type: NORMA writes no population element. */
+  population: "barwise.norma-population",
+  /** A unary row, from its entity instance and role. */
+  unaryInstance: "barwise.norma-unary-instance",
+  /** An objectification link, from the fact type and object type it links. */
+  objectification: "barwise.norma-objectification",
+} as const;

@@ -180,7 +180,11 @@ const FIXTURES: Record<string, () => Promise<OrmModel>> = {
 
 /** Importers deliberately not run here, each with the reason. */
 const EXEMPT: Record<string, string> = {
-  norma: "keeps the source .orm file's role GUIDs on purpose; barwise-1070 tracks re-minting them",
+  norma:
+    "keeps the source .orm file's ids on purpose -- object types, fact types, roles, subtype facts, "
+    + "constraints and fact instances -- and derives the rest from them, so one file imports to one "
+    + "model (orm-format-3.spec.md WS2, which also lists what a round trip does not keep); "
+    + "barwise-1070 asks whether role ids should be re-minted",
 };
 
 function importerFor(name: string): ImportFormat {
