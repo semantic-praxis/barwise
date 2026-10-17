@@ -241,17 +241,29 @@
       "caught_by": "execution",
       "note": "Re-reading the live API after the merge. The first draft asserted GitHub's releases-list sort key was 'measurably neither created_at nor published_at', on the pre-merge reading alone. Running it again after the tag moved showed created_at DID follow the tag (2026-06-14T21:45:35Z -> 2026-09-22T18:40:50Z) while published_at stayed frozen, and the position changed with it -- so the causal chain does run through created_at and the original phrasing overstated the negative. The correction narrows the claim to the chain rather than the full sort rule, because the historical ordering still is not explained by created_at desc alone. Caught by executing the same query twice, not by rethinking it."
     },
-    "effect-adoption::237d1bd2e5d1": {
+    "effect-adoption::3340fd25eab9": {
       "spec": "effect-adoption.spec.md",
       "excerpt": "1. effect types in core's public api -- resolved 2026-10-15 by the owner: exported. alternative and trade-off under alternatives considered. consequence carried",
       "caught_by": "reasoning",
-      "note": "Caught in PR 671 review on 2026-10-16 by Copilot, on decision 2: the claim that a plain newId parameter performs no effect was disputed by reasoning about process-wide generator state and barwise-e8m. No code was run. Item 2 withdraws the claim; item 8 resolves the id source as option (d), so the decoder takes no newId."
+      "note": "Caught in PR 671 review on 2026-10-16 by Copilot, on decision 2: the claim that a plain newId parameter performs no effect was disputed by reasoning about process-wide generator state and barwise-e8m. No code was run. Item 2 withdraws the claim; item 8 resolves the id source as option (d), so the decoder takes no newId. (Row id changed when item 3 gained its superseded line on 2026-10-16.)"
     },
     "effect-adoption::8f82ddd00c0b": {
       "spec": "effect-adoption.spec.md",
       "excerpt": "- s3 names two narrowings, not three. the draft listed valueconstraintdef.ranges among the narrowings to constraint. valueconstraintdef is the object type's val",
       "caught_by": "reasoning",
       "note": "Grounding WS0: reading Constraint.ts and ObjectType.ts to write ConstraintRecord showed ValueConstraintDef is the object type's value constraint, not a member of the Constraint union, so S3 has two narrowings, not three. Found before any code depended on it."
+    },
+    "effect-adoption::a775b188e237": {
+      "spec": "effect-adoption.spec.md",
+      "excerpt": "who reads the files, checked 2026-10-16: core's loader (until part b removes it), the mcp server's orm-schema://json-schema resource, which an llm client reads ",
+      "caught_by": "execution",
+      "note": "The first WS1b draft (and item 3 before it) said the editor and the LLM read the JSON Schema. Grepping the consumers on 2026-10-16 showed only core's loader and the MCP orm-schema resource import it; the VS Code extension registers no schema and no LLM provider sends it as an output constraint."
+    },
+    "effect-adoption::abd77cb8a186": {
+      "spec": "effect-adoption.spec.md",
+      "excerpt": "9. the shipped json schema: generated from effect, or hand-written and drift-tested (revisits item 3; added 2026-10-16) -- resolved 2026-10-16 by the owner: gen",
+      "caught_by": "not-a-correction",
+      "note": "Reopens item 3 after a probe of Schema.toJsonSchemaDocument on the spike codecs showed generation works; the owner then chose generation on 2026-10-16, reasoning that a test stating its expected answer directly is a better check than a hand-written schema. Item 3 was a judgement revisited, not an error."
     },
     "effect-comparison::149864007d79": {
       "spec": "effect-comparison.spec.md",

@@ -3,10 +3,14 @@
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); the spike (WS1) amended 2026-10-15 to measure derived test
 generators and property tests (see WS1 and Reported measures); the spike
-and the workstreams after it not started
+in progress on `experiment/effect-adoption-facttype` (#672, never merges);
+WS1b added 2026-10-16 for review, not started; WS2 onward not started
 Created: 2026-10-15
-Last-updated: 2026-10-15
-Tracking: barwise-jo5 (this spec); barwise-973 (WS1 of
+Last-updated: 2026-10-17
+Tracking: barwise-jo5 (this spec); barwise-4r3 (Effect alone on load,
+WS1b part B); barwise-r27 (the blind-spot harness, part A); barwise-wia (generated JSON
+Schema, part C); barwise-5ly (one format definition, part E); barwise-s6q
+(derived generators, part D); barwise-973 (WS1 of
 `core-branching-load.spec.md`, the work this restyles; held until WS1
 here passes or fails); barwise-cu0 (`effect-comparison.spec.md`, whose
 Result opens this spec); barwise-e8m (the core-purity commitment,
@@ -250,22 +254,22 @@ nowhere else:
 
 ## Inventory
 
-| Area                                                  | Today on `main`                                    | Verdict                                                        |
-| ----------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------- |
-| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema                       |
-| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run                         |
-| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                                            |
-| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                                       |
-| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                       |
-| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; read only at the synchronous boundary (Open decision 8) |
-| `core/schemas/orm-model.schema.json`                  | hand-written                                       | stays hand-written, drift-tested per kind                      |
-| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact                                      |
-| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                  |
-| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                           |
-| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                    |
-| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4)              |
-| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig                |
-| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use              |
+| Area                                                  | Today on `main`                                    | Verdict                                                                               |
+| ----------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `core/src/model/ObjectType.ts`, `objectType.ts`       | hand-written sealed union (barwise-973 step 1)     | WS2: replaced by the Effect arm's schema                                              |
+| `core/src/model/SubtypeFact.ts`, `yaml/subtype.ts`    | class                                              | WS3: from the `trial/effect-t2-m2` run                                                |
+| `core/src/model/Population.ts`, `ObjectifiedFactType` | classes                                            | WS3                                                                                   |
+| `core/src/model/FactType.ts`, `Role.ts`               | classes, 206 + 28 lines                            | WS1 spike, landed in WS4                                                              |
+| `core/src/model/Constraint.ts`, `yaml/constraint.ts`  | 16-kind union, 704 + 227 lines, plus `rolePath.ts` | WS1 spike, landed in WS4                                                              |
+| `core/src/model/id.ts`                                | `setIdGenerator`, installed by each surface        | stays; read only at the synchronous boundary (Open decision 8)                        |
+| `core/schemas/orm-model.schema.json`                  | hand-written                                       | generated from Effect, draft 2020-12 (Open decision 9)                                |
+| `core/CLAUDE.md` dependency rule                      | `yaml`, `ajv`                                      | WS2: adds `effect`, exact; `ajv` to dev once nothing loads with it (Open decision 10) |
+| `core/tests/fixtures/malformed/`                      | 11 object type cases                               | WS0 (done): 17 fact type and constraint cases                                         |
+| `core/tests/serialization/`                           | `objectTypeLayout.test.ts` only pins key order     | WS0 (done): `factTypeLayout.test.ts`                                                  |
+| `scripts/measure-comparison.mjs`                      | `startup`, `bundles`, `malformed`, `diff`, `trial` | WS0 (done): a `typecheck` subcommand for S6                                           |
+| `scripts/lib/malformed-score.mjs`                     | reads `object_types` only                          | WS0 (done): fact types, constraints, nesting (S4)                                     |
+| `core/tests/types/`, `vitest.shared.ts`               | core type-checks no test file                      | WS0 (done): the S3 harness and its own tsconfig                                       |
+| Downstream packages                                   | no `effect` dependency                             | WS2: version-agreement test; declare on first use                                     |
 
 `core/tests/arbitraries/model.ts` (1,010 lines) is the suite's hand-written
 whole-model generator. Lines 242 to 319, 78 lines, are the candidate
@@ -324,7 +328,9 @@ to keep compiling.
 - **Generate the JSON Schema from Effect.** One less copy. Deferred: the
   comparison's Effect arm found three differences between the generated
   and hand-written schema, and the hand-written one feeds the editor and
-  the LLM, where a change is user-visible (Open decision 3).
+  the LLM, where a change is user-visible (Open decision 3). Re-probed on
+  the spike 2026-10-16 (WS1b, part C), with five differences named, and
+  adopted by the owner the same day (Open decision 9).
 - **Spike a smaller union first** (`ValueConstraint`'s ranges). Cheaper,
   and it would not exercise the join-path operands, the widest nesting
   in the metamodel.
@@ -459,8 +465,12 @@ the run count and seed recorded:
 - P2, encoding then decoding returns the same value, with object keys
   compared unordered (M3).
 - P3, every encoded value passes the hand-written JSON Schema (M4).
+  From WS1b the file is generated, and P3 is restated under Open
+  decision 9.
 
-P3 is the only independent check. P1 and P2 are self-consistency checks:
+P3 was the only independent check while the JSON Schema was hand-written;
+from WS1b the file is generated and P3 checks agreement instead (Open
+decision 9). P1 and P2 are self-consistency checks:
 their expected answer comes from the Schema alone, by design. They show
 the generator and the Schema agree, and they say nothing about validity for
 the class. A Schema that is wrong the same way on both sides passes them.
@@ -533,6 +543,353 @@ Not yet measured: M1 on the 16-kind union, M4 on any kind, M5 for the
 spike's derived generators, and whether the union needs `Schema.suspend`
 to derive. Those are the spike's first readings.
 
+### 1b. The spike, continued: one harness, Effect alone on load, derived generators (added 2026-10-16)
+
+In one sentence: on the spike branch, replace the four hand-made
+compensations for Effect's cross-field blind spot with one harness,
+then make the Effect decoders the only validator on load (barwise-4r3),
+and draw the test generators from the same Schemas wherever they can
+express the data. The owner asked for all three on 2026-10-16. Nothing
+here merges; each part extends what WS1 measures toward the end state
+WS2 to WS4 would land, so the adoption decision is made on the whole
+cost, not the first slice of it.
+
+The estimate the owner asked for is 8 to 12 working sessions on the
+spike, each with its review rounds, in the order below: 5 to 7 until
+Effect is the only validator on load (A and B), 2 to 4 more for the
+generated JSON Schema files and the generators (C and D), and 1 for the
+editor and MCP reading the one definition (E). The harness
+comes first because, once ajv leaves the load path, it is what keeps
+the reports complete.
+
+| Part | Work                                                              | Estimate        |
+| ---- | ----------------------------------------------------------------- | --------------- |
+| A    | The blind-spot harness and the planted-defect test                | 1 session       |
+| B1   | Object types: the decoder owns its report; the double decode goes | 0.5 session     |
+| B2   | The rest of the model: header, subtype facts, populations, ...    | 2 to 3 sessions |
+| B3   | Project and context-mapping files                                 | 1 to 2 sessions |
+| B4   | ajv and the merge layers leave the load path                      | 0.5 session     |
+| C    | The shipped JSON Schema files generated by Effect, draft 2020-12  | 1 to 2 sessions |
+| D    | Derived generators, alongside B as each kind gains a Schema       | 1 to 2 sessions |
+| E    | The editor and the MCP server read the one format definition      | 1 session       |
+
+The estimates extrapolate the spike's pace so far, are not a
+commitment, and cover the spike only. "Only Effect" on `main` is WS2 to WS4 and
+the adoption decision, which this part informs and does not make.
+
+**A. One harness for the blind spot.** Effect runs a struct's `.check`
+filters only once every field of that struct has passed, so a rule that
+spans fields goes unreported beside any field error (found in review of
+the spike, #672). The spike compensates in four places, each written for its
+case:
+
+- `withPresence` in `constraintDecoder.ts` re-reads the schema's anyOf
+  presence rules (`role` or `roles`, `values` or `ranges`) on the raw
+  input.
+- `readingsOf` in `factTypeDecoder.ts` runs the reading rule on the raw
+  input after every decode, because it could not live on the Schema.
+- The range check carries a `missingOneOf` annotation, and
+  `withPresence` adds a range's presence problem where Effect skipped
+  the check.
+- The loader re-checks each refused element against its JSON Schema
+  branch (`elementRecheck.ts`) and keeps what the decoder did not
+  report.
+
+The harness replaces the first three with one mechanism, and B4
+retires the fourth.
+
+- A rule spanning fields is stated once, as a check on the file-side
+  struct, beside the fields it reads, carrying a `crossField`
+  annotation.
+- One function runs a decode and, when it fails, walks the codec's
+  file-side AST alongside the raw input: struct properties by key,
+  arrays by index, a union by the discriminator the union itself
+  declares, read from the raw value (`type` for constraints, `kind`
+  for object types, whose value-range presence check sits beneath the
+  entity-or-value union). It
+  runs every `crossField` check at a node whose fields are the right
+  shape for the check to read, and reports each failure at that node's
+  path.
+- A problem the harness finds is dropped when Effect already reported
+  the same check at the same path, matched by path and by a stable
+  identity the check carries, so a rule is reported once whether or not
+  Effect ran it, and two different rules failing at one node are both
+  kept. A frequency constraint with neither `role` nor `roles` and a
+  `max` below its `min`, beside an invalid sibling field, is a test
+  case.
+
+When a decode fails and an element also breaks a cross-field rule, the
+decoder shall report that rule's problem in the same pass, whatever
+other field of the element fails. The reading rule moves back onto the
+fact type's Schema, and `withPresence`, `PRESENCE_BY_TYPE`,
+`TYPES_WITH_RANGES` and the range supplement are deleted.
+
+Two points are unverified and are A's first probes. Whether a failed
+decode tells the walker which checks Effect ran: if not, the walker
+runs every marked check and drops duplicates by path and check
+identity. And whether a check can be run on a raw
+value whose sibling fields failed: the walker must pass only nodes
+whose fields the check reads have the right type, or the check itself
+throws.
+
+The harness is held by a planted-defect test, which needs no second
+validator: the plant knows where it put the defect. It takes every
+corpus document (`tests/helpers/modelCorpus.ts`) and every derived
+valid element (part D), plants one defect at a time from a fixed list
+(drop a required key, add an unknown key, change a type, empty a list,
+break each cross-field rule), and requires that the decoder report a
+problem at the planted path. Each plant also declares the other problems
+it correctly causes -- emptying a fact type's `roles` also breaks its
+readings' placeholders; changing a constraint's `type` fails the element's
+union -- and the decoder must report exactly the declared set, no more and no
+fewer. A single cross-field
+plant does not exercise the blind spot -- its fields still decode, so
+Effect runs the check with or without the harness -- and those cases
+are kept as controls. The cases that do are pairs: each cross-field
+violation beside an unrelated field error in the same struct, with the
+fields the check reads left well-typed. Removing a `crossField`
+annotation from any rule must fail a pair case; the plant is part of the test,
+as every check in this spike has been.
+
+Rejected: stating each cross-field rule as a check on a loose
+"any mapping" stage ahead of the strict struct. A decode chain stops
+at its first failing stage (to be confirmed by A's probe), so the rule
+would hide the field errors instead of joining them.
+
+**B. Effect alone on load (barwise-4r3).** The end state: when a model,
+project or context-mapping file is loaded, the system shall validate it
+with the Effect decoders alone, and ajv shall not run. Every part keeps
+S1 and S4 green on its own head and re-reads S5 and S6.
+
+- **B1, object types.** `mergeObjectTypeProblems`, which reconciles
+  the two validators by ajv keyword, is deleted. Loading inserts the
+  decoded record instead of decoding each object type a second time in
+  `OrmModel.addObjectType`, with an S5 reading before and after, as
+  barwise-4r3 asks.
+- **B2, the rest of the model.** Schemas and decoders for the document
+  header (`orm_version`, `name`, `domain_context`, `note`) and for
+  `subtype_facts`, `objectified_fact_types`, `populations`,
+  `definitions` and `diagrams`, which are every key under `model` in
+  `orm-model.schema.json` not yet decoded. WS3's provisional entry
+  covers three of these for `main`; on the spike they are needed for
+  the load path to drop ajv at all.
+- **B3, the other two file formats.** `ProjectSerializer` and
+  `MappingSerializer` validate against `orm-project.schema.json` (143 lines)
+  and `context-mapping.schema.json` (95 lines) with Ajv instances of their
+  own (`ProjectSerializer.ts` line 48, `MappingSerializer.ts` line 42), not
+  through `SchemaValidator`. Each gets a decoder, and B4 removes both Ajv
+  imports.
+- **B4, removal.** `mergeConstraintProblems`, `mergeFactTypeProblems`,
+  `elementRecheck.ts`, `branchValidator`, `factTypeValidator`,
+  `schemaErrorOf`, and the Ajv instances in `ProjectSerializer` and
+  `MappingSerializer` leave the load path; the header "YAML holds
+  malformed model elements" becomes the only error shape. Where ajv
+  goes afterwards is Open decision 10: a dev dependency of core, used
+  only by P3. `SchemaValidator` is exported
+  from core's root, and no other package imports it today (checked
+  2026-10-16), so its removal from the load path changes no consumer.
+
+**C. The shipped JSON Schema files, generated by Effect in draft
+2020-12 (Open decision 9, resolved by the owner 2026-10-16).** The three
+files under `core/schemas/` stop being written by hand. A script
+generates each from the Effect Schemas with
+`Schema.toJsonSchemaDocument`, writes it with `$schema` set to draft
+2020-12, and a test fails when the checked-in file differs from what
+the script generates, so the file is derived from its authority as the
+repository's parity rule asks. When a Schema changes, the system shall
+fail the build until the regenerated file is committed beside it.
+
+What the probes of 2026-10-16 found, on the spike's
+`FactTypeYamlCodec`, `ConstraintYamlCodec` and `ObjectTypeYamlCodec`
+with `onExcessProperty: "error"`, and what C does about each:
+
+- Field rules come out exactly: types, `minLength`, `minItems`, enums,
+  `required` and `additionalProperties: false`. Nothing to do.
+- Descriptions are supported. Draft 2020-12 keeps `title`,
+  `description` and `examples` as annotation keywords, and Effect emits
+  each from the Schema annotation of the same name (probed: a field's
+  `description` and `examples` and a struct's `title` all came out in
+  place). The hand-written model schema's 149 descriptions move into
+  annotations on the Schemas, where a reader of the code sees them too.
+- A cross-field check is dropped without a trace unless it carries a
+  `toJsonSchema` annotation. With one it is emitted (probed: a range's
+  min-or-max check came out as `anyOf` of two `required` lists). Every
+  `crossField` check from part A carries one, or states that it has no
+  JSON Schema form; the reading rule is the one such case today, as it
+  is in the hand-written file. A test fails on a `crossField` check
+  with neither.
+- A constraint's `id` comes out required, because the codec decodes the
+  file after the loader fills missing ids (Open decision 8). The
+  generated file must accept what the format accepts. Under format 2.0,
+  where `examples/getting-started/shop.orm.yaml` omits constraint ids, the
+  file side states `id` optional and the fill sits in a stage in front of
+  the decode. Under format 3.0 (`orm-format-3.spec.md`), ids are required,
+  the file side states them required, and there is no fill stage. The owner chose
+  3.0 first (that spec's Open decision 6, resolved 2026-10-17), so this part
+  is built against 3.0 and the optional-id stage is never written.
+- The 16-kind union comes out as `anyOf`, not `oneOf`, because Effect
+  marks one branch as an approximation. The branches are disjoint by
+  their `type` constant, so both accept the same files; C finds the
+  approximating branch and removes the approximation if it can, and
+  otherwise ships `anyOf`.
+
+Draft 2020-12 is mostly a renaming of what draft-07 already had
+(`definitions` becomes `$defs`; draft-07's `dependencies` splits into
+`dependentRequired` and `dependentSchemas`), plus two real additions:
+`prefixItems` and `unevaluatedProperties`, the latter able to close an
+object across `allOf` branches, which draft-07's `additionalProperties`
+cannot. Which of these Effect emits is its own
+choice; a `toJsonSchema` annotation can state any of them where a
+check needs one.
+
+Who reads the files, checked 2026-10-16: core's loader (until part B
+removes it), the MCP server's `orm-schema://json-schema` resource, which
+an LLM client reads as a description of the format, and any user who
+points an editor at the schema's `$id`. The VS Code extension registers
+no schema with the editor, and no LLM provider in `@barwise/llm` sends
+the schema as an output constraint. The draft change therefore reaches
+users through the MCP resource and through hand-configured editors
+only; the release notes say so.
+
+Four more readers depend on the hand-written file's draft-07 layout and
+definition names, and C rewrites each against the generated file or core's
+plain-data lists (part E): `scripts/lib/schema-cases.mjs` (lines 161 and
+209 index `schema.definitions` by name), and through it
+`scripts/measure-comparison.mjs`'s malformed-input scorer;
+`core/tests/serialization/schemaDataTypes.test.ts`; and
+`core/tests/model/valueOnlyFields.test.ts`, which reads an `if`/`then`
+branch. The scorer is a measuring instrument for the Effect comparison's two
+arms, and its answer key must not be generated from one of them. It scores
+the comparison's and the spike's 2.0 fixtures, so it keeps the last
+hand-written 2.0 schema as a fixture of its own, scoped to those 2.0 inputs.
+That is not Open decision 9's rejected option (c), which would have kept a
+frozen copy as the oracle for the shipped, growing format: this copy is
+never compared with the current format, and when S4 is next read on a 3.0
+head the scorer is re-baselined against that head's fixtures.
+
+What replaces the independence the hand-written file gave. P3 checked
+derived values against a file the Schemas did not write; with the file
+generated, that check would test Effect against itself. The tests that
+stay independent are the ones whose expected answer a person wrote, or
+the plant fixes: the S4 fixtures, the frozen corpus (every model that
+loads today must still load), the planted-defect test from part A, and
+the byte-layout tests. P3 is kept in a narrower role, below.
+
+**D. Derived generators (M5), as far as the Schemas reach.** M1 reads
+yes for all 16 constraint kinds and both object type codecs, and
+`Arbitrary.schema` already drives the codec and decoder tests. What
+remains is the whole-model generator, `core/tests/arbitraries/model.ts`
+(1,010 lines, used by five law tests in core). Diagram's layout
+generator, `diagram/tests/arbitraries/layout.ts`, deliberately does not
+reuse it: it varies name widths, which core's uniform `T0`/`F0` names
+cannot, so it is out of D's scope and any conversion of it is separate
+work that keeps its layout-specific inputs. The core generator does two
+jobs, and only one
+is a Schema's:
+
+- Element fields -- names, ranges, derivations, constraint fields,
+  population values -- are what a Schema describes. When an element
+  kind has an Effect Schema on the spike, the model generator shall draw
+  that kind's fields from `Arbitrary.schema`, and M5 counts the lines
+  replaced.
+- Consistency across elements -- a role names a player that exists, the
+  identification graph has no cycle, ids derive from positions so a
+  failure shrinks cleanly -- is a property of the whole model that no
+  element Schema states. It stays hand-written, as a wiring layer that
+  combines derived elements.
+
+Three facts from grounding shape D, and each is a probe before it is a
+plan:
+
+- Effect 4's `Arbitrary` is its own library, with its own combinators
+  (`array`, `map`, `flatMap`, `all`, `filter`), runner
+  (`sampleEffect`, `checkEffect`) and shrinker; it does not produce
+  fast-check arbitraries, and passing one to fast-check fails (WS1
+  grounding). A derived element cannot be dropped into the fast-check
+  model generator. Either the generator, wiring included, moves to
+  Effect's combinators, or a bridge samples Effect values inside
+  fast-check and gives up shrinking them. Open decision 11.
+- The hand-written generator is tuned on purpose: entities weighted
+  2 to 1 so composite keys appear (barwise-968), a range's lower bound
+  defaulted so the shrinker never makes an unbounded range, `isFormal`
+  never false so the round-trip law sees no conflation. A derived
+  generator must reproduce each tuning (through `Arbitrary.schema`'s
+  options or a check's `arbitraryConstraint` annotation) or M5 does not
+  count it, since a lost tuning silently weakens a law.
+- Derived valid elements, with one planted defect each, are the
+  planted-defect test's inputs in part A. A and D share that generator.
+
+**E. One format definition, read by every component that needs it
+(added 2026-10-16 at the owner's request).** The `.orm.yaml` format is
+described in four places today, and only one of them is checked
+against the loader:
+
+1. `core/schemas/orm-model.schema.json`, read by the loader and by the
+   MCP server's `orm-schema://json-schema` resource. The MCP server
+   imports it by a relative path into core's directory
+   (`mcp/src/resources/ormSchema.ts`, `../../../core/schemas/...`), not
+   through core's package exports, which couples it to core's file
+   layout.
+2. The Effect Schemas on the spike.
+3. The editor's completion provider
+   (`vscode/src/server/CompletionProvider.ts`), which keeps its own
+   lists: 4 of the 16 constraint kinds, and its own copy of `entity` and
+   `value` for `kind`. It is already out of date, and nothing checks it.
+4. The LLM extraction format (`llm/src/prompt/responseSchema.ts`), a
+   separate, deliberately different format: object types named rather
+   than referenced by id, with room for alternatives. It already draws
+   its data type names and ring types from core.
+
+Under the composability principle the Effect Schemas are the one
+definition, and the JSON Schema is one rendering of it (part C). Part E
+makes the first three read from that definition:
+
+- **E1, core exports the definition.** Core exports the file-side
+  Schemas, the generated JSON Schema documents, and plain-data lists
+  derived from the Schemas (kinds, fields, descriptions, enumerated values)
+  through a subpath export, so no package reaches into core's directories. The subpath's
+  name is settled in E's grounding; `@barwise/core/format` is the
+  working name.
+- **E2, MCP.** The `orm-schema://json-schema` resource serves core's
+  exported document, imported through the package. When the resource
+  is read, the system shall return exactly the document core exports;
+  a test holds the two equal.
+- **E3, the editor.** Completion and hover come from the Schemas:
+  - the constraint kinds offered on a `type:` line are the union's
+    discriminator values, all 16;
+  - the keys offered inside an element are the fields its Schema
+    declares for that kind;
+  - enumerated values (`kind`, `modality`, `ring_type`, data type names)
+    come from the Schema's literals;
+  - each field's `description` annotation (part C) is the completion
+    item's documentation and the hover text.
+
+  When the user requests completion on a constraint's `type:` line, the
+  editor shall offer every constraint kind the Schema defines. A test
+  derives the expected list from the Schema, so a new kind appears in
+  the editor without an edit to it. The hand-written lists are deleted.
+- **Out of scope: the LLM extraction format.** It should not read the
+  file Schemas, because it is a different format. It could follow the
+  same pattern inside `@barwise/llm` -- its own Effect Schema, with the
+  tool's input schema generated from it and the model's response
+  decoded by it -- which is separate work with its own spec.
+- **Not done (Open decision 12, resolved: no): registering the generated
+  file with Red Hat's YAML extension** (`contributes.yamlValidation`). It would give as-you-type
+  JSON Schema errors to users who have that extension, but the language
+  server already reports every problem in the decoder's words, and a
+  second source would report the same problem twice in different
+  words. Open decision 12.
+
+E changes `@barwise/mcp` and `barwise-vscode` on the spike branch,
+neither of which depends on `effect` itself. Reading discriminator values,
+per-kind fields, literals and `description` annotations needs Effect's AST
+API, so E1's export is plain data computed in core from the Schemas -- the
+constraint kinds, each kind's fields with their descriptions, each
+enumerated field's values -- beside the JSON Schema document. The editor
+and the MCP server read those lists and never import `effect`; the bundles
+carry Effect through core already. The capability matrix in the root `CLAUDE.md` does not change;
+no surface gains or loses a capability.
+
 ### 2. Effect in core: the dependency and the `ObjectType` slice (provisional: not yet grounded)
 
 The Effect arm (`8d36e4fc`) rebased onto `main`: `effect` pinned exact
@@ -593,6 +950,7 @@ entry only records that it follows.
    is user-visible. The property P3 depends on this: the schema must stay
    separate from the Schema under test, or P3 checks the Schema against
    itself. Revisit when the drift tests show the two agreeing for every kind.
+   Superseded 2026-10-16 by item 9: the files are generated.
 4. **What a failed spike leaves behind.** Recommend: the WS0
    instruments stay on `main`, the branch is kept as evidence, and
    barwise-973 resumes from the plain arm (`8398a193`), the comparison's
@@ -625,6 +983,85 @@ entry only records that it follows.
      - **File loading** fills a missing id only where the file format lets one be omitted. Today that is every constraint kind: `orm-model.schema.json` requires no constraint id, the shipped `examples/getting-started/shop.orm.yaml` omits them, and `FactType` mints them. Filling these keeps gate S1. Where the file format requires an id (object types, roles, fact types, subtype facts, objectifications, populations, instances), a missing one is refused as it is today. Construction-time minting cannot repair it, because the schema and the decoder refuse the file before any object is constructed.
 
    Consequences. The decoder is a pure function of its input, with no parameter or service for ids. The one place that mints ids is the global generator core already has (`setIdGenerator`, 2026-07-25), now confined to the boundary; barwise-e8m gets a note saying so. The serializer no longer needs to recognise ajv's missing-`id` message, because the decoder reports a missing id itself (barwise-k8y). The spike converts the brought-forward ObjectType slice from `IdSource` to this shape before it builds the constraint decoder. If core should later hold no generator at all, minting moves out to the callers in the outer packages; the decoder does not change for that.
+
+9. **The shipped JSON Schema: generated from Effect, or hand-written
+   and drift-tested (revisits item 3; added 2026-10-16) -- resolved
+   2026-10-16 by the owner: generated, in draft 2020-12.** The owner's
+   reasoning: the hand-written file is not a better answer key than a
+   test that states its expected answer directly, and a newer draft is
+   worth having. The options weighed were (a) keep it hand-written with
+   a drift test per kind, which the draft recommended to keep an
+   independent oracle for P3 and the harness test; (b) ship the
+   generated file; and (c) ship the generated file and freeze the
+   hand-written one as a test-only oracle, rejected because a frozen
+   file goes stale as the format grows. Two things changed between the
+   draft and the decision. Part A's harness test was redesigned to need
+   no oracle: a planted defect knows its own path. And the draft's claim
+   that the editor and the LLM read the file was checked and is too
+   broad: the MCP resource and hand-configured editors read it, the
+   VS Code extension and the LLM providers do not (WS1b, part C).
+
+   Consequence for P3: it no longer tests independence. It is kept as a
+   check that Effect's two outputs agree, as three properties:
+   - Every file-side input the loader accepts at the current format version
+     passes the generated JSON Schema as written, before ids or defaults are
+     filled. A re-encoded value alone would hide a schema that wrongly
+     requires a field the format lets a file omit. A file at an older
+     version is accepted only through its migration, so P3 checks the
+     migrated document: under format 3.0 (`orm-format-3.spec.md`), every
+     2.0 corpus file, `examples/getting-started/shop.orm.yaml` included.
+   - Every value the decoder accepts, encoded, passes the generated schema.
+   - Every planted defect the decoder refuses, the generated schema refuses
+     too, except rules marked as having no JSON Schema form.
+
+   Together they are the property a user of the MCP resource depends on:
+   the schema they read accepts what the loader accepts.
+
+10. **Where ajv goes when it leaves the load path (added 2026-10-16) --
+    resolved 2026-10-16 by the owner: option (a), test-only, for now.**
+    "For now" leaves (c) open if P3 stops earning its dependency.
+    - **(a)** A dev dependency of core, through its draft 2020-12 entry
+      point (`ajv/dist/2020`), used only by P3 as restated under item 9.
+      Recommended: the generated file is a published artifact, read by
+      LLM clients through the MCP server, and P3 is the one test that
+      says it agrees with the loader. The runtime list loses one entry.
+    - **(b)** Kept as a runtime dependency for a `validate`-style JSON
+      Schema check a consumer could call. No caller needs one today
+      (no package outside core imports `SchemaValidator`).
+    - **(c)** Removed outright, with P3 dropped. The generated file would
+      then be shipped with nothing checking that it accepts what the
+      loader accepts.
+
+11. **The whole-model generator: Effect's `Arbitrary`, or fast-check
+    with a bridge (added 2026-10-16) -- resolved 2026-10-16 by the owner:
+    option (a).** Effect's derived generators are not fast-check
+    arbitraries (WS1b, part D). The move counts only once part D has read
+    shrinking and run time on Effect's runner, as (a) says.
+    - **(a)** Move `core/tests/arbitraries/model.ts`, wiring included,
+      to Effect's combinators and runner, and move the five core law
+      tests that use it from `fc.assert` to `Arbitrary.checkEffect`. Recommended on
+      the spike, because it is the only option that keeps shrinking on
+      derived values, and the owner asked for derived generators as far
+      as they reach. fast-check stays for properties that do not draw a
+      model (the scorer's). Cost: two property libraries in the test
+      suite, and the shrink quality and run time of Effect's runner are
+      unmeasured at this size; part D reads both before the move counts.
+    - **(b)** Keep fast-check and bridge by sampling Effect values
+      inside a fast-check generator. Smaller change; a failing model no
+      longer shrinks below the sampled elements, which is the property
+      the generator's design exists for.
+    - **(c)** Derive element generators only in the element-level tests,
+      as today, and leave the model generator hand-written. M5 then
+      reads close to zero, which is a result, not a failure.
+
+12. **Register the generated schema with Red Hat's YAML extension
+    (added 2026-10-16) -- resolved 2026-10-17 by the owner: option (a), no.**
+    - **(a)** No. Recommended: the language server already reports
+      every problem in the decoder's words, and a second source reports
+      the same problem twice, worded differently.
+    - **(b)** Yes, through `contributes.yamlValidation`. Users with that
+      extension get as-you-type errors and key completion from the
+      schema, at the cost of duplicate reports.
 
 ## Risks and testing
 
