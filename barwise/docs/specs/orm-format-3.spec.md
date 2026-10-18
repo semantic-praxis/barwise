@@ -2,8 +2,9 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, not started; WS4 and WS5 not started; Open decisions 1
-to 8 resolved by the owner 2026-10-17, 9 open
+grounded 2026-10-18, not started; WS4 and WS5 not started; every open decision
+resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
+2026-10-18)
 Created: 2026-10-16
 Last-updated: 2026-10-18
 Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
@@ -227,8 +228,8 @@ validation like `diagramReferencesToIds.ts`, and registers in
    position: inserting a constraint before others changes no other
    constraint's id, so two revisions of one 2.0 file migrated separately
    give the same id to the same constraint, and diff and merge can match by
-   id (corrected 2026-10-18: they keep matching by content, for the reason
-   Open decision 4's correction gives). An id is derived once, at migration, and is stated in the file from
+   id (refined 2026-10-18: by id first and content for the rest, with a
+   content-only mode for LLM samples, as Open decision 4's revision says). An id is derived once, at migration, and is stated in the file from
    the first save; editing a constraint afterwards does not change it.
    Every derived id hashes a domain tag first (`barwise.constraint` here,
    `barwise.subtype-constraint` in step 3), then each input with its length
@@ -282,7 +283,7 @@ every time until then.
 | `core/src/model/SubtypeFact.ts`                           | `isExclusive`, `isExhaustive`                     | removed                                                                   |
 | `core/src/model/identification.ts`                        | preferred = internal uniqueness flag              | preferred = the entity's referenced constraint                            |
 | `core/src/validation/`, `verbalization/`, `mapping/`      | read external kinds from `ft.constraints`         | read `model.constraints`; compiler-guided                                 |
-| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | external kinds in a model-level delta; still matched by content (WS3)     |
+| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | by id first, then content; content-only mode for LLM samples (WS3)        |
 | `core/src/project/splitModel.ts`                          | detects cross-domain constraints under hosts      | migrates the raw document to 3.0 before splitting; reads the model list   |
 | `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags    | keeps ids; places by kind; partition constraints 1:1; preferred both ways |
 | `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`             | node id = constraint id                                                   |
@@ -598,34 +599,40 @@ position in the host's list:
 - Diagram: node ids are `constraint-<index>`.
 - Diff: a constraint change sits inside its host's fact type delta.
 
-Open decision 9 sets what replaces the host. The recommendation is the
+Open decision 9 (resolved: option (a)) sets what replaces the host: the
 constraint's id wherever an element id is needed, and the fact types it
 spans, in model order, wherever a name is. Signatures split the same way.
 An internal constraint keeps its fact type as context,
 `(c: InternalConstraint, ft)`; an external one takes the model,
 `(c: ExternalConstraint, model)`.
 
-**Diff and merge keep matching by content.** This corrects Open decision 4
-and the Inventory row. Matching by id would break the comparisons diff
-exists for:
-
-- `llm/src/sampleAgreement.ts` and `TranscriptProcessor.ts` diff
-  independent LLM samples, whose ids are unrelated by construction.
-- `merge` diffs an import against its base.
+**Diff and merge match constraints by id first, then by content.** This
+revises Open decision 4 (owner, 2026-10-18). A constraint whose id occurs
+on both sides is matched by id, and if its content differs that is one
+modification rather than a removal and an addition. The constraints left
+over are matched by content key, as today. The fallback is what keeps
+merging a transcript import working: its ids are fresh, so nothing
+matches by id and everything falls through to content. One mode opts out:
+`llm/src/sampleAgreement.ts` and `TranscriptProcessor.ts` compare
+independent LLM samples, whose ids are unrelated by construction, and ask
+for content only, so a coincidental id never pairs two different
+constraints. `diffModels` takes the mode as an option, with id-first as
+the default, so `barwise diff`, `history`, `merge` and MCP's diff and
+merge tools get it unchanged. This delivers barwise-18n in 3a.
 
 External constraints get their own model-level delta,
 `elementType: "constraint"`, alongside the six element types `deltas.ts`
-already has. Its key cannot be today's, because today's is relative to
-the host: `roleKeys` writes a host role as its position (`h<i>`) and any
-other role as its fact type's name and position. With no host, every role
-takes that second form, through the model-wide role holders
-`elementDiff.ts` already builds, so the key no longer depends on where 2.0
-put the constraint. One limit carries over unchanged: `operandKey` keys a
-join operand's path by raw role ids, so a join constraint never matches
-across independent LLM samples, today or after. Between two
-revisions of one file, which do share ids, matching by id first would
-report an edited constraint as one change instead of a removal and an
-addition. That is filed as barwise-18n, outside this workstream.
+already has, with the same four kinds. Merge treats an accepted
+modification the way it treats every other element: the existing id is
+kept and the incoming content is taken. The content key cannot be
+today's, because today's is relative to the host: `roleKeys` writes a
+host role as its position (`h<i>`) and any other role as its fact
+type's name and position. With no host, every role takes that second
+form, through the model-wide role holders `elementDiff.ts` already
+builds, so the key no longer depends on where 2.0 put the constraint. One
+limit carries over unchanged: `operandKey` keys a join operand's path by
+raw role ids, so a join constraint never matches by content across
+independent LLM samples, today or after.
 
 **The 2.0 serializer keeps the file's nesting.** On load it lifts the
 external kinds into the model list. This happens after `withDerivedIds`,
@@ -743,12 +750,13 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
   `FactType.internalConstraints` holds the internal kinds, `OrmModel.constraints` is new, `SubtypeFact.isExclusive` and
   `isExhaustive` and `isPreferred` are removed. Downstream packages follow in
   the same workstreams; the full monorepo build gates each.
-- **Diff output** reports external constraints in their own model-level
-  delta, still matched by content (WS3).
+- **Diff and merge** match constraints by id first and by content for the
+  rest; an id match with changed content is a modification. External
+  constraints get their own model-level delta (WS3).
 - **Verbalization output** moves external constraints into their own section;
   golden files change in WS3.
 
-## Open decisions (1 to 8 resolved 2026-10-17; 9 open)
+## Open decisions (all resolved: 1 to 8 on 2026-10-17, 9 on 2026-10-18)
 
 1. **ADR 0003 amends ADR 0001's "inline and local" -- resolved 2026-10-17 by the owner: yes,
    as recommended.** Recommend: yes, as
@@ -783,12 +791,14 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
    gets a different id, which diff reports as a removal and an addition,
    the same as today's content-key matching.
 
-   Corrected 2026-10-18, by WS3's grounding: diff and merge do not switch
-   to matching by id. They also compare models whose ids are unrelated by
-   construction -- independent LLM samples, an import against its base --
-   and there an id match would report every constraint as changed. They
-   keep content keys; matching by id first where both sides share an id is
-   barwise-18n.
+   Revised 2026-10-18 by the owner, after WS3's grounding found that diff
+   also compares models whose ids are unrelated by construction
+   (independent LLM samples, a transcript import against its base): ids
+   are the general case. Diff and merge match a constraint by id where the
+   id occurs on both sides, and by content for the rest, so an edited
+   constraint whose id is unchanged is one modification and an import with
+   fresh ids still matches by content. Comparing independent LLM samples
+   asks for content only (WS3). This delivers barwise-18n.
 5. **A `barwise migrate` command -- resolved 2026-10-17 by the owner: yes, CLI only, with a
    deliberate capability-matrix row.** Recommend: yes, CLI-only, rewriting files
    in place to the current version; it serves the 113 tracked files and every
@@ -845,7 +855,8 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
    - **(c)** Keep `is_preferred` in 3.0 alongside the reference. No
      migration judgment, and barwise-971 stays open in the new format.
 9. **What names a constraint across fact types in output, once it has no
-   host -- open (raised 2026-10-18 by WS3's grounding).** Today several
+   host -- resolved 2026-10-18 by the owner: option (a), with `factTypeIds`
+   on every constraint row (below).** Raised by WS3's grounding. Today several
    functions pass the host fact type with an external constraint and write
    it into what they return (WS3 lists them). The host is the arbitrary
    choice format 3 removes, so each of those outputs needs another answer.
@@ -871,11 +882,27 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
      only the external uniqueness rule. For those models option (a)
      changes these sites too.
 
-     Verbalization rows are the one place (a) changes a stated contract:
-     an external constraint's `sourceElementId` becomes its constraint id,
-     resolvable with a new `model.getConstraint(id)`, and the JSON output
-     says which kind of id a row carries. The alternative is to drop the
-     id from those rows, which loses the link back to the model.
+     Verbalization rows are the one place (a) changes a stated contract.
+     The owner confirmed this shape on a Room, Building and RoomNumber
+     model: every constraint row's `sourceElementId` becomes its
+     constraint id, resolvable with a new `model.getConstraint(id)`, and
+     every constraint row gains `factTypeIds`, the fact types it applies
+     to (one entry for an internal constraint). A consumer then has one
+     rule for every constraint row instead of one per kind:
+
+     ```json
+     {
+       "category": "constraint",
+       "text": "The combination of Building and RoomNumber is unique across fact types.",
+       "sourceElementId": "c-room-key",
+       "factTypeIds": ["ft-in", "ft-nr"]
+     }
+     ```
+
+     The text output lists such a constraint once, under a "Constraints
+     across fact types" heading after the fact types; `--fact-type`
+     shows it under each fact type it touches. The sentence's wording is a
+     separate defect (barwise-irx).
    - **(b)** Compute an anchor: the first fact type holding one of the
      constraint's roles, the same rule the 2.0 save uses. Most output
      keeps its current shape, since 46 of the 72 constraints already sit
