@@ -272,26 +272,26 @@ every time until then.
 
 ## Inventory
 
-| Area                                                      | Today                                             | Verdict                                                                   |
-| --------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
-| `core/schemas/orm-model.schema.json`                      | `orm_version` const `2.0`; one constraint `oneOf` | 3.0; internal and external `oneOf`s; ids required; flags removed          |
-| `core/src/serialization/schemaVersion.ts`                 | migrations 1.0 to 1.1 to 2.0                      | adds 2.0 to 3.0                                                           |
-| `core/src/serialization/migrations/`                      | `diagramReferencesToIds.ts`                       | adds the 3.0 migration                                                    |
-| `core/src/serialization/yaml/constraint.ts`, `subtype.ts` | nested constraints; subtype flags                 | model-level constraints; subtype flags gone                               |
-| `core/src/model/FactType.ts`                              | mints missing constraint ids (line 108)           | requires ids; `constraints` removed; `internalConstraints`                |
-| `core/src/model/OrmModel.ts`                              | no constraint list                                | `constraints`, `constraintsTouching`                                      |
-| `core/src/model/Constraint.ts`                            | one 16-kind union                                 | `InternalConstraint` / `ExternalConstraint`; subtype operands             |
-| `core/src/model/SubtypeFact.ts`                           | `isExclusive`, `isExhaustive`                     | removed                                                                   |
-| `core/src/model/identification.ts`                        | preferred = internal uniqueness flag              | preferred = the entity's referenced constraint                            |
-| `core/src/validation/`, `verbalization/`, `mapping/`      | read external kinds from `ft.constraints`         | read `model.constraints`; compiler-guided                                 |
-| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | by id first, then content; content-only mode for LLM samples (WS3)        |
-| `core/src/project/splitModel.ts`                          | detects cross-domain constraints under hosts      | migrates the raw document to 3.0 before splitting; reads the model list   |
-| `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags    | keeps ids; places by kind; partition constraints 1:1; preferred both ways |
-| `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`             | node id = constraint id                                                   |
-| `llm/src/parse/`                                          | attaches constraints to fact types                | places by kind through the model API                                      |
-| tracked `.orm.yaml` files (113)                           | 2.0                                               | rewritten as 3.0 by the migration, in WS5                                 |
-| `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)          | corrected in WS5                                                          |
-| `docs/adr/`                                               | ADR 0001 "inline and local"                       | ADR 0003 amends it for external constraints                               |
+| Area                                                      | Today                                             | Verdict                                                                     |
+| --------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------- |
+| `core/schemas/orm-model.schema.json`                      | `orm_version` const `2.0`; one constraint `oneOf` | 3.0; internal and external `oneOf`s; ids required; flags removed            |
+| `core/src/serialization/schemaVersion.ts`                 | migrations 1.0 to 1.1 to 2.0                      | adds 2.0 to 3.0                                                             |
+| `core/src/serialization/migrations/`                      | `diagramReferencesToIds.ts`                       | adds the 3.0 migration                                                      |
+| `core/src/serialization/yaml/constraint.ts`, `subtype.ts` | nested constraints; subtype flags                 | model-level constraints; subtype flags gone                                 |
+| `core/src/model/FactType.ts`                              | mints missing constraint ids (line 108)           | fills missing ids (3a); `constraints` removed; `internalConstraints`        |
+| `core/src/model/OrmModel.ts`                              | no constraint list                                | `constraints`, `constraintsTouching`, `getConstraint`; `addConstraint` (3c) |
+| `core/src/model/Constraint.ts`                            | one 16-kind union                                 | `InternalConstraint` / `ExternalConstraint`; subtype operands               |
+| `core/src/model/SubtypeFact.ts`                           | `isExclusive`, `isExhaustive`                     | removed                                                                     |
+| `core/src/model/identification.ts`                        | preferred = internal uniqueness flag              | preferred = the entity's referenced constraint                              |
+| `core/src/validation/`, `verbalization/`, `mapping/`      | read external kinds from `ft.constraints`         | read `model.constraints`; compiler-guided                                   |
+| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | by id first, then content; content-only mode for LLM samples (WS3)          |
+| `core/src/project/splitModel.ts`                          | detects cross-domain constraints under hosts      | migrates the raw document to 3.0 before splitting; reads the model list     |
+| `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags    | keeps ids; places by kind; partition constraints 1:1; preferred both ways   |
+| `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`             | node id = constraint id                                                     |
+| `llm/src/parse/`                                          | attaches constraints to fact types                | places by kind through the model API                                        |
+| tracked `.orm.yaml` files (113)                           | 2.0                                               | rewritten as 3.0 by the migration, in WS5                                   |
+| `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)          | corrected in WS5                                                            |
+| `docs/adr/`                                               | ADR 0001 "inline and local"                       | ADR 0003 amends it for external constraints                                 |
 
 Not in the table because they need no design decision, but in WS3 and WS4's
 scope: the programmatic builders that create constraints without ids or set
@@ -481,7 +481,7 @@ Implementation notes (2026-10-17):
   `<id>_2`; that the import splits it predates WS2. What a NORMA round trip
   keeps is the identity of the elements barwise holds with ids; NORMA
   elements barwise folds into another element's fields lose theirs --
-  subtype partition constraints (SubtypeFact flags until WS3 makes them
+  subtype partition constraints (SubtypeFact flags until WS4 makes them
   constraints), reading orders and readings, subtype meta-roles, the
   exclusive-or mandatory half (above) and object-type cardinality
   (barwise-eok). And the trip from barwise is not identity-preserving
@@ -510,7 +510,8 @@ Implementation notes (2026-10-17):
 
 External constraints move from their fact type to `OrmModel.constraints`
 in three PRs, and the file stays 2.0 throughout: 3a adds the new API in
-core and moves core's own readers, 3b moves the other packages' readers,
+core, moves core's own readers, and changes each output together with its
+consumers, 3b moves the other packages' readers,
 and 3c moves the storage and removes `FactType.constraints`. Removing the
 getter last is still what proves no reader was missed: in 3c, any reader
 the first two PRs did not reach stops compiling.
@@ -530,7 +531,7 @@ every package type-checked (a probe, then reverted), the compiler reports
 | vscode  | 1     | 1     |
 
 cli, mcp, promptlab, code-analysis and diagram-ui do not read the getter,
-though cli and mcp read a host through `Counterexample.factTypeId`
+though cli, mcp and vscode read a host through core outputs that change
 (below). The draft's 52
 files across nine packages was a text search, not a compile. Writes come by two
 routes: 12 `addConstraint` calls in four source files (7 in
@@ -583,8 +584,10 @@ position in the host's list:
 
 - Validation: messages say "in fact type X" (the six external cases in
   `constraintConsistency.ts`, and ten join-rule reports in
-  `joinConstraintRules.ts` and `population/joinPath.ts`), and element ids
-  are the host's (`ft.id`) or fall back to it (`c.id ?? ft.id`).
+  `joinConstraintRules.ts` and `population/joinPath.ts`; the templates
+  themselves, which take a single `ftName`, are in `validation/ruleId.ts`),
+  and element ids are the host's (`ft.id`) or fall back to it
+  (`c.id ?? ft.id`).
 - Verbalization: a constraint's `Verbalization` carries the host's id, and
   its labels for roles in other fact types are worded relative to the host.
   The id is a contract: `ConstraintVerbalizer.ts` keeps every constraint
@@ -595,8 +598,12 @@ position in the host's list:
 - Describe: summary ids are positional (`${ft.id}-constraint-${i}`), and
   so is query's fallback id. Both shift when a constraint changes host.
 - References: `ReferenceSource { kind: "constraint", factType }` in
-  `model/graph.ts`, plus counterexamples and lineage's
-  `getConstraintName(c, ft)`.
+  `model/graph.ts`, and lineage's `getConstraintName(c, ft)`.
+- Counterexamples: `Counterexample.factTypeId`, "the constraint's owner",
+  which `barwise verbalize --fact-type` and its JSON projection, MCP's
+  verbalize, and the VS Code hover (`HoverProvider.ts`) filter or emit.
+- Describe: `affectedFactType: ft.name` on each constraint summary, which
+  MCP's `describe_domain` projects field by field.
 - Diagram: node ids are `constraint-<index>`.
 - Diff: a constraint change sits inside its host's fact type delta.
 
@@ -613,8 +620,8 @@ on both sides is matched by id, and if its content differs that is one
 modification rather than a removal and an addition: a new
 `constraintsModified` change, beside `constraintsAdded` and
 `constraintsRemoved` in `changeDescription.ts`, with its own
-`describeChange` text and the `breakingLevel` of the stricter of the
-two. A constraint with no id is never matched by id. The constraints left
+`describeChange` text and the `breakingLevel` `caution`, the level
+`constraintsAdded` and `constraintsRemoved` already have. A constraint with no id is never matched by id. The constraints left
 over are matched by content key, as today. The fallback is what keeps
 merging a transcript import working: its ids are fresh, so nothing
 matches by id and everything falls through to content. One mode opts out:
@@ -631,7 +638,14 @@ In 3c, when storage moves, external constraints get their own model-level
 delta, `elementType: "constraint"`, alongside the six element types
 `deltas.ts` already has, with the same four kinds, and `ModelMerge`
 applies it in the same PR. Before 3c there is no model list to apply it
-to, which is why neither lands earlier. Merge treats an accepted
+to, which is why neither lands earlier. Merge applies an accepted
+constraint delta only when every role it names exists in the merged
+model, and reports one it skips, so rejecting an added fact type cannot
+leave a constraint with dangling roles. The delta also changes what
+`sampleAgreement.differenceCount` counts: two samples that disagree on
+an external constraint differ by one constraint delta rather than by a
+changed fact type, which can move the chosen medoid; 3c's PR measures
+this on the promptlab suite and records it. Merge treats an accepted
 modification the way it treats every other element: the existing id is
 kept and the incoming content is taken. The content key cannot be
 today's, because today's is relative to the host: `roleKeys` writes a
@@ -695,7 +709,7 @@ model level, so this matches it.
 
 **The three PRs.**
 
-- **3a, core.** Adds `InternalConstraint`, `ExternalConstraint` and
+- **3a, core, and the consumers of what it changes.** Adds `InternalConstraint`, `ExternalConstraint` and
   `isInternalConstraint`; `FactType.internalConstraints`; and
   `OrmModel.constraints`, `constraintsTouching` and `getConstraint`.
   While storage stays on the fact types, the last three are computed from
@@ -704,18 +718,21 @@ model level, so this matches it.
   one, and the outputs below never fall back to a host. Core's 29 files
   move, together with the output changes of Open decision 9, id-first
   matching (barwise-18n) and verbalization's section for constraints
-  across fact types. The verbalization contract changes in one PR across
-  every surface that projects it: core's rows, and the CLI's JSON
-  projections (`cli/src/workspace/format.ts`,
+  across fact types. Every core output that changes shape changes in this
+  one PR together with every consumer that projects or filters it, so no
+  surface changes in two releases: the verbalization rows and the CLI's
+  JSON projections of them (`cli/src/workspace/format.ts`,
   `cli/src/commands/verbalize.ts`), which list fields explicitly and gain
-  `factTypeIds`. Golden files and query snapshots change here.
-- **3b, the other packages.** The readers in llm, formats, diagram, learn,
-  dbt and vscode move, and so do the readers of
-  `Counterexample.factTypeId`, "the constraint's owner": `barwise
-  verbalize --fact-type` and MCP's verbalize filter counterexamples by it,
-  so they follow Open decision 9 and, for a view of one fact type, the
-  touching rule above. The diagram's constraint nodes take the
-  constraint's id.
+  `factTypeIds`; `ConstraintRef` and MCP's query output;
+  `Counterexample`, with `barwise verbalize --fact-type` and its JSON,
+  MCP's verbalize and the VS Code hover; describe's `affectedFactType` and
+  MCP's `describe_domain`; and the `ruleId.ts` message templates. The two
+  llm callers that compare samples (`sampleAgreement.ts`,
+  `TranscriptProcessor.ts`) switch to content-only here as well, since
+  id-first becomes the default in this PR. Golden files and query snapshots change here.
+- **3b, the other packages.** The remaining readers of the getter in llm,
+  formats, diagram, learn, dbt and vscode move. The diagram's constraint
+  nodes take the constraint's id.
 - **3c, storage.** External constraints are stored on `OrmModel`;
   `FactType.constraints` is removed; the serializer lifts and lowers them;
   the writers call `model.addConstraint`, which fills a missing id as

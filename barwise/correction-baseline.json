@@ -571,17 +571,17 @@
       "caught_by": "execution",
       "note": "The sharpest of seven defects an offline rehearsal surfaced."
     },
-    "orm-format-3::7e75c536805f": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "cli, mcp, promptlab, code-analysis and diagram-ui do not read the getter, though cli and mcp read a host through counterexample.facttypeid (below). the draft's ",
-      "caught_by": "execution",
-      "note": "A compiler probe (getter renamed, every package type-checked) found 43 files in seven packages where a text search had counted 52 in nine."
-    },
     "orm-format-3::83e024eb5943": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 72 external constraints, in 27 files. - every one comes after its host's internal constraints. - 26 sit on a fact type other than their first holder, in 17 fi",
       "caught_by": "execution",
       "note": "Counting through the loader instead of matching role ids as text gave 26 constraints off their first holder in 17 files, not 27 in 18."
+    },
+    "orm-format-3::8b1e291984ea": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "cli, mcp, promptlab, code-analysis and diagram-ui do not read the getter, though cli, mcp and vscode read a host through core outputs that change (below). the d",
+      "caught_by": "execution",
+      "note": "A compiler probe (getter renamed, every package type-checked) found 43 files in seven packages where a text search had counted 52 in nine."
     },
     "orm-format-3::a484a5199bd7": {
       "spec": "orm-format-3.spec.md",
