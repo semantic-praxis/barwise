@@ -571,7 +571,13 @@
       "caught_by": "execution",
       "note": "The sharpest of seven defects an offline rehearsal surfaced."
     },
-    "orm-format-3::559f116daa85": {
+    "orm-format-3::7e75c536805f": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "cli, mcp, promptlab, code-analysis and diagram-ui do not read the getter, though cli and mcp read a host through counterexample.facttypeid (below). the draft's ",
+      "caught_by": "execution",
+      "note": "A compiler probe (getter renamed, every package type-checked) found 43 files in seven packages where a text search had counted 52 in nine."
+    },
+    "orm-format-3::83e024eb5943": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 72 external constraints, in 27 files. - every one comes after its host's internal constraints. - 26 sit on a fact type other than their first holder, in 17 fi",
       "caught_by": "execution",
@@ -582,12 +588,6 @@
       "excerpt": "the draft put all of this in one pr. the split costs a little: until 3c, ormmodel.constraints walks the fact types on every read, so a rule that calls constrain",
       "caught_by": "reasoning",
       "note": "Grounding the reader sites showed one PR would touch 43 source files, tens of test files and every host-naming output; the split keeps the compile-time check in 3c."
-    },
-    "orm-format-3::c3c495d3872f": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "cli, mcp, promptlab, code-analysis and diagram-ui read none. the draft's 52 files across nine packages was a text search, not a compile. writes come by two rout",
-      "caught_by": "execution",
-      "note": "A compiler probe (getter renamed, every package type-checked) found 43 files in seven packages where a text search had counted 52 in nine."
     },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",

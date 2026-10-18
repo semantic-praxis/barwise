@@ -227,7 +227,8 @@ validation like `diagramReferencesToIds.ts`, and registers in
    position: inserting a constraint before others changes no other
    constraint's id, so two revisions of one 2.0 file migrated separately
    give the same id to the same constraint, and diff and merge can match by
-   id. An id is derived once, at migration, and is stated in the file from
+   id (corrected 2026-10-18: they keep matching by content, for the reason
+   Open decision 4's correction gives). An id is derived once, at migration, and is stated in the file from
    the first save; editing a constraint afterwards does not change it.
    Every derived id hashes a domain tag first (`barwise.constraint` here,
    `barwise.subtype-constraint` in step 3), then each input with its length
@@ -526,16 +527,19 @@ every package type-checked (a probe, then reverted), the compiler reports
 | learn   | 2     | 3     |
 | vscode  | 1     | 1     |
 
-cli, mcp, promptlab, code-analysis and diagram-ui read none. The draft's 52
+cli, mcp, promptlab, code-analysis and diagram-ui do not read the getter,
+though cli and mcp read a host through `Counterexample.factTypeId`
+(below). The draft's 52
 files across nine packages was a text search, not a compile. Writes come by two
 routes: 12 `addConstraint` calls in four source files (7 in
 `llm/src/parse/constraints.ts`, 3 in NORMA's phase 3, and one each in
 `dbt/src/dbtMapping/sqlPatterns.ts` and the DDL importer), and a
 `constraints` list passed to `addFactType` or the `FactType`
-constructor, which is how NORMA's phase 1 adds external kinds. Tests are
+constructor, which is how NORMA's phase 1 and `ModelMerge`'s
+`addFactTypeToMerged` (through `toFactTypeConfig`) add external kinds. Tests are
 not type-checked (barwise-944), so only a text search can size them:
-`.constraints` appears on 373 lines in 54 test files (`git grep -c` over
-`packages/*/tests`), a ceiling that also
+`.constraints` appears on 373 lines in 54 test files (`git grep -c '\.constraints' -- 'packages/*/tests/**'`
+from `barwise/`), a ceiling that also
 counts other objects' fields. The 72 and 27 below count through the
 loader; the 73 and 28 elsewhere in this spec count the raw YAML of every
 tracked file, including one the loader refuses.
@@ -546,11 +550,14 @@ change.**
 - **It reads only internal kinds.** That means a filter on mandatory,
   uniqueness, ring, frequency, value, value comparison or cardinality, or
   a read of `isPreferred`. The read becomes `internalConstraints`, with no
-  change in behaviour. Examples: the ring, uniqueness and value population
-  rules, `identification.ts`, `NormaXmlWriter.collectPreferredIdentifiers`,
+  change in behaviour. Examples: the ring and value population rules,
+  `checkUniquenessViolations` (not its neighbour
+  `checkExternalUniquenessViolations`, in the next group), `identification.ts`, `NormaXmlWriter.collectPreferredIdentifiers`,
   and dbt's `sqlPatterns.ts`.
 - **It reads only external kinds.** These are the spanning, set-comparison,
-  join and disjunctive-mandatory population rules. They read
+  join, external-uniqueness and disjunctive-mandatory population rules.
+  A file can hold both groups, as `population/uniqueness.ts` does, so the
+  group is decided per read, not per file. They read
   `model.constraints` once instead of each host's list. A local external
   constraint, one whose roles all sit in one fact type, is still external:
   the set-comparison rules, which check one population at a time, find it
@@ -640,7 +647,9 @@ Measured through the loader on the 78 tracked files it accepts:
 - 26 sit on a fact type other than their first holder, in 17 files. The
   draft said 27 in 18 from a text search, and the extra one is in a file
   the loader refuses. Those 26 move to their first holder on the next 2.0
-  save, with ids and order kept. That changes where they are written, not
+  save, with ids kept; their order changes too in one file of the corpus
+  (`trial/customers/C02-bank/kernel.orm.yaml`), by the first-save case
+  above. That changes where they are written, not
   what they mean: the host in 2.0 is arbitrary by definition. So the move
   is accepted rather than carried as a hidden host field on the model. If
   a release is cut while 2.0 is still current, its notes say that a save
@@ -677,11 +686,16 @@ model level, so this matches it.
   constraint delta and verbalization's section for constraints across
   fact types. Golden files and query snapshots change here.
 - **3b, the other packages.** The readers in llm, formats, diagram, learn,
-  dbt and vscode move. The diagram's constraint nodes take the
+  dbt and vscode move, and so do the readers of
+  `Counterexample.factTypeId`, "the constraint's owner": `barwise
+  verbalize --fact-type` and MCP's verbalize filter counterexamples by it,
+  so they follow Open decision 9 and, for a view of one fact type, the
+  touching rule above. The diagram's constraint nodes take the
   constraint's id.
 - **3c, storage.** External constraints are stored on `OrmModel`;
   `FactType.constraints` is removed; the serializer lifts and lowers them;
-  the writers call `model.addConstraint`; and ids are filled
+  the writers call `model.addConstraint`, NORMA's phase 1 and
+  `ModelMerge` included, merge with its id remapping; and ids are filled
   (barwise-nkq). It also lands the type test that `FactType.addConstraint`
   and `FactTypeConfig.constraints` reject every external kind.
 
@@ -846,11 +860,16 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
      wherever the file states its id. A 2.0 file that omits ids has no
      such line, so for the six consistency checks that point at the host
      today, the diagnostic falls to line 0 until the next save writes the
-     ids. The thirteen join and spanning report sites have already behaved like
-     that since WS2 for a model loaded from a file, where `c.id ?? ft.id`
-     always finds an id. A model built in code (an LLM import, dbt, DDL)
-     still falls back to the host until 3c fills ids (barwise-nkq), so for
-     those models option (a) changes these sites too.
+     ids. The sixteen other sites that report an external constraint as
+     `c.id ?? ft.id` (thirteen join and spanning reports, the external
+     uniqueness and disjunctive mandatory population rules, and the
+     constraint branch of `referenceDiagnostics.ts`) have already behaved
+     like that since WS2 for a model loaded from a file, where they always
+     find an id. A model built in code still falls back to the host until
+     3c fills ids (barwise-nkq): the LLM parser's subset and equality
+     constraints, and the DDL importer's external uniqueness, which reaches
+     only the external uniqueness rule. For those models option (a)
+     changes these sites too.
 
      Verbalization rows are the one place (a) changes a stated contract:
      an external constraint's `sourceElementId` becomes its constraint id,
