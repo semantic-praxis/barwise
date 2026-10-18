@@ -527,11 +527,18 @@ every package type-checked (a probe, then reverted), the compiler reports
 | vscode  | 1     | 1     |
 
 cli, mcp, promptlab, code-analysis and diagram-ui read none. The draft's 52
-files across nine packages was a text search, not a compile. There are 13
-writes, `addConstraint` calls in four source files (`llm/src/parse/constraints.ts`,
-`dbt/src/dbtMapping/sqlPatterns.ts`, the DDL importer, and NORMA's
-phase 3). Tests read `.constraints` at most 112 times in 30 files; that is a
-text-search ceiling, since tests are not type-checked (barwise-944).
+files across nine packages was a text search, not a compile. Writes come by two
+routes: 12 `addConstraint` calls in four source files (7 in
+`llm/src/parse/constraints.ts`, 3 in NORMA's phase 3, and one each in
+`dbt/src/dbtMapping/sqlPatterns.ts` and the DDL importer), and a
+`constraints` list passed to `addFactType` or the `FactType`
+constructor, which is how NORMA's phase 1 adds external kinds. Tests are
+not type-checked (barwise-944), so only a text search can size them:
+`.constraints` appears on 373 lines in 54 test files (`git grep -c` over
+`packages/*/tests`), a ceiling that also
+counts other objects' fields. The 72 and 27 below count through the
+loader; the 73 and 28 elsewhere in this spec count the raw YAML of every
+tracked file, including one the loader refuses.
 
 **Each read falls into one of three groups, and the group decides the
 change.**
@@ -571,6 +578,9 @@ position in the host's list:
   are the host's (`ft.id`) or fall back to it (`c.id ?? ft.id`).
 - Verbalization: a constraint's `Verbalization` carries the host's id, and
   its labels for roles in other fact types are worded relative to the host.
+  The id is a contract: `ConstraintVerbalizer.ts` keeps every constraint
+  row's `sourceElementId` a fact type id so that `barwise verbalize
+  --format json` consumers can resolve each row with `getFactType`.
 - Query: `ConstraintRef.factType` and `factTypeId`, which MCP's query
   output repeats.
 - Describe: summary ids are positional (`${ft.id}-constraint-${i}`), and
@@ -598,8 +608,14 @@ exists for:
 
 External constraints get their own model-level delta,
 `elementType: "constraint"`, alongside the six element types `deltas.ts`
-already has. It is keyed by the same content key, resolved through the
-model-wide role holders that `elementDiff.ts` already builds. Between two
+already has. Its key cannot be today's, because today's is relative to
+the host: `roleKeys` writes a host role as its position (`h<i>`) and any
+other role as its fact type's name and position. With no host, every role
+takes that second form, through the model-wide role holders
+`elementDiff.ts` already builds, so the key no longer depends on where 2.0
+put the constraint. One limit carries over unchanged: `operandKey` keys a
+join operand's path by raw role ids, so a join constraint never matches
+across independent LLM samples, today or after. Between two
 revisions of one file, which do share ids, matching by id first would
 report an edited constraint as one change instead of a removal and an
 addition. That is filed as barwise-18n, outside this workstream.
@@ -609,8 +625,13 @@ external kinds into the model list. This happens after `withDerivedIds`,
 which hashes the host's id, so derived ids do not change. They keep file
 order: by host, then by position. On save it writes each one under the
 first fact type, in model order, that holds one of its roles, after that
-fact type's internal constraints. A save followed by a load therefore
-gives back the same order.
+fact type's internal constraints. From the second save on, a save
+followed by a load gives back the same order. The first save of a file
+with constraints off their first holder can reorder them: X on host C
+and Y on host D load as [X, Y], but if Y's first holder is C and X's is
+D, the save writes Y under C and X under D, and the reload gives [Y, X].
+List order carries no meaning for external constraints, so this is
+accepted along with the move itself.
 
 Measured through the loader on the 78 tracked files it accepts:
 
@@ -630,11 +651,17 @@ Measured through the loader on the 78 tracked files it accepts:
   constraint and names it, because 2.0 has nowhere to write it.
 
 **Writers.** In 3c, `OrmModel.addConstraint(c: ExternalConstraint)` arrives,
-and `FactType.addConstraint` narrows to `InternalConstraint`. Both fill a
+and `FactType.addConstraint` narrows to `InternalConstraint`, as does
+`FactTypeConfig.constraints`, so the constructor and `addFactType`
+cannot take an external kind either. NORMA's phase 1
+(`resolveConstraintsForFactType` in `mapping/factTypes.ts`) builds
+external kinds into that config today; in 3c it adds them through
+`model.addConstraint`, and its `holdsSame` check against the fact
+type's list moves with them. Both `addConstraint`s fill a
 missing id from the installed generator, as the constructor already does.
 That closes barwise-nkq and makes `NormaXmlWriter`'s positional fallback id
-unreachable, so 3c removes it. Two duplicate checks compare external kinds
-within one host today: NORMA phase 3's `holdsSame` and the LLM parser's
+unreachable, so 3c removes it. Duplicate checks compare external kinds
+within one host today: NORMA's `holdsSame` in both phases and the LLM parser's
 `isDuplicateConstraint`. Pointed at `model.constraints`, they compare
 across the whole model, so two identical external constraints that 2.0 put
 under different hosts become one. NORMA itself keeps every constraint at
@@ -656,15 +683,15 @@ model level, so this matches it.
   `FactType.constraints` is removed; the serializer lifts and lowers them;
   the writers call `model.addConstraint`; and ids are filled
   (barwise-nkq). It also lands the type test that `FactType.addConstraint`
-  rejects every external kind.
+  and `FactTypeConfig.constraints` reject every external kind.
 
 The draft put all of this in one PR. The split costs a little: until 3c,
 `OrmModel.constraints` walks the fact types on every read, so a rule that
 calls `constraintsTouching` once per fact type does work proportional to
 fact types times constraints. On the largest tracked model (121 fact types,
 258 constraints) that is about 31,000 steps, which is negligible. What it buys is a
-reviewable PR per package, against one PR touching 43 source files, up to
-30 test files, and every output above. It costs no safety, because 3c's
+reviewable PR per package, against one PR touching 43 source files, tens
+of test files, and every output above. It costs no safety, because 3c's
 removal is the compile-time check the draft wanted.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
@@ -820,7 +847,16 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
      such line, so for the six consistency checks that point at the host
      today, the diagnostic falls to line 0 until the next save writes the
      ids. The thirteen join and spanning report sites have already behaved like
-     that since WS2, because `c.id ?? ft.id` now always finds an id.
+     that since WS2 for a model loaded from a file, where `c.id ?? ft.id`
+     always finds an id. A model built in code (an LLM import, dbt, DDL)
+     still falls back to the host until 3c fills ids (barwise-nkq), so for
+     those models option (a) changes these sites too.
+
+     Verbalization rows are the one place (a) changes a stated contract:
+     an external constraint's `sourceElementId` becomes its constraint id,
+     resolvable with a new `model.getConstraint(id)`, and the JSON output
+     says which kind of id a row carries. The alternative is to drop the
+     id from those rows, which loses the link back to the model.
    - **(b)** Compute an anchor: the first fact type holding one of the
      constraint's roles, the same rule the 2.0 save uses. Most output
      keeps its current shape, since 46 of the 72 constraints already sit
