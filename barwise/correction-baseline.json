@@ -571,6 +571,24 @@
       "caught_by": "execution",
       "note": "The sharpest of seven defects an offline rehearsal surfaced."
     },
+    "orm-format-3::83e024eb5943": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- 72 external constraints, in 27 files. - every one comes after its host's internal constraints. - 26 sit on a fact type other than their first holder, in 17 fi",
+      "caught_by": "execution",
+      "note": "Counting through the loader instead of matching role ids as text gave 26 constraints off their first holder in 17 files, not 27 in 18."
+    },
+    "orm-format-3::8b1e291984ea": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "cli, mcp, promptlab, code-analysis and diagram-ui do not read the getter, though cli, mcp and vscode read a host through core outputs that change (below). the d",
+      "caught_by": "execution",
+      "note": "A compiler probe (getter renamed, every package type-checked) found 43 files in seven packages where a text search had counted 52 in nine."
+    },
+    "orm-format-3::a484a5199bd7": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "the draft put all of this in one pr. the split costs a little: until 3c, ormmodel.constraints walks the fact types on every read, so a rule that calls constrain",
+      "caught_by": "reasoning",
+      "note": "Grounding the reader sites showed one PR would touch 43 source files, tens of test files and every host-naming output; the split keeps the compile-time check in 3c."
+    },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",
       "excerpt": "- production extraction derives a budget too. processtranscript had the same exposure -- a user importing a long transcript got a silently truncated model with ",
