@@ -145,10 +145,11 @@ describe("Lineage Manifest", () => {
     const EXAMPLE = resolve(__dirname, "../../../../examples/models/learning-design.orm.yaml");
 
     it("hashes two independent loads of the same file identically (barwise-923)", () => {
-      // Every id-less constraint is minted a fresh UUID on load, so two
-      // loads serialize differently on every constraint `id:` line and
-      // hashed differently -- which made `barwise lineage status` report
-      // every export stale on every run for any model like this one.
+      // Before orm-format-3 WS2 every id-less constraint was minted a fresh
+      // UUID on load, so two loads hashed differently -- which made
+      // `barwise lineage status` report every export stale on every run
+      // for any model like this one. Ids are derived now, and hashModel
+      // still canonicalizes them; either alone keeps this passing.
       const text = readFileSync(EXAMPLE, "utf8");
       const serializer = new OrmYamlSerializer();
       const first = serializer.deserialize(text);

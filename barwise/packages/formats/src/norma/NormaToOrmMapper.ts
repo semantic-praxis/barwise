@@ -12,13 +12,20 @@
  */
 import { OrmModel } from "@barwise/core";
 import { runConstraintPasses } from "./mapping/constraintPasses.js";
-import { type NormaMappingContext, NormaMappingError } from "./mapping/context.js";
+import {
+  collectExclusiveOrPairs,
+  collectProcessedRefs,
+  constraintsById,
+  createConstraintIdAllocator,
+  type NormaMappingContext,
+  NormaMappingError,
+} from "./mapping/context.js";
 import { mapDiagrams } from "./mapping/diagrams.js";
 import { mapFactTypes } from "./mapping/factTypes.js";
 import { mapObjectTypes } from "./mapping/objectTypes.js";
 import { mapPopulations } from "./mapping/populations.js";
 import { mapObjectifiedTypes, mapSubtypeFacts } from "./mapping/subtypes.js";
-import type { NormaConstraint, NormaDataType, NormaDocument } from "./NormaXmlTypes.js";
+import type { NormaDataType, NormaDocument } from "./NormaXmlTypes.js";
 
 export { NormaMappingError };
 
@@ -45,11 +52,9 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
     dataTypeById.set(dt.id, dt);
   }
 
-  const constraintById = new Map<string, NormaConstraint>();
-  for (const c of doc.constraints) {
-    constraintById.set(c.id, c);
-  }
+  const constraintById = constraintsById(doc);
 
+  const xorPairs = collectExclusiveOrPairs(doc, constraintById);
   const ctx: NormaMappingContext = {
     doc,
     model,
@@ -58,6 +63,9 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
     factTypeIdMap: new Map(),
     dataTypeById,
     constraintById,
+    processedRefs: collectProcessedRefs(doc),
+    xorPairs,
+    constraintIds: createConstraintIdAllocator(doc, xorPairs),
   };
 
   mapObjectTypes(ctx);

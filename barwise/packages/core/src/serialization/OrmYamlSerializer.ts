@@ -1,5 +1,6 @@
 import { parse, stringify } from "yaml";
 import { OrmModel } from "../model/OrmModel.js";
+import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
   applyMigrations,
@@ -241,10 +242,20 @@ export class OrmYamlSerializer {
       model.addObjectType(deserializeObjectType(otDoc));
     }
 
-    // Add fact types.
-    for (const ftDoc of doc.model.fact_types ?? []) {
+    // Add fact types. An id the file omits is derived from content, not
+    // minted, so one file loads to the same ids every time
+    // (orm-format-3.spec.md, WS2); ids are model-wide, so every derivation
+    // steps past the ids stated in every fact type.
+    const factTypes = (doc.model.fact_types ?? []).map(deserializeFactType);
+    // Every id the file states, then each one derived as it is.
+    const takenConstraintIds = new Set(
+      factTypes.flatMap((ft) =>
+        (ft.constraints ?? []).flatMap((c) => c.id === undefined ? [] : [c.id])
+      ),
+    );
+    for (const ft of factTypes) {
       model.addFactType(
-        deserializeFactType(ftDoc),
+        { ...ft, constraints: withDerivedIds(ft.id!, ft.constraints ?? [], takenConstraintIds) },
         { skipPlayerValidation: options?.lenient },
       );
     }

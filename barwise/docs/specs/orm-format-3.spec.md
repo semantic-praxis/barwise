@@ -1,10 +1,11 @@
 # `.orm.yaml` format 3.0: constraint identity and placement by kind
 
-Status: Draft -- no workstream implemented; every open decision resolved by
-the owner 2026-10-17
+Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
+import keeps constraint ids); WS3 to WS5 not started; every open decision
+resolved by the owner 2026-10-17
 Created: 2026-10-16
 Last-updated: 2026-10-17
-Tracking: barwise-n9n (constraint ids and placement); barwise-loo (one subtype
+Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
 decision 8); barwise-hnb (NORMA comparison doc correction)
@@ -216,8 +217,10 @@ validation like `diagramReferencesToIds.ts`, and registers in
 `schemaVersion.ts`:
 
 1. Every constraint without an id gets one derived from its content: a hash
-   of the fact type id, the kind, and the constraint's fields (roles in
-   their written order, bounds, values, flags), with an occurrence number
+   of the fact type id and the constraint as read (its kind, roles in their
+   written order, bounds, values, flags -- after the reader has folded
+   equivalent spellings, such as a frequency's `role` or `roles`), with an
+   occurrence number
    only to tell apart identical constraints in one fact type. Content, not
    position: inserting a constraint before others changes no other
    constraint's id, so two revisions of one 2.0 file migrated separately
@@ -227,8 +230,8 @@ validation like `diagramReferencesToIds.ts`, and registers in
    Every derived id hashes a domain tag first (`barwise.constraint` here,
    `barwise.subtype-constraint` in step 3), then each input with its length
    in front. The tag keeps the two steps apart; the length prefix keeps
-   inputs within a step apart (`ft-1` with role `r-10` against `ft-11` with
-   role `r-0` would otherwise concatenate identically). Open decision 4 sets
+   inputs within a step apart (the inputs `ft-1`, `mandatory` and `ft-1m`,
+   `andatory` would otherwise concatenate identically). Open decision 4 sets
    the shape. Constraints in a constraint list are what step 1 covers; an
    object type's value constraint and object cardinality stay properties of
    their object type, identified by it, and NORMA export derives their
@@ -346,7 +349,7 @@ lives inline on its fact type; an external constraint, which has no single
 element to be local to, lives in the model's constraint list and refers to
 roles and subtype facts by id. Records the owner's two decisions above.
 
-### 2. Stable ids under 2.0 (provisional: not yet grounded)
+### 2. Stable ids under 2.0 (implemented 2026-10-17)
 
 The user-visible defect, fixed without a format change: when a 2.0 file
 omits a constraint id, the loader derives one with the migration's step 1
@@ -354,6 +357,149 @@ rule instead of minting a random one, so the same file always loads to the
 same ids. The NORMA importer keeps NORMA's constraint ids. The test that
 fails today: loading one 2.0 file twice yields the same constraint ids, and
 two NORMA exports of it are byte-identical.
+
+Implementation notes (2026-10-17):
+
+- `core/src/serialization/derivedId.ts` holds `derivedId` (the UUIDv8),
+  `canonicalJson` and `withDerivedIds`; WS4's migration step 1 reuses
+  `withDerivedIds`, so the ids a 2.0 load gives today are the ids the
+  migration will write. The model loader (`OrmYamlSerializer`) calls it
+  over every fact type `deserializeFactType` read, before `FactType`'s
+  generator fill can run, which now fills only constraints built in code;
+  `deserializeFactType` alone leaves an omitted id omitted. `derivedId` and
+  `canonicalJson` are exported from the core root, and the NORMA importer
+  uses them for a constraint its file gives no id -- the same recipe under
+  its own tag (`barwise.norma-constraint`), over the parsed NORMA
+  constraint and with `_2` suffixes, so its ids are not the ones core
+  would derive for that constraint in a 2.0 file and are not meant to be.
+- A missing id and an empty one are treated alike, as the reader already
+  did. Content is the constraint as `deserializeConstraint` reads it, keys
+  sorted, `id` left out, so spellings the reader folds (a frequency's `role`
+  or `roles`, an explicit `modality: alethic`) give one id. The occurrence
+  number is the only positional input and matters only between exact
+  duplicates.
+- The NORMA importer gives every mapped constraint its id through one
+  allocator on the mapping context (`ConstraintIdAllocator`, in
+  `mapping/context.ts`), claimed at every mapping site in both phases.
+  It holds the rules once. An exclusive-or maps once, under its exclusion's
+  id, whichever half and coupler the file carries and whichever fact types
+  list it (`buildExclusiveOr`); when the couplers disagree,
+  the mandatory's own wins. Both phases ask that one pairing whether a
+  half is an exclusive-or, never the half's own coupler alone, so a listed
+  half whose partner carries the only coupler still maps as the
+  exclusive-or. A half is a constraint that can build the exclusive-or over
+  its own roles: a mandatory that is not simple or implied, or an
+  exclusion with no join path over two single-role sequences or more (a
+  mandatory over two roles or more); a coupled
+  constraint that cannot
+  maps as what it is and keeps its own id. Two halves pair when the
+  mandatory can build and each is in one pair only; the pair maps to one
+  exclusive_or over the mandatory's roles and consumes its exclusion, join
+  path or not, since NORMA couples only plain role sequences (a path that
+  failed to decode used to leave a stray flat exclusion beside it). The
+  pair is built from the mandatory -- its roles and modality -- whichever
+  half a phase reaches first, and couplers that agree in both directions
+  pair before a one-way claim. Phase 3 now keeps a multi-fact constraint's
+  deontic modality and dedupes on it, as phase 1 always did; before, an
+  unlisted deontic exclusion, subset or equality imported as alethic,
+  which predates WS2 and is fixed here because the pass was reworked.
+  Both phases now drop a constraint as a duplicate only when one already
+  held says exactly the same thing (`holdsSame`, over core's
+  `canonicalJson`), so listing no longer decides whether a second identical
+  rule survives -- phase 1 used to keep both. Listing can still change the
+  shape of a few kinds, because phase 3 builds simple mandatory, value,
+  ring and external uniqueness constraints with its own code rather than
+  `mapNormaConstraint`; that predates WS2 and is barwise-vq7. Keeping one of two identical
+  rules, and losing the second one's NORMA id, is the policy nine existing
+  importer tests pin; it is kept, not reopened here. The check replaces per-kind checks that had drifted: a subset
+  compared only its subset roles and an equality only its first sequence,
+  so a NORMA-written file with two subsets from one role lost the second,
+  and its id, on import; a ring ignored its type. A half with no such partner --
+  deleted, unable to build, or the one that lost a coupler disagreement --
+  builds the exclusive-or over its own roles, where before it was skipped for a partner that never built it
+  and the constraint was lost (barwise-e58, fixed here). Every half therefore maps as the exclusive-or. A NORMA constraint the file gives no id (the
+  parser reads it as `""`) gets one derived from its content by core's
+  `derivedId` (tag `barwise.norma-constraint`), rather than one from the
+  generator or from its place in the document; an id-less half or an empty
+  coupler ref pairs with nothing. A second constraint mapped from
+  one NORMA constraint gets `<id>_2`, skipping every id the document holds
+  for any element, since NORMA's ids share one space (every `id` and `...Id` field the
+  parser keeps); an inline
+  cardinality without an id gets the writer's id for it
+  (`cardinalityId`, shared by both; the writer spells an object type's with it too, but that cardinality is a property with no id in the metamodel, so its NORMA id is not kept: barwise-eok), under the same rule. Distinct
+  exclusive-or pairs over the same roles merge into one constraint, as
+  before, and both phases now check the whole model for it
+  (inside `buildExclusiveOr`, a lookup of the role sets built so far) rather
+  than one fact type, so whether two such pairs merge no longer depends
+  on which phase maps which. Which pair's id the merged constraint keeps
+  does: a listed pair maps in phase 1, ahead of an unlisted one. That is
+  fixed for a given file, and only a file with two pairs saying one thing
+  reaches it; the loser is dropped without a diagnostic, as before WS2,
+  because the importer has no warning channel. Modality is part of what is compared: a deontic pair beside
+  an alethic one over the same roles is kept. The exclusive-or pairing and the
+  set of listed constraint ids are computed once per import, on the
+  context, and read by the passes and the allocator alike.
+- The NORMA importer keeps NORMA's fact type and subtype fact ids, as it
+  kept object type ids, and derives an objectification link's id from the
+  two ids it links unless its NestedPredicate carries an id of its own,
+  which it keeps (and the writer now writes the link's id there), keeps fact instance
+  ids, and derives a population's id from its fact type and a unary row's
+  from its instance and role (the parser already drops a fact instance
+  with no id), so one NORMA file
+  imports to one model every time; before, every fact type id came from the
+  generator. That is import determinism, not round-trip identity for sample
+  data: the writer still numbers fact and entity instances by position
+  (barwise-1i6). A constraint added through `addConstraint` in code still has no
+  id until saved, and exports under a positional one (barwise-nkq).
+- In core, the model loader derives ids after reading every fact type
+  (`OrmYamlSerializer`, over `deserializeFactType`'s output), and a derived
+  id steps past any constraint id the file states, in any fact type, so a constraint added without an id beside a saved
+  identical one -- or where a saved one was moved away from -- gets a new id
+  rather than a duplicate. The guarantee is per file: `project split`
+  copies raw YAML, so a constraint that steps past an id stated in another
+  fact type can derive a different id once that fact type is in another
+  domain file. It takes a hand-moved saved id plus an identical id-less
+  constraint, split before any save; saving first states every id. A duplicate id the file states itself is the
+  author's error; the writer's silent drop of a repeated id predates WS2
+  (it now drops the repeat whole, with no second InternalConstraints
+  entry) and is answered by Open decision 4's duplicate-id refusal, which lands
+  with the format in WS4.
+- Known limits, accepted: barwise holds an exclusive-or as one constraint
+  with one id, so the NORMA id of its mandatory half does not survive a
+  NORMA round trip (the exporter writes `<exclusion-id>_xormand`); and
+  list order inside a constraint is hashed, so reordering a uniqueness's
+  roles in an unsaved 2.0 file gives it a new id, as any other edit would.
+  Folding order away would restate, kind by kind, which lists are sets --
+  the rules diff's `constraintKey` holds -- and once a file is saved the id
+  is stated. A NORMA constraint listed in two fact types maps once per
+  fact type, as it did before WS2, and now exports as `<id>` and
+  `<id>_2`; that the import splits it predates WS2. What a NORMA round trip
+  keeps is the identity of the elements barwise holds with ids; NORMA
+  elements barwise folds into another element's fields lose theirs --
+  subtype partition constraints (SubtypeFact flags until WS3 makes them
+  constraints), reading orders and readings, subtype meta-roles, the
+  exclusive-or mandatory half (above) and object-type cardinality
+  (barwise-eok). And the trip from barwise is not identity-preserving
+  for ids without NORMA's `_` prefix: the exporter adds it (`toNormaId`)
+  and the importer keeps what NORMA wrote, so `ft-1` comes back as
+  `_ft-1`; that predates WS2 for object types and now reaches fact types
+  and constraints.
+- Tests: `core/tests/serialization/derivedConstraintIds.test.ts` and
+  `formats/tests/NormaConstraintIds.test.ts`. Each was run against a
+  planted defect (no derivation, no key sort, no length prefix, position
+  instead of content, no occurrence number, no version bits, raw YAML
+  hashed instead of the read constraint; NORMA ids dropped in phase 2, in
+  the passes, no duplicate handling, the exclusive-or pairing read from one
+  coupler only, phase 1 reading a half's own coupler, an empty NORMA id
+  passed through or named by position, an id-less half or empty ref
+  paired, modality left out of the merge, a dropped repeat still listed,
+  the exclusive-or's mandatory half left out of the repeat check, a
+  join-path exclusion counted as a half, any half's claim marking its pair, the same-roles merge
+  dropped in phase 1 or held to one fact type in phase 2, reservation of
+  constraint ids only, the model id missed, a changed tag, a changed read
+  shape, unpadded hex) and failed for each. Two derived ids are pinned to
+  values recomputed by hand from the recipe, so a change to the derivation
+  or to what the reader builds cannot pass unnoticed.
 
 ### 3. Placement by kind, in memory (provisional: not yet grounded)
 

@@ -103,6 +103,17 @@ it, so knip sees an unused file where there is a live edge.
   surface installs it in one line, `setIdGenerator(createUuidv7Generator({
   now: Date.now, randomBytes }))`; do not wrap that in a named installer
   (`docs/specs/uuid7-generator-factory.spec.md`, D2).
+- **A constraint id a file omits is derived, not minted.** On load,
+  `serialization/derivedId.ts` gives an id-less constraint a UUIDv8 hashed
+  from its fact type id and its content, so one unchanged file always loads
+  to the same ids; the generator fills only constraints passed to the
+  `FactType` constructor in code, and `addConstraint` fills none
+  (barwise-nkq)
+  (`docs/specs/orm-format-3.spec.md`, WS2). Do not move the derivation into
+  `FactType`'s constructor: it runs per fact type and cannot see the ids
+  the rest of the file states. And do not let a loaded constraint reach
+  the constructor's random fill: that is what made two NORMA exports of
+  one file differ.
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class
   hierarchies.
