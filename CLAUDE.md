@@ -394,8 +394,10 @@ skill (`.claude/skills/release/`).
 - Doc naming and dating (stable kebab names for specs, dated filenames
   for point-in-time artifacts) follows the convention in the
   `spec-writer` skill.
-- Opening a PR follows the `pr-creation` skill and reviewing one
-  follows `pr-review`; the barwise invariants CI cannot check live once,
+- Opening a PR follows the `pr-creation` skill, reviewing one
+  follows `pr-review`, and merging one follows the `steward` skill's
+  section 4b (the owner's condition: the review has recommended
+  `merge` on the head being merged); the barwise invariants CI cannot check live once,
   in `pr-review/checklist.md`, which the author runs before a reviewer
   has to (`docs/specs/pr-skills.spec.md`).
 - TypeScript strict mode. Base config in `barwise/tsconfig.base.json`

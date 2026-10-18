@@ -220,7 +220,8 @@ shell ran them as commands and the tool reported success.
   locally, `gh auth switch --user gabeschenz` first (`AGENTS.md`).
 - Subscribe to the PR's activity, then read the `steward` skill: from
   here the PR is being driven, and that file owns the mechanics
-  (tracker conflicts, regenerators, the ratchet, the pre-push order).
+  (tracker conflicts, regenerators, the ratchet, the pre-push order)
+  and the condition for merging (its section 4b).
 - Nothing is done until `git status` shows the branch up to date with
   origin (root `CLAUDE.md`, Session Completion).
 

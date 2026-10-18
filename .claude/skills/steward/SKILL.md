@@ -1,6 +1,6 @@
 ---
 name: steward
-description: Use when driving a barwise PR to green - acting on CI failures, review events, or merge conflicts as the PR's agent. Carries only the repo-specific mechanics the generic drive-to-green rules cannot know; conventions themselves live in CLAUDE.md, AGENTS.md, and the scripts this file points at.
+description: Use when driving a barwise PR to green - acting on CI failures, review events, or merge conflicts as the PR's agent, and before merging it. Carries the repo-specific mechanics the generic drive-to-green rules cannot know, and the owner's condition for merging; conventions themselves live in CLAUDE.md, AGENTS.md, and the scripts this file points at.
 ---
 
 # Stewarding a barwise PR
@@ -111,12 +111,41 @@ need its predecessor's code in the diff is better cut against `main`
 directly. Stack only when the later work genuinely will not compile or
 test without the earlier, and then expect this step.
 
+## 4b. Before merging: `/code-review` and `/pr-review`, on the head being merged
+
+The owner lets the agent driving a PR merge it, on one condition
+(2026-10-18): the `pr-review` skill, which runs `/code-review` as its
+correctness engine, has recommended `merge` on the exact head being
+merged. This is the one permission rule in this file, because it is a
+delegation the owner made for this repo, which no generic rule can know.
+
+- **Review the current head, then merge that SHA.** Run the `pr-review`
+  skill, delivered in the session. On `merge`, merge with the reviewed
+  SHA pinned (the GitHub MCP merge's `expectedHeadSha`, or `gh pr
+  merge --match-head-commit`), so a commit pushed after the review is
+  refused rather than merged; once merged, post one PR comment naming
+  the SHA and the recommendation. On anything else, fix what it lists,
+  push, and review the new head. Any push needs a new review.
+- **Ask the owner instead** when the review cannot tell, when
+  `/code-review` could not run, when the PR body leaves the owner a
+  decision they have not answered, or after two reviews of this PR that
+  did not recommend `merge` -- a fresh review always finds something to
+  say, and chasing it ran 28 rounds on one PR (barwise-q93). The owner's
+  answer decides, and resets the count.
+- **The owner's instruction overrides this.** The rule is a condition
+  on a delegation; when the owner says to merge a PR, merge it.
+- **No exemption by size.** Tracker-only and docs-only PRs, including
+  section 5's follow-up, get the review too; PR #679 only closed two
+  issues and merged without it, which is how this rule came to be
+  written down. Nothing mechanical enforces it yet (barwise-zdd).
+
 ## 5. After the PR merges
 
 Close the issues it resolved via
 `node barwise/scripts/beads-crud.mjs close <id> --reason "..."` in a
-tracker-only follow-up commit -- not in the code PR, whose body should
-say the closures follow. `npm run check:tracker-closes` (a CI step on every
+tracker-only follow-up PR -- not in the code PR, whose body should
+say the closures follow. That follow-up is a PR like any other: section
+4b applies before merging it. `npm run check:tracker-closes` (a CI step on every
 pull request, and part of the pre-push run) fails a diff that closes an
 issue and changes anything outside `.beads/`, docs included. Then push and verify per the Session
 Completion section of the root `CLAUDE.md`: work is not done until
