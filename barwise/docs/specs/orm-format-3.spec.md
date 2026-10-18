@@ -206,6 +206,7 @@ type ExternalConstraint = Exclude<Constraint, InternalConstraint>;
 // (FactType.constraints is removed, so every reader must be revisited)
 // OrmModel.constraints: readonly ExternalConstraint[]
 // OrmModel.constraintsTouching(factTypeId): readonly Constraint[]
+// OrmModel.getConstraint(id): Constraint | undefined  (either kind)
 ```
 
 91 reads in 43 source files across seven packages use `factType.constraints`
@@ -609,7 +610,11 @@ An internal constraint keeps its fact type as context,
 **Diff and merge match constraints by id first, then by content.** This
 revises Open decision 4 (owner, 2026-10-18). A constraint whose id occurs
 on both sides is matched by id, and if its content differs that is one
-modification rather than a removal and an addition. The constraints left
+modification rather than a removal and an addition: a new
+`constraintsModified` change, beside `constraintsAdded` and
+`constraintsRemoved` in `changeDescription.ts`, with its own
+`describeChange` text and the `breakingLevel` of the stricter of the
+two. A constraint with no id is never matched by id. The constraints left
 over are matched by content key, as today. The fallback is what keeps
 merging a transcript import working: its ids are fresh, so nothing
 matches by id and everything falls through to content. One mode opts out:
@@ -618,11 +623,15 @@ independent LLM samples, whose ids are unrelated by construction, and ask
 for content only, so a coincidental id never pairs two different
 constraints. `diffModels` takes the mode as an option, with id-first as
 the default, so `barwise diff`, `history`, `merge` and MCP's diff and
-merge tools get it unchanged. This delivers barwise-18n in 3a.
+merge tools get it unchanged. This delivers barwise-18n in 3a, inside
+today's per-fact-type deltas; until 3c an external constraint whose 2.0
+host differs between the two sides is still a removal and an addition.
 
-External constraints get their own model-level delta,
-`elementType: "constraint"`, alongside the six element types `deltas.ts`
-already has, with the same four kinds. Merge treats an accepted
+In 3c, when storage moves, external constraints get their own model-level
+delta, `elementType: "constraint"`, alongside the six element types
+`deltas.ts` already has, with the same four kinds, and `ModelMerge`
+applies it in the same PR. Before 3c there is no model list to apply it
+to, which is why neither lands earlier. Merge treats an accepted
 modification the way it treats every other element: the existing id is
 kept and the incoming content is taken. The content key cannot be
 today's, because today's is relative to the host: `roleKeys` writes a
@@ -673,10 +682,11 @@ cannot take an external kind either. NORMA's phase 1
 (`resolveConstraintsForFactType` in `mapping/factTypes.ts`) builds
 external kinds into that config today; in 3c it adds them through
 `model.addConstraint`, and its `holdsSame` check against the fact
-type's list moves with them. Both `addConstraint`s fill a
-missing id from the installed generator, as the constructor already does.
-That closes barwise-nkq and makes `NormaXmlWriter`'s positional fallback id
-unreachable, so 3c removes it. Duplicate checks compare external kinds
+type's list moves with them. `FactType.addConstraint` fills a missing
+id from the installed generator from 3a, as the constructor already does,
+which closes barwise-nkq and makes `NormaXmlWriter`'s positional fallback id
+unreachable, so 3a removes it; `OrmModel.addConstraint` does the same from
+its arrival in 3c. Duplicate checks compare external kinds
 within one host today: NORMA's `holdsSame` in both phases and the LLM parser's
 `isDuplicateConstraint`. Pointed at `model.constraints`, they compare
 across the whole model, so two identical external constraints that 2.0 put
@@ -687,11 +697,18 @@ model level, so this matches it.
 
 - **3a, core.** Adds `InternalConstraint`, `ExternalConstraint` and
   `isInternalConstraint`; `FactType.internalConstraints`; and
-  `OrmModel.constraints` and `constraintsTouching`. While storage stays on
-  the fact types, the last two are computed from them. Core's 29 files
-  move, together with the output changes of Open decision 9, diff's
-  constraint delta and verbalization's section for constraints across
-  fact types. Golden files and query snapshots change here.
+  `OrmModel.constraints`, `constraintsTouching` and `getConstraint`.
+  While storage stays on the fact types, the last three are computed from
+  them. `FactType.addConstraint` fills a missing id from the installed
+  generator (barwise-nkq), so from 3a on every constraint in memory has
+  one, and the outputs below never fall back to a host. Core's 29 files
+  move, together with the output changes of Open decision 9, id-first
+  matching (barwise-18n) and verbalization's section for constraints
+  across fact types. The verbalization contract changes in one PR across
+  every surface that projects it: core's rows, and the CLI's JSON
+  projections (`cli/src/workspace/format.ts`,
+  `cli/src/commands/verbalize.ts`), which list fields explicitly and gain
+  `factTypeIds`. Golden files and query snapshots change here.
 - **3b, the other packages.** The readers in llm, formats, diagram, learn,
   dbt and vscode move, and so do the readers of
   `Counterexample.factTypeId`, "the constraint's owner": `barwise
@@ -701,9 +718,10 @@ model level, so this matches it.
   constraint's id.
 - **3c, storage.** External constraints are stored on `OrmModel`;
   `FactType.constraints` is removed; the serializer lifts and lowers them;
-  the writers call `model.addConstraint`, NORMA's phase 1 and
-  `ModelMerge` included, merge with its id remapping; and ids are filled
-  (barwise-nkq). It also lands the type test that `FactType.addConstraint`
+  the writers call `model.addConstraint`, which fills a missing id as
+  `FactType.addConstraint` has since 3a, NORMA's phase 1 and
+  `ModelMerge` included, merge with its id remapping; and diff's
+  model-level constraint delta lands with merge's handling of it. It also lands the type test that `FactType.addConstraint`
   and `FactTypeConfig.constraints` reject every external kind.
 
 The draft put all of this in one PR. The split costs a little: until 3c,
@@ -756,7 +774,7 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 - **Verbalization output** moves external constraints into their own section;
   golden files change in WS3.
 
-## Open decisions (all resolved: 1 to 8 on 2026-10-17, 9 on 2026-10-18)
+## Open decisions (all resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18)
 
 1. **ADR 0003 amends ADR 0001's "inline and local" -- resolved 2026-10-17 by the owner: yes,
    as recommended.** Recommend: yes, as
@@ -786,15 +804,15 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
    author id spelled the same way.
 
    Because derived ids come from content (step 1), two revisions of one
-   2.0 file give the same constraint the same id, and diff and merge match
-   constraints by id whatever the files' versions. An edited constraint
-   gets a different id, which diff reports as a removal and an addition,
-   the same as today's content-key matching.
+   2.0 file give the same constraint the same id. (Superseded 2026-10-18,
+   by the revision below: diff and merge do not match by id alone, and an
+   edited constraint whose id is unchanged is one modification.)
 
    Revised 2026-10-18 by the owner, after WS3's grounding found that diff
    also compares models whose ids are unrelated by construction
-   (independent LLM samples, a transcript import against its base): ids
-   are the general case. Diff and merge match a constraint by id where the
+   (independent LLM samples, a transcript import against its base):
+   matching by id stays the general case, and matching by content is the
+   fallback and a specialization for LLM samples. Diff and merge match a constraint by id where the
    id occurs on both sides, and by content for the rest, so an edited
    constraint whose id is unchanged is one modification and an import with
    fresh ids still matches by content. Comparing independent LLM samples
@@ -876,11 +894,10 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
      uniqueness and disjunctive mandatory population rules, and the
      constraint branch of `referenceDiagnostics.ts`) have already behaved
      like that since WS2 for a model loaded from a file, where they always
-     find an id. A model built in code still falls back to the host until
-     3c fills ids (barwise-nkq): the LLM parser's subset and equality
-     constraints, and the DDL importer's external uniqueness, which reaches
-     only the external uniqueness rule. For those models option (a)
-     changes these sites too.
+     find an id. A model built in code still fell back to the host at the
+     time of writing (the LLM parser's subset and equality constraints,
+     and the DDL importer's external uniqueness); 3a fills those ids
+     (barwise-nkq), so those models change at these sites too.
 
      Verbalization rows are the one place (a) changes a stated contract.
      The owner confirmed this shape on a Room, Building and RoomNumber
