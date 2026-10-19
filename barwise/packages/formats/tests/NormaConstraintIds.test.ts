@@ -312,7 +312,7 @@ describe("NORMA import keeps constraint ids", () => {
     };
     const cardinalityOf = (m: OrmModel) =>
       m.factTypes.flatMap((f) => f.constraints).find((c) => c.type === "cardinality")?.id;
-    // The writer's id for a cardinality without one, so the two agree.
+    // The importer's derived id for a cardinality NORMA wrote without one.
     expect(cardinalityOf(mapNormaToOrm(withCard))).toBe(cardinalityId(role!.id));
 
     // ... unless a real constraint holds that id; then it steps aside, and

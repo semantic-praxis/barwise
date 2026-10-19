@@ -65,11 +65,12 @@ export function derivedNormaId(base: NormaId, suffix: string): NormaId {
 }
 
 /**
- * The id of a cardinality restriction -- a unary role's or an object
- * type's -- when the model gives it none, from the element it restricts:
- * one spelling, shared by the writer and the importer, so a model imported
- * from a file whose cardinality lacks an id exports the id an in-code model
- * would.
+ * The id of a cardinality restriction that has none of its own, from the
+ * element it restricts: the importer gives it to a unary role's cardinality
+ * NORMA wrote without an id, and the writer gives it to an object type's
+ * cardinality, which barwise holds as a property and never names. A role
+ * cardinality built in code gets a generated id instead (barwise-nkq), and
+ * the writer exports that.
  */
 export function cardinalityId(restricted: NormaId): NormaId {
   return derivedNormaId(restricted, "_card");
