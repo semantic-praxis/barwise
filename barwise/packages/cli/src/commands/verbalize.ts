@@ -95,15 +95,17 @@ export function registerVerbalizeCommand(program: Command): void {
 function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions) {
   // Keyed on the option, not on the lookup: a project domain without the
   // fact type gets no counterexamples, not the whole model's.
-  const ft = opts.factType !== undefined ? model.getFactTypeByName(opts.factType) : undefined;
-  const verbalizations = opts.factType !== undefined
+  const name = opts.factType;
+  const scoped = name !== undefined;
+  const ft = scoped ? model.getFactTypeByName(name) : undefined;
+  const verbalizations = scoped
     ? (ft ? verbalizer.verbalizeFactType(ft.id, model) : [])
     : verbalizeWhole(verbalizer, model, opts);
 
   let counterexamples: readonly Counterexample[] = [];
   if (opts.counterexamples) {
     const all = generateCounterexamples(model);
-    if (opts.factType === undefined) counterexamples = all;
+    if (!scoped) counterexamples = all;
     else if (ft) counterexamples = counterexamplesTouching(model, ft.id, all);
   }
   return { verbalizations, counterexamples };

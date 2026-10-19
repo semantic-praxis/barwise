@@ -94,6 +94,7 @@ describe("barwise verbalize", () => {
   it("treats an empty --fact-type as a name that is not found", async () => {
     const result = await runCli(["verbalize", `${fixtures}/simple.orm.yaml`, "--fact-type", ""]);
     expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(`Fact type "" not found in model.`);
   });
 
   it("gives a project domain without the fact type no counterexamples", async () => {

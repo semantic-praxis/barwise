@@ -109,12 +109,12 @@ function verbalizeSingle(
   counterexamples: boolean,
   annotate: boolean,
 ): { content: Array<{ type: "text"; text: string; }>; } {
-  if (factType && !model.getFactTypeByName(factType)) {
+  if (factType !== undefined && !model.getFactTypeByName(factType)) {
     return {
       content: [{ type: "text" as const, text: `No fact type found matching "${factType}".` }],
     };
   }
-  if (!factType && mode === "summary") {
+  if (factType === undefined && mode === "summary") {
     const verbalizations = new Verbalizer().verbalizeModel(model);
     return { content: [{ type: "text" as const, text: buildSummary(verbalizations) }] };
   }
@@ -134,7 +134,7 @@ function verbalizeText(
 ): string {
   const verbalizer = new Verbalizer();
 
-  if (factType) {
+  if (factType !== undefined) {
     const ft = model.getFactTypeByName(factType);
     if (!ft) return `No fact type found matching "${factType}".`;
     const verbalizations = verbalizer.verbalizeFactType(ft.id, model);

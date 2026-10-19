@@ -38,6 +38,11 @@ describe("verbalize_model tool", () => {
     expect(result.content[0]!.text).toContain("No fact type found");
   });
 
+  it("treats an empty fact type as a name that is not found, as the CLI does", () => {
+    const result = executeVerbalize(ws.fixture("simple.orm.yaml"), "");
+    expect(result.content[0]!.text).toBe('No fact type found matching "".');
+  });
+
   it("returns content in MCP format", () => {
     const result = executeVerbalize(ws.fixture("simple.orm.yaml"));
     expect(result.content).toHaveLength(1);
