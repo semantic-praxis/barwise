@@ -12,15 +12,17 @@ import {
 } from "./shared.js";
 
 /**
- * Exclusion constraints whose roles span fact types: no object value may
- * appear in more than one of the excluded roles. (The local case -- all
- * roles in one fact type -- is handled by checkExclusionViolations.)
+ * Exclusion constraints: no object may play more than one of the excluded
+ * roles, across the whole population. Every exclusion is checked here,
+ * whether its roles span fact types or sit in one: an object that plays
+ * both roles in different fact instances violates it as surely as one
+ * that plays both in a single instance, which is all a per-instance check
+ * could see (owner, 2026-10-19; orm-format-3 3a-ii-b notes).
  */
 export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   for (const c of model.constraints) {
     if (!isExclusion(c)) continue;
-    if (localFactTypeOf(model, c)) continue; // checked by the local rule
 
     const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
     const all = new Set<string>();
@@ -34,7 +36,7 @@ export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] 
           reportAs(
             severityForModality(c),
             RULE_ID.exclusionViolation,
-            "local",
+            "default",
             constraintElementId(c),
             c.roleIds.join(", "),
             value,
@@ -48,8 +50,11 @@ export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] 
 }
 
 /**
- * Exclusive-or constraints whose roles span fact types: every instance of
- * the common player type must play exactly one of the roles.
+ * Exclusive-or constraints: every instance of the common player type must
+ * play exactly one of the roles, across the whole population. Checked here
+ * for every exclusive-or, local or spanning: a per-instance reading would
+ * flag every instance of a fact type that fills both roles, which is every
+ * instance of a binary (owner, 2026-10-19).
  */
 export function checkSpanningExclusiveOrViolations(
   model: OrmModel,
@@ -61,7 +66,6 @@ export function checkSpanningExclusiveOrViolations(
 
   for (const c of model.constraints) {
     if (!isExclusiveOr(c)) continue;
-    if (localFactTypeOf(model, c)) continue; // checked by the local rule
 
     const playerId = c.roleIds
       .map((rid) => rolePlayer.get(rid))
@@ -78,7 +82,7 @@ export function checkSpanningExclusiveOrViolations(
           reportAs(
             severityForModality(c),
             RULE_ID.exclusiveOrViolation,
-            "localMultiple",
+            "default",
             constraintElementId(c),
             c.roleIds.join(", "),
             value,

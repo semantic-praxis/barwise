@@ -846,10 +846,10 @@ Implementation notes (2026-10-19):
     (`localFactType`), not every role in the host. Three behaviours change
     with it. An external uniqueness whose roles all sit in a fact type
     other than its host now draws `external-uniqueness-all-local`; before,
-    the host-relative check missed it. A local exclusion, exclusive-or,
-    subset or equality nested elsewhere is checked against its own fact
-    type's population by the local rule, where the spanning rule used to
-    catch it under a different message. And both completeness gates read
+    the host-relative check missed it. A local subset or equality nested
+    elsewhere is checked against its own fact type's population by the
+    local rule, where the spanning rule used to catch it under a different
+    message. And both completeness gates read
     `constraintsTouching`: a fact type touched only by a constraint nested
     in another one no longer draws `fact-type-without-constraints`, and,
     being constrained, a binary one now draws
@@ -860,18 +860,19 @@ Implementation notes (2026-10-19):
     "every role is in this fact type", which an empty role list passes for
     every population. An external uniqueness with no roles keeps its
     all-local warning, now with its own message.
-  - **Open, put to the owner 2026-10-19:** which population check an
-    exclusion or exclusive-or whose roles all sit in one fact type gets.
-    The local rule checks each fact instance alone; the spanning rule
-    checks every object across the population, which is what the
-    constraint means. The local reading misses an object that plays both
-    excluded roles in different instances, and flags every instance of an
-    exclusive-or over a fact type with two or more roles. Before this cut
-    the host decided; now the roles do, and they send these constraints to
-    the local rule. Recommended: the spanning rule for both kinds (subset
-    and equality give the same answer either way). No tracked model has
-    such a constraint: all 27 set-comparison constraints in the 113
-    tracked files span fact types.
+  - **Exclusion and exclusive-or are checked across the population,
+    always -- decided by the owner 2026-10-19.** The per-instance rules for
+    them are gone; `checkSpanningExclusionViolations` and
+    `checkSpanningExclusiveOrViolations` take every one, local or not. The
+    per-instance reading missed an object playing both excluded roles in
+    different instances, and flagged every instance of an exclusive-or over
+    a fact type that fills both roles -- every instance of a binary. Before
+    this cut the host decided which reading a constraint got. Each kind is
+    left with one message, now `default`; the per-instance variants are
+    gone, and with them the swapped `local` and `spanning` names. Subset
+    and equality keep the local and spanning split, which gives the same
+    answer either way. No tracked model changes: all 27 set-comparison
+    constraints in the 113 tracked files span fact types.
   - An id-less 2.0 file places these diagnostics at line 0 where they
     used to sit on the host's line: the trade Open decision 9 accepted,
     until the next save writes the ids.

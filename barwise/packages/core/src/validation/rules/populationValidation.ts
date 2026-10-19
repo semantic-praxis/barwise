@@ -11,12 +11,7 @@ import {
   checkMandatoryViolations,
 } from "./population/mandatory.js";
 import { checkRingViolations } from "./population/ring.js";
-import {
-  checkEqualityViolations,
-  checkExclusionViolations,
-  checkExclusiveOrViolations,
-  checkSubsetViolations,
-} from "./population/setComparison.js";
+import { checkEqualityViolations, checkSubsetViolations } from "./population/setComparison.js";
 import { buildObjectUniverse, type ObjectUniverse } from "./population/shared.js";
 import {
   checkSpanningEqualityViolations,
@@ -150,8 +145,6 @@ export function populationValidationRules(model: OrmModel, graph: ModelGraph): D
   diagnostics.push(...checkValueTypeDomainViolations(model));
   diagnostics.push(...checkValueComparisonViolations(model));
   diagnostics.push(...checkFrequencyViolations(model));
-  diagnostics.push(...checkExclusionViolations(model));
-  diagnostics.push(...checkExclusiveOrViolations(model));
   diagnostics.push(...checkSubsetViolations(model));
   diagnostics.push(...checkEqualityViolations(model));
   diagnostics.push(...checkRingViolations(model));

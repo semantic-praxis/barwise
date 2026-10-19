@@ -575,40 +575,89 @@ describe("populationValidationRules", () => {
       );
       expect(excl).toHaveLength(0);
     });
+
+    it("reports a person that plays both excluded roles in different instances", () => {
+      // Checked across the population, not within one instance (owner,
+      // 2026-10-19): the per-instance reading saw nothing wrong here.
+      const model = makeSelfRefModel({
+        exclusion: { roleIds: ["r1", "r2"] },
+      });
+      const ft = model.getFactTypeByName("Person is parent of Person")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { r1: "P001", r2: "P002" } });
+      pop.addInstance({ roleValues: { r1: "P002", r2: "P003" } });
+
+      const excl = populationValidationRules(model, graphFor(model)).filter(
+        (d) => d.ruleId === "population/exclusion-violation",
+      );
+      expect(excl).toHaveLength(1);
+      expect(excl[0]!.message).toContain(`"P002" plays 2 of the excluded roles`);
+    });
   });
 
   describe("exclusive-or violations", () => {
-    it("reports when no excluded role is played", () => {
+    // An exclusive-or is about objects across the population, not about one
+    // fact instance (owner, 2026-10-19): each Person must play exactly one
+    // of the two roles somewhere.
+    it("reports a person that plays neither role", () => {
       const model = makeSelfRefModel({
         exclusiveOr: { roleIds: ["r1", "r2"] },
       });
       const ft = model.getFactTypeByName("Person is parent of Person")!;
       const pop = model.addPopulation({ factTypeId: ft.id });
-      // Instance with no values for either role.
-      pop.addInstance({ id: "inst-1", roleValues: {} });
+      pop.addInstance({ roleValues: { r1: "P001", r2: "P002" } });
+      // P009 exists -- it has a name -- and plays neither role.
+      const person = model.getObjectTypeByName("Person")!;
+      const name = model.addObjectType({ name: "Name", kind: "value" });
+      const hasName = model.addFactType({
+        name: "Person has Name",
+        roles: [
+          { id: "rn1", name: "has", playerId: person.id },
+          { id: "rn2", name: "is of", playerId: name.id },
+        ],
+        readings: ["{0} has {1}"],
+      });
+      model.addPopulation({ factTypeId: hasName.id }).addInstance({
+        roleValues: { rn1: "P009", rn2: "Ann" },
+      });
 
       const diags = populationValidationRules(model, graphFor(model));
       const xor = diags.filter(
         (d) => d.ruleId === "population/exclusive-or-violation",
       );
       expect(xor).toHaveLength(1);
-      expect(xor[0]!.message).toContain("does not play any");
+      expect(xor[0]!.message).toContain(`"P009" plays 0 of them`);
     });
 
-    it("reports when more than one exclusive-or role is played", () => {
+    it("reports a person that plays both roles, in different instances", () => {
       const model = makeSelfRefModel({
         exclusiveOr: { roleIds: ["r1", "r2"] },
       });
       const ft = model.getFactTypeByName("Person is parent of Person")!;
       const pop = model.addPopulation({ factTypeId: ft.id });
-      pop.addInstance({ id: "inst-1", roleValues: { r1: "P001", r2: "P002" } });
+      pop.addInstance({ roleValues: { r1: "P001", r2: "P002" } });
+      pop.addInstance({ roleValues: { r1: "P002", r2: "P003" } });
 
       const diags = populationValidationRules(model, graphFor(model));
       const xor = diags.filter(
         (d) => d.ruleId === "population/exclusive-or-violation",
       );
       expect(xor).toHaveLength(1);
-      expect(xor[0]!.message).toContain("plays 2");
+      expect(xor[0]!.message).toContain(`"P002" plays 2 of them`);
+    });
+
+    it("passes an instance that fills both roles with different people", () => {
+      // The per-instance reading flagged this; each person plays one role.
+      const model = makeSelfRefModel({
+        exclusiveOr: { roleIds: ["r1", "r2"] },
+      });
+      const ft = model.getFactTypeByName("Person is parent of Person")!;
+      model.addPopulation({ factTypeId: ft.id }).addInstance({
+        roleValues: { r1: "P001", r2: "P002" },
+      });
+
+      const diags = populationValidationRules(model, graphFor(model));
+      expect(diags.filter((d) => d.ruleId === "population/exclusive-or-violation")).toEqual([]);
     });
 
     it("passes when exactly one exclusive-or role is played", () => {

@@ -528,28 +528,17 @@ const RULE_DESCRIPTORS = {
     description:
       "An object instance plays more than one of the roles an exclusion constraint forbids combining.",
     messages: {
-      local: (cRoleIds: string, value: string, count: number): string =>
+      default: (cRoleIds: string, value: string, count: number): string =>
         `Exclusion constraint on roles [${cRoleIds}] is violated: "${value}" plays ${count} of the excluded roles.`,
-      spanning: (popId: string, instId: string, val: string, roles: string): string =>
-        `Population "${popId}": instance "${instId}" has value "${val}" in multiple excluded roles [${roles}].`,
     },
   },
   [RULE_ID.exclusiveOrViolation]: {
     severity: "error",
     description:
-      "An object instance plays none of the roles an exclusive-or constraint requires exactly one of.",
+      "An object plays none, or more than one, of the roles an exclusive-or constraint requires exactly one of.",
     messages: {
-      localMultiple: (cRoleIds: string, value: string, count: number): string =>
+      default: (cRoleIds: string, value: string, count: number): string =>
         `Exclusive-or constraint on roles [${cRoleIds}] is violated: "${value}" plays ${count} of them (must be exactly one).`,
-      localNone: (
-        popId: string,
-        instId: string,
-        playedRolesLength: number,
-        playedRoles: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" plays ${playedRolesLength} of the exclusive-or roles [${playedRoles}] but must play exactly one.`,
-      spanning: (popId: string, instId: string, localRoleIds: string): string =>
-        `Population "${popId}": instance "${instId}" does not play any of the exclusive-or roles [${localRoleIds}].`,
     },
   },
   [RULE_ID.externalUniquenessViolation]: {
