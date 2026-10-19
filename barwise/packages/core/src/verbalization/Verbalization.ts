@@ -59,6 +59,16 @@ export interface Verbalization {
 }
 
 /**
+ * Whether a row is a statement about the model, as opposed to a heading
+ * the model verbalization places over a group of rows (category
+ * `section`). The one test every consumer that counts, numbers or matches
+ * statements uses, so a heading is never read as a reading.
+ */
+export function isStatement(v: { readonly category: string; }): boolean {
+  return v.category !== "section";
+}
+
+/**
  * Helper to build a Verbalization from segments.
  */
 export function buildVerbalization(

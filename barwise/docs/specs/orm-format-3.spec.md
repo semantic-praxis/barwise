@@ -802,6 +802,9 @@ Implementation notes (2026-10-19):
   - An object type's cardinality row keeps category `constraint` and
     names its object type, with `factTypeIds: []`: it is a property of the
     object type, not a constraint in a list (barwise-eok).
+  - `isStatement` (core verbalization) is the one test for "a reading, not
+    a heading": the CLI and VS Code count, the diagram tab's numbered list,
+    MCP's summary and the gym's `requires_verbalization` all use it.
   - `--fact-type` and MCP's per-fact-type verbalize pick counterexamples
     with the new `counterexamplesTouching`, so they match the constraints
     the view now says. `Counterexample.factTypeId` itself is the later

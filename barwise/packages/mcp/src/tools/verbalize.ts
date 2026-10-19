@@ -9,7 +9,7 @@ import {
   counterexamplesTouching,
   generateCounterexamples,
 } from "@barwise/core/counterexample";
-import { Verbalizer } from "@barwise/core/verbalization";
+import { isStatement, Verbalizer } from "@barwise/core/verbalization";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveModels, type SourceInput, sourcePath } from "../workspace/resolve.js";
@@ -173,8 +173,7 @@ function renderCounterexamples(ces: readonly Counterexample[]): string {
 function buildSummary(
   rows: ReadonlyArray<{ category: string; text: string; }>,
 ): string {
-  // A section row is a heading, not a reading.
-  const verbalizations = rows.filter((v) => v.category !== "section");
+  const verbalizations = rows.filter(isStatement);
   const counts = new Map<string, number>();
   for (const v of verbalizations) {
     counts.set(v.category, (counts.get(v.category) ?? 0) + 1);

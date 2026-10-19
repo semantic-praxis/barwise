@@ -136,6 +136,7 @@ function jsonPayload(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOpt
     verbalizations: verbalizations.map(verbalizationRow),
     counterexamples: counterexamples.map((c) => ({
       factTypeId: c.factTypeId,
+      ...(c.constraintId ? { constraintId: c.constraintId } : {}),
       constraintType: c.constraintType,
       text: c.text,
     })),
@@ -153,6 +154,7 @@ function singleJson(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOpti
       verbalizations: verbalizations.map(verbalizationRow),
       counterexamples: counterexamples.map((c) => ({
         factTypeId: c.factTypeId,
+        ...(c.constraintId ? { constraintId: c.constraintId } : {}),
         constraintType: c.constraintType,
         text: c.text,
       })),

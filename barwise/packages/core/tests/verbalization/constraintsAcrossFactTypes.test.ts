@@ -123,3 +123,25 @@ describe("verbalizeFactType", () => {
     }
   });
 });
+
+describe("ConstraintVerbalizer.verbalizeAll", () => {
+  it("still says a fact type's own constraints when the model does not hold it", () => {
+    const model = rooms("ft-nr");
+    const loose = new OrmModel({ name: "Loose" });
+    loose.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
+    loose.addObjectType({ id: "ot-nr", name: "RoomNumber", kind: "value" });
+    const ft = loose.addFactType({
+      id: "ft-loose",
+      name: "Room has RoomNumber",
+      roles: [
+        { id: "r-3", name: "has", playerId: "ot-room" },
+        { id: "r-4", name: "is of", playerId: "ot-nr" },
+      ],
+      readings: ["{0} has {1}"],
+      constraints: [{ id: "c-loose", type: "internal_uniqueness", roleIds: ["r-3"] }],
+    });
+    // ft belongs to "Loose", not to "Facilities".
+    const rows = new Verbalizer().constraints.verbalizeAll(ft, model);
+    expect(rows.map((v) => v.sourceElementId)).toContain("c-loose");
+  });
+});

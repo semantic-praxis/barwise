@@ -1,5 +1,5 @@
 import { OrmYamlSerializer } from "@barwise/core";
-import { Verbalizer } from "@barwise/core/verbalization";
+import { isStatement, Verbalizer } from "@barwise/core/verbalization";
 import * as vscode from "vscode";
 
 /**
@@ -67,7 +67,7 @@ export class VerbalizeCommand {
       }
 
       vscode.window.showInformationMessage(
-        `Verbalized ${verbalizations.filter((v) => v.category !== "section").length} statement(s).`,
+        `Verbalized ${verbalizations.filter(isStatement).length} statement(s).`,
       );
     } catch (err) {
       channel.appendLine(`Parse error: ${(err as Error).message}`);

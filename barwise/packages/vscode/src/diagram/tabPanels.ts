@@ -8,7 +8,7 @@
  * is unit-testable outside the extension host.
  */
 import { getExporter, type OrmModel, OrmYamlSerializer } from "@barwise/core";
-import { Verbalizer } from "@barwise/core/verbalization";
+import { isStatement, Verbalizer } from "@barwise/core/verbalization";
 import { registerStandardFormats } from "@barwise/formats";
 
 // The DDL exporter registers through the FormatDescriptor registry;
@@ -46,7 +46,8 @@ export function buildTabPanels(model: OrmModel): TabPanels {
 
 function buildVerbalization(model: OrmModel): readonly string[] {
   try {
-    return verbalizer.verbalizeModel(model).map((v) => v.text);
+    // The tab numbers its rows, so a section heading is left out.
+    return verbalizer.verbalizeModel(model).filter(isStatement).map((v) => v.text);
   } catch (err) {
     return [`Verbalization failed: ${(err as Error).message}`];
   }

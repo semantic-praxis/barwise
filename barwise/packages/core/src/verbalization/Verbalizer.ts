@@ -68,13 +68,14 @@ export class Verbalizer {
 
     // Constraints across fact types, once each (orm-format-3, Open
     // decision 7), under a heading row.
-    if (model.constraints.length > 0) {
+    const across = model.constraints;
+    if (across.length > 0) {
       results.push(
         buildVerbalization("constraints-across-fact-types", "section", [
           textSeg("Constraints across fact types"),
         ]),
       );
-      for (const c of model.constraints) {
+      for (const c of across) {
         results.push(this.constraintVerbalizer.verbalizeExternal(c, model));
       }
     }
