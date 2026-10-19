@@ -57,7 +57,10 @@ export function registerVerbalizeCommand(program: Command): void {
 
         // A single model keeps the original "fact type not found" hard error;
         // across a project's domains a missing fact type just skips a domain.
-        if (!multi && opts.factType && !resolved[0]!.model.getFactTypeByName(opts.factType)) {
+        if (
+          !multi && opts.factType !== undefined
+          && !resolved[0]!.model.getFactTypeByName(opts.factType)
+        ) {
           process.stderr.write(`Error: Fact type "${opts.factType}" not found in model.\n`);
           process.exitCode = 1;
           return;
@@ -92,15 +95,15 @@ export function registerVerbalizeCommand(program: Command): void {
 function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions) {
   // Keyed on the option, not on the lookup: a project domain without the
   // fact type gets no counterexamples, not the whole model's.
-  const ft = opts.factType ? model.getFactTypeByName(opts.factType) : undefined;
-  const verbalizations = opts.factType
+  const ft = opts.factType !== undefined ? model.getFactTypeByName(opts.factType) : undefined;
+  const verbalizations = opts.factType !== undefined
     ? (ft ? verbalizer.verbalizeFactType(ft.id, model) : [])
     : verbalizeWhole(verbalizer, model, opts);
 
   let counterexamples: readonly Counterexample[] = [];
   if (opts.counterexamples) {
     const all = generateCounterexamples(model);
-    if (!opts.factType) counterexamples = all;
+    if (opts.factType === undefined) counterexamples = all;
     else if (ft) counterexamples = counterexamplesTouching(model, ft.id, all);
   }
   return { verbalizations, counterexamples };

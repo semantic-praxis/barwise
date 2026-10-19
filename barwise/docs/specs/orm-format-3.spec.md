@@ -816,7 +816,8 @@ Implementation notes (2026-10-19):
     constraints nested elsewhere, and resolving against the model it was
     handed mixed two models' names in one row). `verbalizeAll` and
     `counterexamplesTouching` now take an id, like `constraintsTouching`,
-    and a fact type the model does not have yields nothing.
+    and a fact type the model does not have gets no constraints (a
+    counterexample with no constraint id still matches by its fact type id).
   - `resolveCommonPlayer` takes the first role that resolves anywhere, not
     the first in the host. For an exclusion or disjunctive mandatory whose
     roles have different players -- malformed, since those kinds constrain
