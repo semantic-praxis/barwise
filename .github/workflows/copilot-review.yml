@@ -98,8 +98,13 @@ permissions:
 jobs:
   request:
     runs-on: ubuntu-latest
+    # PAUSED 2026-10-19 by the owner: the Copilot review quota is exhausted
+    # until November, and every pull request push drew a red `request`
+    # check. Only a manual workflow_dispatch runs the job now. To resume,
+    # restore the commented condition below and delete the line after it.
     # Drafts are skipped without a runner; ready_for_review brings them back.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    if: github.event_name == 'workflow_dispatch'
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
