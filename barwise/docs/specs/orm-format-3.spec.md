@@ -868,10 +868,14 @@ Implementation notes (2026-10-19):
     different instances, and flagged every instance of an exclusive-or over
     a fact type that fills both roles -- every instance of a binary. Before
     this cut the host decided which reading a constraint got. Each kind is
-    left with one message, now `default`; the per-instance variants are
-    gone, and with them the swapped `local` and `spanning` names. Subset
-    and equality keep the local and spanning split, which gives the same
-    answer either way. No tracked model changes: all 27 set-comparison
+    left with one message, now `default`. The two halves of exclusive-or
+    read different sets: "plays more than one" is present data and counts
+    sample populations, "plays none" reads the universe, which leaves them
+    out. Subset and equality still split into a local and a spanning rule,
+    and the two do not always agree -- an unfilled role, or one fact type
+    with two populations -- nor do their message ids read the right way
+    round; barwise-h2a carries that, the same question for those
+    kinds. No tracked model changes: all 27 set-comparison
     constraints in the 113 tracked files span fact types.
   - An id-less 2.0 file places these diagnostics at line 0 where they
     used to sit on the host's line: the trade Open decision 9 accepted,

@@ -646,6 +646,26 @@ describe("populationValidationRules", () => {
       expect(xor[0]!.message).toContain(`"P002" plays 2 of them`);
     });
 
+    it("reports a person that plays both roles in a sample population", () => {
+      // "Plays more than one" is present data: a sample is positive
+      // evidence, so it can make that half fire. Only "plays none", which
+      // reads the universe, leaves samples out.
+      const model = makeSelfRefModel({
+        exclusiveOr: { roleIds: ["r1", "r2"] },
+      });
+      const ft = model.getFactTypeByName("Person is parent of Person")!;
+      const pop = model.addPopulation({ factTypeId: ft.id, sample: true });
+      pop.addInstance({ roleValues: { r1: "P001", r2: "P002" } });
+      pop.addInstance({ roleValues: { r1: "P002", r2: "P003" } });
+
+      const xor = populationValidationRules(model, graphFor(model)).filter(
+        (d) => d.ruleId === "population/exclusive-or-violation",
+      );
+      expect(xor.map((d) => d.message)).toEqual([
+        expect.stringContaining(`"P002" plays 2 of them`),
+      ]);
+    });
+
     it("passes an instance that fills both roles with different people", () => {
       // The per-instance reading flagged this; each person plays one role.
       const model = makeSelfRefModel({

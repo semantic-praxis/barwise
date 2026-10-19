@@ -14,9 +14,9 @@ import { checkRingViolations } from "./population/ring.js";
 import { checkEqualityViolations, checkSubsetViolations } from "./population/setComparison.js";
 import { buildObjectUniverse, type ObjectUniverse } from "./population/shared.js";
 import {
+  checkExclusionViolations,
+  checkExclusiveOrViolations,
   checkSpanningEqualityViolations,
-  checkSpanningExclusionViolations,
-  checkSpanningExclusiveOrViolations,
   checkSpanningSubsetViolations,
 } from "./population/spanning.js";
 import { checkIncompleteInstances } from "./population/structural.js";
@@ -55,9 +55,10 @@ import { checkValueTypeDomainViolations } from "./population/valueTypeDomain.js"
  *
  * Mandatory and disjunctive mandatory are checked against the object
  * universe -- every value that appears in any role played by a type across
- * all populations (a closed-world reading of the sample). Exclusion,
- * exclusive-or, subset, and equality constraints whose roles span fact
- * types are checked too. External uniqueness is checked by inferring the
+ * all populations (a closed-world reading of the sample). Exclusion and
+ * exclusive-or are checked across the population, whatever fact types their
+ * roles sit in; subset and equality constraints whose roles span fact types
+ * are checked too. External uniqueness is checked by inferring the
  * common-object join key and flagging two distinct common instances that
  * share the same identifying combination; it is skipped when that join
  * key cannot be inferred as a single clear object type.
@@ -95,7 +96,7 @@ export type UniverseRule = (model: OrmModel, universe: ObjectUniverse) => Diagno
 export const UNIVERSE_RULES = [
   checkMandatoryViolations,
   checkDisjunctiveMandatoryViolations,
-  checkSpanningExclusiveOrViolations,
+  checkExclusiveOrViolations,
   checkObjectCardinalityViolations,
   checkJoinPathViolations,
 ] as const satisfies readonly UniverseRule[];
@@ -108,7 +109,7 @@ export const UNIVERSE_RULES = [
  *
  * `checkJoinPathViolations` reads the universe to enumerate a join
  * path's roots, but REPORTS two operands projecting the same tuple --
- * a present-data violation. `checkSpanningExclusiveOrViolations` reads
+ * a present-data violation. `checkExclusiveOrViolations` reads
  * it to know which values must play exactly one role, and reports both
  * "plays none" (absence) and "plays two" (presence) under one rule id.
  * A sample population supplies tuples, so it can legitimately make
@@ -150,8 +151,8 @@ export function populationValidationRules(model: OrmModel, graph: ModelGraph): D
   diagnostics.push(...checkRingViolations(model));
   diagnostics.push(...checkMandatoryViolations(model, universe));
   diagnostics.push(...checkDisjunctiveMandatoryViolations(model, universe));
-  diagnostics.push(...checkSpanningExclusionViolations(model));
-  diagnostics.push(...checkSpanningExclusiveOrViolations(model, universe));
+  diagnostics.push(...checkExclusionViolations(model));
+  diagnostics.push(...checkExclusiveOrViolations(model, universe));
   diagnostics.push(...checkSpanningSubsetViolations(model));
   diagnostics.push(...checkSpanningEqualityViolations(model));
   diagnostics.push(...checkExternalUniquenessViolations(model));

@@ -147,7 +147,7 @@ describe("validating constraints across fact types", () => {
     ]);
   });
 
-  it("checks a local exclusion against its own fact type's population, nested anywhere", () => {
+  it("checks an exclusion across the population, nested anywhere", () => {
     for (const host of ["ft-in", "ft-nr", "ft-area"] as const) {
       const ds = validate(rooms(host)).filter((d) => d.ruleId === RULE_ID.exclusionViolation);
       expect(ds, host).toHaveLength(1);

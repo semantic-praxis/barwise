@@ -10,9 +10,9 @@
  * compile error, and the runtime list cannot lag the union.
  *
  * `messages` is a dictionary keyed by message id, following SARIF's
- * `reportingDescriptor.messageStrings`: nine rules report more than one
- * condition (`population/exclusion-violation` fires both for roles
- * within a fact type and for roles spanning several) and SARIF names the
+ * `reportingDescriptor.messageStrings`: several rules report more than one
+ * condition (`population/subset-violation` fires both for roles within a
+ * fact type and for roles spanning several) and SARIF names the
  * message rather than splitting the rule. The id maps onto a result's
  * `message.id` on export, so the distinction stays machine-readable.
  *

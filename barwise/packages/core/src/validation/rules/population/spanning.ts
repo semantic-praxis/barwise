@@ -19,7 +19,7 @@ import {
  * that plays both in a single instance, which is all a per-instance check
  * could see (owner, 2026-10-19; orm-format-3 3a-ii-b notes).
  */
-export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] {
+export function checkExclusionViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   for (const c of model.constraints) {
     if (!isExclusion(c)) continue;
@@ -55,13 +55,17 @@ export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] 
  * for every exclusive-or, local or spanning: a per-instance reading would
  * flag every instance of a fact type that fills both roles, which is every
  * instance of a binary (owner, 2026-10-19).
+ *
+ * The two halves read different sets. "Plays more than one" is present
+ * data, so it reads every value played, sample populations included -- a
+ * sample is positive evidence. "Plays none" is absence, so it reads only
+ * the universe, which leaves samples out.
  */
-export function checkSpanningExclusiveOrViolations(
+export function checkExclusiveOrViolations(
   model: OrmModel,
   universe: ObjectUniverse,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  if (universe.size === 0) return diagnostics;
   const rolePlayer = rolePlayerMap(model);
 
   for (const c of model.constraints) {
@@ -71,13 +75,14 @@ export function checkSpanningExclusiveOrViolations(
       .map((rid) => rolePlayer.get(rid))
       .find((p) => p !== undefined);
     if (playerId === undefined) continue;
-    const required = universe.get(playerId);
-    if (!required || required.size === 0) continue;
+    const required = universe.get(playerId) ?? new Set<string>();
 
     const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
-    for (const value of required) {
+    const candidates = new Set<string>(required);
+    for (const set of valuesByRole) for (const value of set) candidates.add(value);
+    for (const value of candidates) {
       const count = valuesByRole.filter((set) => set.has(value)).length;
-      if (count !== 1) {
+      if (count > 1 || (count === 0 && required.has(value))) {
         diagnostics.push(
           reportAs(
             severityForModality(c),
