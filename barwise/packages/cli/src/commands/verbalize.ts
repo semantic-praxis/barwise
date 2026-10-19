@@ -16,6 +16,7 @@ import { Verbalizer } from "@barwise/core/verbalization";
 import type { Command } from "commander";
 import { resolveDomainModels } from "../workspace/domainModels.js";
 import {
+  counterexampleRow,
   formatCounterexamples,
   formatVerbalizations,
   formatVerbalizationsJson,
@@ -104,7 +105,7 @@ function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions
     const all = generateCounterexamples(model);
     counterexamples = factTypeId === undefined
       ? all
-      : counterexamplesTouching(model, factTypeId, all);
+      : counterexamplesTouching(model, model.getFactType(factTypeId)!, all);
   }
   return { verbalizations, counterexamples };
 }
@@ -134,12 +135,7 @@ function jsonPayload(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOpt
   }
   return {
     verbalizations: verbalizations.map(verbalizationRow),
-    counterexamples: counterexamples.map((c) => ({
-      factTypeId: c.factTypeId,
-      ...(c.constraintId ? { constraintId: c.constraintId } : {}),
-      constraintType: c.constraintType,
-      text: c.text,
-    })),
+    counterexamples: counterexamples.map(counterexampleRow),
   };
 }
 
@@ -152,12 +148,7 @@ function singleJson(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOpti
   return JSON.stringify(
     {
       verbalizations: verbalizations.map(verbalizationRow),
-      counterexamples: counterexamples.map((c) => ({
-        factTypeId: c.factTypeId,
-        ...(c.constraintId ? { constraintId: c.constraintId } : {}),
-        constraintType: c.constraintType,
-        text: c.text,
-      })),
+      counterexamples: counterexamples.map(counterexampleRow),
     },
     null,
     2,

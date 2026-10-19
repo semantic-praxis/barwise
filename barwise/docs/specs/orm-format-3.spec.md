@@ -802,9 +802,18 @@ Implementation notes (2026-10-19):
   - An object type's cardinality row keeps category `constraint` and
     names its object type, with `factTypeIds: []`: it is a property of the
     object type, not a constraint in a list (barwise-eok).
-  - `isStatement` (core verbalization) is the one test for "a reading, not
-    a heading": the CLI and VS Code count, the diagram tab's numbered list,
-    MCP's summary and the gym's `requires_verbalization` all use it.
+  - `isStatement` (core verbalization) tells a reading from the section
+    heading: the VS Code count, the diagram tab's numbered list, MCP's
+    summary and the gym's `requires_verbalization` use it.
+  - `constraintsTouching` takes a fact type as well as an id, and is the one
+    per-fact-type view: `verbalizeAll` and `counterexamplesTouching` both
+    ask it, and it answers a fact type the model does not hold from that
+    fact type's own list.
+  - `resolveCommonPlayer` takes the first role that resolves anywhere, not
+    the first in the host. For an exclusion or disjunctive mandatory whose
+    roles have different players -- malformed, since those kinds constrain
+    one player -- the sentence's subject can change. `requiresLocalRoles`
+    is gone; `isInternalConstraint` is the same question.
   - `--fact-type` and MCP's per-fact-type verbalize pick counterexamples
     with the new `counterexamplesTouching`, so they match the constraints
     the view now says. `Counterexample.factTypeId` itself is the later

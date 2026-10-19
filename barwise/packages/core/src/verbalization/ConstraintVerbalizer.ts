@@ -141,15 +141,7 @@ export class ConstraintVerbalizer {
     factType: FactType,
     model: OrmModel,
   ): Verbalization[] {
-    // Read from the fact type itself and the model's list, rather than by
-    // id through `constraintsTouching`, so a fact type the model does not
-    // hold still says its own constraints.
-    const touching = model.constraints.filter((c) =>
-      roleIdsOf(c).some((rid) => factType.hasRole(rid))
-    );
-    return [...factType.internalConstraints, ...touching].map((c) =>
-      this.verbalize(c, factType, model)
-    );
+    return model.constraintsTouching(factType).map((c) => this.verbalize(c, factType, model));
   }
 
   /**

@@ -191,13 +191,23 @@ export class OrmModel {
    * A constraint across fact types therefore appears under every fact type
    * it touches; a whole-model reader wants each fact type's
    * `internalConstraints` plus `constraints` once instead.
+   *
+   * Takes the fact type itself as well as its id. A fact type this model
+   * does not hold (a draft, a diff side) is still answered: its own
+   * constraints, including the external ones a 2.0 file nests in it, plus
+   * this model's that touch it. Every per-fact-type view -- verbalization,
+   * counterexamples -- asks here, so they cannot disagree.
    */
-  constraintsTouching(factTypeId: string): readonly Constraint[] {
-    const ft = this._factTypes.get(factTypeId);
+  constraintsTouching(factType: FactType | string): readonly Constraint[] {
+    const ft = typeof factType === "string" ? this._factTypes.get(factType) : factType;
     if (!ft) return [];
+    const held = this._factTypes.get(ft.id) === ft;
+    const external = held
+      ? this.constraints
+      : [...this.constraints, ...ft.constraints.filter(isExternalConstraint)];
     return [
       ...ft.internalConstraints,
-      ...this.constraints.filter((c) => roleIdsOf(c).some((rid) => ft.hasRole(rid))),
+      ...external.filter((c) => roleIdsOf(c).some((rid) => ft.hasRole(rid))),
     ];
   }
 

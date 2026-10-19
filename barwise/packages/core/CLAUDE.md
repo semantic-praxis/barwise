@@ -118,7 +118,7 @@ it, so knip sees an unused file where there is a live edge.
   `PLACEMENT` in `model/Constraint.ts` classifies every kind as internal
   (it lives in its fact type; every role is one of its roles) or external
   (it lives in the model; its roles may span fact types).
-  `InternalConstraint`, `ExternalConstraint`, `requiresLocalRoles` and the
+  `InternalConstraint`, `ExternalConstraint` and the
   two guards all derive from it. Read through `FactType.internalConstraints`,
   `OrmModel.constraints`, `OrmModel.constraintsTouching` and
   `OrmModel.getConstraint`, not `FactType.constraints`, which WS3c removes

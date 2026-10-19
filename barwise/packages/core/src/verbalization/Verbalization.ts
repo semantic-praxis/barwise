@@ -59,10 +59,12 @@ export interface Verbalization {
 }
 
 /**
- * Whether a row is a statement about the model, as opposed to a heading
- * the model verbalization places over a group of rows (category
- * `section`). The one test every consumer that counts, numbers or matches
- * statements uses, so a heading is never read as a reading.
+ * Whether a row is a statement about the model, as opposed to the
+ * `section` heading the model verbalization places over the constraints
+ * across fact types. Consumers that count, number or match statements use
+ * it, so that heading is never read as a reading. (The "Open questions"
+ * block of `verbalizeModelWithAnnotations` is its own category, and keeps
+ * its own heading row.)
  */
 export function isStatement(v: { readonly category: string; }): boolean {
   return v.category !== "section";

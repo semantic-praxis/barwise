@@ -88,8 +88,9 @@ export function formatCounterexamples(
 /**
  * One verbalization as the JSON output writes it. A constraint row's
  * `sourceElementId` is the constraint's id and `factTypeIds` the fact
- * types it applies to (orm-format-3, Open decision 9); other rows carry
- * no `factTypeIds`. The one projection every JSON form of
+ * types it applies to (orm-format-3, Open decision 9); an object type's
+ * cardinality row names its object type with `factTypeIds: []`; other rows
+ * carry no `factTypeIds`. The one projection every JSON form of
  * `barwise verbalize` uses, so the forms cannot disagree on a field.
  */
 export function verbalizationRow(v: Verbalization): {
@@ -103,6 +104,25 @@ export function verbalizationRow(v: Verbalization): {
     text: v.text,
     sourceElementId: v.sourceElementId,
     ...(v.factTypeIds ? { factTypeIds: v.factTypeIds } : {}),
+  };
+}
+
+/**
+ * One counterexample as the JSON output writes it, with the id of the
+ * constraint it probes when it has one. The one projection both JSON forms
+ * of `barwise verbalize --counterexamples` use.
+ */
+export function counterexampleRow(c: Counterexample): {
+  factTypeId: string;
+  constraintId?: string;
+  constraintType: Counterexample["constraintType"];
+  text: string;
+} {
+  return {
+    factTypeId: c.factTypeId,
+    ...(c.constraintId ? { constraintId: c.constraintId } : {}),
+    constraintType: c.constraintType,
+    text: c.text,
   };
 }
 

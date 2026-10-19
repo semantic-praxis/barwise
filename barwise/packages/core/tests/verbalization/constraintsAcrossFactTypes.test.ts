@@ -134,14 +134,18 @@ describe("ConstraintVerbalizer.verbalizeAll", () => {
       id: "ft-loose",
       name: "Room has RoomNumber",
       roles: [
-        { id: "r-3", name: "has", playerId: "ot-room" },
-        { id: "r-4", name: "is of", playerId: "ot-nr" },
+        { id: "rl-3", name: "has", playerId: "ot-room" },
+        { id: "rl-4", name: "is of", playerId: "ot-nr" },
       ],
       readings: ["{0} has {1}"],
-      constraints: [{ id: "c-loose", type: "internal_uniqueness", roleIds: ["r-3"] }],
+      constraints: [
+        { id: "c-loose", type: "internal_uniqueness", roleIds: ["rl-3"] },
+        // A constraint across fact types nested here, as a 2.0 file might.
+        { id: "c-loose-excl", type: "exclusion", roleIds: ["rl-3", "rl-4"] },
+      ],
     });
     // ft belongs to "Loose", not to "Facilities".
     const rows = new Verbalizer().constraints.verbalizeAll(ft, model);
-    expect(rows.map((v) => v.sourceElementId)).toContain("c-loose");
+    expect(rows.map((v) => v.sourceElementId)).toEqual(["c-loose", "c-loose-excl"]);
   });
 });
