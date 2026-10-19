@@ -1,5 +1,9 @@
 name: Copilot review
 
+# PAUSED 2026-10-19 until the Copilot quota resets in November: the
+# request job runs only on a manual workflow_dispatch (see its `if:`), so
+# the description below is what it does once resumed (barwise-ilb).
+#
 # Requests one Copilot code review on every NON-TRIVIAL pull request,
 # except one opened by Dependabot (see DEPENDABOT below).
 #
@@ -102,7 +106,8 @@ jobs:
     # until November, and every pull request push drew a red `request`
     # check. Only a manual workflow_dispatch runs the job now. To resume,
     # restore the commented condition below and delete the line after it.
-    # Drafts are skipped without a runner; ready_for_review brings them back.
+    # Once resumed, drafts are skipped without a runner; ready_for_review
+    # brings them back.
     # if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     if: github.event_name == 'workflow_dispatch'
     env:
