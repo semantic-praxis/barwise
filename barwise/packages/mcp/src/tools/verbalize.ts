@@ -103,8 +103,10 @@ export function executeVerbalize(
 /**
  * The original single-model behavior, kept byte-for-byte. An empty or null
  * `factType` means no fact type, unlike the CLI's `--fact-type ""`: the
- * callers here are models filling an optional field, which send "" or null
- * for "none", and VS Code forwards their input unvalidated.
+ * callers here are models filling an optional field, which send "" for
+ * "none". Null only arrives through VS Code, which forwards a tool's input
+ * unvalidated (MCP's schema rejects it); barwise-jto normalizes that at the
+ * boundary for every field.
  */
 function verbalizeSingle(
   model: OrmModel,
