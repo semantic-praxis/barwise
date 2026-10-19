@@ -50,7 +50,10 @@ export interface Verbalization {
   /**
    * On a constraint row: the fact types the constraint applies to, one
    * for an internal constraint, every fact type holding one of its roles
-   * for one across fact types. Its `sourceElementId` is the constraint id.
+   * for one across fact types, and its `sourceElementId` is the
+   * constraint id. The one exception is an object type's cardinality, a
+   * property of the object type rather than a constraint in a list: its
+   * row names the object type and has no fact types.
    */
   readonly factTypeIds?: readonly string[];
 }

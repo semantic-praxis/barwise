@@ -7,7 +7,11 @@
 
 import type { OrmModel } from "@barwise/core";
 import { collectOpenQuestionAnnotations } from "@barwise/core/annotation";
-import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
+import {
+  type Counterexample,
+  counterexamplesTouching,
+  generateCounterexamples,
+} from "@barwise/core/counterexample";
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { Command } from "commander";
 import { resolveDomainModels } from "../workspace/domainModels.js";
@@ -97,9 +101,10 @@ function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions
 
   let counterexamples: readonly Counterexample[] = [];
   if (opts.counterexamples) {
-    counterexamples = generateCounterexamples(model).filter(
-      (c) => factTypeId === undefined || c.factTypeId === factTypeId,
-    );
+    const all = generateCounterexamples(model);
+    counterexamples = factTypeId === undefined
+      ? all
+      : counterexamplesTouching(model, factTypeId, all);
   }
   return { verbalizations, counterexamples };
 }

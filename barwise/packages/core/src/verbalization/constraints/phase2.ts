@@ -625,7 +625,6 @@ function spanningArm(model: OrmModel, roleId: string): VerbalizationSegment[] {
   return segments;
 }
 
-/** The fact type owning a role id, scanning the whole model. */
 /**
  * The one fact type holding every role a constraint names, if there is one.
  * A subset or equality whose roles all sit in one fact type labels them by
@@ -634,14 +633,13 @@ function spanningArm(model: OrmModel, roleId: string): VerbalizationSegment[] {
  * constraint's own (orm-format-3, placement by kind).
  */
 function soleFactType(model: OrmModel, roleIds: readonly string[]): FactType | undefined {
-  // A dangling role has no fact type, and says nothing about whether the
+  // A dangling role holds no fact type, and says nothing about whether the
   // others share one.
-  const homes = new Set(
-    roleIds.map((rid) => factTypeOfRole(model, rid)).filter((ft) => ft !== undefined),
-  );
-  return homes.size === 1 ? [...homes][0] : undefined;
+  const holding = model.factTypesHolding(roleIds);
+  return holding.length === 1 ? holding[0] : undefined;
 }
 
+/** The fact type owning a role id, scanning the whole model. */
 function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {
   for (const ft of model.factTypes) {
     if (ft.getRoleById(roleId)) return ft;

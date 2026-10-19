@@ -122,10 +122,7 @@ function asConstraintRow(
 
 /** The fact types holding a constraint's roles, in model order. */
 function factTypesSpanned(constraint: Constraint, model: OrmModel): string[] {
-  const roles = roleIdsOf(constraint);
-  return model.factTypes
-    .filter((ft) => roles.some((rid) => ft.hasRole(rid)))
-    .map((ft) => ft.id);
+  return model.factTypesHolding(roleIdsOf(constraint)).map((ft) => ft.id);
 }
 
 /**

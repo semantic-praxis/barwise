@@ -4,7 +4,11 @@
 
 import type { OrmModel } from "@barwise/core";
 import { collectOpenQuestionAnnotations } from "@barwise/core/annotation";
-import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
+import {
+  type Counterexample,
+  counterexamplesTouching,
+  generateCounterexamples,
+} from "@barwise/core/counterexample";
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -137,7 +141,7 @@ function verbalizeText(
     let text = verbalizations.map((v) => v.text).join("\n");
     if (counterexamples) {
       text += renderCounterexamples(
-        generateCounterexamples(model).filter((c) => c.factTypeId === ft.id),
+        counterexamplesTouching(model, ft.id, generateCounterexamples(model)),
       );
     }
     return text;
@@ -167,8 +171,10 @@ function renderCounterexamples(ces: readonly Counterexample[]): string {
 
 /** Build a compact, never-spilling digest of a model's verbalizations. */
 function buildSummary(
-  verbalizations: ReadonlyArray<{ category: string; text: string; }>,
+  rows: ReadonlyArray<{ category: string; text: string; }>,
 ): string {
+  // A section row is a heading, not a reading.
+  const verbalizations = rows.filter((v) => v.category !== "section");
   const counts = new Map<string, number>();
   for (const v of verbalizations) {
     counts.set(v.category, (counts.get(v.category) ?? 0) + 1);

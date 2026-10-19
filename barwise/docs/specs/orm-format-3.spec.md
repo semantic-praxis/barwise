@@ -799,6 +799,17 @@ Implementation notes (2026-10-19):
   - `verbalizeAll` and `verbalizeFactType` read `constraintsTouching`.
     The CLI's three JSON projections share one `verbalizationRow`, so
     `factTypeIds` cannot reach one form and miss another.
+  - An object type's cardinality row keeps category `constraint` and
+    names its object type, with `factTypeIds: []`: it is a property of the
+    object type, not a constraint in a list (barwise-eok).
+  - `--fact-type` and MCP's per-fact-type verbalize pick counterexamples
+    with the new `counterexamplesTouching`, so they match the constraints
+    the view now says. `Counterexample.factTypeId` itself is the later
+    counterexample cut.
+  - The section lists constraints in model-list order, which in 2.0 is
+    file order (host, then position). A constraint's own sentence and row
+    no longer depend on its host; their order in the list still follows
+    the file, as every list does.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

@@ -57,9 +57,12 @@ export class Verbalizer {
     // Object-type population cardinality.
     for (const ot of model.objectTypes) {
       if (ot.cardinality) {
-        results.push(
-          verbalizeObjectCardinality(ot.id, ot.name, ot.cardinality.min, ot.cardinality.max),
-        );
+        // A property of the object type, not a constraint in a list: the
+        // row names the object type and applies to no fact type.
+        results.push({
+          ...verbalizeObjectCardinality(ot.id, ot.name, ot.cardinality.min, ot.cardinality.max),
+          factTypeIds: [],
+        });
       }
     }
 

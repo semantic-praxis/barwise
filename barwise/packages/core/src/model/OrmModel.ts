@@ -201,6 +201,16 @@ export class OrmModel {
     ];
   }
 
+  /**
+   * The fact types holding any of these roles, in model order. A dangling
+   * role id holds no fact type and adds none. The one answer to "which fact
+   * types does this constraint apply to", for the verbalizer's row fields
+   * and its role labels alike.
+   */
+  factTypesHolding(roleIds: readonly string[]): readonly FactType[] {
+    return this.factTypes.filter((ft) => roleIds.some((rid) => ft.hasRole(rid)));
+  }
+
   /** Look up a constraint of either placement by id. */
   getConstraint(id: string): Constraint | undefined {
     for (const ft of this._factTypes.values()) {

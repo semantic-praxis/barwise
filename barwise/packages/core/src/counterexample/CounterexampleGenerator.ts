@@ -58,6 +58,24 @@ export function generateCounterexamples(model: OrmModel): Counterexample[] {
 }
 
 /**
+ * The counterexamples for a view of one fact type: those probing a
+ * constraint that applies to it (`OrmModel.constraintsTouching`), so a
+ * constraint across fact types is probed under every fact type it touches,
+ * as the verbalization of that fact type says it. A counterexample without
+ * a constraint id falls back to the fact type it was generated under.
+ */
+export function counterexamplesTouching(
+  model: OrmModel,
+  factTypeId: string,
+  counterexamples: readonly Counterexample[],
+): Counterexample[] {
+  const touching = new Set(model.constraintsTouching(factTypeId).map((c) => c.id));
+  return counterexamples.filter((ce) =>
+    ce.constraintId ? touching.has(ce.constraintId) : ce.factTypeId === factTypeId
+  );
+}
+
+/**
  * Generate the counterexample for a single constraint, if one exists.
  *
  * A switch rather than the chain of `is*` guards this used to be: eleven

@@ -67,7 +67,7 @@ export class VerbalizeCommand {
       }
 
       vscode.window.showInformationMessage(
-        `Verbalized ${verbalizations.length} statement(s).`,
+        `Verbalized ${verbalizations.filter((v) => v.category !== "section").length} statement(s).`,
       );
     } catch (err) {
       channel.appendLine(`Parse error: ${(err as Error).message}`);
