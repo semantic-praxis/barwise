@@ -862,8 +862,9 @@ Implementation notes (2026-10-19):
     all-local warning, now with its own message.
   - **Exclusion and exclusive-or are checked across the population,
     always -- decided by the owner 2026-10-19.** The per-instance rules for
-    them are gone; `checkSpanningExclusionViolations` and
-    `checkSpanningExclusiveOrViolations` take every one, local or not. The
+    them are gone, and the cross-population rules take their names
+    (`checkExclusionViolations`, `checkExclusiveOrViolations`, formerly
+    `checkSpanning...`) and every constraint of the two kinds, local or not. The
     per-instance reading missed an object playing both excluded roles in
     different instances, and flagged every instance of an exclusive-or over
     a fact type that fills both roles -- every instance of a binary. Before
