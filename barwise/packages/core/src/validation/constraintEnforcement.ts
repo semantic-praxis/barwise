@@ -92,9 +92,9 @@ function violationsFor(
   c: Constraint,
 ): Diagnostic[] | undefined {
   if (isInternalUniqueness(c)) return uniquenessViolationsFor(model, ft.id, c);
-  if (isExternalUniqueness(c)) return externalUniquenessViolationsFor(model, ft, c);
+  if (isExternalUniqueness(c)) return externalUniquenessViolationsFor(model, c);
   if (isMandatoryRole(c)) return mandatoryViolationsFor(model, ft, c);
-  if (isDisjunctiveMandatory(c)) return disjunctiveMandatoryViolationsFor(model, ft, c);
+  if (isDisjunctiveMandatory(c)) return disjunctiveMandatoryViolationsFor(model, c);
   if (isValueConstraint(c)) return valueConstraintViolationsFor(model, ft.id, c);
   if (isFrequency(c)) return frequencyViolationsFor(model, ft.id, c);
   if (isRing(c)) return ringViolationsFor(model, ft.id, c);

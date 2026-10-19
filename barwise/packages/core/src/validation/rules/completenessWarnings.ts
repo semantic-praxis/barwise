@@ -54,13 +54,15 @@ function checkMissingObjectTypeDefinitions(model: OrmModel): Diagnostic[] {
 
 /**
  * Fact types without constraints usually indicate the modeler hasn't
- * finished specifying business rules for that relationship.
+ * finished specifying business rules for that relationship. A constraint
+ * across fact types counts for every fact type it touches, and for no
+ * other -- not for the one a 2.0 file happened to nest it under.
  */
 function checkFactTypesWithoutConstraints(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
-    if (ft.constraints.length === 0) {
+    if (model.constraintsTouching(ft.id).length === 0) {
       diagnostics.push(report(RULE_ID.factTypeWithoutConstraints, "default", ft.id, ft.name));
     }
   }
@@ -117,7 +119,7 @@ function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
-    if (ft.arity < 2 || ft.constraints.length === 0) continue;
+    if (ft.arity < 2 || model.constraintsTouching(ft.id).length === 0) continue;
     const hasUniqueness = ft.internalConstraints.some(
       (c) => c.type === "internal_uniqueness",
     );

@@ -44,7 +44,7 @@ function today(model: OrmModel, ruleId: string) {
 function mapped(model: OrmModel, ruleId: string) {
   const result = graphOf(model);
   if (result.ok) throw new Error("expected graphOf to fail");
-  return referenceDiagnostics(result.unresolved).filter((d) => d.ruleId === ruleId);
+  return referenceDiagnostics(model, result.unresolved).filter((d) => d.ruleId === ruleId);
 }
 
 /**
@@ -105,13 +105,13 @@ const BEFORE: Record<string, { ruleId: string; severity: string; message: string
     ruleId: "constraint/join-unknown-root",
     severity: "error",
     message:
-      'Join constraint in fact type "Customer has Name" references an unknown root object type "ot-missing".',
+      'Join constraint over no fact type in the model references an unknown root object type "ot-missing".',
   },
   joinStep: {
     ruleId: "constraint/join-bad-step",
     severity: "error",
     message:
-      'Join constraint in fact type "Customer has Name" has a step whose entry "Customer has Name::role1" / exit "role-missing" are not both roles of one fact type.',
+      'Join constraint over fact type "Customer has Name" has a step whose entry "Customer has Name::role1" / exit "role-missing" are not both roles of one fact type.',
   },
   rolePlayer: {
     ruleId: "structural/dangling-role-reference",
@@ -221,7 +221,7 @@ describe("referenceDiagnostics for what the graph is first to check", () => {
 
     const result = graphOf(model);
     if (result.ok) throw new Error("expected graphOf to fail on a duplicate role id");
-    const diags = referenceDiagnostics(result.unresolved);
+    const diags = referenceDiagnostics(model, result.unresolved);
 
     expect(diags.map((d) => d.ruleId)).toEqual([RULE_ID.duplicateRoleId]);
     expect(diags[0]!.message).toContain(shared);

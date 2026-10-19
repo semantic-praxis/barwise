@@ -16,7 +16,7 @@
  * The subset matters, and it was found by this law rather than
  * assumed: run over all five universe-reading rules, it went red twice,
  * first on `checkJoinPathViolations` (two operands projecting the same
- * tuple) and then on `checkSpanningExclusiveOrViolations` ("plays two
+ * tuple) and then on `checkExclusiveOrViolations` ("plays two
  * of them"). Both are present-data violations that a sample can
  * legitimately create. Their exclusions are argued in
  * `populationValidation.ts`, not here.

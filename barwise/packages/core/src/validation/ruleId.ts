@@ -10,9 +10,9 @@
  * compile error, and the runtime list cannot lag the union.
  *
  * `messages` is a dictionary keyed by message id, following SARIF's
- * `reportingDescriptor.messageStrings`: nine rules report more than one
- * condition (`population/exclusion-violation` fires both for roles
- * within a fact type and for roles spanning several) and SARIF names the
+ * `reportingDescriptor.messageStrings`: several rules report more than one
+ * condition (`population/subset-violation` fires both for roles within a
+ * fact type and for roles spanning several) and SARIF names the
  * message rather than splitting the rule. The id maps onto a result's
  * `message.id` on export, so the distinction stays machine-readable.
  *
@@ -241,8 +241,8 @@ const RULE_DESCRIPTORS = {
     severity: "error",
     description: "A disjunctive mandatory constraint spans fewer than two roles.",
     messages: {
-      default: (ftName: string): string =>
-        `Disjunctive mandatory constraint in fact type "${ftName}" must reference at least 2 roles.`,
+      default: (span: string): string =>
+        `Disjunctive mandatory constraint over ${span} must reference at least 2 roles.`,
     },
   },
   [RULE_ID.equalityArityMismatch]: {
@@ -250,27 +250,27 @@ const RULE_DESCRIPTORS = {
     description: "An equality constraint compares two role sequences of different lengths.",
     messages: {
       default: (
-        ftName: string,
+        span: string,
         constraintRoleIds1Length: number,
         constraintRoleIds2Length: number,
       ): string =>
-        `Equality constraint in fact type "${ftName}" has mismatched role sequence lengths: first has ${constraintRoleIds1Length} roles, second has ${constraintRoleIds2Length} roles.`,
+        `Equality constraint over ${span} has mismatched role sequence lengths: first has ${constraintRoleIds1Length} roles, second has ${constraintRoleIds2Length} roles.`,
     },
   },
   [RULE_ID.exclusionTooFewRoles]: {
     severity: "error",
     description: "An exclusion constraint spans fewer than two roles.",
     messages: {
-      default: (ftName: string): string =>
-        `Exclusion constraint in fact type "${ftName}" must reference at least 2 roles.`,
+      default: (span: string): string =>
+        `Exclusion constraint over ${span} must reference at least 2 roles.`,
     },
   },
   [RULE_ID.exclusiveOrTooFewRoles]: {
     severity: "error",
     description: "An exclusive-or constraint spans fewer than two roles.",
     messages: {
-      default: (ftName: string): string =>
-        `Exclusive-or constraint in fact type "${ftName}" must reference at least 2 roles.`,
+      default: (span: string): string =>
+        `Exclusive-or constraint over ${span} must reference at least 2 roles.`,
     },
   },
   [RULE_ID.externalUniquenessAllLocal]: {
@@ -278,8 +278,10 @@ const RULE_DESCRIPTORS = {
     description:
       "An external uniqueness constraint spans roles that all belong to one fact type, where an internal one would say the same thing.",
     messages: {
-      default: (ftName: string): string =>
-        `External uniqueness constraint in fact type "${ftName}" references only roles within this fact type. Consider using internal uniqueness instead.`,
+      default: (span: string): string =>
+        `External uniqueness constraint over ${span} references only roles within that fact type. Consider using internal uniqueness instead.`,
+      noRoles: (): string =>
+        `External uniqueness constraint references no roles. Name the roles whose combination is unique, or remove it.`,
     },
   },
   [RULE_ID.frequencyEmptyRoles]: {
@@ -334,16 +336,16 @@ const RULE_DESCRIPTORS = {
     description:
       "A join constraint's operands project tuples of different lengths, so they cannot be compared.",
     messages: {
-      default: (ftName: string): string =>
-        `Join constraint in fact type "${ftName}" has operands that project tuples of different arity; they must match.`,
+      default: (span: string): string =>
+        `Join constraint over ${span} has operands that project tuples of different arity; they must match.`,
     },
   },
   [RULE_ID.joinBadProjection]: {
     severity: "error",
     description: "A join constraint projects a path node that does not exist on the path.",
     messages: {
-      default: (ftName: string, idx: number, nodeTypesLength1: number): string =>
-        `Join constraint in fact type "${ftName}" projects node ${idx}, which is outside the path (0..${nodeTypesLength1}).`,
+      default: (span: string, idx: number, nodeTypesLength1: number): string =>
+        `Join constraint over ${span} projects node ${idx}, which is outside the path (0..${nodeTypesLength1}).`,
     },
   },
   [RULE_ID.joinBadStep]: {
@@ -351,16 +353,16 @@ const RULE_DESCRIPTORS = {
     description:
       "A join constraint has a step whose entry and exit roles do not share a fact type.",
     messages: {
-      default: (ftName: string, stepEntry: string, stepExit: string): string =>
-        `Join constraint in fact type "${ftName}" has a step whose entry "${stepEntry}" / exit "${stepExit}" are not both roles of one fact type.`,
+      default: (span: string, stepEntry: string, stepExit: string): string =>
+        `Join constraint over ${span} has a step whose entry "${stepEntry}" / exit "${stepExit}" are not both roles of one fact type.`,
     },
   },
   [RULE_ID.joinColumnTypeMismatch]: {
     severity: "error",
     description: "A join constraint compares two projected columns whose object types differ.",
     messages: {
-      default: (ftName: string, col1: number): string =>
-        `Join constraint in fact type "${ftName}" projects column ${col1} from different object types across operands; they must match.`,
+      default: (span: string, col1: number): string =>
+        `Join constraint over ${span} projects column ${col1} from different object types across operands; they must match.`,
     },
   },
   [RULE_ID.joinDiscontiguous]: {
@@ -368,24 +370,24 @@ const RULE_DESCRIPTORS = {
     description:
       "A join constraint's path is not contiguous: a step does not start where the previous one ended.",
     messages: {
-      default: (ftName: string, stepEntry: string): string =>
-        `Join constraint in fact type "${ftName}" is not contiguous: the entry role "${stepEntry}" is not played by the preceding path node.`,
+      default: (span: string, stepEntry: string): string =>
+        `Join constraint over ${span} is not contiguous: the entry role "${stepEntry}" is not played by the preceding path node.`,
     },
   },
   [RULE_ID.joinEmptyProjection]: {
     severity: "error",
     description: "A join constraint has an operand that projects no nodes.",
     messages: {
-      default: (ftName: string): string =>
-        `Join constraint in fact type "${ftName}" has an operand with an empty projection.`,
+      default: (span: string): string =>
+        `Join constraint over ${span} has an operand with an empty projection.`,
     },
   },
   [RULE_ID.joinTooFewOperands]: {
     severity: "error",
     description: "A join equality or exclusion constraint has fewer than two operands.",
     messages: {
-      default: (cTypeJoinEqualityEqualityExclusion: string, ftName: string): string =>
-        `Join ${cTypeJoinEqualityEqualityExclusion} constraint in fact type "${ftName}" must have at least two operands.`,
+      default: (cTypeJoinEqualityEqualityExclusion: string, span: string): string =>
+        `Join ${cTypeJoinEqualityEqualityExclusion} constraint over ${span} must have at least two operands.`,
     },
   },
   [RULE_ID.joinUnknownRoot]: {
@@ -393,8 +395,8 @@ const RULE_DESCRIPTORS = {
     description:
       "A join constraint's path is rooted at an object type that does not exist in the model.",
     messages: {
-      default: (ftName: string, pathRoot: string): string =>
-        `Join constraint in fact type "${ftName}" references an unknown root object type "${pathRoot}".`,
+      default: (span: string, pathRoot: string): string =>
+        `Join constraint over ${span} references an unknown root object type "${pathRoot}".`,
     },
   },
   [RULE_ID.mandatoryInvalidRole]: {
@@ -435,11 +437,11 @@ const RULE_DESCRIPTORS = {
     description: "A subset constraint compares two role sequences of different lengths.",
     messages: {
       default: (
-        ftName: string,
+        span: string,
         constraintSubsetRoleIdsLength: number,
         constraintSupersetRoleIdsLength: number,
       ): string =>
-        `Subset constraint in fact type "${ftName}" has mismatched role sequence lengths: subset has ${constraintSubsetRoleIdsLength} roles, superset has ${constraintSupersetRoleIdsLength} roles.`,
+        `Subset constraint over ${span} has mismatched role sequence lengths: subset has ${constraintSubsetRoleIdsLength} roles, superset has ${constraintSupersetRoleIdsLength} roles.`,
     },
   },
   [RULE_ID.valueComparisonInvalidRole]: {
@@ -526,28 +528,17 @@ const RULE_DESCRIPTORS = {
     description:
       "An object instance plays more than one of the roles an exclusion constraint forbids combining.",
     messages: {
-      local: (cRoleIds: string, value: string, count: number): string =>
+      default: (cRoleIds: string, value: string, count: number): string =>
         `Exclusion constraint on roles [${cRoleIds}] is violated: "${value}" plays ${count} of the excluded roles.`,
-      spanning: (popId: string, instId: string, val: string, roles: string): string =>
-        `Population "${popId}": instance "${instId}" has value "${val}" in multiple excluded roles [${roles}].`,
     },
   },
   [RULE_ID.exclusiveOrViolation]: {
     severity: "error",
     description:
-      "An object instance plays none of the roles an exclusive-or constraint requires exactly one of.",
+      "An object plays none, or more than one, of the roles an exclusive-or constraint requires exactly one of.",
     messages: {
-      localMultiple: (cRoleIds: string, value: string, count: number): string =>
+      default: (cRoleIds: string, value: string, count: number): string =>
         `Exclusive-or constraint on roles [${cRoleIds}] is violated: "${value}" plays ${count} of them (must be exactly one).`,
-      localNone: (
-        popId: string,
-        instId: string,
-        playedRolesLength: number,
-        playedRoles: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" plays ${playedRolesLength} of the exclusive-or roles [${playedRoles}] but must play exactly one.`,
-      spanning: (popId: string, instId: string, localRoleIds: string): string =>
-        `Population "${popId}": instance "${instId}" does not play any of the exclusive-or roles [${localRoleIds}].`,
     },
   },
   [RULE_ID.externalUniquenessViolation]: {
@@ -928,8 +919,8 @@ const RULE_DESCRIPTORS = {
     description:
       "A tuple projected by a join subset constraint's subset path is absent from its superset path.",
     messages: {
-      default: (factTypeName: string, tuple: string): string =>
-        `Join subset constraint in fact type "${factTypeName}" is violated: the subset tuple [${tuple}] is not in the superset operand.`,
+      default: (span: string, tuple: string): string =>
+        `Join subset constraint over ${span} is violated: the subset tuple [${tuple}] is not in the superset operand.`,
     },
   },
   [RULE_ID.joinEqualityViolation]: {
@@ -937,8 +928,8 @@ const RULE_DESCRIPTORS = {
     description:
       "The tuple sets a join equality constraint compares across its paths are not identical.",
     messages: {
-      default: (factTypeName: string, tuple: string): string =>
-        `Join equality constraint in fact type "${factTypeName}" is violated: the tuple [${tuple}] is not projected by every operand.`,
+      default: (span: string, tuple: string): string =>
+        `Join equality constraint over ${span} is violated: the tuple [${tuple}] is not projected by every operand.`,
     },
   },
   [RULE_ID.joinExclusionViolation]: {
@@ -946,8 +937,8 @@ const RULE_DESCRIPTORS = {
     description:
       "A tuple appears in the projected sets of more than one operand of a join exclusion constraint.",
     messages: {
-      default: (factTypeName: string, tuple: string): string =>
-        `Join exclusion constraint in fact type "${factTypeName}" is violated: the tuple [${tuple}] is projected by more than one operand.`,
+      default: (span: string, tuple: string): string =>
+        `Join exclusion constraint over ${span} is violated: the tuple [${tuple}] is projected by more than one operand.`,
     },
   },
   [RULE_ID.ringViolation]: {

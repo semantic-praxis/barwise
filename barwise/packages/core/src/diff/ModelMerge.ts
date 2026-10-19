@@ -765,7 +765,9 @@ export function getStructuralErrors(model: OrmModel): readonly Diagnostic[] {
     // barwise-978 names, and on this path it would let a duplicate name
     // reach disk.
     ...structuralWellFormedness(model),
-    ...(result.ok ? structuralRules(model, result.graph) : referenceDiagnostics(result.unresolved)),
+    ...(result.ok
+      ? structuralRules(model, result.graph)
+      : referenceDiagnostics(model, result.unresolved)),
   ];
   return diagnostics.filter((d) => d.severity === "error");
 }

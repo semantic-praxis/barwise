@@ -26,9 +26,11 @@
 import type { Constraint, JoinOperand } from "../model/Constraint.js";
 import { joinOperandsOf } from "../model/Constraint.js";
 import type { UnresolvedReference } from "../model/graph.js";
+import type { OrmModel } from "../model/OrmModel.js";
 import type { RolePathStep } from "../model/RolePath.js";
 import type { Diagnostic } from "./Diagnostic.js";
 import { report, RULE_ID } from "./ruleId.js";
+import { constraintElementId, constraintSpan } from "./span.js";
 
 /** The constraint kinds whose role references live in a join path. */
 type JoinConstraintType = "join_subset" | "join_equality" | "join_exclusion";
@@ -79,12 +81,13 @@ const CONSTRAINT_INVALID_ROLE: Record<
 
 /** Diagnostics for every reference `graphOf` could not resolve. */
 export function referenceDiagnostics(
+  model: OrmModel,
   unresolved: readonly UnresolvedReference[],
 ): Diagnostic[] {
-  return unresolved.map((u) => diagnosticFor(u));
+  return unresolved.map((u) => diagnosticFor(model, u));
 }
 
-function diagnosticFor(u: UnresolvedReference): Diagnostic {
+function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
   switch (u.from.kind) {
     case "role":
       // Two different findings share this source: a role whose player
@@ -102,11 +105,16 @@ function diagnosticFor(u: UnresolvedReference): Diagnostic {
       );
     case "constraint": {
       const { constraint, factType } = u.from;
-      const elementId = constraint.id ?? factType.id;
       // A join operand's path root is its own finding, distinct from a
       // dangling hop.
       if (u.field === "path.root") {
-        return report(RULE_ID.joinUnknownRoot, "default", elementId, factType.name, u.missing);
+        return report(
+          RULE_ID.joinUnknownRoot,
+          "default",
+          constraintElementId(constraint),
+          constraintSpan(model, constraint),
+          u.missing,
+        );
       }
       // Narrowed on the kind rather than on `joinOperandsOf(...).length`,
       // which reads the same and is not: a `join_equality` declaring no
@@ -120,8 +128,8 @@ function diagnosticFor(u: UnresolvedReference): Diagnostic {
       ) {
         return joinStepDiagnostic(
           joinOperandsOf(constraint),
-          elementId,
-          factType.name,
+          constraintElementId(constraint),
+          constraintSpan(model, constraint),
           u.missing,
         );
       }
@@ -174,7 +182,7 @@ function diagnosticFor(u: UnresolvedReference): Diagnostic {
 function joinStepDiagnostic(
   operands: readonly JoinOperand[],
   elementId: string,
-  factTypeName: string,
+  span: string,
   missing: string,
 ): Diagnostic {
   let step: RolePathStep | undefined;
@@ -191,7 +199,7 @@ function joinStepDiagnostic(
     RULE_ID.joinBadStep,
     "default",
     elementId,
-    factTypeName,
+    span,
     step?.entry ?? missing,
     step?.exit ?? missing,
   );

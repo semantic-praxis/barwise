@@ -33,5 +33,5 @@ export function graphFor(model: OrmModel): ModelGraph {
 export function unresolvedDiagnostics(model: OrmModel): Diagnostic[] {
   const result = graphOf(model);
   if (result.ok) throw new Error("unresolvedDiagnostics: every reference resolved");
-  return referenceDiagnostics(result.unresolved);
+  return referenceDiagnostics(model, result.unresolved);
 }
