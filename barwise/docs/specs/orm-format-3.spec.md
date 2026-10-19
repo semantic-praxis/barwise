@@ -430,8 +430,8 @@ Implementation notes (2026-10-17):
   one NORMA constraint gets `<id>_2`, skipping every id the document holds
   for any element, since NORMA's ids share one space (every `id` and `...Id` field the
   parser keeps); an inline
-  cardinality without an id gets the writer's id for it
-  (`cardinalityId`, shared by both; the writer spells an object type's with it too, but that cardinality is a property with no id in the metamodel, so its NORMA id is not kept: barwise-eok), under the same rule. Distinct
+  cardinality without an id gets one derived from its role
+  (`cardinalityId`; until WS3a-i the writer shared it for a role cardinality without an id, and since then every constraint has its own; the writer spells an object type's with it too, but that cardinality is a property with no id in the metamodel, so its NORMA id is not kept: barwise-eok), under the same rule. Distinct
   exclusive-or pairs over the same roles merge into one constraint, as
   before, and both phases now check the whole model for it
   (inside `buildExclusiveOr`, a lookup of the role sets built so far) rather

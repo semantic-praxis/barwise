@@ -139,9 +139,9 @@ function roleCardinalityConstraints(
     if (!card || !r) continue;
     constraints.push({
       type: "cardinality",
-      // One the file leaves without an id gets the writer's id for it,
-      // so the import stays deterministic rather than falling to the
-      // generator.
+      // One the file leaves without an id gets one derived from its role
+      // (`cardinalityId`), so the import stays deterministic rather than
+      // falling to the generator.
       id: ids.claimCardinality(card.id, nr.id),
       roleId: nr.id,
       min: r.from,
