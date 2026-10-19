@@ -90,7 +90,9 @@ export function formatCounterexamples(
  * `sourceElementId` is the constraint's id and `factTypeIds` the fact
  * types it applies to (orm-format-3, Open decision 9); an object type's
  * cardinality row names its object type with `factTypeIds: []`; other rows
- * carry no `factTypeIds`. The one projection every JSON form of
+ * carry no `factTypeIds`. The heading over the constraints across fact types is a
+ * `section` row whose `sourceElementId` names the section, not a model
+ * element; a consumer counting statements skips `section` rows. The one projection every JSON form of
  * `barwise verbalize` uses, so the forms cannot disagree on a field.
  */
 export function verbalizationRow(v: Verbalization): {

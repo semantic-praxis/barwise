@@ -205,7 +205,7 @@ type ExternalConstraint = Exclude<Constraint, InternalConstraint>;
 // FactType.internalConstraints: readonly InternalConstraint[]
 // (FactType.constraints is removed, so every reader must be revisited)
 // OrmModel.constraints: readonly ExternalConstraint[]
-// OrmModel.constraintsTouching(factTypeId): readonly Constraint[]
+// OrmModel.constraintsTouching(factType | factTypeId): readonly Constraint[]
 // OrmModel.getConstraint(id): Constraint | undefined  (either kind)
 ```
 
@@ -807,8 +807,14 @@ Implementation notes (2026-10-19):
     summary and the gym's `requires_verbalization` use it.
   - `constraintsTouching` takes a fact type as well as an id, and is the one
     per-fact-type view: `verbalizeAll` and `counterexamplesTouching` both
-    ask it, and it answers a fact type the model does not hold from that
-    fact type's own list.
+    ask it, and it answers a fact type instance the model does not hold
+    from that fact type's own list alone. It does not also match the
+    model's constraints against it: the instance's role ids are another
+    model's id space, and a collision attached unrelated constraints (and,
+    for a twin of a held fact type, listed a nested one twice). The
+    external rows of such an instance verbalize against a model that does
+    not hold their roles, so their text is degraded; no surface asks this,
+    and 3c removes the nested list it reads.
   - `resolveCommonPlayer` takes the first role that resolves anywhere, not
     the first in the host. For an exclusion or disjunctive mandatory whose
     roles have different players -- malformed, since those kinds constrain

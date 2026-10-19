@@ -5,7 +5,7 @@
  * `.orm-project.yaml` -- for each domain (or one chosen with `--domain`).
  */
 
-import type { OrmModel } from "@barwise/core";
+import type { FactType, OrmModel } from "@barwise/core";
 import { collectOpenQuestionAnnotations } from "@barwise/core/annotation";
 import {
   type Counterexample,
@@ -90,12 +90,12 @@ export function registerVerbalizeCommand(program: Command): void {
 
 /** Verbalizations (and optional counterexamples) for one model. */
 function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions) {
-  let factTypeId: string | undefined;
+  let factType: FactType | undefined;
   let verbalizations;
   if (opts.factType) {
     const ft = model.getFactTypeByName(opts.factType);
     verbalizations = ft ? verbalizer.verbalizeFactType(ft.id, model) : [];
-    factTypeId = ft?.id;
+    factType = ft;
   } else {
     verbalizations = verbalizeWhole(verbalizer, model, opts);
   }
@@ -103,9 +103,7 @@ function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions
   let counterexamples: readonly Counterexample[] = [];
   if (opts.counterexamples) {
     const all = generateCounterexamples(model);
-    counterexamples = factTypeId === undefined
-      ? all
-      : counterexamplesTouching(model, model.getFactType(factTypeId)!, all);
+    counterexamples = factType === undefined ? all : counterexamplesTouching(model, factType, all);
   }
   return { verbalizations, counterexamples };
 }

@@ -692,7 +692,9 @@ caller that bypassed the dispatcher, a programming error rather than a
 model defect.
 
 **Which kinds the guard applies to is the whole subtlety, and it is
-`requiresLocalRoles` in `model/Constraint.ts`.** Exclusion, subset,
+`requiresLocalRoles` in `model/Constraint.ts`.** (Since orm-format-3 WS3a-ii it is
+`isInternalConstraint`, derived from the `PLACEMENT` table, and the drift
+test below is `tests/model/internalConstraintLocality.test.ts`.) Exclusion, subset,
 equality, exclusive-or and disjunctive mandatory span fact types
 routinely; an external uniqueness constraint that is entirely local is
 the anomaly, not the other way round; join constraints reach across by

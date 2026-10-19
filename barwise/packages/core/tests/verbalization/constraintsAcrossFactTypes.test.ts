@@ -148,4 +148,20 @@ describe("ConstraintVerbalizer.verbalizeAll", () => {
     const rows = new Verbalizer().constraints.verbalizeAll(ft, model);
     expect(rows.map((v) => v.sourceElementId)).toEqual(["c-loose", "c-loose-excl"]);
   });
+
+  it("does not attach the other model's constraints through a colliding role id", () => {
+    const model = rooms("ft-nr");
+    const twin = rooms("none");
+    // Same ids as Facilities' ft-nr (r-3, r-4), a different instance: the
+    // key c-room-key names r-4 in Facilities, and must not be matched here.
+    const ft = twin.getFactType("ft-nr")!;
+    expect(model.constraintsTouching(ft).map((c) => c.id)).toEqual(["c-one-nr"]);
+  });
+
+  it("lists a twin's nested constraint once, not again from the model", () => {
+    const model = rooms("ft-nr");
+    const twin = rooms("ft-nr");
+    const ft = twin.getFactType("ft-nr")!;
+    expect(model.constraintsTouching(ft).map((c) => c.id)).toEqual(["c-one-nr", "c-room-key"]);
+  });
 });

@@ -63,8 +63,9 @@ export interface Verbalization {
  * `section` heading the model verbalization places over the constraints
  * across fact types. Consumers that count, number or match statements use
  * it, so that heading is never read as a reading. (The "Open questions"
- * block of `verbalizeModelWithAnnotations` is its own category, and keeps
- * its own heading row.)
+ * heading of `verbalizeModelWithAnnotations` predates this category and is
+ * still an `open_question` row, so it is counted until barwise-rsy moves it
+ * to `section`.)
  */
 export function isStatement(v: { readonly category: string; }): boolean {
   return v.category !== "section";
