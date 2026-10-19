@@ -19,7 +19,7 @@ export function checkUniquenessViolations(model: OrmModel): Diagnostic[] {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const uniquenessConstraints = ft.constraints.filter(isInternalUniqueness);
+    const uniquenessConstraints = ft.internalConstraints.filter(isInternalUniqueness);
     for (const uc of uniquenessConstraints) {
       diagnostics.push(...uniquenessViolationsIn(pop, uc));
     }

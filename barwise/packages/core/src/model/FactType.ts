@@ -1,5 +1,5 @@
 import type { Complete } from "../util/complete.js";
-import type { Constraint } from "./Constraint.js";
+import { type Constraint, type InternalConstraint, isInternalConstraint } from "./Constraint.js";
 import { generateId } from "./id.js";
 import { ModelElement } from "./ModelElement.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
@@ -129,6 +129,17 @@ export class FactType extends ModelElement {
     return this._constraints;
   }
 
+  /**
+   * The constraints that live in this fact type: the internal kinds, whose
+   * roles are all its own. Until storage moves (orm-format-3 WS3c) the list
+   * above also holds the external kinds a 2.0 file nests here; this view and
+   * `OrmModel.constraints` are how a reader asks for one placement or the
+   * other, so that the move changes no reader.
+   */
+  get internalConstraints(): readonly InternalConstraint[] {
+    return this._constraints.filter(isInternalConstraint);
+  }
+
   /** The arity (number of roles). */
   get arity(): number {
     return this._roles.length;
@@ -165,9 +176,15 @@ export class FactType extends ModelElement {
     return this._roles.some((r) => r.id === roleId);
   }
 
-  /** Add a constraint to this fact type. */
+  /**
+   * Add a constraint to this fact type, giving it an id from the installed
+   * generator when it has none, as the constructor does. A constraint built
+   * in code is new, so a fresh id is right (barwise-nkq); without one, every
+   * output that names a constraint by id would have nothing to name it by
+   * until the model was saved and reloaded.
+   */
   addConstraint(constraint: Constraint): void {
-    this._constraints.push(constraint);
+    this._constraints.push(constraint.id ? constraint : { ...constraint, id: generateId() });
   }
 
   /** Get all role ids that reference a given object type (by player id). */

@@ -1369,7 +1369,7 @@ describe("deontic modality", () => {
       expect(populationValidationRules(model, graphFor(model))).toHaveLength(0);
     });
 
-    it("falls back to the fact type id when a min- or max-violating cardinality constraint has no id", () => {
+    it("reports min- and max-violating cardinality constraints added in code under their filled ids", () => {
       const model = new OrmModel({ name: "Test" });
       const promo = model.addObjectType({
         name: "Promotion",
@@ -1381,8 +1381,8 @@ describe("deontic modality", () => {
         roles: [{ name: "is featured", playerId: promo.id, id: "p1" }],
         readings: ["{0} is featured"],
       });
-      // addConstraint (unlike the fact-type constructor) does not
-      // backfill a missing id.
+      // addConstraint fills a missing id, as the fact type constructor
+      // does (barwise-nkq), so each diagnostic names its constraint.
       underMin.addConstraint({ type: "cardinality", roleId: "p1", min: 3, max: "unbounded" });
       const underPop = model.addPopulation({ factTypeId: underMin.id });
       underPop.addInstance({ roleValues: { p1: "P1" } });
@@ -1404,7 +1404,9 @@ describe("deontic modality", () => {
         (d) => d.ruleId === "population/unary-role-cardinality-violation",
       );
       expect(diags).toHaveLength(2);
-      expect(diags.map((d) => d.elementId)).toEqual([underMin.id, overMax.id]);
+      const filled = [underMin.constraints[0]!.id, overMax.constraints[0]!.id];
+      expect(filled).toEqual([expect.any(String), expect.any(String)]);
+      expect(diags.map((d) => d.elementId)).toEqual(filled);
     });
   });
 });

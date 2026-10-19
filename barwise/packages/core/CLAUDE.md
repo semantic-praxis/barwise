@@ -106,14 +106,23 @@ it, so knip sees an unused file where there is a live edge.
 - **A constraint id a file omits is derived, not minted.** On load,
   `serialization/derivedId.ts` gives an id-less constraint a UUIDv8 hashed
   from its fact type id and its content, so one unchanged file always loads
-  to the same ids; the generator fills only constraints passed to the
-  `FactType` constructor in code, and `addConstraint` fills none
-  (barwise-nkq)
-  (`docs/specs/orm-format-3.spec.md`, WS2). Do not move the derivation into
+  to the same ids; the generator fills only constraints built in code,
+  through the `FactType` constructor or `addConstraint` (barwise-nkq), so
+  every constraint in a model has an id
+  (`docs/specs/orm-format-3.spec.md`, WS2 and WS3). Do not move the derivation into
   `FactType`'s constructor: it runs per fact type and cannot see the ids
   the rest of the file states. And do not let a loaded constraint reach
   the constructor's random fill: that is what made two NORMA exports of
   one file differ.
+- **Where a constraint lives is decided by its kind, in one table.**
+  `PLACEMENT` in `model/Constraint.ts` classifies every kind as internal
+  (it lives in its fact type; every role is one of its roles) or external
+  (it lives in the model; its roles may span fact types).
+  `InternalConstraint`, `ExternalConstraint`, `requiresLocalRoles` and the
+  two guards all derive from it. Read through `FactType.internalConstraints`,
+  `OrmModel.constraints`, `OrmModel.constraintsTouching` and
+  `OrmModel.getConstraint`, not `FactType.constraints`, which WS3c removes
+  (`docs/specs/orm-format-3.spec.md`, WS3).
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class
   hierarchies.

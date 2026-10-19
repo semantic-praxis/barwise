@@ -33,7 +33,7 @@ export function checkRingViolations(model: OrmModel): Diagnostic[] {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const ringConstraints = ft.constraints.filter(isRing);
+    const ringConstraints = ft.internalConstraints.filter(isRing);
     for (const rc of ringConstraints) {
       diagnostics.push(...ringViolationsIn(pop, ft, rc));
     }

@@ -674,31 +674,59 @@ export function joinOperandsOf(c: Constraint): readonly JoinOperand[] {
  * treat a "no" as a defect: whether it is a defect depends on the kind,
  * and that judgement is this function.
  *
- * A total `Record` rather than a list of the seven, so a constraint kind
+ * The same table decides where a constraint lives
+ * (`docs/specs/orm-format-3.spec.md`, placement by kind): a kind whose
+ * roles must be local is internal and belongs to its fact type, every
+ * other kind is external and belongs to the model. One table, so the
+ * placement rule and the locality rule cannot disagree, and the
+ * `InternalConstraint` type below is derived from it rather than listed
+ * a second time.
+ *
+ * A total record rather than a list of the seven, so a constraint kind
  * added later fails to compile until someone classifies it, instead of
  * silently defaulting to whichever answer the author of the list
  * happened to write first.
  */
-const REQUIRES_LOCAL_ROLES: Record<Constraint["type"], boolean> = {
-  internal_uniqueness: true,
-  mandatory: true,
-  value_constraint: true,
-  ring: true,
-  frequency: true,
-  cardinality: true,
-  value_comparison: true,
-  external_uniqueness: false,
-  disjunctive_mandatory: false,
-  exclusion: false,
-  exclusive_or: false,
-  subset: false,
-  equality: false,
-  join_subset: false,
-  join_equality: false,
-  join_exclusion: false,
-};
+const PLACEMENT = {
+  internal_uniqueness: "internal",
+  mandatory: "internal",
+  value_constraint: "internal",
+  ring: "internal",
+  frequency: "internal",
+  cardinality: "internal",
+  value_comparison: "internal",
+  external_uniqueness: "external",
+  disjunctive_mandatory: "external",
+  exclusion: "external",
+  exclusive_or: "external",
+  subset: "external",
+  equality: "external",
+  join_subset: "external",
+  join_equality: "external",
+  join_exclusion: "external",
+} as const satisfies Record<Constraint["type"], "internal" | "external">;
 
-/** See `REQUIRES_LOCAL_ROLES`. */
+type InternalKind = {
+  [K in keyof typeof PLACEMENT]: (typeof PLACEMENT)[K] extends "internal" ? K : never;
+}[keyof typeof PLACEMENT];
+
+/** The kinds that live in their fact type: every role is one of its roles. */
+export type InternalConstraint = Extract<Constraint, { type: InternalKind; }>;
+
+/** The kinds that live in the model: their roles may span fact types. */
+export type ExternalConstraint = Exclude<Constraint, InternalConstraint>;
+
+/** See `PLACEMENT`. */
 export function requiresLocalRoles(c: Constraint): boolean {
-  return REQUIRES_LOCAL_ROLES[c.type];
+  return PLACEMENT[c.type] === "internal";
+}
+
+/** Whether `c` lives in its fact type (see `PLACEMENT`). */
+export function isInternalConstraint(c: Constraint): c is InternalConstraint {
+  return PLACEMENT[c.type] === "internal";
+}
+
+/** Whether `c` lives in the model (see `PLACEMENT`). */
+export function isExternalConstraint(c: Constraint): c is ExternalConstraint {
+  return PLACEMENT[c.type] === "external";
 }

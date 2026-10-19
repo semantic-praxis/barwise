@@ -2,11 +2,11 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, not started; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i implemented 2026-10-19; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
-Last-updated: 2026-10-18
+Last-updated: 2026-10-19
 Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
@@ -749,6 +749,33 @@ fact types times constraints. On the largest tracked model (121 fact types,
 reviewable PR per package, against one PR touching 43 source files, tens
 of test files, and every output above. It costs no safety, because 3c's
 removal is the compile-time check the draft wanted.
+
+Implementation notes (2026-10-19):
+
+- **3a lands as three PRs, not one.** Measured against the list above, 3a
+  still touched every core reader, every changed output with its
+  consumers, and id-first diff, which is too much to review in one
+  sitting. The cut is by behaviour. **3a-i** adds the API (`PLACEMENT`,
+  the two types and guards, `internalConstraints`, `constraints`,
+  `constraintsTouching`, `getConstraint`), makes `FactType.addConstraint`
+  fill ids (barwise-nkq; the NORMA writer's positional fallback becomes an
+  error), and moves the 20 core reads that look only at internal kinds,
+  none of which can change any output. **3a-ii** changes the outputs of
+  Open decision 9 with their consumers and moves the rest of core's
+  readers. **3a-iii** is id-first matching (barwise-18n). Each is green on
+  its own.
+- **The placement table is the locality table.** `requiresLocalRoles`
+  already classified the sixteen kinds the same way, in a total record,
+  so 3a-i turned that record into `PLACEMENT` and derived both rules and
+  both types from it, rather than adding a second classification.
+- **Filling ids moved committed fixtures.** Six core tests built an
+  id-less constraint through `addConstraint` to reach a host fallback;
+  each now asserts that the output names the filled id instead. The ten
+  promptlab reference models gained constraint ids, and the counter-drawn
+  ids after them were renumbered (`npm run regen:references`).
+- **Downstream internal-only readers stay for 3b**, as planned, even where
+  the change is one word: dbt's `sqlPatterns.ts`, llm's `ModelContext.ts`,
+  and NORMA's writer and population graph.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

@@ -386,7 +386,7 @@ function hasPreferredIdentifier(
     const playsRole = ft.roles.some((r) => r.playerId === entity.id);
     if (!playsRole) continue;
 
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (isInternalUniqueness(c) && c.isPreferred) {
         return true;
       }

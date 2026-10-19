@@ -685,7 +685,7 @@ export class RelationalMapper {
     const role1Id = ft.roles[0]!.id;
     const role2Id = ft.roles[1]!.id;
 
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type === "internal_uniqueness") {
         if (c.roleIds.length === 1 && c.roleIds[0] === role1Id) {
           role1Unique = true;
@@ -720,7 +720,7 @@ export class RelationalMapper {
     const role1Id = ft.roles[0]!.id;
     const role2Id = ft.roles[1]!.id;
 
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type === "mandatory") {
         if (c.roleId === role1Id) role1Mandatory = true;
         if (c.roleId === role2Id) role2Mandatory = true;
@@ -806,7 +806,7 @@ function associativeKey(
   roleColumns: ReadonlyMap<string, readonly string[]>,
   columns: readonly Column[],
 ): string[] {
-  const uniqueness = ft.constraints.filter((c) => c.type === "internal_uniqueness");
+  const uniqueness = ft.internalConstraints.filter((c) => c.type === "internal_uniqueness");
   const chosen = uniqueness.find((c) => c.isPreferred) ?? uniqueness[0];
   if (!chosen) return columns.map((c) => c.name);
   return chosen.roleIds.flatMap((id) => roleColumns.get(id) ?? []);

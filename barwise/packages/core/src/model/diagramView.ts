@@ -36,7 +36,7 @@ export function absorbedReferenceModes(
     if (ot.kind !== "entity" || !ot.referenceMode) continue;
     for (const ft of model.factTypes) {
       if (ft.arity !== 2) continue;
-      const hasPreferred = ft.constraints.some(
+      const hasPreferred = ft.internalConstraints.some(
         (c) => c.type === "internal_uniqueness" && c.isPreferred,
       );
       if (!hasPreferred) continue;

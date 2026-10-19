@@ -324,7 +324,7 @@ class QueryContext {
 
     const roles: RoleRef[] = [];
     for (const ft of this.model.factTypes) {
-      for (const c of ft.constraints) {
+      for (const c of ft.internalConstraints) {
         if (c.type !== "mandatory") continue;
         const role = ft.getRoleById(c.roleId);
         if (!role) continue;
@@ -423,7 +423,7 @@ class QueryContext {
     const mandatoryFactTypes = new Set<string>();
 
     for (const ft of this.model.factTypesForObjectType(entity.id)) {
-      for (const c of ft.constraints) {
+      for (const c of ft.internalConstraints) {
         if (
           preferredIdentifier === undefined
           && isInternalUniqueness(c)

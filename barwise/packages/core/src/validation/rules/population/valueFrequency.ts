@@ -19,7 +19,7 @@ export function checkValueConstraintViolations(model: OrmModel): Diagnostic[] {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const valueConstraints = ft.constraints.filter(isValueConstraint);
+    const valueConstraints = ft.internalConstraints.filter(isValueConstraint);
     for (const vc of valueConstraints) {
       diagnostics.push(...valueConstraintViolationsIn(pop, vc));
     }
@@ -88,7 +88,7 @@ export function checkFrequencyViolations(model: OrmModel): Diagnostic[] {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const frequencyConstraints = ft.constraints.filter(isFrequency);
+    const frequencyConstraints = ft.internalConstraints.filter(isFrequency);
     for (const fc of frequencyConstraints) {
       diagnostics.push(...frequencyViolationsIn(pop, fc));
     }
