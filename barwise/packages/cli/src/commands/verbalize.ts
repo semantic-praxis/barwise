@@ -90,22 +90,18 @@ export function registerVerbalizeCommand(program: Command): void {
 
 /** Verbalizations (and optional counterexamples) for one model. */
 function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions) {
-  let factTypeId: string | undefined;
-  let verbalizations;
-  if (opts.factType) {
-    const ft = model.getFactTypeByName(opts.factType);
-    verbalizations = ft ? verbalizer.verbalizeFactType(ft.id, model) : [];
-    factTypeId = ft?.id;
-  } else {
-    verbalizations = verbalizeWhole(verbalizer, model, opts);
-  }
+  // Keyed on the option, not on the lookup: a project domain without the
+  // fact type gets no counterexamples, not the whole model's.
+  const ft = opts.factType ? model.getFactTypeByName(opts.factType) : undefined;
+  const verbalizations = opts.factType
+    ? (ft ? verbalizer.verbalizeFactType(ft.id, model) : [])
+    : verbalizeWhole(verbalizer, model, opts);
 
   let counterexamples: readonly Counterexample[] = [];
   if (opts.counterexamples) {
     const all = generateCounterexamples(model);
-    counterexamples = factTypeId === undefined
-      ? all
-      : counterexamplesTouching(model, factTypeId, all);
+    if (!opts.factType) counterexamples = all;
+    else if (ft) counterexamples = counterexamplesTouching(model, ft.id, all);
   }
   return { verbalizations, counterexamples };
 }

@@ -30,7 +30,7 @@ describe("ConstraintVerbalizer", () => {
         .build();
 
       const ft = model.factTypes[0]!;
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
 
       // Uniqueness on role2 (Order): "Each Order is placed by at most one Customer."
       expect(v).toHaveLength(1);
@@ -52,7 +52,7 @@ describe("ConstraintVerbalizer", () => {
         .build();
 
       const ft = model.factTypes[0]!;
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
 
       // Uniqueness on role1 (Customer): "Each Customer places at most one Order."
       expect(v).toHaveLength(1);
@@ -73,7 +73,7 @@ describe("ConstraintVerbalizer", () => {
         .build();
 
       const ft = model.factTypes[0]!;
-      const v = verbalizer.verbalizeAll(ft, model)[0]!;
+      const v = verbalizer.verbalizeAll(ft.id, model)[0]!;
 
       const keywords = v.segments.filter((s) => s.kind === "keyword");
       expect(keywords.map((s) => s.text)).toContain("Each ");
@@ -115,7 +115,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v).toHaveLength(1);
       expect(v[0]!.text).toBe(
         "For each Employee and Project combination, at most one Department applies.",
@@ -142,7 +142,7 @@ describe("ConstraintVerbalizer", () => {
         { skipPlayerValidation: true },
       );
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe("Each Order is placed by at most one places.");
     });
 
@@ -166,7 +166,7 @@ describe("ConstraintVerbalizer", () => {
         { skipPlayerValidation: true },
       );
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe("Each is placed by is placed by at most one Customer.");
     });
 
@@ -191,7 +191,7 @@ describe("ConstraintVerbalizer", () => {
         { skipPlayerValidation: true },
       );
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         'Malformed: the uniqueness constraint on A relates B and C names role "bogus", '
           + "which is not among its roles.",
@@ -219,7 +219,7 @@ describe("ConstraintVerbalizer", () => {
         constraints: [{ type: "internal_uniqueness", roleIds: ["r1", "r2", "r3"] }],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "For each A, B and C combination, at most one D and E applies.",
       );
@@ -246,7 +246,7 @@ describe("ConstraintVerbalizer", () => {
         { skipPlayerValidation: true },
       );
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "For each role-a and B combination, at most one role-c and D applies.",
       );
@@ -266,7 +266,7 @@ describe("ConstraintVerbalizer", () => {
         .build();
 
       const ft = model.factTypes[0]!;
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
 
       // Mandatory on role1 (Customer): "Each Customer places at least one Order."
       expect(v).toHaveLength(1);
@@ -287,7 +287,7 @@ describe("ConstraintVerbalizer", () => {
         .build();
 
       const ft = model.factTypes[0]!;
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
 
       expect(v).toHaveLength(1);
       expect(v[0]!.text).toBe(
@@ -315,7 +315,7 @@ describe("ConstraintVerbalizer", () => {
         { skipPlayerValidation: true },
       );
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe("Each places places at least one Order.");
     });
 
@@ -339,7 +339,7 @@ describe("ConstraintVerbalizer", () => {
         { skipPlayerValidation: true },
       );
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe("Each Customer places at least one is placed by.");
     });
 
@@ -371,7 +371,7 @@ describe("ConstraintVerbalizer", () => {
         constraints: [{ type: "mandatory", roleId: "r1" }],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe("Each Employee must: Employee works on Employee in Employee.");
     });
 
@@ -403,7 +403,7 @@ describe("ConstraintVerbalizer", () => {
         constraints: [{ type: "mandatory", roleId: "bogus" }],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "Malformed: the mandatory constraint on Employee works on Project in Department "
           + 'names role "bogus", which is not among its roles.',
@@ -440,7 +440,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v).toHaveLength(1);
       expect(v[0]!.text).toBe(
         "The possible values of Rating are: {'A', 'B', 'C', 'D', 'F'}.",
@@ -473,7 +473,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "The possible values of Age are: {at least 18, at least 0 and less than 120}.",
       );
@@ -505,7 +505,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "The possible values of Discount are: {'N/A', between 1 and 10}.",
       );
@@ -528,7 +528,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v).toHaveLength(1);
       expect(v[0]!.text).toContain("Widget exists");
       expect(v[0]!.text).toContain("'X', 'Y', 'Z'");
@@ -562,7 +562,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model)[0]!;
+      const v = verbalizer.verbalizeAll(ft.id, model)[0]!;
       const valueLiterals = v.segments.filter(
         (s) => s.kind === "value_literal",
       );
@@ -586,7 +586,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         'Malformed: the value constraint on Student has Rating names role "bogus", '
           + "which is not among its roles.",
@@ -618,7 +618,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe("The possible values of Age are: {greater than 0}.");
     });
 
@@ -647,7 +647,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "The possible values of Age are: {at most 120, any value}.",
       );
@@ -682,7 +682,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v).toHaveLength(1);
       expect(v[0]!.text).toContain("combination of");
       expect(v[0]!.text).toContain("FirstName");
@@ -722,7 +722,7 @@ describe("ConstraintVerbalizer", () => {
         readings: ["{0} has {1}", "{1} numbers {0}"],
       });
 
-      const v = verbalizer.verbalizeAll(inBuilding, model);
+      const v = verbalizer.verbalizeAll(inBuilding.id, model);
       const text = v.find((x) => x.text.includes("combination of"))!.text;
       expect(text).toContain("Building");
       expect(text).toContain("RoomNumber");
@@ -755,7 +755,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "The combination of A, B and C is unique across fact types.",
       );
@@ -776,7 +776,7 @@ describe("ConstraintVerbalizer", () => {
         .build();
 
       const ft = model.factTypes[0]!;
-      const vs = verbalizer.verbalizeAll(ft, model);
+      const vs = verbalizer.verbalizeAll(ft.id, model);
 
       expect(vs).toHaveLength(2);
       expect(vs[0]!.text).toContain("at most one");
@@ -808,7 +808,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "StartDay must be less than or equal to EndDay.",
       );
@@ -840,7 +840,7 @@ describe("ConstraintVerbalizer", () => {
         ],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       // The alethic sentence "Each Order ... " becomes an obligation with a
       // lower-cased leading keyword.
       expect(v[0]!.text).toBe(
@@ -864,7 +864,7 @@ describe("ConstraintVerbalizer", () => {
         constraints: [{ type: "cardinality", roleId: "p1", min: 0, max: 10 }],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(
         "The 'is active' role is played by at most 10 Promotion instances.",
       );

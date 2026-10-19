@@ -571,7 +571,7 @@
       "caught_by": "execution",
       "note": "The sharpest of seven defects an offline rehearsal surfaced."
     },
-    "orm-format-3::2979b76557a7": {
+    "orm-format-3::27ef78eb76a5": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 3a lands as three prs, not one. measured against the list above, 3a still touched every core reader, every changed output with its consumers, and id-first dif",
       "caught_by": "reasoning",

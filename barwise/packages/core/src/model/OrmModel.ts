@@ -195,8 +195,7 @@ export class OrmModel {
    * Verbalization and counterexamples ask here by id, so their views of
    * one fact type cannot disagree (describe still reads the nested list
    * until WS3a-ii-c moves it). The answer is about this model's
-   * fact type: a fact type it does not have touches nothing here, and a
-   * view of another model's fact type asks that model.
+   * fact type: a fact type it does not have touches nothing here.
    */
   constraintsTouching(factTypeId: string): readonly Constraint[] {
     const ft = this._factTypes.get(factTypeId);

@@ -91,6 +91,24 @@ describe("barwise verbalize", () => {
     expect(result.stdout).not.toContain("== Open questions ==");
   });
 
+  it("gives a project domain without the fact type no counterexamples", async () => {
+    const result = await runCli([
+      "verbalize",
+      `${fixtures}/project/project.orm-project.yaml`,
+      "--fact-type",
+      "Customer has Email",
+      "--counterexamples",
+      "--format",
+      "json",
+    ]);
+    expect(result.exitCode).toBe(0);
+    const blocks: Array<{ domain: string; counterexamples: unknown[]; }> = JSON.parse(
+      result.stdout,
+    );
+    expect(blocks.find((b) => b.domain === "crm")!.counterexamples.length).toBeGreaterThan(0);
+    expect(blocks.find((b) => b.domain === "billing")!.counterexamples).toEqual([]);
+  });
+
   it("appends counterexamples with --counterexamples", async () => {
     const result = await runCli([
       "verbalize",

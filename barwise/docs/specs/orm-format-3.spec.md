@@ -813,11 +813,10 @@ Implementation notes (2026-10-19):
     surface asks it, and each way of answering it was wrong somewhere (role
     ids from another model's id space attached unrelated constraints, a
     twin listed a nested one twice, the nested list alone left out
-    constraints nested elsewhere). `counterexamplesTouching` takes the id
-    too. `verbalizeAll` resolves the model's own instance by id and builds
-    both list and text from it, so a same-id copy cannot mix two models in
-    one row; a fact type the model does not have says only its internal
-    constraints, which are its own wherever it sits.
+    constraints nested elsewhere, and resolving against the model it was
+    handed mixed two models' names in one row). `verbalizeAll` and
+    `counterexamplesTouching` now take an id, like `constraintsTouching`,
+    and a fact type the model does not have yields nothing.
   - `resolveCommonPlayer` takes the first role that resolves anywhere, not
     the first in the host. For an exclusion or disjunctive mandatory whose
     roles have different players -- malformed, since those kinds constrain

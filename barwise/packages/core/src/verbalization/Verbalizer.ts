@@ -151,7 +151,7 @@ export class Verbalizer {
     const results: Verbalization[] = [];
     results.push(...this.factTypeVerbalizer.verbalizeAll(ft, model));
     results.push(
-      ...this.constraintVerbalizer.verbalizeAll(ft, model),
+      ...this.constraintVerbalizer.verbalizeAll(ft.id, model),
     );
     return results;
   }

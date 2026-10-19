@@ -125,32 +125,15 @@ describe("verbalizeFactType", () => {
 });
 
 describe("ConstraintVerbalizer.verbalizeAll", () => {
-  it("answers from the model that holds the fact type, by id", () => {
-    const verbalizer = new Verbalizer();
-    const model = rooms("ft-nr");
-    // A twin from another model: same ids, no key, another reading. The
-    // view is Facilities' ft-nr -- its list and its text -- not the twin's.
-    const other = rooms("none");
-    const twin = other.getFactType("ft-nr")!;
-    (twin.readings[0] as { template: string; }).template = "{0} carries {1}";
-    const rows = verbalizer.constraints.verbalizeAll(twin, model);
-    expect(rows.map((v) => v.sourceElementId)).toEqual(["c-one-nr", "c-room-key"]);
-    expect(rows[0]!.text).toBe("Each Room has at most one RoomNumber.");
+  it("answers by id from the model, list and text alike", () => {
+    const rows = new Verbalizer().constraints.verbalizeAll("ft-nr", rooms("ft-nr"));
+    expect(rows.map((v) => [v.sourceElementId, v.text])).toEqual([
+      ["c-one-nr", "Each Room has at most one RoomNumber."],
+      ["c-room-key", KEY_TEXT],
+    ]);
   });
 
-  it("says a fact type's own internal constraints when the model does not have it", () => {
-    const verbalizer = new Verbalizer();
-    const model = rooms("ft-nr");
-    const loose = new OrmModel({ name: "Loose" });
-    loose.addObjectType({ id: "ot-x", name: "X", kind: "value" });
-    const other = loose.addFactType({
-      id: "ft-loose",
-      name: "X exists",
-      roles: [{ id: "r-3", name: "exists", playerId: "ot-x" }],
-      readings: ["{0} exists"],
-      constraints: [{ id: "c-loose", type: "mandatory", roleId: "r-3" }],
-    });
-    expect(verbalizer.constraints.verbalizeAll(other, model).map((v) => v.sourceElementId))
-      .toEqual(["c-loose"]);
+  it("yields nothing for a fact type the model does not have", () => {
+    expect(new Verbalizer().constraints.verbalizeAll("ft-missing", rooms("ft-nr"))).toEqual([]);
   });
 });
