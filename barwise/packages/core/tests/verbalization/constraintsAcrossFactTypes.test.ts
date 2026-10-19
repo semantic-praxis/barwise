@@ -125,43 +125,24 @@ describe("verbalizeFactType", () => {
 });
 
 describe("ConstraintVerbalizer.verbalizeAll", () => {
-  it("still says a fact type's own constraints when the model does not hold it", () => {
+  it("answers from the model that holds the fact type, by id", () => {
+    const verbalizer = new Verbalizer();
     const model = rooms("ft-nr");
+    // A twin from another model: same ids, its own (empty-of-key) lists.
+    // The view is Facilities' ft-nr, key included, not the twin's.
+    const twin = rooms("none").getFactType("ft-nr")!;
+    expect(verbalizer.constraints.verbalizeAll(twin, model).map((v) => v.sourceElementId))
+      .toEqual(["c-one-nr", "c-room-key"]);
+    // A fact type Facilities does not have touches nothing in it.
     const loose = new OrmModel({ name: "Loose" });
-    loose.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
-    loose.addObjectType({ id: "ot-nr", name: "RoomNumber", kind: "value" });
-    const ft = loose.addFactType({
+    loose.addObjectType({ id: "ot-x", name: "X", kind: "value" });
+    const other = loose.addFactType({
       id: "ft-loose",
-      name: "Room has RoomNumber",
-      roles: [
-        { id: "rl-3", name: "has", playerId: "ot-room" },
-        { id: "rl-4", name: "is of", playerId: "ot-nr" },
-      ],
-      readings: ["{0} has {1}"],
-      constraints: [
-        { id: "c-loose", type: "internal_uniqueness", roleIds: ["rl-3"] },
-        // A constraint across fact types nested here, as a 2.0 file might.
-        { id: "c-loose-excl", type: "exclusion", roleIds: ["rl-3", "rl-4"] },
-      ],
+      name: "X exists",
+      roles: [{ id: "r-3", name: "exists", playerId: "ot-x" }],
+      readings: ["{0} exists"],
+      constraints: [{ id: "c-loose", type: "mandatory", roleId: "r-3" }],
     });
-    // ft belongs to "Loose", not to "Facilities".
-    const rows = new Verbalizer().constraints.verbalizeAll(ft, model);
-    expect(rows.map((v) => v.sourceElementId)).toEqual(["c-loose", "c-loose-excl"]);
-  });
-
-  it("does not attach the other model's constraints through a colliding role id", () => {
-    const model = rooms("ft-nr");
-    const twin = rooms("none");
-    // Same ids as Facilities' ft-nr (r-3, r-4), a different instance: the
-    // key c-room-key names r-4 in Facilities, and must not be matched here.
-    const ft = twin.getFactType("ft-nr")!;
-    expect(model.constraintsTouching(ft).map((c) => c.id)).toEqual(["c-one-nr"]);
-  });
-
-  it("lists a twin's nested constraint once, not again from the model", () => {
-    const model = rooms("ft-nr");
-    const twin = rooms("ft-nr");
-    const ft = twin.getFactType("ft-nr")!;
-    expect(model.constraintsTouching(ft).map((c) => c.id)).toEqual(["c-one-nr", "c-room-key"]);
+    expect(verbalizer.constraints.verbalizeAll(other, model)).toEqual([]);
   });
 });

@@ -192,17 +192,14 @@ export class OrmModel {
    * it touches; a whole-model reader wants each fact type's
    * `internalConstraints` plus `constraints` once instead.
    *
-   * Takes the fact type itself as well as its id. A fact type instance this
-   * model does not hold (a draft, a diff side) gets exactly its own list:
-   * this model's constraints are not matched against it, because its role
-   * ids belong to another model's id space and a collision would attach
-   * constraints it has nothing to do with. Every per-fact-type view --
-   * verbalization, counterexamples -- asks here, so they cannot disagree.
+   * Every per-fact-type view -- verbalization, counterexamples -- asks
+   * here by id, so they cannot disagree. The answer is about this model's
+   * fact type: a fact type it does not have touches nothing here, and a
+   * view of another model's fact type asks that model.
    */
-  constraintsTouching(factType: FactType | string): readonly Constraint[] {
-    const ft = typeof factType === "string" ? this._factTypes.get(factType) : factType;
+  constraintsTouching(factTypeId: string): readonly Constraint[] {
+    const ft = this._factTypes.get(factTypeId);
     if (!ft) return [];
-    if (this._factTypes.get(ft.id) !== ft) return [...ft.constraints];
     return [
       ...ft.internalConstraints,
       ...this.constraints.filter((c) => roleIdsOf(c).some((rid) => ft.hasRole(rid))),

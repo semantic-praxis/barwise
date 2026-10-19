@@ -92,7 +92,8 @@ export function formatCounterexamples(
  * cardinality row names its object type with `factTypeIds: []`; other rows
  * carry no `factTypeIds`. The heading over the constraints across fact types is a
  * `section` row whose `sourceElementId` names the section, not a model
- * element; a consumer counting statements skips `section` rows. The one projection every JSON form of
+ * element; a consumer counting statements skips `section` rows (and, until
+ * barwise-rsy, the Open questions heading, an `open_question` row). The one projection every JSON form of
  * `barwise verbalize` uses, so the forms cannot disagree on a field.
  */
 export function verbalizationRow(v: Verbalization): {

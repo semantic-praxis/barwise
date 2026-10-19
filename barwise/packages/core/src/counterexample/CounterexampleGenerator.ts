@@ -69,7 +69,7 @@ export function counterexamplesTouching(
   factType: FactType,
   counterexamples: readonly Counterexample[],
 ): Counterexample[] {
-  const touching = new Set(model.constraintsTouching(factType).map((c) => c.id));
+  const touching = new Set(model.constraintsTouching(factType.id).map((c) => c.id));
   return counterexamples.filter((ce) =>
     ce.constraintId ? touching.has(ce.constraintId) : ce.factTypeId === factType.id
   );

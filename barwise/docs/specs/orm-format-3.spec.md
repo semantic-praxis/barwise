@@ -205,7 +205,7 @@ type ExternalConstraint = Exclude<Constraint, InternalConstraint>;
 // FactType.internalConstraints: readonly InternalConstraint[]
 // (FactType.constraints is removed, so every reader must be revisited)
 // OrmModel.constraints: readonly ExternalConstraint[]
-// OrmModel.constraintsTouching(factType | factTypeId): readonly Constraint[]
+// OrmModel.constraintsTouching(factTypeId): readonly Constraint[]
 // OrmModel.getConstraint(id): Constraint | undefined  (either kind)
 ```
 
@@ -805,16 +805,16 @@ Implementation notes (2026-10-19):
   - `isStatement` (core verbalization) tells a reading from the section
     heading: the VS Code count, the diagram tab's numbered list, MCP's
     summary and the gym's `requires_verbalization` use it.
-  - `constraintsTouching` takes a fact type as well as an id, and is the one
-    per-fact-type view: `verbalizeAll` and `counterexamplesTouching` both
-    ask it, and it answers a fact type instance the model does not hold
-    from that fact type's own list alone. It does not also match the
-    model's constraints against it: the instance's role ids are another
-    model's id space, and a collision attached unrelated constraints (and,
-    for a twin of a held fact type, listed a nested one twice). The
-    external rows of such an instance verbalize against a model that does
-    not hold their roles, so their text is degraded; no surface asks this,
-    and 3c removes the nested list it reads.
+  - `constraintsTouching` is the one per-fact-type view: `verbalizeAll`
+    and `counterexamplesTouching` both ask it by the fact type's id, so
+    they cannot disagree. Before this cut `verbalizeAll` read the fact
+    type's own nested list, so it also answered a fact type the model did
+    not hold. That case was carried for two review rounds and dropped: no
+    surface asks it, and each way of answering it was wrong somewhere (role
+    ids from another model's id space attached unrelated constraints, a
+    twin listed a nested one twice, the nested list alone left out
+    constraints nested elsewhere). A view of a fact type now asks the model
+    that holds it.
   - `resolveCommonPlayer` takes the first role that resolves anywhere, not
     the first in the host. For an exclusion or disjunctive mandatory whose
     roles have different players -- malformed, since those kinds constrain

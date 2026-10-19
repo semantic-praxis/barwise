@@ -135,13 +135,15 @@ export class ConstraintVerbalizer {
    * constraints, then each constraint across fact types that names one of
    * its roles (`OrmModel.constraintsTouching`). This is the view of one
    * fact type; a whole-model verbalization says each constraint across fact
-   * types once, in its own section (`Verbalizer.verbalizeModel`).
+   * types once, in its own section (`Verbalizer.verbalizeModel`). The
+   * constraints are `model`'s for that fact type's id, so `model` must be
+   * the one that holds it.
    */
   verbalizeAll(
     factType: FactType,
     model: OrmModel,
   ): Verbalization[] {
-    return model.constraintsTouching(factType).map((c) => this.verbalize(c, factType, model));
+    return model.constraintsTouching(factType.id).map((c) => this.verbalize(c, factType, model));
   }
 
   /**
