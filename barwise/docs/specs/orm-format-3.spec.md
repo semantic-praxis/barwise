@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization part of 3a-ii implemented 2026-10-19; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -831,6 +831,61 @@ Implementation notes (2026-10-19):
     file order (host, then position). A constraint's own sentence and row
     no longer depend on its host; their order in the list still follows
     the file, as every list does.
+- **Validation diagnostics (3a-ii-b, 2026-10-19).**
+  - Every rule that read an external constraint through a fact type's list
+    now reads `model.constraints`: `constraintConsistency` (split into an
+    internal pass per fact type and one external pass), the join structural
+    and population rules, the four spanning set-comparison rules, the four
+    local set-comparison rules, and the external uniqueness and disjunctive
+    mandatory population rules. A diagnostic about one is located by
+    `constraintElementId` (its id; a missing id throws, since loading and
+    construction both fill one) and names its span with `constraintSpan`:
+    `Subset constraint over fact types "A" and "B" ...`. Seventeen message
+    templates changed from `in fact type "<host>"` to `over <span>`.
+  - "Local" means every role in one fact type, whichever it is
+    (`localFactType`), not every role in the host. Three behaviours change
+    with it. An external uniqueness whose roles all sit in a fact type
+    other than its host now draws `external-uniqueness-all-local`; before,
+    the host-relative check missed it. A local exclusion, exclusive-or,
+    subset or equality nested elsewhere is checked against its own fact
+    type's population by the local rule, where the spanning rule used to
+    catch it under a different message. And both completeness gates read
+    `constraintsTouching`: a fact type touched only by a constraint nested
+    in another one no longer draws `fact-type-without-constraints`, and,
+    being constrained, a binary one now draws
+    `fact-type-without-uniqueness` if it has no internal uniqueness;
+    the host of a constraint that touches none of its roles is no longer
+    counted as constrained by it.
+  - The local rules ask `localFactTypeOf(model, c) === ft` rather than
+    "every role is in this fact type", which an empty role list passes for
+    every population. An external uniqueness with no roles keeps its
+    all-local warning, now with its own message.
+  - **Open, put to the owner 2026-10-19:** which population check an
+    exclusion or exclusive-or whose roles all sit in one fact type gets.
+    The local rule checks each fact instance alone; the spanning rule
+    checks every object across the population, which is what the
+    constraint means. The local reading misses an object that plays both
+    excluded roles in different instances, and flags every instance of an
+    exclusive-or over a fact type with two or more roles. Before this cut
+    the host decided; now the roles do, and they send these constraints to
+    the local rule. Recommended: the spanning rule for both kinds (subset
+    and equality give the same answer either way). No tracked model has
+    such a constraint: all 27 set-comparison constraints in the 113
+    tracked files span fact types.
+  - An id-less 2.0 file places these diagnostics at line 0 where they
+    used to sit on the host's line: the trade Open decision 9 accepted,
+    until the next save writes the ids.
+  - `referenceDiagnostics` takes the model, so the two join messages it
+    renders (`joinUnknownRoot`, `joinBadStep`) name the span too. Its other
+    constraint branch -- a dangling role on a non-join kind, reported
+    against the host with the internal kinds' templates -- moves with the
+    graph references in 3a-ii-c.
+  - `externalUniquenessViolationsFor` and `disjunctiveMandatoryViolationsFor`
+    no longer take a fact type. `evaluateConstraintEnforcement` keeps its
+    signature; its fact type now only matters for the internal kinds.
+  - The editor needed no change: its source map indexes every mapping with
+    an `id`, so a constraint's diagnostic lands on the constraint's own
+    line. A 2.0 file that omits the id still falls to line 0.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

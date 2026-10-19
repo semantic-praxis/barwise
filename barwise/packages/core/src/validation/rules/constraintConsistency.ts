@@ -1,19 +1,24 @@
+import type { ExternalConstraint } from "../../model/Constraint.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import { assertNever } from "../../util/assertNever.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, reportAs, RULE_ID } from "../ruleId.js";
+import { constraintElementId, constraintSpan, localFactTypeOf } from "../span.js";
 
 /**
  * Constraint consistency rules.
  *
  * These verify that constraints reference valid roles and are
- * logically coherent.
+ * logically coherent. An internal constraint is checked against the fact
+ * type it lives in and reported there; a constraint across fact types is
+ * checked once, located by its own id and named by the fact types it
+ * spans (orm-format-3, Open decision 9).
  */
 export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
-    for (const constraint of ft.constraints) {
+    for (const constraint of ft.internalConstraints) {
       switch (constraint.type) {
         case "internal_uniqueness": {
           for (const roleId of constraint.roleIds) {
@@ -64,71 +69,6 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
                 ft.id,
                 ft.name,
                 constraint.roleId,
-              ),
-            );
-          }
-          break;
-        }
-
-        case "external_uniqueness": {
-          const allLocal = constraint.roleIds.every((rid) => ft.hasRole(rid));
-          if (allLocal) {
-            diagnostics.push(report(RULE_ID.externalUniquenessAllLocal, "default", ft.id, ft.name));
-          }
-          break;
-        }
-
-        // -- Phase 2 constraints --
-
-        case "disjunctive_mandatory": {
-          if (constraint.roleIds.length < 2) {
-            diagnostics.push(
-              report(RULE_ID.disjunctiveMandatoryTooFewRoles, "default", ft.id, ft.name),
-            );
-          }
-          break;
-        }
-
-        case "exclusion": {
-          if (constraint.roleIds.length < 2) {
-            diagnostics.push(report(RULE_ID.exclusionTooFewRoles, "default", ft.id, ft.name));
-          }
-          break;
-        }
-
-        case "exclusive_or": {
-          if (constraint.roleIds.length < 2) {
-            diagnostics.push(report(RULE_ID.exclusiveOrTooFewRoles, "default", ft.id, ft.name));
-          }
-          break;
-        }
-
-        case "subset": {
-          if (constraint.subsetRoleIds.length !== constraint.supersetRoleIds.length) {
-            diagnostics.push(
-              report(
-                RULE_ID.subsetArityMismatch,
-                "default",
-                ft.id,
-                ft.name,
-                constraint.subsetRoleIds.length,
-                constraint.supersetRoleIds.length,
-              ),
-            );
-          }
-          break;
-        }
-
-        case "equality": {
-          if (constraint.roleIds1.length !== constraint.roleIds2.length) {
-            diagnostics.push(
-              report(
-                RULE_ID.equalityArityMismatch,
-                "default",
-                ft.id,
-                ft.name,
-                constraint.roleIds1.length,
-                constraint.roleIds2.length,
               ),
             );
           }
@@ -237,20 +177,90 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
           break;
         }
 
-        // Join constraints (join_subset, join_equality, join_exclusion)
-        // carry their roles inside path-projected operands rather than a
-        // flat role id attached to this fact type; their consistency is
-        // validated separately in joinConstraintRules.ts.
-        case "join_subset":
-        case "join_equality":
-        case "join_exclusion":
-          break;
-
         default:
           assertNever(constraint);
       }
     }
   }
 
+  for (const constraint of model.constraints) {
+    diagnostics.push(...externalConsistency(model, constraint));
+  }
+
   return diagnostics;
+}
+
+function externalConsistency(model: OrmModel, constraint: ExternalConstraint): Diagnostic[] {
+  const id = constraintElementId(constraint);
+  const span = constraintSpan(model, constraint);
+  switch (constraint.type) {
+    case "external_uniqueness": {
+      // All local means all in ONE fact type, whichever it is -- not all in
+      // the fact type a 2.0 file happened to nest it under.
+      // An empty one is reported too, as it always was (by vacuous truth):
+      // nothing else reports an external uniqueness with no roles, and the
+      // schema's minItems guards only a loaded file.
+      if (constraint.roleIds.length === 0) {
+        return [report(RULE_ID.externalUniquenessAllLocal, "noRoles", id)];
+      }
+      return localFactTypeOf(model, constraint)
+        ? [report(RULE_ID.externalUniquenessAllLocal, "default", id, span)]
+        : [];
+    }
+
+    case "disjunctive_mandatory":
+      return constraint.roleIds.length < 2
+        ? [report(RULE_ID.disjunctiveMandatoryTooFewRoles, "default", id, span)]
+        : [];
+
+    case "exclusion":
+      return constraint.roleIds.length < 2
+        ? [report(RULE_ID.exclusionTooFewRoles, "default", id, span)]
+        : [];
+
+    case "exclusive_or":
+      return constraint.roleIds.length < 2
+        ? [report(RULE_ID.exclusiveOrTooFewRoles, "default", id, span)]
+        : [];
+
+    case "subset":
+      return constraint.subsetRoleIds.length !== constraint.supersetRoleIds.length
+        ? [
+          report(
+            RULE_ID.subsetArityMismatch,
+            "default",
+            id,
+            span,
+            constraint.subsetRoleIds.length,
+            constraint.supersetRoleIds.length,
+          ),
+        ]
+        : [];
+
+    case "equality":
+      return constraint.roleIds1.length !== constraint.roleIds2.length
+        ? [
+          report(
+            RULE_ID.equalityArityMismatch,
+            "default",
+            id,
+            span,
+            constraint.roleIds1.length,
+            constraint.roleIds2.length,
+          ),
+        ]
+        : [];
+
+    // Join constraints (join_subset, join_equality, join_exclusion)
+    // carry their roles inside path-projected operands rather than a
+    // flat list of roles; their consistency is validated separately in
+    // joinConstraintRules.ts.
+    case "join_subset":
+    case "join_equality":
+    case "join_exclusion":
+      return [];
+
+    default:
+      return assertNever(constraint);
+  }
 }

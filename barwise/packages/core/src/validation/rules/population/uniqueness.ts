@@ -1,11 +1,11 @@
 import { inferExternalUniquenessJoin } from "../../../externalUniqueness.js";
 import type { Constraint, InternalUniquenessConstraint } from "../../../model/Constraint.js";
 import { isExternalUniqueness, isInternalUniqueness } from "../../../model/Constraint.js";
-import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Population } from "../../../model/Population.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
+import { constraintElementId } from "../../span.js";
 import { makeCompositeKey, severityForModality } from "./shared.js";
 
 /**
@@ -93,10 +93,8 @@ export function uniquenessViolationsFor(
  */
 export function checkExternalUniquenessViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      diagnostics.push(...externalUniquenessViolationsIn(model, ft, c));
-    }
+  for (const c of model.constraints) {
+    diagnostics.push(...externalUniquenessViolationsIn(model, c));
   }
   return diagnostics;
 }
@@ -106,7 +104,6 @@ export function checkExternalUniquenessViolations(model: OrmModel): Diagnostic[]
  * (barwise-904). Shared by the sweep and the per-constraint entry. */
 function externalUniquenessViolationsIn(
   model: OrmModel,
-  ft: FactType,
   c: Constraint,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -160,7 +157,7 @@ function externalUniquenessViolationsIn(
           severityForModality(c),
           RULE_ID.externalUniquenessViolation,
           "default",
-          c.id ?? ft.id,
+          constraintElementId(c),
           common,
           first,
           parts.join(", "),
@@ -174,10 +171,6 @@ function externalUniquenessViolationsIn(
 }
 
 /** Does this one external uniqueness constraint reject the model's population? */
-export function externalUniquenessViolationsFor(
-  model: OrmModel,
-  ft: FactType,
-  c: Constraint,
-): Diagnostic[] {
-  return externalUniquenessViolationsIn(model, ft, c);
+export function externalUniquenessViolationsFor(model: OrmModel, c: Constraint): Diagnostic[] {
+  return externalUniquenessViolationsIn(model, c);
 }

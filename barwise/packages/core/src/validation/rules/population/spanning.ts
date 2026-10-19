@@ -2,6 +2,7 @@ import { isEquality, isExclusion, isExclusiveOr, isSubset } from "../../../model
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
+import { constraintElementId, localFactTypeOf } from "../../span.js";
 import {
   type ObjectUniverse,
   rolePlayerMap,
@@ -17,31 +18,29 @@ import {
  */
 export function checkSpanningExclusionViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (!isExclusion(c)) continue;
-      if (c.roleIds.every((rid) => ft.hasRole(rid))) continue; // local
+  for (const c of model.constraints) {
+    if (!isExclusion(c)) continue;
+    if (localFactTypeOf(model, c)) continue; // checked by the local rule
 
-      const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
-      const all = new Set<string>();
-      for (const set of valuesByRole) {
-        for (const value of set) all.add(value);
-      }
-      for (const value of all) {
-        const count = valuesByRole.filter((set) => set.has(value)).length;
-        if (count > 1) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.exclusionViolation,
-              "local",
-              c.id ?? ft.id,
-              c.roleIds.join(", "),
-              value,
-              count,
-            ),
-          );
-        }
+    const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
+    const all = new Set<string>();
+    for (const set of valuesByRole) {
+      for (const value of set) all.add(value);
+    }
+    for (const value of all) {
+      const count = valuesByRole.filter((set) => set.has(value)).length;
+      if (count > 1) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.exclusionViolation,
+            "local",
+            constraintElementId(c),
+            c.roleIds.join(", "),
+            value,
+            count,
+          ),
+        );
       }
     }
   }
@@ -60,34 +59,32 @@ export function checkSpanningExclusiveOrViolations(
   if (universe.size === 0) return diagnostics;
   const rolePlayer = rolePlayerMap(model);
 
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (!isExclusiveOr(c)) continue;
-      if (c.roleIds.every((rid) => ft.hasRole(rid))) continue; // local
+  for (const c of model.constraints) {
+    if (!isExclusiveOr(c)) continue;
+    if (localFactTypeOf(model, c)) continue; // checked by the local rule
 
-      const playerId = c.roleIds
-        .map((rid) => rolePlayer.get(rid))
-        .find((p) => p !== undefined);
-      if (playerId === undefined) continue;
-      const required = universe.get(playerId);
-      if (!required || required.size === 0) continue;
+    const playerId = c.roleIds
+      .map((rid) => rolePlayer.get(rid))
+      .find((p) => p !== undefined);
+    if (playerId === undefined) continue;
+    const required = universe.get(playerId);
+    if (!required || required.size === 0) continue;
 
-      const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
-      for (const value of required) {
-        const count = valuesByRole.filter((set) => set.has(value)).length;
-        if (count !== 1) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.exclusiveOrViolation,
-              "localMultiple",
-              c.id ?? ft.id,
-              c.roleIds.join(", "),
-              value,
-              count,
-            ),
-          );
-        }
+    const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
+    for (const value of required) {
+      const count = valuesByRole.filter((set) => set.has(value)).length;
+      if (count !== 1) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.exclusiveOrViolation,
+            "localMultiple",
+            constraintElementId(c),
+            c.roleIds.join(", "),
+            value,
+            count,
+          ),
+        );
       }
     }
   }
@@ -100,29 +97,25 @@ export function checkSpanningExclusiveOrViolations(
  */
 export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (!isSubset(c)) continue;
-      const allLocal = c.subsetRoleIds.every((rid) => ft.hasRole(rid))
-        && c.supersetRoleIds.every((rid) => ft.hasRole(rid));
-      if (allLocal) continue;
+  for (const c of model.constraints) {
+    if (!isSubset(c)) continue;
+    if (localFactTypeOf(model, c)) continue; // checked by the local rule
 
-      const subsetTuples = tuplesForRoleSeq(model, c.subsetRoleIds);
-      const supersetTuples = tuplesForRoleSeq(model, c.supersetRoleIds);
-      for (const tuple of subsetTuples) {
-        if (!supersetTuples.has(tuple)) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.subsetViolation,
-              "local",
-              c.id ?? ft.id,
-              tuple,
-              c.subsetRoleIds.join(", "),
-              c.supersetRoleIds.join(", "),
-            ),
-          );
-        }
+    const subsetTuples = tuplesForRoleSeq(model, c.subsetRoleIds);
+    const supersetTuples = tuplesForRoleSeq(model, c.supersetRoleIds);
+    for (const tuple of subsetTuples) {
+      if (!supersetTuples.has(tuple)) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.subsetViolation,
+            "local",
+            constraintElementId(c),
+            tuple,
+            c.subsetRoleIds.join(", "),
+            c.supersetRoleIds.join(", "),
+          ),
+        );
       }
     }
   }
@@ -135,44 +128,40 @@ export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
  */
 export function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (!isEquality(c)) continue;
-      const allLocal = c.roleIds1.every((rid) => ft.hasRole(rid))
-        && c.roleIds2.every((rid) => ft.hasRole(rid));
-      if (allLocal) continue;
+  for (const c of model.constraints) {
+    if (!isEquality(c)) continue;
+    if (localFactTypeOf(model, c)) continue; // checked by the local rule
 
-      const tuples1 = tuplesForRoleSeq(model, c.roleIds1);
-      const tuples2 = tuplesForRoleSeq(model, c.roleIds2);
-      for (const tuple of tuples1) {
-        if (!tuples2.has(tuple)) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.equalityViolation,
-              "local",
-              c.id ?? ft.id,
-              tuple,
-              c.roleIds1.join(", "),
-              c.roleIds2.join(", "),
-            ),
-          );
-        }
+    const tuples1 = tuplesForRoleSeq(model, c.roleIds1);
+    const tuples2 = tuplesForRoleSeq(model, c.roleIds2);
+    for (const tuple of tuples1) {
+      if (!tuples2.has(tuple)) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.equalityViolation,
+            "local",
+            constraintElementId(c),
+            tuple,
+            c.roleIds1.join(", "),
+            c.roleIds2.join(", "),
+          ),
+        );
       }
-      for (const tuple of tuples2) {
-        if (!tuples1.has(tuple)) {
-          diagnostics.push(
-            reportAs(
-              severityForModality(c),
-              RULE_ID.equalityViolation,
-              "localReverse",
-              c.id ?? ft.id,
-              tuple,
-              c.roleIds2.join(", "),
-              c.roleIds1.join(", "),
-            ),
-          );
-        }
+    }
+    for (const tuple of tuples2) {
+      if (!tuples1.has(tuple)) {
+        diagnostics.push(
+          reportAs(
+            severityForModality(c),
+            RULE_ID.equalityViolation,
+            "localReverse",
+            constraintElementId(c),
+            tuple,
+            c.roleIds2.join(", "),
+            c.roleIds1.join(", "),
+          ),
+        );
       }
     }
   }

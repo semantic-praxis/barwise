@@ -2,6 +2,7 @@ import { isEquality, isExclusion, isExclusiveOr, isSubset } from "../../../model
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
+import { localFactTypeOf } from "../../span.js";
 import { makeCompositeKey, severityForModality } from "./shared.js";
 
 /**
@@ -14,15 +15,16 @@ import { makeCompositeKey, severityForModality } from "./shared.js";
 export function checkExclusionViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
+  const exclusionConstraints = model.constraints.filter(isExclusion);
   for (const pop of model.populations) {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const exclusionConstraints = ft.constraints.filter(isExclusion);
     for (const ec of exclusionConstraints) {
-      // Skip cross-fact-type constraints (roles not in this fact type).
-      const localRoleIds = ec.roleIds.filter((rid) => ft.hasRole(rid));
-      if (localRoleIds.length !== ec.roleIds.length) continue;
+      // Only a constraint whose roles all sit in this fact type; the
+      // spanning rule takes the rest (`localFactTypeOf`).
+      if (localFactTypeOf(model, ec) !== ft) continue;
+      const localRoleIds = ec.roleIds;
 
       for (const inst of pop.instances) {
         const valuesInRoles = new Map<string, string[]>(); // value -> role ids
@@ -71,14 +73,14 @@ export function checkExclusionViolations(model: OrmModel): Diagnostic[] {
 export function checkExclusiveOrViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
+  const xorConstraints = model.constraints.filter(isExclusiveOr);
   for (const pop of model.populations) {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const xorConstraints = ft.constraints.filter(isExclusiveOr);
     for (const xor of xorConstraints) {
-      const localRoleIds = xor.roleIds.filter((rid) => ft.hasRole(rid));
-      if (localRoleIds.length !== xor.roleIds.length) continue;
+      if (localFactTypeOf(model, xor) !== ft) continue;
+      const localRoleIds = xor.roleIds;
 
       for (const inst of pop.instances) {
         const playedRoles: string[] = [];
@@ -130,15 +132,13 @@ export function checkExclusiveOrViolations(model: OrmModel): Diagnostic[] {
 export function checkSubsetViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
+  const subsetConstraints = model.constraints.filter(isSubset);
   for (const pop of model.populations) {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const subsetConstraints = ft.constraints.filter(isSubset);
     for (const sc of subsetConstraints) {
-      const allLocal = sc.subsetRoleIds.every((rid) => ft.hasRole(rid))
-        && sc.supersetRoleIds.every((rid) => ft.hasRole(rid));
-      if (!allLocal) continue;
+      if (localFactTypeOf(model, sc) !== ft) continue;
 
       // Collect superset tuples.
       const supersetTuples = new Set<string>();
@@ -180,15 +180,13 @@ export function checkSubsetViolations(model: OrmModel): Diagnostic[] {
 export function checkEqualityViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
+  const equalityConstraints = model.constraints.filter(isEquality);
   for (const pop of model.populations) {
     const ft = model.getFactType(pop.factTypeId);
     if (!ft) continue;
 
-    const equalityConstraints = ft.constraints.filter(isEquality);
     for (const eq of equalityConstraints) {
-      const allLocal = eq.roleIds1.every((rid) => ft.hasRole(rid))
-        && eq.roleIds2.every((rid) => ft.hasRole(rid));
-      if (!allLocal) continue;
+      if (localFactTypeOf(model, eq) !== ft) continue;
 
       // Collect both tuple sets.
       const tuples1 = new Set<string>();

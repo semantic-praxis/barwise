@@ -4,9 +4,11 @@ import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
+import { constraintElementId } from "../../span.js";
 import {
   buildObjectUniverse,
   type ObjectUniverse,
+  rolePlayerMap,
   severityForModality,
   valuesPlayedInRole,
 } from "./shared.js";
@@ -88,19 +90,9 @@ export function checkDisjunctiveMandatoryViolations(
   const diagnostics: Diagnostic[] = [];
   if (universe.size === 0) return diagnostics;
 
-  const rolePlayer = new Map<string, string>();
-  for (const ft of model.factTypes) {
-    for (const role of ft.roles) {
-      rolePlayer.set(role.id, role.playerId);
-    }
-  }
-
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      diagnostics.push(
-        ...disjunctiveMandatoryViolationsIn(model, ft, c, universe, rolePlayer),
-      );
-    }
+  const rolePlayer = rolePlayerMap(model);
+  for (const c of model.constraints) {
+    diagnostics.push(...disjunctiveMandatoryViolationsIn(model, c, universe, rolePlayer));
   }
   return diagnostics;
 }
@@ -109,7 +101,6 @@ export function checkDisjunctiveMandatoryViolations(
  * needs. Shared by the sweep and the per-constraint entry (barwise-904). */
 function disjunctiveMandatoryViolationsIn(
   model: OrmModel,
-  ft: FactType,
   c: Constraint,
   universe: ObjectUniverse,
   rolePlayer: Map<string, string>,
@@ -137,7 +128,7 @@ function disjunctiveMandatoryViolationsIn(
           severityForModality(c),
           RULE_ID.disjunctiveMandatoryViolation,
           "default",
-          c.id ?? ft.id,
+          constraintElementId(c),
           c.roleIds.join(", "),
           value,
         ),
@@ -149,19 +140,11 @@ function disjunctiveMandatoryViolationsIn(
 
 /**
  * Does this one disjunctive mandatory constraint reject the model's
- * population? Its roles may span fact types, so `ft` is where the
- * constraint is declared, not the whole of what it covers.
+ * population? Its roles may span fact types, so it is answered from the
+ * model, not from a fact type.
  */
-export function disjunctiveMandatoryViolationsFor(
-  model: OrmModel,
-  ft: FactType,
-  c: Constraint,
-): Diagnostic[] {
+export function disjunctiveMandatoryViolationsFor(model: OrmModel, c: Constraint): Diagnostic[] {
   const universe = buildObjectUniverse(model);
   if (universe.size === 0) return [];
-  const rolePlayer = new Map<string, string>();
-  for (const f of model.factTypes) {
-    for (const role of f.roles) rolePlayer.set(role.id, role.playerId);
-  }
-  return disjunctiveMandatoryViolationsIn(model, ft, c, universe, rolePlayer);
+  return disjunctiveMandatoryViolationsIn(model, c, universe, rolePlayerMap(model));
 }

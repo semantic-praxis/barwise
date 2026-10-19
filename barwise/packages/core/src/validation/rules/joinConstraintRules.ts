@@ -1,15 +1,20 @@
 import {
-  type Constraint,
   isJoinEquality,
   isJoinExclusion,
   isJoinSubset,
   type JoinOperand,
 } from "../../model/Constraint.js";
-import type { FactType } from "../../model/FactType.js";
 import type { ModelGraph } from "../../model/graph.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
+import { constraintElementId, constraintSpan } from "../span.js";
+
+/** Where a join constraint's diagnostics point, and how they name it. */
+interface At {
+  readonly id: string;
+  readonly span: string;
+}
 
 /**
  * Structural well-formedness for join constraints (role-path operands).
@@ -31,24 +36,24 @@ import { report, RULE_ID } from "../ruleId.js";
 export function joinConstraintRules(model: OrmModel, graph: ModelGraph): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (isJoinSubset(c)) {
-        checkOperands([c.subset, c.superset], c, ft, graph, diagnostics);
-      } else if (isJoinEquality(c) || isJoinExclusion(c)) {
-        if (c.operands.length < 2) {
-          diagnostics.push(
-            report(
-              RULE_ID.joinTooFewOperands,
-              "default",
-              c.id ?? ft.id,
-              c.type === "join_equality" ? "equality" : "exclusion",
-              ft.name,
-            ),
-          );
-        }
-        checkOperands(c.operands, c, ft, graph, diagnostics);
+  for (const c of model.constraints) {
+    if (!isJoinSubset(c) && !isJoinEquality(c) && !isJoinExclusion(c)) continue;
+    const at = { id: constraintElementId(c), span: constraintSpan(model, c) };
+    if (isJoinSubset(c)) {
+      checkOperands([c.subset, c.superset], at, graph, diagnostics);
+    } else {
+      if (c.operands.length < 2) {
+        diagnostics.push(
+          report(
+            RULE_ID.joinTooFewOperands,
+            "default",
+            at.id,
+            c.type === "join_equality" ? "equality" : "exclusion",
+            at.span,
+          ),
+        );
       }
+      checkOperands(c.operands, at, graph, diagnostics);
     }
   }
 
@@ -61,25 +66,24 @@ export function joinConstraintRules(model: OrmModel, graph: ModelGraph): Diagnos
  */
 function checkOperands(
   operands: readonly JoinOperand[],
-  c: Constraint,
-  ft: FactType,
+  at: At,
   graph: ModelGraph,
   diagnostics: Diagnostic[],
 ): void {
-  const columnTypes = operands.map((o) => checkOperand(o, c, ft, graph, diagnostics));
+  const columnTypes = operands.map((o) => checkOperand(o, at, graph, diagnostics));
   const valid = columnTypes.filter((t): t is readonly string[] => t !== undefined);
   if (valid.length !== operands.length) return; // a malformed operand was already flagged
 
   const arity = valid[0]!.length;
   if (valid.some((t) => t.length !== arity)) {
-    diagnostics.push(report(RULE_ID.joinArityMismatch, "default", c.id ?? ft.id, ft.name));
+    diagnostics.push(report(RULE_ID.joinArityMismatch, "default", at.id, at.span));
     return;
   }
   for (let col = 0; col < arity; col++) {
     const types = new Set(valid.map((t) => t[col]));
     if (types.size > 1) {
       diagnostics.push(
-        report(RULE_ID.joinColumnTypeMismatch, "default", c.id ?? ft.id, ft.name, col + 1),
+        report(RULE_ID.joinColumnTypeMismatch, "default", at.id, at.span, col + 1),
       );
     }
   }
@@ -92,12 +96,11 @@ function checkOperands(
  */
 function checkOperand(
   operand: JoinOperand,
-  c: Constraint,
-  ft: FactType,
+  at: At,
   graph: ModelGraph,
   diagnostics: Diagnostic[],
 ): readonly string[] | undefined {
-  const nodeTypes = pathNodeTypes(operand, c, ft, graph, diagnostics);
+  const nodeTypes = pathNodeTypes(operand, at, graph, diagnostics);
   if (!nodeTypes) return undefined;
 
   const columns: string[] = [];
@@ -107,8 +110,8 @@ function checkOperand(
         report(
           RULE_ID.joinBadProjection,
           "default",
-          c.id ?? ft.id,
-          ft.name,
+          at.id,
+          at.span,
           idx,
           nodeTypes.length - 1,
         ),
@@ -118,7 +121,7 @@ function checkOperand(
     columns.push(nodeTypes[idx]!);
   }
   if (columns.length === 0) {
-    diagnostics.push(report(RULE_ID.joinEmptyProjection, "default", c.id ?? ft.id, ft.name));
+    diagnostics.push(report(RULE_ID.joinEmptyProjection, "default", at.id, at.span));
     return undefined;
   }
   return columns;
@@ -136,8 +139,7 @@ function checkOperand(
  */
 function pathNodeTypes(
   operand: JoinOperand,
-  c: Constraint,
-  ft: FactType,
+  at: At,
   graph: ModelGraph,
   diagnostics: Diagnostic[],
 ): string[] | undefined {
@@ -150,13 +152,13 @@ function pathNodeTypes(
     const exitRole = stepFt.getRoleById(step.exit);
     if (!entryRole || !exitRole) {
       diagnostics.push(
-        report(RULE_ID.joinBadStep, "default", c.id ?? ft.id, ft.name, step.entry, step.exit),
+        report(RULE_ID.joinBadStep, "default", at.id, at.span, step.entry, step.exit),
       );
       return undefined;
     }
     if (entryRole.playerId !== currentTypeId) {
       diagnostics.push(
-        report(RULE_ID.joinDiscontiguous, "default", c.id ?? ft.id, ft.name, step.entry),
+        report(RULE_ID.joinDiscontiguous, "default", at.id, at.span, step.entry),
       );
       return undefined;
     }

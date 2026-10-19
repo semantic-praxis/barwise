@@ -8,6 +8,7 @@ import type { FactType } from "../../../model/FactType.js";
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
+import { constraintElementId, constraintSpan } from "../../span.js";
 import { type ObjectUniverse, severityForModality } from "./shared.js";
 
 /**
@@ -25,48 +26,48 @@ import { type ObjectUniverse, severityForModality } from "./shared.js";
 export function checkJoinPathViolations(model: OrmModel, universe: ObjectUniverse): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      const elementId = c.id ?? ft.id;
-      const severity = severityForModality(c);
+  for (const c of model.constraints) {
+    if (!isJoinSubset(c) && !isJoinEquality(c) && !isJoinExclusion(c)) continue;
+    const elementId = constraintElementId(c);
+    const span = constraintSpan(model, c);
+    const severity = severityForModality(c);
 
-      if (isJoinSubset(c)) {
-        const sub = projectedTuples(model, universe, c.subset);
-        const sup = projectedTuples(model, universe, c.superset);
-        const missing = [...sub].find((t) => !sup.has(t));
-        if (missing !== undefined) {
-          diagnostics.push(
-            reportAs(severity, RULE_ID.joinSubsetViolation, "default", elementId, ft.name, missing),
-          );
-        }
-      } else if (isJoinEquality(c)) {
-        const sets = c.operands.map((o) => projectedTuples(model, universe, o));
-        const all = new Set<string>(sets.flatMap((s) => [...s]));
-        const bad = [...all].find((t) => sets.some((s) => !s.has(t)));
-        if (bad !== undefined) {
-          diagnostics.push(
-            reportAs(severity, RULE_ID.joinEqualityViolation, "default", elementId, ft.name, bad),
-          );
-        }
-      } else if (isJoinExclusion(c)) {
-        const sets = c.operands.map((o) => projectedTuples(model, universe, o));
-        const counts = new Map<string, number>();
-        for (const s of sets) {
-          for (const t of s) counts.set(t, (counts.get(t) ?? 0) + 1);
-        }
-        const shared = [...counts].find(([, n]) => n > 1)?.[0];
-        if (shared !== undefined) {
-          diagnostics.push(
-            reportAs(
-              severity,
-              RULE_ID.joinExclusionViolation,
-              "default",
-              elementId,
-              ft.name,
-              shared,
-            ),
-          );
-        }
+    if (isJoinSubset(c)) {
+      const sub = projectedTuples(model, universe, c.subset);
+      const sup = projectedTuples(model, universe, c.superset);
+      const missing = [...sub].find((t) => !sup.has(t));
+      if (missing !== undefined) {
+        diagnostics.push(
+          reportAs(severity, RULE_ID.joinSubsetViolation, "default", elementId, span, missing),
+        );
+      }
+    } else if (isJoinEquality(c)) {
+      const sets = c.operands.map((o) => projectedTuples(model, universe, o));
+      const all = new Set<string>(sets.flatMap((s) => [...s]));
+      const bad = [...all].find((t) => sets.some((s) => !s.has(t)));
+      if (bad !== undefined) {
+        diagnostics.push(
+          reportAs(severity, RULE_ID.joinEqualityViolation, "default", elementId, span, bad),
+        );
+      }
+    } else if (isJoinExclusion(c)) {
+      const sets = c.operands.map((o) => projectedTuples(model, universe, o));
+      const counts = new Map<string, number>();
+      for (const s of sets) {
+        for (const t of s) counts.set(t, (counts.get(t) ?? 0) + 1);
+      }
+      const shared = [...counts].find(([, n]) => n > 1)?.[0];
+      if (shared !== undefined) {
+        diagnostics.push(
+          reportAs(
+            severity,
+            RULE_ID.joinExclusionViolation,
+            "default",
+            elementId,
+            span,
+            shared,
+          ),
+        );
       }
     }
   }

@@ -123,6 +123,53 @@ describe("DiagnosticsProvider", () => {
     expect(constraintError.range.start.line).toBe(30);
   });
 
+  it("positions a constraint across fact types at its own line, not its host's", () => {
+    // orm-format-3, Open decision 9: the diagnostic is located by the
+    // constraint's id, so the editor points at the constraint wherever the
+    // file nests it.
+    const yaml = [
+      `orm_version: "1.0"`,
+      `model:`,
+      `  name: "Spans"`,
+      `  object_types:`,
+      `    - id: "ot-person"`,
+      `      name: "Person"`,
+      `      kind: "entity"`,
+      `      reference_mode: "id"`,
+      `    - id: "ot-name"`,
+      `      name: "Name"`,
+      `      kind: "value"`,
+      `  fact_types:`,
+      `    - id: "ft-has-name"`,
+      `      name: "Person has Name"`,
+      `      roles:`,
+      `        - id: "r-person-name"`,
+      `          player: "ot-person"`,
+      `          role_name: "has"`,
+      `        - id: "r-name"`,
+      `          player: "ot-name"`,
+      `          role_name: "is of"`,
+      `      readings:`,
+      `        - "{0} has {1}"`,
+      `      constraints:`,
+      `        - type: "internal_uniqueness"`,
+      `          roles: ["r-person-name"]`,
+      `        - id: "c-subset"`, // line 26 (0-indexed)
+      `          type: "subset"`,
+      `          subset_roles: ["r-person-name"]`,
+      `          superset_roles: ["r-person-name", "r-name"]`,
+      ``,
+    ].join("\n");
+    provider.validate(makeDocument(yaml));
+
+    const call = connection.sendDiagnostics.mock.calls[0]![0]!;
+    const subset = call.diagnostics.find((d: { source: string; }) =>
+      d.source === "barwise (constraint/subset-arity-mismatch)"
+    );
+    expect(subset).toBeDefined();
+    expect(subset.range.start.line).toBe(26);
+  });
+
   it("falls back to line 0 for parse errors", () => {
     const doc = makeDocument("{{{{not valid yaml");
     provider.validate(doc);
