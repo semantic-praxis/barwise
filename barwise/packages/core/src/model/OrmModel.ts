@@ -176,8 +176,10 @@ export class OrmModel {
    * may span fact types (orm-format-3, placement by kind). Until storage
    * moves (WS3c) they are read from the fact types a 2.0 file nests them
    * under, in fact type order and then list order -- the order a reader
-   * walking every fact type's list met them in, so a reader that switches
-   * to this list reports in the same order.
+   * walking every fact type's list met them in, so such a reader that
+   * switches to this list reports in the same order. (A reader that skipped
+   * some fact types, as the diagram skips absorbed ones, now sees the
+   * constraints nested under them too.)
    */
   get constraints(): readonly ExternalConstraint[] {
     return this.factTypes.flatMap((ft) => ft.constraints.filter(isExternalConstraint));

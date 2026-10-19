@@ -105,10 +105,7 @@ export class FactType extends ModelElement {
     }
 
     this._readings = config.readings.map((template) => ({ template }));
-    // Assign IDs to constraints that don't have them (for traceability).
-    this._constraints = (config.constraints ?? []).map((c) =>
-      c.id ? c : { ...c, id: generateId() }
-    );
+    this._constraints = (config.constraints ?? []).map(withId);
     this._definition = config.definition;
     this._note = config.note;
     this._derivation = config.derivation;
@@ -184,13 +181,22 @@ export class FactType extends ModelElement {
    * until the model was saved and reloaded.
    */
   addConstraint(constraint: Constraint): void {
-    this._constraints.push(constraint.id ? constraint : { ...constraint, id: generateId() });
+    this._constraints.push(withId(constraint));
   }
 
   /** Get all role ids that reference a given object type (by player id). */
   rolesForPlayer(playerId: string): readonly Role[] {
     return this._roles.filter((r) => r.playerId === playerId);
   }
+}
+
+/**
+ * A constraint with an id: its own, or a fresh one from the installed
+ * generator. The one rule both ways into a fact type follow, so the
+ * constructor and `addConstraint` cannot drift apart again (barwise-nkq).
+ */
+function withId(c: Constraint): Constraint {
+  return c.id ? c : { ...c, id: generateId() };
 }
 
 /**

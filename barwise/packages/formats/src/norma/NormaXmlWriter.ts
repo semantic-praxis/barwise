@@ -239,8 +239,8 @@ function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
       for (const role of ft.roles) {
         if (constrainedRoleIds.has(role.id)) continue;
         const player = model.getObjectType(role.playerId);
-        if (player && player.kind === "entity" && c.id) {
-          result.set(player.id, toNormaId(c.id));
+        if (player && player.kind === "entity") {
+          result.set(player.id, toNormaId(constraintId(c, ft)));
         }
       }
     }
@@ -301,6 +301,9 @@ function writeFactType(
 
   const internalRefs: NormaId[] = [];
   for (const c of ft.constraints) {
+    // Carried on the role (writeRole), never written here, so it needs no
+    // NORMA id of its own.
+    if (c.type === "cardinality") continue;
     const ownId = toNormaId(constraintId(c, ft));
     if (c.type === "exclusive_or") {
       // NORMA has no single xor element: the native encoding is an

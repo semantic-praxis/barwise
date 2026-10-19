@@ -228,10 +228,10 @@ describe("graphOf: a built graph is total", () => {
     expect(resolved.commonPlayer).toBeDefined();
   });
 
-  // A constraint's id is OPTIONAL and `addConstraint` does not mint one
-  // (only FactType's constructor does), so an index keyed by `c.id`
-  // reports "no roles" for a constraint that references real ones, on a
-  // graph that built successfully. Found by reviewing this workstream
+  // A constraint's id is OPTIONAL in the type (every path into a model now
+  // fills one, barwise-nkq), so an index keyed by `c.id` could report "no
+  // roles" for a constraint that references real ones, on a graph that
+  // built successfully. Found by reviewing this workstream
   // before it opened; it is the silent-[] shape of barwise-928.
   it("resolves roles for a constraint added in code", () => {
     const model = simpleModel();
