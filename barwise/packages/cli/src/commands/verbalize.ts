@@ -15,6 +15,7 @@ import {
   formatCounterexamples,
   formatVerbalizations,
   formatVerbalizationsJson,
+  verbalizationRow,
 } from "../workspace/format.js";
 
 interface VerbalizeOptions {
@@ -127,11 +128,7 @@ function jsonPayload(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOpt
     return JSON.parse(formatVerbalizationsJson(verbalizations)) as object;
   }
   return {
-    verbalizations: verbalizations.map((v) => ({
-      category: v.category,
-      text: v.text,
-      sourceElementId: v.sourceElementId,
-    })),
+    verbalizations: verbalizations.map(verbalizationRow),
     counterexamples: counterexamples.map((c) => ({
       factTypeId: c.factTypeId,
       constraintType: c.constraintType,
@@ -148,11 +145,7 @@ function singleJson(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOpti
   }
   return JSON.stringify(
     {
-      verbalizations: verbalizations.map((v) => ({
-        category: v.category,
-        text: v.text,
-        sourceElementId: v.sourceElementId,
-      })),
+      verbalizations: verbalizations.map(verbalizationRow),
       counterexamples: counterexamples.map((c) => ({
         factTypeId: c.factTypeId,
         constraintType: c.constraintType,

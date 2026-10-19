@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i implemented 2026-10-19; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization part of 3a-ii implemented 2026-10-19; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -776,6 +776,29 @@ Implementation notes (2026-10-19):
 - **Downstream internal-only readers stay for 3b**, as planned, even where
   the change is one word: dbt's `sqlPatterns.ts`, llm's `ModelContext.ts`,
   and NORMA's writer and population graph.
+- **3a-ii lands one output family at a time**, each with every consumer
+  that reads it: verbalization first, then validation diagnostics, then
+  query, describe, counterexamples, lineage and graph references.
+  Grounding 3a-ii found four families, each with its own consumers in
+  cli, mcp and vscode, which is the same width problem as 3a.
+- **Verbalization (3a-ii-a, 2026-10-19).**
+  - `ConstraintVerbalizer.verbalize` ignores the fact type it is handed
+    for a constraint across fact types and calls the new
+    `verbalizeExternal(c, model)`. The external verbalizers take no host:
+    `resolveCommonPlayer` resolves roles model-wide.
+  - A subset or equality names each role's fact type unless all its
+    resolved roles share one. Across fact types, both sides are now
+    qualified: "If Appointment in Appointment has FollowUpNote then
+    Appointment in Appointment has AppointmentStatus", where the host
+    reading was "If Appointment then Appointment in ...". The DDL
+    export's comment for an inexpressible constraint changes with it.
+  - The new `section` category is the heading row, following the "Open
+    questions" precedent. It comes after object cardinality and before
+    subtypes. `formatVerbalizations` indents the rows under it, and the
+    VS Code verbalize command prints it as a heading.
+  - `verbalizeAll` and `verbalizeFactType` read `constraintsTouching`.
+    The CLI's three JSON projections share one `verbalizationRow`, so
+    `factTypeIds` cannot reach one form and miss another.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

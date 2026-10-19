@@ -51,6 +51,11 @@ export function formatVerbalizations(verbalizations: readonly Verbalization[]): 
     if (v.category === "fact_type") {
       currentFactType = v.text;
       lines.push(v.text);
+    } else if (v.category === "section") {
+      // A heading over the rows that follow -- the constraints across
+      // fact types -- which indent under it as under a fact type.
+      currentFactType = v.text;
+      lines.push(v.text);
     } else if (v.category === "constraint" && currentFactType) {
       lines.push(`  ${v.text}`);
     } else if (v.category === "subtype") {
@@ -81,16 +86,29 @@ export function formatCounterexamples(
 }
 
 /**
+ * One verbalization as the JSON output writes it. A constraint row's
+ * `sourceElementId` is the constraint's id and `factTypeIds` the fact
+ * types it applies to (orm-format-3, Open decision 9); other rows carry
+ * no `factTypeIds`. The one projection every JSON form of
+ * `barwise verbalize` uses, so the forms cannot disagree on a field.
+ */
+export function verbalizationRow(v: Verbalization): {
+  category: Verbalization["category"];
+  text: string;
+  sourceElementId: string;
+  factTypeIds?: readonly string[];
+} {
+  return {
+    category: v.category,
+    text: v.text,
+    sourceElementId: v.sourceElementId,
+    ...(v.factTypeIds ? { factTypeIds: v.factTypeIds } : {}),
+  };
+}
+
+/**
  * Format verbalizations as JSON.
  */
 export function formatVerbalizationsJson(verbalizations: readonly Verbalization[]): string {
-  return JSON.stringify(
-    verbalizations.map((v) => ({
-      category: v.category,
-      text: v.text,
-      sourceElementId: v.sourceElementId,
-    })),
-    null,
-    2,
-  );
+  return JSON.stringify(verbalizations.map(verbalizationRow), null, 2);
 }

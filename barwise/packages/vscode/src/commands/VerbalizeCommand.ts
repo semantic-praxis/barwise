@@ -46,6 +46,14 @@ export class VerbalizeCommand {
 
       let lastCategory = "";
       for (const v of verbalizations) {
+        if (v.category === "section") {
+          // The heading over the constraints across fact types, which
+          // follow it as constraints.
+          channel.appendLine("");
+          channel.appendLine(`${v.text}:`);
+          lastCategory = "constraint";
+          continue;
+        }
         if (v.category !== lastCategory) {
           if (lastCategory) channel.appendLine("");
           channel.appendLine(

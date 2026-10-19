@@ -43,10 +43,11 @@ export class Verbalizer {
     for (const ft of model.factTypes) {
       // Fact type readings.
       results.push(...this.factTypeVerbalizer.verbalizeAll(ft, model));
-      // Constraint verbalizations.
-      results.push(
-        ...this.constraintVerbalizer.verbalizeAll(ft, model),
-      );
+      // The constraints that live in the fact type. Those across fact
+      // types follow in their own section, each said once.
+      for (const c of ft.internalConstraints) {
+        results.push(this.constraintVerbalizer.verbalize(c, ft, model));
+      }
       // Derivation rule, when the fact type is derived.
       if (ft.derivation) {
         results.push(this.verbalizeDerivation(ft));
@@ -59,6 +60,19 @@ export class Verbalizer {
         results.push(
           verbalizeObjectCardinality(ot.id, ot.name, ot.cardinality.min, ot.cardinality.max),
         );
+      }
+    }
+
+    // Constraints across fact types, once each (orm-format-3, Open
+    // decision 7), under a heading row.
+    if (model.constraints.length > 0) {
+      results.push(
+        buildVerbalization("constraints-across-fact-types", "section", [
+          textSeg("Constraints across fact types"),
+        ]),
+      );
+      for (const c of model.constraints) {
+        results.push(this.constraintVerbalizer.verbalizeExternal(c, model));
       }
     }
 

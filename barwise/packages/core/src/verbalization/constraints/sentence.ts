@@ -39,11 +39,13 @@ export function localRole(factType: FactType, roleId: string): Role {
 
 export function resolveCommonPlayer(
   roleIds: readonly string[],
-  factType: FactType,
   model: OrmModel,
 ): { name: string; id: string; } {
+  // Model-wide: the roles of a constraint across fact types belong to
+  // several fact types, and none of them is the constraint's own
+  // (orm-format-3, placement by kind).
   for (const rid of roleIds) {
-    const role = factType.getRoleById(rid);
+    const role = model.findRole(rid);
     if (role) {
       const ot = model.getObjectType(role.playerId);
       if (ot) return { name: ot.name, id: ot.id };
