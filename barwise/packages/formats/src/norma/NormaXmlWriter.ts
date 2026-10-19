@@ -300,23 +300,16 @@ function writeFactType(
   }));
 
   const internalRefs: NormaId[] = [];
-  ft.constraints.forEach((c, i) => {
-    // A model loaded from a file or imported from NORMA gives every
-    // constraint an id (orm-format-3.spec.md, WS2). One added in code
-    // through FactType.addConstraint may have none -- every constraint the
-    // LLM transcript importer builds, until the model is saved -- and gets
-    // an id from the fact type id and its position. That id moves when a
-    // constraint is inserted before it and is not checked against stated
-    // ids (a repeat is dropped by `seen` below): barwise-nkq.
-    const fallbackId = derivedNormaId(toNormaId(ft.id), `_c${i}`);
+  for (const c of ft.constraints) {
+    const ownId = toNormaId(constraintId(c, ft));
     if (c.type === "exclusive_or") {
       // NORMA has no single xor element: the native encoding is an
       // exclusion + disjunctive mandatory pair joined by mutual coupler
       // refs. Both halves are multi-fact, so neither is internal.
-      const exclusionId = c.id ? toNormaId(c.id) : fallbackId;
+      const exclusionId = ownId;
       const mandatoryId = derivedNormaId(exclusionId, "_xormand");
       // Either half's id already written makes this a repeat, dropped whole.
-      if (seen.has(exclusionId) || seen.has(mandatoryId)) return;
+      if (seen.has(exclusionId) || seen.has(mandatoryId)) continue;
       seen.add(exclusionId);
       seen.add(mandatoryId);
       const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
@@ -338,21 +331,21 @@ function writeFactType(
         roleRefs: c.roleIds.map(toNormaId),
         exclusiveOrExclusionRef: exclusionId,
       });
-      return;
+      continue;
     }
-    const written = writeConstraint(c, fallbackId);
-    if (!written) return;
+    const written = writeConstraint(c, ownId);
+    if (!written) continue;
     // A repeated id is dropped whole: its constraint is not written, so no
     // InternalConstraints entry may name it a second time either.
-    if (seen.has(written.id)) return;
+    if (seen.has(written.id)) continue;
     seen.add(written.id);
     constraints.push(written);
     // Internal (single-fact) constraints are referenced from the fact's
     // InternalConstraints; multi-fact constraints are top-level only.
-    if (isInternalConstraint(c)) {
+    if (listedInInternalConstraints(c)) {
       internalRefs.push(written.id);
     }
-  });
+  }
 
   return {
     norma: {
@@ -398,13 +391,16 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
 }
 
 /**
- * A constraint is "internal" (lives in a fact's InternalConstraints and is
- * derived from a single fact type) when it is internal uniqueness, simple
- * mandatory, single-role frequency, a role-level value constraint, or a ring.
- * External uniqueness and the set-comparison/partition constraints span fact
- * types and are emitted only at the top level.
+ * Whether NORMA lists a constraint in its fact's InternalConstraints:
+ * internal uniqueness, simple mandatory, single-role frequency, a
+ * role-level value constraint, or a ring. External uniqueness and the
+ * set-comparison/partition constraints span fact types and are emitted only
+ * at the top level. This is NORMA's list, not barwise's placement rule
+ * (core's `isInternalConstraint`): NORMA writes a value comparison at the
+ * top level although barwise keeps it in its fact type, and carries
+ * cardinality on the role.
  */
-function isInternalConstraint(c: Constraint): boolean {
+function listedInInternalConstraints(c: Constraint): boolean {
   switch (c.type) {
     case "internal_uniqueness":
     case "mandatory":
@@ -421,8 +417,22 @@ function isInternalConstraint(c: Constraint): boolean {
 // Constraints
 // ---------------------------------------------------------------------------
 
-function writeConstraint(c: Constraint, fallbackId: NormaId): NormaConstraint | undefined {
-  const id = c.id ? toNormaId(c.id) : fallbackId;
+/**
+ * A constraint's id, which every path into a model now supplies: a file's
+ * load states or derives it (orm-format-3 WS2), and the fact type
+ * constructor and `addConstraint` fill one from the generator
+ * (barwise-nkq). The type keeps it optional, so the writer says so rather
+ * than inventing the positional `<ft>_c<i>` id it once fell back to,
+ * which moved when a constraint was inserted before it.
+ */
+function constraintId(c: Constraint, ft: FactType): string {
+  if (!c.id) {
+    throw new Error(`A ${c.type} constraint on fact type "${ft.name}" has no id.`);
+  }
+  return c.id;
+}
+
+function writeConstraint(c: Constraint, id: NormaId): NormaConstraint | undefined {
   const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
   switch (c.type) {
     case "internal_uniqueness":
