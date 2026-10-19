@@ -192,8 +192,9 @@ export class OrmModel {
    * it touches; a whole-model reader wants each fact type's
    * `internalConstraints` plus `constraints` once instead.
    *
-   * Every per-fact-type view -- verbalization, counterexamples -- asks
-   * here by id, so they cannot disagree. The answer is about this model's
+   * Verbalization and counterexamples ask here by id, so their views of
+   * one fact type cannot disagree (describe still reads the nested list
+   * until WS3a-ii-c moves it). The answer is about this model's
    * fact type: a fact type it does not have touches nothing here, and a
    * view of another model's fact type asks that model.
    */

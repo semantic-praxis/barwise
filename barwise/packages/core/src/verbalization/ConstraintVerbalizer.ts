@@ -135,15 +135,22 @@ export class ConstraintVerbalizer {
    * constraints, then each constraint across fact types that names one of
    * its roles (`OrmModel.constraintsTouching`). This is the view of one
    * fact type; a whole-model verbalization says each constraint across fact
-   * types once, in its own section (`Verbalizer.verbalizeModel`). The
-   * constraints are `model`'s for that fact type's id, so `model` must be
-   * the one that holds it.
+   * types once, in its own section (`Verbalizer.verbalizeModel`).
+   *
+   * The view is `model`'s: when `model` holds a fact type with this id,
+   * both the list and the text come from that one, so a same-id copy from
+   * another model (a diff side) cannot mix two models in one row. A fact
+   * type `model` does not have says its internal constraints, which are
+   * its own wherever it sits; the constraints across fact types belong to
+   * a model, and this one has none touching it.
    */
   verbalizeAll(
     factType: FactType,
     model: OrmModel,
   ): Verbalization[] {
-    return model.constraintsTouching(factType.id).map((c) => this.verbalize(c, factType, model));
+    const held = model.getFactType(factType.id);
+    if (!held) return factType.internalConstraints.map((c) => this.verbalize(c, factType, model));
+    return model.constraintsTouching(held.id).map((c) => this.verbalize(c, held, model));
   }
 
   /**

@@ -141,7 +141,7 @@ function verbalizeText(
     let text = verbalizations.map((v) => v.text).join("\n");
     if (counterexamples) {
       text += renderCounterexamples(
-        counterexamplesTouching(model, ft, generateCounterexamples(model)),
+        counterexamplesTouching(model, ft.id, generateCounterexamples(model)),
       );
     }
     return text;

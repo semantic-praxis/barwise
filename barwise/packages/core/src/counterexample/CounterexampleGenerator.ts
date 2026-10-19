@@ -66,12 +66,12 @@ export function generateCounterexamples(model: OrmModel): Counterexample[] {
  */
 export function counterexamplesTouching(
   model: OrmModel,
-  factType: FactType,
+  factTypeId: string,
   counterexamples: readonly Counterexample[],
 ): Counterexample[] {
-  const touching = new Set(model.constraintsTouching(factType.id).map((c) => c.id));
+  const touching = new Set(model.constraintsTouching(factTypeId).map((c) => c.id));
   return counterexamples.filter((ce) =>
-    ce.constraintId ? touching.has(ce.constraintId) : ce.factTypeId === factType.id
+    ce.constraintId ? touching.has(ce.constraintId) : ce.factTypeId === factTypeId
   );
 }
 
