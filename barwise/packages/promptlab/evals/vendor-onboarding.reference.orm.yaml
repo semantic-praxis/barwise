@@ -164,11 +164,14 @@ model:
           roles:
             - 00000000-0000-7015-99a0-a7aeb5bcc3ca
           is_preferred: true
+          id: 00000000-0000-7041-adf4-fb020910171e
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7016-b8bf-c6cdd4dbe2e9
+          id: 00000000-0000-7042-8c13-1a21282f363d
         - type: mandatory
           role: 00000000-0000-7015-99a0-a7aeb5bcc3ca
+          id: 00000000-0000-7043-ab32-3940474e555c
     - id: 00000000-0000-7017-97de-e5ecf3fa0108
       name: Vendor has LegalName
       roles:
@@ -185,8 +188,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7018-b6fd-040b12192027
+          id: 00000000-0000-7044-8a51-585f666d747b
         - type: mandatory
           role: 00000000-0000-7018-b6fd-040b12192027
+          id: 00000000-0000-7045-a970-777e858c939a
     - id: 00000000-0000-701a-b43b-424950575e65
       name: Vendor has TaxID
       roles:
@@ -203,8 +208,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701b-935a-61686f767d84
+          id: 00000000-0000-7046-888f-969da4abb2b9
         - type: mandatory
           role: 00000000-0000-701b-935a-61686f767d84
+          id: 00000000-0000-7047-a7ae-b5bcc3cad1d8
     - id: 00000000-0000-701d-9198-9fa6adb4bbc2
       name: Vendor has VendorStatus
       roles:
@@ -221,8 +228,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701e-b0b7-bec5ccd3dae1
+          id: 00000000-0000-7048-86cd-d4dbe2e9f0f7
         - type: mandatory
           role: 00000000-0000-701e-b0b7-bec5ccd3dae1
+          id: 00000000-0000-7049-a5ec-f3fa01080f16
     - id: 00000000-0000-7020-aef5-fc030a11181f
       name: Vendor has SpendTier
       roles:
@@ -239,8 +248,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7021-8d14-1b222930373e
+          id: 00000000-0000-704a-840b-121920272e35
         - type: mandatory
           role: 00000000-0000-7021-8d14-1b222930373e
+          id: 00000000-0000-704b-a32a-31383f464d54
     - id: 00000000-0000-7023-8b52-5960676e757c
       name: Vendor has RiskTier
       roles:
@@ -257,6 +268,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7024-aa71-787f868d949b
+          id: 00000000-0000-704c-8249-50575e656c73
     - id: 00000000-0000-7026-a8af-b6bdc4cbd2d9
       name: Region has RegionCode
       roles:
@@ -274,11 +286,14 @@ model:
           roles:
             - 00000000-0000-7027-87ce-d5dce3eaf1f8
           is_preferred: true
+          id: 00000000-0000-704d-a168-6f767d848b92
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7028-a6ed-f4fb02091017
+          id: 00000000-0000-704e-8087-8e959ca3aab1
         - type: mandatory
           role: 00000000-0000-7027-87ce-d5dce3eaf1f8
+          id: 00000000-0000-704f-9fa6-adb4bbc2c9d0
     - id: 00000000-0000-7029-850c-131a21282f36
       name: Vendor operates in Region with Contact
       roles:
@@ -304,6 +319,7 @@ model:
           roles:
             - 00000000-0000-702a-a42b-323940474e55
             - 00000000-0000-702b-834a-51585f666d74
+          id: 00000000-0000-7050-bec5-ccd3dae1e8ef
     - id: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
       name: RiskReview has ReviewID
       roles:
@@ -321,11 +337,14 @@ model:
           roles:
             - 00000000-0000-7030-9ee5-ecf3fa01080f
           is_preferred: true
+          id: 00000000-0000-7051-9de4-ebf2f900070e
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7031-bd04-0b121920272e
+          id: 00000000-0000-7052-bc03-0a11181f262d
         - type: mandatory
           role: 00000000-0000-7030-9ee5-ecf3fa01080f
+          id: 00000000-0000-7053-9b22-2930373e454c
     - id: 00000000-0000-7032-9c23-2a31383f464d
       name: RiskReview is for Vendor
       roles:
@@ -342,6 +361,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7033-bb42-4950575e656c
+          id: 00000000-0000-7054-ba41-484f565d646b
     - id: 00000000-0000-7035-b980-878e959ca3aa
       name: PurchaseOrder has PONumber
       roles:
@@ -359,11 +379,14 @@ model:
           roles:
             - 00000000-0000-7036-989f-a6adb4bbc2c9
           is_preferred: true
+          id: 00000000-0000-7055-9960-676e757c838a
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7037-b7be-c5ccd3dae1e8
+          id: 00000000-0000-7056-b87f-868d949ba2a9
         - type: mandatory
           role: 00000000-0000-7036-989f-a6adb4bbc2c9
+          id: 00000000-0000-7057-979e-a5acb3bac1c8
     - id: 00000000-0000-7038-96dd-e4ebf2f90007
       name: PurchaseOrder is raised against Vendor
       roles:
@@ -380,13 +403,16 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7039-b5fc-030a11181f26
+          id: 00000000-0000-7058-b6bd-c4cbd2d9e0e7
         - type: mandatory
           role: 00000000-0000-7039-b5fc-030a11181f26
+          id: 00000000-0000-7059-95dc-e3eaf1f8ff06
         - type: subset
           subset_roles:
             - 00000000-0000-703a-941b-222930373e45
           superset_roles:
             - 00000000-0000-701e-b0b7-bec5ccd3dae1
+          id: 00000000-0000-705e-b077-7e858c939aa1
     - id: 00000000-0000-703b-b33a-41484f565d64
       name: PurchaseOrder has Amount
       roles:
@@ -403,8 +429,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-703c-9259-60676e757c83
+          id: 00000000-0000-705a-b4fb-020910171e25
         - type: mandatory
           role: 00000000-0000-703c-9259-60676e757c83
+          id: 00000000-0000-705b-931a-21282f363d44
     - id: 00000000-0000-703e-9097-9ea5acb3bac1
       name: PurchaseOrder has RaisedDate
       roles:
@@ -421,5 +449,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-703f-afb6-bdc4cbd2d9e0
+          id: 00000000-0000-705c-b239-40474e555c63
         - type: mandatory
           role: 00000000-0000-703f-afb6-bdc4cbd2d9e0
+          id: 00000000-0000-705d-9158-5f666d747b82

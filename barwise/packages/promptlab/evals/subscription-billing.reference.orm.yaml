@@ -148,11 +148,14 @@ model:
           roles:
             - 00000000-0000-7014-ba81-888f969da4ab
           is_preferred: true
+          id: 00000000-0000-7049-a5ec-f3fa01080f16
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7015-99a0-a7aeb5bcc3ca
+          id: 00000000-0000-704a-840b-121920272e35
         - type: mandatory
           role: 00000000-0000-7014-ba81-888f969da4ab
+          id: 00000000-0000-704b-a32a-31383f464d54
     - id: 00000000-0000-7016-b8bf-c6cdd4dbe2e9
       name: Subscription has SubscriptionID
       roles:
@@ -170,11 +173,14 @@ model:
           roles:
             - 00000000-0000-7017-97de-e5ecf3fa0108
           is_preferred: true
+          id: 00000000-0000-704c-8249-50575e656c73
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7018-b6fd-040b12192027
+          id: 00000000-0000-704d-a168-6f767d848b92
         - type: mandatory
           role: 00000000-0000-7017-97de-e5ecf3fa0108
+          id: 00000000-0000-704e-8087-8e959ca3aab1
     - id: 00000000-0000-7019-951c-232a31383f46
       name: Product has ProductCode
       roles:
@@ -192,11 +198,14 @@ model:
           roles:
             - 00000000-0000-701a-b43b-424950575e65
           is_preferred: true
+          id: 00000000-0000-704f-9fa6-adb4bbc2c9d0
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701b-935a-61686f767d84
+          id: 00000000-0000-7050-bec5-ccd3dae1e8ef
         - type: mandatory
           role: 00000000-0000-701a-b43b-424950575e65
+          id: 00000000-0000-7051-9de4-ebf2f900070e
     - id: 00000000-0000-701c-b279-80878e959ca3
       name: PricePlan has PlanCode
       roles:
@@ -214,11 +223,14 @@ model:
           roles:
             - 00000000-0000-701d-9198-9fa6adb4bbc2
           is_preferred: true
+          id: 00000000-0000-7052-bc03-0a11181f262d
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701e-b0b7-bec5ccd3dae1
+          id: 00000000-0000-7053-9b22-2930373e454c
         - type: mandatory
           role: 00000000-0000-701d-9198-9fa6adb4bbc2
+          id: 00000000-0000-7054-ba41-484f565d646b
     - id: 00000000-0000-701f-8fd6-dde4ebf2f900
       name: FeatureBundle has BundleName
       roles:
@@ -236,11 +248,14 @@ model:
           roles:
             - 00000000-0000-7020-aef5-fc030a11181f
           is_preferred: true
+          id: 00000000-0000-7055-9960-676e757c838a
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7021-8d14-1b222930373e
+          id: 00000000-0000-7056-b87f-868d949ba2a9
         - type: mandatory
           role: 00000000-0000-7020-aef5-fc030a11181f
+          id: 00000000-0000-7057-979e-a5acb3bac1c8
     - id: 00000000-0000-7022-ac33-3a41484f565d
       name: PlanChange has ChangeID
       roles:
@@ -258,11 +273,14 @@ model:
           roles:
             - 00000000-0000-7023-8b52-5960676e757c
           is_preferred: true
+          id: 00000000-0000-7058-b6bd-c4cbd2d9e0e7
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7024-aa71-787f868d949b
+          id: 00000000-0000-7059-95dc-e3eaf1f8ff06
         - type: mandatory
           role: 00000000-0000-7023-8b52-5960676e757c
+          id: 00000000-0000-705a-b4fb-020910171e25
     - id: 00000000-0000-7025-8990-979ea5acb3ba
       name: Subscription belongs to Account
       roles:
@@ -278,9 +296,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-7026-a8af-b6bdc4cbd2d9
+          id: 00000000-0000-705b-931a-21282f363d44
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7026-a8af-b6bdc4cbd2d9
+          id: 00000000-0000-705c-b239-40474e555c63
     - id: 00000000-0000-7028-a6ed-f4fb02091017
       name: Subscription is for Product
       roles:
@@ -296,9 +316,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-7029-850c-131a21282f36
+          id: 00000000-0000-705d-9158-5f666d747b82
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7029-850c-131a21282f36
+          id: 00000000-0000-705e-b077-7e858c939aa1
     - id: 00000000-0000-702b-834a-51585f666d74
       name: Subscription uses PricePlan
       roles:
@@ -314,9 +336,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-702c-a269-70777e858c93
+          id: 00000000-0000-705f-8f96-9da4abb2b9c0
         - type: internal_uniqueness
           roles:
             - 00000000-0000-702c-a269-70777e858c93
+          id: 00000000-0000-7060-aeb5-bcc3cad1d8df
     - id: 00000000-0000-702e-a0a7-aeb5bcc3cad1
       name: Subscription has StartDate
       roles:
@@ -332,9 +356,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
+          id: 00000000-0000-7061-8dd4-dbe2e9f0f7fe
         - type: internal_uniqueness
           roles:
             - 00000000-0000-702f-bfc6-cdd4dbe2e9f0
+          id: 00000000-0000-7062-acf3-fa01080f161d
     - id: 00000000-0000-7031-bd04-0b121920272e
       name: Subscription has EndDate
       roles:
@@ -351,6 +377,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7032-9c23-2a31383f464d
+          id: 00000000-0000-7063-8b12-1920272e353c
     - id: 00000000-0000-7034-9a61-686f767d848b
       name: Subscription has BillingPeriod
       roles:
@@ -366,9 +393,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-7035-b980-878e959ca3aa
+          id: 00000000-0000-7064-aa31-383f464d545b
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7035-b980-878e959ca3aa
+          id: 00000000-0000-7065-8950-575e656c737a
     - id: 00000000-0000-7037-b7be-c5ccd3dae1e8
       name: Subscription has SubscriptionStatus
       roles:
@@ -384,9 +413,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-7038-96dd-e4ebf2f90007
+          id: 00000000-0000-7066-a86f-767d848b9299
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7038-96dd-e4ebf2f90007
+          id: 00000000-0000-7067-878e-959ca3aab1b8
     - id: 00000000-0000-703a-941b-222930373e45
       name: PricePlan entitles FeatureBundle
       roles:
@@ -402,9 +433,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-703b-b33a-41484f565d64
+          id: 00000000-0000-7068-a6ad-b4bbc2c9d0d7
         - type: internal_uniqueness
           roles:
             - 00000000-0000-703b-b33a-41484f565d64
+          id: 00000000-0000-7069-85cc-d3dae1e8eff6
     - id: 00000000-0000-703d-b178-7f868d949ba2
       name: PlanChange is for Subscription
       roles:
@@ -420,9 +453,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-703e-9097-9ea5acb3bac1
+          id: 00000000-0000-706a-a4eb-f2f900070e15
         - type: internal_uniqueness
           roles:
             - 00000000-0000-703e-9097-9ea5acb3bac1
+          id: 00000000-0000-706b-830a-11181f262d34
     - id: 00000000-0000-7040-8ed5-dce3eaf1f8ff
       name: PlanChange specifies PricePlan
       roles:
@@ -438,9 +473,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-7041-adf4-fb020910171e
+          id: 00000000-0000-706c-a229-30373e454c53
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7041-adf4-fb020910171e
+          id: 00000000-0000-706d-8148-4f565d646b72
     - id: 00000000-0000-7043-ab32-3940474e555c
       name: PlanChange has EffectiveDate
       roles:
@@ -456,9 +493,11 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-7044-8a51-585f666d747b
+          id: 00000000-0000-706e-a067-6e757c838a91
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7044-8a51-585f666d747b
+          id: 00000000-0000-706f-bf86-8d949ba2a9b0
     - id: 00000000-0000-7046-888f-969da4abb2b9
       name: PlanChange has Requester
       roles:
@@ -474,6 +513,8 @@ model:
       constraints:
         - type: mandatory
           role: 00000000-0000-7047-a7ae-b5bcc3cad1d8
+          id: 00000000-0000-7070-9ea5-acb3bac1c8cf
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7047-a7ae-b5bcc3cad1d8
+          id: 00000000-0000-7071-bdc4-cbd2d9e0e7ee

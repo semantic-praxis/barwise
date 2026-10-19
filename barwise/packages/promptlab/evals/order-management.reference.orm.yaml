@@ -57,8 +57,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7009-a52c-333a41484f56
+          id: 00000000-0000-7015-99a0-a7aeb5bcc3ca
         - type: mandatory
           role: 00000000-0000-7009-a52c-333a41484f56
+          id: 00000000-0000-7016-b8bf-c6cdd4dbe2e9
     - id: 00000000-0000-700a-844b-525960676e75
       name: Order contains Product with Quantity
       roles:
@@ -78,6 +80,7 @@ model:
           roles:
             - 00000000-0000-700b-a36a-71787f868d94
             - 00000000-0000-700c-8289-90979ea5acb3
+          id: 00000000-0000-7014-ba81-888f969da4ab
     - id: 00000000-0000-700e-80c7-ced5dce3eaf1
       name: Order has OrderStatus
       roles:
@@ -94,8 +97,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-700f-9fe6-edf4fb020910
+          id: 00000000-0000-7017-97de-e5ecf3fa0108
         - type: mandatory
           role: 00000000-0000-700f-9fe6-edf4fb020910
+          id: 00000000-0000-7018-b6fd-040b12192027
     - id: 00000000-0000-7011-9d24-2b323940474e
       name: Customer has Name
       roles:
@@ -113,5 +118,7 @@ model:
           roles:
             - 00000000-0000-7012-bc43-4a51585f666d
           is_preferred: true
+          id: 00000000-0000-7019-951c-232a31383f46
         - type: mandatory
           role: 00000000-0000-7012-bc43-4a51585f666d
+          id: 00000000-0000-701a-b43b-424950575e65
