@@ -210,12 +210,12 @@ export function graphOf(model: OrmModel): GraphResult {
   }
 
   // Constraint -> roles, and the reverse index.
-  // Keyed by the constraint OBJECT, not by `c.id`. `Constraint.id` is
-  // optional and `FactType.addConstraint` does not mint one (only the
-  // constructor does), so an id-keyed index silently reports "no roles"
-  // for a constraint that references real ones -- the same silent-[]
-  // failure barwise-928 was about, which is why this is not keyed the
-  // obvious way.
+  // Keyed by the constraint OBJECT, not by `c.id`. Every path into a
+  // model now fills an id (the loader, the FactType constructor and
+  // `addConstraint`, barwise-nkq), but the type keeps it optional, and an
+  // id-keyed index would silently report "no roles" for any constraint that
+  // arrived without one -- the same silent-[] failure barwise-928 was
+  // about. Keying by the object cannot have that hole.
   const rolesOfConstraint = new Map<Constraint, Role[]>();
   const constraintsByRole = new Map<string, Constraint[]>();
   for (const ft of model.factTypes) {

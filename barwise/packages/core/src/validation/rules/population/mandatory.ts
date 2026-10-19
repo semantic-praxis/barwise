@@ -21,7 +21,7 @@ export function checkMandatoryViolations(model: OrmModel, universe: ObjectUniver
   if (universe.size === 0) return diagnostics;
 
   for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       diagnostics.push(...mandatoryViolationsIn(model, ft, c, universe));
     }
   }

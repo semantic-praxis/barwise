@@ -36,10 +36,12 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7006-88cf-d6dde4ebf2f9
+          id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
         - type: ring
           role_1: 00000000-0000-7005-a9b0-b7bec5ccd3da
           role_2: 00000000-0000-7006-88cf-d6dde4ebf2f9
           ring_type: acyclic
+          id: 00000000-0000-700e-80c7-ced5dce3eaf1
     - id: 00000000-0000-7007-a7ee-f5fc030a1118
       name: Employee is assigned to Project
       roles:
@@ -57,10 +59,12 @@ model:
           roles:
             - 00000000-0000-7008-860d-141b22293037
             - 00000000-0000-7009-a52c-333a41484f56
+          id: 00000000-0000-700f-9fe6-edf4fb020910
         - type: frequency
           role: 00000000-0000-7008-860d-141b22293037
           min: 1
           max: 3
+          id: 00000000-0000-7010-be05-0c131a21282f
     - id: 00000000-0000-700a-844b-525960676e75
       name: Project has ProjectName
       roles:
@@ -77,3 +81,4 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-700b-a36a-71787f868d94
+          id: 00000000-0000-7011-9d24-2b323940474e

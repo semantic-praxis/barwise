@@ -312,7 +312,7 @@ describe("NORMA import keeps constraint ids", () => {
     };
     const cardinalityOf = (m: OrmModel) =>
       m.factTypes.flatMap((f) => f.constraints).find((c) => c.type === "cardinality")?.id;
-    // The writer's id for a cardinality without one, so the two agree.
+    // The importer's derived id for a cardinality NORMA wrote without one.
     expect(cardinalityOf(mapNormaToOrm(withCard))).toBe(cardinalityId(role!.id));
 
     // ... unless a real constraint holds that id; then it steps aside, and
@@ -1128,6 +1128,21 @@ describe("NORMA export of a file that omits constraint ids", () => {
     const doc = writeOrmToNorma(model);
     expect(doc.factTypes[0]!.internalConstraintRefs).toEqual(["_c-dup"]);
     expect(doc.constraints.filter((c) => c.id === "_c-dup")).toHaveLength(1);
+  });
+
+  it("exports a constraint added in code under the id addConstraint gave it (barwise-nkq)", () => {
+    // The writer once fell back to a positional `<ft>_c<i>` id for a
+    // constraint with none; addConstraint now fills one, and the writer
+    // uses it rather than inventing another.
+    const model = xorModel();
+    const ft = model.getFactType("ft-employed")!;
+    ft.addConstraint({ type: "mandatory", roleId: "r-employed" });
+    const filled = ft.constraints.at(-1)!.id!;
+    expect(filled).toEqual(expect.any(String));
+
+    const doc = writeOrmToNorma(model);
+    expect(normaIdsOf(doc).has(`_${filled}`)).toBe(true);
+    expect([...normaIdsOf(doc)].some((id) => /_c\d+$/.test(id))).toBe(false);
   });
 
   it("writes the same document on every export", () => {

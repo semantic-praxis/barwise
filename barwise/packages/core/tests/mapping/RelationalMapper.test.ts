@@ -1525,7 +1525,7 @@ describe("RelationalMapper", () => {
       expect(fk.sourceConstraintId).toBe(uniquenessConstraint.id);
     });
 
-    it("omits sourceConstraintId when the uniqueness constraint has no id", () => {
+    it("traces a uniqueness constraint added in code to the id addConstraint gives it", () => {
       const model = new OrmModel({ name: "Test" });
       const customer = model.addObjectType({
         name: "Customer",
@@ -1545,13 +1545,15 @@ describe("RelationalMapper", () => {
         ],
         readings: ["{0} places {1}", "{1} is placed by {0}"],
       });
-      // addConstraint (unlike the fact-type constructor) does not
-      // backfill a missing id.
+      // addConstraint fills a missing id, as the fact type constructor
+      // does (barwise-nkq).
       ft.addConstraint({ type: "internal_uniqueness", roleIds: ["r2"] });
+      const filled = ft.constraints[0]!.id;
+      expect(filled).toEqual(expect.any(String));
 
       const schema = mapper.map(model);
       const orderTable = schema.tables.find((t) => t.name === "order")!;
-      expect(orderTable.foreignKeys[0]!.sourceConstraintId).toBeUndefined();
+      expect(orderTable.foreignKeys[0]!.sourceConstraintId).toBe(filled);
     });
   });
 });

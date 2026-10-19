@@ -118,7 +118,7 @@ function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
 
   for (const ft of model.factTypes) {
     if (ft.arity < 2 || ft.constraints.length === 0) continue;
-    const hasUniqueness = ft.constraints.some(
+    const hasUniqueness = ft.internalConstraints.some(
       (c) => c.type === "internal_uniqueness",
     );
     if (!hasUniqueness) {
@@ -288,7 +288,7 @@ function checkFrequencyWithoutEffect(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type !== "frequency") continue;
       if (c.max === "unbounded" && c.min <= 1) {
         diagnostics.push(report(RULE_ID.frequencyWithoutEffect, "default", ft.id, ft.name, c.min));

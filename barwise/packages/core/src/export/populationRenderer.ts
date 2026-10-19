@@ -125,7 +125,7 @@ export function renderPopulationAsOpenApiExamples(
       return (
         ft.roles.length === 2
         && ft.roles.some((r) => r.playerId === objectType.id)
-        && ft.constraints.some(
+        && ft.internalConstraints.some(
           (c) =>
             c.type === "internal_uniqueness"
             && c.isPreferred === true,

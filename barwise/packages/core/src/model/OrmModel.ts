@@ -1,3 +1,9 @@
+import {
+  type Constraint,
+  type ExternalConstraint,
+  isExternalConstraint,
+  roleIdsOf,
+} from "./Constraint.js";
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
@@ -161,6 +167,47 @@ export class OrmModel {
   /** Look up a fact type by id. */
   getFactType(id: string): FactType | undefined {
     return this._factTypes.get(id);
+  }
+
+  // ---- Constraints ----
+
+  /**
+   * The constraints that live in the model: the external kinds, whose roles
+   * may span fact types (orm-format-3, placement by kind). Until storage
+   * moves (WS3c) they are read from the fact types a 2.0 file nests them
+   * under, in fact type order and then list order -- the order a reader
+   * walking every fact type's list met them in, so such a reader that
+   * switches to this list reports in the same order. (A reader that skipped
+   * some fact types, as the diagram skips absorbed ones, now sees the
+   * constraints nested under them too.)
+   */
+  get constraints(): readonly ExternalConstraint[] {
+    return this.factTypes.flatMap((ft) => ft.constraints.filter(isExternalConstraint));
+  }
+
+  /**
+   * Every constraint that applies to one fact type: its internal
+   * constraints, then each model-level constraint naming one of its roles.
+   * A constraint across fact types therefore appears under every fact type
+   * it touches; a whole-model reader wants each fact type's
+   * `internalConstraints` plus `constraints` once instead.
+   */
+  constraintsTouching(factTypeId: string): readonly Constraint[] {
+    const ft = this._factTypes.get(factTypeId);
+    if (!ft) return [];
+    return [
+      ...ft.internalConstraints,
+      ...this.constraints.filter((c) => roleIdsOf(c).some((rid) => ft.hasRole(rid))),
+    ];
+  }
+
+  /** Look up a constraint of either placement by id. */
+  getConstraint(id: string): Constraint | undefined {
+    for (const ft of this._factTypes.values()) {
+      const found = ft.constraints.find((c) => c.id === id);
+      if (found) return found;
+    }
+    return undefined;
   }
 
   /** Look up a fact type by name. */

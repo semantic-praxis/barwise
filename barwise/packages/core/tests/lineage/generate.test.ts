@@ -520,7 +520,7 @@ describe("Lineage Generation", () => {
       ]);
     });
 
-    it("omits a constraint source when the constraint has no id", () => {
+    it("names a constraint added in code by the id addConstraint gives it", () => {
       const model = new OrmModel({ name: "Test Model" });
       const person = model.addObjectType({
         name: "Person",
@@ -532,13 +532,15 @@ describe("Lineage Generation", () => {
         roles: [{ id: "r1", name: "is active", playerId: person.id }],
         readings: ["{0} is active"],
       });
-      // addConstraint (unlike the fact-type constructor) does not
-      // backfill a missing id.
+      // addConstraint fills a missing id, as the fact type constructor
+      // does (barwise-nkq), so lineage can name the constraint.
       ft.addConstraint({ type: "value_constraint", roleId: "r1", values: ["x"] });
+      const filled = ft.constraints[0]!.id;
+      expect(filled).toEqual(expect.any(String));
 
       const lineage = generateModelLineage(model);
       const constraintSources = lineage[0]!.sources.filter((s) => s.elementType === "Constraint");
-      expect(constraintSources).toEqual([]);
+      expect(constraintSources.map((s) => s.elementId)).toEqual([filled]);
     });
   });
 

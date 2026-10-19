@@ -228,12 +228,12 @@ describe("graphOf: a built graph is total", () => {
     expect(resolved.commonPlayer).toBeDefined();
   });
 
-  // A constraint's id is OPTIONAL and `addConstraint` does not mint one
-  // (only FactType's constructor does), so an index keyed by `c.id`
-  // reports "no roles" for a constraint that references real ones, on a
-  // graph that built successfully. Found by reviewing this workstream
+  // A constraint's id is OPTIONAL in the type (every path into a model now
+  // fills one, barwise-nkq), so an index keyed by `c.id` could report "no
+  // roles" for a constraint that references real ones, on a graph that
+  // built successfully. Found by reviewing this workstream
   // before it opened; it is the silent-[] shape of barwise-928.
-  it("resolves roles for a constraint that carries no id", () => {
+  it("resolves roles for a constraint added in code", () => {
     const model = simpleModel();
     const ft = model.factTypes[0]!;
     ft.addConstraint({ type: "mandatory", roleId: ft.roles[0]!.id });
@@ -242,13 +242,14 @@ describe("graphOf: a built graph is total", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const idless = ft.constraints.find((c) => !c.id)!;
-    expect(idless).toBeDefined();
-    expect(result.graph.rolesOf(idless).map((r) => r.id)).toEqual([ft.roles[0]!.id]);
-    expect(result.graph.resolve(idless).roles.length).toBe(1);
+    const added = ft.constraints.at(-1)!;
+    expect(added.type).toBe("mandatory");
+    expect(added.id).toEqual(expect.any(String));
+    expect(result.graph.rolesOf(added).map((r) => r.id)).toEqual([ft.roles[0]!.id]);
+    expect(result.graph.resolve(added).roles.length).toBe(1);
   });
 
-  it("carries the constraint and its fact type when the constraint has no id", () => {
+  it("carries the constraint and its fact type for an unresolved role", () => {
     const model = simpleModel();
     const ft = model.factTypes[0]!;
     ft.addConstraint({ type: "mandatory", roleId: "bogus" });
@@ -256,11 +257,12 @@ describe("graphOf: a built graph is total", () => {
     const result = graphOf(model);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    // A constraint's id is optional, so the record carries the constraint
-    // and its fact type instead of an id that may not exist.
+    // The record carries the constraint and its fact type, not only an
+    // id: a constraint's id is optional in the type, though every path
+    // into a model now fills one (barwise-nkq).
     const found = result.unresolved.find((u) => u.missing === "bogus");
     if (found?.from.kind !== "constraint") throw new Error("expected a constraint source");
-    expect(found.from.constraint.id).toBeUndefined();
+    expect(found.from.constraint.id).toBe(ft.constraints.at(-1)!.id);
     expect(found.from.constraint.type).toBe("mandatory");
     expect(found.from.factType.id).toBe(ft.id);
   });

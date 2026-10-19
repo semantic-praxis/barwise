@@ -96,8 +96,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-700d-a1a8-afb6bdc4cbd2
+          id: 00000000-0000-7027-87ce-d5dce3eaf1f8
         - type: mandatory
           role: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+          id: 00000000-0000-7028-a6ed-f4fb02091017
     - id: 00000000-0000-700e-80c7-ced5dce3eaf1
       name: Appointment is with Doctor
       roles:
@@ -114,8 +116,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-700f-9fe6-edf4fb020910
+          id: 00000000-0000-7029-850c-131a21282f36
         - type: mandatory
           role: 00000000-0000-700f-9fe6-edf4fb020910
+          id: 00000000-0000-702a-a42b-323940474e55
     - id: 00000000-0000-7011-9d24-2b323940474e
       name: Doctor has Specialty
       roles:
@@ -132,8 +136,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7012-bc43-4a51585f666d
+          id: 00000000-0000-702b-834a-51585f666d74
         - type: mandatory
           role: 00000000-0000-7012-bc43-4a51585f666d
+          id: 00000000-0000-702c-a269-70777e858c93
     - id: 00000000-0000-7014-ba81-888f969da4ab
       name: Appointment is on AppointmentDate
       roles:
@@ -150,8 +156,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7015-99a0-a7aeb5bcc3ca
+          id: 00000000-0000-702d-8188-8f969da4abb2
         - type: mandatory
           role: 00000000-0000-7015-99a0-a7aeb5bcc3ca
+          id: 00000000-0000-702e-a0a7-aeb5bcc3cad1
     - id: 00000000-0000-7017-97de-e5ecf3fa0108
       name: Appointment is at TimeSlot
       roles:
@@ -168,8 +176,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7018-b6fd-040b12192027
+          id: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
         - type: mandatory
           role: 00000000-0000-7018-b6fd-040b12192027
+          id: 00000000-0000-7030-9ee5-ecf3fa01080f
     - id: 00000000-0000-701a-b43b-424950575e65
       name: Appointment has VisitReason
       roles:
@@ -186,6 +196,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701b-935a-61686f767d84
+          id: 00000000-0000-7026-a8af-b6bdc4cbd2d9
     - id: 00000000-0000-701d-9198-9fa6adb4bbc2
       name: Appointment has AppointmentStatus
       roles:
@@ -202,8 +213,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701e-b0b7-bec5ccd3dae1
+          id: 00000000-0000-7031-bd04-0b121920272e
         - type: mandatory
           role: 00000000-0000-701e-b0b7-bec5ccd3dae1
+          id: 00000000-0000-7032-9c23-2a31383f464d
     - id: 00000000-0000-7020-aef5-fc030a11181f
       name: Appointment has FollowUpNote
       roles:
@@ -220,6 +233,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7021-8d14-1b222930373e
+          id: 00000000-0000-7033-bb42-4950575e656c
     - id: 00000000-0000-7023-8b52-5960676e757c
       name: Patient has primary Doctor
       roles:
@@ -236,5 +250,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7024-aa71-787f868d949b
+          id: 00000000-0000-7034-9a61-686f767d848b
         - type: mandatory
           role: 00000000-0000-7024-aa71-787f868d949b
+          id: 00000000-0000-7035-b980-878e959ca3aa

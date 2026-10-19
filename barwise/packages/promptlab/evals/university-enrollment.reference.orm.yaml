@@ -76,6 +76,7 @@ model:
           roles:
             - 00000000-0000-700d-a1a8-afb6bdc4cbd2
             - 00000000-0000-700e-80c7-ced5dce3eaf1
+          id: 00000000-0000-702b-834a-51585f666d74
     - id: 00000000-0000-700f-9fe6-edf4fb020910
       name: CourseOffering is of Course
       roles:
@@ -92,8 +93,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7010-be05-0c131a21282f
+          id: 00000000-0000-702d-8188-8f969da4abb2
         - type: mandatory
           role: 00000000-0000-7010-be05-0c131a21282f
+          id: 00000000-0000-702e-a0a7-aeb5bcc3cad1
     - id: 00000000-0000-7012-bc43-4a51585f666d
       name: CourseOffering is in Semester
       roles:
@@ -110,8 +113,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7013-9b62-6970777e858c
+          id: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
         - type: mandatory
           role: 00000000-0000-7013-9b62-6970777e858c
+          id: 00000000-0000-7030-9ee5-ecf3fa01080f
     - id: 00000000-0000-7015-99a0-a7aeb5bcc3ca
       name: Instructor teaches CourseOffering
       roles:
@@ -128,8 +133,10 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7017-97de-e5ecf3fa0108
+          id: 00000000-0000-7031-bd04-0b121920272e
         - type: mandatory
           role: 00000000-0000-7017-97de-e5ecf3fa0108
+          id: 00000000-0000-7032-9c23-2a31383f464d
     - id: 00000000-0000-7018-b6fd-040b12192027
       name: Course has Title
       roles:
@@ -146,6 +153,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7019-951c-232a31383f46
+          id: 00000000-0000-7033-bb42-4950575e656c
     - id: 00000000-0000-701b-935a-61686f767d84
       name: Course has CreditValue
       roles:
@@ -162,6 +170,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701c-b279-80878e959ca3
+          id: 00000000-0000-7034-9a61-686f767d848b
     - id: 00000000-0000-701e-b0b7-bec5ccd3dae1
       name: CourseOffering has MaxCapacity
       roles:
@@ -178,6 +187,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701f-8fd6-dde4ebf2f900
+          id: 00000000-0000-7035-b980-878e959ca3aa
     - id: 00000000-0000-7021-8d14-1b222930373e
       name: Semester has StartDate
       roles:
@@ -194,6 +204,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7022-ac33-3a41484f565d
+          id: 00000000-0000-7036-989f-a6adb4bbc2c9
     - id: 00000000-0000-7024-aa71-787f868d949b
       name: Semester has EndDate
       roles:
@@ -210,6 +221,7 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7025-8990-979ea5acb3ba
+          id: 00000000-0000-7037-b7be-c5ccd3dae1e8
     - id: 00000000-0000-7027-87ce-d5dce3eaf1f8
       name: Student receives LetterGrade for CourseOffering
       roles:
@@ -229,3 +241,4 @@ model:
           roles:
             - 00000000-0000-7028-a6ed-f4fb02091017
             - 00000000-0000-702a-a42b-323940474e55
+          id: 00000000-0000-702c-a269-70777e858c93

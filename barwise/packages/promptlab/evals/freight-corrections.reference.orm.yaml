@@ -45,6 +45,7 @@ model:
           roles:
             - 00000000-0000-7006-88cf-d6dde4ebf2f9
             - 00000000-0000-7007-a7ee-f5fc030a1118
+          id: 00000000-0000-700c-8289-90979ea5acb3
     - id: 00000000-0000-7009-a52c-333a41484f56
       name: Shipment is stored in Warehouse
       roles:
@@ -62,15 +63,17 @@ model:
           roles:
             - 00000000-0000-700a-844b-525960676e75
             - 00000000-0000-700b-a36a-71787f868d94
+          id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
         - type: frequency
           role: 00000000-0000-700a-844b-525960676e75
           min: 1
           max: 2
+          id: 00000000-0000-700e-80c7-ced5dce3eaf1
   populations:
-    - id: 00000000-0000-700c-8289-90979ea5acb3
+    - id: 00000000-0000-700f-9fe6-edf4fb020910
       fact_type: 00000000-0000-7005-a9b0-b7bec5ccd3da
       instances:
-        - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+        - id: 00000000-0000-7010-be05-0c131a21282f
           role_values:
             00000000-0000-7006-88cf-d6dde4ebf2f9: S-100
             00000000-0000-7007-a7ee-f5fc030a1118: P-77

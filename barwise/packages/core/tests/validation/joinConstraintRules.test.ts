@@ -135,7 +135,7 @@ describe("joinConstraintRules", () => {
       .toContain("constraint/join-empty-projection");
   });
 
-  it("falls back to the fact type id when a malformed join constraint has no id of its own", () => {
+  it("reports a malformed join constraint added in code under the id addConstraint gives it", () => {
     const model = new OrmModel({ name: "Test" });
     const person = model.addObjectType({
       id: "ot-person",
@@ -152,14 +152,16 @@ describe("joinConstraintRules", () => {
       ],
       readings: ["{0} is citizen of {1}"],
     });
-    // addConstraint (unlike the fact-type constructor) does not backfill
-    // a missing id.
+    // addConstraint fills a missing id, as the fact type constructor does
+    // (barwise-nkq), so the diagnostic names the constraint, not its host.
     const bad: JoinOperand = { path: { root: "ot-missing", steps: [] }, projection: [0] };
     ft.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
+    const filled = ft.constraints.at(-1)!.id;
+    expect(filled).toEqual(expect.any(String));
 
     const diags = unresolvedDiagnostics(model);
     const unknownRoot = diags.find((d) => d.ruleId === "constraint/join-unknown-root");
     expect(unknownRoot).toBeDefined();
-    expect(unknownRoot!.elementId).toBe(ft.id);
+    expect(unknownRoot!.elementId).toBe(filled);
   });
 });

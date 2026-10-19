@@ -145,7 +145,7 @@ export function preferredIdentifyingBinary(
 ): PreferredIdentifyingBinary | undefined {
   for (const factType of model.factTypes) {
     if (factType.arity !== 2) continue;
-    const preferred = factType.constraints.some(
+    const preferred = factType.internalConstraints.some(
       (c) => c.type === "internal_uniqueness" && c.isPreferred,
     );
     if (!preferred) continue;
@@ -213,7 +213,7 @@ export function identificationSources(
   const sources: IdentificationSource[] = [];
 
   for (const ft of model.factTypesForObjectType(entity.id)) {
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type === "internal_uniqueness" && c.isPreferred) {
         sources.push({ kind: "preferred-uniqueness", factTypeId: ft.id });
       }
