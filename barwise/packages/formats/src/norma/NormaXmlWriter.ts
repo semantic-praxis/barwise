@@ -301,24 +301,23 @@ function writeFactType(
 
   const internalRefs: NormaId[] = [];
   for (const c of ft.constraints) {
-    // Carried on the role (writeRole), never written here, so it needs no
-    // NORMA id of its own.
+    // Carried on the role (writeRole), which writes it under its own id;
+    // never a top-level constraint, so it has no place in this loop.
     if (c.type === "cardinality") continue;
     const ownId = toNormaId(constraintId(c, ft));
     if (c.type === "exclusive_or") {
       // NORMA has no single xor element: the native encoding is an
       // exclusion + disjunctive mandatory pair joined by mutual coupler
       // refs. Both halves are multi-fact, so neither is internal.
-      const exclusionId = ownId;
-      const mandatoryId = derivedNormaId(exclusionId, "_xormand");
+      const mandatoryId = derivedNormaId(ownId, "_xormand");
       // Either half's id already written makes this a repeat, dropped whole.
-      if (seen.has(exclusionId) || seen.has(mandatoryId)) continue;
-      seen.add(exclusionId);
+      if (seen.has(ownId) || seen.has(mandatoryId)) continue;
+      seen.add(ownId);
       seen.add(mandatoryId);
       const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
       constraints.push({
         type: "exclusion",
-        id: exclusionId,
+        id: ownId,
         name: "",
         ...modality,
         roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
@@ -332,7 +331,7 @@ function writeFactType(
         isSimple: false,
         isImplied: false,
         roleRefs: c.roleIds.map(toNormaId),
-        exclusiveOrExclusionRef: exclusionId,
+        exclusiveOrExclusionRef: ownId,
       });
       continue;
     }
@@ -384,7 +383,7 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
     ...(card
       ? {
         cardinality: {
-          id: card.id ? toNormaId(card.id) : cardinalityId(toNormaId(role.id)),
+          id: toNormaId(constraintId(card, ft)),
           ranges: [{ from: card.min, ...(card.max !== "unbounded" ? { to: card.max } : {}) }],
           ...(card.modality === "deontic" ? { modality: "deontic" as const } : {}),
         },

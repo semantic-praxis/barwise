@@ -85,11 +85,25 @@ function rooms() {
 const ids = (cs: readonly Constraint[]) => cs.map((c) => c.id);
 
 describe("placement guards", () => {
-  it("classify every kind, and agree with requiresLocalRoles", () => {
+  // Stated as a literal, not derived from PLACEMENT, so a kind moved in the
+  // table fails here at run time as well as in the type test.
+  const INTERNAL = [
+    "internal_uniqueness",
+    "mandatory",
+    "value_constraint",
+    "ring",
+    "frequency",
+    "cardinality",
+    "value_comparison",
+  ];
+
+  it("classify every kind as exactly one placement", () => {
     for (const type of CONSTRAINT_TYPES) {
       const probe = { type } as Constraint;
-      expect(isInternalConstraint(probe)).toBe(requiresLocalRoles(probe));
-      expect(isExternalConstraint(probe)).toBe(!requiresLocalRoles(probe));
+      const internal = INTERNAL.includes(type);
+      expect(isInternalConstraint(probe), type).toBe(internal);
+      expect(isExternalConstraint(probe), type).toBe(!internal);
+      expect(requiresLocalRoles(probe), type).toBe(internal);
     }
   });
 });
