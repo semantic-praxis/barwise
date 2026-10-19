@@ -4,8 +4,12 @@
 
 import type { OrmModel } from "@barwise/core";
 import { collectOpenQuestionAnnotations } from "@barwise/core/annotation";
-import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
-import { Verbalizer } from "@barwise/core/verbalization";
+import {
+  type Counterexample,
+  counterexamplesTouching,
+  generateCounterexamples,
+} from "@barwise/core/counterexample";
+import { isStatement, Verbalizer } from "@barwise/core/verbalization";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveModels, type SourceInput, sourcePath } from "../workspace/resolve.js";
@@ -96,7 +100,14 @@ export function executeVerbalize(
   return boundedTextResult(warn + parts.join("\n\n"), { kind: "verbalization", source: spill });
 }
 
-/** The original single-model behavior, kept byte-for-byte. */
+/**
+ * The original single-model behavior, kept byte-for-byte. An empty or null
+ * `factType` means no fact type, unlike the CLI's `--fact-type ""`: the
+ * callers here are models filling an optional field, which send "" for
+ * "none". Null only arrives through VS Code, which forwards a tool's input
+ * unvalidated (MCP's schema rejects it); barwise-jto normalizes that at the
+ * boundary for every field.
+ */
 function verbalizeSingle(
   model: OrmModel,
   spill: string | undefined,
@@ -137,7 +148,7 @@ function verbalizeText(
     let text = verbalizations.map((v) => v.text).join("\n");
     if (counterexamples) {
       text += renderCounterexamples(
-        generateCounterexamples(model).filter((c) => c.factTypeId === ft.id),
+        counterexamplesTouching(model, ft.id, generateCounterexamples(model)),
       );
     }
     return text;
@@ -167,8 +178,9 @@ function renderCounterexamples(ces: readonly Counterexample[]): string {
 
 /** Build a compact, never-spilling digest of a model's verbalizations. */
 function buildSummary(
-  verbalizations: ReadonlyArray<{ category: string; text: string; }>,
+  rows: ReadonlyArray<{ category: string; text: string; }>,
 ): string {
+  const verbalizations = rows.filter(isStatement);
   const counts = new Map<string, number>();
   for (const v of verbalizations) {
     counts.set(v.category, (counts.get(v.category) ?? 0) + 1);

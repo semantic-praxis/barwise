@@ -13,7 +13,6 @@ import {
   CONSTRAINT_TYPES,
   isExternalConstraint,
   isInternalConstraint,
-  requiresLocalRoles,
 } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
@@ -103,7 +102,6 @@ describe("placement guards", () => {
       const internal = INTERNAL.includes(type);
       expect(isInternalConstraint(probe), type).toBe(internal);
       expect(isExternalConstraint(probe), type).toBe(!internal);
-      expect(requiresLocalRoles(probe), type).toBe(internal);
     }
   });
 });

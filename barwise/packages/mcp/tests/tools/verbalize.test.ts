@@ -38,6 +38,14 @@ describe("verbalize_model tool", () => {
     expect(result.content[0]!.text).toContain("No fact type found");
   });
 
+  it("treats an empty fact type as none, since a model sends it for an unset field", () => {
+    const whole = executeVerbalize(ws.fixture("simple.orm.yaml"));
+    expect(executeVerbalize(ws.fixture("simple.orm.yaml"), "")).toEqual(whole);
+    // VS Code forwards a model's null unvalidated (barwise-jto).
+    expect(executeVerbalize(ws.fixture("simple.orm.yaml"), null as unknown as string))
+      .toEqual(whole);
+  });
+
   it("returns content in MCP format", () => {
     const result = executeVerbalize(ws.fixture("simple.orm.yaml"));
     expect(result.content).toHaveLength(1);

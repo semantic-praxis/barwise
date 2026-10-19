@@ -7,14 +7,20 @@
 
 import type { OrmModel } from "@barwise/core";
 import { collectOpenQuestionAnnotations } from "@barwise/core/annotation";
-import { type Counterexample, generateCounterexamples } from "@barwise/core/counterexample";
+import {
+  type Counterexample,
+  counterexamplesTouching,
+  generateCounterexamples,
+} from "@barwise/core/counterexample";
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { Command } from "commander";
 import { resolveDomainModels } from "../workspace/domainModels.js";
 import {
+  counterexampleRow,
   formatCounterexamples,
   formatVerbalizations,
   formatVerbalizationsJson,
+  verbalizationRow,
 } from "../workspace/format.js";
 
 interface VerbalizeOptions {
@@ -51,7 +57,10 @@ export function registerVerbalizeCommand(program: Command): void {
 
         // A single model keeps the original "fact type not found" hard error;
         // across a project's domains a missing fact type just skips a domain.
-        if (!multi && opts.factType && !resolved[0]!.model.getFactTypeByName(opts.factType)) {
+        if (
+          !multi && opts.factType !== undefined
+          && !resolved[0]!.model.getFactTypeByName(opts.factType)
+        ) {
           process.stderr.write(`Error: Fact type "${opts.factType}" not found in model.\n`);
           process.exitCode = 1;
           return;
@@ -84,21 +93,20 @@ export function registerVerbalizeCommand(program: Command): void {
 
 /** Verbalizations (and optional counterexamples) for one model. */
 function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions) {
-  let factTypeId: string | undefined;
-  let verbalizations;
-  if (opts.factType) {
-    const ft = model.getFactTypeByName(opts.factType);
-    verbalizations = ft ? verbalizer.verbalizeFactType(ft.id, model) : [];
-    factTypeId = ft?.id;
-  } else {
-    verbalizations = verbalizeWhole(verbalizer, model, opts);
-  }
+  // Keyed on the option, not on the lookup: a project domain without the
+  // fact type gets no counterexamples, not the whole model's.
+  const name = opts.factType;
+  const scoped = name !== undefined;
+  const ft = scoped ? model.getFactTypeByName(name) : undefined;
+  const verbalizations = scoped
+    ? (ft ? verbalizer.verbalizeFactType(ft.id, model) : [])
+    : verbalizeWhole(verbalizer, model, opts);
 
   let counterexamples: readonly Counterexample[] = [];
   if (opts.counterexamples) {
-    counterexamples = generateCounterexamples(model).filter(
-      (c) => factTypeId === undefined || c.factTypeId === factTypeId,
-    );
+    const all = generateCounterexamples(model);
+    if (!scoped) counterexamples = all;
+    else if (ft) counterexamples = counterexamplesTouching(model, ft.id, all);
   }
   return { verbalizations, counterexamples };
 }
@@ -127,16 +135,8 @@ function jsonPayload(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOpt
     return JSON.parse(formatVerbalizationsJson(verbalizations)) as object;
   }
   return {
-    verbalizations: verbalizations.map((v) => ({
-      category: v.category,
-      text: v.text,
-      sourceElementId: v.sourceElementId,
-    })),
-    counterexamples: counterexamples.map((c) => ({
-      factTypeId: c.factTypeId,
-      constraintType: c.constraintType,
-      text: c.text,
-    })),
+    verbalizations: verbalizations.map(verbalizationRow),
+    counterexamples: counterexamples.map(counterexampleRow),
   };
 }
 
@@ -148,16 +148,8 @@ function singleJson(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOpti
   }
   return JSON.stringify(
     {
-      verbalizations: verbalizations.map((v) => ({
-        category: v.category,
-        text: v.text,
-        sourceElementId: v.sourceElementId,
-      })),
-      counterexamples: counterexamples.map((c) => ({
-        factTypeId: c.factTypeId,
-        constraintType: c.constraintType,
-        text: c.text,
-      })),
+      verbalizations: verbalizations.map(verbalizationRow),
+      counterexamples: counterexamples.map(counterexampleRow),
     },
     null,
     2,

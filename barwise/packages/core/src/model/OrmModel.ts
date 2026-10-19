@@ -191,6 +191,11 @@ export class OrmModel {
    * A constraint across fact types therefore appears under every fact type
    * it touches; a whole-model reader wants each fact type's
    * `internalConstraints` plus `constraints` once instead.
+   *
+   * Verbalization and counterexamples ask here by id, so their views of
+   * one fact type cannot disagree (describe still reads the nested list
+   * until WS3a-ii-c moves it). The answer is about this model's
+   * fact type: a fact type it does not have touches nothing here.
    */
   constraintsTouching(factTypeId: string): readonly Constraint[] {
     const ft = this._factTypes.get(factTypeId);
@@ -199,6 +204,16 @@ export class OrmModel {
       ...ft.internalConstraints,
       ...this.constraints.filter((c) => roleIdsOf(c).some((rid) => ft.hasRole(rid))),
     ];
+  }
+
+  /**
+   * The fact types holding any of these roles, in model order. A dangling
+   * role id holds no fact type and adds none. The one answer to "which fact
+   * types does this constraint apply to", for the verbalizer's row fields
+   * and its role labels alike.
+   */
+  factTypesHolding(roleIds: readonly string[]): readonly FactType[] {
+    return this.factTypes.filter((ft) => roleIds.some((rid) => ft.hasRole(rid)));
   }
 
   /** Look up a constraint of either placement by id. */

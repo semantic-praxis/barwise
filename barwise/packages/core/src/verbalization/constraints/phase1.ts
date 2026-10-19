@@ -294,7 +294,7 @@ export function verbalizeValueConstraint(
  */
 export function verbalizeExternalUniqueness(
   roleIds: readonly string[],
-  factType: FactType,
+  sourceId: string,
   model: OrmModel,
 ): Verbalization {
   const segments: VerbalizationSegment[] = [
@@ -318,5 +318,5 @@ export function verbalizeExternalUniqueness(
 
   segments.push(textSeg(" is unique across fact types."));
 
-  return buildVerbalization(factType.id, "constraint", segments);
+  return buildVerbalization(sourceId, "constraint", segments);
 }

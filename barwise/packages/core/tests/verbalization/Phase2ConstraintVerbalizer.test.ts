@@ -472,7 +472,7 @@ describe("Phase 2 constraint verbalization", () => {
       { skipPlayerValidation: true },
     );
 
-    const v = verbalizer.verbalizeAll(ft, model);
+    const v = verbalizer.verbalizeAll(ft.id, model);
     expect(v[0]!.text).toContain("is placed by");
     expect(v[0]!.text).toContain("at least 1 and at most 2");
   });
@@ -495,7 +495,7 @@ describe("Phase 2 constraint verbalization", () => {
       { skipPlayerValidation: true },
     );
 
-    const v = verbalizer.verbalizeAll(ft, model);
+    const v = verbalizer.verbalizeAll(ft.id, model);
     expect(v[0]!.text).toContain("places");
     expect(v[0]!.text).toContain("Order");
   });
@@ -777,7 +777,7 @@ describe("Phase 2 constraint verbalization", () => {
         constraints: [{ type: "cardinality", roleId: "p1", min: 1, max: 1 }],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toContain("'Currently active:' role");
     });
 
@@ -795,7 +795,7 @@ describe("Phase 2 constraint verbalization", () => {
         constraints: [{ type: "cardinality", roleId: "p1", min: 1, max: 1 }],
       });
 
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toContain("'Promotion is active' role");
     });
 
@@ -820,7 +820,7 @@ describe("Phase 2 constraint verbalization", () => {
       // This triggers extractPredicate with subjectIdx=0 and objectIdx=1,
       // but the reading has {1} before {0}, so the primary path fails.
       // The fallback extracts the predicate between the two placeholders.
-      const v = verbalizer.verbalizeAll(ft, model);
+      const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v).toHaveLength(1);
       expect(v[0]!.text).toBeDefined();
     });

@@ -11,11 +11,11 @@ import type { Role } from "../../model/Role.js";
  * The role a local-role constraint names, which `ConstraintVerbalizer`
  * has already established belongs to this fact type.
  *
- * Not a fallback. The kinds this serves are the ones
- * `requiresLocalRoles` marks -- uniqueness, mandatory, value, ring,
- * frequency, cardinality, value comparison -- and the dispatcher answers
- * a non-local role with a malformed-constraint sentence before reaching
- * them (barwise-979). So a miss is a caller that bypassed the
+ * Not a fallback. The kinds this serves are the internal ones
+ * (`isInternalConstraint`) -- uniqueness, mandatory, value, ring,
+ * frequency, cardinality, value comparison -- and the dispatcher's
+ * internal path answers a non-local role with a malformed-constraint
+ * sentence before reaching them (barwise-979). So a miss is a caller that bypassed the
  * dispatcher: a programming error, not a model defect. It says so where
  * the mistake is, rather than phrasing a sentence around an id and
  * letting a reader believe it.
@@ -39,11 +39,13 @@ export function localRole(factType: FactType, roleId: string): Role {
 
 export function resolveCommonPlayer(
   roleIds: readonly string[],
-  factType: FactType,
   model: OrmModel,
 ): { name: string; id: string; } {
+  // Model-wide: the roles of a constraint across fact types belong to
+  // several fact types, and none of them is the constraint's own
+  // (orm-format-3, placement by kind).
   for (const rid of roleIds) {
-    const role = factType.getRoleById(rid);
+    const role = model.findRole(rid);
     if (role) {
       const ot = model.getObjectType(role.playerId);
       if (ot) return { name: ot.name, id: ot.id };

@@ -27,7 +27,7 @@ CREATE TABLE doctor (
   CHECK (specialty IN ('cardiology', 'dermatology', 'family medicine', 'orthopedics', 'pediatrics'))
 );
 
--- Constraint (not expressible in SQL DDL): If Appointment then Appointment in Appointment has AppointmentStatus.
+-- Constraint (not expressible in SQL DDL): If Appointment in Appointment has FollowUpNote then Appointment in Appointment has AppointmentStatus.
 -- Table: appointment
 -- Source: Appointment (283bb11c-11a1-4564-aaa5-3393ffc81d94)
 -- Definition: A scheduled visit between a patient and a doctor, identified by a unique confirmation number.

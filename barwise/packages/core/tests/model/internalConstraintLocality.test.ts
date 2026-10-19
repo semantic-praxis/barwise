@@ -1,8 +1,11 @@
 /**
- * `requiresLocalRoles` must agree with what validation actually reports.
+ * `isInternalConstraint` -- the placement rule, which is also the locality
+ * rule -- must agree with what validation actually reports.
  *
  * The classification now has two consumers -- `ConstraintVerbalizer`
- * reads it to decide whether a non-local role is a defect, and
+ * reads it to route a constraint to the internal path, which treats a
+ * non-local role as a defect, or to the external one, which resolves its
+ * roles model-wide -- and
  * `constraintConsistency` encodes the same judgement in its per-kind
  * switch. That is a must-agree pair, and the repo's rule is that such a
  * pair is shared, derived, registered, or drift-tested in the same
@@ -19,7 +22,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";
-import { requiresLocalRoles } from "../../src/model/Constraint.js";
+import { isInternalConstraint } from "../../src/model/Constraint.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
@@ -119,7 +122,7 @@ function constraintsByKind(
   };
 }
 
-describe("requiresLocalRoles agrees with what validation reports", () => {
+describe("isInternalConstraint agrees with what validation reports", () => {
   const sample = twoFactTypes();
   const cases = constraintsByKind(sample.foreign, sample.foreign2);
 
@@ -134,7 +137,7 @@ describe("requiresLocalRoles agrees with what validation reports", () => {
         .some((d) => d.ruleId.endsWith("-invalid-role"));
 
       expect(reportsInvalidRole).toBe(
-        requiresLocalRoles({ type: kind } as Constraint),
+        isInternalConstraint({ type: kind } as Constraint),
       );
     });
   }

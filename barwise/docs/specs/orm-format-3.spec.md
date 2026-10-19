@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i implemented 2026-10-19; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization part of 3a-ii implemented 2026-10-19; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -776,6 +776,61 @@ Implementation notes (2026-10-19):
 - **Downstream internal-only readers stay for 3b**, as planned, even where
   the change is one word: dbt's `sqlPatterns.ts`, llm's `ModelContext.ts`,
   and NORMA's writer and population graph.
+- **3a-ii lands one output family at a time**, each with every consumer
+  that reads it: verbalization first, then validation diagnostics, then
+  query, describe, counterexamples, lineage and graph references.
+  Grounding 3a-ii found four families, each with its own consumers in
+  cli, mcp and vscode, which is the same width problem as 3a.
+- **Verbalization (3a-ii-a, 2026-10-19).**
+  - `ConstraintVerbalizer.verbalize` ignores the fact type it is handed
+    for a constraint across fact types and calls the new
+    `verbalizeExternal(c, model)`. The external verbalizers take no host:
+    `resolveCommonPlayer` resolves roles model-wide.
+  - A subset or equality names each role's fact type unless all its
+    resolved roles share one. Across fact types, both sides are now
+    qualified: "If Appointment in Appointment has FollowUpNote then
+    Appointment in Appointment has AppointmentStatus", where the host
+    reading was "If Appointment then Appointment in ...". The DDL
+    export's comment for an inexpressible constraint changes with it.
+  - The new `section` category is the heading row, following the "Open
+    questions" precedent. It comes after object cardinality and before
+    subtypes. `formatVerbalizations` indents the rows under it, and the
+    VS Code verbalize command prints it as a heading.
+  - `verbalizeAll` and `verbalizeFactType` read `constraintsTouching`.
+    The CLI's three JSON projections share one `verbalizationRow`, so
+    `factTypeIds` cannot reach one form and miss another.
+  - An object type's cardinality row keeps category `constraint` and
+    names its object type, with `factTypeIds: []`: it is a property of the
+    object type, not a constraint in a list (barwise-eok).
+  - `isStatement` (core verbalization) tells a reading from the section
+    heading: the VS Code count, the diagram tab's numbered list, MCP's
+    summary and the gym's `requires_verbalization` use it.
+  - `constraintsTouching` is the one per-fact-type view: `verbalizeAll`
+    and `counterexamplesTouching` both ask it by the fact type's id, so
+    they cannot disagree. Before this cut `verbalizeAll` read the fact
+    type's own nested list, so it also answered a fact type the model did
+    not hold. That case was carried for two review rounds and dropped: no
+    surface asks it, and each way of answering it was wrong somewhere (role
+    ids from another model's id space attached unrelated constraints, a
+    twin listed a nested one twice, the nested list alone left out
+    constraints nested elsewhere, and resolving against the model it was
+    handed mixed two models' names in one row). `verbalizeAll` and
+    `counterexamplesTouching` now take an id, like `constraintsTouching`,
+    and a fact type the model does not have gets no constraints (a
+    counterexample with no constraint id still matches by its fact type id).
+  - `resolveCommonPlayer` takes the first role that resolves anywhere, not
+    the first in the host. For an exclusion or disjunctive mandatory whose
+    roles have different players -- malformed, since those kinds constrain
+    one player -- the sentence's subject can change. `requiresLocalRoles`
+    is gone; `isInternalConstraint` is the same question.
+  - `--fact-type` and MCP's per-fact-type verbalize pick counterexamples
+    with the new `counterexamplesTouching`, so they match the constraints
+    the view now says. `Counterexample.factTypeId` itself is the later
+    counterexample cut.
+  - The section lists constraints in model-list order, which in 2.0 is
+    file order (host, then position). A constraint's own sentence and row
+    no longer depend on its host; their order in the list still follows
+    the file, as every list does.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

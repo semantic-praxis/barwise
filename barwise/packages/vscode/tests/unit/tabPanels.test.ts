@@ -41,6 +41,28 @@ describe("buildTabPanels", () => {
     expect(panels.verbalization.join("\n")).toContain("Customer");
   });
 
+  it("numbers statements only, leaving out a section heading", () => {
+    // The tab renders an <ol>; a heading row there would read as a
+    // numbered statement (orm-format-3 WS3a-ii).
+    const spanning = orderModel();
+    const [places] = spanning.factTypes;
+    const ships = spanning.addFactType({
+      name: "Customer ships Order",
+      roles: [
+        { name: "ships", playerId: places!.roles[0]!.playerId },
+        { name: "is shipped by", playerId: places!.roles[1]!.playerId },
+      ],
+      readings: ["{0} ships {1}"],
+    });
+    places!.addConstraint({
+      type: "exclusion",
+      roleIds: [places!.roles[0]!.id, ships.roles[0]!.id],
+    });
+    const lines = buildTabPanels(spanning).verbalization;
+    expect(lines.some((l) => l.startsWith("No Customer both"))).toBe(true);
+    expect(lines).not.toContain("Constraints across fact types");
+  });
+
   it("serializes the model to YAML", () => {
     expect(panels.yaml).toContain("orm_version");
     expect(panels.yaml).toContain("Customer places Order");

@@ -716,15 +716,6 @@ export type InternalConstraint = Extract<Constraint, { type: InternalKind; }>;
 /** The kinds that live in the model: their roles may span fact types. */
 export type ExternalConstraint = Exclude<Constraint, InternalConstraint>;
 
-/**
- * Whether every role a constraint names must belong to its fact type. The
- * same question as `isInternalConstraint` asked for validation's sake;
- * kept under its own name because that is the question its callers ask.
- */
-export function requiresLocalRoles(c: Constraint): boolean {
-  return isInternalConstraint(c);
-}
-
 /** Whether `c` lives in its fact type (see `PLACEMENT`). */
 export function isInternalConstraint(c: Constraint): c is InternalConstraint {
   return PLACEMENT[c.type] === "internal";

@@ -32,6 +32,36 @@ describe("barwise verbalize", () => {
     expect(parsed[0]).toHaveProperty("text");
   });
 
+  it("names every constraint row by its own id and the fact types it applies to", async () => {
+    // orm-format-3 Open decision 9: one rule for every constraint row, so a
+    // consumer resolves sourceElementId as a constraint and factTypeIds as
+    // fact types, whatever the kind. The external uniqueness spans both.
+    const fixture = resolve(
+      __dirname,
+      "../../../../test-plan/fixtures/external-uniqueness.orm.yaml",
+    );
+    for (const extra of [[], ["--counterexamples"]]) {
+      const result = await runCli(["verbalize", fixture, "--format", "json", ...extra]);
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout);
+      const rows: Array<{ category: string; sourceElementId: string; factTypeIds?: string[]; }> =
+        Array.isArray(parsed) ? parsed : parsed.verbalizations;
+      const factTypeIds = new Set(
+        rows.filter((r) => r.category === "fact_type").map((r) => r.sourceElementId),
+      );
+      const constraints = rows.filter((r) => r.category === "constraint");
+      expect(constraints.length).toBeGreaterThan(0);
+      for (const r of constraints) {
+        expect(factTypeIds.has(r.sourceElementId), r.sourceElementId).toBe(false);
+        expect(r.factTypeIds!.every((id) => factTypeIds.has(id))).toBe(true);
+      }
+      expect(constraints.map((r) => r.factTypeIds!.length).sort()).toEqual([1, 1, 2]);
+      expect(rows.some((r) => r.category === "section")).toBe(true);
+      expect(rows.filter((r) => r.category !== "constraint").every((r) => !("factTypeIds" in r)))
+        .toBe(true);
+    }
+  });
+
   it("filters by fact type with --fact-type", async () => {
     const result = await runCli([
       "verbalize",
@@ -59,6 +89,30 @@ describe("barwise verbalize", () => {
     ]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).not.toContain("== Open questions ==");
+  });
+
+  it("treats an empty --fact-type as a name that is not found", async () => {
+    const result = await runCli(["verbalize", `${fixtures}/simple.orm.yaml`, "--fact-type", ""]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(`Fact type "" not found in model.`);
+  });
+
+  it("gives a project domain without the fact type no counterexamples", async () => {
+    const result = await runCli([
+      "verbalize",
+      `${fixtures}/project/project.orm-project.yaml`,
+      "--fact-type",
+      "Customer has Email",
+      "--counterexamples",
+      "--format",
+      "json",
+    ]);
+    expect(result.exitCode).toBe(0);
+    const blocks: Array<{ domain: string; counterexamples: unknown[]; }> = JSON.parse(
+      result.stdout,
+    );
+    expect(blocks.find((b) => b.domain === "crm")!.counterexamples.length).toBeGreaterThan(0);
+    expect(blocks.find((b) => b.domain === "billing")!.counterexamples).toEqual([]);
   });
 
   it("appends counterexamples with --counterexamples", async () => {

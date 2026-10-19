@@ -36,8 +36,39 @@ export interface Verbalization {
   readonly text: string;
   /** The id of the model element this verbalization describes. */
   readonly sourceElementId: string;
-  /** What kind of element was verbalized. */
-  readonly category: "fact_type" | "constraint" | "subtype" | "objectification" | "open_question";
+  /**
+   * What kind of element was verbalized. A `section` row is a heading the
+   * model verbalization emits before a group of rows, not an element.
+   */
+  readonly category:
+    | "fact_type"
+    | "constraint"
+    | "subtype"
+    | "objectification"
+    | "open_question"
+    | "section";
+  /**
+   * On a constraint row: the fact types the constraint applies to, one
+   * for an internal constraint, every fact type holding one of its roles
+   * for one across fact types, and its `sourceElementId` is the
+   * constraint id. The one exception is an object type's cardinality, a
+   * property of the object type rather than a constraint in a list: its
+   * row names the object type and has no fact types.
+   */
+  readonly factTypeIds?: readonly string[];
+}
+
+/**
+ * Whether a row is a statement about the model, as opposed to the
+ * `section` heading the model verbalization places over the constraints
+ * across fact types. Consumers that count, number or match statements use
+ * it, so that heading is never read as a reading. (The "Open questions"
+ * heading of `verbalizeModelWithAnnotations` predates this category and is
+ * still an `open_question` row, so it is counted until barwise-rsy moves it
+ * to `section`.)
+ */
+export function isStatement(v: { readonly category: string; }): boolean {
+  return v.category !== "section";
 }
 
 /**

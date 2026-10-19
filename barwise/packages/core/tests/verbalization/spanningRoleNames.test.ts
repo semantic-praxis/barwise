@@ -68,7 +68,12 @@ describe("a subset constraint whose superset role is in another fact type", () =
 
     const text = verbalizedText(model);
 
-    expect(text).toContain("If Vendor then Vendor in Vendor has VendorStatus.");
+    // Both sides are qualified: a constraint across fact types lives in the
+    // model, not in the fact type a 2.0 file nests it under, so neither
+    // side is its own (orm-format-3, placement by kind).
+    expect(text).toContain(
+      "If Vendor in Vendor has VendorClassification then Vendor in Vendor has VendorStatus.",
+    );
     // The role id must not appear anywhere: printing it was the defect.
     expect(text).not.toMatch(UUID_SHAPED);
     expect(text).not.toContain(foreignRoleId);
@@ -100,7 +105,9 @@ describe("a subset constraint whose superset role is in another fact type", () =
 
     const text = verbalizedText(model);
 
-    expect(text).toContain("Vendor if and only if Vendor in Vendor has VendorStatus.");
+    expect(text).toContain(
+      "Vendor in Vendor has VendorClassification if and only if Vendor in Vendor has VendorStatus.",
+    );
     expect(text).not.toMatch(UUID_SHAPED);
   });
 
