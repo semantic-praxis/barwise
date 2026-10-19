@@ -38,9 +38,9 @@ describe("verbalize_model tool", () => {
     expect(result.content[0]!.text).toContain("No fact type found");
   });
 
-  it("treats an empty fact type as a name that is not found, as the CLI does", () => {
-    const result = executeVerbalize(ws.fixture("simple.orm.yaml"), "");
-    expect(result.content[0]!.text).toBe('No fact type found matching "".');
+  it("treats an empty fact type as none, since a model sends it for an unset field", () => {
+    const whole = executeVerbalize(ws.fixture("simple.orm.yaml"));
+    expect(executeVerbalize(ws.fixture("simple.orm.yaml"), "")).toEqual(whole);
   });
 
   it("returns content in MCP format", () => {

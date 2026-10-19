@@ -100,7 +100,12 @@ export function executeVerbalize(
   return boundedTextResult(warn + parts.join("\n\n"), { kind: "verbalization", source: spill });
 }
 
-/** The original single-model behavior, kept byte-for-byte. */
+/**
+ * The original single-model behavior, kept byte-for-byte. An empty or null
+ * `factType` means no fact type, unlike the CLI's `--fact-type ""`: the
+ * callers here are models filling an optional field, which send "" or null
+ * for "none", and VS Code forwards their input unvalidated.
+ */
 function verbalizeSingle(
   model: OrmModel,
   spill: string | undefined,
@@ -109,12 +114,12 @@ function verbalizeSingle(
   counterexamples: boolean,
   annotate: boolean,
 ): { content: Array<{ type: "text"; text: string; }>; } {
-  if (factType !== undefined && !model.getFactTypeByName(factType)) {
+  if (factType && !model.getFactTypeByName(factType)) {
     return {
       content: [{ type: "text" as const, text: `No fact type found matching "${factType}".` }],
     };
   }
-  if (factType === undefined && mode === "summary") {
+  if (!factType && mode === "summary") {
     const verbalizations = new Verbalizer().verbalizeModel(model);
     return { content: [{ type: "text" as const, text: buildSummary(verbalizations) }] };
   }
@@ -134,7 +139,7 @@ function verbalizeText(
 ): string {
   const verbalizer = new Verbalizer();
 
-  if (factType !== undefined) {
+  if (factType) {
     const ft = model.getFactTypeByName(factType);
     if (!ft) return `No fact type found matching "${factType}".`;
     const verbalizations = verbalizer.verbalizeFactType(ft.id, model);
