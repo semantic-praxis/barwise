@@ -4,9 +4,10 @@
  * fact types it applies to; a whole-model list says each constraint once;
  * a view of one fact type or entity says every constraint touching it,
  * once; and which constraints each view says does not depend on which fact
- * type a 2.0 file nested a constraint under. Their order still does:
- * constraints across fact types follow file order until storage moves to
- * the model (WS3c), which is why the last test compares sorted lists.
+ * type a 2.0 file nested a constraint under (every constraint here states
+ * its id). Their order still does: constraints across fact types follow
+ * their position in the file, which is why the last test compares sorted
+ * lists.
  */
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";

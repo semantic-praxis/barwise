@@ -924,15 +924,15 @@ Implementation notes (2026-10-19):
   - Order changed in two ways a positional consumer can see. Within a fact
     type, its own constraints now come first and those across fact types
     after, where the nested list interleaved them. And the constraints
-    across fact types still follow file order, so moving one to another
-    host reorders them. The set each view says does not change for a
-    constraint whose id the file states; one whose id is derived on load
-    takes a new id when it moves, because WS2 seeds that id with the fact
-    type it is nested under (and numbers identical constraints in list
-    order, so a move can renumber an identical one that stayed). The
-    reordering lasts until storage moves to the model (WS3c); the id
-    change lasts until format 3.0 writes the ids into the file (WS4), since
-    3c keeps hashing the 2.0 host.
+    across fact types follow their position in a 2.0 file, so moving one
+    to another fact type in the file reorders them. For constraints whose
+    ids the file states, the set each view says does not change.
+  - A constraint whose id a 2.0 file omits is the exception. WS2 derives
+    its id from the fact type it is nested under, its content, and its
+    place among identical constraints there, so a move changes its id and
+    can renumber identical id-less constraints in the fact types it left
+    and joined. Saving the file states the ids, which ends this for that
+    file.
   - The CLI (`barwise query --json`) and MCP (`query_model`) print the
     result as it is, so their output changes shape with it and neither
     needed code. `mcp/tests/tools/queryModel.test.ts` pins the ids and the
