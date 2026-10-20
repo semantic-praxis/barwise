@@ -59,10 +59,15 @@ export interface ConstraintRef {
   readonly constraintType: string;
   /** FORML verbalization of the constraint. */
   readonly verbalization: string;
-  /** Name of the fact type the constraint is attached to. */
-  readonly factType: string;
-  /** Id of the fact type the constraint is attached to. */
-  readonly factTypeId: string;
+  /**
+   * Names of the fact types the constraint applies to, in model order: one
+   * for an internal constraint, every fact type it spans for one across
+   * fact types (orm-format-3, Open decision 9). Never the fact type a 2.0
+   * file happened to nest it under.
+   */
+  readonly factTypes: readonly string[];
+  /** Ids of the same fact types, in the same order. */
+  readonly factTypeIds: readonly string[];
 }
 
 /** A lightweight reference to a role within a fact type. */

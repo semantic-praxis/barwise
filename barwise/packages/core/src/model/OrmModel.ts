@@ -1,6 +1,7 @@
 import {
   type Constraint,
   type ExternalConstraint,
+  type InternalConstraint,
   isExternalConstraint,
   roleIdsOf,
 } from "./Constraint.js";
@@ -12,6 +13,16 @@ import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./Obje
 import { Population, type PopulationConfig } from "./Population.js";
 import type { Role } from "./Role.js";
 import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
+
+/**
+ * A constraint in a view of fact types: an internal one with the fact type
+ * it lives in, one across fact types with none. The second has no host
+ * (orm-format-3, Open decision 9), so a reader that wants to name its fact
+ * types asks for the ones it spans rather than being handed one.
+ */
+export type ConstraintInView =
+  | readonly [constraint: InternalConstraint, factType: FactType]
+  | readonly [constraint: ExternalConstraint, factType: undefined];
 
 /**
  * Configuration for creating a new OrmModel.
@@ -176,10 +187,14 @@ export class OrmModel {
    * may span fact types (orm-format-3, placement by kind). Until storage
    * moves (WS3c) they are read from the fact types a 2.0 file nests them
    * under, in fact type order and then list order -- the order a reader
-   * walking every fact type's list met them in, so such a reader that
-   * switches to this list reports in the same order. (A reader that skipped
-   * some fact types, as the diagram skips absorbed ones, now sees the
-   * constraints nested under them too.)
+   * walking every fact type's list met them in, so a reader of the external
+   * kinds alone that switches to this list reports in the same order. A
+   * reader of every kind that moves to `internalConstraints` plus this
+   * list does not: a view of one fact type says its own constraints first,
+   * and a whole-model view says every fact type's own constraints before
+   * any of these. (A reader that skipped some fact types, as the
+   * diagram skips absorbed ones, now sees the constraints nested under them
+   * too.)
    */
   get constraints(): readonly ExternalConstraint[] {
     return this.factTypes.flatMap((ft) => ft.constraints.filter(isExternalConstraint));
@@ -192,18 +207,44 @@ export class OrmModel {
    * it touches; a whole-model reader wants each fact type's
    * `internalConstraints` plus `constraints` once instead.
    *
-   * Verbalization and counterexamples ask here by id, so their views of
-   * one fact type cannot disagree (describe still reads the nested list
-   * until WS3a-ii-c moves it). The answer is about this model's
+   * Verbalization and counterexamples ask here by id, and query asks
+   * `constraintsTouchingAny`, which this is the one fact type case of, so
+   * their views of one fact type cannot disagree (describe still reads the
+   * nested list until WS3a-ii-c moves it). The answer is about this model's
    * fact type: a fact type it does not have touches nothing here.
    */
   constraintsTouching(factTypeId: string): readonly Constraint[] {
-    const ft = this._factTypes.get(factTypeId);
-    if (!ft) return [];
-    return [
-      ...ft.internalConstraints,
-      ...this.constraints.filter((c) => roleIdsOf(c).some((rid) => ft.hasRole(rid))),
-    ];
+    return this.constraintsTouchingAny([factTypeId]).map(([c]) => c);
+  }
+
+  /**
+   * Every constraint touching any of these fact types, each once, in the
+   * order given: each fact type's own constraints, then each constraint
+   * across fact types touching it that an earlier one did not. The view of
+   * an entity or of several fact types, so a constraint spanning two of
+   * them is said once; `constraintsTouching` is the one fact type case.
+   * Ids this model does not have touch nothing, and an id given twice adds
+   * nothing the second time.
+   */
+  constraintsTouchingAny(factTypeIds: readonly string[]): readonly ConstraintInView[] {
+    const across = this.constraints;
+    const seen = new Set<Constraint>();
+    const touching: ConstraintInView[] = [];
+    for (const id of factTypeIds) {
+      const ft = this._factTypes.get(id);
+      if (!ft) continue;
+      for (const c of ft.internalConstraints) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        touching.push([c, ft]);
+      }
+      for (const c of across) {
+        if (seen.has(c) || !roleIdsOf(c).some((rid) => ft.hasRole(rid))) continue;
+        seen.add(c);
+        touching.push([c, undefined]);
+      }
+    }
+    return touching;
   }
 
   /**

@@ -2,11 +2,11 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, its query part 2026-10-20; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
-Last-updated: 2026-10-19
+Last-updated: 2026-10-20
 Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
@@ -898,6 +898,45 @@ Implementation notes (2026-10-19):
   - The editor needed no change: its source map indexes every mapping with
     an `id`, so a constraint's diagnostic lands on the constraint's own
     line. A 2.0 file that omits the id still falls to line 0.
+- **3a-ii-c lands as four PRs, one family each:** query, describe,
+  counterexamples (with barwise-0od), then graph references and lineage.
+- **Query (3a-ii-c, 2026-10-20).**
+  - `ConstraintRef.factType` and `factTypeId` become `factTypes` and
+    `factTypeIds`, the fact types the constraint applies to in model order
+    (one entry for an internal constraint). The id is the constraint's own;
+    the positional fallback `${ft.id}-constraint-${i}` is gone.
+  - Both come from the constraint's verbalization row, which has carried
+    the id and `factTypeIds` since 3a-ii-a, so query and verbalize cannot
+    disagree about which fact types a constraint spans.
+  - `list-constraints` says each fact type's own constraints, then each
+    constraint across fact types once. `fact-type`, `entity` and
+    `constraints-of` say every constraint touching the fact types in view,
+    once even when it spans two of them. Before, an entity whose two fact
+    types a key spanned listed it under whichever one nested it, and the
+    other fact type's view did not list it at all.
+  - "Every constraint touching these fact types, once" is
+    `OrmModel.constraintsTouchingAny`, beside `constraintsTouching`, which
+    is now its one fact type case. Query reads it here and reads
+    `model.constraints` once per view rather than once per fact type;
+    describe, the next PR, reads the same walk. Each entry is a
+    `ConstraintInView`: an internal constraint with its fact type, one
+    across fact types with none, so the walk cannot hand a reader a host.
+  - Order changed in two ways a positional consumer can see. Within a fact
+    type, its own constraints now come first and those across fact types
+    after, where the nested list interleaved them. And the constraints
+    across fact types follow their position in a 2.0 file, so moving one
+    to another fact type in the file reorders them. For constraints whose
+    ids the file states, the set each view says does not change.
+  - A constraint whose id a 2.0 file omits is the exception. WS2 derives
+    its id from the fact type it is nested under, its content, and its
+    place among identical constraints there, so a move changes its id and
+    can renumber identical id-less constraints in the fact types it left
+    and joined. Saving the file states the ids, which ends this for that
+    file.
+  - The CLI (`barwise query --json`) and MCP (`query_model`) print the
+    result as it is, so their output changes shape with it and neither
+    needed code. `mcp/tests/tools/queryModel.test.ts` pins the ids and the
+    span of a constraint across fact types at the MCP surface.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

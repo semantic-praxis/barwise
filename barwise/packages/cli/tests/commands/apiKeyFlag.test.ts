@@ -12,7 +12,7 @@
  * subprocess is not instrumented by the parent's coverage collector.
  */
 import { describe, expect, it } from "vitest";
-import { runCli } from "../workspace/run.js";
+import { runCli, warmPromptCommand } from "../workspace/run.js";
 
 // Assembled, not a literal: `check:secrets` scans this repository's history
 // including this file, so a realistic key shape here would make that gate
@@ -36,6 +36,8 @@ const COMMANDS: ReadonlyArray<readonly string[]> = [
   ["prompt", "eval"],
   ["prompt", "run", "/dev/null"],
 ];
+
+warmPromptCommand();
 
 describe("--api-key is refused", () => {
   for (const argv of COMMANDS) {

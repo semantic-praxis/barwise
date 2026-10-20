@@ -1,7 +1,8 @@
 /**
  * The read API for placement by kind (docs/specs/orm-format-3.spec.md, WS3a):
  * `FactType.internalConstraints`, `OrmModel.constraints`,
- * `OrmModel.constraintsTouching` and `OrmModel.getConstraint`, while storage
+ * `OrmModel.constraintsTouching`, `OrmModel.constraintsTouchingAny` and
+ * `OrmModel.getConstraint`, while storage
  * still nests every constraint under a fact type. The order assertions are
  * the point of the derived list: a reader that moves from walking each fact
  * type's list to `model.constraints` must meet the constraints in the order
@@ -144,6 +145,21 @@ describe("OrmModel.constraintsTouching", () => {
   it("is empty for a fact type the model does not have", () => {
     const { model } = rooms();
     expect(model.constraintsTouching("ft-missing")).toEqual([]);
+  });
+});
+
+describe("OrmModel.constraintsTouchingAny", () => {
+  it("says a constraint spanning two fact types in view once, where the first meets it", () => {
+    const { model } = rooms();
+    const touching = model.constraintsTouchingAny(["ft-nr", "ft-missing", "ft-in", "ft-nr"]);
+    // A constraint across fact types comes with no fact type: it has no host.
+    expect(touching.map(([c, ft]) => [c.id, ft?.id])).toEqual([
+      ["c-one-nr", "ft-nr"],
+      ["c-room-key", undefined],
+      ["c-one-building", "ft-in"],
+      ["c-in-mandatory", "ft-in"],
+      ["c-in-or-area", undefined],
+    ]);
   });
 });
 

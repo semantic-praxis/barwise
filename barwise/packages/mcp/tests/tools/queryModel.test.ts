@@ -46,6 +46,35 @@ model:
           role: r-order-placed-by
 `;
 
+/** A composite key across two fact types, nested under the second. */
+const roomsModel = `
+orm_version: "1.0"
+model:
+  name: Facilities
+  object_types:
+    - { id: ot-room, name: Room, kind: entity, reference_mode: id }
+    - { id: ot-building, name: Building, kind: entity, reference_mode: code }
+    - { id: ot-nr, name: RoomNumber, kind: value }
+  fact_types:
+    - id: ft-in
+      name: Room is in Building
+      roles:
+        - { id: r-1, player: ot-room, role_name: is in }
+        - { id: r-2, player: ot-building, role_name: houses }
+      readings: ["{0} is in {1}"]
+      constraints:
+        - { id: c-one-building, type: internal_uniqueness, roles: [r-1] }
+    - id: ft-nr
+      name: Room has RoomNumber
+      roles:
+        - { id: r-3, player: ot-room, role_name: has }
+        - { id: r-4, player: ot-nr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: c-one-nr, type: internal_uniqueness, roles: [r-3] }
+        - { id: c-room-key, type: external_uniqueness, roles: [r-2, r-4] }
+`;
+
 function parse(result: { content: Array<{ text: string; }>; }): Record<string, unknown> {
   return JSON.parse(result.content[0]!.text);
 }
@@ -69,6 +98,42 @@ describe("query_model tool", () => {
     const result = parsed.result as { kind: string; factTypes: unknown[]; };
     expect(result.kind).toBe("fact-types");
     expect(result.factTypes).toHaveLength(1);
+  });
+
+  it("names each constraint by its own id and the fact types it applies to (orm-format-3, Open decision 9)", () => {
+    const parsed = parse(executeQueryModel(roomsModel, "constraints-of Room"));
+    const result = parsed.result as { constraints: Record<string, unknown>[]; };
+    expect(result.constraints.map(({ id, factTypes, factTypeIds }) => ({
+      id,
+      factTypes,
+      factTypeIds,
+    }))).toEqual([
+      { id: "c-one-building", factTypes: ["Room is in Building"], factTypeIds: ["ft-in"] },
+      {
+        id: "c-room-key",
+        factTypes: ["Room is in Building", "Room has RoomNumber"],
+        factTypeIds: ["ft-in", "ft-nr"],
+      },
+      { id: "c-one-nr", factTypes: ["Room has RoomNumber"], factTypeIds: ["ft-nr"] },
+    ]);
+  });
+
+  it("gives a constraint the file leaves without an id its own derived id, not a position", () => {
+    const parsed = parse(executeQueryModel(simpleModel, "constraints-of Order"));
+    const refs = (parsed.result as { constraints: Record<string, unknown>[]; }).constraints;
+    const ids = refs.map((c) => c.id);
+    expect(new Set(ids).size).toBe(2);
+    // Derived from content, so a second load gives the same ids; a random
+    // fill would not.
+    const again = parse(executeQueryModel(simpleModel, "constraints-of Order"));
+    expect((again.result as { constraints: { id: string; }[]; }).constraints.map((c) => c.id))
+      .toEqual(ids);
+    for (const c of refs) {
+      expect(c.id).not.toMatch(/-constraint-\d+$/);
+      expect(c.id).not.toBe("ft-customer-places-order");
+      expect(c).not.toHaveProperty("factType");
+      expect(c).not.toHaveProperty("factTypeId");
+    }
   });
 
   it("returns model statistics", () => {

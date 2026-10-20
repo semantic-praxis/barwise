@@ -10,6 +10,7 @@
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { beforeAll } from "vitest";
 import { commandNameIn, createProgram } from "../../src/cli.js";
 
 // Mirror the bin entry: supply the real version so `--version` tests see
@@ -17,6 +18,32 @@ import { commandNameIn, createProgram } from "../../src/cli.js";
 const { version } = JSON.parse(
   readFileSync(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8"),
 ) as { version: string; };
+
+/**
+ * Load the `prompt` command in a `beforeAll`, so no test pays for it. The
+ * first call into it imports the command and its dependencies (promptlab,
+ * llm) through vitest's transform: the first test of prompt.test.ts took
+ * about 4.2s alone under coverage, and 35-38s in the pre-push coverage gate,
+ * which runs every package's suite at once on a 4-core machine. That
+ * exceeded the 30s test default on four pushes of
+ * semantic-praxis/barwise#689. In the hook the load gets its own limit and
+ * the tests keep the default, so a hung test still fails in 30s; with the
+ * hook that first test takes about 1.2s alone. Only the import is warmed:
+ * work an action does on each call, such as loading the eval suite, stays
+ * in the test. Every test file that runs `prompt` calls this once, at top
+ * level (tests/promptWarmup.test.ts checks). Why the import costs
+ * what it does is barwise-xlw.
+ */
+export function warmPromptCommand(): void {
+  beforeAll(async () => {
+    // createProgram rather than runCli: runCli turns any throw into exit 1,
+    // so a failed import would reach here without its message.
+    const program = await createProgram(version, "prompt");
+    if (!program.commands.some((c) => c.name() === "prompt")) {
+      throw new Error('createProgram(version, "prompt") registered no prompt command.');
+    }
+  }, 120_000);
+}
 
 export interface RunResult {
   readonly stdout: string;

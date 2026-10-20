@@ -115,7 +115,7 @@ export {
   type ValueRange,
   type ValueType,
 } from "./model/ObjectType.js";
-export { OrmModel, type OrmModelConfig } from "./model/OrmModel.js";
+export { type ConstraintInView, OrmModel, type OrmModelConfig } from "./model/OrmModel.js";
 export {
   type ExportFormat,
   OrmProject,
