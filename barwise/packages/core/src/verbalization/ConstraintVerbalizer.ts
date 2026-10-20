@@ -120,9 +120,9 @@ function asConstraintRow(
   return { ...v, sourceElementId: constraint.id ?? fallbackId, factTypeIds };
 }
 
-/** The fact types holding a constraint's roles, in model order. */
+/** The ids of the fact types a constraint applies to, in model order. */
 function factTypesSpanned(constraint: Constraint, model: OrmModel): string[] {
-  return model.factTypesHolding(roleIdsOf(constraint)).map((ft) => ft.id);
+  return model.factTypesOf(constraint).map((ft) => ft.id);
 }
 
 /** What `ConstraintVerbalizer.reportInView` says about a constraint. */

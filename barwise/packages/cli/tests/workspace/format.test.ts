@@ -35,11 +35,12 @@ describe("formatCounterexamples", () => {
   it("renders a header and one line per counterexample", () => {
     const counterexamples: Counterexample[] = [
       {
-        factTypeId: "ft1",
+        factTypeIds: ["ft1"],
         constraintType: "mandatory",
-        populations: [],
+        forbidden: [],
+        segments: [],
         text: "Some customer has no name.",
-      } as unknown as Counterexample,
+      },
     ];
     const out = formatCounterexamples(counterexamples);
     expect(out).toContain("Counterexamples (what the constraints rule out):");

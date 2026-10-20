@@ -984,9 +984,15 @@ Implementation notes (2026-10-19):
     --counterexamples`) projects `factTypeIds`; the VS Code hover shows a
     counterexample on every player of a fact type its constraint touches.
   - A subset or equality whose two role sequences sit in one fact type now
-    gets a witness, one fact whose two sides hold different values
+    gets a witness, one fact whose two sides read different tuples
     (barwise-0od), since validation checks those across the population
-    too (barwise-h2a). Sequences sharing a role get none.
+    too (barwise-h2a). The generator tries a few minted values on each
+    side, so a value constraint that makes the first choice collide does
+    not lose the witness, and sequences that share only some roles get one;
+    only the same roles, or domains leaving one choice, get none.
+  - The span is `OrmModel.factTypesOf(constraint)`, now the one answer
+    verbalization rows, validation messages and counterexamples name a
+    constraint by; each had its own `factTypesHolding(roleIdsOf(c))`.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

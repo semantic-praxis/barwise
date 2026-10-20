@@ -90,7 +90,7 @@ describe("counterexamples over constraints across fact types", () => {
   });
 });
 
-/** Person reviews Paper / Person authors Paper in one ternary-free model. */
+/** One binary fact type, Person mentors Person, nesting the constraint given. */
 function reviews(c: (ft: string) => Constraint): OrmModel {
   const model = new OrmModel({ name: "Reviews" });
   model.addObjectType({ id: "ot-person", name: "Person", kind: "entity", referenceMode: "id" });
@@ -131,7 +131,56 @@ describe("subset and equality within one fact type (barwise-0od)", () => {
     expect(counterexampleRoundTripFailure(model)).toBeUndefined();
   });
 
-  it("gives none when the two sequences share a role", () => {
+  it("finds a witness when a value constraint makes the first choice collide", () => {
+    // RoomCode admits x and y on one role and only x on the other, so the
+    // first values minted for the two sides are the same, x.
+    const model = new OrmModel({ name: "Codes" });
+    model.addObjectType({ id: "ot-code", name: "Code", kind: "value" });
+    model.addFactType({
+      id: "ft-maps",
+      name: "Code maps to Code",
+      roles: [
+        { id: "r-from", name: "maps to", playerId: "ot-code" },
+        { id: "r-to", name: "is mapped from", playerId: "ot-code" },
+      ],
+      readings: ["{0} maps to {1}"],
+      constraints: [
+        { id: "vc-from", type: "value_constraint", roleId: "r-from", values: ["x", "y"] },
+        { id: "vc-to", type: "value_constraint", roleId: "r-to", values: ["x"] },
+        { id: "c-sub", type: "subset", subsetRoleIds: ["r-from"], supersetRoleIds: ["r-to"] },
+      ],
+    });
+    expect(generateCounterexamples(model).map((c) => c.constraintId)).toContain("c-sub");
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
+
+  it("finds a witness when the two sequences share only some roles", () => {
+    const model = new OrmModel({ name: "Referrals" });
+    model.addObjectType({ id: "ot-emp", name: "Emp", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "ot-person", name: "Person", kind: "entity", referenceMode: "id" });
+    model.addFactType({
+      id: "ft-recommends",
+      name: "Emp recommends Person to Person",
+      roles: [
+        { id: "r-1", name: "recommends", playerId: "ot-emp" },
+        { id: "r-2", name: "is recommended", playerId: "ot-person" },
+        { id: "r-3", name: "is recommended to", playerId: "ot-person" },
+      ],
+      readings: ["{0} recommends {1} to {2}"],
+      constraints: [
+        {
+          id: "c-sub",
+          type: "subset",
+          subsetRoleIds: ["r-1", "r-2"],
+          supersetRoleIds: ["r-1", "r-3"],
+        },
+      ],
+    });
+    expect(generateCounterexamples(model).map((c) => c.constraintId)).toEqual(["c-sub"]);
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
+
+  it("gives none when the two sequences are the same roles", () => {
     const model = reviews(() => ({
       id: "c-self",
       type: "subset",

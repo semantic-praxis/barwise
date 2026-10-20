@@ -263,10 +263,21 @@ export class OrmModel {
   }
 
   /**
+   * The fact types a constraint applies to: those holding its roles, in
+   * model order (orm-format-3, Open decision 9). One for an internal
+   * constraint, every fact type it spans for one across fact types. The
+   * one answer verbalization rows, validation messages and counterexamples
+   * all name a constraint by.
+   */
+  factTypesOf(constraint: Constraint): readonly FactType[] {
+    return this.factTypesHolding(roleIdsOf(constraint));
+  }
+
+  /**
    * The fact types holding any of these roles, in model order. A dangling
-   * role id holds no fact type and adds none. The one answer to "which fact
-   * types does this constraint apply to", for the verbalizer's row fields
-   * and its role labels alike.
+   * role id holds no fact type and adds none. `factTypesOf` is the answer
+   * for a whole constraint; this is the one for some of its roles, as the
+   * verbalizer's role labels need.
    */
   factTypesHolding(roleIds: readonly string[]): readonly FactType[] {
     return this.factTypes.filter((ft) => roleIds.some((rid) => ft.hasRole(rid)));
