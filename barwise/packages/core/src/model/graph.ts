@@ -83,13 +83,21 @@ export interface UnresolvedReference {
  * not enough in practice: `validation/` reports a dangling constraint
  * role under a per-KIND rule id (`mandatoryInvalidRole`,
  * `ringInvalidRole`, `frequencyInvalidRole` and four more), keyed on the
- * constraint's `type`, and names the owning fact type as the affected
- * element. Neither is recoverable from an id -- a constraint's id is
+ * constraint's `type`, and names the fact type an internal constraint
+ * lives in. Neither is recoverable from an id -- a constraint's id is
  * optional, so there may not even be one.
+ *
+ * A constraint's `factType` is the one it lives in, and is undefined for
+ * a constraint across fact types, which lives in none (orm-format-3, Open
+ * decision 9): the fact type a 2.0 file nests it under is not its owner.
  */
 export type ReferenceSource =
   | { readonly kind: "role"; readonly role: Role; readonly factType: FactType; }
-  | { readonly kind: "constraint"; readonly constraint: Constraint; readonly factType: FactType; }
+  | {
+    readonly kind: "constraint";
+    readonly constraint: Constraint;
+    readonly factType: FactType | undefined;
+  }
   | { readonly kind: "subtypeFact"; readonly subtypeFact: SubtypeFact; }
   | {
     readonly kind: "objectifiedFactType";
@@ -218,41 +226,39 @@ export function graphOf(model: OrmModel): GraphResult {
   // about. Keying by the object cannot have that hole.
   const rolesOfConstraint = new Map<Constraint, Role[]>();
   const constraintsByRole = new Map<string, Constraint[]>();
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      const resolved: Role[] = [];
-      for (const roleId of roleIdsOf(c)) {
-        const role = roleById.get(roleId);
-        if (!role) {
-          unresolved.push({
-            from: { kind: "constraint", constraint: c, factType: ft },
-            field: "roleIds",
-            missing: roleId,
-          });
-          continue;
-        }
-        resolved.push(role);
-        const list = constraintsByRole.get(role.id);
-        if (list) list.push(c);
-        else constraintsByRole.set(role.id, [c]);
+  for (const [c, ft] of model.everyConstraint()) {
+    const resolved: Role[] = [];
+    for (const roleId of roleIdsOf(c)) {
+      const role = roleById.get(roleId);
+      if (!role) {
+        unresolved.push({
+          from: { kind: "constraint", constraint: c, factType: ft },
+          field: "roleIds",
+          missing: roleId,
+        });
+        continue;
       }
-      // A join operand's path is rooted at an object type, which is a
-      // reference like any other. Enumerated systematically rather than
-      // found one at a time: Role.playerId, the constraint role ids,
-      // these path roots, SubtypeFact's two ends, ObjectifiedFactType's
-      // two, and Population.factTypeId are every id-shaped field in the
-      // metamodel. JoinOperand.projection holds indices, not ids.
-      for (const otId of objectTypeIdsOf(c)) {
-        if (!model.getObjectType(otId)) {
-          unresolved.push({
-            from: { kind: "constraint", constraint: c, factType: ft },
-            field: "path.root",
-            missing: otId,
-          });
-        }
-      }
-      rolesOfConstraint.set(c, resolved);
+      resolved.push(role);
+      const list = constraintsByRole.get(role.id);
+      if (list) list.push(c);
+      else constraintsByRole.set(role.id, [c]);
     }
+    // A join operand's path is rooted at an object type, which is a
+    // reference like any other. Enumerated systematically rather than
+    // found one at a time: Role.playerId, the constraint role ids,
+    // these path roots, SubtypeFact's two ends, ObjectifiedFactType's
+    // two, and Population.factTypeId are every id-shaped field in the
+    // metamodel. JoinOperand.projection holds indices, not ids.
+    for (const otId of objectTypeIdsOf(c)) {
+      if (!model.getObjectType(otId)) {
+        unresolved.push({
+          from: { kind: "constraint", constraint: c, factType: ft },
+          field: "path.root",
+          missing: otId,
+        });
+      }
+    }
+    rolesOfConstraint.set(c, resolved);
   }
 
   for (const sf of model.subtypeFacts) {

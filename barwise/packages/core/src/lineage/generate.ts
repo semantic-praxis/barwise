@@ -104,48 +104,47 @@ export function generateDdlLineage(
       }
 
       if (fk.sourceConstraintId) {
-        // Find which fact type contains this constraint
-        for (const ft of model.factTypes) {
-          for (const constraint of ft.constraints) {
-            if (constraint.id === fk.sourceConstraintId) {
-              // Add the constraint as a source
-              sources.set(constraint.id, {
-                elementId: constraint.id,
-                elementType: "Constraint",
-                elementName: getConstraintName(constraint, ft),
-              });
+        const inView = model.getConstraintInView(fk.sourceConstraintId);
+        if (inView) {
+          const [constraint] = inView;
+          // The fact types the constraint is named by (orm-format-3, Open
+          // decision 9): its own for an internal one, every one it spans
+          // for one across fact types, such as a composite key.
+          const named = model.factTypesNaming(inView);
+          sources.set(constraint.id!, {
+            elementId: constraint.id!,
+            elementType: "Constraint",
+            elementName: getConstraintName(constraint, named),
+          });
 
-              // Also add the fact type if not already present
-              if (!sources.has(ft.id)) {
-                sources.set(ft.id, {
-                  elementId: ft.id,
-                  elementType: "FactType",
-                  elementName: ft.name,
+          for (const ft of named) {
+            if (!sources.has(ft.id)) {
+              sources.set(ft.id, {
+                elementId: ft.id,
+                elementType: "FactType",
+                elementName: ft.name,
+              });
+            }
+
+            // Add all roles and their players from this fact type
+            for (const r of ft.roles) {
+              if (!sources.has(r.id)) {
+                sources.set(r.id, {
+                  elementId: r.id,
+                  elementType: "Role",
+                  elementName: r.name,
                 });
               }
 
-              // Add all roles and their players from this fact type
-              for (const r of ft.roles) {
-                if (!sources.has(r.id)) {
-                  sources.set(r.id, {
-                    elementId: r.id,
-                    elementType: "Role",
-                    elementName: r.name,
-                  });
-                }
-
-                const player = model.getObjectType(r.playerId);
-                if (player && !sources.has(player.id)) {
-                  const playerType = player.kind === "entity" ? "EntityType" : "ValueType";
-                  sources.set(player.id, {
-                    elementId: player.id,
-                    elementType: playerType,
-                    elementName: player.name,
-                  });
-                }
+              const player = model.getObjectType(r.playerId);
+              if (player && !sources.has(player.id)) {
+                const playerType = player.kind === "entity" ? "EntityType" : "ValueType";
+                sources.set(player.id, {
+                  elementId: player.id,
+                  elementType: playerType,
+                  elementName: player.name,
+                });
               }
-
-              break;
             }
           }
         }
@@ -212,6 +211,7 @@ export function generateModelLineage(
 
     // Find all fact types that involve this entity
     const relatedFactTypes = model.factTypesForObjectType(entity.id);
+    const seenConstraints = new Set<Constraint>();
 
     for (const ft of relatedFactTypes) {
       // Add the fact type
@@ -240,13 +240,16 @@ export function generateModelLineage(
         }
       }
 
-      // Add constraints from this fact type
-      for (const constraint of ft.constraints) {
-        if (constraint.id) {
+      // Add the constraints touching this fact type, each once for the
+      // entity even when it spans two of the entity's fact types.
+      for (const inView of model.constraintsTouchingAny([ft.id])) {
+        const [constraint] = inView;
+        if (constraint.id && !seenConstraints.has(constraint)) {
+          seenConstraints.add(constraint);
           sources.push({
             elementId: constraint.id,
             elementType: "Constraint",
-            elementName: getConstraintName(constraint, ft),
+            elementName: getConstraintName(constraint, model.factTypesNaming(inView)),
           });
         }
       }
@@ -311,12 +314,15 @@ const GENERIC_LABELED: Record<
 };
 
 /**
- * Helper to generate a readable name for a constraint.
+ * A readable name for a constraint, by the fact types it is named by
+ * (`OrmModel.factTypesNaming`): one for an internal constraint, every
+ * one it spans for one across fact types, joined with "and".
  */
 function getConstraintName(
   constraint: { type: Constraint["type"]; id?: string; },
-  factType: { name: string; },
+  factTypes: readonly { name: string; }[],
 ): string {
+  const factType = { name: factTypes.map((ft) => ft.name).join(" and ") };
   switch (constraint.type) {
     case "internal_uniqueness":
       return `UC: ${factType.name}`;

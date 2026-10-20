@@ -23,8 +23,8 @@
  * stated here rather than discovered.
  */
 
-import type { Constraint, JoinOperand } from "../model/Constraint.js";
-import { joinOperandsOf } from "../model/Constraint.js";
+import type { ExternalConstraint, InternalConstraint, JoinOperand } from "../model/Constraint.js";
+import { isExternalConstraint, joinOperandsOf } from "../model/Constraint.js";
 import type { UnresolvedReference } from "../model/graph.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { RolePathStep } from "../model/RolePath.js";
@@ -50,33 +50,43 @@ type InvalidRoleRuleId =
   | typeof RULE_ID.ringInvalidRole;
 
 /**
- * The rule id for a dangling role reference on a constraint, by kind.
+ * The rule id for a dangling role reference on an internal constraint, by
+ * kind. Each renders from (factTypeName, roleId): an internal constraint
+ * lives in one fact type, and the message names it.
  *
  * A total `Record` rather than a switch with a default arm: a constraint
  * kind added later fails to compile here until it is given an id,
- * instead of silently reporting under someone else's. The join kinds are
- * excluded because their references are reported per hop, not per role
- * -- see `joinStepDiagnostic`. Kinds whose dangling roles were never
- * reported separately map to the internal-uniqueness id, which is what
- * `constraintConsistency` used for the generic case.
+ * instead of silently reporting under someone else's.
  */
-const CONSTRAINT_INVALID_ROLE: Record<
-  Exclude<Constraint["type"], JoinConstraintType>,
-  InvalidRoleRuleId
-> = {
+const CONSTRAINT_INVALID_ROLE: Record<InternalConstraint["type"], InvalidRoleRuleId> = {
   internal_uniqueness: RULE_ID.internalUniquenessInvalidRole,
-  external_uniqueness: RULE_ID.internalUniquenessInvalidRole,
   mandatory: RULE_ID.mandatoryInvalidRole,
-  disjunctive_mandatory: RULE_ID.mandatoryInvalidRole,
   frequency: RULE_ID.frequencyInvalidRole,
   cardinality: RULE_ID.cardinalityInvalidRole,
   value_constraint: RULE_ID.valueConstraintInvalidRole,
   value_comparison: RULE_ID.valueComparisonInvalidRole,
   ring: RULE_ID.ringInvalidRole,
-  exclusion: RULE_ID.internalUniquenessInvalidRole,
-  exclusive_or: RULE_ID.mandatoryInvalidRole,
-  subset: RULE_ID.internalUniquenessInvalidRole,
-  equality: RULE_ID.internalUniquenessInvalidRole,
+};
+
+/**
+ * How `unknownRole` names each kind of constraint across fact types, by
+ * kind. These reported under the internal kinds' templates until
+ * orm-format-3 WS3a-ii-c, which named the fact type a 2.0 file nested
+ * them under and the wrong kind ("Internal uniqueness constraint in fact
+ * type ..." for an exclusion). The join kinds are excluded because their
+ * references are reported per hop, not per role -- see
+ * `joinStepDiagnostic`.
+ */
+const EXTERNAL_KIND_LABEL: Record<
+  Exclude<ExternalConstraint["type"], JoinConstraintType>,
+  string
+> = {
+  external_uniqueness: "External uniqueness",
+  disjunctive_mandatory: "Disjunctive mandatory",
+  exclusion: "Exclusion",
+  exclusive_or: "Exclusive-or",
+  subset: "Subset",
+  equality: "Equality",
 };
 
 /** Diagnostics for every reference `graphOf` could not resolve. */
@@ -133,11 +143,23 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
           u.missing,
         );
       }
+      if (isExternalConstraint(constraint)) {
+        return report(
+          RULE_ID.unknownRole,
+          "default",
+          constraintElementId(constraint),
+          EXTERNAL_KIND_LABEL[constraint.type],
+          constraintSpan(model, constraint),
+          u.missing,
+        );
+      }
+      // An internal constraint always arrives with the fact type it lives
+      // in (`graphOf` walks `everyConstraint`).
       return report(
         CONSTRAINT_INVALID_ROLE[constraint.type],
         "default",
-        factType.id,
-        factType.name,
+        factType!.id,
+        factType!.name,
         u.missing,
       );
     }

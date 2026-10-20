@@ -67,6 +67,7 @@ export const RULE_ID = {
   joinEmptyProjection: "constraint/join-empty-projection",
   joinTooFewOperands: "constraint/join-too-few-operands",
   joinUnknownRoot: "constraint/join-unknown-root",
+  unknownRole: "constraint/unknown-role",
   mandatoryInvalidRole: "constraint/mandatory-invalid-role",
   ringDifferentPlayers: "constraint/ring-different-players",
   ringInvalidRole: "constraint/ring-invalid-role",
@@ -388,6 +389,14 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (cTypeJoinEqualityEqualityExclusion: string, span: string): string =>
         `Join ${cTypeJoinEqualityEqualityExclusion} constraint over ${span} must have at least two operands.`,
+    },
+  },
+  [RULE_ID.unknownRole]: {
+    severity: "error",
+    description: "A constraint across fact types names a role that no fact type in the model has.",
+    messages: {
+      default: (kind: string, span: string, roleId: string): string =>
+        `${kind} constraint over ${span} references role id "${roleId}", which no fact type in the model has.`,
     },
   },
   [RULE_ID.joinUnknownRoot]: {

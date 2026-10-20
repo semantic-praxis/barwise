@@ -304,6 +304,15 @@ export class OrmModel {
     return undefined;
   }
 
+  /**
+   * Look up a constraint by id, with the fact type it lives in when it is
+   * internal and none when it spans fact types: the pair a view names it
+   * by (`factTypesNaming`), never the fact type a 2.0 file nests it under.
+   */
+  getConstraintInView(id: string): ConstraintInView | undefined {
+    return this.everyConstraint().find(([c]) => c.id === id);
+  }
+
   /** Look up a fact type by name. */
   getFactTypeByName(name: string): FactType | undefined {
     return this.factTypes.find((ft) => ft.name === name);
