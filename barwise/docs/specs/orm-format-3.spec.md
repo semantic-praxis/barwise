@@ -846,20 +846,19 @@ Implementation notes (2026-10-19):
     (`localFactType`), not every role in the host. Three behaviours change
     with it. An external uniqueness whose roles all sit in a fact type
     other than its host now draws `external-uniqueness-all-local`; before,
-    the host-relative check missed it. A local subset or equality nested
-    elsewhere is checked against its own fact type's population by the
-    local rule, where the spanning rule used to catch it under a different
-    message. And both completeness gates read
+    the host-relative check missed it. And both completeness gates read
     `constraintsTouching`: a fact type touched only by a constraint nested
     in another one no longer draws `fact-type-without-constraints`, and,
     being constrained, a binary one now draws
     `fact-type-without-uniqueness` if it has no internal uniqueness;
     the host of a constraint that touches none of its roles is no longer
     counted as constrained by it.
-  - The local rules ask `localFactTypeOf(model, c) === ft` rather than
-    "every role is in this fact type", which an empty role list passes for
-    every population. An external uniqueness with no roles keeps its
-    all-local warning, now with its own message.
+  - `localFactTypeOf` answers "all local" for an external uniqueness, by
+    its roles rather than its host. (While local population rules existed,
+    they asked it too; the first cut asked "every role is in this fact
+    type", which an empty role list passes for every population.) An
+    external uniqueness with no roles keeps its all-local warning, now with
+    its own message.
   - **Exclusion and exclusive-or are checked across the population,
     always -- decided by the owner 2026-10-19.** The per-instance rules for
     them are gone, and the cross-population rules take their names
@@ -872,11 +871,17 @@ Implementation notes (2026-10-19):
     left with one message, now `default`. The two halves of exclusive-or
     read different sets: "plays more than one" is present data and counts
     sample populations, "plays none" reads the universe, which leaves them
-    out. Subset and equality still split into a local and a spanning rule,
-    and the two do not always agree -- an unfilled role, or one fact type
-    with two populations -- nor do their message ids read the right way
-    round; barwise-h2a carries that, the same question for those
-    kinds. No tracked model changes: all 27 set-comparison
+    out. Subset and equality followed the next
+    day, by the same decision (barwise-h2a): the local per-population rules
+    padded an unfilled role with an empty value and reported it, and missed
+    a tuple whose halves sat in two populations of one fact type, so
+    `checkSubsetViolations` and `checkEqualityViolations` now take every
+    one, `setComparison.ts` is gone, and their messages are `default` and
+    `reverse`. A local one's diagnostic now points at the constraint rather
+    than the population, and names the tuple rather than the instance: in an
+    id-less 2.0 file it falls to line 0, the trade Open decision 9 accepted.
+    The counterexample generator still treats them as local and out of
+    scope; that is barwise-0od, with 3a-ii-c. No tracked model changes: all 27 set-comparison
     constraints in the 113 tracked files span fact types.
   - An id-less 2.0 file places these diagnostics at line 0 where they
     used to sit on the host's line: the trade Open decision 9 accepted,
