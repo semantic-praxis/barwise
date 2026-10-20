@@ -257,6 +257,22 @@ describe("subset and equality within one fact type (barwise-0od)", () => {
     expect(counterexampleRoundTripFailure(model)).toBeUndefined();
   });
 
+  it("gives none when the two sides differ in length, an arity mismatch", () => {
+    for (
+      const [sub, sup] of [[["r-mentor"], ["r-mentor", "r-mentee"]], [["r-mentor", "r-mentee"], [
+        "r-mentor",
+      ]]]
+    ) {
+      const model = reviews(() => ({
+        id: "c-arity",
+        type: "subset",
+        subsetRoleIds: sub!,
+        supersetRoleIds: sup!,
+      }));
+      expect(generateCounterexamples(model), sub!.join()).toEqual([]);
+    }
+  });
+
   it("gives none when the two sequences are the same roles", () => {
     const model = reviews(() => ({
       id: "c-self",

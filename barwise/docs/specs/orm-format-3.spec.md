@@ -995,7 +995,10 @@ Implementation notes (2026-10-19):
     types: on the absent side no fact holds them all, so validation finds
     no absent tuple and one present fact is the witness; on the present
     side no one fact can be written, so a subset has none, rather than a
-    crash, and an equality tries its other side.
+    crash, and an equality tries its other side. Sides of different
+    lengths are an arity mismatch validation reports itself, and get none.
+    The local search compares tuples with validation's own
+    `makeCompositeKey`, so the two agree on what matches.
   - Naming is `OrmModel.factTypesNaming(inView)`: an internal constraint by
     the fact type it lives in, as `constraintsTouching` lists it, even when
     a stale role id leaves its roles naming nothing; one across fact types

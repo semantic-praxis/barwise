@@ -21,7 +21,10 @@ import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import { assertNever } from "../util/assertNever.js";
-import { identificationSharingAncestry } from "../validation/rules/population/shared.js";
+import {
+  identificationSharingAncestry,
+  makeCompositeKey,
+} from "../validation/rules/population/shared.js";
 import { describeValueRange } from "../verbalization/constraints/phase1.js";
 import {
   kwSeg,
@@ -455,7 +458,11 @@ function forTupleAbsence(
   const present = presentRoleIds.map((rid) => findRoleById(model, rid));
   const absent = absentRoleIds.map((rid) => findRoleById(model, rid));
   if (present.some((r) => !r) || absent.some((r) => !r)) return undefined;
-  if (presentRoleIds.length === 0) return undefined;
+  // Sides of different lengths are an arity mismatch validation reports
+  // on its own; there is no tuple comparison to witness.
+  if (presentRoleIds.length === 0 || presentRoleIds.length !== absentRoleIds.length) {
+    return undefined;
+  }
   const presentFt = present[0]!.ft;
   // One fact holds one fact type's roles, so a present side spanning fact
   // types cannot be written as one fact.
@@ -515,8 +522,11 @@ function localWitness(
         [[absentRoleIds, a], ...positional(presentRoleIds, p)],
         model,
       );
-      const differs = presentRoleIds.some((rid, i) => inst[rid] !== inst[absentRoleIds[i]!]);
-      if (differs) return inst;
+      // Tuples compared as validation keys them, so the two cannot disagree.
+      const fact = { roleValues: inst };
+      if (makeCompositeKey(fact, presentRoleIds) !== makeCompositeKey(fact, absentRoleIds)) {
+        return inst;
+      }
     }
   }
   return undefined;
