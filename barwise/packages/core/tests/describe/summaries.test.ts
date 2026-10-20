@@ -112,7 +112,8 @@ describe("buildEntityFocusSummary", () => {
       id: `c${i}`,
       type: "mandatory",
       verbalization: `Constraint ${i}`,
-      affectedFactType: "ft",
+      factTypes: ["ft"],
+      factTypeIds: ["ft"],
     }));
     const text = buildEntityFocusSummary(e, [], constraints, undefined);
     expect(text).toContain("... and 2 more");
@@ -215,13 +216,14 @@ describe("buildFactTypeFocusSummary", () => {
 });
 
 describe("buildConstraintTypeFocusSummary", () => {
-  it("lists each constraint tagged with its affected fact type", () => {
+  it("lists each constraint tagged with the fact types it applies to", () => {
     const constraints: ConstraintSummary[] = [
       {
         id: "c1",
         type: "mandatory",
         verbalization: "Each X has some Y.",
-        affectedFactType: "X has Y",
+        factTypes: ["X has Y"],
+        factTypeIds: ["ft-xy"],
       },
     ];
     const text = buildConstraintTypeFocusSummary("mandatory", constraints);

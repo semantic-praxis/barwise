@@ -53,7 +53,7 @@ export function summarizeFactType(
     arity: factType.roles.length,
     primaryReading,
     involvedEntities,
-    constraintCount: factType.constraints.length,
+    constraintCount: model.constraintsTouching(factType.id).length,
   };
 }
 
@@ -229,7 +229,7 @@ export function buildConstraintTypeFocusSummary(
 
   parts.push(`\nConstraints:`);
   for (const c of constraints) {
-    parts.push(`  - [${c.affectedFactType}] ${c.verbalization}`);
+    parts.push(`  - [${c.factTypes.join(", ")}] ${c.verbalization}`);
   }
 
   return parts.join("\n");

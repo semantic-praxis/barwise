@@ -64,7 +64,7 @@ function shapeDescription(description: DomainDescription): Record<string, unknow
     .map((c) => ({
       type: c.type,
       verbalization: c.verbalization,
-      affectedFactType: c.affectedFactType,
+      factTypes: c.factTypes,
     }));
   if (description.constraints.length > MAX_CONSTRAINTS) {
     truncation.constraints = {

@@ -43,13 +43,18 @@ export interface FactTypeSummary {
 }
 
 /**
- * Summary of a constraint.
+ * Summary of a constraint (orm-format-3, Open decision 9): its own id, and
+ * the fact types it applies to, in model order -- one for an internal
+ * constraint, every one it spans for a constraint across fact types.
  */
 export interface ConstraintSummary {
   readonly id: string;
   readonly type: string;
   readonly verbalization: string;
-  readonly affectedFactType: string; // Fact type name
+  /** Names of the fact types the constraint applies to. */
+  readonly factTypes: readonly string[];
+  /** Ids of the same fact types, in the same order. */
+  readonly factTypeIds: readonly string[];
 }
 
 /**

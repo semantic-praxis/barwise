@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, its query part 2026-10-20; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, its query and describe parts 2026-10-20; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -937,6 +937,23 @@ Implementation notes (2026-10-19):
     result as it is, so their output changes shape with it and neither
     needed code. `mcp/tests/tools/queryModel.test.ts` pins the ids and the
     span of a constraint across fact types at the MCP surface.
+- **Describe (3a-ii-c, 2026-10-20).**
+  - `ConstraintSummary.affectedFactType` becomes `factTypes` and
+    `factTypeIds`, and the positional id `${ft.id}-constraint-${i}` becomes
+    the constraint's own, both from the verbalization row as in query.
+    Its views read the same walk as query's, `constraintsTouchingAny`.
+  - The whole model says each fact type's own constraints, then each
+    constraint across fact types once; an entity or fact type focus says
+    every constraint touching it, once. `FactTypeSummary.constraintCount`
+    counts the same set, so a fact type a key spans counts it whichever
+    fact type nests it.
+  - A constraint-type focus brings in every fact type a matching
+    constraint spans, in model order, and tags each line of its summary
+    with all of them (`[A, B] ...`); before, it brought in only the host.
+  - MCP's `describe_domain` projects field by field, so its
+    `affectedFactType` became `factTypes` there; `barwise describe --json`
+    prints the description as it is. `mcp/tests/tools/describeDomain.test.ts`
+    pins the span and the count at the MCP surface.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

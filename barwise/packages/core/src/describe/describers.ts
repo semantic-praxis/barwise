@@ -2,11 +2,12 @@
  * Focus-specific describers: build a DomainDescription for the full
  * model, a single entity, a single fact type, or a constraint type.
  */
+import type { Constraint } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import type { ModelGraph } from "../model/graph.js";
 import type { ObjectType } from "../model/ObjectType.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
 import {
   buildConstraintTypeFocusSummary,
@@ -30,20 +31,7 @@ export function describeFullModel(
   const entitySummaries = model.objectTypes.map(summarizeEntity);
   const factTypeSummaries = model.factTypes.map((ft) => summarizeFactType(model, ft, graph));
 
-  const verbalizer = new Verbalizer();
-  const constraintSummaries: ConstraintSummary[] = [];
-  for (const ft of model.factTypes) {
-    for (let i = 0; i < ft.constraints.length; i++) {
-      const c = ft.constraints[i]!;
-      const v = verbalizer.constraints.verbalize(c, ft, model);
-      constraintSummaries.push({
-        id: `${ft.id}-constraint-${i}`, // Generate ID from fact type + index
-        type: c.type, // Use constraint type, not verbalization category
-        verbalization: v.text,
-        affectedFactType: ft.name,
-      });
-    }
-  }
+  const constraintSummaries = new ConstraintSummarizer(model).wholeModel(() => true);
 
   const populationSummaries = includePopulations
     ? model.populations.map((p) => summarizePopulation(model, p))
@@ -84,21 +72,7 @@ export function describeEntity(
 
   const factTypeSummaries = relatedFactTypes.map((ft) => summarizeFactType(model, ft, graph));
 
-  // Find all constraints on those fact types.
-  const verbalizer = new Verbalizer();
-  const constraintSummaries: ConstraintSummary[] = [];
-  for (const ft of relatedFactTypes) {
-    for (let i = 0; i < ft.constraints.length; i++) {
-      const c = ft.constraints[i]!;
-      const v = verbalizer.constraints.verbalize(c, ft, model);
-      constraintSummaries.push({
-        id: `${ft.id}-constraint-${i}`,
-        type: c.type,
-        verbalization: v.text,
-        affectedFactType: ft.name,
-      });
-    }
-  }
+  const constraintSummaries = new ConstraintSummarizer(model).touching(relatedFactTypes);
 
   // Find populations for related fact types.
   const populationSummaries = includePopulations
@@ -141,19 +115,7 @@ export function describeFactType(
 
   const entitySummaries = involvedEntities.map(summarizeEntity);
 
-  // Get constraint verbalizations for this fact type.
-  const verbalizer = new Verbalizer();
-  const constraintSummaries: ConstraintSummary[] = factType.constraints.map(
-    (c, i) => {
-      const v = verbalizer.constraints.verbalize(c, factType, model);
-      return {
-        id: `${factType.id}-constraint-${i}`,
-        type: c.type,
-        verbalization: v.text,
-        affectedFactType: factType.name,
-      };
-    },
-  );
+  const constraintSummaries = new ConstraintSummarizer(model).touching([factType]);
 
   // Find populations for this fact type.
   const populationSummaries = includePopulations
@@ -187,27 +149,12 @@ export function describeConstraintType(
   constraintTypeKeyword: string,
   includePopulations: boolean,
 ): DomainDescription {
-  const verbalizer = new Verbalizer();
-  const constraintSummaries: ConstraintSummary[] = [];
-  const relatedFactTypes: FactType[] = [];
-
-  for (const ft of model.factTypes) {
-    for (let i = 0; i < ft.constraints.length; i++) {
-      const c = ft.constraints[i]!;
-      if (matchesConstraintType(c.type, constraintTypeKeyword)) {
-        const v = verbalizer.constraints.verbalize(c, ft, model);
-        constraintSummaries.push({
-          id: `${ft.id}-constraint-${i}`,
-          type: c.type,
-          verbalization: v.text,
-          affectedFactType: ft.name,
-        });
-        if (!relatedFactTypes.some((f) => f.id === ft.id)) {
-          relatedFactTypes.push(ft);
-        }
-      }
-    }
-  }
+  const constraintSummaries = new ConstraintSummarizer(model).wholeModel((c) =>
+    matchesConstraintType(c.type, constraintTypeKeyword)
+  );
+  // Every fact type a matching constraint applies to, in model order.
+  const spanned = new Set(constraintSummaries.flatMap((c) => c.factTypeIds));
+  const relatedFactTypes = model.factTypes.filter((ft) => spanned.has(ft.id));
 
   const factTypeSummaries = relatedFactTypes.map((ft) => summarizeFactType(model, ft, graph));
 
@@ -242,6 +189,58 @@ export function describeConstraintType(
     constraints: constraintSummaries,
     populations: populationSummaries,
   };
+}
+
+/**
+ * Constraint summaries by Open decision 9: each says the constraint's own
+ * id and the fact types it applies to, read from its verbalization row so
+ * describe, query and verbalize cannot disagree about either. The id used
+ * to be positional (`${ft.id}-constraint-${i}`) and the fact type the
+ * one nesting the constraint, so both moved when a file was reordered.
+ */
+class ConstraintSummarizer {
+  private readonly verbalizer = new Verbalizer();
+
+  constructor(private readonly model: OrmModel) {}
+
+  /** Each fact type's own constraints, then each constraint across fact types once. */
+  wholeModel(matches: (c: Constraint) => boolean): ConstraintSummary[] {
+    const summaries: ConstraintSummary[] = [];
+    for (const ft of this.model.factTypes) {
+      for (const c of ft.internalConstraints) {
+        if (matches(c)) summaries.push(this.summary([c, ft]));
+      }
+    }
+    for (const c of this.model.constraints) {
+      if (matches(c)) summaries.push(this.summary([c, undefined]));
+    }
+    return summaries;
+  }
+
+  /** Every constraint touching these fact types, once even when it spans two of them. */
+  touching(factTypes: readonly FactType[]): ConstraintSummary[] {
+    return this.model.constraintsTouchingAny(factTypes.map((ft) => ft.id))
+      .map((inView) => this.summary(inView));
+  }
+
+  /**
+   * An internal constraint is verbalized in the fact type it lives in; one
+   * across fact types has none.
+   */
+  private summary([c, ft]: ConstraintInView): ConstraintSummary {
+    const row = ft === undefined
+      ? this.verbalizer.constraints.verbalizeExternal(c, this.model)
+      : this.verbalizer.constraints.verbalize(c, ft, this.model);
+    // Every id here came from [ft.id] or factTypesHolding, so each resolves.
+    const factTypeIds = row.factTypeIds ?? [];
+    return {
+      id: row.sourceElementId,
+      type: c.type,
+      verbalization: row.text,
+      factTypes: factTypeIds.map((id) => this.model.getFactType(id)!.name),
+      factTypeIds,
+    };
+  }
 }
 
 /**

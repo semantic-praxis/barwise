@@ -436,3 +436,49 @@ model:
     });
   });
 });
+
+describe("describe_domain over a constraint across fact types (orm-format-3, Open decision 9)", () => {
+  /** A composite key across two fact types, nested under the second. */
+  const roomsModel = `
+orm_version: "1.0"
+model:
+  name: Facilities
+  object_types:
+    - { id: ot-room, name: Room, kind: entity, reference_mode: id }
+    - { id: ot-building, name: Building, kind: entity, reference_mode: code }
+    - { id: ot-nr, name: RoomNumber, kind: value }
+  fact_types:
+    - id: ft-in
+      name: Room is in Building
+      roles:
+        - { id: r-1, player: ot-room, role_name: is in }
+        - { id: r-2, player: ot-building, role_name: houses }
+      readings: ["{0} is in {1}"]
+      constraints:
+        - { id: c-one-building, type: internal_uniqueness, roles: [r-1] }
+    - id: ft-nr
+      name: Room has RoomNumber
+      roles:
+        - { id: r-3, player: ot-room, role_name: has }
+        - { id: r-4, player: ot-nr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: c-one-nr, type: internal_uniqueness, roles: [r-3] }
+        - { id: c-room-key, type: external_uniqueness, roles: [r-2, r-4] }
+`;
+
+  it("names each constraint by every fact type it applies to, and counts it under each", () => {
+    const parsed = JSON.parse(executeDescribeDomain(roomsModel, "Room").content[0]!.text);
+    const constraints = parsed.constraints as Record<string, unknown>[];
+    expect(constraints.map((c) => [c.type, c.factTypes])).toEqual([
+      ["internal_uniqueness", ["Room is in Building"]],
+      ["external_uniqueness", ["Room is in Building", "Room has RoomNumber"]],
+      ["internal_uniqueness", ["Room has RoomNumber"]],
+    ]);
+    for (const c of constraints) expect(c).not.toHaveProperty("affectedFactType");
+    expect(
+      (parsed.factTypes as { name: string; constraintCount: number; }[])
+        .map((ft) => [ft.name, ft.constraintCount]),
+    ).toEqual([["Room is in Building", 2], ["Room has RoomNumber", 2]]);
+  });
+});
