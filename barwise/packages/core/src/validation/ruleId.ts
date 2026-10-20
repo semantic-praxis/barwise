@@ -11,8 +11,8 @@
  *
  * `messages` is a dictionary keyed by message id, following SARIF's
  * `reportingDescriptor.messageStrings`: several rules report more than one
- * condition (`population/subset-violation` fires both for roles within a
- * fact type and for roles spanning several) and SARIF names the
+ * condition (`population/equality-violation` names which side of the
+ * constraint is missing the tuple) and SARIF names the
  * message rather than splitting the rule. The id maps onto a result's
  * `message.id` on export, so the distinction stays machine-readable.
  *
@@ -501,26 +501,10 @@ const RULE_DESCRIPTORS = {
     severity: "error",
     description: "A tuple appears in one side of an equality constraint and not the other.",
     messages: {
-      local: (tuple: string, cRoleIds1: string, cRoleIds2: string): string =>
+      default: (tuple: string, cRoleIds1: string, cRoleIds2: string): string =>
         `Equality constraint is violated: tuple [${tuple}] in roles [${cRoleIds1}] has no match in roles [${cRoleIds2}].`,
-      localReverse: (tuple: string, cRoleIds2: string, cRoleIds1: string): string =>
+      reverse: (tuple: string, cRoleIds2: string, cRoleIds1: string): string =>
         `Equality constraint is violated: tuple [${tuple}] in roles [${cRoleIds2}] has no match in roles [${cRoleIds1}].`,
-      spanning: (
-        popId: string,
-        instId: string,
-        key1: string,
-        eqRoleIds1: string,
-        eqRoleIds2: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" has tuple [${key1}] in roles [${eqRoleIds1}] with no matching tuple in roles [${eqRoleIds2}].`,
-      spanningReverse: (
-        popId: string,
-        instId: string,
-        key2: string,
-        eqRoleIds2: string,
-        eqRoleIds1: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" has tuple [${key2}] in roles [${eqRoleIds2}] with no matching tuple in roles [${eqRoleIds1}].`,
     },
   },
   [RULE_ID.exclusionViolation]: {
@@ -603,16 +587,8 @@ const RULE_DESCRIPTORS = {
     description:
       "A tuple appears in a subset constraint's subset side without appearing in its superset side.",
     messages: {
-      local: (tuple: string, cSubsetRoleIds: string, cSupersetRoleIds: string): string =>
+      default: (tuple: string, cSubsetRoleIds: string, cSupersetRoleIds: string): string =>
         `Subset constraint is violated: tuple [${tuple}] in roles [${cSubsetRoleIds}] has no match in roles [${cSupersetRoleIds}].`,
-      spanning: (
-        popId: string,
-        instId: string,
-        subsetKey: string,
-        scSubsetRoleIds: string,
-        scSupersetRoleIds: string,
-      ): string =>
-        `Population "${popId}": instance "${instId}" has subset tuple [${subsetKey}] for roles [${scSubsetRoleIds}] with no matching superset tuple in roles [${scSupersetRoleIds}].`,
     },
   },
   [RULE_ID.unaryRoleCardinalityViolation]: {

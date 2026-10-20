@@ -2,14 +2,18 @@ import { isEquality, isExclusion, isExclusiveOr, isSubset } from "../../../model
 import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
-import { constraintElementId, localFactTypeOf } from "../../span.js";
+import { constraintElementId } from "../../span.js";
 import {
+  compositeKeyParts,
   type ObjectUniverse,
   rolePlayerMap,
   severityForModality,
   tuplesForRoleSeq,
   valuesPlayedInRole,
 } from "./shared.js";
+
+/** A composite key as a message shows it: its parts, not its separator. */
+const showTuple = (key: string): string => compositeKeyParts(key).join(", ");
 
 /**
  * Exclusion constraints: no object may play more than one of the excluded
@@ -101,14 +105,18 @@ export function checkExclusiveOrViolations(
 }
 
 /**
- * Subset constraints whose roles span fact types: every tuple in the subset
- * role sequence must appear in the superset role sequence.
+ * Subset constraints: every tuple in the subset role sequence must appear in
+ * the superset role sequence, across the whole population. Every subset is
+ * checked here, local or spanning (owner, 2026-10-20, barwise-h2a): a
+ * per-population check padded an unfilled role with an empty value and
+ * reported it, and reported a tuple whose match sat in another population
+ * of the same fact type -- two false violations. A tuple with an unfilled role is skipped,
+ * as an incomplete instance is reported on its own.
  */
-export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
+export function checkSubsetViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   for (const c of model.constraints) {
     if (!isSubset(c)) continue;
-    if (localFactTypeOf(model, c)) continue; // checked by the local rule
 
     const subsetTuples = tuplesForRoleSeq(model, c.subsetRoleIds);
     const supersetTuples = tuplesForRoleSeq(model, c.supersetRoleIds);
@@ -118,9 +126,9 @@ export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
           reportAs(
             severityForModality(c),
             RULE_ID.subsetViolation,
-            "local",
+            "default",
             constraintElementId(c),
-            tuple,
+            showTuple(tuple),
             c.subsetRoleIds.join(", "),
             c.supersetRoleIds.join(", "),
           ),
@@ -132,14 +140,14 @@ export function checkSpanningSubsetViolations(model: OrmModel): Diagnostic[] {
 }
 
 /**
- * Equality constraints whose roles span fact types: the tuple sets of both
- * role sequences must be identical.
+ * Equality constraints: the tuple sets of both role sequences must be
+ * identical, across the whole population -- local or spanning, for the
+ * same reasons as subset (barwise-h2a).
  */
-export function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
+export function checkEqualityViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   for (const c of model.constraints) {
     if (!isEquality(c)) continue;
-    if (localFactTypeOf(model, c)) continue; // checked by the local rule
 
     const tuples1 = tuplesForRoleSeq(model, c.roleIds1);
     const tuples2 = tuplesForRoleSeq(model, c.roleIds2);
@@ -149,9 +157,9 @@ export function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
           reportAs(
             severityForModality(c),
             RULE_ID.equalityViolation,
-            "local",
+            "default",
             constraintElementId(c),
-            tuple,
+            showTuple(tuple),
             c.roleIds1.join(", "),
             c.roleIds2.join(", "),
           ),
@@ -164,9 +172,9 @@ export function checkSpanningEqualityViolations(model: OrmModel): Diagnostic[] {
           reportAs(
             severityForModality(c),
             RULE_ID.equalityViolation,
-            "localReverse",
+            "reverse",
             constraintElementId(c),
-            tuple,
+            showTuple(tuple),
             c.roleIds2.join(", "),
             c.roleIds1.join(", "),
           ),

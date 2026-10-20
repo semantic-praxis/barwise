@@ -44,11 +44,11 @@ export function constraintElementId(c: Constraint): string {
 }
 
 /**
- * The one fact type holding every one of these roles, if there is one. A
- * constraint across fact types whose roles all sit in one fact type is
- * checked like an internal one, against that fact type's populations --
- * whichever fact type a 2.0 file nested it under. A dangling role makes
- * the answer undefined, as a role of another fact type does.
+ * The one fact type holding every one of a constraint's roles, if there is
+ * one -- whichever fact type a 2.0 file nested it under. An external
+ * uniqueness for which this answers is "all local": an internal uniqueness
+ * would say the same thing. A dangling role makes the answer undefined, as
+ * a role of another fact type does.
  */
 export function localFactTypeOf(model: OrmModel, c: Constraint): FactType | undefined {
   return localFactType(model, roleIdsOf(c));
