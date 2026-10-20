@@ -15,9 +15,6 @@ import type { Role } from "./Role.js";
 import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
 
 /**
- * Configuration for creating a new OrmModel.
- */
-/**
  * A constraint in a view of fact types: an internal one with the fact type
  * it lives in, one across fact types with none. The second has no host
  * (orm-format-3, Open decision 9), so a reader that wants to name its fact
@@ -27,6 +24,9 @@ export type ConstraintInView =
   | readonly [constraint: InternalConstraint, factType: FactType]
   | readonly [constraint: ExternalConstraint, factType: undefined];
 
+/**
+ * Configuration for creating a new OrmModel.
+ */
 export interface OrmModelConfig {
   readonly name: string;
   /** The bounded context this model represents. */

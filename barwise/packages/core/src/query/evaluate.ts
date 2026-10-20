@@ -15,7 +15,6 @@ import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
 import type { Role } from "../model/Role.js";
-import type { Verbalization } from "../verbalization/Verbalization.js";
 import { Verbalizer } from "../verbalization/Verbalizer.js";
 import type {
   ConstraintRef,
@@ -127,10 +126,6 @@ class QueryContext {
     const row = ft === undefined
       ? this.verbalizer.constraints.verbalizeExternal(c, this.model)
       : this.verbalizer.constraints.verbalize(c, ft, this.model);
-    return this.refFromRow(c, row);
-  }
-
-  private refFromRow(c: Constraint, row: Verbalization): ConstraintRef {
     // Every id here came from [ft.id] or factTypesHolding, so each resolves.
     const factTypeIds = row.factTypeIds ?? [];
     return {
