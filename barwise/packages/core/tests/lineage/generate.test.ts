@@ -506,17 +506,19 @@ describe("Lineage Generation", () => {
         .filter((s) => s.elementType === "Constraint")
         .map((s) => s.elementName);
 
+      // The fact type's own constraints first, then those across fact
+      // types, as every view since orm-format-3 WS3a-ii-c lists them.
       expect(names).toEqual([
-        "External UC: Person recommends Person",
         "Value: Person recommends Person",
-        "Disjunctive Mandatory",
-        "Exclusion: Person recommends Person",
-        "Exclusive-Or",
         "Frequency: Person recommends Person",
         "Ring: Person recommends Person",
-        "Subset",
-        "Equality",
         "Constraint: Person recommends Person",
+        "External UC: Person recommends Person",
+        "Disjunctive Mandatory: Person recommends Person",
+        "Exclusion: Person recommends Person",
+        "Exclusive-Or: Person recommends Person",
+        "Subset: Person recommends Person",
+        "Equality: Person recommends Person",
       ]);
     });
 

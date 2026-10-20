@@ -47,7 +47,22 @@ describe("graphOf: references that do not resolve", () => {
     // kind and name its fact type without a second lookup.
     expect(found.from.constraint.id).toBe("c-bogus");
     expect(found.from.constraint.type).toBe("mandatory");
-    expect(found.from.factType.id).toBe(ft.id);
+    expect(found.from.factType?.id).toBe(ft.id);
+  });
+
+  it("gives a constraint across fact types no fact type, whichever one nests it", () => {
+    const model = simpleModel();
+    const ft = model.factTypes[0]!;
+    // Nested under the first fact type, as a 2.0 file might, but an
+    // exclusion lives in no fact type (orm-format-3, Open decision 9).
+    ft.addConstraint({ type: "exclusion", roleIds: [ft.roles[0]!.id, "gone"], id: "c-excl" });
+
+    const result = graphOf(model);
+    if (result.ok) throw new Error("expected an unresolved reference");
+    const found = result.unresolved.find((u) => u.missing === "gone");
+    if (found?.from.kind !== "constraint") throw new Error("expected a constraint source");
+    expect(found.from.constraint.id).toBe("c-excl");
+    expect(found.from.factType).toBeUndefined();
   });
 
   it("fails when a role's player does not exist", () => {

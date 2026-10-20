@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, its query, describe and counterexample parts 2026-10-20; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1006,6 +1006,41 @@ Implementation notes (2026-10-19):
     and counterexamples both read it, so they cannot name one constraint
     differently. Validation messages read `factTypesOf` directly, since
     they report what the roles say.
+- **Graph references and lineage (3a-ii-c, 2026-10-20).**
+  - `graphOf` walks `everyConstraint`, so a constraint's `ReferenceSource`
+    carries the fact type it lives in, and none (`factType: undefined`)
+    for one across fact types.
+  - `referenceDiagnostics`' last host-relative branch moved: a role no fact
+    type has, on a constraint across fact types, is the new
+    `constraint/across-fact-types-unknown-role`, reported against the constraint's own id
+    and naming its span ("Exclusion constraint over fact type ... references
+    role id ..."), or, when none of its roles resolve, without a span
+    ("Exclusion constraint references role id ..., which no fact type in
+    the model has; none of its roles resolve"). It used to borrow the internal kinds' templates, which
+    named the nesting fact type and the wrong kind ("Internal uniqueness
+    constraint in fact type ..." for an exclusion). An internal
+    constraint's dangling role keeps its per-kind template and its fact
+    type.
+  - Lineage looks a foreign key's constraint up with the new
+    `OrmModel.getConstraintInView(id)` and traces it to every fact type
+    `factTypesNaming` gives. RelationalMapper sets that id to an internal
+    uniqueness (or a subtype fact or fact type) today, so a composite key
+    tracing to both fact types it spans is the placement-correct reading
+    rather than one an export reaches yet.
+  - An entity's lineage lists the constraints touching its fact types
+    once each, from one `constraintsTouchingAny` call, after the fact
+    types, roles and players. `getConstraintName` names every kind by its span,
+    including the four (disjunctive mandatory, exclusive-or, subset,
+    equality) that had a bare label, so two subsets on one entity no longer
+    read the same ("Subset: A and B"). One none of whose roles
+    resolve reads as its label alone; that one touches no fact type, so no
+    entity lists it. Validation reports one naming a role no fact type
+    has. One with no roles at all, buildable only in code, is reported
+    for every kind but subset and equality, which have no role-count
+    rule; that gap is not this workstream's.
+  - `ReferenceSource`'s constraint arm pairs an internal constraint with
+    its fact type and one across fact types with none in the type, so
+    `referenceDiagnostics` needs no assertion to read either.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

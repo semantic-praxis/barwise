@@ -180,6 +180,86 @@ describe("a constraint across fact types with no roles", () => {
   });
 });
 
+describe("a constraint across fact types naming a role no fact type has", () => {
+  it("is reported against its own id and span, whichever fact type nests it", () => {
+    for (const host of ["ft-in", "ft-nr", "ft-area"] as const) {
+      const model = rooms(host);
+      model.getFactType(host)!.addConstraint({
+        id: "c-excl-gone",
+        type: "exclusion",
+        roleIds: ["r-1", "r-gone"],
+      });
+      // Every diagnostic naming the dangling id, so a second report under a
+      // borrowed internal kind's id would show here too.
+      const ds = validate(model).filter((d) => d.message.includes('"r-gone"'));
+      expect(ds, host).toEqual([
+        expect.objectContaining({
+          ruleId: RULE_ID.acrossFactTypesUnknownRole,
+          elementId: "c-excl-gone",
+          message:
+            `Exclusion constraint over fact type "Room is in Building" references role id "r-gone", which no fact type in the model has.`,
+        }),
+      ]);
+    }
+  });
+
+  it("names each kind by its own label, wherever in the constraint the dangling id sits", () => {
+    const cases: [string, Constraint][] = [
+      ["External uniqueness", {
+        id: "c",
+        type: "external_uniqueness",
+        roleIds: ["r-1", "r-gone"],
+      }],
+      ["Disjunctive mandatory", {
+        id: "c",
+        type: "disjunctive_mandatory",
+        roleIds: ["r-1", "r-gone"],
+      }],
+      ["Exclusion", { id: "c", type: "exclusion", roleIds: ["r-1", "r-gone"] }],
+      ["Exclusive-or", { id: "c", type: "exclusive_or", roleIds: ["r-1", "r-gone"] }],
+      ["Subset", { id: "c", type: "subset", subsetRoleIds: ["r-1"], supersetRoleIds: ["r-gone"] }],
+      ["Equality", { id: "c", type: "equality", roleIds1: ["r-1"], roleIds2: ["r-gone"] }],
+    ];
+    for (const [label, constraint] of cases) {
+      const model = rooms("ft-nr");
+      model.getFactType("ft-nr")!.addConstraint(constraint);
+      const ds = validate(model).filter((d) => d.ruleId === RULE_ID.acrossFactTypesUnknownRole);
+      expect(ds.map((d) => d.message), label).toEqual([
+        `${label} constraint over fact type "Room is in Building" references role id "r-gone", which no fact type in the model has.`,
+      ]);
+    }
+  });
+
+  it("names no span when none of its roles resolve", () => {
+    const model = rooms("ft-in");
+    model.getFactType("ft-in")!.addConstraint({
+      id: "c-excl-lost",
+      type: "exclusion",
+      roleIds: ["r-gone", "r-lost"],
+    });
+    const ds = validate(model).filter((d) => d.ruleId === RULE_ID.acrossFactTypesUnknownRole);
+    expect(ds.map((d) => [d.elementId, d.message])).toEqual(
+      ["r-gone", "r-lost"].map((id) => [
+        "c-excl-lost",
+        `Exclusion constraint references role id "${id}", which no fact type in the model has; none of its roles resolve.`,
+      ]),
+    );
+  });
+
+  it("leaves an internal constraint's dangling role under its own fact type's template", () => {
+    const model = rooms("ft-in");
+    model.getFactType("ft-nr")!.addConstraint({ id: "c-m", type: "mandatory", roleId: "r-gone" });
+    const ds = validate(model).filter((d) => d.ruleId === RULE_ID.mandatoryInvalidRole);
+    expect(ds).toEqual([
+      expect.objectContaining({
+        elementId: "ft-nr",
+        message:
+          `Mandatory constraint in fact type "Room has RoomNumber" references role id "r-gone" which does not belong to this fact type.`,
+      }),
+    ]);
+  });
+});
+
 describe("spanPhrase", () => {
   it("names one, two and more fact types in the order given", () => {
     expect(spanPhrase([])).toBe("no fact type in the model");

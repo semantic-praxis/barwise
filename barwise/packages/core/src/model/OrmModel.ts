@@ -3,6 +3,7 @@ import {
   type ExternalConstraint,
   type InternalConstraint,
   isExternalConstraint,
+  isInternalConstraint,
   roleIdsOf,
 } from "./Constraint.js";
 import type { Definition } from "./Definition.js";
@@ -297,9 +298,24 @@ export class OrmModel {
 
   /** Look up a constraint of either placement by id. */
   getConstraint(id: string): Constraint | undefined {
+    return this.getConstraintInView(id)?.[0];
+  }
+
+  /**
+   * Look up a constraint by id, with the fact type it lives in when it is
+   * internal and none when it spans fact types: the pair a view names it
+   * by (`factTypesNaming`), never the fact type a 2.0 file nests it under.
+   */
+  getConstraintInView(id: string): ConstraintInView | undefined {
+    // One pass over the stored lists, stopping at the first match, so the
+    // first constraint with this id in file order wins whatever its
+    // placement, as `getConstraint` always answered (duplicate ids are
+    // barwise-b2s).
     for (const ft of this._factTypes.values()) {
-      const found = ft.constraints.find((c) => c.id === id);
-      if (found) return found;
+      for (const c of ft.constraints) {
+        if (c.id !== id) continue;
+        return isInternalConstraint(c) ? [c, ft] : [c, undefined];
+      }
     }
     return undefined;
   }
