@@ -5,9 +5,9 @@
  * a view of one fact type or entity says every constraint touching it,
  * once; and which constraints each view says does not depend on which fact
  * type a 2.0 file nested a constraint under (every constraint here states
- * its id). Their order still does: constraints across fact types follow
- * their position in the file, which is why the last test compares sorted
- * lists.
+ * its id). With one constraint across fact types, as here, neither does
+ * their order; with several, their order follows where each is nested
+ * (the spec note "Query (3a-ii-c)").
  */
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";
@@ -126,10 +126,8 @@ describe("query over constraints across fact types", () => {
       { kind: "entity", name: "Room" },
     ] as const;
     for (const q of queries) {
-      const sortIds = (r: QueryResult) =>
-        [...constraintsOf(r)].sort((a, b) => a.id.localeCompare(b.id));
-      expect(sortIds(queryModel(rooms("ft-in"), q)), q.kind)
-        .toEqual(sortIds(queryModel(rooms("ft-nr"), q)));
+      expect(constraintsOf(queryModel(rooms("ft-in"), q)), q.kind)
+        .toEqual(constraintsOf(queryModel(rooms("ft-nr"), q)));
     }
   });
 });
