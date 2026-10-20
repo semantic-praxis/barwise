@@ -12,7 +12,7 @@
  * Every id below but one already existed and was emitted by a rule that
  * resolved the reference itself, because a diagnostic id is a promise to
  * whoever reads validator output, and moving WHERE a check runs must not
- * change WHAT a consumer sees. The exception is `unknownRole`
+ * change WHAT a consumer sees. The exception is `acrossFactTypesUnknownRole`
  * (orm-format-3 WS3a-ii-c): a dangling role on a constraint across fact
  * types used to borrow an internal kind's id and template, which named the
  * fact type a 2.0 file nested it under and, for an exclusion, subset or
@@ -74,7 +74,7 @@ const CONSTRAINT_INVALID_ROLE: Record<InternalConstraint["type"], InvalidRoleRul
 };
 
 /**
- * How `unknownRole` names each kind of constraint across fact types, by
+ * How `acrossFactTypesUnknownRole` names each kind of constraint across fact types, by
  * kind. These reported under the internal kinds' templates until
  * orm-format-3 WS3a-ii-c, which named the fact type a 2.0 file nested
  * them under and the wrong kind ("Internal uniqueness constraint in fact
@@ -149,14 +149,23 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
         );
       }
       if (factType === undefined) {
-        return report(
-          RULE_ID.unknownRole,
-          "default",
-          constraintElementId(constraint),
-          EXTERNAL_KIND_LABEL[constraint.type],
-          constraintSpan(model, constraint),
-          u.missing,
-        );
+        const kind = EXTERNAL_KIND_LABEL[constraint.type];
+        return model.factTypesOf(constraint).length === 0
+          ? report(
+            RULE_ID.acrossFactTypesUnknownRole,
+            "noSpan",
+            constraintElementId(constraint),
+            kind,
+            u.missing,
+          )
+          : report(
+            RULE_ID.acrossFactTypesUnknownRole,
+            "default",
+            constraintElementId(constraint),
+            kind,
+            constraintSpan(model, constraint),
+            u.missing,
+          );
       }
       return report(
         CONSTRAINT_INVALID_ROLE[constraint.type],

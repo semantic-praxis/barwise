@@ -1012,9 +1012,11 @@ Implementation notes (2026-10-19):
     for one across fact types.
   - `referenceDiagnostics`' last host-relative branch moved: a role no fact
     type has, on a constraint across fact types, is the new
-    `constraint/unknown-role`, reported against the constraint's own id
+    `constraint/across-fact-types-unknown-role`, reported against the constraint's own id
     and naming its span ("Exclusion constraint over fact type ... references
-    role id ..."). It used to borrow the internal kinds' templates, which
+    role id ..."), or, when none of its roles resolve, without a span
+    ("Exclusion constraint references role id ..., which no fact type in
+    the model has; none of its roles resolve"). It used to borrow the internal kinds' templates, which
     named the nesting fact type and the wrong kind ("Internal uniqueness
     constraint in fact type ..." for an exclusion). An internal
     constraint's dangling role keeps its per-kind template and its fact
@@ -1030,7 +1032,10 @@ Implementation notes (2026-10-19):
     types, roles and players. `getConstraintName` names one across fact
     types by its span ("External UC: A and B"), and one none of whose roles
     resolve by its label alone; that one touches no fact type, so no
-    entity lists it, and validation reports it.
+    entity lists it. Validation reports one naming a role no fact type
+    has. One with no roles at all, buildable only in code, is reported
+    for every kind but subset and equality, which have no role-count
+    rule; that gap is not this workstream's.
   - `ReferenceSource`'s constraint arm pairs an internal constraint with
     its fact type and one across fact types with none in the type, so
     `referenceDiagnostics` needs no assertion to read either.

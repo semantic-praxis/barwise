@@ -189,7 +189,7 @@ describe("a constraint across fact types naming a role no fact type has", () => 
         type: "exclusion",
         roleIds: ["r-1", "r-gone"],
       });
-      const ds = validate(model).filter((d) => d.ruleId === RULE_ID.unknownRole);
+      const ds = validate(model).filter((d) => d.ruleId === RULE_ID.acrossFactTypesUnknownRole);
       expect(ds, host).toEqual([
         expect.objectContaining({
           elementId: "c-excl-gone",
@@ -198,6 +198,22 @@ describe("a constraint across fact types naming a role no fact type has", () => 
         }),
       ]);
     }
+  });
+
+  it("names no span when none of its roles resolve", () => {
+    const model = rooms("ft-in");
+    model.getFactType("ft-in")!.addConstraint({
+      id: "c-excl-lost",
+      type: "exclusion",
+      roleIds: ["r-gone", "r-lost"],
+    });
+    const ds = validate(model).filter((d) => d.ruleId === RULE_ID.acrossFactTypesUnknownRole);
+    expect(ds.map((d) => [d.elementId, d.message])).toEqual(
+      ["r-gone", "r-lost"].map((id) => [
+        "c-excl-lost",
+        `Exclusion constraint references role id "${id}", which no fact type in the model has; none of its roles resolve.`,
+      ]),
+    );
   });
 
   it("leaves an internal constraint's dangling role under its own fact type's template", () => {

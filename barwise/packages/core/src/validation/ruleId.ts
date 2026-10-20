@@ -46,6 +46,7 @@ export const RULE_ID = {
   missingValueTypeDataType: "completeness/missing-value-type-data-type",
   conflictingIdentification: "completeness/conflicting-identification",
   multiplePreferredIdentifiers: "completeness/multiple-preferred-identifiers",
+  acrossFactTypesUnknownRole: "constraint/across-fact-types-unknown-role",
   cardinalityInvalidRole: "constraint/cardinality-invalid-role",
   cardinalityMaxLessThanMin: "constraint/cardinality-max-less-than-min",
   cardinalityNonUnary: "constraint/cardinality-non-unary",
@@ -67,7 +68,6 @@ export const RULE_ID = {
   joinEmptyProjection: "constraint/join-empty-projection",
   joinTooFewOperands: "constraint/join-too-few-operands",
   joinUnknownRoot: "constraint/join-unknown-root",
-  unknownRole: "constraint/unknown-role",
   mandatoryInvalidRole: "constraint/mandatory-invalid-role",
   ringDifferentPlayers: "constraint/ring-different-players",
   ringInvalidRole: "constraint/ring-invalid-role",
@@ -207,6 +207,19 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (otName: string, preferredCount: number): string =>
         `Entity type "${otName}" has ${preferredCount} preferred identifiers. Each entity should have exactly one.`,
+    },
+  },
+  [RULE_ID.acrossFactTypesUnknownRole]: {
+    severity: "error",
+    description: "A constraint across fact types names a role that no fact type in the model has.",
+    messages: {
+      default: (kind: string, span: string, roleId: string): string =>
+        `${kind} constraint over ${span} references role id "${roleId}", which no fact type in the model has.`,
+      // None of its roles resolve, so there is no span to name, and "over no
+      // fact type in the model ... which no fact type in the model has" says
+      // the same thing twice.
+      noSpan: (kind: string, roleId: string): string =>
+        `${kind} constraint references role id "${roleId}", which no fact type in the model has; none of its roles resolve.`,
     },
   },
   [RULE_ID.cardinalityInvalidRole]: {
@@ -389,14 +402,6 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (cTypeJoinEqualityEqualityExclusion: string, span: string): string =>
         `Join ${cTypeJoinEqualityEqualityExclusion} constraint over ${span} must have at least two operands.`,
-    },
-  },
-  [RULE_ID.unknownRole]: {
-    severity: "error",
-    description: "A constraint across fact types names a role that no fact type in the model has.",
-    messages: {
-      default: (kind: string, span: string, roleId: string): string =>
-        `${kind} constraint over ${span} references role id "${roleId}", which no fact type in the model has.`,
     },
   },
   [RULE_ID.joinUnknownRoot]: {

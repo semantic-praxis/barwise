@@ -297,11 +297,7 @@ export class OrmModel {
 
   /** Look up a constraint of either placement by id. */
   getConstraint(id: string): Constraint | undefined {
-    for (const ft of this._factTypes.values()) {
-      const found = ft.constraints.find((c) => c.id === id);
-      if (found) return found;
-    }
-    return undefined;
+    return this.getConstraintInView(id)?.[0];
   }
 
   /**
@@ -310,7 +306,14 @@ export class OrmModel {
    * by (`factTypesNaming`), never the fact type a 2.0 file nests it under.
    */
   getConstraintInView(id: string): ConstraintInView | undefined {
-    return this.everyConstraint().find(([c]) => c.id === id);
+    // The walk `everyConstraint` makes, stopping at the first match rather
+    // than building the whole list for every lookup.
+    for (const ft of this.factTypes) {
+      const c = ft.internalConstraints.find((c) => c.id === id);
+      if (c) return [c, ft];
+    }
+    const c = this.constraints.find((c) => c.id === id);
+    return c ? [c, undefined] : undefined;
   }
 
   /** Look up a fact type by name. */
