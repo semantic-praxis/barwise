@@ -46,6 +46,7 @@ function shapeDescription(description: DomainDescription): Record<string, unknow
   }
 
   const factTypes = description.factTypes.slice(0, MAX_FACT_TYPES).map((ft) => ({
+    id: ft.id,
     name: ft.name,
     arity: ft.arity,
     primaryReading: ft.primaryReading,

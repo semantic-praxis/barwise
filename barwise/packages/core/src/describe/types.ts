@@ -2,6 +2,7 @@
  * Domain-description summary types.
  */
 import type { FactInstance } from "../model/Population.js";
+import type { ConstraintReport } from "../verbalization/ConstraintVerbalizer.js";
 
 /**
  * Options for describing a domain.
@@ -43,18 +44,12 @@ export interface FactTypeSummary {
 }
 
 /**
- * Summary of a constraint (orm-format-3, Open decision 9): its own id, and
- * the fact types it applies to, in model order -- one for an internal
- * constraint, every one it spans for a constraint across fact types.
+ * Summary of a constraint: what `ConstraintVerbalizer.reportInView` says
+ * about it (its own id, sentence, and the fact types it applies to;
+ * orm-format-3, Open decision 9), plus its kind.
  */
-export interface ConstraintSummary {
-  readonly id: string;
+export interface ConstraintSummary extends ConstraintReport {
   readonly type: string;
-  readonly verbalization: string;
-  /** Names of the fact types the constraint applies to. */
-  readonly factTypes: readonly string[];
-  /** Ids of the same fact types, in the same order. */
-  readonly factTypeIds: readonly string[];
 }
 
 /**

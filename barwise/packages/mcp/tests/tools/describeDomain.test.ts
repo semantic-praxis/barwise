@@ -482,8 +482,8 @@ model:
     ]);
     for (const c of constraints) expect(c).not.toHaveProperty("affectedFactType");
     expect(
-      (parsed.factTypes as { name: string; constraintCount: number; }[])
-        .map((ft) => [ft.name, ft.constraintCount]),
-    ).toEqual([["Room is in Building", 2], ["Room has RoomNumber", 2]]);
+      (parsed.factTypes as { id: string; name: string; constraintCount: number; }[])
+        .map((ft) => [ft.id, ft.name, ft.constraintCount]),
+    ).toEqual([["ft-in", "Room is in Building", 2], ["ft-nr", "Room has RoomNumber", 2]]);
   });
 });

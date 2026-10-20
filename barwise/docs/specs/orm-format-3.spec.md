@@ -960,7 +960,8 @@ Implementation notes (2026-10-19):
   - MCP's `describe_domain` projects field by field, so its
     `affectedFactType` became `factTypes` there; `barwise describe --json`
     prints the description as it is. The projection now also carries the
-    constraint's `id` and `factTypeIds`, since the id is stable now;
+    constraint's `id` and `factTypeIds`, since the id is stable now, and
+    each fact type's `id`, so the two can be joined;
     `mcp/tests/tools/describeDomain.test.ts` pins them, the span and the
     count at the MCP surface.
   - `FactTypeSummary.constraintCount` costs a `constraintsTouching` call
