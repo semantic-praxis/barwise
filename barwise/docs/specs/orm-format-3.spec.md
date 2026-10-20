@@ -988,8 +988,15 @@ Implementation notes (2026-10-19):
     (barwise-0od), since validation checks those across the population
     too (barwise-h2a). The generator tries a few minted values on each
     side, so a value constraint that makes the first choice collide does
-    not lose the witness, and sequences that share only some roles get one;
-    only the same roles, or domains leaving one choice, get none.
+    not lose the witness; sequences that share only some roles, or reorder
+    the same roles (the symmetric pair a1, a2 against a2, a1), get one.
+    Only the same roles in the same order, or domains leaving one choice,
+    get none. A role sequence whose roles sit in several fact types is a
+    join no single fact can break, and gets none rather than a crash.
+  - `factTypeIds` is decided once, in the dispatch: an internal constraint
+    is named by the fact type it lives in, as `constraintsTouching` lists
+    it, even when a stale role id leaves `factTypesOf` naming nothing; one
+    across fact types by `factTypesOf`.
   - The span is `OrmModel.factTypesOf(constraint)`, now the one answer
     verbalization rows, validation messages and counterexamples name a
     constraint by; each had its own `factTypesHolding(roleIdsOf(c))`.

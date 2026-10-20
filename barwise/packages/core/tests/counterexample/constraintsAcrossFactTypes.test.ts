@@ -83,6 +83,34 @@ describe("counterexamples over constraints across fact types", () => {
     expect(generateCounterexamples(model).map((c) => c.constraintId)).toEqual(["c-uc", "c-excl"]);
   });
 
+  it("names an internal constraint's own fact type even when its roles no longer resolve", () => {
+    // A hand edit can leave a role id behind; the constraint still lives
+    // in its fact type, and constraintsTouching still lists it there.
+    const uc: Constraint = { id: "c-stale", type: "internal_uniqueness", roleIds: ["r-gone"] };
+    const ces = generateCounterexamples(commute("ft-walks", uc));
+    expect(ces.map((c) => [c.constraintId, c.factTypeIds])).toEqual([["c-stale", ["ft-walks"]]]);
+  });
+
+  it("gives no witness, rather than failing, for a sequence that spans fact types", () => {
+    const join: Constraint = {
+      id: "c-join",
+      type: "subset",
+      subsetRoleIds: ["r-1a", "r-2b"],
+      supersetRoleIds: ["r-2a", "r-1b"],
+    };
+    // Both sides span fact types, and then only the subset side does.
+    const presentOnly: Constraint = {
+      id: "c-join-present",
+      type: "subset",
+      subsetRoleIds: ["r-1a", "r-2b"],
+      supersetRoleIds: ["r-3a", "r-3b"],
+    };
+    for (const c of [join, presentOnly]) {
+      expect(() => generateCounterexamples(commute("ft-drives", c)), c.id).not.toThrow();
+      expect(generateCounterexamples(commute("ft-drives", c)), c.id).toEqual([]);
+    }
+  });
+
   it("names an internal constraint's own fact type", () => {
     const uc: Constraint = { id: "c-uc", type: "internal_uniqueness", roleIds: ["r-3a"] };
     const ces = generateCounterexamples(commute("ft-walks", uc));
@@ -177,6 +205,18 @@ describe("subset and equality within one fact type (barwise-0od)", () => {
       ],
     });
     expect(generateCounterexamples(model).map((c) => c.constraintId)).toEqual(["c-sub"]);
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
+
+  it("finds a witness when one sequence reorders the other", () => {
+    // The symmetric-pair pattern: if a mentors b then b mentors a.
+    const model = reviews(() => ({
+      id: "c-sym",
+      type: "subset",
+      subsetRoleIds: ["r-mentor", "r-mentee"],
+      supersetRoleIds: ["r-mentee", "r-mentor"],
+    }));
+    expect(generateCounterexamples(model).map((c) => c.constraintId)).toEqual(["c-sym"]);
     expect(counterexampleRoundTripFailure(model)).toBeUndefined();
   });
 
