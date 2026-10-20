@@ -14,8 +14,13 @@ import type { VerbalizationSegment } from "../verbalization/Verbalization.js";
  * but to let a modeler confirm the model rules out what it should.
  */
 export interface Counterexample {
-  /** The fact type the counterexample probes (the constraint's owner). */
-  readonly factTypeId: string;
+  /**
+   * The fact types the probed constraint applies to, in model order: its
+   * own fact type for an internal constraint, every fact type it spans for
+   * one across fact types (orm-format-3, Open decision 9). Never the fact
+   * type a 2.0 file happened to nest it under.
+   */
+  readonly factTypeIds: readonly string[];
   /** The constraint this counterexample probes, when it carries an id. */
   readonly constraintId?: string;
   /** The discriminator of the constraint this counterexample probes. */

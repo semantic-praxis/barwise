@@ -12,6 +12,7 @@ import {
   RING_PROPERTIES,
   type RingConstraint,
   type RingProperty,
+  roleIdsOf,
   type SubsetConstraint,
   type ValueConstraint,
 } from "../model/Constraint.js";
@@ -46,33 +47,26 @@ type RoleValues = Record<string, string>;
  */
 export function generateCounterexamples(model: OrmModel): Counterexample[] {
   const result: Counterexample[] = [];
-  for (const factType of model.factTypes) {
-    for (const constraint of factType.constraints) {
-      const ce = generateCounterexampleForConstraint(constraint, factType, model);
-      if (ce) {
-        result.push(ce);
-      }
-    }
+  for (const [constraint, factType] of model.everyConstraint()) {
+    const ce = generateInView(constraint, factType, model);
+    if (ce) result.push(ce);
   }
   return result;
 }
 
 /**
  * The counterexamples for a view of one fact type: those probing a
- * constraint that applies to it (`OrmModel.constraintsTouching`), so a
- * constraint across fact types is probed under every fact type it touches,
- * as the verbalization of that fact type says it. A counterexample without
- * a constraint id falls back to the fact type it was generated under.
+ * constraint that applies to it, so a constraint across fact types is
+ * probed under every fact type it touches, as the verbalization of that
+ * fact type says it. A counterexample's `factTypeIds` are the fact types
+ * holding its constraint's roles, which is the same set
+ * `OrmModel.constraintsTouching` reads.
  */
 export function counterexamplesTouching(
-  model: OrmModel,
   factTypeId: string,
   counterexamples: readonly Counterexample[],
 ): Counterexample[] {
-  const touching = new Set(model.constraintsTouching(factTypeId).map((c) => c.id));
-  return counterexamples.filter((ce) =>
-    ce.constraintId ? touching.has(ce.constraintId) : ce.factTypeId === factTypeId
-  );
+  return counterexamples.filter((ce) => ce.factTypeIds.includes(factTypeId));
 }
 
 /**
@@ -95,29 +89,44 @@ export function generateCounterexampleForConstraint(
   factType: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
+  // A constraint across fact types belongs to none, so its generator is
+  // not handed `factType`, as `ConstraintVerbalizer.verbalize` ignores it.
+  return generateInView(constraint, factType, model);
+}
+
+/**
+ * The dispatch. Only the kinds that live in a fact type are handed `ft`;
+ * it is undefined for a constraint across fact types from
+ * `everyConstraint`, which those kinds never read.
+ */
+function generateInView(
+  constraint: Constraint,
+  ft: FactType | undefined,
+  model: OrmModel,
+): Counterexample | undefined {
   switch (constraint.type) {
     case "internal_uniqueness":
-      return forUniqueness(constraint, factType, model);
+      return ft && forUniqueness(constraint, ft, model);
     case "value_constraint":
-      return forValue(constraint, factType, model);
+      return ft && forValue(constraint, ft, model);
     case "frequency":
-      return forFrequency(constraint, factType, model);
+      return ft && forFrequency(constraint, ft, model);
     case "ring":
-      return forRing(constraint, factType, model);
+      return ft && forRing(constraint, ft, model);
     case "mandatory":
-      return forMandatory(constraint, factType, model);
+      return ft && forMandatory(constraint, ft, model);
     case "disjunctive_mandatory":
-      return forDisjunctive(constraint, factType, model);
+      return forDisjunctive(constraint, model);
     case "exclusion":
-      return forExclusion(constraint, factType, model);
+      return forExclusion(constraint, model);
     case "exclusive_or":
-      return forExclusiveOr(constraint, factType, model);
+      return forExclusiveOr(constraint, model);
     case "subset":
-      return forSubset(constraint, factType, model);
+      return forSubset(constraint, model);
     case "equality":
-      return forEquality(constraint, factType, model);
+      return forEquality(constraint, model);
     case "external_uniqueness":
-      return forExternalUniqueness(constraint, factType, model);
+      return forExternalUniqueness(constraint, model);
 
     // No generator, deliberately and for two different reasons. A
     // value-comparison or cardinality violation needs values chosen to
@@ -320,7 +329,7 @@ function forMandatory(
   const reason = `a ${playerName(role, model)} that exists but never plays `
     + `"${ft.name}"`;
   const rendered = `${value} appears in ${anchor.ft.name} but not in ${ft.name}`;
-  return makeCrossCounterexample(ft, mc, [forbidden], reason, rendered);
+  return makeCrossCounterexample([ft.id], mc, [forbidden], reason, rendered);
 }
 
 /**
@@ -329,7 +338,6 @@ function forMandatory(
  */
 function forDisjunctive(
   dc: DisjunctiveMandatoryConstraint,
-  ft: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
   const firstId = dc.roleIds[0];
@@ -345,7 +353,7 @@ function forDisjunctive(
     + `required roles`;
   const rendered = `${value} appears in ${anchor.ft.name} but plays none of `
     + `[${dc.roleIds.join(", ")}]`;
-  return makeCrossCounterexample(ft, dc, [forbidden], reason, rendered);
+  return makeCrossCounterexample(spannedBy(dc, model), dc, [forbidden], reason, rendered);
 }
 
 /**
@@ -391,35 +399,39 @@ function valueInAllRoles(
 /** Exclusion: an object value that plays more than one of the excluded roles. */
 function forExclusion(
   ec: ExclusionConstraint,
-  ft: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
   const built = valueInAllRoles(ec.roleIds, model);
   if (!built) return undefined;
   const reason = `an object that plays more than one of the excluded roles`;
   const rendered = `${built.value} plays all ${ec.roleIds.length} excluded roles`;
-  return makeCrossCounterexample(ft, ec, built.populations, reason, rendered);
+  return makeCrossCounterexample(spannedBy(ec, model), ec, built.populations, reason, rendered);
 }
 
 /** Exclusive-or: an object value that plays more than one of the roles. */
 function forExclusiveOr(
   xor: ExclusiveOrConstraint,
-  ft: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
   const built = valueInAllRoles(xor.roleIds, model);
   if (!built) return undefined;
   const reason = `an object that plays more than one of the exclusive-or roles`;
   const rendered = `${built.value} plays all ${xor.roleIds.length} roles (must be one)`;
-  return makeCrossCounterexample(ft, xor, built.populations, reason, rendered);
+  return makeCrossCounterexample(spannedBy(xor, model), xor, built.populations, reason, rendered);
 }
 
 /**
  * Build a forbidden tuple in one role sequence with no match in the other.
- * Spanning only (the two sequences live in different fact types).
+ *
+ * Spanning, the two sequences live in different fact types: one tuple in
+ * the present side's fact type, and nothing in the absent side's. Local,
+ * both live in one fact type (barwise-0od): one fact whose present roles
+ * hold one value and whose absent roles hold another, so the present tuple
+ * matches no absent tuple in the same population. Validation checks both
+ * shapes across the population (barwise-h2a), so both get a witness. A
+ * sequence pair sharing a role cannot be split this way and has none.
  */
 function forTupleAbsence(
-  ft: FactType,
   constraint: Constraint,
   presentRoleIds: readonly string[],
   absentRoleIds: readonly string[],
@@ -431,7 +443,8 @@ function forTupleAbsence(
   if (presentRoleIds.length === 0) return undefined;
   const presentFt = present[0]!.ft;
   const absentFt = absent[0]!.ft;
-  if (presentFt.id === absentFt.id) return undefined; // local: out of scope
+  const local = presentFt.id === absentFt.id;
+  if (local && presentRoleIds.some((rid) => absentRoleIds.includes(rid))) return undefined;
 
   const inst: RoleValues = {};
   for (const r of presentFt.roles) {
@@ -440,32 +453,37 @@ function forTupleAbsence(
   presentRoleIds.forEach((rid, i) => {
     inst[rid] = mintValue(present[i]!.role, presentFt, model, 0);
   });
+  if (local && presentRoleIds.every((rid, i) => inst[rid] === inst[absentRoleIds[i]!])) {
+    // Both sides would read the same tuple, which matches itself.
+    return undefined;
+  }
   const forbidden = new Population({
     factTypeId: presentFt.id,
     instances: [{ roleValues: inst }],
   });
-  const reason = `a ${presentFt.name} tuple with no match in ${absentFt.name}`;
+  const reason = local
+    ? `a ${presentFt.name} fact whose [${presentRoleIds.join(", ")}] tuple is not `
+      + `also a [${absentRoleIds.join(", ")}] tuple`
+    : `a ${presentFt.name} tuple with no match in ${absentFt.name}`;
   const rendered = `a tuple in [${presentRoleIds.join(", ")}] absent from `
     + `[${absentRoleIds.join(", ")}]`;
-  return makeCrossCounterexample(ft, constraint, [forbidden], reason, rendered);
+  return makeCrossCounterexample(
+    spannedBy(constraint, model),
+    constraint,
+    [forbidden],
+    reason,
+    rendered,
+  );
 }
 
-/** Subset (spanning): a subset tuple with no superset match. */
-function forSubset(
-  sc: SubsetConstraint,
-  ft: FactType,
-  model: OrmModel,
-): Counterexample | undefined {
-  return forTupleAbsence(ft, sc, sc.subsetRoleIds, sc.supersetRoleIds, model);
+/** Subset: a subset tuple with no superset match. */
+function forSubset(sc: SubsetConstraint, model: OrmModel): Counterexample | undefined {
+  return forTupleAbsence(sc, sc.subsetRoleIds, sc.supersetRoleIds, model);
 }
 
-/** Equality (spanning): a tuple on one side with no match on the other. */
-function forEquality(
-  eq: EqualityConstraint,
-  ft: FactType,
-  model: OrmModel,
-): Counterexample | undefined {
-  return forTupleAbsence(ft, eq, eq.roleIds1, eq.roleIds2, model);
+/** Equality: a tuple on one side with no match on the other. */
+function forEquality(eq: EqualityConstraint, model: OrmModel): Counterexample | undefined {
+  return forTupleAbsence(eq, eq.roleIds1, eq.roleIds2, model);
 }
 
 /**
@@ -475,7 +493,6 @@ function forEquality(
  */
 function forExternalUniqueness(
   euc: ExternalUniquenessConstraint,
-  ft: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
   const join = inferExternalUniquenessJoin(euc.roleIds, model);
@@ -517,7 +534,7 @@ function forExternalUniqueness(
   const reason = `two ${playerName(firstKeyRole, model)} instances sharing the same `
     + `identifying combination`;
   const rendered = `${common1} and ${common2} share the same combination`;
-  return makeCrossCounterexample(ft, euc, forbidden, reason, rendered);
+  return makeCrossCounterexample(spannedBy(euc, model), euc, forbidden, reason, rendered);
 }
 
 /** A single anchor role in some fact type, used to make an instance exist. */
@@ -616,7 +633,7 @@ function makeCounterexample(
     instances: instances.map((roleValues) => ({ roleValues })),
   });
   return makeCrossCounterexample(
-    ft,
+    [ft.id],
     constraint,
     [forbidden],
     reason,
@@ -624,9 +641,14 @@ function makeCounterexample(
   );
 }
 
+/** The fact types holding a constraint's roles, in model order. */
+function spannedBy(constraint: Constraint, model: OrmModel): string[] {
+  return model.factTypesHolding(roleIdsOf(constraint)).map((ft) => ft.id);
+}
+
 /** Assemble a Counterexample from a set of forbidden populations. */
 function makeCrossCounterexample(
-  ft: FactType,
+  factTypeIds: readonly string[],
   constraint: Constraint,
   forbidden: readonly Population[],
   reason: string,
@@ -639,7 +661,7 @@ function makeCrossCounterexample(
     valSeg(rendered),
   ];
   return {
-    factTypeId: ft.id,
+    factTypeIds,
     constraintId: constraint.id,
     constraintType: constraint.type,
     forbidden,
