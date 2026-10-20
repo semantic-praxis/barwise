@@ -898,6 +898,25 @@ Implementation notes (2026-10-19):
   - The editor needed no change: its source map indexes every mapping with
     an `id`, so a constraint's diagnostic lands on the constraint's own
     line. A 2.0 file that omits the id still falls to line 0.
+- **3a-ii-c lands as four PRs, one family each:** query, describe,
+  counterexamples (with barwise-0od), then graph references and lineage.
+- **Query (3a-ii-c, 2026-10-20).**
+  - `ConstraintRef.factType` and `factTypeId` become `factTypes` and
+    `factTypeIds`, the fact types the constraint applies to in model order
+    (one entry for an internal constraint). The id is the constraint's own;
+    the positional fallback `${ft.id}-constraint-${i}` is gone.
+  - Both come from the constraint's verbalization row, which has carried
+    the id and `factTypeIds` since 3a-ii-a, so query and verbalize cannot
+    disagree about which fact types a constraint spans.
+  - `list-constraints` says each fact type's own constraints, then each
+    constraint across fact types once. `fact-type`, `entity` and
+    `constraints-of` say every constraint touching the fact types in view,
+    once even when it spans two of them. Before, an entity whose two fact
+    types a key spanned listed it under whichever one nested it, and the
+    other fact type's view did not list it at all.
+  - The CLI (`barwise query --json`) and MCP (`query_model`) print the
+    result as it is, so their output changes shape with it and neither
+    needed code.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 
