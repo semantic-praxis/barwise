@@ -118,6 +118,19 @@ describe("query_model tool", () => {
     ]);
   });
 
+  it("gives a constraint the file leaves without an id its own derived id, not a position", () => {
+    const parsed = parse(executeQueryModel(simpleModel, "constraints-of Order"));
+    const refs = (parsed.result as { constraints: Record<string, unknown>[]; }).constraints;
+    const ids = refs.map((c) => c.id);
+    expect(new Set(ids).size).toBe(2);
+    for (const c of refs) {
+      expect(c.id).not.toMatch(/-constraint-\d+$/);
+      expect(c.id).not.toBe("ft-customer-places-order");
+      expect(c).not.toHaveProperty("factType");
+      expect(c).not.toHaveProperty("factTypeId");
+    }
+  });
+
   it("returns model statistics", () => {
     const parsed = parse(executeQueryModel(simpleModel, "stats"));
     const result = parsed.result as { kind: string; stats: { factTypes: number; }; };

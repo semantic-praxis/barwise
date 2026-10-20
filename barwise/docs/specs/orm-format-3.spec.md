@@ -925,8 +925,11 @@ Implementation notes (2026-10-19):
     type, its own constraints now come first and those across fact types
     after, where the nested list interleaved them. And the constraints
     across fact types still follow file order, so moving one to another
-    host reorders them; the set each view says does not change. That
-    lasts until storage moves to the model (WS3c).
+    host reorders them. The set each view says does not change for a
+    constraint whose id the file states; one whose id is derived on load
+    takes a new id when it moves, because WS2 seeds that id with the fact
+    type it is nested under. Both last until storage moves to the model
+    (WS3c).
   - The CLI (`barwise query --json`) and MCP (`query_model`) print the
     result as it is, so their output changes shape with it and neither
     needed code. `mcp/tests/tools/queryModel.test.ts` pins the ids and the
