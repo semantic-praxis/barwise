@@ -991,15 +991,17 @@ Implementation notes (2026-10-19):
     not lose the witness; sequences that share only some roles, or reorder
     the same roles (the symmetric pair a1, a2 against a2, a1), get one.
     Only the same roles in the same order, or domains leaving one choice,
-    get none. A role sequence whose roles sit in several fact types is a
-    join no single fact can break, and gets none rather than a crash.
-  - `factTypeIds` is decided once, in the dispatch: an internal constraint
-    is named by the fact type it lives in, as `constraintsTouching` lists
-    it, even when a stale role id leaves `factTypesOf` naming nothing; one
-    across fact types by `factTypesOf`.
-  - The span is `OrmModel.factTypesOf(constraint)`, now the one answer
-    verbalization rows, validation messages and counterexamples name a
-    constraint by; each had its own `factTypesHolding(roleIdsOf(c))`.
+    get none. A subset or equality side whose roles sit in several fact
+    types: on the absent side no fact holds them all, so validation finds
+    no absent tuple and one present fact is the witness; on the present
+    side no one fact can be written, so there is none, rather than a crash.
+  - Naming is `OrmModel.factTypesNaming(inView)`: an internal constraint by
+    the fact type it lives in, as `constraintsTouching` lists it, even when
+    a stale role id leaves its roles naming nothing; one across fact types
+    by the fact types holding its roles (`factTypesOf`). Verbalization rows
+    and counterexamples both read it, so they cannot name one constraint
+    differently. Validation messages read `factTypesOf` directly, since
+    they report what the roles say.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

@@ -17,7 +17,7 @@ import {
   type ValueConstraint,
 } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import { assertNever } from "../util/assertNever.js";
@@ -58,9 +58,9 @@ export function generateCounterexamples(model: OrmModel): Counterexample[] {
  * The counterexamples for a view of one fact type: those probing a
  * constraint that applies to it, so a constraint across fact types is
  * probed under every fact type it touches, as the verbalization of that
- * fact type says it. A counterexample's `factTypeIds` are the fact types
- * holding its constraint's roles, which is the same set
- * `OrmModel.constraintsTouching` reads.
+ * fact type says it. A counterexample's `factTypeIds` are
+ * `OrmModel.factTypesNaming` of its constraint, the set
+ * `OrmModel.constraintsTouching` lists it under.
  */
 export function counterexamplesTouching(
   factTypeId: string,
@@ -107,12 +107,9 @@ function generateInView(
 ): Counterexample | undefined {
   const probe = probeFor(constraint, ft, model);
   if (!probe) return undefined;
-  // Decided here, once: an internal constraint is named by the fact type
-  // it lives in, as `constraintsTouching` lists it -- even one whose role
-  // ids no longer resolve, which `factTypesOf` would leave naming nothing
-  // -- and one across fact types by the fact types it spans.
-  const factTypeIds = ft ? [ft.id] : model.factTypesOf(constraint).map((f) => f.id);
-  return { ...probe, factTypeIds };
+  // Named as its verbalization row names it, so the two cannot disagree.
+  const inView = (ft ? [constraint, ft] : [constraint, undefined]) as ConstraintInView;
+  return { ...probe, factTypeIds: model.factTypesNaming(inView).map((f) => f.id) };
 }
 
 /** What each generator builds: a counterexample short of the fact types it names. */
@@ -462,11 +459,13 @@ function forTupleAbsence(
   if (presentRoleIds.length === 0) return undefined;
   const presentFt = present[0]!.ft;
   const absentFt = absent[0]!.ft;
-  // One fact holds one fact type's roles. A sequence whose roles sit in
-  // several fact types is a join, which a one-fact witness cannot break.
+  // One fact holds one fact type's roles, so a present side spanning fact
+  // types cannot be written as one fact.
   if (present.some((r) => r!.ft.id !== presentFt.id)) return undefined;
-  if (absent.some((r) => r!.ft.id !== absentFt.id)) return undefined;
-  const local = presentFt.id === absentFt.id;
+  // The absent side may span fact types: then no single fact holds all its
+  // roles, validation finds no absent tuple at all, and one present fact
+  // is the witness, as for any spanning pair.
+  const local = absent.every((r) => r!.ft.id === presentFt.id);
 
   const inst = local
     ? localWitness(presentFt, presentRoleIds, absentRoleIds, model)

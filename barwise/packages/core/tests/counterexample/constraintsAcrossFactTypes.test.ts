@@ -111,6 +111,20 @@ describe("counterexamples over constraints across fact types", () => {
     }
   });
 
+  it("witnesses a subset whose superset side spans fact types with one subset fact", () => {
+    // No single fact holds both superset roles, so validation finds no
+    // superset tuple, and any walks fact breaks the subset.
+    const c: Constraint = {
+      id: "c-into-join",
+      type: "subset",
+      subsetRoleIds: ["r-3a", "r-3b"],
+      supersetRoleIds: ["r-1a", "r-2b"],
+    };
+    const model = commute("ft-walks", c);
+    expect(generateCounterexamples(model).map((ce) => ce.constraintId)).toEqual(["c-into-join"]);
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
+
   it("names an internal constraint's own fact type", () => {
     const uc: Constraint = { id: "c-uc", type: "internal_uniqueness", roleIds: ["r-3a"] };
     const ces = generateCounterexamples(commute("ft-walks", uc));

@@ -263,14 +263,26 @@ export class OrmModel {
   }
 
   /**
-   * The fact types a constraint applies to: those holding its roles, in
-   * model order (orm-format-3, Open decision 9). One for an internal
-   * constraint, every fact type it spans for one across fact types. The
-   * one answer verbalization rows, validation messages and counterexamples
-   * all name a constraint by.
+   * The fact types holding a constraint's roles, in model order: every
+   * fact type a constraint across fact types spans. For an internal
+   * constraint this is its own fact type only while its role ids resolve;
+   * a stale one names nothing, which is why a constraint in a view is
+   * named by `factTypesNaming` instead. Validation messages read this
+   * directly, since they report what the roles say.
    */
   factTypesOf(constraint: Constraint): readonly FactType[] {
     return this.factTypesHolding(roleIdsOf(constraint));
+  }
+
+  /**
+   * The fact types a constraint in a view is named by (orm-format-3, Open
+   * decision 9): an internal constraint by the fact type it lives in, as
+   * `constraintsTouching` lists it, and one across fact types by the fact
+   * types it spans. The one answer verbalization rows and counterexamples
+   * name a constraint by, so the two cannot disagree for one constraint.
+   */
+  factTypesNaming([constraint, factType]: ConstraintInView): readonly FactType[] {
+    return factType ? [factType] : this.factTypesOf(constraint);
   }
 
   /**
