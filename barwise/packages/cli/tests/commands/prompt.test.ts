@@ -8,8 +8,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { beforeAll, describe, expect, it } from "vitest";
-import { FIRST_LOAD_TIMEOUT_MS, runCli, warmPromptCommand } from "../workspace/run.js";
+import { describe, expect, it } from "vitest";
+import { runCli, warmPromptCommand } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const responsesDir = resolve(
@@ -17,7 +17,7 @@ const responsesDir = resolve(
   "../../../promptlab/tests/fixtures/responses",
 );
 
-beforeAll(warmPromptCommand, FIRST_LOAD_TIMEOUT_MS);
+warmPromptCommand();
 
 describe("barwise prompt score", () => {
   it("scores a recorded payload against its case", async () => {

@@ -48,9 +48,9 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type FakeOllama, fixtureAnswerer, startFakeOllama } from "../workspace/fakeOllama.js";
-import { FIRST_LOAD_TIMEOUT_MS, runCli, warmPromptCommand } from "../workspace/run.js";
+import { runCli, warmPromptCommand } from "../workspace/run.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EVALS = resolve(here, "../../../promptlab/evals");
@@ -119,7 +119,7 @@ function evalArgs(extra: string[] = []): string[] {
 
 const historyPath = (): string => join(tmp, "history.jsonl");
 
-beforeAll(warmPromptCommand, FIRST_LOAD_TIMEOUT_MS);
+warmPromptCommand();
 
 describe("barwise prompt eval, against a loopback provider", () => {
   it("runs the train split end to end and reports the recorded scores", async () => {

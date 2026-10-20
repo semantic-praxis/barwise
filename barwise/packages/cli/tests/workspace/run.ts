@@ -10,6 +10,7 @@
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { beforeAll } from "vitest";
 import { commandNameIn, createProgram } from "../../src/cli.js";
 
 // Mirror the bin entry: supply the real version so `--version` tests see
@@ -19,22 +20,29 @@ const { version } = JSON.parse(
 ) as { version: string; };
 
 /**
- * Load the `prompt` command once, before a file's tests, so no test pays
- * for it. The first `runCli` call into it loads the command, promptlab and
- * the eval suite through vitest's transform: about 4s alone under coverage,
- * and 35-38s in the pre-push coverage gate, which runs every package's
- * suite at once on a 4-core machine. As the first statement of a test that
- * beat the 30s default on four pushes of semantic-praxis/barwise#689. In a
- * hook it gets its own, longer limit, and the tests keep the default
- * whatever their order, so a hung one still fails in 30s. Why the load
- * costs what it does is barwise-xlw.
+ * Load the `prompt` command in a `beforeAll`, so no test pays for it. The
+ * first call into it imports the command and its dependencies (promptlab,
+ * llm) through vitest's transform: the first test of prompt.test.ts took
+ * about 4.2s alone under coverage, and 35-38s in the pre-push coverage gate,
+ * which runs every package's suite at once on a 4-core machine. That
+ * exceeded the 30s test default on four pushes of
+ * semantic-praxis/barwise#689. In the hook the load gets its own limit and
+ * the tests keep the default, so a hung test still fails in 30s; with the
+ * hook that first test takes about 1.2s alone. Only the import is warmed:
+ * work an action does on each call, such as loading the eval suite, stays
+ * in the test. Every test file that calls `prompt` calls this once at top
+ * level. Why the import costs what it does is barwise-xlw.
  */
-export async function warmPromptCommand(): Promise<void> {
-  await runCli(["prompt", "--help"]);
+export function warmPromptCommand(): void {
+  beforeAll(async () => {
+    // runCli reports a failed import as exit 1, the same code `--help`
+    // ends with here, so only the help text shows the command loaded.
+    const { stdout, stderr } = await runCli(["prompt", "--help"]);
+    if (!stdout.startsWith("Usage: barwise prompt")) {
+      throw new Error(`The prompt command did not load: ${stderr || stdout}`);
+    }
+  }, 120_000);
 }
-
-/** The limit for `warmPromptCommand` in a `beforeAll`. */
-export const FIRST_LOAD_TIMEOUT_MS = 120_000;
 
 export interface RunResult {
   readonly stdout: string;
