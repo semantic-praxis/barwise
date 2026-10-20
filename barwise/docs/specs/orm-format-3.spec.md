@@ -873,8 +873,9 @@ Implementation notes (2026-10-19):
     sample populations, "plays none" reads the universe, which leaves them
     out. Subset and equality followed the next
     day, by the same decision (barwise-h2a): the local per-population rules
-    padded an unfilled role with an empty value and reported it, and missed
-    a tuple whose halves sat in two populations of one fact type, so
+    padded an unfilled role with an empty value and reported it, and
+    reported a tuple whose match sat in another population of the same fact
+    type -- two false violations -- so
     `checkSubsetViolations` and `checkEqualityViolations` now take every
     one, `setComparison.ts` is gone, and their messages are `default` and
     `reverse`. A local one's diagnostic now points at the constraint rather

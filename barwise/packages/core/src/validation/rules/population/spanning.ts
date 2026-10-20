@@ -4,6 +4,7 @@ import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
 import { constraintElementId } from "../../span.js";
 import {
+  compositeKeyParts,
   type ObjectUniverse,
   rolePlayerMap,
   severityForModality,
@@ -12,7 +13,7 @@ import {
 } from "./shared.js";
 
 /** A composite key as a message shows it: its parts, not its separator. */
-const showTuple = (key: string): string => key.split("\0").join(", ");
+const showTuple = (key: string): string => compositeKeyParts(key).join(", ");
 
 /**
  * Exclusion constraints: no object may play more than one of the excluded
@@ -108,8 +109,8 @@ export function checkExclusiveOrViolations(
  * the superset role sequence, across the whole population. Every subset is
  * checked here, local or spanning (owner, 2026-10-20, barwise-h2a): a
  * per-population check padded an unfilled role with an empty value and
- * reported it, and missed a tuple whose two halves sat in different
- * populations of one fact type. A tuple with an unfilled role is skipped,
+ * reported it, and reported a tuple whose match sat in another population
+ * of the same fact type -- two false violations. A tuple with an unfilled role is skipped,
  * as an incomplete instance is reported on its own.
  */
 export function checkSubsetViolations(model: OrmModel): Diagnostic[] {

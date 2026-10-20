@@ -818,7 +818,45 @@ describe("populationValidationRules", () => {
         (d) => d.ruleId === "population/equality-violation",
       );
       // P001 not in r2 set AND P002 not in r1 set.
-      expect(eq).toHaveLength(2);
+      expect(eq.map((d) => d.message)).toEqual([
+        "Equality constraint is violated: tuple [P001] in roles [r1] has no match in roles [r2].",
+        "Equality constraint is violated: tuple [P002] in roles [r2] has no match in roles [r1].",
+      ]);
+    });
+
+    // Checked across the whole population, as subset is (barwise-h2a).
+    it("does not report an instance that leaves one side unfilled", () => {
+      const model = makeSelfRefModel({
+        equality: { roleIds1: ["r1"], roleIds2: ["r2"] },
+      });
+      const ft = model.getFactTypeByName("Person is parent of Person")!;
+      const pop = model.addPopulation({ factTypeId: ft.id });
+      pop.addInstance({ roleValues: { r1: "P001", r2: "P001" } });
+      pop.addInstance({ roleValues: { r2: "P001" } });
+
+      const eq = populationValidationRules(model, graphFor(model)).filter(
+        (d) => d.ruleId === "population/equality-violation",
+      );
+      expect(eq).toEqual([]);
+    });
+
+    it("finds the matching tuple in another population of the same fact type", () => {
+      const model = makeSelfRefModel({
+        equality: { roleIds1: ["r1"], roleIds2: ["r2"] },
+      });
+      const ft = model.getFactTypeByName("Person is parent of Person")!;
+      model.addPopulation({ factTypeId: ft.id }).addInstance({
+        roleValues: { r1: "P001", r2: "P002" },
+      });
+      model.addPopulation({ factTypeId: ft.id }).addInstance({
+        roleValues: { r1: "P002", r2: "P001" },
+      });
+
+      const eq = populationValidationRules(model, graphFor(model)).filter(
+        (d) => d.ruleId === "population/equality-violation",
+      );
+      // Each side holds {P001, P002} across the two populations.
+      expect(eq).toEqual([]);
     });
 
     it("passes when tuple sets are identical", () => {
