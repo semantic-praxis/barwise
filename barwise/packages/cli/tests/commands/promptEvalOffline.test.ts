@@ -50,7 +50,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type FakeOllama, fixtureAnswerer, startFakeOllama } from "../workspace/fakeOllama.js";
-import { runCli } from "../workspace/run.js";
+import { FIRST_LOAD_TIMEOUT_MS, runCli } from "../workspace/run.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EVALS = resolve(here, "../../../promptlab/evals");
@@ -142,7 +142,7 @@ describe("barwise prompt eval, against a loopback provider", () => {
     expect(report.mean).toBeCloseTo(ANSWER_KEY_MEAN, 10);
     expect(report.worst).toBeCloseTo(1, 10);
     expect(fake!.requests).toHaveLength(TRAIN.length);
-  });
+  }, FIRST_LOAD_TIMEOUT_MS);
 
   it("says which provider and model failed to match when it falls back", async () => {
     // "Using the default prompt artifact." on its own read as a

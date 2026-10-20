@@ -18,6 +18,17 @@ const { version } = JSON.parse(
   readFileSync(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8"),
 ) as { version: string; };
 
+/**
+ * Timeout for a test that makes its file's first `runCli` call into a
+ * heavy command (`prompt score`, `prompt eval`). That call loads the
+ * command, promptlab and the eval suite through vitest's transform: about
+ * 4s alone under coverage, and 35-38s in the pre-push coverage gate, which
+ * runs every package's suite at once on a 4-core machine -- past the 30s
+ * default, on four pushes of semantic-praxis/barwise#689. The test is slow,
+ * not hung; why the first load costs what it does is barwise-xlw.
+ */
+export const FIRST_LOAD_TIMEOUT_MS = 120_000;
+
 export interface RunResult {
   readonly stdout: string;
   readonly stderr: string;

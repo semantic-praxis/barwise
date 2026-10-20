@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { runCli } from "../workspace/run.js";
+import { FIRST_LOAD_TIMEOUT_MS, runCli } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const responsesDir = resolve(
@@ -32,7 +32,7 @@ describe("barwise prompt score", () => {
     expect(score.caseId).toBe("order-management");
     expect(score.rubricPassed).toBe(score.rubricTotal);
     expect(score.score).toBeCloseTo(1, 10);
-  });
+  }, FIRST_LOAD_TIMEOUT_MS);
 
   it("reports an unknown case id with the available ids", async () => {
     const result = await runCli([
