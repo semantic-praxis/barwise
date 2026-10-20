@@ -9,10 +9,15 @@
  * module -- which is inside `validation/`, where `RULE_ID` lives --
  * says what each finding is called.
  *
- * Every id below already existed and was emitted by a rule that resolved
- * the reference itself. Nothing new is minted, because a diagnostic id
- * is a promise to whoever reads validator output, and moving WHERE a
- * check runs must not change WHAT a consumer sees.
+ * Every id below but one already existed and was emitted by a rule that
+ * resolved the reference itself, because a diagnostic id is a promise to
+ * whoever reads validator output, and moving WHERE a check runs must not
+ * change WHAT a consumer sees. The exception is `unknownRole`
+ * (orm-format-3 WS3a-ii-c): a dangling role on a constraint across fact
+ * types used to borrow an internal kind's id and template, which named the
+ * fact type a 2.0 file nested it under and, for an exclusion, subset or
+ * equality, the wrong kind. That message was wrong rather than merely
+ * moved, so it changed deliberately.
  *
  * One multiplicity difference is deliberate. `joinConstraintRules`
  * walked a path and gave up at the first bad hop, so a path with two
@@ -24,7 +29,7 @@
  */
 
 import type { ExternalConstraint, InternalConstraint, JoinOperand } from "../model/Constraint.js";
-import { isExternalConstraint, joinOperandsOf } from "../model/Constraint.js";
+import { joinOperandsOf } from "../model/Constraint.js";
 import type { UnresolvedReference } from "../model/graph.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { RolePathStep } from "../model/RolePath.js";
@@ -143,7 +148,7 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
           u.missing,
         );
       }
-      if (isExternalConstraint(constraint)) {
+      if (factType === undefined) {
         return report(
           RULE_ID.unknownRole,
           "default",
@@ -153,13 +158,11 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
           u.missing,
         );
       }
-      // An internal constraint always arrives with the fact type it lives
-      // in (`graphOf` walks `everyConstraint`).
       return report(
         CONSTRAINT_INVALID_ROLE[constraint.type],
         "default",
-        factType!.id,
-        factType!.name,
+        factType.id,
+        factType.name,
         u.missing,
       );
     }

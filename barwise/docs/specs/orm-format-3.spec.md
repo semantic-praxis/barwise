@@ -1021,12 +1021,19 @@ Implementation notes (2026-10-19):
     type.
   - Lineage looks a foreign key's constraint up with the new
     `OrmModel.getConstraintInView(id)` and traces it to every fact type
-    `factTypesNaming` gives, so a composite key traces to both fact types
-    it spans rather than the one nesting it. An entity's lineage lists
-    each constraint touching its fact types once, and `getConstraintName`
-    names one across fact types by its span ("External UC: A and B").
-    Within a fact type, its own constraints now come first, as every
-    other view lists them.
+    `factTypesNaming` gives. RelationalMapper sets that id to an internal
+    uniqueness (or a subtype fact or fact type) today, so a composite key
+    tracing to both fact types it spans is the placement-correct reading
+    rather than one an export reaches yet.
+  - An entity's lineage lists the constraints touching its fact types
+    once each, from one `constraintsTouchingAny` call, after the fact
+    types, roles and players. `getConstraintName` names one across fact
+    types by its span ("External UC: A and B"), and one none of whose roles
+    resolve by its label alone; that one touches no fact type, so no
+    entity lists it, and validation reports it.
+  - `ReferenceSource`'s constraint arm pairs an internal constraint with
+    its fact type and one across fact types with none in the type, so
+    `referenceDiagnostics` needs no assertion to read either.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

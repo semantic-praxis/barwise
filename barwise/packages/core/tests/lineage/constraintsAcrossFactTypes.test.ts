@@ -89,6 +89,25 @@ describe("lineage over constraints across fact types", () => {
     expect(traced("ft-area")).toEqual(fromIn);
   });
 
+  it("labels a constraint none of whose roles resolve without an empty span", () => {
+    const model = rooms("ft-in");
+    // Nested anywhere, a constraint across fact types with no roles has no span.
+    model.getFactType("ft-in")!.addConstraint({
+      id: "c-empty",
+      type: "external_uniqueness",
+      roleIds: [],
+    });
+    const schema = schemaFor(model);
+    schema.tables[0]!.foreignKeys[0] = {
+      ...schema.tables[0]!.foreignKeys[0]!,
+      sourceConstraintId: "c-empty",
+    };
+    const sources = generateDdlLineage(model, schema).find((e) => e.artifact === "room")!.sources;
+    expect(sources.filter((s) => s.elementType === "Constraint")).toEqual([
+      { elementId: "c-empty", elementType: "Constraint", elementName: "External UC" },
+    ]);
+  });
+
   it("lists the key once in its entity's lineage, named by its span, whichever fact type nests it", () => {
     for (const host of ["ft-in", "ft-nr", "ft-area"] as const) {
       const room = generateModelLineage(rooms(host)).find((e) => e.artifact === "Room")!;

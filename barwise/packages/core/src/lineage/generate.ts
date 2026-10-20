@@ -109,10 +109,13 @@ export function generateDdlLineage(
           const [constraint] = inView;
           // The fact types the constraint is named by (orm-format-3, Open
           // decision 9): its own for an internal one, every one it spans
-          // for one across fact types, such as a composite key.
+          // for one across fact types. RelationalMapper sets this id to an
+          // internal uniqueness (or, below, a subtype fact or fact type)
+          // today, so the second case is the placement-correct reading,
+          // not one an export reaches yet.
           const named = model.factTypesNaming(inView);
-          sources.set(constraint.id!, {
-            elementId: constraint.id!,
+          sources.set(fk.sourceConstraintId, {
+            elementId: fk.sourceConstraintId,
             elementType: "Constraint",
             elementName: getConstraintName(constraint, named),
           });
@@ -211,7 +214,6 @@ export function generateModelLineage(
 
     // Find all fact types that involve this entity
     const relatedFactTypes = model.factTypesForObjectType(entity.id);
-    const seenConstraints = new Set<Constraint>();
 
     for (const ft of relatedFactTypes) {
       // Add the fact type
@@ -239,19 +241,20 @@ export function generateModelLineage(
           });
         }
       }
+    }
 
-      // Add the constraints touching this fact type, each once for the
-      // entity even when it spans two of the entity's fact types.
-      for (const inView of model.constraintsTouchingAny([ft.id])) {
-        const [constraint] = inView;
-        if (constraint.id && !seenConstraints.has(constraint)) {
-          seenConstraints.add(constraint);
-          sources.push({
-            elementId: constraint.id,
-            elementType: "Constraint",
-            elementName: getConstraintName(constraint, model.factTypesNaming(inView)),
-          });
-        }
+    // The constraints touching the entity's fact types, each once even
+    // when it spans two of them. A constraint across fact types none of
+    // whose roles resolve touches no fact type, so no entity lists it;
+    // validation reports it.
+    for (const inView of model.constraintsTouchingAny(relatedFactTypes.map((ft) => ft.id))) {
+      const [constraint] = inView;
+      if (constraint.id) {
+        sources.push({
+          elementId: constraint.id,
+          elementType: "Constraint",
+          elementName: getConstraintName(constraint, model.factTypesNaming(inView)),
+        });
       }
     }
 
@@ -322,26 +325,29 @@ function getConstraintName(
   constraint: { type: Constraint["type"]; id?: string; },
   factTypes: readonly { name: string; }[],
 ): string {
-  const factType = { name: factTypes.map((ft) => ft.name).join(" and ") };
+  // The span, joined; empty for a constraint none of whose roles resolve,
+  // which then reads as its label alone rather than "Label: ".
+  const span = factTypes.map((ft) => ft.name).join(" and ");
+  const of = (label: string) => (span ? `${label}: ${span}` : label);
   switch (constraint.type) {
     case "internal_uniqueness":
-      return `UC: ${factType.name}`;
+      return of("UC");
     case "mandatory":
-      return `Mandatory: ${factType.name}`;
+      return of("Mandatory");
     case "external_uniqueness":
-      return `External UC: ${factType.name}`;
+      return of("External UC");
     case "value_constraint":
-      return `Value: ${factType.name}`;
+      return of("Value");
     case "disjunctive_mandatory":
       return `Disjunctive Mandatory`;
     case "exclusion":
-      return `Exclusion: ${factType.name}`;
+      return of("Exclusion");
     case "exclusive_or":
       return `Exclusive-Or`;
     case "frequency":
-      return `Frequency: ${factType.name}`;
+      return of("Frequency");
     case "ring":
-      return `Ring: ${factType.name}`;
+      return of("Ring");
     case "subset":
       return `Subset`;
     case "equality":
@@ -351,7 +357,7 @@ function getConstraintName(
       // member missing from GENERIC_LABELED fails to compile.
       const declared: true = GENERIC_LABELED[constraint.type];
       void declared;
-      return `Constraint: ${factType.name}`;
+      return of("Constraint");
     }
   }
 }
