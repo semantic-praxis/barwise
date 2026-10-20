@@ -15,6 +15,12 @@
  * reporting them had never fired. barwise-977 gave both constructors the
  * escape their two siblings already had, so those cases are now built
  * the same way as the rest and assert the same equivalence.
+ *
+ * One branch breaks the equivalence on purpose and is tested elsewhere: a
+ * dangling role on a constraint across fact types borrowed an internal
+ * kind's id and named the fact type a 2.0 file nested it under, and now
+ * reports `acrossFactTypesUnknownRole` against the constraint's own id
+ * (orm-format-3 WS3a-ii-c; `constraintsAcrossFactTypes.test.ts`).
  */
 import { describe, expect, it } from "vitest";
 import { graphOf } from "../../src/model/graph.js";

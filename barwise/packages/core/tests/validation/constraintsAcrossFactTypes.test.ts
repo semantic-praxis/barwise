@@ -189,9 +189,12 @@ describe("a constraint across fact types naming a role no fact type has", () => 
         type: "exclusion",
         roleIds: ["r-1", "r-gone"],
       });
-      const ds = validate(model).filter((d) => d.ruleId === RULE_ID.acrossFactTypesUnknownRole);
+      // Every diagnostic naming the dangling id, so a second report under a
+      // borrowed internal kind's id would show here too.
+      const ds = validate(model).filter((d) => d.message.includes('"r-gone"'));
       expect(ds, host).toEqual([
         expect.objectContaining({
+          ruleId: RULE_ID.acrossFactTypesUnknownRole,
           elementId: "c-excl-gone",
           message:
             `Exclusion constraint over fact type "Room is in Building" references role id "r-gone", which no fact type in the model has.`,
