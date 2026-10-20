@@ -83,6 +83,19 @@ describe("query over constraints across fact types", () => {
     expect(refs[2]).toMatchObject(KEY);
   });
 
+  it("filters constraints across fact types by kind like the rest", () => {
+    const byKind = (constraintType: string) =>
+      constraintsOf(queryModel(rooms("ft-nr"), { kind: "list-constraints", constraintType }))
+        .map((c) => c.id);
+    expect(byKind("internal_uniqueness")).toEqual(["c-one-building", "c-one-nr"]);
+    expect(byKind("external_uniqueness")).toEqual(["c-room-key"]);
+  });
+
+  it("counts a constraint across fact types once in the model's stats", () => {
+    const r = queryModel(rooms("ft-nr"), { kind: "model-stats" });
+    expect(r.kind === "stats" && r.stats.constraints).toBe(3);
+  });
+
   it("shows a constraint across fact types under each fact type it touches", () => {
     for (const name of ["Room is in Building", "Room has RoomNumber"]) {
       const refs = constraintsOf(queryModel(rooms("ft-nr"), { kind: "fact-type", name }));

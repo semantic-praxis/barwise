@@ -71,6 +71,20 @@ describe("query_model tool", () => {
     expect(result.factTypes).toHaveLength(1);
   });
 
+  it("names each constraint by the fact types it applies to (orm-format-3, Open decision 9)", () => {
+    const parsed = parse(executeQueryModel(simpleModel, "constraints-of Order"));
+    const result = parsed.result as { constraints: Record<string, unknown>[]; };
+    expect(result.constraints).toHaveLength(2);
+    for (const c of result.constraints) {
+      expect(c).toMatchObject({
+        factTypes: ["Customer places Order"],
+        factTypeIds: ["ft-customer-places-order"],
+      });
+      expect(c).not.toHaveProperty("factType");
+      expect(c.id).not.toMatch(/-constraint-\d+$/);
+    }
+  });
+
   it("returns model statistics", () => {
     const parsed = parse(executeQueryModel(simpleModel, "stats"));
     const result = parsed.result as { kind: string; stats: { factTypes: number; }; };

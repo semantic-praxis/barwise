@@ -12,7 +12,7 @@ import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import { type ModelGraph, requireGraph } from "../model/graph.js";
 import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
 import type { Role } from "../model/Role.js";
 import type { Verbalization } from "../verbalization/Verbalization.js";
@@ -121,11 +121,13 @@ class QueryContext {
    * its verbalization row, which already answers both for every kind (the
    * constraint's own id; the fact types it applies to), so query and
    * verbalize cannot disagree. An internal constraint is verbalized in the
-   * fact type it lives in; the verbalizer ignores `ft` for one across fact
-   * types.
+   * fact type it lives in; one across fact types has none.
    */
-  private constraintRef(c: Constraint, ft: FactType): ConstraintRef {
-    return this.refFromRow(c, this.verbalizer.constraints.verbalize(c, ft, this.model));
+  private constraintRef([c, ft]: ConstraintInView): ConstraintRef {
+    const row = ft === undefined
+      ? this.verbalizer.constraints.verbalizeExternal(c, this.model)
+      : this.verbalizer.constraints.verbalize(c, ft, this.model);
+    return this.refFromRow(c, row);
   }
 
   private refFromRow(c: Constraint, row: Verbalization): ConstraintRef {
@@ -143,7 +145,7 @@ class QueryContext {
   /** Each constraint touching any of these fact types, once, in order. */
   private refsTouching(factTypes: readonly FactType[]): ConstraintRef[] {
     return this.model.constraintsTouchingAny(factTypes.map((ft) => ft.id))
-      .map(([c, ft]) => this.constraintRef(c, ft));
+      .map((inView) => this.constraintRef(inView));
   }
 
   private roleRef(role: Role, ft: FactType): RoleRef {
@@ -183,14 +185,11 @@ class QueryContext {
     const constraints: ConstraintRef[] = [];
     for (const ft of this.model.factTypes) {
       for (const c of ft.internalConstraints) {
-        if (matches(c)) constraints.push(this.constraintRef(c, ft));
+        if (matches(c)) constraints.push(this.constraintRef([c, ft]));
       }
     }
     for (const c of this.model.constraints) {
-      if (!matches(c)) continue;
-      constraints.push(
-        this.refFromRow(c, this.verbalizer.constraints.verbalizeExternal(c, this.model)),
-      );
+      if (matches(c)) constraints.push(this.constraintRef([c, undefined]));
     }
     return { kind: "constraints", constraints };
   }
@@ -474,10 +473,13 @@ class QueryContext {
   stats(): QueryResult {
     const entityTypes = this.model.objectTypes.filter((ot) => ot.kind === "entity").length;
     const valueTypes = this.model.objectTypes.filter((ot) => ot.kind === "value").length;
-    const constraints = this.model.factTypes.reduce(
+    // Each fact type's own constraints, plus each constraint across fact
+    // types once.
+    const internal = this.model.factTypes.reduce(
       (sum, ft) => sum + ft.internalConstraints.length,
-      this.model.constraints.length,
+      0,
     );
+    const constraints = internal + this.model.constraints.length;
     const stats: ModelStats = {
       modelName: this.model.name,
       ...(this.model.domainContext !== undefined

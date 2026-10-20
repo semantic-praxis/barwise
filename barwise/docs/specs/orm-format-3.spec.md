@@ -918,7 +918,9 @@ Implementation notes (2026-10-19):
     `OrmModel.constraintsTouchingAny`, beside `constraintsTouching`, which
     is now its one fact type case. Query reads it here and reads
     `model.constraints` once per view rather than once per fact type;
-    describe, the next PR, reads the same walk.
+    describe, the next PR, reads the same walk. Each entry is a
+    `ConstraintInView`: an internal constraint with its fact type, one
+    across fact types with none, so the walk cannot hand a reader a host.
   - Order changed in two ways a positional consumer can see. Within a fact
     type, its own constraints now come first and those across fact types
     after, where the nested list interleaved them. And the constraints
@@ -927,7 +929,8 @@ Implementation notes (2026-10-19):
     lasts until storage moves to the model (WS3c).
   - The CLI (`barwise query --json`) and MCP (`query_model`) print the
     result as it is, so their output changes shape with it and neither
-    needed code.
+    needed code. `mcp/tests/tools/queryModel.test.ts` pins the new fields
+    at the MCP surface.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 
