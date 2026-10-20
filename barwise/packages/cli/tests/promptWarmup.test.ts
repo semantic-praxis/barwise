@@ -6,10 +6,11 @@
  * omission is silent until a loaded pre-push run. The call must be at top
  * level because inside a `describe` its hook covers only that block, and a
  * prompt test outside it would pay the import. Files that load every
- * command (cli.test.ts, commandRouting.test.ts, docs/gettingStartedDocs
- * .test.ts) load it too without naming it, so this check cannot see them;
- * barwise-xlw holds the general fix. The check is textual, and asks only
- * for the one form the helper is called in.
+ * command load it too without naming it, so this check cannot see them:
+ * cli.test.ts, commandRouting.test.ts and
+ * docs/gettingStartedDocs.test.ts. barwise-xlw holds the general fix.
+ * The check is textual, and asks only for the one form the helper is
+ * called in.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -17,11 +18,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const testsDir = dirname(fileURLToPath(import.meta.url));
-const REGISTER_EVERY_COMMAND = new Set(["cli.test.ts", "commandRouting.test.ts"]);
 
 function testFiles(): { name: string; text: string; }[] {
   return readdirSync(testsDir, { recursive: true, encoding: "utf8" })
-    .filter((f) => f.endsWith(".test.ts") && !REGISTER_EVERY_COMMAND.has(f))
+    .filter((f) => f.endsWith(".test.ts"))
     .map((f) => ({ name: f, text: readFileSync(join(testsDir, f), "utf8") }));
 }
 
