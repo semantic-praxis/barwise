@@ -47,8 +47,8 @@ type RoleValues = Record<string, string>;
  */
 export function generateCounterexamples(model: OrmModel): Counterexample[] {
   const result: Counterexample[] = [];
-  for (const [constraint, factType] of model.everyConstraint()) {
-    const ce = generateInView(constraint, factType, model);
+  for (const inView of model.everyConstraint()) {
+    const ce = generateInView(inView, model);
     if (ce) result.push(ce);
   }
   return result;
@@ -80,7 +80,10 @@ export function generateCounterexampleForConstraint(
   factType: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
-  return generateInView(constraint, isExternalConstraint(constraint) ? undefined : factType, model);
+  return generateInView(
+    isExternalConstraint(constraint) ? [constraint, undefined] : [constraint, factType],
+    model,
+  );
 }
 
 /**
@@ -100,15 +103,11 @@ export function generateCounterexampleForConstraint(
  * seventeenth member to `Constraint` failed to compile at six consumers
  * and NOT here, because a guard chain ending in a fallback cannot fail.
  */
-function generateInView(
-  constraint: Constraint,
-  ft: FactType | undefined,
-  model: OrmModel,
-): Counterexample | undefined {
+function generateInView(inView: ConstraintInView, model: OrmModel): Counterexample | undefined {
+  const [constraint, ft] = inView;
   const probe = probeFor(constraint, ft, model);
   if (!probe) return undefined;
   // Named as its verbalization row names it, so the two cannot disagree.
-  const inView = (ft ? [constraint, ft] : [constraint, undefined]) as ConstraintInView;
   return { ...probe, factTypeIds: model.factTypesNaming(inView).map((f) => f.id) };
 }
 
@@ -458,7 +457,6 @@ function forTupleAbsence(
   if (present.some((r) => !r) || absent.some((r) => !r)) return undefined;
   if (presentRoleIds.length === 0) return undefined;
   const presentFt = present[0]!.ft;
-  const absentFt = absent[0]!.ft;
   // One fact holds one fact type's roles, so a present side spanning fact
   // types cannot be written as one fact.
   if (present.some((r) => r!.ft.id !== presentFt.id)) return undefined;
@@ -478,7 +476,8 @@ function forTupleAbsence(
   const reason = local
     ? `a ${presentFt.name} fact whose [${presentRoleIds.join(", ")}] tuple is not `
       + `also a [${absentRoleIds.join(", ")}] tuple`
-    : `a ${presentFt.name} tuple with no match in ${absentFt.name}`;
+    : `a ${presentFt.name} tuple with no match in `
+      + model.factTypesHolding(absentRoleIds).map((f) => f.name).join(" and ");
   const rendered = `a tuple in [${presentRoleIds.join(", ")}] absent from `
     + `[${absentRoleIds.join(", ")}]`;
   return makeCrossCounterexample(constraint, [forbidden], reason, rendered);
@@ -548,9 +547,14 @@ function forSubset(sc: SubsetConstraint, model: OrmModel): Probe | undefined {
   return forTupleAbsence(sc, sc.subsetRoleIds, sc.supersetRoleIds, model);
 }
 
-/** Equality: a tuple on one side with no match on the other. */
+/**
+ * Equality: a tuple on one side with no match on the other. Either side
+ * will do, so a first side no one fact can hold (it spans fact types)
+ * leaves the other to try.
+ */
 function forEquality(eq: EqualityConstraint, model: OrmModel): Probe | undefined {
-  return forTupleAbsence(eq, eq.roleIds1, eq.roleIds2, model);
+  return forTupleAbsence(eq, eq.roleIds1, eq.roleIds2, model)
+    ?? forTupleAbsence(eq, eq.roleIds2, eq.roleIds1, model);
 }
 
 /**

@@ -994,7 +994,8 @@ Implementation notes (2026-10-19):
     get none. A subset or equality side whose roles sit in several fact
     types: on the absent side no fact holds them all, so validation finds
     no absent tuple and one present fact is the witness; on the present
-    side no one fact can be written, so there is none, rather than a crash.
+    side no one fact can be written, so a subset has none, rather than a
+    crash, and an equality tries its other side.
   - Naming is `OrmModel.factTypesNaming(inView)`: an internal constraint by
     the fact type it lives in, as `constraintsTouching` lists it, even when
     a stale role id leaves its roles naming nothing; one across fact types

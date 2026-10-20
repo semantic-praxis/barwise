@@ -125,6 +125,29 @@ describe("counterexamples over constraints across fact types", () => {
     expect(counterexampleRoundTripFailure(model)).toBeUndefined();
   });
 
+  it("witnesses an equality from its other side when the first spans fact types", () => {
+    const c: Constraint = {
+      id: "c-eq-join",
+      type: "equality",
+      roleIds1: ["r-1a", "r-2b"],
+      roleIds2: ["r-3a", "r-3b"],
+    };
+    const model = commute("ft-walks", c);
+    expect(generateCounterexamples(model).map((ce) => ce.constraintId)).toEqual(["c-eq-join"]);
+    expect(counterexampleRoundTripFailure(model)).toBeUndefined();
+  });
+
+  it("names every fact type of a superset side that spans fact types", () => {
+    const c: Constraint = {
+      id: "c-into-mixed",
+      type: "subset",
+      subsetRoleIds: ["r-3a", "r-3b"],
+      supersetRoleIds: ["r-3a", "r-2b"],
+    };
+    const [ce] = generateCounterexamples(commute("ft-walks", c));
+    expect(ce?.text).toContain("with no match in Person rides Bus and Person walks in Park");
+  });
+
   it("names an internal constraint's own fact type", () => {
     const uc: Constraint = { id: "c-uc", type: "internal_uniqueness", roleIds: ["r-3a"] };
     const ces = generateCounterexamples(commute("ft-walks", uc));
