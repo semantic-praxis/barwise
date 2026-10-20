@@ -123,6 +123,11 @@ describe("query_model tool", () => {
     const refs = (parsed.result as { constraints: Record<string, unknown>[]; }).constraints;
     const ids = refs.map((c) => c.id);
     expect(new Set(ids).size).toBe(2);
+    // Derived from content, so a second load gives the same ids; a random
+    // fill would not.
+    const again = parse(executeQueryModel(simpleModel, "constraints-of Order"));
+    expect((again.result as { constraints: { id: string; }[]; }).constraints.map((c) => c.id))
+      .toEqual(ids);
     for (const c of refs) {
       expect(c.id).not.toMatch(/-constraint-\d+$/);
       expect(c.id).not.toBe("ft-customer-places-order");

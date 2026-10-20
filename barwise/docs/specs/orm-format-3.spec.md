@@ -928,8 +928,11 @@ Implementation notes (2026-10-19):
     host reorders them. The set each view says does not change for a
     constraint whose id the file states; one whose id is derived on load
     takes a new id when it moves, because WS2 seeds that id with the fact
-    type it is nested under. Both last until storage moves to the model
-    (WS3c).
+    type it is nested under (and numbers identical constraints in list
+    order, so a move can renumber an identical one that stayed). The
+    reordering lasts until storage moves to the model (WS3c); the id
+    change lasts until format 3.0 writes the ids into the file (WS4), since
+    3c keeps hashing the 2.0 host.
   - The CLI (`barwise query --json`) and MCP (`query_model`) print the
     result as it is, so their output changes shape with it and neither
     needed code. `mcp/tests/tools/queryModel.test.ts` pins the ids and the
