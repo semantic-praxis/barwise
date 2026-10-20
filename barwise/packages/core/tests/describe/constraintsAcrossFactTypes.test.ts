@@ -13,8 +13,11 @@ import type { DomainDescription } from "../../src/describe/types.js";
 import type { Constraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
-/** Room is in Building, Room has RoomNumber; the composite key nests in `host`. */
-function rooms(host: "ft-in" | "ft-nr"): OrmModel {
+/**
+ * Room is in Building, Room has RoomNumber, Room has Area; the composite key
+ * over the first two nests in `host`, which may be the third.
+ */
+function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
   const key: Constraint = {
     id: "c-room-key",
     type: "external_uniqueness",
@@ -29,6 +32,7 @@ function rooms(host: "ft-in" | "ft-nr"): OrmModel {
     referenceMode: "code",
   });
   model.addObjectType({ id: "ot-nr", name: "RoomNumber", kind: "value" });
+  model.addObjectType({ id: "ot-area", name: "Area", kind: "value" });
   model.addFactType({
     id: "ft-in",
     name: "Room is in Building",
@@ -54,6 +58,16 @@ function rooms(host: "ft-in" | "ft-nr"): OrmModel {
       { id: "c-one-nr", type: "internal_uniqueness", roleIds: ["r-3"] },
       ...(host === "ft-nr" ? [key] : []),
     ],
+  });
+  model.addFactType({
+    id: "ft-area",
+    name: "Room has Area",
+    roles: [
+      { id: "r-5", name: "has", playerId: "ot-room" },
+      { id: "r-6", name: "is of", playerId: "ot-area" },
+    ],
+    readings: ["{0} has {1}"],
+    constraints: host === "ft-area" ? [key] : [],
   });
   return model;
 }
@@ -102,6 +116,14 @@ describe("describe over constraints across fact types", () => {
     expect(d.summary).toContain(
       "[Room is in Building, Room has RoomNumber] The combination of Building and RoomNumber",
     );
+  });
+
+  it("does not show or count it under a fact type that nests it but holds none of its roles", () => {
+    const d = describeDomain(rooms("ft-area"), { focus: "Room has Area" });
+    expect(d.constraints).toEqual([]);
+    expect(d.factTypes[0]!.constraintCount).toBe(0);
+    const spanned = describeDomain(rooms("ft-area"), { focus: "Room has RoomNumber" });
+    expect(spanned.constraints.map((c) => c.id)).toEqual(["c-one-nr", "c-room-key"]);
   });
 
   it("leaves out a constraint across fact types of another kind", () => {

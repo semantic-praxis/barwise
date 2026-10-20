@@ -571,17 +571,17 @@
       "caught_by": "execution",
       "note": "The sharpest of seven defects an offline rehearsal surfaced."
     },
-    "orm-format-3::814f6c42f9bf": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "- 3a lands as three prs, not one. measured against the list above, 3a still touched every core reader, every changed output with its consumers, and id-first dif",
-      "caught_by": "reasoning",
-      "note": "Code review on PR #684 found the unheld-fact-type path in constraintsTouching wrong three ways across two rounds; it was dropped rather than patched again."
-    },
     "orm-format-3::83e024eb5943": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 72 external constraints, in 27 files. - every one comes after its host's internal constraints. - 26 sit on a fact type other than their first holder, in 17 fi",
       "caught_by": "execution",
       "note": "Counting through the loader instead of matching role ids as text gave 26 constraints off their first holder in 17 files, not 27 in 18."
+    },
+    "orm-format-3::889d7aae61fc": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- 3a lands as three prs, not one. measured against the list above, 3a still touched every core reader, every changed output with its consumers, and id-first dif",
+      "caught_by": "reasoning",
+      "note": "Code review on PR #684 found the unheld-fact-type path in constraintsTouching wrong three ways across two rounds; it was dropped rather than patched again."
     },
     "orm-format-3::8b1e291984ea": {
       "spec": "orm-format-3.spec.md",

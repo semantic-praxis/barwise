@@ -941,7 +941,12 @@ Implementation notes (2026-10-19):
   - `ConstraintSummary.affectedFactType` becomes `factTypes` and
     `factTypeIds`, and the positional id `${ft.id}-constraint-${i}` becomes
     the constraint's own, both from the verbalization row as in query.
-    Its views read the same walk as query's, `constraintsTouchingAny`.
+    Query and describe now share every piece that decides what a view
+    says: `OrmModel.everyConstraint` for the whole model,
+    `constraintsTouchingAny` for some fact types, and
+    `ConstraintVerbalizer.verbalizeInView` for the row. Only their
+    projections, which are different types, are their own. An entity view
+    selects its fact types with `factTypesForObjectType` in both.
   - The whole model says each fact type's own constraints, then each
     constraint across fact types once; an entity or fact type focus says
     every constraint touching it, once. `FactTypeSummary.constraintCount`
@@ -952,8 +957,14 @@ Implementation notes (2026-10-19):
     with all of them (`[A, B] ...`); before, it brought in only the host.
   - MCP's `describe_domain` projects field by field, so its
     `affectedFactType` became `factTypes` there; `barwise describe --json`
-    prints the description as it is. `mcp/tests/tools/describeDomain.test.ts`
-    pins the span and the count at the MCP surface.
+    prints the description as it is. The projection now also carries the
+    constraint's `id` and `factTypeIds`, since the id is stable now;
+    `mcp/tests/tools/describeDomain.test.ts` pins them, the span and the
+    count at the MCP surface.
+  - `FactTypeSummary.constraintCount` costs a `constraintsTouching` call
+    per fact type, which rebuilds `model.constraints` each time, as
+    validation's completeness rules already do. WS3c stores that list,
+    which removes the rebuild for every such reader at once.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

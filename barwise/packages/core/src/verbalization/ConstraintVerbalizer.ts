@@ -6,7 +6,7 @@ import {
   roleIdsOf,
 } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import {
   verbalizeExternalUniqueness,
   verbalizeInternalUniqueness,
@@ -166,6 +166,17 @@ export class ConstraintVerbalizer {
       [factType.id],
       factType.id,
     );
+  }
+
+  /**
+   * Verbalize a constraint as a view of the model holds it: an internal one
+   * in the fact type it lives in, one across fact types in none. Query and
+   * describe both report constraints this way, so they verbalize alike.
+   */
+  verbalizeInView([constraint, factType]: ConstraintInView, model: OrmModel): Verbalization {
+    return factType === undefined
+      ? this.verbalizeExternal(constraint, model)
+      : this.verbalize(constraint, factType, model);
   }
 
   /**

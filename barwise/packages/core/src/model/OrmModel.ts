@@ -218,6 +218,21 @@ export class OrmModel {
   }
 
   /**
+   * Every constraint in the model, each once: each fact type's own
+   * constraints in fact type order, then the constraints across fact types
+   * (`constraints`). The whole-model view query and describe both list; a
+   * view of some fact types is `constraintsTouchingAny`.
+   */
+  everyConstraint(): readonly ConstraintInView[] {
+    return [
+      ...this.factTypes.flatMap((ft) =>
+        ft.internalConstraints.map((c): ConstraintInView => [c, ft])
+      ),
+      ...this.constraints.map((c): ConstraintInView => [c, undefined]),
+    ];
+  }
+
+  /**
    * Every constraint touching any of these fact types, each once, in the
    * order given: each fact type's own constraints, then each constraint
    * across fact types touching it that an earlier one did not. The view of

@@ -148,6 +148,20 @@ describe("OrmModel.constraintsTouching", () => {
   });
 });
 
+describe("OrmModel.everyConstraint", () => {
+  it("says each fact type's own constraints in fact type order, then each constraint across fact types once, with no host", () => {
+    const { model } = rooms();
+    expect(model.everyConstraint().map(([c, ft]) => [c.id, ft?.id])).toEqual([
+      ["c-one-building", "ft-in"],
+      ["c-in-mandatory", "ft-in"],
+      ["c-one-nr", "ft-nr"],
+      ["c-one-area", "ft-area"],
+      ["c-room-key", undefined],
+      ["c-in-or-area", undefined],
+    ]);
+  });
+});
+
 describe("OrmModel.constraintsTouchingAny", () => {
   it("says a constraint spanning two fact types in view once, where the first meets it", () => {
     const { model } = rooms();

@@ -66,9 +66,7 @@ export function describeEntity(
   const entitySummary = summarizeEntity(entity);
 
   // Find all fact types involving this entity.
-  const relatedFactTypes = model.factTypes.filter((ft) =>
-    ft.roles.some((r) => r.playerId === entity.id)
-  );
+  const relatedFactTypes = model.factTypesForObjectType(entity.id);
 
   const factTypeSummaries = relatedFactTypes.map((ft) => summarizeFactType(model, ft, graph));
 
@@ -205,16 +203,9 @@ class ConstraintSummarizer {
 
   /** Each fact type's own constraints, then each constraint across fact types once. */
   wholeModel(matches: (c: Constraint) => boolean): ConstraintSummary[] {
-    const summaries: ConstraintSummary[] = [];
-    for (const ft of this.model.factTypes) {
-      for (const c of ft.internalConstraints) {
-        if (matches(c)) summaries.push(this.summary([c, ft]));
-      }
-    }
-    for (const c of this.model.constraints) {
-      if (matches(c)) summaries.push(this.summary([c, undefined]));
-    }
-    return summaries;
+    return this.model.everyConstraint()
+      .filter(([c]) => matches(c))
+      .map((inView) => this.summary(inView));
   }
 
   /** Every constraint touching these fact types, once even when it spans two of them. */
@@ -223,14 +214,9 @@ class ConstraintSummarizer {
       .map((inView) => this.summary(inView));
   }
 
-  /**
-   * An internal constraint is verbalized in the fact type it lives in; one
-   * across fact types has none.
-   */
-  private summary([c, ft]: ConstraintInView): ConstraintSummary {
-    const row = ft === undefined
-      ? this.verbalizer.constraints.verbalizeExternal(c, this.model)
-      : this.verbalizer.constraints.verbalize(c, ft, this.model);
+  private summary(inView: ConstraintInView): ConstraintSummary {
+    const [c] = inView;
+    const row = this.verbalizer.constraints.verbalizeInView(inView, this.model);
     // Every id here came from [ft.id] or factTypesHolding, so each resolves.
     const factTypeIds = row.factTypeIds ?? [];
     return {

@@ -470,10 +470,15 @@ model:
   it("names each constraint by every fact type it applies to, and counts it under each", () => {
     const parsed = JSON.parse(executeDescribeDomain(roomsModel, "Room").content[0]!.text);
     const constraints = parsed.constraints as Record<string, unknown>[];
-    expect(constraints.map((c) => [c.type, c.factTypes])).toEqual([
-      ["internal_uniqueness", ["Room is in Building"]],
-      ["external_uniqueness", ["Room is in Building", "Room has RoomNumber"]],
-      ["internal_uniqueness", ["Room has RoomNumber"]],
+    expect(constraints.map((c) => [c.id, c.type, c.factTypes, c.factTypeIds])).toEqual([
+      ["c-one-building", "internal_uniqueness", ["Room is in Building"], ["ft-in"]],
+      [
+        "c-room-key",
+        "external_uniqueness",
+        ["Room is in Building", "Room has RoomNumber"],
+        ["ft-in", "ft-nr"],
+      ],
+      ["c-one-nr", "internal_uniqueness", ["Room has RoomNumber"], ["ft-nr"]],
     ]);
     for (const c of constraints) expect(c).not.toHaveProperty("affectedFactType");
     expect(
