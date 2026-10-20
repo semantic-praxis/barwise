@@ -35,7 +35,7 @@ import type { OrmModel } from "../model/OrmModel.js";
 import type { RolePathStep } from "../model/RolePath.js";
 import type { Diagnostic } from "./Diagnostic.js";
 import { report, RULE_ID } from "./ruleId.js";
-import { constraintElementId, constraintSpan } from "./span.js";
+import { constraintElementId, constraintSpan, spanPhrase } from "./span.js";
 
 /** The constraint kinds whose role references live in a join path. */
 type JoinConstraintType = "join_subset" | "join_equality" | "join_exclusion";
@@ -150,7 +150,8 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
       }
       if (factType === undefined) {
         const kind = EXTERNAL_KIND_LABEL[constraint.type];
-        return model.factTypesOf(constraint).length === 0
+        const held = model.factTypesOf(constraint);
+        return held.length === 0
           ? report(
             RULE_ID.acrossFactTypesUnknownRole,
             "noSpan",
@@ -163,7 +164,7 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
             "default",
             constraintElementId(constraint),
             kind,
-            constraintSpan(model, constraint),
+            spanPhrase(held.map((ft) => ft.name)),
             u.missing,
           );
       }

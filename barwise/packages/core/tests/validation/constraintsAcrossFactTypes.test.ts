@@ -200,6 +200,33 @@ describe("a constraint across fact types naming a role no fact type has", () => 
     }
   });
 
+  it("names each kind by its own label, wherever in the constraint the dangling id sits", () => {
+    const cases: [string, Constraint][] = [
+      ["External uniqueness", {
+        id: "c",
+        type: "external_uniqueness",
+        roleIds: ["r-1", "r-gone"],
+      }],
+      ["Disjunctive mandatory", {
+        id: "c",
+        type: "disjunctive_mandatory",
+        roleIds: ["r-1", "r-gone"],
+      }],
+      ["Exclusion", { id: "c", type: "exclusion", roleIds: ["r-1", "r-gone"] }],
+      ["Exclusive-or", { id: "c", type: "exclusive_or", roleIds: ["r-1", "r-gone"] }],
+      ["Subset", { id: "c", type: "subset", subsetRoleIds: ["r-1"], supersetRoleIds: ["r-gone"] }],
+      ["Equality", { id: "c", type: "equality", roleIds1: ["r-1"], roleIds2: ["r-gone"] }],
+    ];
+    for (const [label, constraint] of cases) {
+      const model = rooms("ft-nr");
+      model.getFactType("ft-nr")!.addConstraint(constraint);
+      const ds = validate(model).filter((d) => d.ruleId === RULE_ID.acrossFactTypesUnknownRole);
+      expect(ds.map((d) => d.message), label).toEqual([
+        `${label} constraint over fact type "Room is in Building" references role id "r-gone", which no fact type in the model has.`,
+      ]);
+    }
+  });
+
   it("names no span when none of its roles resolve", () => {
     const model = rooms("ft-in");
     model.getFactType("ft-in")!.addConstraint({
