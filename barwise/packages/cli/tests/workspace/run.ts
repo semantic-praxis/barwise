@@ -30,16 +30,17 @@ const { version } = JSON.parse(
  * the tests keep the default, so a hung test still fails in 30s; with the
  * hook that first test takes about 1.2s alone. Only the import is warmed:
  * work an action does on each call, such as loading the eval suite, stays
- * in the test. Every test file that calls `prompt` calls this once at top
- * level. Why the import costs what it does is barwise-xlw.
+ * in the test. Every test file under tests/commands that runs `prompt`
+ * calls this once (tests/promptWarmup.test.ts checks). Why the import costs
+ * what it does is barwise-xlw.
  */
 export function warmPromptCommand(): void {
   beforeAll(async () => {
-    // runCli reports a failed import as exit 1, the same code `--help`
-    // ends with here, so only the help text shows the command loaded.
-    const { stdout, stderr } = await runCli(["prompt", "--help"]);
-    if (!stdout.startsWith("Usage: barwise prompt")) {
-      throw new Error(`The prompt command did not load: ${stderr || stdout}`);
+    // createProgram rather than runCli: runCli turns any throw into exit 1,
+    // so a failed import would reach here without its message.
+    const program = await createProgram(version, "prompt");
+    if (!program.commands.some((c) => c.name() === "prompt")) {
+      throw new Error('createProgram(version, "prompt") registered no prompt command.');
     }
   }, 120_000);
 }
