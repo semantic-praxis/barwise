@@ -1029,9 +1029,11 @@ Implementation notes (2026-10-19):
     rather than one an export reaches yet.
   - An entity's lineage lists the constraints touching its fact types
     once each, from one `constraintsTouchingAny` call, after the fact
-    types, roles and players. `getConstraintName` names one across fact
-    types by its span ("External UC: A and B"), and one none of whose roles
-    resolve by its label alone; that one touches no fact type, so no
+    types, roles and players. `getConstraintName` names every kind by its span,
+    including the four (disjunctive mandatory, exclusive-or, subset,
+    equality) that had a bare label, so two subsets on one entity no longer
+    read the same ("Subset: A and B"). One none of whose roles
+    resolve reads as its label alone; that one touches no fact type, so no
     entity lists it. Validation reports one naming a role no fact type
     has. One with no roles at all, buildable only in code, is reported
     for every kind but subset and equality, which have no role-count

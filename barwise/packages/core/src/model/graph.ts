@@ -86,12 +86,13 @@ export interface UnresolvedReference {
  * An id would make every consumer look the element up, which is the
  * defect this whole module exists to remove; a record produced BY the
  * thing that eliminates lookups must not hand out bare ids. It is also
- * not enough in practice: `validation/` reports a dangling constraint
- * role under a per-KIND rule id (`mandatoryInvalidRole`,
+ * not enough in practice: `validation/` reports an internal constraint's
+ * dangling role under a per-KIND rule id (`mandatoryInvalidRole`,
  * `ringInvalidRole`, `frequencyInvalidRole` and four more), keyed on the
- * constraint's `type`, and names the fact type an internal constraint
- * lives in. Neither is recoverable from an id -- a constraint's id is
- * optional, so there may not even be one.
+ * constraint's `type`, and names the fact type it lives in; one across
+ * fact types under `acrossFactTypesUnknownRole`, with its kind and span in
+ * the message. Neither the kind nor the fact type is recoverable from an
+ * id without a lookup.
  *
  * A constraint's `factType` is the one it lives in, and is undefined for
  * a constraint across fact types, which lives in none (orm-format-3, Open

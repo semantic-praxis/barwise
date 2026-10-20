@@ -514,11 +514,11 @@ describe("Lineage Generation", () => {
         "Ring: Person recommends Person",
         "Constraint: Person recommends Person",
         "External UC: Person recommends Person",
-        "Disjunctive Mandatory",
+        "Disjunctive Mandatory: Person recommends Person",
         "Exclusion: Person recommends Person",
-        "Exclusive-Or",
-        "Subset",
-        "Equality",
+        "Exclusive-Or: Person recommends Person",
+        "Subset: Person recommends Person",
+        "Equality: Person recommends Person",
       ]);
     });
 

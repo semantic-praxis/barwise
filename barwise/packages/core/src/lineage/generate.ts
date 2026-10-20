@@ -284,19 +284,19 @@ function getConstraintName(
     case "value_constraint":
       return of("Value");
     case "disjunctive_mandatory":
-      return `Disjunctive Mandatory`;
+      return of("Disjunctive Mandatory");
     case "exclusion":
       return of("Exclusion");
     case "exclusive_or":
-      return `Exclusive-Or`;
+      return of("Exclusive-Or");
     case "frequency":
       return of("Frequency");
     case "ring":
       return of("Ring");
     case "subset":
-      return `Subset`;
+      return of("Subset");
     case "equality":
-      return `Equality`;
+      return of("Equality");
     default: {
       // Narrowed to exactly the declared generic-labeled kinds; a new
       // member missing from GENERIC_LABELED fails to compile.
