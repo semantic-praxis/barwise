@@ -944,9 +944,11 @@ Implementation notes (2026-10-19):
     Query and describe now share every piece that decides what a view
     says: `OrmModel.everyConstraint` for the whole model,
     `constraintsTouchingAny` for some fact types, and
-    `ConstraintVerbalizer.verbalizeInView` for the row. Only their
-    projections, which are different types, are their own. An entity view
-    selects its fact types with `factTypesForObjectType` in both.
+    `ConstraintVerbalizer.reportInView` for the id, sentence and span. Each
+    adds only its own name for the kind (`type`, `constraintType`). An
+    entity view selects its fact types with `factTypesForObjectType` in
+    both, and lists those, not every fact type its constraints span: a
+    constraint across fact types can name one the view does not describe.
   - The whole model says each fact type's own constraints, then each
     constraint across fact types once; an entity or fact type focus says
     every constraint touching it, once. `FactTypeSummary.constraintCount`

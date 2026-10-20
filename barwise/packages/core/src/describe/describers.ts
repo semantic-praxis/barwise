@@ -215,17 +215,8 @@ class ConstraintSummarizer {
   }
 
   private summary(inView: ConstraintInView): ConstraintSummary {
-    const [c] = inView;
-    const row = this.verbalizer.constraints.verbalizeInView(inView, this.model);
-    // Every id here came from [ft.id] or factTypesHolding, so each resolves.
-    const factTypeIds = row.factTypeIds ?? [];
-    return {
-      id: row.sourceElementId,
-      type: c.type,
-      verbalization: row.text,
-      factTypes: factTypeIds.map((id) => this.model.getFactType(id)!.name),
-      factTypeIds,
-    };
+    const report = this.verbalizer.constraints.reportInView(inView, this.model);
+    return { ...report, type: inView[0].type };
   }
 }
 

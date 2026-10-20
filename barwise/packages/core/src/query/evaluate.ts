@@ -123,17 +123,8 @@ class QueryContext {
    * fact type it lives in; one across fact types has none.
    */
   private constraintRef(inView: ConstraintInView): ConstraintRef {
-    const [c] = inView;
-    const row = this.verbalizer.constraints.verbalizeInView(inView, this.model);
-    // Every id here came from [ft.id] or factTypesHolding, so each resolves.
-    const factTypeIds = row.factTypeIds ?? [];
-    return {
-      id: row.sourceElementId,
-      constraintType: c.type,
-      verbalization: row.text,
-      factTypes: factTypeIds.map((id) => this.model.getFactType(id)!.name),
-      factTypeIds,
-    };
+    const report = this.verbalizer.constraints.reportInView(inView, this.model);
+    return { ...report, constraintType: inView[0].type };
   }
 
   /** Each constraint touching any of these fact types, once, in order. */
