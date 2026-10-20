@@ -7,14 +7,7 @@
  * returns a `not-found` result rather than throwing.
  */
 
-import {
-  type Constraint,
-  type ExternalConstraint,
-  type InternalConstraint,
-  isExternalConstraint,
-  isInternalUniqueness,
-  isMandatoryRole,
-} from "../model/Constraint.js";
+import { type Constraint, isInternalUniqueness, isMandatoryRole } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import { type ModelGraph, requireGraph } from "../model/graph.js";
@@ -128,18 +121,11 @@ class QueryContext {
    * its verbalization row, which already answers both for every kind (the
    * constraint's own id; the fact types it applies to), so query and
    * verbalize cannot disagree. An internal constraint is verbalized in the
-   * fact type it lives in; one across fact types ignores `ft`.
+   * fact type it lives in; the verbalizer ignores `ft` for one across fact
+   * types.
    */
   private constraintRef(c: Constraint, ft: FactType): ConstraintRef {
-    return isExternalConstraint(c) ? this.externalRef(c) : this.internalRef(c, ft);
-  }
-
-  private internalRef(c: InternalConstraint, ft: FactType): ConstraintRef {
     return this.refFromRow(c, this.verbalizer.constraints.verbalize(c, ft, this.model));
-  }
-
-  private externalRef(c: ExternalConstraint): ConstraintRef {
-    return this.refFromRow(c, this.verbalizer.constraints.verbalizeExternal(c, this.model));
   }
 
   private refFromRow(c: Constraint, row: Verbalization): ConstraintRef {
@@ -156,16 +142,8 @@ class QueryContext {
 
   /** Each constraint touching any of these fact types, once, in order. */
   private constraintsTouchingAll(factTypes: readonly FactType[]): ConstraintRef[] {
-    const seen = new Set<Constraint>();
-    const refs: ConstraintRef[] = [];
-    for (const ft of factTypes) {
-      for (const c of this.model.constraintsTouching(ft.id)) {
-        if (seen.has(c)) continue;
-        seen.add(c);
-        refs.push(this.constraintRef(c, ft));
-      }
-    }
-    return refs;
+    return this.model.constraintsTouchingAny(factTypes.map((ft) => ft.id))
+      .map(([c, ft]) => this.constraintRef(c, ft));
   }
 
   private roleRef(role: Role, ft: FactType): RoleRef {
@@ -205,12 +183,14 @@ class QueryContext {
     const constraints: ConstraintRef[] = [];
     for (const ft of this.model.factTypes) {
       for (const c of ft.internalConstraints) {
-        if (matches(c)) constraints.push(this.internalRef(c, ft));
+        if (matches(c)) constraints.push(this.constraintRef(c, ft));
       }
     }
     for (const c of this.model.constraints) {
       if (!matches(c)) continue;
-      constraints.push(this.externalRef(c));
+      constraints.push(
+        this.refFromRow(c, this.verbalizer.constraints.verbalizeExternal(c, this.model)),
+      );
     }
     return { kind: "constraints", constraints };
   }

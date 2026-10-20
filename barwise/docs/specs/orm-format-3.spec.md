@@ -914,6 +914,17 @@ Implementation notes (2026-10-19):
     once even when it spans two of them. Before, an entity whose two fact
     types a key spanned listed it under whichever one nested it, and the
     other fact type's view did not list it at all.
+  - "Every constraint touching these fact types, once" is
+    `OrmModel.constraintsTouchingAny`, beside `constraintsTouching`, which
+    is now its one fact type case, so query and describe share one walk
+    and read `model.constraints` once per view rather than once per fact
+    type.
+  - Order changed in two ways a positional consumer can see. Within a fact
+    type, its own constraints now come first and those across fact types
+    after, where the nested list interleaved them. And the constraints
+    across fact types still follow file order, so moving one to another
+    host reorders them; the set each view says does not change. That
+    lasts until storage moves to the model (WS3c).
   - The CLI (`barwise query --json`) and MCP (`query_model`) print the
     result as it is, so their output changes shape with it and neither
     needed code.

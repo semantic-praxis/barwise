@@ -147,6 +147,20 @@ describe("OrmModel.constraintsTouching", () => {
   });
 });
 
+describe("OrmModel.constraintsTouchingAny", () => {
+  it("says a constraint spanning two fact types in view once, under the first that meets it", () => {
+    const { model } = rooms();
+    const touching = model.constraintsTouchingAny(["ft-nr", "ft-missing", "ft-in", "ft-nr"]);
+    expect(touching.map(([c, ft]) => [c.id, ft.id])).toEqual([
+      ["c-one-nr", "ft-nr"],
+      ["c-room-key", "ft-nr"],
+      ["c-one-building", "ft-in"],
+      ["c-in-mandatory", "ft-in"],
+      ["c-in-or-area", "ft-in"],
+    ]);
+  });
+});
+
 describe("OrmModel.getConstraint", () => {
   it("finds a constraint of either placement by id", () => {
     const { model } = rooms();

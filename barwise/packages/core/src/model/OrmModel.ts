@@ -176,10 +176,13 @@ export class OrmModel {
    * may span fact types (orm-format-3, placement by kind). Until storage
    * moves (WS3c) they are read from the fact types a 2.0 file nests them
    * under, in fact type order and then list order -- the order a reader
-   * walking every fact type's list met them in, so such a reader that
-   * switches to this list reports in the same order. (A reader that skipped
-   * some fact types, as the diagram skips absorbed ones, now sees the
-   * constraints nested under them too.)
+   * walking every fact type's list met them in, so a reader of the external
+   * kinds alone that switches to this list reports in the same order. A
+   * reader of every kind that moves to `internalConstraints` plus this
+   * list does not: within a fact type it now says the fact type's own
+   * constraints first. (A reader that skipped some fact types, as the
+   * diagram skips absorbed ones, now sees the constraints nested under them
+   * too.)
    */
   get constraints(): readonly ExternalConstraint[] {
     return this.factTypes.flatMap((ft) => ft.constraints.filter(isExternalConstraint));
@@ -192,18 +195,42 @@ export class OrmModel {
    * it touches; a whole-model reader wants each fact type's
    * `internalConstraints` plus `constraints` once instead.
    *
-   * Verbalization and counterexamples ask here by id, so their views of
-   * one fact type cannot disagree (describe still reads the nested list
-   * until WS3a-ii-c moves it). The answer is about this model's
-   * fact type: a fact type it does not have touches nothing here.
+   * Verbalization, counterexamples and query ask here by id, so their views
+   * of one fact type cannot disagree (describe still reads the nested list
+   * until WS3a-ii-c moves it). The answer is about this model's fact type:
+   * a fact type it does not have touches nothing here.
    */
   constraintsTouching(factTypeId: string): readonly Constraint[] {
-    const ft = this._factTypes.get(factTypeId);
-    if (!ft) return [];
-    return [
-      ...ft.internalConstraints,
-      ...this.constraints.filter((c) => roleIdsOf(c).some((rid) => ft.hasRole(rid))),
-    ];
+    return this.constraintsTouchingAny([factTypeId]).map(([c]) => c);
+  }
+
+  /**
+   * Every constraint touching any of these fact types, each once, paired
+   * with the fact type it was first met under -- for an internal constraint,
+   * its own. In the order given: each fact type's own constraints, then
+   * each constraint across fact types touching it that an earlier one did
+   * not. The view of an entity or of several fact types, so a constraint
+   * spanning two of them is said once; `constraintsTouching` is the one
+   * fact type case. Ids this model does not have touch nothing.
+   */
+  constraintsTouchingAny(
+    factTypeIds: readonly string[],
+  ): readonly (readonly [Constraint, FactType])[] {
+    const across = this.constraints;
+    const seen = new Set<Constraint>();
+    const touching: (readonly [Constraint, FactType])[] = [];
+    for (const id of factTypeIds) {
+      const ft = this._factTypes.get(id);
+      if (!ft) continue;
+      const own = ft.internalConstraints;
+      const spanning = across.filter((c) => roleIdsOf(c).some((rid) => ft.hasRole(rid)));
+      for (const c of [...own, ...spanning]) {
+        if (seen.has(c)) continue;
+        seen.add(c);
+        touching.push([c, ft]);
+      }
+    }
+    return touching;
   }
 
   /**
