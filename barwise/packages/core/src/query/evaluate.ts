@@ -122,19 +122,9 @@ class QueryContext {
    * verbalize cannot disagree. An internal constraint is verbalized in the
    * fact type it lives in; one across fact types has none.
    */
-  private constraintRef([c, ft]: ConstraintInView): ConstraintRef {
-    const row = ft === undefined
-      ? this.verbalizer.constraints.verbalizeExternal(c, this.model)
-      : this.verbalizer.constraints.verbalize(c, ft, this.model);
-    // Every id here came from [ft.id] or factTypesHolding, so each resolves.
-    const factTypeIds = row.factTypeIds ?? [];
-    return {
-      id: row.sourceElementId,
-      constraintType: c.type,
-      verbalization: row.text,
-      factTypes: factTypeIds.map((id) => this.model.getFactType(id)!.name),
-      factTypeIds,
-    };
+  private constraintRef(inView: ConstraintInView): ConstraintRef {
+    const report = this.verbalizer.constraints.reportInView(inView, this.model);
+    return { ...report, constraintType: inView[0].type };
   }
 
   /** Each constraint touching any of these fact types, once, in order. */
@@ -175,17 +165,9 @@ class QueryContext {
     const keyword = constraintType;
     const matches = (c: Constraint) =>
       keyword === undefined || matchesConstraintType(c.type, keyword);
-    // The whole model: each fact type's own constraints, then every
-    // constraint across fact types once.
-    const constraints: ConstraintRef[] = [];
-    for (const ft of this.model.factTypes) {
-      for (const c of ft.internalConstraints) {
-        if (matches(c)) constraints.push(this.constraintRef([c, ft]));
-      }
-    }
-    for (const c of this.model.constraints) {
-      if (matches(c)) constraints.push(this.constraintRef([c, undefined]));
-    }
+    const constraints = this.model.everyConstraint()
+      .filter(([c]) => matches(c))
+      .map((inView) => this.constraintRef(inView));
     return { kind: "constraints", constraints };
   }
 

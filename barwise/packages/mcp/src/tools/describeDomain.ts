@@ -46,6 +46,7 @@ function shapeDescription(description: DomainDescription): Record<string, unknow
   }
 
   const factTypes = description.factTypes.slice(0, MAX_FACT_TYPES).map((ft) => ({
+    id: ft.id,
     name: ft.name,
     arity: ft.arity,
     primaryReading: ft.primaryReading,
@@ -62,9 +63,11 @@ function shapeDescription(description: DomainDescription): Record<string, unknow
   const constraints = description.constraints
     .slice(0, MAX_CONSTRAINTS)
     .map((c) => ({
+      id: c.id,
       type: c.type,
       verbalization: c.verbalization,
-      affectedFactType: c.affectedFactType,
+      factTypes: c.factTypes,
+      factTypeIds: c.factTypeIds,
     }));
   if (description.constraints.length > MAX_CONSTRAINTS) {
     truncation.constraints = {

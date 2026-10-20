@@ -6,7 +6,7 @@ import {
   roleIdsOf,
 } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import {
   verbalizeExternalUniqueness,
   verbalizeInternalUniqueness,
@@ -125,6 +125,18 @@ function factTypesSpanned(constraint: Constraint, model: OrmModel): string[] {
   return model.factTypesHolding(roleIdsOf(constraint)).map((ft) => ft.id);
 }
 
+/** What `ConstraintVerbalizer.reportInView` says about a constraint. */
+export interface ConstraintReport {
+  /** The constraint's own id. */
+  readonly id: string;
+  /** Its FORML sentence. */
+  readonly verbalization: string;
+  /** Names of the fact types it applies to, in model order. */
+  readonly factTypes: readonly string[];
+  /** Ids of the same fact types, in the same order. */
+  readonly factTypeIds: readonly string[];
+}
+
 /**
  * Verbalizes ORM constraints using FORML sentence patterns. The
  * per-constraint logic lives in ./constraints/{phase1,phase2,sentence}.
@@ -166,6 +178,29 @@ export class ConstraintVerbalizer {
       [factType.id],
       factType.id,
     );
+  }
+
+  /**
+   * A constraint as a view of the model reports it: verbalized in the fact
+   * type it lives in if it is internal, in none if it spans fact types, and
+   * named by its own id and the fact types it applies to (orm-format-3, Open
+   * decision 9). Query and describe both report constraints through this,
+   * so they cannot disagree about any of the four.
+   */
+  reportInView(inView: ConstraintInView, model: OrmModel): ConstraintReport {
+    const [constraint, factType] = inView;
+    const row = factType === undefined
+      ? this.verbalizeExternal(constraint, model)
+      : this.verbalize(constraint, factType, model);
+    // Every id here came from [factType.id] or factTypesHolding, so each
+    // resolves.
+    const factTypeIds = row.factTypeIds ?? [];
+    return {
+      id: row.sourceElementId,
+      verbalization: row.text,
+      factTypes: factTypeIds.map((id) => model.getFactType(id)!.name),
+      factTypeIds,
+    };
   }
 
   /**

@@ -7,6 +7,8 @@
  * DSL front-end that produces `ModelQuery` values.
  */
 
+import type { ConstraintReport } from "../verbalization/ConstraintVerbalizer.js";
+
 /**
  * A formal query over an ORM model. Discriminated by `kind`.
  *
@@ -53,21 +55,9 @@ export interface FactTypeRef {
 }
 
 /** A lightweight reference to a constraint. */
-export interface ConstraintRef {
-  readonly id: string;
+export interface ConstraintRef extends ConstraintReport {
   /** The metamodel constraint type (e.g. "internal_uniqueness"). */
   readonly constraintType: string;
-  /** FORML verbalization of the constraint. */
-  readonly verbalization: string;
-  /**
-   * Names of the fact types the constraint applies to, in model order: one
-   * for an internal constraint, every fact type it spans for one across
-   * fact types (orm-format-3, Open decision 9). Never the fact type a 2.0
-   * file happened to nest it under.
-   */
-  readonly factTypes: readonly string[];
-  /** Ids of the same fact types, in the same order. */
-  readonly factTypeIds: readonly string[];
 }
 
 /** A lightweight reference to a role within a fact type. */

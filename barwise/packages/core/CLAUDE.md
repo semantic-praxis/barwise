@@ -122,7 +122,8 @@ it, so knip sees an unused file where there is a live edge.
   two guards all derive from it. Read through `FactType.internalConstraints`,
   `OrmModel.constraints`, `OrmModel.constraintsTouching` (or
   `constraintsTouchingAny` for a view of several fact types, which says a
-  constraint spanning two of them once) and
+  constraint spanning two of them once, and `everyConstraint` for the whole
+  model) and
   `OrmModel.getConstraint`, not `FactType.constraints`, which WS3c removes
   (`docs/specs/orm-format-3.spec.md`, WS3).
 - Constraint types use discriminated unions with type guard functions

@@ -207,14 +207,29 @@ export class OrmModel {
    * it touches; a whole-model reader wants each fact type's
    * `internalConstraints` plus `constraints` once instead.
    *
-   * Verbalization and counterexamples ask here by id, and query asks
-   * `constraintsTouchingAny`, which this is the one fact type case of, so
-   * their views of one fact type cannot disagree (describe still reads the
-   * nested list until WS3a-ii-c moves it). The answer is about this model's
-   * fact type: a fact type it does not have touches nothing here.
+   * Verbalization and counterexamples ask here by id, and query and
+   * describe ask `constraintsTouchingAny`, which this is the one fact type
+   * case of, so their views of one fact type cannot disagree. The answer is
+   * about this model's fact type: a fact type it does not have touches
+   * nothing here.
    */
   constraintsTouching(factTypeId: string): readonly Constraint[] {
     return this.constraintsTouchingAny([factTypeId]).map(([c]) => c);
+  }
+
+  /**
+   * Every constraint in the model, each once: each fact type's own
+   * constraints in fact type order, then the constraints across fact types
+   * (`constraints`). The whole-model view query and describe both list; a
+   * view of some fact types is `constraintsTouchingAny`.
+   */
+  everyConstraint(): readonly ConstraintInView[] {
+    return [
+      ...this.factTypes.flatMap((ft) =>
+        ft.internalConstraints.map((c): ConstraintInView => [c, ft])
+      ),
+      ...this.constraints.map((c): ConstraintInView => [c, undefined]),
+    ];
   }
 
   /**
