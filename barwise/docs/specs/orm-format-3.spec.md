@@ -929,8 +929,8 @@ Implementation notes (2026-10-19):
     lasts until storage moves to the model (WS3c).
   - The CLI (`barwise query --json`) and MCP (`query_model`) print the
     result as it is, so their output changes shape with it and neither
-    needed code. `mcp/tests/tools/queryModel.test.ts` pins the new fields
-    at the MCP surface.
+    needed code. `mcp/tests/tools/queryModel.test.ts` pins the ids and the
+    span of a constraint across fact types at the MCP surface.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 
