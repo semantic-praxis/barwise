@@ -30,8 +30,8 @@ const { version } = JSON.parse(
  * the tests keep the default, so a hung test still fails in 30s; with the
  * hook that first test takes about 1.2s alone. Only the import is warmed:
  * work an action does on each call, such as loading the eval suite, stays
- * in the test. Every test file under tests/commands that runs `prompt`
- * calls this once (tests/promptWarmup.test.ts checks). Why the import costs
+ * in the test. Every test file that runs `prompt` calls this once, at top
+ * level (tests/promptWarmup.test.ts checks). Why the import costs
  * what it does is barwise-xlw.
  */
 export function warmPromptCommand(): void {
