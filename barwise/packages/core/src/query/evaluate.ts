@@ -141,7 +141,7 @@ class QueryContext {
   }
 
   /** Each constraint touching any of these fact types, once, in order. */
-  private constraintsTouchingAll(factTypes: readonly FactType[]): ConstraintRef[] {
+  private refsTouching(factTypes: readonly FactType[]): ConstraintRef[] {
     return this.model.constraintsTouchingAny(factTypes.map((ft) => ft.id))
       .map(([c, ft]) => this.constraintRef(c, ft));
   }
@@ -206,7 +206,7 @@ class QueryContext {
         roles.push(this.roleRef(role, ft));
       }
     }
-    const constraints = this.constraintsTouchingAll(factTypes);
+    const constraints = this.refsTouching(factTypes);
 
     return {
       kind: "entity-detail",
@@ -237,7 +237,7 @@ class QueryContext {
         factType: this.factTypeRef(ft),
         roles: ft.roles.map((r) => this.roleRef(r, ft)),
         readings: ft.readings.map((r) => expandReading(r.template, playerNames)),
-        constraints: this.constraintsTouchingAll([ft]),
+        constraints: this.refsTouching([ft]),
         objectified: this.model.objectificationOf(ft.id) !== undefined,
       },
     };
@@ -273,14 +273,14 @@ class QueryContext {
     // A name may refer to a fact type or to an entity.
     const ft = this.findFactType(name);
     if (ft) {
-      return { kind: "constraints", constraints: this.constraintsTouchingAll([ft]) };
+      return { kind: "constraints", constraints: this.refsTouching([ft]) };
     }
 
     const entity = this.findEntity(name);
     if (entity) {
       return {
         kind: "constraints",
-        constraints: this.constraintsTouchingAll(this.model.factTypesForObjectType(entity.id)),
+        constraints: this.refsTouching(this.model.factTypesForObjectType(entity.id)),
       };
     }
 

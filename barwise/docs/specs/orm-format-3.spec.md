@@ -916,9 +916,9 @@ Implementation notes (2026-10-19):
     other fact type's view did not list it at all.
   - "Every constraint touching these fact types, once" is
     `OrmModel.constraintsTouchingAny`, beside `constraintsTouching`, which
-    is now its one fact type case, so query and describe share one walk
-    and read `model.constraints` once per view rather than once per fact
-    type.
+    is now its one fact type case. Query reads it here and reads
+    `model.constraints` once per view rather than once per fact type;
+    describe, the next PR, reads the same walk.
   - Order changed in two ways a positional consumer can see. Within a fact
     type, its own constraints now come first and those across fact types
     after, where the nested list interleaved them. And the constraints

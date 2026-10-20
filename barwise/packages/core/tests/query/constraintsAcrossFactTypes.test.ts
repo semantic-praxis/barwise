@@ -109,11 +109,11 @@ describe("query over constraints across fact types", () => {
       { kind: "list-constraints" },
       { kind: "fact-type", name: "Room is in Building" },
       { kind: "constraints-of", name: "Room has RoomNumber" },
-      { kind: "model-stats" },
+      { kind: "entity", name: "Room" },
     ] as const;
     for (const q of queries) {
       const sortIds = (r: QueryResult) =>
-        r.kind === "stats" ? r : [...constraintsOf(r)].sort((a, b) => a.id.localeCompare(b.id));
+        [...constraintsOf(r)].sort((a, b) => a.id.localeCompare(b.id));
       expect(sortIds(queryModel(rooms("ft-in"), q)), q.kind)
         .toEqual(sortIds(queryModel(rooms("ft-nr"), q)));
     }

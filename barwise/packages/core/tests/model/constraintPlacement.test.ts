@@ -1,7 +1,8 @@
 /**
  * The read API for placement by kind (docs/specs/orm-format-3.spec.md, WS3a):
  * `FactType.internalConstraints`, `OrmModel.constraints`,
- * `OrmModel.constraintsTouching` and `OrmModel.getConstraint`, while storage
+ * `OrmModel.constraintsTouching`, `OrmModel.constraintsTouchingAny` and
+ * `OrmModel.getConstraint`, while storage
  * still nests every constraint under a fact type. The order assertions are
  * the point of the derived list: a reader that moves from walking each fact
  * type's list to `model.constraints` must meet the constraints in the order
