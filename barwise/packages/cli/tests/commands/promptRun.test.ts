@@ -21,9 +21,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type FakeOllama, startFakeOllama } from "../workspace/fakeOllama.js";
-import { runCli } from "../workspace/run.js";
+import { FIRST_LOAD_TIMEOUT_MS, runCli, warmPromptCommand } from "../workspace/run.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(here, "../fixtures");
@@ -111,6 +111,8 @@ function systemPromptSent(): string {
 function modelSent(): unknown {
   return fake!.requests[0]!["model"];
 }
+
+beforeAll(warmPromptCommand, FIRST_LOAD_TIMEOUT_MS);
 
 describe("barwise prompt run", () => {
   it("sends an unshipped extraction candidate, not the shipped artifact", async () => {

@@ -5,9 +5,8 @@
  * a view of one fact type or entity says every constraint touching it,
  * once; and which constraints each view says does not depend on which fact
  * type a 2.0 file nested a constraint under (every constraint here states
- * its id). With one constraint across fact types, as here, neither does
- * their order; with several, their order follows where each is nested
- * (the spec note "Query (3a-ii-c)").
+ * its id), and with one constraint across fact types, as here, neither
+ * does their order.
  */
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";

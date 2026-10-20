@@ -19,14 +19,21 @@ const { version } = JSON.parse(
 ) as { version: string; };
 
 /**
- * Timeout for a test that makes its file's first `runCli` call into a
- * heavy command (`prompt score`, `prompt eval`). That call loads the
- * command, promptlab and the eval suite through vitest's transform: about
- * 4s alone under coverage, and 35-38s in the pre-push coverage gate, which
- * runs every package's suite at once on a 4-core machine -- past the 30s
- * default, on four pushes of semantic-praxis/barwise#689. The test is slow,
- * not hung; why the first load costs what it does is barwise-xlw.
+ * Load the `prompt` command once, before a file's tests, so no test pays
+ * for it. The first `runCli` call into it loads the command, promptlab and
+ * the eval suite through vitest's transform: about 4s alone under coverage,
+ * and 35-38s in the pre-push coverage gate, which runs every package's
+ * suite at once on a 4-core machine. As the first statement of a test that
+ * beat the 30s default on four pushes of semantic-praxis/barwise#689. In a
+ * hook it gets its own, longer limit, and the tests keep the default
+ * whatever their order, so a hung one still fails in 30s. Why the load
+ * costs what it does is barwise-xlw.
  */
+export async function warmPromptCommand(): Promise<void> {
+  await runCli(["prompt", "--help"]);
+}
+
+/** The limit for `warmPromptCommand` in a `beforeAll`. */
 export const FIRST_LOAD_TIMEOUT_MS = 120_000;
 
 export interface RunResult {
