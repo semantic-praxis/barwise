@@ -589,7 +589,7 @@
       "caught_by": "reasoning",
       "note": "Grounding the reader sites showed one PR would touch 43 source files, tens of test files and every host-naming output; the split keeps the compile-time check in 3c."
     },
-    "orm-format-3::d2a094e6deca": {
+    "orm-format-3::f38c9af380ba": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 3a lands as three prs, not one. measured against the list above, 3a still touched every core reader, every changed output with its consumers, and id-first dif",
       "caught_by": "reasoning",

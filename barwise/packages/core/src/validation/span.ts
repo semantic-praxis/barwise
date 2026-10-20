@@ -18,7 +18,7 @@ import type { OrmModel } from "../model/OrmModel.js";
  * nothing, and the dangling roles are reported separately.
  */
 export function constraintSpan(model: OrmModel, c: Constraint): string {
-  return spanPhrase(model.factTypesHolding(roleIdsOf(c)).map((ft) => ft.name));
+  return spanPhrase(model.factTypesOf(c).map((ft) => ft.name));
 }
 
 /** The phrase for a list of fact type names; see `constraintSpan`. */

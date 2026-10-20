@@ -46,9 +46,7 @@ describe("counterexamplesTouching", () => {
     const model = drivesRidesWalks();
     const all = generateCounterexamples(model);
     const ids = (name: string) =>
-      counterexamplesTouching(model, model.getFactTypeByName(name)!.id, all).map((c) =>
-        c.constraintId
-      );
+      counterexamplesTouching(model.getFactTypeByName(name)!.id, all).map((c) => c.constraintId);
 
     expect(ids("Person drives Car")).toContain("c-excl");
     expect(ids("Person rides Bus")).toContain("c-excl");
@@ -64,7 +62,7 @@ describe("counterexamplesTouching", () => {
       roleIds: [walks.roles[0]!.id],
     });
     const all = generateCounterexamples(model);
-    expect(counterexamplesTouching(model, walks.id, all).map((c) => c.constraintId)).toEqual([
+    expect(counterexamplesTouching(walks.id, all).map((c) => c.constraintId)).toEqual([
       "c-walks-uc",
     ]);
   });

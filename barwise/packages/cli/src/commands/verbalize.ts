@@ -106,7 +106,7 @@ function compute(verbalizer: Verbalizer, model: OrmModel, opts: VerbalizeOptions
   if (opts.counterexamples) {
     const all = generateCounterexamples(model);
     if (!scoped) counterexamples = all;
-    else if (ft) counterexamples = counterexamplesTouching(model, ft.id, all);
+    else if (ft) counterexamples = counterexamplesTouching(ft.id, all);
   }
   return { verbalizations, counterexamples };
 }

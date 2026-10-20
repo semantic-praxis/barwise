@@ -120,11 +120,6 @@ function asConstraintRow(
   return { ...v, sourceElementId: constraint.id ?? fallbackId, factTypeIds };
 }
 
-/** The fact types holding a constraint's roles, in model order. */
-function factTypesSpanned(constraint: Constraint, model: OrmModel): string[] {
-  return model.factTypesHolding(roleIdsOf(constraint)).map((ft) => ft.id);
-}
-
 /** What `ConstraintVerbalizer.reportInView` says about a constraint. */
 export interface ConstraintReport {
   /** The constraint's own id. */
@@ -175,7 +170,7 @@ export class ConstraintVerbalizer {
     return asConstraintRow(
       this.verbalizeInternal(constraint, factType, model),
       constraint,
-      [factType.id],
+      model.factTypesNaming([constraint, factType]).map((ft) => ft.id),
       factType.id,
     );
   }
@@ -209,7 +204,7 @@ export class ConstraintVerbalizer {
    * type wherever they differ.
    */
   verbalizeExternal(constraint: ExternalConstraint, model: OrmModel): Verbalization {
-    const spanned = factTypesSpanned(constraint, model);
+    const spanned = model.factTypesNaming([constraint, undefined]).map((ft) => ft.id);
     const id = constraint.id ?? spanned[0] ?? "";
     const v = this.verbalizeExternalByType(constraint, id, model);
     return asConstraintRow(

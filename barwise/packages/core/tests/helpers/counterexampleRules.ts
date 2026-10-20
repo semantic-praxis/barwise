@@ -30,7 +30,7 @@ import { graphFor } from "./graphFor.js";
  *
  * `null` means the generator deliberately emits no counterexample for
  * that kind. The five null entries mirror the `return undefined` arm of
- * `generateCounterexampleForConstraint`, which carries the two reasons;
+ * `probeFor` in CounterexampleGenerator.ts, which carries the two reasons;
  * they are listed rather than omitted so that "no generator yet" stays
  * distinguishable from "nobody noticed" on this side too.
  *

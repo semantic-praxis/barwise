@@ -117,13 +117,13 @@ export function verbalizationRow(v: Verbalization): {
  * of `barwise verbalize --counterexamples` use.
  */
 export function counterexampleRow(c: Counterexample): {
-  factTypeId: string;
+  factTypeIds: readonly string[];
   constraintId?: string;
   constraintType: Counterexample["constraintType"];
   text: string;
 } {
   return {
-    factTypeId: c.factTypeId,
+    factTypeIds: c.factTypeIds,
     ...(c.constraintId ? { constraintId: c.constraintId } : {}),
     constraintType: c.constraintType,
     text: c.text,

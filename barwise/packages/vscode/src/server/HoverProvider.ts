@@ -81,7 +81,9 @@ export class HoverProvider {
     // Counterexamples: what the object type's constraints rule out.
     if (this.showCounterexamples && factTypes.length > 0) {
       const ftIds = new Set(factTypes.map((ft) => ft.id));
-      const ces = generateCounterexamples(model).filter((c) => ftIds.has(c.factTypeId));
+      const ces = generateCounterexamples(model).filter((c) =>
+        c.factTypeIds.some((id) => ftIds.has(id))
+      );
       if (ces.length > 0) {
         lines.push("", "**Rules out:**");
         for (const c of ces) {

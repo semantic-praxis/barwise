@@ -1,0 +1,22 @@
+orm_version: "1.0"
+model:
+  name: Commute
+  object_types:
+    - { id: ot-person, name: Person, kind: entity, reference_mode: id }
+    - { id: ot-car, name: Car, kind: entity, reference_mode: plate }
+    - { id: ot-bus, name: Bus, kind: entity, reference_mode: number }
+  fact_types:
+    - id: ft-drives
+      name: Person drives Car
+      roles:
+        - { id: r-drives, player: ot-person, role_name: drives }
+        - { id: r-driven, player: ot-car, role_name: is driven by }
+      readings: ["{0} drives {1}"]
+    - id: ft-rides
+      name: Person rides Bus
+      roles:
+        - { id: r-rides, player: ot-person, role_name: rides }
+        - { id: r-ridden, player: ot-bus, role_name: is ridden by }
+      readings: ["{0} rides {1}"]
+      constraints:
+        - { id: c-excl, type: exclusion, roles: [r-drives, r-rides] }

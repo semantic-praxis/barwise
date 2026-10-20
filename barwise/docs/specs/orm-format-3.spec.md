@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, its query and describe parts 2026-10-20; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, its query, describe and counterexample parts 2026-10-20; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -968,6 +968,44 @@ Implementation notes (2026-10-19):
     per fact type, which rebuilds `model.constraints` each time, as
     validation's completeness rules already do. WS3c stores that list,
     which removes the rebuild for every such reader at once.
+- **Counterexamples (3a-ii-c, 2026-10-20).**
+  - `Counterexample.factTypeId`, "the constraint's owner", becomes
+    `factTypeIds`: the fact types the constraint applies to, in model
+    order. `generateCounterexamples` reads `everyConstraint`, so the whole
+    model lists each fact type's own constraints first, then each
+    constraint across fact types once, as query and describe do.
+  - The generators for constraints across fact types no longer take a
+    fact type. `generateCounterexampleForConstraint(c, ft, model)` keeps its
+    signature for its callers in formats and learn (3b), and does not hand
+    `ft` on for those kinds, as `ConstraintVerbalizer.verbalize` ignores it.
+  - `counterexamplesTouching(factTypeId, counterexamples)` filters on
+    `factTypeIds`, the same set `constraintsTouching` reads, and lost its
+    `model` parameter. The CLI's JSON row (`barwise verbalize
+    --counterexamples`) projects `factTypeIds`; the VS Code hover shows a
+    counterexample on every player of a fact type its constraint touches.
+  - A subset or equality whose two role sequences sit in one fact type now
+    gets a witness, one fact whose two sides read different tuples
+    (barwise-0od), since validation checks those across the population
+    too (barwise-h2a). The generator tries a few minted values on each
+    side, so a value constraint that makes the first choice collide does
+    not lose the witness; sequences that share only some roles, or reorder
+    the same roles (the symmetric pair a1, a2 against a2, a1), get one.
+    Only the same roles in the same order, or domains leaving one choice,
+    get none. A subset or equality side whose roles sit in several fact
+    types: on the absent side no fact holds them all, so validation finds
+    no absent tuple and one present fact is the witness; on the present
+    side no one fact can be written, so a subset has none, rather than a
+    crash, and an equality tries its other side. Sides of different
+    lengths are an arity mismatch validation reports itself, and get none.
+    The local search compares tuples with validation's own
+    `makeCompositeKey`, so the two agree on what matches.
+  - Naming is `OrmModel.factTypesNaming(inView)`: an internal constraint by
+    the fact type it lives in, as `constraintsTouching` lists it, even when
+    a stale role id leaves its roles naming nothing; one across fact types
+    by the fact types holding its roles (`factTypesOf`). Verbalization rows
+    and counterexamples both read it, so they cannot name one constraint
+    differently. Validation messages read `factTypesOf` directly, since
+    they report what the roles say.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

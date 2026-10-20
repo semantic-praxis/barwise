@@ -144,6 +144,37 @@ describe("barwise verbalize", () => {
     expect(parsed.counterexamples.length).toBeGreaterThan(0);
   });
 
+  it("names every fact type a counterexample's constraint applies to (orm-format-3, Open decision 9)", async () => {
+    const result = await runCli([
+      "verbalize",
+      `${fixtures}/commute.orm.yaml`,
+      "--counterexamples",
+      "--format",
+      "json",
+    ]);
+    expect(result.exitCode).toBe(0);
+    const rows: Record<string, unknown>[] = JSON.parse(result.stdout).counterexamples;
+    expect(rows.map((r) => [r.constraintId, r.factTypeIds])).toEqual([
+      ["c-excl", ["ft-drives", "ft-rides"]],
+    ]);
+    expect(rows[0]).not.toHaveProperty("factTypeId");
+  });
+
+  it("gives a fact type's view the counterexample of a constraint it does not nest", async () => {
+    const result = await runCli([
+      "verbalize",
+      `${fixtures}/commute.orm.yaml`,
+      "--fact-type",
+      "Person drives Car",
+      "--counterexamples",
+      "--format",
+      "json",
+    ]);
+    expect(result.exitCode).toBe(0);
+    const rows: Record<string, unknown>[] = JSON.parse(result.stdout).counterexamples;
+    expect(rows.map((r) => r.constraintId)).toEqual(["c-excl"]);
+  });
+
   it("reports error for nonexistent fact type", async () => {
     const result = await runCli([
       "verbalize",
