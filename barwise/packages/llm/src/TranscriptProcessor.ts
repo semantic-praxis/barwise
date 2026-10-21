@@ -11,6 +11,7 @@
 import type { OrmModel } from "@barwise/core";
 import { diffModels } from "@barwise/core/diff";
 import { suggestMaxTokens } from "./budget.js";
+import { UNRELATED_IDS_DIFF } from "./diffOptions.js";
 import { parseDraftModel } from "./DraftModelParser.js";
 import { enforceConformance } from "./ExtractionConformance.js";
 import {
@@ -25,7 +26,6 @@ import type { ExtractionLogSink } from "./observe/extractionLog.js";
 import { emitExtractionRecord, summariseExtraction } from "./observe/extractionLog.js";
 import type { PromptArtifact } from "./prompt/artifacts/PromptArtifact.js";
 import { selectArtifact } from "./prompt/selectArtifact.js";
-import { UNRELATED_IDS_DIFF } from "./sampleAgreement.js";
 
 export interface ProcessorOptions {
   /** Name for the resulting model. Defaults to "Extracted Model". */

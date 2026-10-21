@@ -36,6 +36,7 @@ src/
   ModelContext.ts         Existing-model context for incremental extraction
   ReasoningTrail.ts       Extraction reasoning capture
   budget.ts               Output-token budget derived from transcript length
+  diffOptions.ts          UNRELATED_IDS_DIFF: content-only constraint matching for models with unrelated ids
   parse/                  Response parsing (object types, fact types, constraints, ...)
   prompt/                 Prompt artifacts (builtins.generated.ts, selectArtifact,
                           systemPrompt, reviewPrompt, responseSchema, promptHash)

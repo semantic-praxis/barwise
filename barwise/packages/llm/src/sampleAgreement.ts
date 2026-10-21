@@ -18,6 +18,7 @@
  */
 import type { OrmModel } from "@barwise/core";
 import { diffModels, type NamedElementType } from "@barwise/core/diff";
+import { UNRELATED_IDS_DIFF } from "./diffOptions.js";
 import type { Ambiguity } from "./ExtractionTypes.js";
 
 /** One element the samples do not agree on. */
@@ -58,15 +59,6 @@ interface ElementTally {
 function keyOf(elementType: string, name: string): string {
   return `${elementType} ${name}`;
 }
-
-/**
- * How to diff two models extracted independently, whose ids are unrelated
- * by construction: pair constraints by content alone, so a coincidental id
- * never pairs two different constraints. The samples here are one case;
- * an alternative framing, extracted beside the primary rather than from
- * it, is the other (`TranscriptProcessor`).
- */
-export const UNRELATED_IDS_DIFF = { constraintMatching: "content" } as const;
 
 /** Deltas that represent an actual difference between two models. */
 function differenceCount(a: OrmModel, b: OrmModel): number {

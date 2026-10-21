@@ -333,8 +333,8 @@ function valueConstraintKey(vc: ValueConstraintDef | undefined): string {
     .map((r) =>
       JSON.stringify([
         r.minInclusive !== false,
-        r.min ?? null,
-        r.max ?? null,
+        r.min ?? "",
+        r.max ?? "",
         r.maxInclusive !== false,
       ])
     )
@@ -393,9 +393,10 @@ export function roleHolders(model: OrmModel): RoleHolders {
  * name, so a reorder under the same reading changes what the constraint
  * says while every per-role comparison of the fact type agrees. A role of
  * the host is keyed by its host position, so the host's own id never
- * enters the key; a role of another fact type by that fact type's id and
- * its position there, so a role moved to another fact type reads as a
- * change and a holder renamed does not. The content
+ * enters the key; a role of another fact type by that fact type's name
+ * and its position there, as the content pass keys it, because the diff
+ * matches fact types by name: a holder that changed only its id is the
+ * same fact type, and one renamed is a different one. The content
  * pass never keys by id: it pairs constraints whose ids say nothing, and
  * keying by role id there would let a coincidental role id pair two
  * different constraints, which is what content matching exists to rule
@@ -426,7 +427,7 @@ function roleKeys(
       const home = mine[0]!;
       return at !== undefined
         ? `i${JSON.stringify([id, at])}`
-        : `i${JSON.stringify([id, home.id, home.roles.findIndex((r) => r.id === id)])}`;
+        : `i${JSON.stringify([id, home.name, home.roles.findIndex((r) => r.id === id)])}`;
     }
     const homes = mine ?? theirs ?? [];
     if (homes.length !== 1) return raw(id);
@@ -552,8 +553,8 @@ function diffConstraints(
   // Pair by id first, where an id names exactly one constraint in each
   // model. An id given twice anywhere in a model (barwise-b2s) pairs
   // nothing, so those constraints fall through to content rather than
-  // pairing one of them arbitrarily. A constraint with no id is never
-  // paired by id.
+  // pairing one of them arbitrarily. The id is optional in the type until
+  // WS3c, though every constraint in a model has one (barwise-nkq).
   const paired = new Set<Constraint>();
   const modified: { from: Constraint; to: Constraint; }[] = [];
   if (pairing.matching === "id-first") {

@@ -1066,7 +1066,7 @@ Implementation notes (2026-10-19):
     derivation; it is not handled in 3a.
   - A pair joined by id is compared with a key that reads each role both
     models hold, once each, by its id as well as its position (its host
-    position, or its holder's id and position there); the content pass
+    position, or its holder's name and position there); the content pass
     keeps the positional key alone. By position alone, a constraint moved
     onto the role that took the old position kept its key; the pair's id
     makes its roles' ids evidence, so it reads them. Position stays
@@ -1074,9 +1074,11 @@ Implementation notes (2026-10-19):
     player and a name, so a reorder under one reading changes what the
     constraint says while every per-role comparison agrees. A plain role
     swap therefore reads as a modification of the constraints on those
-    roles, which is true of what they say. The host's own id is not in
-    the key, so a fact type that changed only its id changes nothing; a
-    renamed holder changes nothing either. The content pass does not read
+    roles, which is true of what they say. No fact type id is in the key,
+    so a fact type that changed only its id changes nothing, which is
+    what a merge leaves behind (an accepted fact type keeps the existing
+    id); a renamed holder is a different fact type to a diff that matches
+    by name, so it reads as a change. The content pass does not read
     role ids, because there a role id is as coincidental as a constraint
     id. The key's sorting and default folding hold in both, so a
     reordered role list or `isPreferred: false` written out reads as no

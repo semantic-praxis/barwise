@@ -353,9 +353,26 @@ describe("which key reads a role", () => {
       .toEqual([["constraintsModified", [["eu-1", "eu-1"]]]]);
   });
 
-  it("reads a renamed holder as no change of a pair joined by id", () => {
+  it("reads a renamed holder as a change, since the diff matches fact types by name", () => {
     expect(constraintChanges(threeFacts("ft-2"), threeFacts("ft-2", "Person leases Car")))
-      .toEqual([]);
+      .toEqual([["constraintsModified", [["eu-1", "eu-1"]]]]);
+  });
+
+  it("reads a holder that changed only its id as no change", () => {
+    // What a merge leaves behind: an accepted fact type keeps the existing
+    // id and takes the incoming roles.
+    const reId = (m: OrmModel) => {
+      const ft2 = m.getFactType("ft-2")!;
+      m.removeFactType("ft-2");
+      m.addFactType({
+        id: "ft-2b",
+        name: ft2.name,
+        roles: ft2.roles.map((r) => ({ id: r.id, name: r.name, playerId: r.playerId })),
+        readings: ft2.readings.map((r) => r.template),
+      });
+      return m;
+    };
+    expect(constraintChanges(threeFacts("ft-2"), reId(threeFacts("ft-2")))).toEqual([]);
   });
 });
 
