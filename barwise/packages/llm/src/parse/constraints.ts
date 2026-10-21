@@ -488,9 +488,13 @@ function isDuplicateConstraint(
   if (candidate.type === "equality") {
     return held.some((existing) => {
       if (existing.type !== "equality") return false;
+      // Symmetric: the same rule stated from the other fact type swaps the
+      // two sequences, and now that it is checked model-wide it is found.
       return (
-        arraysEqual(existing.roleIds1, candidate.roleIds1)
-        && arraysEqual(existing.roleIds2, candidate.roleIds2)
+        (arraysEqual(existing.roleIds1, candidate.roleIds1)
+          && arraysEqual(existing.roleIds2, candidate.roleIds2))
+        || (arraysEqual(existing.roleIds1, candidate.roleIds2)
+          && arraysEqual(existing.roleIds2, candidate.roleIds1))
       );
     });
   }

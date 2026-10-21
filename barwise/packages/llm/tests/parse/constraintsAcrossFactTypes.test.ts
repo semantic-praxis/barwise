@@ -1,8 +1,9 @@
 /**
  * The draft parser's duplicate check for constraints across fact types
  * (orm-format-3, Open decision 9, WS3b): a rule already in the model is a
- * duplicate whichever fact type a 2.0 file nests it under, not only when
- * it sits under the fact type the extraction names.
+ * duplicate whichever fact type holds it. For the single-fact-type kinds
+ * only a hand-built model can nest one elsewhere; an equality stated from
+ * each side is the case a draft reaches.
  */
 import { OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
@@ -47,6 +48,26 @@ describe("parseConstraints across fact types", () => {
     const [provenance] = parseConstraints([exclusion], model, []);
     expect(provenance?.applied).toBe(false);
     expect(provenance?.skipReason).toContain("Duplicate constraint");
+    expect(model.constraints).toHaveLength(1);
+  });
+
+  it("skips an equality stated again from the other fact type", () => {
+    const model = fleet();
+    const both = (from: string, to: string): InferredConstraint => ({
+      type: "equality",
+      fact_type: from,
+      superset_fact_type: to,
+      roles: ["Person"],
+      superset_roles: ["Person"],
+      description: "rule",
+      confidence: "high",
+    });
+    const provenance = parseConstraints(
+      [both("Person owns Car", "Person drives Car"), both("Person drives Car", "Person owns Car")],
+      model,
+      [],
+    );
+    expect(provenance.map((p) => p.applied)).toEqual([true, false]);
     expect(model.constraints).toHaveLength(1);
   });
 
