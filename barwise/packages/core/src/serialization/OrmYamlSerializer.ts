@@ -536,12 +536,6 @@ function readLegacy(
   return { model, placed, flags: flagged.size };
 }
 
-/**
- * What the 2.0 reader made of the flags it could not carry into the model
- * as they stood: a flag that identifies no entity, and an entity two or
- * more flags name, of which the stored reference keeps one. In a file that
- * names elements it does not define, the flags are not judged at all.
- */
 /** The ids a leniently loaded model names and does not define, sorted. */
 function missingReferences(model: OrmModel): string[] {
   const missing = new Set<string>();
@@ -557,9 +551,18 @@ function missingReferences(model: OrmModel): string[] {
     object(oft.objectTypeId);
     if (!model.getFactType(oft.factTypeId)) missing.add(oft.factTypeId);
   }
+  for (const p of model.populations) {
+    if (!model.getFactType(p.factTypeId)) missing.add(p.factTypeId);
+  }
   return [...missing].sort();
 }
 
+/**
+ * What the 2.0 reader made of the flags it could not carry into the model
+ * as they stood: a flag that identifies no entity, and an entity two or
+ * more flags name, of which the stored reference keeps one. In a file that
+ * names elements it does not define, the flags are not judged at all.
+ */
 function migrationNotes(model: OrmModel, placed: PlacedFlags, flags: number): MigrationNote[] {
   const missing = missingReferences(model);
   if (flags > 0 && missing.length > 0) return [{ kind: "flags-unplaceable", missing }];

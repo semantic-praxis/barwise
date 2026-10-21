@@ -284,3 +284,28 @@ model:
     expect(yaml.serialize(result.model)).toBe(yaml.serialize(yaml.deserialize(text)));
   });
 });
+
+describe("migrate on a file that names what it does not define", () => {
+  it("judges no flag, and names every missing id, a population's fact type included", () => {
+    const fragment = `orm_version: "2.0"
+model:
+  name: Fragment
+  object_types:
+    - { id: ot-nr, name: CustomerNr, kind: value }
+  fact_types:
+    - id: ft-nr
+      name: Customer has CustomerNr
+      roles:
+        - { id: r-c, player: ot-c, role_name: has }
+        - { id: r-nr, player: ot-nr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: u-nr, type: internal_uniqueness, roles: [r-nr], is_preferred: true }
+  populations:
+    - { id: p, fact_type: ft-base, instances: [] }
+`;
+    expect(yaml.migrate(fragment, { lenient: true }).notes).toEqual([
+      { kind: "flags-unplaceable", missing: ["ft-base", "ot-c"] },
+    ]);
+  });
+});

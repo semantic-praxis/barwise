@@ -162,14 +162,15 @@ describe("barwise migrate", () => {
 
   it("migrates the file a symlink names, keeping the link and the file's mode", async () => {
     const target = file("real.orm.yaml", V20);
-    chmodSync(target, 0o600);
+    // Group-writable, which a creation mode under umask 022 would lose.
+    chmodSync(target, 0o664);
     const link = join(dir, "link.orm.yaml");
     symlinkSync(target, link);
     const result = await runCli(["migrate", link]);
     expect(result.exitCode).toBe(0);
     expect(lstatSync(link).isSymbolicLink()).toBe(true);
     expect(readFileSync(target, "utf-8")).toMatch(/^orm_version: "3\.0"/);
-    expect(statSync(target).mode & 0o777).toBe(0o600);
+    expect(statSync(target).mode & 0o777).toBe(0o664);
     expect(existsSync(`${target}.migrating`)).toBe(false);
   });
 

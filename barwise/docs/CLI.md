@@ -221,9 +221,9 @@ This is the one command that modifies its inputs. The file is written
 from the model, so YAML comments and hand layout in it are not kept. A
 file already at 3.0 is left untouched. A file is not written, and is
 reported, when it cannot be read or does not load, when its 3.0 form would
-not load back (2.0 allowed two constraints to share an id), or when it is
-a fragment whose `is_preferred` flag names an object type defined in
-another file. The rest are still migrated.
+not load back (2.0 allowed two constraints to share an id), or when it
+names elements it does not define (a fragment) and carries `is_preferred`
+flags, which cannot be placed without the rest of the model. The rest are still migrated.
 
 Exit codes: 0 when every file was migrated or already current; 1 under
 `--check` when a file would be rewritten; 2 when any file could not be

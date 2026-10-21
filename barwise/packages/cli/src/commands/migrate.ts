@@ -10,7 +10,7 @@
 
 import { CURRENT_ORM_VERSION, type MigrationNote } from "@barwise/core";
 import type { Command } from "commander";
-import { realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readFile, serializer } from "../workspace/io.js";
 
 interface MigrateOptions {
@@ -63,6 +63,8 @@ function migrateFile(file: string, check: boolean): FileOutcome {
     // refusing a fragment that names elements it does not define.
     const result = serializer.migrate(readFile(file), { lenient: true });
     if (result.from === CURRENT_ORM_VERSION) return { file, status: "current" };
+    const unplaceable = result.notes.find((n) => n.kind === "flags-unplaceable");
+    if (unplaceable) return { file, status: "error", error: `not migrated: ${note(unplaceable)}` };
     const text = serializer.serialize(result.model);
     // A 2.0 file can hold what 3.0 refuses (two constraints sharing an id):
     // rewriting it would turn a file that loads into one that does not.
@@ -77,8 +79,6 @@ function migrateFile(file: string, check: boolean): FileOutcome {
         }`,
       };
     }
-    const unplaceable = result.notes.find((n) => n.kind === "flags-unplaceable");
-    if (unplaceable) return { file, status: "error", error: `not migrated: ${note(unplaceable)}` };
     if (!check) replace(file, text);
     return {
       file,
@@ -93,17 +93,25 @@ function migrateFile(file: string, check: boolean): FileOutcome {
 
 /**
  * Write beside the file, then rename over it, so an interrupted write
- * leaves the original. Through a symlink to the file it names, with its
- * mode kept, so a linked model is migrated where it lives.
+ * leaves the original. Through a symlink to the file it names, so a linked
+ * model is migrated where it lives, and with its permission bits. A rename
+ * makes a new file: a second hard link keeps the old content, and the new
+ * one belongs to whoever ran the command.
  */
 function replace(file: string, text: string): void {
   const target = realpathSync(file);
   const temp = `${target}.migrating`;
   try {
-    writeFileSync(temp, text, { encoding: "utf-8", mode: statSync(target).mode });
+    writeFileSync(temp, text, "utf-8");
+    // Set after writing: a creation mode is masked by the umask.
+    chmodSync(temp, statSync(target).mode & 0o7777);
     renameSync(temp, target);
   } catch (err) {
-    rmSync(temp, { force: true });
+    try {
+      rmSync(temp, { force: true });
+    } catch {
+      // The write's error is the one to report.
+    }
     throw err;
   }
 }
