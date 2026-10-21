@@ -1119,7 +1119,9 @@ Implementation notes (2026-10-19):
     type, so a composite key shows under both fact types it spans and not
     under one it is only nested in. A constraint none of whose roles
     resolve, which no fact type lists, goes under a new "Unattached
-    Constraints" category rather than vanishing.
+    Constraints" category, described by its id, rather than vanishing.
+    Core's new `constraintsTouchingNone()` is that set, kept beside
+    `constraintsTouchingAny` as the complement of its touch test.
   - Core: `evaluateConstraintEnforcement(model, inView)` takes the
     `ConstraintInView` pair instead of a fact type and a constraint, and
     `generateCounterexampleInView` is exported beside
@@ -1131,6 +1133,10 @@ Implementation notes (2026-10-19):
     carriers, each constraint once, so a candidate's external
     uniqueness or disjunctive mandatory counts wherever its file nests it;
     before, one nested under a fact type outside the carriers was missed.
+    For the mandatory kind this also widens a known weakness: a
+    disjunctive mandatory touching the correspondent counts whatever
+    player its roles have, as one nested under it did before
+    (barwise-ra1).
     The reference side reads `internalConstraints`, which is every kind
     the check accepts.
   - The tutorial renderer finds a motivation's constraint with

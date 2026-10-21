@@ -13,7 +13,7 @@ import {
   type OrmModel,
   type PopulationConfig,
 } from "@barwise/core";
-import { generateCounterexampleForConstraint } from "@barwise/core/counterexample";
+import { generateCounterexampleInView } from "@barwise/core/counterexample";
 import type { ConstraintKind, NameLicence } from "../../exercise/types.js";
 import type { CheckResult } from "../GymReport.js";
 import {
@@ -76,8 +76,9 @@ const CANDIDATE_GUARDS: Record<ConstraintKind, readonly ((c: Constraint) => bool
 };
 
 /**
- * Every (fact type, constraint) pair in the candidate that could carry
- * the rule, for one set of populations about to be injected.
+ * Every constraint in the candidate that could carry the rule, for one set
+ * of populations about to be injected, as the pair a view returns: with
+ * the fact type it lives in, or with none for one across fact types.
  *
  * Two sources, and the asymmetry between them is load-bearing.
  * `correspondents` is the candidate's answer to the fact type the check
@@ -182,7 +183,7 @@ function candidateRejects(
 /**
  * Pass iff the candidate rejects the population the named reference
  * constraint forbids. The population is derived from the reference model
- * (via `generateCounterexampleForConstraint`) and mapped onto the
+ * (via `generateCounterexampleInView`) and mapped onto the
  * candidate, so a candidate that has not encoded the constraint -- or has
  * not modeled the relationship at all -- fails, with a concrete message.
  */
@@ -211,7 +212,7 @@ export function forbidsPopulation(
     );
   }
 
-  const counterexample = generateCounterexampleForConstraint(constraint, refFt, reference);
+  const counterexample = generateCounterexampleInView([constraint, refFt], reference);
   if (!counterexample || counterexample.forbidden.length === 0) {
     return fail(
       `Could not generate a forbidden population for the ${constraintKind} constraint on `

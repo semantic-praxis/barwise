@@ -97,9 +97,10 @@ describe("renderTutorial over a constraint across fact types", () => {
       return { ...s, motivation: { kind: "counterexample", constraintId: "c-dm-order" } as const };
     });
     const markdown = renderTutorial({ ...tutorial, steps }, { toolVersion: "0.0.0-test" });
-    expect(markdown).toContain(
-      "Rules out: a Order that plays none of the required roles -- e.g. Order#1 appears in "
-        + "Customer places Order but plays none of [r-includes-order, r-status-order]",
+    // The article is the generator's, not this check's: matched loosely so
+    // a fix to "a Order" does not break a test about placement.
+    expect(markdown).toMatch(
+      /Rules out: an? Order that plays none of the required roles -- e\.g\. Order#1 appears in Customer places Order but plays none of \[r-includes-order, r-status-order\]/,
     );
   });
 });

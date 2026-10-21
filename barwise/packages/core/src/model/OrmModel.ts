@@ -264,6 +264,18 @@ export class OrmModel {
   }
 
   /**
+   * The constraints across fact types that touch no fact type: none of
+   * their roles resolve. No `constraintsTouchingAny` view lists them, so a
+   * reader that shows constraints by fact type reads these too, or a
+   * constraint left dangling by a renamed or deleted role disappears.
+   * This is the complement of that view's touch test, kept beside it so
+   * the two cannot drift.
+   */
+  constraintsTouchingNone(): readonly ExternalConstraint[] {
+    return this.constraints.filter((c) => !roleIdsOf(c).some((rid) => this.findRole(rid)));
+  }
+
+  /**
    * The fact types holding a constraint's roles, in model order: every
    * fact type a constraint across fact types spans. For an internal
    * constraint this is its own fact type only while its role ids resolve;

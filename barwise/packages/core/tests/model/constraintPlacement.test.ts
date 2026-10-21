@@ -177,6 +177,25 @@ describe("OrmModel.constraintsTouchingAny", () => {
   });
 });
 
+describe("OrmModel.constraintsTouchingNone", () => {
+  it("is exactly the constraints across fact types no fact type's view lists", () => {
+    const { model, hasArea } = rooms();
+    hasArea.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] });
+    hasArea.addConstraint({ id: "c-half", type: "exclusion", roleIds: ["r-1", "r-z"] });
+    const viewed = new Set(
+      model.constraintsTouchingAny(model.factTypes.map((ft) => ft.id))
+        .map(([c]) => c.id),
+    );
+    const none = ids(model.constraintsTouchingNone());
+    expect(none).toEqual(["c-gone"]);
+    expect(viewed.has("c-half")).toBe(true);
+    // Together the two say every constraint in the model, each once.
+    expect([...viewed, ...none].sort()).toEqual(
+      ids(model.everyConstraint().map(([c]) => c)).sort(),
+    );
+  });
+});
+
 describe("OrmModel.getConstraint", () => {
   it("finds a constraint of either placement by id", () => {
     const { model } = rooms();

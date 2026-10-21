@@ -1,5 +1,5 @@
 import {
-  type Constraint,
+  type ConstraintInView,
   type EntityType,
   type FactType,
   isDisjunctiveMandatory,
@@ -187,13 +187,17 @@ export function buildTree(model: OrmModel): ModelTreeItem[] {
   // Constraints across fact types none of whose roles resolve, so no fact
   // type lists them; without this a constraint left dangling by a renamed
   // or deleted role would vanish from the tree just when it needs fixing.
-  const unattached = model.constraints.filter((c) => model.factTypesOf(c).length === 0);
+  // Each is described by its id, the one thing that finds it in the file.
+  const unattached = model.constraintsTouchingNone();
   if (unattached.length > 0) {
     categories.push({
       kind: "category",
       label: "Unattached Constraints",
       iconId: "warning",
-      children: unattached.map((c) => constraintItem(c, undefined, model)),
+      children: unattached.map((c) => ({
+        ...constraintItem([c, undefined]),
+        description: c.id,
+      })),
     });
   }
 
@@ -257,8 +261,8 @@ function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
   // across fact types that names one of its roles, so a composite key
   // shows under both fact types it spans rather than under whichever one
   // a 2.0 file nests it in (orm-format-3, Open decision 9).
-  const constraintChildren: ModelTreeItem[] = model.constraintsTouching(ft.id).map((c) =>
-    constraintItem(c, ft, model)
+  const constraintChildren: ModelTreeItem[] = model.constraintsTouchingAny([ft.id]).map(
+    constraintItem,
   );
 
   return {
@@ -270,14 +274,16 @@ function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
   };
 }
 
-function constraintItem(
-  c: Constraint,
-  ft: FactType | undefined,
-  _model: OrmModel,
-): ModelTreeItem {
+/**
+ * A constraint's row, from the pair a view returns: an internal constraint
+ * names its roles through the fact type it lives in, which the pair always
+ * carries for one; a constraint across fact types has none and needs none.
+ */
+function constraintItem(inView: ConstraintInView): ModelTreeItem {
+  const [c, ft] = inView;
   if (isInternalUniqueness(c)) {
     const roleNames = c.roleIds
-      .map((rid) => ft?.roles.find((r) => r.id === rid)?.name)
+      .map((rid) => ft!.roles.find((r) => r.id === rid)?.name)
       .filter(Boolean);
     const preferred = c.isPreferred ? " (preferred)" : "";
     return {
@@ -286,7 +292,7 @@ function constraintItem(
     };
   }
   if (isMandatoryRole(c)) {
-    const role = ft?.roles.find((r) => r.id === c.roleId);
+    const role = ft!.roles.find((r) => r.id === c.roleId);
     return {
       kind: "constraint",
       label: `Mandatory: ${role?.name ?? c.roleId}`,

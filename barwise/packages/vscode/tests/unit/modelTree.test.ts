@@ -54,7 +54,9 @@ describe("model tree constraints", () => {
       roleIds: ["r-gone", "r-lost"],
     });
     const unattached = buildTree(model).find((c) => c.label === "Unattached Constraints");
-    expect(unattached?.children?.map((c) => c.label)).toEqual(["Exclusion"]);
+    expect(unattached?.children?.map((c) => [c.label, c.description])).toEqual([
+      ["Exclusion", "c-gone"],
+    ]);
     expect(buildTree(rooms("ft-area")).map((c) => c.label)).not.toContain("Unattached Constraints");
   });
 
