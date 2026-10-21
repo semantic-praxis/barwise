@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), 4a implemented 2026-10-21; WS5 not started; open decisions 1 to 9
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), 4a implemented 2026-10-21, 4b split into PRs and 4b-i (constraints over subtypes in memory) implemented 2026-10-21; WS5 not started; open decisions 1 to 9
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1625,6 +1625,79 @@ Implementation notes (2026-10-21, WS4a):
 - barwise-pm7: a flag that identifies nobody is dropped without a
   diagnostic naming it. The entity still gets the missing-identifier note
   when nothing else identifies it.
+
+Implementation notes (2026-10-21, WS4b-i, subtype constraints in memory):
+
+- **4b lands as more than one PR.** The draft planned one PR in commits
+  that each keep the suite green. The first commit alone touches 45 files
+  across five packages and keeps 2.0 on disk unchanged, so it ships as
+  4b-i; the stored `preferredIdentifierId` and schema 3.0 follow as their
+  own PRs, each green.
+
+- **The operand.** `RoleOrSubtypeOperand` makes `exclusion`,
+  `disjunctive_mandatory` and `exclusive_or` take `roleIds` or
+  `subtypeFactIds`, exactly one. `roleIdsOf` returns no roles for one over
+  subtypes, `subtypeFactIdsOf` returns its subtype facts, and each of the
+  nine `roleIdsOf` callers decides which it needs.
+- **Step 3 has one home, and the 2.0 format keeps the flags.**
+  `serialization/subtypeFlags.ts` converts flags to constraints
+  (`subtypeConstraintsFromFlags`) and back (`subtypeFlagsFromConstraints`)
+  over plain records. The 2.0 loader and writer and the DDL annotation v1
+  reader and writer call it, so a 2.0 file and a DDL export write exactly
+  what they wrote before. Commit 3's migration reuses the same function.
+- **NORMA maps partitions one to one now, not in a later PR.** Each NORMA
+  exclusion or non-simple mandatory over supertype meta-roles imports as
+  one constraint over the subtype facts, with its modality and NORMA's id;
+  an exclusion and a mandatory over the same subtypes are one
+  exclusive-or. Export writes each constraint over its own subtype facts.
+  Code review found that going through the flags, in either direction,
+  merged two exclusions over one supertype into a wider one, dropped
+  modality, and wrote a partition over every subtype of a supertype. The
+  draft placed this in the later PR; it moved here because the flag path
+  was wrong, not only lossy. No tracked model has a partial group, so no
+  export moves. A disjunctive mandatory over one subtype is not written,
+  because NORMA reads a mandatory over one role as a simple one
+  (barwise-yx8).
+- **`removeSubtypeFact` keeps what still holds, rather than mirroring
+  `removeFactType`.** The draft said it should drop a constraint "whose
+  operand it was", as `removeFactType` drops one every role of which was
+  in it, leaving a constraint that names others dangling. A dangling
+  subtype fact id would make a model fail to load after its next save, so
+  the removed id leaves every constraint naming it, and each keeps only
+  what is still true without it: an exclusion narrows; an exclusive-or
+  keeps its exclusion half over the rest; a disjunctive mandatory goes,
+  because "each Person is at least one of Male, Female" without Male is
+  not "each Person is a Female". An exclusion left over one subtype goes
+  too. A first version narrowed every kind, which made a disjunctive
+  mandatory or exclusive-or stronger than the modeller stated; code review
+  caught it. `withoutSubtypeFacts` in `model/Constraint.ts` holds the rule,
+  and the merge reads it too, so a subtype fact the merge leaves out
+  leaves the same constraint a removal by hand does.
+- **The 2.0 writer is lossy beyond the draft's two cases**, for models
+  built in code or by a merge mixing two sides: modality, a stated id, and
+  an exclusive-or beside a disjunctive mandatory over other subtypes,
+  which reloads weaker. `subtypeFlagsFromConstraints` lists every case;
+  the 3.0 serializer ends them.
+- **Validation** adds three rules: too few subtypes (one for a
+  disjunctive mandatory, two for the other kinds), subtype facts of more
+  than one supertype, and a subtype fact id the model does not have. The
+  last is reported from the model graph, as a dangling role is.
+- **Readers.** Diff labels a subtype constraint's operands as the
+  relationships they state ("Male is a Person"), and its
+  `subtypeExclusive` and `subtypeExhaustive` change kinds are gone: the
+  change is a constraint delta now. Merge adds subtype constraints after
+  subtype facts, mapping each id to the merged subtype fact with the same
+  subtype and supertype, and drops one whose subtype facts were not
+  accepted. `constraintsTouchingNone` leaves them out unless none of their
+  subtype facts resolve, so the VS Code tree lists only a dangling one as
+  unattached; its subtype rows still say
+  "exclusive" and "exhaustive", read from the constraints. DDL routing
+  leaves them to the annotation, as it left the flags. The diagram does
+  not draw them, as it never drew the flags (barwise-yeq). Lineage lists
+  each as a source of its supertype and the subtypes it names.
+- **The llm parser writes no flags.** The draft listed
+  `llm/src/parse/subtypes.ts` among the flags' writers; it never set them.
+  Its constraint dedupe now compares subtype operands as well as roles.
 
 ### 5. Corpus, docs, release notes (provisional: not yet grounded)
 

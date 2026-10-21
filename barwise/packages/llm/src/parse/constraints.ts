@@ -9,6 +9,8 @@ import {
   isExternalConstraint,
   type OrmModel,
   type RingType,
+  roleIdsOf,
+  subtypeFactIdsOf,
 } from "@barwise/core";
 import type { ConstraintProvenance, InferredConstraint } from "../ExtractionTypes.js";
 import { resolveRolesByPlayerName, VALID_RING_TYPES } from "./helpers.js";
@@ -452,10 +454,14 @@ function isDuplicateConstraint(
     || candidate.type === "exclusion"
     || candidate.type === "exclusive_or"
   ) {
-    const candidateRoles = [...candidate.roleIds].sort();
+    // The roles the parser builds every one of these over; one over
+    // subtypes names none, so it never matches one over roles.
+    const operand = (c: Constraint) =>
+      [...roleIdsOf(c), ...subtypeFactIdsOf(c).map((id) => `subtype:${id}`)].sort();
+    const candidateRoles = operand(candidate);
     return held.some((existing) => {
       if (existing.type !== candidate.type) return false;
-      const existingRoles = [...(existing as typeof candidate).roleIds].sort();
+      const existingRoles = operand(existing);
       return (
         existingRoles.length === candidateRoles.length
         && existingRoles.every((id, i) => id === candidateRoles[i])

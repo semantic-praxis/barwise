@@ -112,18 +112,37 @@ export interface ValueConstraint extends ConstraintBase {
 // ---------------------------------------------------------------------------
 
 /**
+ * The operand of an exclusion, a disjunctive mandatory or an exclusive-or:
+ * the roles it constrains, or, for a supertype's subtypes, the subtype
+ * facts (orm-format-3, Open decision 2, option a). Exactly one is present,
+ * so a reader of `roleIds` must first ask which it has.
+ */
+export type RoleOrSubtypeOperand =
+  | {
+    /** Role ids (may span fact types). */
+    readonly roleIds: readonly string[];
+    readonly subtypeFactIds?: never;
+  }
+  | {
+    /** Subtype fact ids, all of one supertype. */
+    readonly subtypeFactIds: readonly string[];
+    readonly roleIds?: never;
+  };
+
+/**
  * Disjunctive mandatory constraint.
  *
  * Each instance of the common object type must play at least one of
- * the specified roles. The roles may span multiple fact types.
+ * the specified roles. The roles may span multiple fact types. Over
+ * subtype facts it is totality: each instance of the supertype is an
+ * instance of at least one of the subtypes.
  *
  * Example: "Each Person drives some Car or rides some Bus."
  */
-export interface DisjunctiveMandatoryConstraint extends ConstraintBase {
-  readonly type: "disjunctive_mandatory";
-  /** Two or more role ids (may span fact types). */
-  readonly roleIds: readonly string[];
-}
+export type DisjunctiveMandatoryConstraint =
+  & ConstraintBase
+  & { readonly type: "disjunctive_mandatory"; }
+  & RoleOrSubtypeOperand;
 
 /**
  * Exclusion constraint.
@@ -133,11 +152,10 @@ export interface DisjunctiveMandatoryConstraint extends ConstraintBase {
  *
  * Example: "No Person both drives some Car and rides some Bus."
  */
-export interface ExclusionConstraint extends ConstraintBase {
-  readonly type: "exclusion";
-  /** Two or more role ids (may span fact types). */
-  readonly roleIds: readonly string[];
-}
+export type ExclusionConstraint =
+  & ConstraintBase
+  & { readonly type: "exclusion"; }
+  & RoleOrSubtypeOperand;
 
 /**
  * Exclusive-or constraint.
@@ -147,11 +165,10 @@ export interface ExclusionConstraint extends ConstraintBase {
  *
  * Example: "Each Person either drives some Car or rides some Bus but not both."
  */
-export interface ExclusiveOrConstraint extends ConstraintBase {
-  readonly type: "exclusive_or";
-  /** Two or more role ids (may span fact types). */
-  readonly roleIds: readonly string[];
-}
+export type ExclusiveOrConstraint =
+  & ConstraintBase
+  & { readonly type: "exclusive_or"; }
+  & RoleOrSubtypeOperand;
 
 /**
  * Subset constraint.
@@ -561,11 +578,13 @@ export function roleIdsOf(c: Constraint): string[] {
   switch (c.type) {
     case "internal_uniqueness":
     case "external_uniqueness":
+    case "frequency":
+      return [...c.roleIds];
     case "disjunctive_mandatory":
     case "exclusion":
     case "exclusive_or":
-    case "frequency":
-      return [...c.roleIds];
+      // A subtype operand names no role; `subtypeFactIdsOf` has it.
+      return c.roleIds ? [...c.roleIds] : [];
     case "mandatory":
     case "cardinality":
       return [c.roleId];
@@ -588,6 +607,64 @@ export function roleIdsOf(c: Constraint): string[] {
 /** Role ids a join operand references: both ends of every hop in its path. */
 export function operandRoleIds(o: JoinOperand): string[] {
   return o.path.steps.flatMap((s) => [s.entry, s.exit]);
+}
+
+/**
+ * Every SUBTYPE FACT id a constraint references: the operand of an
+ * exclusion, a disjunctive mandatory or an exclusive-or over a supertype's
+ * subtypes (orm-format-3, Open decision 2). The sibling of `roleIdsOf`,
+ * which returns none for such a constraint: a caller asking which fact
+ * types or elements a constraint touches must ask both, or a subtype
+ * constraint touches nothing.
+ */
+export function subtypeFactIdsOf(c: Constraint): string[] {
+  switch (c.type) {
+    case "disjunctive_mandatory":
+    case "exclusion":
+    case "exclusive_or":
+      return c.subtypeFactIds ? [...c.subtypeFactIds] : [];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Whether a constraint's operand is subtype facts rather than roles. The one
+ * test for it, so every reader agrees on a constraint whose subtype fact
+ * list is empty: it is over subtypes, and validation reports it as too few.
+ */
+export function isOverSubtypes(c: Constraint): boolean {
+  return (c.type === "disjunctive_mandatory" || c.type === "exclusion" || c.type === "exclusive_or")
+    && c.subtypeFactIds !== undefined;
+}
+
+/**
+ * What a constraint over subtypes still says once some of its subtype facts
+ * are gone, or undefined when it says nothing. An exclusion narrows: no
+ * Person is two of the rest still holds. An exclusive-or keeps its
+ * exclusion half over the rest. A disjunctive mandatory goes: "each Person
+ * is at least one of Male, Female" without Male is not "each Person is a
+ * Female", a rule nobody stated, and an exclusive-or's exhaustive half goes
+ * for the same reason. An exclusion left over fewer than two states nothing.
+ * One with none gone is returned as it is.
+ *
+ * `OrmModel.removeSubtypeFact` and the merge both read it, so a subtype
+ * fact removed by hand and one a merge leaves out leave the same rule.
+ */
+export function withoutSubtypeFacts(
+  c: ExternalConstraint,
+  gone: (subtypeFactId: string) => boolean,
+): ExternalConstraint | undefined {
+  const ids = subtypeFactIdsOf(c);
+  if (!ids.some(gone)) return c;
+  const rest = ids.filter((id) => !gone(id));
+  if (c.type === "disjunctive_mandatory" || rest.length < 2) return undefined;
+  return {
+    ...(c.id !== undefined ? { id: c.id } : {}),
+    ...(c.modality !== undefined ? { modality: c.modality } : {}),
+    type: "exclusion",
+    subtypeFactIds: rest,
+  };
 }
 
 /**

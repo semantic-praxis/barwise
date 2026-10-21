@@ -366,11 +366,15 @@ function forDisjunctive(
   dc: DisjunctiveMandatoryConstraint,
   model: OrmModel,
 ): Probe | undefined {
-  const firstId = dc.roleIds[0];
+  // Over subtype facts there is no fact type population to mint into:
+  // subtype membership is not populated in a model (orm-format-3 WS4b).
+  if (!dc.roleIds) return undefined;
+  const roleIds = dc.roleIds;
+  const firstId = roleIds[0];
   if (firstId === undefined) return undefined;
   const first = findRoleById(model, firstId);
   if (!first) return undefined;
-  const anchor = findAnchorRole(model, first.role.playerId, new Set(dc.roleIds));
+  const anchor = findAnchorRole(model, first.role.playerId, new Set(roleIds));
   if (!anchor) return undefined;
 
   const value = mintValueForAll([first, anchor], model, 0);
@@ -378,7 +382,7 @@ function forDisjunctive(
   const reason = `a ${playerName(first.role, model)} that plays none of the `
     + `required roles`;
   const rendered = `${value} appears in ${anchor.ft.name} but plays none of `
-    + `[${dc.roleIds.join(", ")}]`;
+    + `[${roleIds.join(", ")}]`;
   return makeCrossCounterexample(dc, [forbidden], reason, rendered);
 }
 
@@ -427,6 +431,7 @@ function forExclusion(
   ec: ExclusionConstraint,
   model: OrmModel,
 ): Probe | undefined {
+  if (!ec.roleIds) return undefined; // subtype facts: see forDisjunctive
   const built = valueInAllRoles(ec.roleIds, model);
   if (!built) return undefined;
   const reason = `an object that plays more than one of the excluded roles`;
@@ -439,6 +444,7 @@ function forExclusiveOr(
   xor: ExclusiveOrConstraint,
   model: OrmModel,
 ): Probe | undefined {
+  if (!xor.roleIds) return undefined; // subtype facts: see forDisjunctive
   const built = valueInAllRoles(xor.roleIds, model);
   if (!built) return undefined;
   const reason = `an object that plays more than one of the exclusive-or roles`;

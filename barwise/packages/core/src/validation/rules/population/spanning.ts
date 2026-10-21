@@ -26,7 +26,8 @@ const showTuple = (key: string): string => compositeKeyParts(key).join(", ");
 export function checkExclusionViolations(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   for (const c of model.constraints) {
-    if (!isExclusion(c)) continue;
+    // Over subtypes there is no population to check (see checkExclusiveOrViolations).
+    if (!isExclusion(c) || !c.roleIds) continue;
 
     const valuesByRole = c.roleIds.map((rid) => valuesPlayedInRole(model, rid));
     const all = new Set<string>();
@@ -73,7 +74,9 @@ export function checkExclusiveOrViolations(
   const rolePlayer = rolePlayerMap(model);
 
   for (const c of model.constraints) {
-    if (!isExclusiveOr(c)) continue;
+    // Subtype membership is not populated in a model, so an exclusive-or
+    // over subtypes has nothing to check (orm-format-3 WS4b).
+    if (!isExclusiveOr(c) || !c.roleIds) continue;
 
     const playerId = c.roleIds
       .map((rid) => rolePlayer.get(rid))

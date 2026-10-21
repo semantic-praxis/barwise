@@ -8,7 +8,7 @@
  * comparisons, breaking-level classification, and synonym detection live
  * in sibling modules.
  */
-import { roleIdsOf } from "../model/Constraint.js";
+import { roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Population } from "../model/Population.js";
@@ -199,9 +199,9 @@ export function diffModels(
     // first), which is how validation and verbalization name its span; its
     // role labels use the first holder. One lookup serves both, so the two
     // cannot disagree.
-    const [order, own, other] = pair.incoming
-      ? [incomingFirst, holders.incoming, holders.existing]
-      : [existingFirst, holders.existing, holders.incoming];
+    const [order, own, other, ownModel, otherModel] = pair.incoming
+      ? [incomingFirst, holders.incoming, holders.existing, incoming, existing]
+      : [existingFirst, holders.existing, holders.incoming, existing, incoming];
     const roleIds = roleIdsOf(named);
     const holdersOf = (id: string) => own.get(id) ?? other.get(id) ?? [];
     const spanned = new Set(roleIds.flatMap(holdersOf));
@@ -217,10 +217,15 @@ export function diffModels(
       constraintType: named.type,
       // By name, once: a fragment's fact type and the full model's can share it.
       factTypes: [...new Set(order.filter((ft) => spanned.has(ft)).map((ft) => ft.name))],
-      roles: roleIds.map((id) => {
-        const holder = holdersOf(id)[0];
-        return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;
-      }),
+      roles: [
+        ...roleIds.map((id) => {
+          const holder = holdersOf(id)[0];
+          return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;
+        }),
+        // A constraint over subtypes names subtype facts, labelled as the
+        // subtype relationship each states, read like its roles.
+        ...subtypeFactIdsOf(named).map((id) => subtypeFactLabel(id, ownModel, otherModel)),
+      ],
       ...(pair.existing ? { existing: pair.existing } : {}),
       ...(pair.incoming ? { incoming: pair.incoming } : {}),
       changes,
@@ -581,4 +586,15 @@ export function diffModels(
     incoming,
   );
   return { deltas, hasChanges, synonymCandidates };
+}
+
+/** "Male is a Person" for a subtype fact, read against its own model first. */
+function subtypeFactLabel(id: string, own: OrmModel, other: OrmModel): string {
+  for (const model of [own, other]) {
+    const sf = model.getSubtypeFact(id);
+    if (!sf) continue;
+    const name = (ot: string) => model.getObjectType(ot)?.name ?? ot;
+    return `${name(sf.subtypeId)} is a ${name(sf.supertypeId)}`;
+  }
+  return id;
 }

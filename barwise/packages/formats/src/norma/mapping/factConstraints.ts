@@ -99,6 +99,9 @@ export function exclusiveOrToAdd(
   nc: NormaConstraint,
   mapped: ExclusiveOr,
 ): ExternalConstraint | undefined {
+  // A fact type's xor pair is over roles; one over subtypes is mapped
+  // with the subtype facts (`mapSubtypeFacts`), never here.
+  if (!mapped.roleIds) throw new Error("An exclusive-or over subtypes is mapped with them.");
   const id = ids.buildExclusiveOr(nc, mapped.roleIds);
   return id === undefined ? undefined : { ...withModality(nc, mapped), id };
 }

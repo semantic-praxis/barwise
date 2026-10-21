@@ -2,7 +2,10 @@ import {
   type Constraint,
   type ExternalConstraint,
   type InternalConstraint,
+  isOverSubtypes,
   roleIdsOf,
+  subtypeFactIdsOf,
+  withoutSubtypeFacts,
 } from "./Constraint.js";
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
@@ -293,11 +296,17 @@ export class OrmModel {
    * reader that shows constraints by fact type reads these too, or a
    * constraint left dangling by a renamed or deleted role disappears.
    * Both read the one `holdsAny` test, so a constraint is in exactly one
-   * of this and some fact type's view.
+   * of this and some fact type's view. A constraint over subtypes names no
+   * role; it is here only when none of its subtype facts resolve either,
+   * since otherwise it belongs with the subtype facts it names
+   * (orm-format-3 WS4b).
    */
   constraintsTouchingNone(): readonly ExternalConstraint[] {
     const factTypes = this.factTypes;
     return this.constraints.filter((c) => {
+      if (isOverSubtypes(c)) {
+        return !subtypeFactIdsOf(c).some((id) => this._subtypeFacts.has(id));
+      }
       const roleIds = roleIdsOf(c);
       return !factTypes.some((ft) => holdsAny(ft, roleIds));
     });
@@ -520,12 +529,23 @@ export class OrmModel {
     return sf;
   }
 
-  /** Remove a subtype fact from the model. */
+  /**
+   * Remove a subtype fact from the model, and keep of each constraint over
+   * subtypes naming it only what still holds without it
+   * (`withoutSubtypeFacts`). Not left dangling, as `removeFactType` leaves
+   * a constraint's roles: a model holding an id that names nothing does not
+   * load after its next save.
+   */
   removeSubtypeFact(id: string): void {
     if (!this._subtypeFacts.has(id)) {
       throw new Error(`Subtype fact with id "${id}" not found.`);
     }
     this._subtypeFacts.delete(id);
+    for (let i = this._constraints.length - 1; i >= 0; i--) {
+      const kept = withoutSubtypeFacts(this._constraints[i]!, (sf) => sf === id);
+      if (kept === undefined) this._constraints.splice(i, 1);
+      else this._constraints[i] = kept;
+    }
   }
 
   /**

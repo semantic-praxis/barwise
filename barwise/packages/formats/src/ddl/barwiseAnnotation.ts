@@ -13,7 +13,7 @@
  * test over the trial kernels and the examples pins it.
  */
 
-import { type OrmModel, validateReadingTemplate } from "@barwise/core";
+import { type OrmModel, subtypeFlagsFromConstraints, validateReadingTemplate } from "@barwise/core";
 import type { DerivationKind, DerivationRule, DerivationStorage, FactType } from "@barwise/core";
 import type { RelationalSchema, Table } from "@barwise/core/mapping";
 
@@ -153,8 +153,11 @@ export function annotateTable(
   const objectifies = objectifiedFt ? relationshipOf(model, objectifiedFt, table) : undefined;
   // The mapper tags each subtype's foreign key with its subtype fact's id.
   const supertypes: SupertypeLink[] = [];
-  for (const sf of model.subtypeFacts) {
-    if (sf.subtypeId !== entity.id) continue;
+  // v1 states the constraints over subtypes as flags on each link, read
+  // only for a table that has one.
+  const links = model.subtypeFacts.filter((sf) => sf.subtypeId === entity.id);
+  const flags = links.length > 0 ? subtypeFlagsFromConstraints(model.constraints) : undefined;
+  for (const sf of links) {
     const supertype = model.getObjectType(sf.supertypeId);
     const fk = table.foreignKeys.find((f) => f.sourceConstraintId === sf.id);
     if (!supertype || !fk) continue;
@@ -162,8 +165,8 @@ export function annotateTable(
       entity: supertype.name,
       columns: [...fk.columnNames],
       providesIdentification: sf.providesIdentification,
-      isExclusive: sf.isExclusive,
-      isExhaustive: sf.isExhaustive,
+      isExclusive: flags?.get(sf.id)?.exclusive ?? false,
+      isExhaustive: flags?.get(sf.id)?.exhaustive ?? false,
       ...(sf.definingRule ? { definingRule: sf.definingRule } : {}),
     });
   }

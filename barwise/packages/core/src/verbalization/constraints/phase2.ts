@@ -43,6 +43,49 @@ export function verbalizeDisjunctiveMandatory(
 }
 
 /**
+ * A constraint over a supertype's subtypes (orm-format-3, Open decision 2):
+ * "Each Person is at most one of: Male, Female." for an exclusion, "at
+ * least one of" for a disjunctive mandatory (totality) and "exactly one
+ * of" for an exclusive-or (a partition). With one subtype, "Each Person
+ * is a Male." The supertype is the first subtype fact's; a subtype fact
+ * that resolves to nothing is shown by its id.
+ */
+export function verbalizeSubtypeConstraint(
+  kind: "exclusion" | "disjunctive_mandatory" | "exclusive_or",
+  subtypeFactIds: readonly string[],
+  sourceId: string,
+  model: OrmModel,
+): Verbalization {
+  const facts = subtypeFactIds.map((id) => model.getSubtypeFact(id));
+  const supertypeId = facts.find((f) => f !== undefined)?.supertypeId;
+  const supertype = supertypeId === undefined ? undefined : model.getObjectType(supertypeId);
+  const segments: VerbalizationSegment[] = [kwSeg("Each ")];
+  segments.push(
+    supertype ? refSeg(supertype.name, supertype.id) : textSeg("instance of the supertype"),
+  );
+  const subtypes = facts.map((f, i) => {
+    const sub = f ? model.getObjectType(f.subtypeId) : undefined;
+    return sub ? refSeg(sub.name, sub.id) : textSeg(subtypeFactIds[i]!);
+  });
+  if (kind === "disjunctive_mandatory" && subtypes.length === 1) {
+    segments.push(kwSeg(" is a "), subtypes[0]!, textSeg("."));
+    return buildVerbalization(sourceId, "constraint", segments);
+  }
+  const quantity = kind === "exclusion"
+    ? "at most one"
+    : kind === "disjunctive_mandatory"
+    ? "at least one"
+    : "exactly one";
+  segments.push(kwSeg(` is ${quantity} of: `));
+  subtypes.forEach((seg, i) => {
+    if (i > 0) segments.push(textSeg(", "));
+    segments.push(seg);
+  });
+  segments.push(textSeg("."));
+  return buildVerbalization(sourceId, "constraint", segments);
+}
+
+/**
  * "No {Subject} both {pred1} some {Obj1} and {pred2} some {Obj2}."
  */
 export function verbalizeExclusion(

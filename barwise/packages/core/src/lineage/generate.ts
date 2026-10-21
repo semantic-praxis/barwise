@@ -3,7 +3,7 @@
  */
 
 import type { RelationalSchema } from "../mapping/RelationalSchema.js";
-import type { Constraint } from "../model/Constraint.js";
+import { type Constraint, subtypeFactIdsOf } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
@@ -143,6 +143,25 @@ export function generateModelLineage(
 ): readonly LineageEntry[] {
   const entries: LineageEntry[] = [];
 
+  // Each constraint over subtypes, as a source of its supertype and of every
+  // subtype it names, indexed once rather than per entity.
+  const subtypeConstraintSources = new Map<string, SourceReference[]>();
+  for (const c of model.constraints) {
+    const facts = subtypeFactIdsOf(c).flatMap((id) => model.getSubtypeFact(id) ?? []);
+    if (!c.id || facts.length === 0) continue;
+    const supertype = model.getObjectType(facts[0]!.supertypeId)?.name ?? facts[0]!.supertypeId;
+    const source: SourceReference = {
+      elementId: c.id,
+      elementType: "Constraint",
+      elementName: getConstraintName(c, [{ name: `subtypes of ${supertype}` }]),
+    };
+    for (const id of new Set(facts.flatMap((sf) => [sf.subtypeId, sf.supertypeId]))) {
+      const list = subtypeConstraintSources.get(id);
+      if (list) list.push(source);
+      else subtypeConstraintSources.set(id, [source]);
+    }
+  }
+
   for (const entity of model.objectTypes) {
     if (entity.kind !== "entity") continue;
 
@@ -232,6 +251,11 @@ export function generateModelLineage(
         elementName: subtypeFactName(model, sf),
       });
     }
+
+    // The constraints over those subtype facts (orm-format-3 WS4b): the
+    // NORMA writer and the DDL annotation emit them, so impact on one must
+    // find this artifact too.
+    for (const source of subtypeConstraintSources.get(entity.id) ?? []) sources.push(source);
 
     entries.push({
       artifact: entity.name,

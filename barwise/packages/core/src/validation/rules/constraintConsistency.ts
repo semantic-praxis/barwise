@@ -190,6 +190,54 @@ export function constraintConsistencyRules(model: OrmModel): Diagnostic[] {
   return diagnostics;
 }
 
+/**
+ * A constraint over a supertype's subtypes (orm-format-3, Open decision 2):
+ * an exclusion or exclusive-or needs two subtype facts or more, since
+ * exclusion within a one-member group always holds and states nothing;
+ * a disjunctive mandatory needs one, since "every Person is a Male" is a
+ * real rule. Every subtype fact must share one supertype. A subtype fact
+ * id that resolves to nothing is `referenceDiagnostics`', not this rule's.
+ */
+function subtypeOperandConsistency(
+  model: OrmModel,
+  id: string,
+  kind: string,
+  subtypeFactIds: readonly string[],
+  min: number,
+): Diagnostic[] {
+  const facts = subtypeFactIds.flatMap((sf) => model.getSubtypeFact(sf) ?? []);
+  const supertypes = [...new Set(facts.map((sf) => sf.supertypeId))];
+  const nameOf = (ot: string) => model.getObjectType(ot)?.name ?? ot;
+  if (supertypes.length > 1) {
+    return [
+      report(
+        RULE_ID.subtypeConstraintMixedSupertypes,
+        "default",
+        id,
+        kind,
+        supertypes.map(nameOf).join(", "),
+      ),
+    ];
+  }
+  // Distinct subtype facts: one named twice is still one subtype.
+  const count = new Set(subtypeFactIds).size;
+  if (count < min) {
+    const supertype = supertypes[0] === undefined ? "its supertype" : nameOf(supertypes[0]);
+    return [
+      report(
+        RULE_ID.subtypeConstraintTooFewSubtypes,
+        "default",
+        id,
+        kind,
+        supertype,
+        count,
+        min,
+      ),
+    ];
+  }
+  return [];
+}
+
 function externalConsistency(model: OrmModel, constraint: ExternalConstraint): Diagnostic[] {
   const id = constraintElementId(constraint);
   const span = constraintSpan(model, constraint);
@@ -209,16 +257,31 @@ function externalConsistency(model: OrmModel, constraint: ExternalConstraint): D
     }
 
     case "disjunctive_mandatory":
+      if (constraint.subtypeFactIds) {
+        return subtypeOperandConsistency(
+          model,
+          id,
+          "Disjunctive mandatory",
+          constraint.subtypeFactIds,
+          1,
+        );
+      }
       return constraint.roleIds.length < 2
         ? [report(RULE_ID.disjunctiveMandatoryTooFewRoles, "default", id, span)]
         : [];
 
     case "exclusion":
+      if (constraint.subtypeFactIds) {
+        return subtypeOperandConsistency(model, id, "Exclusion", constraint.subtypeFactIds, 2);
+      }
       return constraint.roleIds.length < 2
         ? [report(RULE_ID.exclusionTooFewRoles, "default", id, span)]
         : [];
 
     case "exclusive_or":
+      if (constraint.subtypeFactIds) {
+        return subtypeOperandConsistency(model, id, "Exclusive-or", constraint.subtypeFactIds, 2);
+      }
       return constraint.roleIds.length < 2
         ? [report(RULE_ID.exclusiveOrTooFewRoles, "default", id, span)]
         : [];

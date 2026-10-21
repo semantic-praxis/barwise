@@ -25,6 +25,7 @@ import {
   verbalizeJoinSubset,
   verbalizeRing,
   verbalizeSubset,
+  verbalizeSubtypeConstraint,
   verbalizeValueComparison,
 } from "./constraints/phase2.js";
 import { buildVerbalization, kwSeg, refSeg, textSeg, type Verbalization } from "./Verbalization.js";
@@ -296,11 +297,17 @@ export class ConstraintVerbalizer {
       case "external_uniqueness":
         return verbalizeExternalUniqueness(constraint.roleIds, id, model);
       case "disjunctive_mandatory":
-        return verbalizeDisjunctiveMandatory(constraint.roleIds, id, model);
+        return constraint.subtypeFactIds
+          ? verbalizeSubtypeConstraint(constraint.type, constraint.subtypeFactIds, id, model)
+          : verbalizeDisjunctiveMandatory(constraint.roleIds, id, model);
       case "exclusion":
-        return verbalizeExclusion(constraint.roleIds, id, model);
+        return constraint.subtypeFactIds
+          ? verbalizeSubtypeConstraint(constraint.type, constraint.subtypeFactIds, id, model)
+          : verbalizeExclusion(constraint.roleIds, id, model);
       case "exclusive_or":
-        return verbalizeExclusiveOr(constraint.roleIds, id, model);
+        return constraint.subtypeFactIds
+          ? verbalizeSubtypeConstraint(constraint.type, constraint.subtypeFactIds, id, model)
+          : verbalizeExclusiveOr(constraint.roleIds, id, model);
       case "subset":
         return verbalizeSubset(constraint.subsetRoleIds, constraint.supersetRoleIds, id, model);
       case "equality":

@@ -1,25 +1,22 @@
 /**
  * Phases 4 and 5 of the NORMA mapping: subtype facts and objectification.
  *
- * Subtype partitions (exclusive/exhaustive) are resolved from the
- * exclusion / disjunctive-mandatory constraints NORMA places on the
- * supertype meta-roles; objectified types are linked to their nested
- * fact types once both exist.
+ * The exclusion and disjunctive-mandatory constraints NORMA places on the
+ * supertype meta-roles become constraints over the subtype facts, one for
+ * each; objectified types are linked to their nested fact types once both
+ * exist.
  */
+import type { ExternalConstraint } from "@barwise/core";
 import { derivedNormaElementId, NORMA_ID_TAGS } from "../normaId.js";
-import type { NormaDocument } from "../NormaXmlTypes.js";
+import type { NormaConstraint } from "../NormaXmlTypes.js";
 import { type NormaMappingContext, NormaMappingError } from "./context.js";
 
-/** Create subtype facts with partition properties (phase 4). */
+/** Create subtype facts and the constraints over them (phase 4). */
 export function mapSubtypeFacts(ctx: NormaMappingContext): void {
   const { doc, model, objectTypeIdMap } = ctx;
 
-  // Determine subtype partition properties (exclusive/exhaustive) by
-  // scanning for exclusion and disjunctive mandatory constraints on
-  // SupertypeMetaRoles. These must be resolved before creating SubtypeFacts
-  // because the properties are immutable.
-  const subtypePartition = resolveSubtypePartitions(doc);
-
+  // Each SupertypeMetaRole's subtype fact, as the model ids it.
+  const bySupertypeRole = new Map<string, string>();
   for (const sf of doc.subtypeFacts) {
     const subtypeId = objectTypeIdMap.get(sf.subtypePlayerRef);
     const supertypeId = objectTypeIdMap.get(sf.supertypePlayerRef);
@@ -35,19 +32,17 @@ export function mapSubtypeFacts(ctx: NormaMappingContext): void {
       );
     }
 
-    const partition = subtypePartition.get(sf.supertypeRoleId);
-    model.addSubtypeFact({
+    const added = model.addSubtypeFact({
       // NORMA's own id, as for every other element the importer maps.
       ...(sf.id ? { id: sf.id } : {}),
       subtypeId,
       supertypeId,
       providesIdentification: sf.providesIdentification,
-      isExclusive: partition?.isExclusive,
-      isExhaustive: partition?.isExhaustive,
     });
+    bySupertypeRole.set(sf.supertypeRoleId, added.id);
   }
+  for (const c of subtypeConstraints(ctx, bySupertypeRole)) model.addConstraint(c);
 }
-
 /** Link objectified types to their nested fact types (phase 5). */
 export function mapObjectifiedTypes(ctx: NormaMappingContext): void {
   const { doc, model, objectTypeIdMap, factTypeIdMap } = ctx;
@@ -80,56 +75,66 @@ export function mapObjectifiedTypes(ctx: NormaMappingContext): void {
 }
 
 /**
- * Resolve subtype partition constraints (exclusive/exhaustive) from NORMA's
- * top-level constraint definitions.
+ * The constraints over subtypes NORMA states over supertype meta-roles
+ * (orm-format-3 WS4b), one for each: an ExclusionConstraint whose role
+ * sequences are all meta-roles is an exclusion, and a non-simple, non-implied
+ * MandatoryConstraint over them a disjunctive mandatory. An exclusion and a
+ * mandatory over the same subtypes, with one modality, are one exclusive-or,
+ * as NORMA draws a partition. Each keeps NORMA's modality and, through the
+ * allocator, its id.
  *
- * In NORMA, exclusive subtypes are represented by ExclusionConstraint
- * elements whose role sequences reference SupertypeMetaRoles. Exhaustive
- * subtypes are represented by non-simple, non-implied MandatoryConstraint
- * (disjunctive mandatory) elements referencing the same SupertypeMetaRoles.
- *
- * Returns a map from SupertypeMetaRole id -> { isExclusive, isExhaustive }.
- * Each SubtypeFact's supertypeRoleId can be looked up in this map.
+ * One NORMA constraint is one model constraint. This replaced reading them
+ * as flags on each subtype fact, which merged two exclusions over one
+ * supertype into a single wider one and dropped a deontic modality.
  */
-function resolveSubtypePartitions(
-  doc: NormaDocument,
-): Map<string, { isExclusive: boolean; isExhaustive: boolean; }> {
-  // Build a set of all SupertypeMetaRole ids for fast lookup.
-  const supertypeRoleIds = new Set<string>();
-  for (const sf of doc.subtypeFacts) {
-    supertypeRoleIds.add(sf.supertypeRoleId);
-  }
+function subtypeConstraints(
+  ctx: NormaMappingContext,
+  bySupertypeRole: ReadonlyMap<string, string>,
+): ExternalConstraint[] {
+  const over = (roles: readonly string[]) =>
+    roles.length >= 2 && roles.every((r) => bySupertypeRole.has(r))
+      ? roles.map((r) => bySupertypeRole.get(r)!)
+      : undefined;
+  const modalityOf = (nc: NormaConstraint) =>
+    nc.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
+  const sameSet = (a: readonly string[], b: readonly string[]) =>
+    a.length === b.length && a.every((id) => b.includes(id));
 
-  // Track which SupertypeMetaRoles participate in exclusion constraints.
-  const exclusiveRoles = new Set<string>();
-  for (const nc of doc.constraints) {
-    if (nc.type !== "exclusion") continue;
-    const allRoles = nc.roleSequences.flat();
-    const onSupertype = allRoles.every((r) => supertypeRoleIds.has(r));
-    if (onSupertype && allRoles.length >= 2) {
-      for (const r of allRoles) exclusiveRoles.add(r);
+  const exclusions: { nc: NormaConstraint; ids: string[]; }[] = [];
+  const mandatories: { nc: NormaConstraint; ids: string[]; }[] = [];
+  for (const nc of ctx.doc.constraints) {
+    if (nc.type === "exclusion") {
+      const ids = over(nc.roleSequences.flat());
+      if (ids) exclusions.push({ nc, ids });
+    } else if (nc.type === "mandatory" && !nc.isSimple && !nc.isImplied) {
+      const ids = over(nc.roleRefs);
+      if (ids) mandatories.push({ nc, ids });
     }
   }
 
-  // Track which SupertypeMetaRoles participate in disjunctive mandatory constraints.
-  const exhaustiveRoles = new Set<string>();
-  for (const nc of doc.constraints) {
-    if (nc.type !== "mandatory" || nc.isSimple || nc.isImplied) continue;
-    const onSupertype = nc.roleRefs.every((r) => supertypeRoleIds.has(r));
-    if (onSupertype && nc.roleRefs.length >= 2) {
-      for (const r of nc.roleRefs) exhaustiveRoles.add(r);
-    }
+  const out: ExternalConstraint[] = [];
+  const paired = new Set<NormaConstraint>();
+  for (const ex of exclusions) {
+    const mandatory = mandatories.find((m) =>
+      !paired.has(m.nc) && sameSet(m.ids, ex.ids)
+      && (m.nc.modality === "deontic") === (ex.nc.modality === "deontic")
+    );
+    if (mandatory) paired.add(mandatory.nc);
+    out.push({
+      id: ctx.constraintIds.claim(ex.nc),
+      type: mandatory ? "exclusive_or" : "exclusion",
+      ...modalityOf(ex.nc),
+      subtypeFactIds: ex.ids,
+    });
   }
-
-  // Build the result map.
-  const result = new Map<string, { isExclusive: boolean; isExhaustive: boolean; }>();
-  for (const roleId of supertypeRoleIds) {
-    const isExclusive = exclusiveRoles.has(roleId);
-    const isExhaustive = exhaustiveRoles.has(roleId);
-    if (isExclusive || isExhaustive) {
-      result.set(roleId, { isExclusive, isExhaustive });
-    }
+  for (const m of mandatories) {
+    if (paired.has(m.nc)) continue;
+    out.push({
+      id: ctx.constraintIds.claim(m.nc),
+      type: "disjunctive_mandatory",
+      ...modalityOf(m.nc),
+      subtypeFactIds: m.ids,
+    });
   }
-
-  return result;
+  return out;
 }

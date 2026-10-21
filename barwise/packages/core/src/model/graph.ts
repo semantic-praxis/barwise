@@ -51,6 +51,7 @@ import {
   type InternalConstraint,
   objectTypeIdsOf,
   roleIdsOf,
+  subtypeFactIdsOf,
 } from "./Constraint.js";
 import type { FactType } from "./FactType.js";
 import type { ObjectifiedFactType } from "./ObjectifiedFactType.js";
@@ -73,7 +74,10 @@ import type { SubtypeFact } from "./SubtypeFact.js";
 export interface UnresolvedReference {
   /** The element that carries the dangling reference, resolved. */
   readonly from: ReferenceSource;
-  /** The field that holds it, e.g. "playerId", "roleIds", "factTypeId". */
+  /**
+   * The field that holds it, e.g. "playerId", "roleIds", "subtypeFactIds",
+   * "factTypeId".
+   */
   readonly field: string;
   /** The id that does not resolve. */
   readonly missing: string;
@@ -268,7 +272,7 @@ export function graphOf(model: OrmModel): GraphResult {
     // A join operand's path is rooted at an object type, which is a
     // reference like any other. Enumerated systematically rather than
     // found one at a time: Role.playerId, the constraint role ids,
-    // these path roots, SubtypeFact's two ends, ObjectifiedFactType's
+    // these path roots, the subtype fact ids above, SubtypeFact's two ends, ObjectifiedFactType's
     // two, and Population.factTypeId are every id-shaped field in the
     // metamodel. JoinOperand.projection holds indices, not ids.
     for (const otId of objectTypeIdsOf(c)) {
@@ -278,6 +282,13 @@ export function graphOf(model: OrmModel): GraphResult {
           field: "path.root",
           missing: otId,
         });
+      }
+    }
+    // A constraint over subtypes names subtype facts, not roles
+    // (orm-format-3, Open decision 2); each is a reference like a role id.
+    for (const sfId of subtypeFactIdsOf(c)) {
+      if (!model.getSubtypeFact(sfId)) {
+        unresolved.push({ from: constraintSource(inView), field: "subtypeFactIds", missing: sfId });
       }
     }
     rolesOfConstraint.set(c, resolved);

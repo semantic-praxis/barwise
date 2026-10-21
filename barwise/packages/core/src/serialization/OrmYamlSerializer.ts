@@ -3,6 +3,7 @@ import {
   type ExternalConstraint,
   isExternalConstraint,
   isInternalConstraint,
+  isOverSubtypes,
 } from "../model/Constraint.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { withDerivedIds } from "./derivedId.js";
@@ -13,6 +14,7 @@ import {
   type MigrationPlan,
   planMigration,
 } from "./schemaVersion.js";
+import { subtypeConstraintsFromFlags, subtypeFlagsFromConstraints } from "./subtypeFlags.js";
 import { deserializeDefinition, serializeDefinition } from "./yaml/definition.js";
 import { deserializeDiagramLayout, serializeDiagramLayout } from "./yaml/diagram.js";
 import type { OrmYamlDocument } from "./yaml/document.js";
@@ -205,7 +207,10 @@ export class OrmYamlSerializer {
 
     const subtypeFacts = model.subtypeFacts;
     if (subtypeFacts.length > 0) {
-      doc.model.subtype_facts = subtypeFacts.map((sf) => serializeSubtypeFact(sf));
+      const flags = subtypeFlagsFromConstraints(model.constraints);
+      doc.model.subtype_facts = subtypeFacts.map((sf) =>
+        serializeSubtypeFact(sf, flags.get(sf.id))
+      );
     }
 
     const objectifiedFactTypes = model.objectifiedFactTypes;
@@ -280,6 +285,11 @@ export class OrmYamlSerializer {
         { skipPlayerValidation: options?.lenient },
       );
     }
+    // A 2.0 file states partitions as flags on subtype facts; the model holds
+    // them as constraints over the subtype facts (migration step 3).
+    for (const c of subtypeConstraintsFromFlags(doc.model.subtype_facts ?? [])) {
+      model.addConstraint(c);
+    }
 
     // Add objectified fact types (after object types and fact types).
     for (const oftDoc of doc.model.objectified_fact_types ?? []) {
@@ -327,6 +337,8 @@ export class OrmYamlSerializer {
 function lowerConstraints(model: OrmModel): ReadonlyMap<string, ExternalConstraint[]> {
   const byHost = new Map<string, ExternalConstraint[]>();
   for (const c of model.constraints) {
+    // A constraint over subtypes is written as flags on its subtype facts.
+    if (isOverSubtypes(c)) continue;
     const host = model.factTypesOf(c)[0] ?? model.factTypes[0];
     if (!host) {
       throw new Error(

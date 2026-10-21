@@ -357,14 +357,17 @@ export function modelToGraph(
       case "external_uniqueness":
         addConstraintNode(c, "external_uniqueness", c.roleIds);
         break;
+      // A constraint over subtypes has no roles to attach to. It is not
+      // drawn, as the 2.0 subtype flags it replaces never were; drawing it
+      // across the subtype arrows is barwise-yeq.
       case "exclusion":
-        addConstraintNode(c, "exclusion", c.roleIds);
+        if (c.roleIds) addConstraintNode(c, "exclusion", c.roleIds);
         break;
       case "exclusive_or":
-        addConstraintNode(c, "exclusive_or", c.roleIds);
+        if (c.roleIds) addConstraintNode(c, "exclusive_or", c.roleIds);
         break;
       case "disjunctive_mandatory":
-        addConstraintNode(c, "disjunctive_mandatory", c.roleIds);
+        if (c.roleIds) addConstraintNode(c, "disjunctive_mandatory", c.roleIds);
         break;
       case "subset":
         addConstraintNode(c, "subset", c.subsetRoleIds, c.supersetRoleIds);

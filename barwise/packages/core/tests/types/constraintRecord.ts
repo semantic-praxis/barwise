@@ -19,6 +19,10 @@
  * required, and a join constraint's `operands` a tuple of at least two.
  * Its third narrowing, `ValueConstraintDef.ranges`, is on the object
  * type's value constraint, not on a member of this union.
+ *
+ * Since orm-format-3 WS4b the three kinds that can constrain subtypes take
+ * either roles or subtype facts, exactly one of the two; recorded here in
+ * the commit that changed `src/`.
  */
 
 type ConstraintModality = "alethic" | "deontic";
@@ -47,6 +51,11 @@ interface JoinOperand {
 }
 type Operands = readonly [JoinOperand, JoinOperand, ...JoinOperand[]];
 
+/** Roles or subtype facts, exactly one of the two. */
+type RoleOrSubtypeOperand =
+  | { readonly roleIds: readonly string[]; readonly subtypeFactIds?: never; }
+  | { readonly subtypeFactIds: readonly string[]; readonly roleIds?: never; };
+
 interface Base {
   readonly id: string;
   readonly modality: ConstraintModality;
@@ -67,9 +76,9 @@ export type ConstraintRecord =
     readonly values: readonly string[];
     readonly ranges?: readonly ValueRange[];
   })
-  | (Base & { readonly type: "disjunctive_mandatory"; readonly roleIds: readonly string[]; })
-  | (Base & { readonly type: "exclusion"; readonly roleIds: readonly string[]; })
-  | (Base & { readonly type: "exclusive_or"; readonly roleIds: readonly string[]; })
+  | (Base & { readonly type: "disjunctive_mandatory"; } & RoleOrSubtypeOperand)
+  | (Base & { readonly type: "exclusion"; } & RoleOrSubtypeOperand)
+  | (Base & { readonly type: "exclusive_or"; } & RoleOrSubtypeOperand)
   | (Base & {
     readonly type: "subset";
     readonly subsetRoleIds: readonly string[];

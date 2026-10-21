@@ -26,6 +26,7 @@ import {
   claimValueTypeName,
   type DataTypeDef,
   type FactType,
+  type FlaggedSubtypeFact,
   generateId,
   type ImportFormat,
   type ImportOptions,
@@ -33,6 +34,7 @@ import {
   type InternalConstraint,
   type ObjectType,
   OrmModel,
+  subtypeConstraintsFromFlags,
   type ValueConstraintDef,
 } from "@barwise/core";
 import { parseSqlDataType } from "@barwise/core/sql";
@@ -415,6 +417,9 @@ export class DdlImportFormat implements ImportFormat {
     // table key -> the columns a declared subtype link took, which step 3
     // must not read as a relationship as well.
     const subtypeLinks = new Map<string, Set<string>>();
+    // The v1 annotation's subtype flags, converted to constraints over the
+    // subtype facts once every table's are imported (orm-format-3 WS4b).
+    const flagged: FlaggedSubtypeFact[] = [];
     for (const table of accepted) {
       const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
       const found = annotations.tables.get(tableKey(table.name));
@@ -426,7 +431,15 @@ export class DdlImportFormat implements ImportFormat {
       // list whose every entry no longer matches the DDL falls back to the
       // rule (requirements 4a, 4b).
       if (entity && declared) {
-        const kept = this.importSupertypes(model, entity, table, declared, entityMap, warnings);
+        const kept = this.importSupertypes(
+          model,
+          entity,
+          table,
+          declared,
+          entityMap,
+          flagged,
+          warnings,
+        );
         if (kept.size > 0 || declared.length === 0) {
           subtypeLinks.set(tableKey(table.name), kept.columns);
           if (kept.identifiedByKey) continue;
@@ -465,6 +478,7 @@ export class DdlImportFormat implements ImportFormat {
         : undefined;
       if (binary) binaries.set(columnKey(table.name, table.primaryKey[0]!), binary);
     }
+    for (const c of subtypeConstraintsFromFlags(flagged)) model.addConstraint(c);
 
     // Step 3: Create value types and fact types for the other columns
     for (const table of accepted) {
@@ -913,6 +927,7 @@ export class DdlImportFormat implements ImportFormat {
     table: ParsedTable,
     declared: readonly SupertypeLink[],
     entityMap: ReadonlyMap<string, string>,
+    flagged: FlaggedSubtypeFact[],
     warnings: string[],
   ): { size: number; columns: Set<string>; identifiedByKey: boolean; } {
     const columns = new Set<string>();
@@ -948,13 +963,17 @@ export class DdlImportFormat implements ImportFormat {
         );
         continue;
       }
-      model.addSubtypeFact({
+      const sf = model.addSubtypeFact({
         subtypeId: entity.id,
         supertypeId: supertype.id,
         providesIdentification: link.providesIdentification,
-        isExclusive: link.isExclusive,
-        isExhaustive: link.isExhaustive,
         ...(link.definingRule ? { definingRule: link.definingRule } : {}),
+      });
+      flagged.push({
+        id: sf.id,
+        supertype: supertype.id,
+        is_exclusive: link.isExclusive,
+        is_exhaustive: link.isExhaustive,
       });
       size++;
       for (const c of link.columns) columns.add(c.toLowerCase());

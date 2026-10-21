@@ -15,7 +15,15 @@ export interface OrmYamlSubtypeFact {
   defining_rule?: OrmYamlDerivation;
 }
 
-export function serializeSubtypeFact(sf: SubtypeFact): OrmYamlSubtypeFact {
+/**
+ * A subtype fact as 2.0 writes it. `flags` are what the model's constraints
+ * over subtypes say about it (`subtypeFlagsFromConstraints`): 2.0 states
+ * them on the subtype fact, the model as constraints.
+ */
+export function serializeSubtypeFact(
+  sf: SubtypeFact,
+  flags?: { readonly exclusive: boolean; readonly exhaustive: boolean; },
+): OrmYamlSubtypeFact {
   const result: OrmYamlSubtypeFact = {
     id: sf.id,
     subtype: sf.subtypeId,
@@ -24,10 +32,10 @@ export function serializeSubtypeFact(sf: SubtypeFact): OrmYamlSubtypeFact {
   if (!sf.providesIdentification) {
     result.provides_identification = false;
   }
-  if (sf.isExclusive) {
+  if (flags?.exclusive) {
     result.is_exclusive = true;
   }
-  if (sf.isExhaustive) {
+  if (flags?.exhaustive) {
     result.is_exhaustive = true;
   }
   if (sf.definingRule) {
@@ -42,8 +50,6 @@ export function deserializeSubtypeFact(sfDoc: OrmYamlSubtypeFact): SubtypeFactCo
     subtypeId: sfDoc.subtype,
     supertypeId: sfDoc.supertype,
     providesIdentification: sfDoc.provides_identification ?? true,
-    isExclusive: sfDoc.is_exclusive ?? false,
-    isExhaustive: sfDoc.is_exhaustive ?? false,
     definingRule: sfDoc.defining_rule
       ? deserializeDerivation(sfDoc.defining_rule)
       : undefined,

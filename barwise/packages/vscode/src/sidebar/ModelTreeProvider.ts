@@ -22,6 +22,8 @@ import {
   preferredIdentifiers,
   roleIdsOf,
   type SubtypeFact,
+  subtypeFactIdsOf,
+  subtypeFlagsFromConstraints,
   type ValueType,
 } from "@barwise/core";
 import * as vscode from "vscode";
@@ -204,18 +206,19 @@ export function buildTree(model: OrmModel): ModelTreeItem[] {
       iconId: "warning",
       children: unattached.map((c) => ({
         ...externalConstraintItem(c),
-        description: [...new Set(roleIdsOf(c))].join(", "),
+        description: [...new Set([...roleIdsOf(c), ...subtypeFactIdsOf(c)])].join(", "),
       })),
     });
   }
 
-  // Subtype facts
+  // Subtype facts, each with what the constraints over subtypes say of it.
   if (model.subtypeFacts.length > 0) {
+    const partitions = subtypeFlagsFromConstraints(model.constraints);
     categories.push({
       kind: "category",
       label: "Subtype Relationships",
       iconId: "type-hierarchy",
-      children: model.subtypeFacts.map((sf) => subtypeItem(sf, model)).sort((a, b) =>
+      children: model.subtypeFacts.map((sf) => subtypeItem(sf, model, partitions)).sort((a, b) =>
         a.label.localeCompare(b.label)
       ),
     });
@@ -344,15 +347,21 @@ function externalConstraintItem(c: ExternalConstraint): ModelTreeItem {
   return { kind: "constraint", label: `Constraint: ${c.type}` };
 }
 
-function subtypeItem(sf: SubtypeFact, model: OrmModel): ModelTreeItem {
+function subtypeItem(
+  sf: SubtypeFact,
+  model: OrmModel,
+  partitions: ReturnType<typeof subtypeFlagsFromConstraints>,
+): ModelTreeItem {
   const sub = model.getObjectType(sf.subtypeId);
   const sup = model.getObjectType(sf.supertypeId);
   const subName = sub?.name ?? sf.subtypeId;
   const supName = sup?.name ?? sf.supertypeId;
   const flags: string[] = [];
   if (sf.providesIdentification) flags.push("identifies");
-  if (sf.isExclusive) flags.push("exclusive");
-  if (sf.isExhaustive) flags.push("exhaustive");
+  // What the constraints over this supertype's subtypes say of this one.
+  const partition = partitions.get(sf.id);
+  if (partition?.exclusive) flags.push("exclusive");
+  if (partition?.exhaustive) flags.push("exhaustive");
   return {
     kind: "subtype_fact",
     label: `${subName} is a ${supName}`,

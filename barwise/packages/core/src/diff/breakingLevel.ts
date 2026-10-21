@@ -65,12 +65,10 @@ const CHANGE_LEVEL = {
   constraintsModified: "caution",
   derivation: "caution",
 
-  // A subtype fact's own fields. `isExclusive` and `isExhaustive` state
-  // which populations the model admits; a defining rule decides what a
-  // derived subtype contains. Neither changes the shape a consumer
-  // binds to.
-  subtypeExclusive: "caution",
-  subtypeExhaustive: "caution",
+  // A subtype fact's own fields. A defining rule decides what a derived
+  // subtype contains, which does not change the shape a consumer binds to.
+  // Whether subtypes are exclusive or exhaustive is a constraint over
+  // them, diffed as one (orm-format-3 WS4b).
   definingRule: "caution",
 
   // `providesIdentification` is the exception, and it is breaking
