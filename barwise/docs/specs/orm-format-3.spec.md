@@ -1285,7 +1285,9 @@ Implementation notes (2026-10-21, WS3c-ii):
     which was in the removed fact type. One that also spans another stays,
     its roles there dangling, so validation reports it; before, one went
     when nested there whatever else it spanned, and one nested elsewhere
-    stayed.
+    stayed. A merge differs on purpose: there the removal is a reviewed
+    decision, and a constraint left dangling would fail the merged model,
+    so it is left out, as above.
   - The 2.0 save writes each under the first fact type, in model order,
     holding one of its roles, after that fact type's own constraints. One
     none of whose roles is in a fact type goes under the first fact type:

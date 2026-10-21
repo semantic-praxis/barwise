@@ -37,6 +37,7 @@ import { hashModel } from "../../src/lineage/manifest.js";
 import { CONSTRAINT_TYPES } from "../../src/model/Constraint.js";
 import { toFactTypeConfig } from "../../src/model/FactType.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
+import { canonicalJson } from "../../src/serialization/derivedId.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { structuralRules } from "../../src/validation/rules/structural.js";
 import { arbOrmModel, RUNS, SEED } from "../arbitraries/model.js";
@@ -99,7 +100,7 @@ describe("law: serialization is lossless", () => {
         // holds since the model stores them (orm-format-3 WS3c). By id: the
         // 2.0 save groups them under their first holders, so the order can
         // change and the content may not.
-        const byId = (m: OrmModel) => [...m.constraints].sort((a, b) => a.id!.localeCompare(b.id!));
+        const byId = (m: OrmModel) => m.constraints.map((c) => canonicalJson(c)).sort();
         expect(byId(restored)).toEqual(byId(model));
       }),
       { seed: SEED, numRuns: RUNS },

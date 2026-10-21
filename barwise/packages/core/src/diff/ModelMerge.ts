@@ -27,7 +27,7 @@ import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
-import { isDanglingFactType, isDanglingPlayer, roleHolders } from "./elementDiff.js";
+import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
 import type {
   ConstraintDelta,
   DefinitionDelta,
@@ -199,8 +199,9 @@ export function mergeModels(
     .map((d, i) => [d, i] as const)
     .filter(([d]) => d.elementType === "constraint") as [ConstraintDelta, number][];
 
-  const mergedRoles = roleHolders(merged);
-  const sourceRoles = new Set([...roleHolders(existing).keys(), ...roleHolders(incoming).keys()]);
+  const roleIds = (m: OrmModel) => m.factTypes.flatMap((ft) => ft.roles.map((r) => r.id));
+  const mergedRoles = new Set(roleIds(merged));
+  const sourceRoles = new Set([...roleIds(existing), ...roleIds(incoming)]);
   for (const [delta, idx] of constraintDeltas) {
     const isAccepted = accepted.has(idx);
     // In order of preference: an accepted modification whose incoming

@@ -454,9 +454,13 @@ export class OrmModel {
     // dangling, so validation reports it rather than a rule over the fact
     // types still present disappearing without a word; it used to go only
     // when a 2.0 file nested it here.
-    for (const c of this._constraints.filter((c) => roleIdsOf(c).every((r) => ft.hasRole(r)))) {
-      this.removeConstraint(c);
-    }
+    // (A merge drops one it would leave dangling: there the removal is a
+    // reviewed decision, and a dangling role would fail the merged model.)
+    const within = (c: ExternalConstraint) => {
+      const roles = roleIdsOf(c);
+      return roles.length > 0 && roles.every((r) => ft.hasRole(r));
+    };
+    for (const c of this._constraints.filter(within)) this.removeConstraint(c);
     this.pruneDiagramReferences(id);
   }
 

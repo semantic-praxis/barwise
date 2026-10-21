@@ -109,6 +109,16 @@ describe("the constraint delta", () => {
     ]);
   });
 
+  it("reads a fragment's constraint against the full model it is diffed with", () => {
+    // The fragment holds the constraint and no fact type; the roles it
+    // names are the full model's.
+    const fragment = new OrmModel({ name: "Rooms" });
+    fragment.addConstraint(key());
+    const [d] = only(rooms([]), fragment);
+    expect(d.factTypes).toEqual(["Room is in Building", "Room has RoomNumber"]);
+    expect(d.roles).toEqual(["Room is in Building (for)", "Room has RoomNumber (for)"]);
+  });
+
   it("is unchanged when only the role ids differ, as an import mints them", () => {
     const [d] = only(rooms([key()]), rooms([key(["m-b", "m-n"], "other")], "m"));
     expect(d.kind).toBe("unchanged");

@@ -577,17 +577,17 @@
       "caught_by": "reasoning",
       "note": "Code review on PR #684 found the unheld-fact-type path in constraintsTouching wrong three ways across two rounds; it was dropped rather than patched again."
     },
-    "orm-format-3::5a42fe5d28c9": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "- 3c-ii, storage. - ormmodel stores the constraints across fact types, in the order added, and ormmodel.addconstraint fills a missing id. facttype holds only it",
-      "caught_by": "execution",
-      "note": "Departures from the draft: a runtime probe (FactType throwing on external kinds) failed about 380 tests in ten packages, so the writers moved to 3c-iii behind a forward; merge leaves out a constraint whose fact type the merge took, silently as populations are; and the 2.0 save keeps a constraint with no holder under the first fact type rather than refusing it, which code review on the PR showed would fail merge and import saves."
-    },
     "orm-format-3::5f6ecfc2e469": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
       "caught_by": "reasoning",
       "note": "The first 3b-iv note said a single draft could not put a duplicate under another fact type; /code-review on #699 showed an equality stated from each side does, and the equality check was made symmetric."
+    },
+    "orm-format-3::6c003f30f5e7": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- 3c-ii, storage. - ormmodel stores the constraints across fact types, in the order added, and ormmodel.addconstraint fills a missing id. facttype holds only it",
+      "caught_by": "execution",
+      "note": "Departures from the draft: a runtime probe (FactType throwing on external kinds) failed about 380 tests in ten packages, so the writers moved to 3c-iii behind a forward; merge leaves out a constraint whose fact type the merge took, silently as populations are; and the 2.0 save keeps a constraint with no holder under the first fact type rather than refusing it, which code review on the PR showed would fail merge and import saves."
     },
     "orm-format-3::83e024eb5943": {
       "spec": "orm-format-3.spec.md",

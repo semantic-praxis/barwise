@@ -96,6 +96,13 @@ describe("constraints across fact types on the model", () => {
     model.removeFactType("ft-in");
     expect(model.constraints.map((c) => c.id)).toEqual(["c-key"]);
   });
+
+  it("keeps one with no roles, which touches no fact type to be removed with", () => {
+    const model = rooms();
+    model.addConstraint({ id: "c-empty", type: "exclusion", roleIds: [] });
+    model.removeFactType("ft-in");
+    expect(model.constraints.map((c) => c.id)).toEqual(["c-empty"]);
+  });
 });
 
 describe("a 2.0 save of constraints across fact types", () => {

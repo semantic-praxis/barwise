@@ -189,7 +189,14 @@ export function diffModels(
       ? "modified"
       : "unchanged";
     const named = pair.incoming ?? pair.existing!;
-    const model = pair.incoming ? incoming : existing;
+    // Its fact types and roles are read against its own model, then the
+    // other, as its key is: a lenient fragment can name a role only the
+    // full model holds.
+    const [own, other] = pair.incoming
+      ? [holders.incoming, holders.existing]
+      : [holders.existing, holders.incoming];
+    const holderOf = (id: string) => own.get(id)?.[0] ?? other.get(id)?.[0];
+    const roleIds = roleIdsOf(named);
     const changes = pair.modified && pair.existing && pair.incoming
       ? [{
         change: "constraintsModified" as const,
@@ -200,14 +207,9 @@ export function diffModels(
       kind,
       elementType: "constraint",
       constraintType: named.type,
-      factTypes: model.factTypesOf(named).map((ft) => ft.name),
-      // Resolved against its own model, then the other, as its key is: a
-      // lenient fragment can name a role only the full model holds.
-      roles: roleIdsOf(named).map((id) => {
-        const [own, other] = pair.incoming
-          ? [holders.incoming, holders.existing]
-          : [holders.existing, holders.incoming];
-        const holder = own.get(id)?.[0] ?? other.get(id)?.[0];
+      factTypes: [...new Set(roleIds.flatMap((id) => holderOf(id)?.name ?? []))],
+      roles: roleIds.map((id) => {
+        const holder = holderOf(id);
         return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;
       }),
       ...(pair.existing ? { existing: pair.existing } : {}),
