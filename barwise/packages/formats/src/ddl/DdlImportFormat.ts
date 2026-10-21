@@ -545,10 +545,10 @@ export class DdlImportFormat implements ImportFormat {
       }
 
       // Step 3b: a combination of columns that is unique is an external
-      // uniqueness over their binaries' other roles, stored on the first
-      // column's fact type as the kernels store it -- the shape the export
-      // writes a multi-column UNIQUE from (ddl-round-trip-fixed-point
-      // spec, workstream 6).
+      // uniqueness over their binaries' other roles, stored on the model,
+      // where every constraint across fact types lives (orm-format-3 WS3c);
+      // the export writes a multi-column UNIQUE from it
+      // (ddl-round-trip-fixed-point spec, workstream 6).
       // A column of the relationship the table objectifies stands for that
       // relationship's role; the columns of a composite foreign key all
       // stand for one role, so a combination naming only some of them

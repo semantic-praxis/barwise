@@ -167,7 +167,10 @@ export function parseConstraints(
       || ic.type === "exclusion"
       || ic.type === "exclusive_or"
     ) {
-      // Multi-role constraints within a single fact type.
+      // Multi-role constraints, stored on the model as every constraint
+      // across fact types is (orm-format-3 WS3c). The roles still resolve
+      // within the one fact type the draft names, so one spanning two is
+      // not yet reachable from a draft.
       // All four share the same structure: { type, roleIds }.
       const roleIds = resolveRolesByPlayerName(ft, ic.roles, model, warnings, ic.description);
       if (roleIds.length === 0) {

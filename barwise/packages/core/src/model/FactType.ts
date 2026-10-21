@@ -1,5 +1,10 @@
 import type { Complete } from "../util/complete.js";
-import { type Constraint, type InternalConstraint, isInternalConstraint } from "./Constraint.js";
+import {
+  type Constraint,
+  type InternalConstraint,
+  isExternalConstraint,
+  isInternalConstraint,
+} from "./Constraint.js";
 import { generateId } from "./id.js";
 import { ModelElement } from "./ModelElement.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
@@ -186,10 +191,17 @@ export class FactType extends ModelElement {
    */
   addConstraint(constraint: InternalConstraint): void {
     const c = constraint as Constraint;
+    if (isExternalConstraint(c)) {
+      throw new Error(
+        `A ${c.type} constraint spans fact types, so it lives in the model, `
+          + `not in fact type "${this.name}": add it with OrmModel.addConstraint.`,
+      );
+    }
     if (!isInternalConstraint(c)) {
       throw new Error(
-        `A ${c.type} constraint spans fact types and lives in a model; `
-          + `add it to fact type "${this.name}"'s model with OrmModel.addConstraint.`,
+        `Fact type "${this.name}" has no constraint kind "${
+          String((constraint as { type?: unknown; }).type)
+        }".`,
       );
     }
     this._constraints.push(withId(c));

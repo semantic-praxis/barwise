@@ -196,8 +196,8 @@ export class OrmModel {
   /**
    * The constraints that live in the model: the external kinds, whose roles
    * may span fact types (orm-format-3, placement by kind), in the order they
-   * were added. A 2.0 file's are added as its fact types load, so they keep
-   * file order: by the fact type nesting each, then by position.
+   * were added. The 2.0 loader adds a file's after every fact type, in file
+   * order: by the fact type nesting each, then by position.
    */
   get constraints(): readonly ExternalConstraint[] {
     return this._constraints;
