@@ -29,6 +29,7 @@ function composite(model: OrmModel) {
     || f.roles.some((r) => objectifiers.has(r.playerId))
   );
   const playerOf = new Map(facts.flatMap((f) => f.roles.map((r) => [r.id, name(r.playerId)])));
+  const anyRole = new Set(model.factTypes.flatMap((f) => f.roles.map((r) => r.id)));
   const sorted = <T>(xs: T[]) =>
     xs.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   return {
@@ -45,9 +46,9 @@ function composite(model: OrmModel) {
     externalUniques: sorted(
       model.constraints.filter((c) =>
         c.type === "external_uniqueness"
-        // Over a composite fact type, or over roles that resolve nowhere,
-        // which shows as "?" rather than dropping out of the comparison.
-        && (c.roleIds.some((id) => playerOf.has(id)) || model.constraintsTouchingNone().includes(c))
+        // Over a role of the fact types compared above, or over a role that
+        // resolves nowhere, which shows as "?" rather than dropping out.
+        && c.roleIds.some((id) => playerOf.has(id) || !anyRole.has(id))
       )
         .map((c) => c.roleIds.map((id) => playerOf.get(id) ?? "?").sort()),
     ),
