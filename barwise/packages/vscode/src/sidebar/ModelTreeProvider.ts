@@ -281,9 +281,11 @@ function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
  */
 function constraintItem(inView: ConstraintInView): ModelTreeItem {
   const [c, ft] = inView;
-  if (isInternalUniqueness(c)) {
+  // Each internal branch also checks `ft`: narrowing `c` does not narrow
+  // the destructured fact type, and the pair guarantees it is there.
+  if (ft && isInternalUniqueness(c)) {
     const roleNames = c.roleIds
-      .map((rid) => ft!.roles.find((r) => r.id === rid)?.name)
+      .map((rid) => ft.roles.find((r) => r.id === rid)?.name)
       .filter(Boolean);
     const preferred = c.isPreferred ? " (preferred)" : "";
     return {
@@ -291,8 +293,8 @@ function constraintItem(inView: ConstraintInView): ModelTreeItem {
       label: `Uniqueness: ${roleNames.join(", ")}${preferred}`,
     };
   }
-  if (isMandatoryRole(c)) {
-    const role = ft!.roles.find((r) => r.id === c.roleId);
+  if (ft && isMandatoryRole(c)) {
+    const role = ft.roles.find((r) => r.id === c.roleId);
     return {
       kind: "constraint",
       label: `Mandatory: ${role?.name ?? c.roleId}`,

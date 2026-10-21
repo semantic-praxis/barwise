@@ -272,7 +272,7 @@ export class OrmModel {
    * the two cannot drift.
    */
   constraintsTouchingNone(): readonly ExternalConstraint[] {
-    return this.constraints.filter((c) => !roleIdsOf(c).some((rid) => this.findRole(rid)));
+    return this.constraints.filter((c) => this.factTypesOf(c).length === 0);
   }
 
   /**
