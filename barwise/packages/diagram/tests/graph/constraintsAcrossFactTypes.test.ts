@@ -5,7 +5,7 @@
  * node's id, not its edges, and not whether it is drawn, which it used to
  * when that fact type was a reference mode absorbed into its entity.
  */
-import type { Constraint } from "@barwise/core";
+import type { Constraint, OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { modelToGraph } from "../../src/graph/ModelToGraph.js";
 import { rooms } from "../fixtures/rooms.js";
@@ -96,10 +96,10 @@ describe("constraint nodes across fact types", () => {
     expect(ids).toEqual(["c-key", "c-key#2"]);
   });
 
-  it("does not take the id of an internal constraint", () => {
+  it("keeps an id an internal constraint shares, since a badge has no node id", () => {
     const samePref: Constraint = { id: "c-pref", type: "exclusion", roleIds: ["r-b", "r-n"] };
     const ids = constraintPart(rooms("ft-in", [samePref])).nodes.map((n) => n.id).sort();
-    expect(ids).toEqual(["c-key", "c-pref#2"]);
+    expect(ids).toEqual(["c-key", "c-pref"]);
   });
 
   it("never issues a node id another node holds, and leaves a unique stated id to its owner", () => {
