@@ -1,9 +1,11 @@
 import {
   absorbedReferenceModes,
+  type Constraint,
   type OrmModel,
   pureObjectifyingEntityIds,
   referenceModeOf,
   type RingType,
+  roleIdsOf,
 } from "@barwise/core";
 import type {
   ConstraintEdge,
@@ -21,25 +23,13 @@ import type {
 /**
  * Constraint kinds deliberately not drawn as dedicated constraint
  * nodes, each with the reason. A new Constraint member must be added
- * either to the drawn cases in the constraint-node switch or here --
- * the switch's default indexes this record over the external kinds it
- * does not draw, so leaving one out of both is a compile error. The
- * internal kinds never reach the switch, which walks `model.constraints`;
- * they stay listed to say where each is drawn instead.
+ * either to the drawn cases in the constraint-node switch or here: the
+ * record is total over every kind that is not a drawn `ConstraintKind`,
+ * internal kinds included, so leaving one out of both is a compile error.
+ * The internal kinds never reach the switch, which walks
+ * `model.constraints`; their entries say where each is drawn instead.
  */
-const NOT_DRAWN: Record<
-  | "internal_uniqueness"
-  | "mandatory"
-  | "value_constraint"
-  | "frequency"
-  | "ring"
-  | "value_comparison"
-  | "cardinality"
-  | "join_subset"
-  | "join_equality"
-  | "join_exclusion",
-  string
-> = {
+const NOT_DRAWN: Record<Exclude<Constraint["type"], ConstraintKind>, string> = {
   internal_uniqueness: "Phase 1: rendered inline as a uniqueness bar on the fact type",
   mandatory: "Phase 1: rendered inline as a mandatory dot on the role connector",
   value_constraint: "Phase 1: rendered inline on the object type",
@@ -145,11 +135,13 @@ export function modelToGraph(
   for (const ft of model.factTypes) {
     if (absorbedFactTypeIds.has(ft.id)) continue;
     if (filter && !filter.factTypeIds.has(ft.id)) continue;
+    // The badges read the kinds that live in the fact type, once.
+    const internal = ft.internalConstraints;
     // Determine which roles have single-role internal uniqueness.
     const singleRoleUniqueIds = new Set<string>();
     let hasSpanning = false;
 
-    for (const c of ft.internalConstraints) {
+    for (const c of internal) {
       if (c.type === "internal_uniqueness") {
         if (c.roleIds.length === 1 && c.roleIds[0]) {
           singleRoleUniqueIds.add(c.roleIds[0]);
@@ -161,7 +153,7 @@ export function modelToGraph(
 
     // Determine which roles are mandatory.
     const mandatoryRoleIds = new Set<string>();
-    for (const c of ft.internalConstraints) {
+    for (const c of internal) {
       if (c.type === "mandatory") {
         mandatoryRoleIds.add(c.roleId);
       }
@@ -169,7 +161,7 @@ export function modelToGraph(
 
     // Collect frequency constraints per role.
     const frequencyByRole = new Map<string, { min: number; max: number | "unbounded"; }>();
-    for (const c of ft.internalConstraints) {
+    for (const c of internal) {
       // Single-role frequency renders as a per-role badge; a multi-role
       // (role-sequence) frequency has no single-role anchor and is skipped.
       if (c.type === "frequency" && c.roleIds.length === 1) {
@@ -179,7 +171,7 @@ export function modelToGraph(
 
     // Detect ring constraint (at most one per fact type).
     let ringConstraint: FactTypeNode["ringConstraint"];
-    for (const c of ft.internalConstraints) {
+    for (const c of internal) {
       if (c.type === "ring") {
         ringConstraint = {
           label: RING_TYPE_LABELS[c.ringType],
@@ -231,6 +223,11 @@ export function modelToGraph(
     }
   }
 
+  // The fact types that got a node: a constraint attaches only to these.
+  const drawnFactTypeIds = new Set(
+    nodes.filter((n) => n.kind === "fact_type").map((n) => n.id),
+  );
+
   // Build role-to-fact-type lookup for constraint edge routing.
   const roleToFactType = new Map<string, string>();
   for (const ft of model.factTypes) {
@@ -268,7 +265,7 @@ export function modelToGraph(
       : roleIds;
     for (const roleId of allRoleIds) {
       const factTypeId = roleToFactType.get(roleId);
-      if (factTypeId) {
+      if (factTypeId && drawnFactTypeIds.has(factTypeId)) {
         constraintEdges.push({
           constraintNodeId: constraintId,
           factTypeNodeId: factTypeId,
@@ -278,17 +275,28 @@ export function modelToGraph(
     }
   }
 
-  // Every constraint across fact types, once, unless every fact type it
-  // touches is absorbed into a reference mode and so has no node to attach
-  // to. The fact type a 2.0 file nests it under decides nothing: it used to
-  // decide whether the constraint was drawn at all.
+  // Every constraint across fact types that touches a fact type with a
+  // node, once. One absorbed into a reference mode, filtered out of a
+  // neighbourhood view, or left dangling by a deleted role has nothing to
+  // attach to, so it is not drawn as a floating node, and its edges go to
+  // drawn fact types only. The fact type a 2.0 file nests it under decides
+  // nothing: it used to decide whether the constraint was drawn at all.
+  const usedIds = new Map<string, number>();
+  let unnamed = 0;
   for (const c of model.constraints) {
-    const touched = model.factTypesOf(c);
-    if (touched.length > 0 && touched.every((ft) => absorbedFactTypeIds.has(ft.id))) continue;
-    // Every constraint in a model has an id (barwise-nkq); the type stays
-    // optional until WS3c, and a node without one could not be named.
-    if (c.id === undefined) throw new Error(`A ${c.type} constraint in the model has no id.`);
-    const id = c.id;
+    const drawn = roleIdsOf(c).some((rid) => {
+      const ftId = roleToFactType.get(rid);
+      return ftId !== undefined && drawnFactTypeIds.has(ftId);
+    });
+    if (!drawn) continue;
+    // The constraint's own id names its node. Two constraints sharing one
+    // (barwise-b2s) would collapse into one node, so a repeat is
+    // suffixed; one without an id, which construction rules out
+    // (barwise-nkq) though the type allows it until WS3c, is numbered.
+    const base = c.id ?? `constraint-${unnamed++}`;
+    const seen = usedIds.get(base) ?? 0;
+    usedIds.set(base, seen + 1);
+    const id = seen === 0 ? base : `${base}#${seen + 1}`;
     switch (c.type) {
       case "external_uniqueness":
         addConstraintNode(id, "external_uniqueness", c.roleIds);

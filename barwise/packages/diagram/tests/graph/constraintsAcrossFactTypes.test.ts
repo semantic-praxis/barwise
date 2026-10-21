@@ -65,8 +65,8 @@ function rooms(host: Host, extra: Constraint[] = []): OrmModel {
 }
 
 /** The constraint nodes and their edges, which is all a constraint draws. */
-function constraintPart(model: OrmModel) {
-  const graph = modelToGraph(model);
+function constraintPart(model: OrmModel, options?: Parameters<typeof modelToGraph>[1]) {
+  const graph = modelToGraph(model, options);
   return {
     nodes: graph.nodes.filter((n) => n.kind === "constraint"),
     edges: graph.constraintEdges,
@@ -113,9 +113,41 @@ describe("constraint nodes across fact types", () => {
       type: "exclusion",
       roleIds: ["r-room-id", "r-room-in"],
     };
-    const ids = constraintPart(rooms("ft-in", [halfAbsorbed])).nodes.map((n) => n.id);
+    const part = constraintPart(rooms("ft-in", [halfAbsorbed]));
     // Order-free: node order is file order, which 3c makes model order.
-    expect(ids.sort()).toEqual(["c-half", "c-key"]);
+    expect(part.nodes.map((n) => n.id).sort()).toEqual(["c-half", "c-key"]);
+    // Its edges go to drawn fact types only: none to the absorbed one.
+    expect(part.edges.filter((e) => e.constraintNodeId === "c-half")).toEqual([
+      { constraintNodeId: "c-half", factTypeNodeId: "ft-in", roleId: "r-room-in" },
+    ]);
+  });
+
+  it("does not draw one whose roles resolve to nothing", () => {
+    const dangling: Constraint = { id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] };
+    expect(constraintPart(rooms("ft-in", [dangling])).nodes.map((n) => n.id)).toEqual(["c-key"]);
+  });
+
+  it("does not draw one whose fact types a neighbourhood view leaves out", () => {
+    const filter = {
+      objectTypeIds: new Set(["ot-room", "ot-rid"]),
+      factTypeIds: new Set(["ft-id"]),
+      subtypeFactIds: new Set<string>(),
+    };
+    expect(constraintPart(rooms("ft-in"), { includeFilter: filter })).toEqual({
+      nodes: [],
+      edges: [],
+    });
+    // With one of its two fact types in view, it is drawn with that edge.
+    const partial = { ...filter, factTypeIds: new Set(["ft-in"]) };
+    expect(constraintPart(rooms("ft-in"), { includeFilter: partial }).edges).toEqual([
+      { constraintNodeId: "c-key", factTypeNodeId: "ft-in", roleId: "r-b" },
+    ]);
+  });
+
+  it("keeps two constraints that share an id apart (barwise-b2s)", () => {
+    const twin: Constraint = { id: "c-key", type: "exclusion", roleIds: ["r-b", "r-n"] };
+    const ids = constraintPart(rooms("ft-in", [twin])).nodes.map((n) => n.id).sort();
+    expect(ids).toEqual(["c-key", "c-key#2"]);
   });
 });
 

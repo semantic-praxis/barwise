@@ -1151,16 +1151,25 @@ Implementation notes (2026-10-19):
   - A constraint node takes its constraint's own id, where a counter
     numbered them `constraint-0`, `constraint-1` in walk order, so a
     selection, a view or a diff names the same node however the file
-    orders its constraints.
-  - `modelToGraph` walks `model.constraints` and skips a constraint only
-    when every fact type it touches is absorbed into a reference mode.
-    It used to skip any constraint nested under an absorbed fact type,
-    whatever it spanned, and draw one nested elsewhere that touched only
-    absorbed ones.
+    orders its constraints. A repeated id (barwise-b2s) is suffixed
+    (`c-key#2`) so two nodes never share one; an id-less constraint,
+    which construction rules out, is numbered as before.
+  - `modelToGraph` walks `model.constraints` and draws a constraint when
+    it touches a fact type that got a node, with edges to drawn fact
+    types only. One touching only absorbed fact types, only fact types a
+    neighbourhood view leaves out, or none at all is not drawn. It used
+    to skip any constraint nested under an absorbed fact type, whatever
+    it spanned, and to draw the rest whatever the view, including
+    floating nodes and edges to fact types with no node.
+  - `NOT_DRAWN` is total over every kind that is not drawn, internal
+    kinds included, so the barwise-869 compile check still covers kinds
+    the constraint-node walk no longer sees.
   - The four per-fact-type badge reads (uniqueness, mandatory, frequency,
     ring) read `internalConstraints`.
   - The webview's model summary lists `constraintsTouching` per fact
-    type, so its tree badge and inspector agree with the sidebar.
+    type, so its tree badge and inspector agree with the sidebar. A
+    constraint touching no fact type is in no list; the sidebar shows it
+    and the webview has no place for it yet (barwise-f2r).
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 
