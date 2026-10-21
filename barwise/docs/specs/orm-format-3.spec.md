@@ -1151,13 +1151,15 @@ Implementation notes (2026-10-19):
   - A constraint node takes its constraint's own id, where a counter
     numbered them `constraint-0`, `constraint-1` in walk order, so a
     selection, a view or a diff names the same node however the file
-    orders its constraints. One allocator issues node ids against every id
-    already taken, object and fact type nodes included: an id another
-    node holds, a second constraint's copy of one (barwise-b2s), or a
-    suffix that is itself a stated id gets the first free `#2`, `#3`;
-    an id-less constraint, which construction rules out, is numbered. It
-    runs only for a constraint that is drawn. Which of two same-id
-    constraints keeps the plain id follows file order.
+    orders its constraints. Node ids are decided once from the whole
+    model, so a constraint has the same node id in every view and whether
+    or not a view draws it: a constraint keeps its own id when no other
+    constraint and no element of the model holds it, and otherwise (a
+    second constraint's copy, barwise-b2s, or an element's id) gets the
+    first `#2`, `#3` free of every reserved id, the unique stated ones
+    included. An id-less constraint, which construction rules out, is
+    numbered. Which of two same-id constraints is suffixed follows file
+    order.
   - `modelToGraph` walks `model.constraints` and draws a constraint when
     it touches a fact type that got a node, with edges to drawn fact
     types only. One touching only absorbed fact types, only fact types a
@@ -1170,8 +1172,9 @@ Implementation notes (2026-10-19):
     the constraint-node walk no longer sees.
   - The four per-fact-type badge reads (uniqueness, mandatory, frequency,
     ring) read `internalConstraints`.
-  - The webview's model summary lists `constraintsTouching` per fact
-    type, so its tree badge and inspector agree with the sidebar. A
+  - The webview's model summary calls `constraintsTouching` per fact
+    type, the core authority, so its tree badge and inspector agree with
+    the sidebar. A
     constraint touching no fact type is in no list; the sidebar shows it
     and the webview has no place for it yet (barwise-f2r).
 

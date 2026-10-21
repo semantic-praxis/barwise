@@ -75,6 +75,60 @@ export interface ModelToGraphOptions {
 }
 
 /**
+ * The node id of every constraint across fact types, decided once from the
+ * whole model, so a constraint's node has the same id in every view and
+ * whether or not the view draws it.
+ *
+ * A constraint keeps its own id when no other constraint and no element of
+ * the model (object type, fact type, subtype fact) holds it. Otherwise,
+ * for a second constraint with the same id (barwise-b2s) or one colliding
+ * with an element, it gets the first `#2`, `#3` free of every id
+ * reserved here; which of two same-id constraints is suffixed follows
+ * file order. An id-less constraint, which construction rules out
+ * (barwise-nkq) though the type allows it until WS3c, is numbered.
+ */
+function constraintNodeIds(model: OrmModel): ReadonlyMap<Constraint, string> {
+  const taken = new Set<string>([
+    ...model.objectTypes.map((ot) => ot.id),
+    ...model.factTypes.map((ft) => ft.id),
+    ...model.subtypeFacts.map((sf) => sf.id),
+  ]);
+  const constraints = model.constraints;
+  const uses = new Map<string, number>();
+  for (const c of constraints) {
+    if (c.id !== undefined) uses.set(c.id, (uses.get(c.id) ?? 0) + 1);
+  }
+  // A stated id held by exactly one constraint and no element is that
+  // constraint's own, reserved before any suffix is handed out.
+  const own = new Set<string>();
+  for (const [id, count] of uses) {
+    if (count === 1 && !taken.has(id)) own.add(id);
+  }
+  for (const id of own) taken.add(id);
+
+  const ids = new Map<Constraint, string>();
+  let unnamed = 0;
+  const free = (base: string) => {
+    let id = base;
+    for (let n = 2; taken.has(id); n++) id = `${base}#${n}`;
+    taken.add(id);
+    return id;
+  };
+  for (const c of constraints) {
+    if (c.id !== undefined && own.has(c.id)) {
+      ids.set(c, c.id);
+    } else if (c.id !== undefined) {
+      ids.set(c, free(c.id));
+    } else {
+      let base: string;
+      do base = `constraint-${unnamed++}`; while (taken.has(base));
+      ids.set(c, free(base));
+    }
+  }
+  return ids;
+}
+
+/**
  * Convert an OrmModel into an OrmGraph suitable for layout and rendering.
  *
  * This is the bridge between the semantic model and the visual representation.
@@ -245,31 +299,13 @@ export function modelToGraph(
   // those fact types only: none floats, and no edge points at a fact type
   // absorbed into a reference mode or left out of a neighbourhood view.
 
-  // Node ids already taken, by object types and fact types first. A
-  // constraint's node takes its own id unless that is taken: by another
-  // node kind, or by a second constraint with the same id (barwise-b2s),
-  // which then gets the first free `#2`, `#3`. Which of two same-id
-  // constraints keeps the plain id follows file order; unique ids are what
-  // make it order-free. An id-less constraint, which construction rules out
-  // (barwise-nkq) though the type allows it until WS3c, is numbered.
-  const issued = new Set(nodes.map((n) => n.id));
-  let unnamed = 0;
-  function nodeIdFor(c: Constraint): string {
-    let base = c.id;
-    if (base === undefined) {
-      do base = `constraint-${unnamed++}`; while (issued.has(base));
-    }
-    let id = base;
-    for (let n = 2; issued.has(id); n++) id = `${base}#${n}`;
-    issued.add(id);
-    return id;
-  }
+  const nodeIds = constraintNodeIds(model);
 
   /**
    * Draw a constraint as a node with an edge to each of its roles whose fact
    * type got a node (both sides for subset/equality). One with no such role
    * has nothing to attach to, absorbed, filtered out or dangling, and is not
-   * drawn; its id is then not used up.
+   * drawn.
    */
   function addConstraintNode(
     c: Constraint,
@@ -286,7 +322,7 @@ export function modelToGraph(
     });
     if (attached.length === 0) return;
 
-    const constraintId = nodeIdFor(c);
+    const constraintId = nodeIds.get(c)!;
     nodes.push(
       {
         kind: "constraint",

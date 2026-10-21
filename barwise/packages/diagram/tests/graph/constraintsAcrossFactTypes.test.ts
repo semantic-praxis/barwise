@@ -150,27 +150,43 @@ describe("constraint nodes across fact types", () => {
     expect(ids).toEqual(["c-key", "c-key#2"]);
   });
 
-  it("never issues a node id another node holds", () => {
-    // An id equal to a fact type's, and a suffix equal to a stated id.
+  it("never issues a node id another node holds, and leaves a unique stated id to its owner", () => {
+    // Under "Room has RoomId", walked first: an id equal to a fact type's,
+    // a twin of the key, and an exclusive-or whose own unique id is what a
+    // suffix for the twins would otherwise be.
     const sameAsFactType: Constraint = { id: "ft-nr", type: "exclusion", roleIds: ["r-b", "r-n"] };
     const twin: Constraint = { id: "c-key", type: "exclusion", roleIds: ["r-b", "r-n"] };
-    const stated: Constraint = { id: "c-key#2", type: "exclusion", roleIds: ["r-b", "r-n"] };
+    const stated: Constraint = { id: "c-key#2", type: "exclusive_or", roleIds: ["r-b", "r-n"] };
     const graph = modelToGraph(rooms("ft-in", [sameAsFactType, twin, stated]));
     const ids = graph.nodes.map((n) => n.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(graph.nodes.filter((n) => n.kind === "constraint").map((n) => n.id).sort()).toEqual([
-      "c-key",
-      "c-key#2",
-      "c-key#3",
-      "ft-nr#2",
+    const byKind = graph.nodes.flatMap((n) =>
+      n.kind === "constraint" ? [[n.id, n.constraintKind] as const] : []
+    );
+    expect(byKind).toEqual([
+      ["ft-nr#2", "exclusion"],
+      ["c-key", "exclusion"],
+      ["c-key#2", "exclusive_or"],
+      ["c-key#3", "external_uniqueness"],
     ]);
   });
 
-  it("does not use up an id on a constraint it does not draw", () => {
-    // Walked first, under "Room has RoomId", and dangling, so not drawn:
-    // the key drawn after it keeps its plain id.
-    const dangling: Constraint = { id: "c-key", type: "exclusion", roleIds: ["r-x", "r-y"] };
-    expect(constraintPart(rooms("ft-in", [dangling])).nodes.map((n) => n.id)).toEqual(["c-key"]);
+  it("gives a constraint the same node id in every view", () => {
+    // Two constraints share c-key. The twin, walked first, spans only
+    // "Room has RoomNumber"; a view of "Room is in Building" draws only the
+    // key, which keeps the suffixed id it has in the full view.
+    const twin: Constraint = { id: "c-key", type: "exclusion", roleIds: ["r-room-nr", "r-n"] };
+    const model = rooms("ft-in", [twin]);
+    const full = constraintPart(model).nodes.map((n) => n.id);
+    const view = constraintPart(model, {
+      includeFilter: {
+        objectTypeIds: new Set(["ot-room", "ot-b"]),
+        factTypeIds: new Set(["ft-in"]),
+        subtypeFactIds: new Set<string>(),
+      },
+    }).nodes.map((n) => n.id);
+    expect(full).toEqual(["c-key", "c-key#2"]);
+    expect(view).toEqual(["c-key#2"]);
   });
 });
 

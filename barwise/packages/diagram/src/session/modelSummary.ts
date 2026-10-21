@@ -9,7 +9,7 @@
  * display-ready readings and constraint labels, and subtype links.
  * Pure and deterministic; order follows model declaration order.
  */
-import { dataTypeOf, type ExternalConstraint, type OrmModel, referenceModeOf } from "@barwise/core";
+import { dataTypeOf, type OrmModel, referenceModeOf } from "@barwise/core";
 
 export interface SummaryRole {
   readonly id: string;
@@ -102,17 +102,6 @@ export function buildModelSummary(model: OrmModel): ModelSummary {
     factTypeIds: playedIn.get(ot.id) ?? [],
   }));
 
-  // Each constraint across fact types, under every fact type it spans, in
-  // one pass over the model's list rather than one per fact type.
-  const acrossByFactType = new Map<string, ExternalConstraint[]>();
-  for (const c of model.constraints) {
-    for (const ft of model.factTypesOf(c)) {
-      const list = acrossByFactType.get(ft.id);
-      if (list) list.push(c);
-      else acrossByFactType.set(ft.id, [c]);
-    }
-  }
-
   const factTypes: SummaryFactType[] = model.factTypes.map((ft) => {
     const playerNames = ft.roles.map((r) => model.getObjectType(r.playerId)?.name ?? r.playerId);
     return {
@@ -128,7 +117,7 @@ export function buildModelSummary(model: OrmModel): ModelSummary {
       // Every constraint that applies to the fact type, as the sidebar and
       // describe list them: a constraint across fact types under each
       // fact type it spans, not under the one a 2.0 file nests it in.
-      constraints: [...ft.internalConstraints, ...(acrossByFactType.get(ft.id) ?? [])].map((c) => ({
+      constraints: model.constraintsTouching(ft.id).map((c) => ({
         ...(c.id !== undefined && { id: c.id }),
         type: c.type,
       })),
