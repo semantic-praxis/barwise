@@ -315,7 +315,7 @@ describe("Lineage Generation", () => {
           { id: "c-unique", type: "internal_uniqueness", roleIds: ["r2"] },
         ],
       });
-      expect(ft.constraints.map((c) => c.id)).toEqual(["c-mandatory", "c-unique"]);
+      expect(ft.internalConstraints.map((c) => c.id)).toEqual(["c-mandatory", "c-unique"]);
 
       const mapper = new RelationalMapper();
       const schema = mapper.map(model);
@@ -537,7 +537,7 @@ describe("Lineage Generation", () => {
       // addConstraint fills a missing id, as the fact type constructor
       // does (barwise-nkq), so lineage can name the constraint.
       ft.addConstraint({ type: "value_constraint", roleId: "r1", values: ["x"] });
-      const filled = ft.constraints[0]!.id;
+      const filled = ft.internalConstraints[0]!.id;
       expect(filled).toEqual(expect.any(String));
 
       const lineage = generateModelLineage(model);

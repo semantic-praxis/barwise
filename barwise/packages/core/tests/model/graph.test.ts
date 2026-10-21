@@ -180,7 +180,7 @@ describe("graphOf: a built graph is total", () => {
     if (!result.ok) throw new Error("expected a graph");
 
     const ft = model.factTypes[0]!;
-    const constraint = ft.constraints[0]!;
+    const constraint = ft.internalConstraints[0]!;
     const roles = result.graph.rolesOf(constraint);
     expect(roles.length).toBeGreaterThan(0);
     for (const role of roles) {
@@ -193,7 +193,7 @@ describe("graphOf: a built graph is total", () => {
     const result = graphOf(model);
     if (!result.ok) throw new Error("expected a graph");
 
-    const resolved = result.graph.resolve(model.factTypes[0]!.constraints[0]!);
+    const resolved = result.graph.resolve(model.factTypes[0]!.internalConstraints[0]!);
     expect(resolved.roles.length).toBeGreaterThan(0);
     for (const r of resolved.roles) {
       expect(r.player.id).toBe(r.role.playerId);
@@ -229,7 +229,7 @@ describe("graphOf: a built graph is total", () => {
 
     const result = graphOf(model);
     if (!result.ok) throw new Error("expected a graph");
-    expect(result.graph.resolve(ft1!.constraints[0]!).spansFactTypes).toBe(true);
+    expect(result.graph.resolve(model.constraints[0]!).spansFactTypes).toBe(true);
   });
 
   it("reports commonPlayer only when every role shares one", () => {
@@ -239,7 +239,7 @@ describe("graphOf: a built graph is total", () => {
 
     // The uniqueness constraint covers one role, so its single player is
     // trivially common.
-    const resolved = result.graph.resolve(model.factTypes[0]!.constraints[0]!);
+    const resolved = result.graph.resolve(model.factTypes[0]!.internalConstraints[0]!);
     expect(resolved.commonPlayer).toBeDefined();
   });
 
@@ -257,7 +257,7 @@ describe("graphOf: a built graph is total", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const added = ft.constraints.at(-1)!;
+    const added = ft.internalConstraints.at(-1)!;
     expect(added.type).toBe("mandatory");
     expect(added.id).toEqual(expect.any(String));
     expect(result.graph.rolesOf(added).map((r) => r.id)).toEqual([ft.roles[0]!.id]);
@@ -277,7 +277,7 @@ describe("graphOf: a built graph is total", () => {
     // into a model now fills one (barwise-nkq).
     const found = result.unresolved.find((u) => u.missing === "bogus");
     if (found?.from.kind !== "constraint") throw new Error("expected a constraint source");
-    expect(found.from.constraint.id).toBe(ft.constraints.at(-1)!.id);
+    expect(found.from.constraint.id).toBe(ft.internalConstraints.at(-1)!.id);
     expect(found.from.constraint.type).toBe("mandatory");
     expect(found.from.factType.id).toBe(ft.id);
   });
@@ -391,10 +391,10 @@ describe("graphOf over the shipped example models", () => {
         expect(result.graph.player(role)).toBeDefined();
         expect(result.graph.factTypeOf(role)).toBeDefined();
       }
-      for (const c of ft.constraints) {
-        expect(result.graph.rolesOf(c)).toBeDefined();
-        expect(result.graph.resolve(c).roles.length).toBe(roleIdsOf(c).length);
-      }
+    }
+    for (const [c] of model.everyConstraint()) {
+      expect(result.graph.rolesOf(c)).toBeDefined();
+      expect(result.graph.resolve(c).roles.length).toBe(roleIdsOf(c).length);
     }
   });
 });

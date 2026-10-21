@@ -319,7 +319,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const iuc = ft.constraints.find((c) => c.type === "internal_uniqueness");
+      const iuc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(iuc).toBeDefined();
       if (iuc?.type === "internal_uniqueness") {
         expect(iuc.roleIds).toEqual(["_ft1_r2"]);
@@ -349,7 +349,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const iuc = ft.constraints.find((c) => c.type === "internal_uniqueness");
+      const iuc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(iuc).toBeDefined();
       if (iuc?.type === "internal_uniqueness") {
         expect(iuc.isPreferred).toBe(true);
@@ -379,7 +379,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const iuc = ft.constraints.find((c) => c.type === "internal_uniqueness");
+      const iuc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(iuc).toBeDefined();
       if (iuc?.type === "internal_uniqueness") {
         expect(iuc.isPreferred).toBeUndefined();
@@ -409,7 +409,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const mandatory = ft.constraints.find((c) => c.type === "mandatory");
+      const mandatory = ft.internalConstraints.find((c) => c.type === "mandatory");
       expect(mandatory).toBeDefined();
       if (mandatory?.type === "mandatory") {
         expect(mandatory.roleId).toBe("_ft1_r1");
@@ -439,7 +439,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const freq = ft.constraints.find((c) => c.type === "frequency");
+      const freq = ft.internalConstraints.find((c) => c.type === "frequency");
       expect(freq).toBeDefined();
       if (freq?.type === "frequency") {
         expect(freq.min).toBe(2);
@@ -470,7 +470,7 @@ describe("NormaToOrmMapper", () => {
         constraints: [fc],
       });
       const model = mapNormaToOrm(doc);
-      const freq = model.factTypes[0]!.constraints.find((c) => c.type === "frequency");
+      const freq = model.factTypes[0]!.internalConstraints.find((c) => c.type === "frequency");
       expect(freq).toBeDefined();
       if (freq?.type === "frequency") {
         expect(freq.roleIds).toEqual(["_ft1_r1", "_ft1_r2"]);
@@ -496,7 +496,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const ring = ft.constraints.find((c) => c.type === "ring");
+      const ring = ft.internalConstraints.find((c) => c.type === "ring");
       expect(ring).toBeDefined();
       if (ring?.type === "ring") {
         expect(ring.ringType).toBe("irreflexive");
@@ -528,7 +528,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const subset = ft.constraints.find((c) => c.type === "subset");
+      const subset = model.constraintsTouching(ft.id).find((c) => c.type === "subset");
       expect(subset).toBeDefined();
       if (subset?.type === "subset") {
         expect(subset.subsetRoleIds).toEqual(["_ft1_r1"]);
@@ -567,7 +567,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const mandatories = ft.constraints.filter((c) => c.type === "mandatory");
+      const mandatories = ft.internalConstraints.filter((c) => c.type === "mandatory");
       // Only the non-implied one should be mapped.
       expect(mandatories).toHaveLength(1);
       if (mandatories[0]?.type === "mandatory") {
@@ -598,7 +598,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const mandatories = ft.constraints.filter((c) => c.type === "mandatory");
+      const mandatories = ft.internalConstraints.filter((c) => c.type === "mandatory");
       expect(mandatories).toHaveLength(0);
     });
 
@@ -629,7 +629,7 @@ describe("NormaToOrmMapper", () => {
 
       // External uniqueness should be attached to the first fact type
       // containing a referenced role.
-      const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+      const allConstraints = model.everyConstraint().map(([c]) => c);
       const extConstraints = allConstraints.filter(
         (c) => c.type === "external_uniqueness",
       );
@@ -665,7 +665,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const extConstraints = ft.constraints.filter(
+      const extConstraints = model.constraintsTouching(ft.id).filter(
         (c) => c.type === "external_uniqueness",
       );
       // Should only appear once (from internalConstraintRefs processing).
@@ -697,7 +697,7 @@ describe("NormaToOrmMapper", () => {
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
       // The external uniqueness pass should NOT pick up internal uniqueness constraints.
-      const extConstraints = ft.constraints.filter(
+      const extConstraints = model.constraintsTouching(ft.id).filter(
         (c) => c.type === "external_uniqueness",
       );
       expect(extConstraints).toHaveLength(0);
@@ -726,7 +726,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const valConstraints = ft.constraints.filter(
+      const valConstraints = ft.internalConstraints.filter(
         (c) => c.type === "value_constraint",
       );
       expect(valConstraints).toHaveLength(1);
@@ -760,7 +760,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const valConstraints = ft.constraints.filter(
+      const valConstraints = ft.internalConstraints.filter(
         (c) => c.type === "value_constraint",
       );
       // Should only appear once.
@@ -789,7 +789,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const valConstraints = ft.constraints.filter(
+      const valConstraints = ft.internalConstraints.filter(
         (c) => c.type === "value_constraint",
       );
       expect(valConstraints).toHaveLength(0);
@@ -817,7 +817,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const valConstraint = ft.constraints.find((c) => c.type === "value_constraint");
+      const valConstraint = ft.internalConstraints.find((c) => c.type === "value_constraint");
       expect(valConstraint).toBeDefined();
       if (valConstraint?.type === "value_constraint") {
         expect(valConstraint.values).toEqual(["A", "B", "C"]);
@@ -843,7 +843,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const valConstraint = ft.constraints.find((c) => c.type === "value_constraint");
+      const valConstraint = ft.internalConstraints.find((c) => c.type === "value_constraint");
       expect(valConstraint).toBeDefined();
       if (valConstraint?.type === "value_constraint") {
         expect(valConstraint.ranges).toEqual([{ min: "1", max: "10" }]);
@@ -877,7 +877,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const valConstraints = ft.constraints.filter((c) => c.type === "value_constraint");
+      const valConstraints = ft.internalConstraints.filter((c) => c.type === "value_constraint");
       expect(valConstraints).toHaveLength(1);
     });
 
@@ -905,7 +905,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes.find((f) => f.name === "CustomerPlacesOrder")!;
-      const mandatory = ft.constraints.find((c) => c.type === "mandatory");
+      const mandatory = ft.internalConstraints.find((c) => c.type === "mandatory");
       expect(mandatory).toBeDefined();
       if (mandatory?.type === "mandatory") {
         expect(mandatory.roleId).toBe("_ft1_r1");
@@ -941,7 +941,7 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
       const ft = model.factTypes[0]!;
-      const mandatories = ft.constraints.filter((c) => c.type === "mandatory");
+      const mandatories = ft.internalConstraints.filter((c) => c.type === "mandatory");
       expect(mandatories).toHaveLength(1);
     });
 
@@ -975,7 +975,7 @@ describe("NormaToOrmMapper", () => {
         constraints: [extUc1, extUc2],
       });
       const model = mapNormaToOrm(doc);
-      const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+      const allConstraints = model.everyConstraint().map(([c]) => c);
       const extConstraints = allConstraints.filter((c) => c.type === "external_uniqueness");
       expect(extConstraints).toHaveLength(1);
     });
@@ -1007,7 +1007,9 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([mc]));
         const ft = model.factTypes.find((f) => f.name === "PersonDrivesCar")!;
-        const disj = ft.constraints.find((c) => c.type === "disjunctive_mandatory");
+        const disj = model.constraintsTouching(ft.id).find((c) =>
+          c.type === "disjunctive_mandatory"
+        );
         expect(disj).toBeDefined();
         if (disj?.type === "disjunctive_mandatory") {
           expect(disj.roleIds).toEqual(["_ft1_r1", "_ft2_r1"]);
@@ -1033,7 +1035,9 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([mc1, mc2]));
         const ft = model.factTypes.find((f) => f.name === "PersonDrivesCar")!;
-        const disjs = ft.constraints.filter((c) => c.type === "disjunctive_mandatory");
+        const disjs = model.constraintsTouching(ft.id).filter((c) =>
+          c.type === "disjunctive_mandatory"
+        );
         expect(disjs).toHaveLength(1);
       });
 
@@ -1047,7 +1051,7 @@ describe("NormaToOrmMapper", () => {
           roleRefs: ["_ft1_r1"],
         };
         const model = mapNormaToOrm(makeSpanningDoc([mc]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "disjunctive_mandatory")).toBe(false);
       });
 
@@ -1061,7 +1065,7 @@ describe("NormaToOrmMapper", () => {
           roleRefs: ["_missing_r1", "_missing_r2"],
         };
         const model = mapNormaToOrm(makeSpanningDoc([mc]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "disjunctive_mandatory")).toBe(false);
       });
 
@@ -1084,13 +1088,13 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([mc, exc]));
         const ft = model.factTypes.find((f) => f.name === "PersonDrivesCar")!;
-        const xor = ft.constraints.filter((c) => c.type === "exclusive_or");
+        const xor = model.constraintsTouching(ft.id).filter((c) => c.type === "exclusive_or");
         expect(xor).toHaveLength(1);
         if (xor[0]?.type === "exclusive_or") {
           expect(xor[0].roleIds).toEqual(["_ft1_r1", "_ft2_r1"]);
         }
         // The paired exclusion half must not also surface as a plain exclusion.
-        expect(ft.constraints.some((c) => c.type === "exclusion")).toBe(false);
+        expect(model.constraintsTouching(ft.id).some((c) => c.type === "exclusion")).toBe(false);
       });
 
       it("does not duplicate an exclusive-or constraint listed as two pairs", () => {
@@ -1128,7 +1132,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([mc1, exc1, mc2, exc2]));
         const ft = model.factTypes.find((f) => f.name === "PersonDrivesCar")!;
-        const xor = ft.constraints.filter((c) => c.type === "exclusive_or");
+        const xor = model.constraintsTouching(ft.id).filter((c) => c.type === "exclusive_or");
         expect(xor).toHaveLength(1);
       });
     });
@@ -1158,7 +1162,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([sc]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const subset = ft.constraints.find((c) => c.type === "subset");
+        const subset = model.constraintsTouching(ft.id).find((c) => c.type === "subset");
         expect(subset).toBeDefined();
       });
 
@@ -1179,7 +1183,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([sc1, sc2]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const subsets = ft.constraints.filter((c) => c.type === "subset");
+        const subsets = model.constraintsTouching(ft.id).filter((c) => c.type === "subset");
         expect(subsets).toHaveLength(1);
       });
 
@@ -1192,7 +1196,7 @@ describe("NormaToOrmMapper", () => {
           supersetRoleRefs: [],
         };
         const model = mapNormaToOrm(makeSpanningDoc([sc]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "subset")).toBe(false);
       });
 
@@ -1205,7 +1209,7 @@ describe("NormaToOrmMapper", () => {
           supersetRoleRefs: ["_missing_r2"],
         };
         const model = mapNormaToOrm(makeSpanningDoc([sc]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "subset")).toBe(false);
       });
 
@@ -1218,7 +1222,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([exc]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const exclusion = ft.constraints.find((c) => c.type === "exclusion");
+        const exclusion = model.constraintsTouching(ft.id).find((c) => c.type === "exclusion");
         expect(exclusion).toBeDefined();
         if (exclusion?.type === "exclusion") {
           expect(exclusion.roleIds).toEqual(["_ft1_r1", "_ft2_r1"]);
@@ -1240,7 +1244,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([exc1, exc2]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const exclusions = ft.constraints.filter((c) => c.type === "exclusion");
+        const exclusions = model.constraintsTouching(ft.id).filter((c) => c.type === "exclusion");
         expect(exclusions).toHaveLength(1);
       });
 
@@ -1252,7 +1256,7 @@ describe("NormaToOrmMapper", () => {
           roleSequences: [[], []],
         };
         const model = mapNormaToOrm(makeSpanningDoc([exc]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "exclusion")).toBe(false);
       });
 
@@ -1264,7 +1268,7 @@ describe("NormaToOrmMapper", () => {
           roleSequences: [["_missing_r1"], ["_missing_r2"]],
         };
         const model = mapNormaToOrm(makeSpanningDoc([exc]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "exclusion")).toBe(false);
       });
 
@@ -1277,7 +1281,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([eq]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const equality = ft.constraints.find((c) => c.type === "equality");
+        const equality = model.constraintsTouching(ft.id).find((c) => c.type === "equality");
         expect(equality).toBeDefined();
         if (equality?.type === "equality") {
           expect(equality.roleIds1).toEqual(["_ft1_r1"]);
@@ -1300,7 +1304,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([eq1, eq2]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const equalities = ft.constraints.filter((c) => c.type === "equality");
+        const equalities = model.constraintsTouching(ft.id).filter((c) => c.type === "equality");
         expect(equalities).toHaveLength(1);
       });
 
@@ -1312,7 +1316,7 @@ describe("NormaToOrmMapper", () => {
           roleSequences: [["_ft1_r1"]],
         };
         const model = mapNormaToOrm(makeSpanningDoc([eq]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "equality")).toBe(false);
       });
 
@@ -1324,7 +1328,7 @@ describe("NormaToOrmMapper", () => {
           roleSequences: [["_missing_r1"], ["_missing_r2"]],
         };
         const model = mapNormaToOrm(makeSpanningDoc([eq]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "equality")).toBe(false);
       });
 
@@ -1338,7 +1342,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([vcmp]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const vc = ft.constraints.find((c) => c.type === "value_comparison");
+        const vc = ft.internalConstraints.find((c) => c.type === "value_comparison");
         expect(vc).toBeDefined();
         if (vc?.type === "value_comparison") {
           expect(vc.operator).toBe("<");
@@ -1362,7 +1366,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([vcmp1, vcmp2]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const vcs = ft.constraints.filter((c) => c.type === "value_comparison");
+        const vcs = ft.internalConstraints.filter((c) => c.type === "value_comparison");
         expect(vcs).toHaveLength(1);
       });
 
@@ -1375,7 +1379,7 @@ describe("NormaToOrmMapper", () => {
           roleRefs: ["_ft1_r1"],
         };
         const model = mapNormaToOrm(makeSpanningDoc([vcmp]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "value_comparison")).toBe(false);
       });
 
@@ -1388,7 +1392,7 @@ describe("NormaToOrmMapper", () => {
           roleRefs: ["_ft1_r1", "_ft1_r2"],
         };
         const model = mapNormaToOrm(makeSpanningDoc([vcmp]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "value_comparison")).toBe(false);
       });
 
@@ -1401,7 +1405,7 @@ describe("NormaToOrmMapper", () => {
           roleRefs: ["_ft1_r1", "_ft2_r1"],
         };
         const model = mapNormaToOrm(makeSpanningDoc([vcmp]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "value_comparison")).toBe(false);
       });
 
@@ -1415,7 +1419,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([rc]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const ring = ft.constraints.find((c) => c.type === "ring");
+        const ring = ft.internalConstraints.find((c) => c.type === "ring");
         expect(ring).toBeDefined();
       });
 
@@ -1436,7 +1440,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeSpanningDoc([rc1, rc2]));
         const ft = model.factTypes.find((f) => f.name === "CustomerRatesProduct")!;
-        const rings = ft.constraints.filter((c) => c.type === "ring");
+        const rings = ft.internalConstraints.filter((c) => c.type === "ring");
         expect(rings).toHaveLength(1);
       });
 
@@ -1449,7 +1453,7 @@ describe("NormaToOrmMapper", () => {
           roleRefs: ["_ft1_r1"],
         };
         const model = mapNormaToOrm(makeSpanningDoc([rc]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "ring")).toBe(false);
       });
 
@@ -1462,7 +1466,7 @@ describe("NormaToOrmMapper", () => {
           roleRefs: ["_missing_r1", "_missing_r2"],
         };
         const model = mapNormaToOrm(makeSpanningDoc([rc]));
-        const allConstraints = model.factTypes.flatMap((ft) => ft.constraints);
+        const allConstraints = model.everyConstraint().map(([c]) => c);
         expect(allConstraints.some((c) => c.type === "ring")).toBe(false);
       });
     });
@@ -1489,7 +1493,7 @@ describe("NormaToOrmMapper", () => {
         });
         const model = mapNormaToOrm(doc);
         const ft = model.factTypes[0]!;
-        const exclusion = ft.constraints.find((c) => c.type === "exclusion");
+        const exclusion = model.constraintsTouching(ft.id).find((c) => c.type === "exclusion");
         expect(exclusion).toBeDefined();
         if (exclusion?.type === "exclusion") {
           expect(exclusion.roleIds).toEqual(["_ft1_r1", "_ft1_r2"]);
@@ -1517,7 +1521,7 @@ describe("NormaToOrmMapper", () => {
         });
         const model = mapNormaToOrm(doc);
         const ft = model.factTypes[0]!;
-        const equality = ft.constraints.find((c) => c.type === "equality");
+        const equality = model.constraintsTouching(ft.id).find((c) => c.type === "equality");
         expect(equality).toBeDefined();
       });
 
@@ -1543,7 +1547,7 @@ describe("NormaToOrmMapper", () => {
         });
         const model = mapNormaToOrm(doc);
         const ft = model.factTypes[0]!;
-        const vc = ft.constraints.find((c) => c.type === "value_comparison");
+        const vc = ft.internalConstraints.find((c) => c.type === "value_comparison");
         expect(vc).toBeDefined();
         if (vc?.type === "value_comparison") {
           expect(vc.operator).toBe(">=");
@@ -1573,7 +1577,9 @@ describe("NormaToOrmMapper", () => {
         });
         const model = mapNormaToOrm(doc);
         const ft = model.factTypes[0]!;
-        const disj = ft.constraints.find((c) => c.type === "disjunctive_mandatory");
+        const disj = model.constraintsTouching(ft.id).find((c) =>
+          c.type === "disjunctive_mandatory"
+        );
         expect(disj).toBeDefined();
       });
 
@@ -1601,7 +1607,7 @@ describe("NormaToOrmMapper", () => {
         });
         const model = mapNormaToOrm(doc);
         const ft = model.factTypes[0]!;
-        const xor = ft.constraints.find((c) => c.type === "exclusive_or");
+        const xor = model.constraintsTouching(ft.id).find((c) => c.type === "exclusive_or");
         expect(xor).toBeDefined();
       });
 
@@ -1638,7 +1644,7 @@ describe("NormaToOrmMapper", () => {
         });
         const model = mapNormaToOrm(doc);
         const ft = model.factTypes[0]!;
-        const xor = ft.constraints.filter((c) => c.type === "exclusive_or");
+        const xor = model.constraintsTouching(ft.id).filter((c) => c.type === "exclusive_or");
         expect(xor).toHaveLength(1);
       });
 
@@ -1665,7 +1671,7 @@ describe("NormaToOrmMapper", () => {
         });
         const model = mapNormaToOrm(doc);
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "internal_uniqueness")).toBe(false);
+        expect(ft.internalConstraints.some((c) => c.type === "internal_uniqueness")).toBe(false);
       });
     });
 
@@ -1696,7 +1702,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(mc));
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "mandatory")).toBe(false);
+        expect(ft.internalConstraints.some((c) => c.type === "mandatory")).toBe(false);
       });
 
       it("drops a frequency constraint whose role is outside the fact type", () => {
@@ -1710,7 +1716,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(fc));
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "frequency")).toBe(false);
+        expect(ft.internalConstraints.some((c) => c.type === "frequency")).toBe(false);
       });
 
       it("drops a value constraint whose role is outside the fact type", () => {
@@ -1723,7 +1729,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(vc));
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "value_constraint")).toBe(false);
+        expect(ft.internalConstraints.some((c) => c.type === "value_constraint")).toBe(false);
       });
 
       it("maps a value constraint with ranges via internalConstraintRefs", () => {
@@ -1737,7 +1743,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(vc));
         const ft = model.factTypes[0]!;
-        const valConstraint = ft.constraints.find((c) => c.type === "value_constraint");
+        const valConstraint = ft.internalConstraints.find((c) => c.type === "value_constraint");
         expect(valConstraint).toBeDefined();
         if (valConstraint?.type === "value_constraint") {
           expect(valConstraint.ranges).toEqual([{ min: "0", max: "100", minInclusive: true }]);
@@ -1753,7 +1759,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(exc));
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "exclusion")).toBe(false);
+        expect(model.constraintsTouching(ft.id).some((c) => c.type === "exclusion")).toBe(false);
       });
 
       it("maps an exclusion constraint as exclusive-or when it carries the coupler ref on its own", () => {
@@ -1766,7 +1772,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(exc));
         const ft = model.factTypes[0]!;
-        const xor = ft.constraints.find((c) => c.type === "exclusive_or");
+        const xor = model.constraintsTouching(ft.id).find((c) => c.type === "exclusive_or");
         expect(xor).toBeDefined();
       });
 
@@ -1780,7 +1786,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(vcmp));
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "value_comparison")).toBe(false);
+        expect(ft.internalConstraints.some((c) => c.type === "value_comparison")).toBe(false);
       });
 
       it("drops a value comparison constraint whose role is outside the fact type", () => {
@@ -1793,7 +1799,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(vcmp));
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "value_comparison")).toBe(false);
+        expect(ft.internalConstraints.some((c) => c.type === "value_comparison")).toBe(false);
       });
 
       it("drops an equality constraint referenced with a single role sequence", () => {
@@ -1805,7 +1811,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(eq));
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "equality")).toBe(false);
+        expect(model.constraintsTouching(ft.id).some((c) => c.type === "equality")).toBe(false);
       });
 
       it("drops a ring constraint that resolves to fewer than two roles in the fact type", () => {
@@ -1818,7 +1824,7 @@ describe("NormaToOrmMapper", () => {
         };
         const model = mapNormaToOrm(makeDocWithRef(rc));
         const ft = model.factTypes[0]!;
-        expect(ft.constraints.some((c) => c.type === "ring")).toBe(false);
+        expect(ft.internalConstraints.some((c) => c.type === "ring")).toBe(false);
       });
     });
   });
@@ -2067,10 +2073,10 @@ describe("NormaToOrmMapper", () => {
       expect(model.factTypes).toHaveLength(2);
 
       const placesFt = model.getFactTypeByName("CustomerPlacesOrder")!;
-      expect(placesFt.constraints).toHaveLength(2);
+      expect(model.constraintsTouching(placesFt.id)).toHaveLength(2);
 
       const hasNameFt = model.getFactTypeByName("CustomerHasName")!;
-      expect(hasNameFt.constraints).toHaveLength(0);
+      expect(model.constraintsTouching(hasNameFt.id)).toHaveLength(0);
     });
   });
 });

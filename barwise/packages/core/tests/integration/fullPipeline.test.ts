@@ -195,7 +195,7 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
       // The Customer rates Product fact type has a frequency constraint.
       const ratesFt = model.getFactTypeByName("Customer rates Product");
       expect(ratesFt).toBeDefined();
-      const freqConstraint = ratesFt!.constraints.find(
+      const freqConstraint = ratesFt!.internalConstraints.find(
         (c) => c.type === "frequency",
       );
       expect(freqConstraint).toBeDefined();
@@ -211,9 +211,7 @@ describe("Full pipeline integration: load -> validate -> verbalize -> map -> DDL
     const model = serializer.deserialize(yaml);
 
     it("loads all Phase 2 constraint types", () => {
-      const allConstraints = model.factTypes.flatMap(
-        (ft) => ft.constraints,
-      );
+      const allConstraints = model.everyConstraint().map(([c]) => c);
       const types = new Set(allConstraints.map((c) => c.type));
 
       expect(types.has("exclusive_or")).toBe(true);

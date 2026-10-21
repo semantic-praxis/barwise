@@ -395,7 +395,7 @@ model:
       result.domains.find((d) => d.context === "identity")!.yaml,
     );
     const born = identity.getFactTypeByName("Person was born in Country")!;
-    expect(born.constraints).toHaveLength(0);
+    expect(identity.constraintsTouching(born.id)).toHaveLength(0);
     expect(
       result.warnings.some((w) =>
         w.includes('Dropped a "join_equality" constraint')

@@ -86,9 +86,7 @@ describe("OpenApiImportFormat", () => {
       expect(hasNameFact?.roles).toHaveLength(2);
 
       // Should have mandatory constraints (all fields are required)
-      const allConstraints = result.model.factTypes.flatMap(
-        (ft) => ft.constraints,
-      );
+      const allConstraints = result.model.everyConstraint().map(([c]) => c);
       const mandatoryConstraints = allConstraints.filter(
         (c) => c.type === "mandatory",
       );
@@ -118,9 +116,7 @@ describe("OpenApiImportFormat", () => {
 
       const result = importer.parse(JSON.stringify(spec));
 
-      const allConstraints = result.model.factTypes.flatMap(
-        (ft) => ft.constraints,
-      );
+      const allConstraints = result.model.everyConstraint().map(([c]) => c);
       const mandatoryConstraints = allConstraints.filter(
         (c) => c.type === "mandatory",
       );
@@ -134,7 +130,7 @@ describe("OpenApiImportFormat", () => {
       expect(descriptionFact).toBeDefined();
 
       // The description fact should not have a mandatory constraint
-      const descMandatory = descriptionFact?.constraints.some(
+      const descMandatory = descriptionFact?.internalConstraints.some(
         (c) => c.type === "mandatory",
       );
       expect(descMandatory).toBe(false);
@@ -191,13 +187,13 @@ describe("OpenApiImportFormat", () => {
       expect(refFact).toBeDefined();
 
       // Relationship should have uniqueness constraint (many-to-one)
-      const uniquenessConstraints = refFact?.constraints.filter(
+      const uniquenessConstraints = refFact?.internalConstraints.filter(
         (c) => c.type === "internal_uniqueness",
       );
       expect(uniquenessConstraints).toHaveLength(1);
 
       // Should have mandatory constraint since department is required
-      const mandatoryConstraints = refFact?.constraints.filter(
+      const mandatoryConstraints = refFact?.internalConstraints.filter(
         (c) => c.type === "mandatory",
       );
       expect(mandatoryConstraints).toHaveLength(1);
@@ -294,7 +290,7 @@ describe("OpenApiImportFormat", () => {
       expect(manyToManyFact).toBeDefined();
 
       // Many-to-many should have no uniqueness constraints
-      const uniquenessConstraints = manyToManyFact?.constraints.filter(
+      const uniquenessConstraints = manyToManyFact?.internalConstraints.filter(
         (c) => c.type === "internal_uniqueness",
       );
       expect(uniquenessConstraints?.length ?? 0).toBe(0);

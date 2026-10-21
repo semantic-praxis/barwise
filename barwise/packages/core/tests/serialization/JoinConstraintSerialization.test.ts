@@ -58,7 +58,8 @@ function buildModel(constraint: Constraint): OrmModel {
 function roundTrip(constraint: Constraint): Constraint {
   const yaml = serializer.serialize(buildModel(constraint));
   const restored = serializer.deserialize(yaml);
-  return restored.getFactTypeByName("Person is citizen of Country")!.constraints
+  const citizenFt = restored.getFactTypeByName("Person is citizen of Country")!;
+  return restored.constraintsTouching(citizenFt.id)
     .find((c) => c.type === constraint.type)!;
 }
 

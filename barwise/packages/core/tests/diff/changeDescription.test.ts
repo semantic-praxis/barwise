@@ -254,7 +254,7 @@ describe("a delta carries copies, not references into the models", () => {
     // would. A variant carrying a reference would follow it; the copy
     // does not. This is the aliasing shape the merge's diagram layouts
     // had, found the same day this union was designed.
-    const source = after.ft.constraints[0]! as { roleId: string; };
+    const source = after.ft.internalConstraints[0]! as { roleId: string; };
     const originalRoleId = source.roleId;
     source.roleId = "mutated-after-the-diff";
 

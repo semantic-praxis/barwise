@@ -73,7 +73,7 @@ describe("dbt import: typed identifiers", () => {
     const customerId = model.getObjectTypeByName("CustomerId")!;
 
     const preferred = model.factTypes.filter((ft) =>
-      ft.constraints.some((c) => c.type === "internal_uniqueness" && c.isPreferred)
+      ft.internalConstraints.some((c) => c.type === "internal_uniqueness" && c.isPreferred)
     );
     expect(preferred.map((ft) => ft.name)).toEqual([
       "Customers has CustomerId",
@@ -83,13 +83,13 @@ describe("dbt import: typed identifiers", () => {
     const binary = preferred[0]!;
     const entityRole = binary.roles.find((r) => r.playerId === customers.id)!;
     const valueRole = binary.roles.find((r) => r.playerId === customerId.id)!;
-    expect(binary.constraints).toContainEqual(expect.objectContaining({
+    expect(binary.internalConstraints).toContainEqual(expect.objectContaining({
       type: "internal_uniqueness",
       roleIds: [valueRole.id],
       isPreferred: true,
     }));
 
-    const entityRoleConstraints = binary.constraints.filter(
+    const entityRoleConstraints = binary.internalConstraints.filter(
       (c) =>
         (c.type === "mandatory" && c.roleId === entityRole.id)
         || (c.type === "internal_uniqueness" && c.roleIds.includes(entityRole.id)),

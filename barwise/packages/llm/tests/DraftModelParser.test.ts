@@ -485,7 +485,7 @@ describe("DraftModelParser", () => {
       );
 
       const ft = result.model.getFactTypeByName("Customer places Order");
-      const uc = ft?.constraints.find((c) => c.type === "internal_uniqueness");
+      const uc = ft?.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(uc).toBeDefined();
 
       expect(result.constraintProvenance[0]?.applied).toBe(true);
@@ -512,7 +512,7 @@ describe("DraftModelParser", () => {
       );
 
       const ft = result.model.getFactTypeByName("Customer places Order");
-      const mc = ft?.constraints.find((c) => c.type === "mandatory");
+      const mc = ft?.internalConstraints.find((c) => c.type === "mandatory");
       expect(mc).toBeDefined();
 
       expect(result.constraintProvenance[0]?.applied).toBe(true);
@@ -539,7 +539,7 @@ describe("DraftModelParser", () => {
       );
 
       const ft = result.model.getFactTypeByName("Customer places Order");
-      const uc = ft?.constraints.find((c) => c.type === "internal_uniqueness");
+      const uc = ft?.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(uc).toBeDefined();
       expect(uc?.type === "internal_uniqueness" && uc.isPreferred).toBe(true);
       expect(result.constraintProvenance[0]?.applied).toBe(true);
@@ -565,7 +565,7 @@ describe("DraftModelParser", () => {
       );
 
       const ft = result.model.getFactTypeByName("Customer places Order");
-      const uc = ft?.constraints.find((c) => c.type === "internal_uniqueness");
+      const uc = ft?.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(uc).toBeDefined();
       expect(uc?.type === "internal_uniqueness" && uc.isPreferred).toBeFalsy();
     });
@@ -684,7 +684,7 @@ describe("DraftModelParser", () => {
       // Should resolve via player name lookup.
       expect(result.constraintProvenance[0]?.applied).toBe(true);
       const ft = result.model.getFactTypeByName("Customer places Order")!;
-      const uc = ft.constraints.find((c) => c.type === "internal_uniqueness");
+      const uc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(uc).toBeDefined();
       // The constraint should be on the Order role (role index 1).
       const orderRole = ft.roles.find((r) => r.name === "is placed by")!;
@@ -789,7 +789,7 @@ describe("DraftModelParser", () => {
 
       const ft = result.model.getFactTypeByName("Customer places Order");
       expect(ft).toBeDefined();
-      const vcs = ft!.constraints.filter((c) => c.type === "value_constraint");
+      const vcs = ft!.internalConstraints.filter((c) => c.type === "value_constraint");
       expect(vcs).toHaveLength(1);
       const vc = vcs[0]!;
       expect(vc.type).toBe("value_constraint");
@@ -1257,7 +1257,9 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person drives Car")!;
-        const eu = ft.constraints.find((c) => c.type === "external_uniqueness");
+        const eu = result.model.constraintsTouching(ft.id).find((c) =>
+          c.type === "external_uniqueness"
+        );
         expect(eu).toBeDefined();
         if (eu?.type === "external_uniqueness") {
           expect(eu.roleIds).toHaveLength(1);
@@ -1344,7 +1346,9 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person drives Car")!;
-        const dm = ft.constraints.find((c) => c.type === "disjunctive_mandatory");
+        const dm = result.model.constraintsTouching(ft.id).find((c) =>
+          c.type === "disjunctive_mandatory"
+        );
         expect(dm).toBeDefined();
         if (dm?.type === "disjunctive_mandatory") {
           expect(dm.roleIds).toHaveLength(2);
@@ -1431,7 +1435,7 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person drives Car")!;
-        const ex = ft.constraints.find((c) => c.type === "exclusion");
+        const ex = result.model.constraintsTouching(ft.id).find((c) => c.type === "exclusion");
         expect(ex).toBeDefined();
         if (ex?.type === "exclusion") {
           expect(ex.roleIds).toHaveLength(2);
@@ -1517,7 +1521,7 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person drives Car")!;
-        const xor = ft.constraints.find((c) => c.type === "exclusive_or");
+        const xor = result.model.constraintsTouching(ft.id).find((c) => c.type === "exclusive_or");
         expect(xor).toBeDefined();
         if (xor?.type === "exclusive_or") {
           expect(xor.roleIds).toHaveLength(2);
@@ -1605,7 +1609,7 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person drives Car")!;
-        const fc = ft.constraints.find((c) => c.type === "frequency");
+        const fc = ft.internalConstraints.find((c) => c.type === "frequency");
         expect(fc).toBeDefined();
         if (fc?.type === "frequency") {
           expect(fc.min).toBe(1);
@@ -1636,7 +1640,7 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person drives Car")!;
-        const fc = ft.constraints.find((c) => c.type === "frequency");
+        const fc = ft.internalConstraints.find((c) => c.type === "frequency");
         if (fc?.type === "frequency") {
           expect(fc.min).toBe(2);
           expect(fc.max).toBe("unbounded");
@@ -1803,7 +1807,7 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person manages Person")!;
-        const rc = ft.constraints.find((c) => c.type === "ring");
+        const rc = ft.internalConstraints.find((c) => c.type === "ring");
         expect(rc).toBeDefined();
         if (rc?.type === "ring") {
           expect(rc.ringType).toBe("irreflexive");
@@ -1832,7 +1836,7 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person manages Person")!;
-        const rc = ft.constraints.find((c) => c.type === "ring");
+        const rc = ft.internalConstraints.find((c) => c.type === "ring");
         if (rc?.type === "ring") {
           expect(rc.ringType).toBe("asymmetric");
         }
@@ -1970,7 +1974,7 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person drives Car")!;
-        const sc = ft.constraints.find((c) => c.type === "subset");
+        const sc = result.model.constraintsTouching(ft.id).find((c) => c.type === "subset");
         expect(sc).toBeDefined();
         if (sc?.type === "subset") {
           expect(sc.subsetRoleIds).toHaveLength(1);
@@ -2139,7 +2143,7 @@ describe("DraftModelParser", () => {
 
         expect(result.constraintProvenance[0]?.applied).toBe(true);
         const ft = result.model.getFactTypeByName("Person drives Car")!;
-        const eq = ft.constraints.find((c) => c.type === "equality");
+        const eq = result.model.constraintsTouching(ft.id).find((c) => c.type === "equality");
         expect(eq).toBeDefined();
         if (eq?.type === "equality") {
           expect(eq.roleIds1).toHaveLength(1);

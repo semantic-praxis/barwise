@@ -223,10 +223,10 @@ describe("TranscriptProcessor", () => {
       expect(ft).toBeDefined();
 
       // Should have at least one uniqueness and one mandatory.
-      const hasUniqueness = ft!.constraints.some(
+      const hasUniqueness = ft!.internalConstraints.some(
         (c) => c.type === "internal_uniqueness",
       );
-      const hasMandatory = ft!.constraints.some(
+      const hasMandatory = ft!.internalConstraints.some(
         (c) => c.type === "mandatory",
       );
       expect(hasUniqueness).toBe(true);
@@ -257,7 +257,7 @@ describe("TranscriptProcessor", () => {
 
       const ft = result.model.getFactTypeByName("Customer has Name");
       expect(ft).toBeDefined();
-      const uc = ft!.constraints.find((c) => c.type === "internal_uniqueness");
+      const uc = ft!.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(uc).toBeDefined();
       expect(uc!.type === "internal_uniqueness" && uc!.isPreferred).toBe(true);
     });

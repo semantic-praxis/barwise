@@ -54,11 +54,7 @@ describe("NORMA join path import", () => {
   const model = importNormaXml(loadFixture("personCountryDemo.orm"));
 
   function findJoinEquality() {
-    for (const ft of model.factTypes) {
-      const c = ft.constraints.find(isJoinEquality);
-      if (c) return c;
-    }
-    return undefined;
+    return model.constraints.find(isJoinEquality);
   }
 
   it("imports the join equality instead of dropping it", () => {
@@ -208,7 +204,7 @@ describe("NORMA join path fallbacks", () => {
     // Only the second sequence declares a join path; the first (flat,
     // two roles in one fact type) converts to the equivalent operand.
     const model = importNormaXml(equalityXml("", validJoinRule));
-    const joins = model.factTypes.flatMap((ft) => ft.constraints.filter(isJoinEquality));
+    const joins = model.constraints.filter(isJoinEquality);
     expect(joins).toHaveLength(1);
     expect(joins[0]!.operands).toHaveLength(2);
     expect(joins[0]!.operands[0]!.path.steps).toEqual([{ entry: "_R1", exit: "_R2" }]);
@@ -231,11 +227,9 @@ describe("NORMA join path fallbacks", () => {
               </orm:JoinPath>
             </orm:JoinRule>`;
     const model = importNormaXml(equalityXml("", danglingRule));
-    const joins = model.factTypes.flatMap((ft) => ft.constraints.filter(isJoinEquality));
+    const joins = model.constraints.filter(isJoinEquality);
     expect(joins).toHaveLength(0);
-    const flats = model.factTypes.flatMap((ft) =>
-      ft.constraints.filter((c) => c.type === "equality")
-    );
+    const flats = model.constraints.filter((c) => c.type === "equality");
     expect(flats).toHaveLength(1);
   });
 });

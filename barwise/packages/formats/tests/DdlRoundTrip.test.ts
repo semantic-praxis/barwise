@@ -140,7 +140,7 @@ describe("an identity clause reads back as auto_counter", () => {
     const ft = model.factTypes.find((f) =>
       f.roles.some((r) => model.getObjectType(r.playerId)?.name === "SeqNo")
     );
-    expect(ft?.constraints.some((c) => c.type === "mandatory"), "NOT NULL read").toBe(true);
+    expect(ft?.internalConstraints.some((c) => c.type === "mandatory"), "NOT NULL read").toBe(true);
     expect(valueType(model, "Qty")?.dataType).toEqual({ name: "integer" });
   });
 
@@ -234,7 +234,11 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
       "Student",
       "Course",
     ]);
-    expect(ft?.constraints.map((c) => [c.type, "roleIds" in c ? c.roleIds.length : 0])).toEqual([
+    expect(
+      (ft ? model.constraintsTouching(ft.id) : undefined)?.map((
+        c,
+      ) => [c.type, "roleIds" in c ? c.roleIds.length : 0]),
+    ).toEqual([
       ["internal_uniqueness", 2],
     ]);
     const enrollment = model.getObjectTypeByName("Enrollment");
@@ -278,7 +282,7 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
     expect(model.objectifiedFactTypes.map((o) => model.getObjectType(o.objectTypeId)?.name))
       .toEqual(["Enrollment"]);
     expect(
-      model.factTypes.flatMap((f) => f.constraints).filter((c) => c.type === "external_uniqueness"),
+      model.everyConstraint().map(([c]) => c).filter((c) => c.type === "external_uniqueness"),
     )
       .toEqual([]);
   });
@@ -301,7 +305,7 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
     const where = new Map(
       model.factTypes.flatMap((f) => f.roles.map((r, i) => [r.id, `${f.name}#${i}`] as const)),
     );
-    const external = model.factTypes.flatMap((f) => f.constraints)
+    const external = model.everyConstraint().map(([c]) => c)
       .filter((c) => c.type === "external_uniqueness")
       .map((c) => c.roleIds.map((id) => where.get(id)));
     expect(external).toEqual([[
@@ -333,7 +337,7 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
           )
           .flatMap((f) => f.roles.map((r) => r.id)),
       );
-      return model.factTypes.flatMap((f) => f.constraints)
+      return model.everyConstraint().map(([c]) => c)
         .filter((c) => c.type === "external_uniqueness" && c.roleIds.some((id) => ofLink.has(id)));
     };
     const linkWarnings = (warnings: string[]) =>
@@ -352,7 +356,9 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
     it("wholly inside the relationship", () => {
       const { model, warnings } = ddl.parse(schema("UNIQUE (parent_a, child_id)"));
       const ft = model.getFactTypeByName("Parent and Child link");
-      expect(ft?.constraints.filter((c) => c.type === "internal_uniqueness")).toHaveLength(1);
+      expect(ft?.internalConstraints.filter((c) => c.type === "internal_uniqueness")).toHaveLength(
+        1,
+      );
       expect(warnings).toContain(
         `Table "link": UNIQUE (parent_a, child_id) covers only part of the composite foreign key `
           + `(parent_a, parent_b), and was not imported (barwise-1077).`,

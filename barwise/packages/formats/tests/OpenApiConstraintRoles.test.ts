@@ -30,7 +30,7 @@ function factType(model: OrmModel, name: string): FactType {
 
 /** The names of the players whose roles carry a constraint of `type`. */
 function constrainedPlayers(model: OrmModel, ft: FactType, type: string): string[] {
-  const roleIds = ft.constraints.flatMap((c) =>
+  const roleIds = ft.internalConstraints.flatMap((c) =>
     c.type !== type ? [] : "roleIds" in c ? c.roleIds : "roleId" in c ? [c.roleId] : []
   );
   return roleIds.map((id) => {
@@ -160,7 +160,7 @@ describe("R3: the reference-mode property is the entity's preferred identifier",
   function shape(model: OrmModel, ft: FactType): string[] {
     const player = (id: string) =>
       model.getObjectType(ft.roles.find((r) => r.id === id)!.playerId)!.name;
-    return ft.constraints.map((c) => {
+    return ft.internalConstraints.map((c) => {
       if (c.type === "mandatory") return `mandatory:${player(c.roleId)}`;
       if (c.type === "internal_uniqueness") {
         return `unique:${c.roleIds.map(player).join(",")}${c.isPreferred ? ":preferred" : ""}`;

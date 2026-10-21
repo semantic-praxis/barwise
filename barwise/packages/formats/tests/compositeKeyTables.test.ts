@@ -29,12 +29,12 @@ function shape(model: OrmModel) {
       const index = new Map(f.roles.map((r, i) => [r.id, i]));
       return {
         players: f.roles.map((r) => name(r.playerId)),
-        uniques: f.constraints.filter((c) => c.type === "internal_uniqueness")
+        uniques: f.internalConstraints.filter((c) => c.type === "internal_uniqueness")
           .map((c) => c.roleIds.map((id) => index.get(id)).sort()),
       };
     }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
-    externalUniques: model.factTypes.flatMap((f) => f.constraints)
+    externalUniques: model.everyConstraint().map(([c]) => c)
       .filter((c) => c.type === "external_uniqueness")
       .map((c) => c.roleIds.map((id) => playerOf.get(id) ?? "?").sort().join(","))
       .sort(),
@@ -200,7 +200,7 @@ describe("a composite-key table imports as the fact type it states", () => {
     const lineId = model.getFactTypeByName("OrderLine has LineId")!;
     const valueRole = lineId.roles.find((r) => model.getObjectType(r.playerId)?.name === "LineId")!;
     expect(
-      lineId.constraints.some((c) =>
+      lineId.internalConstraints.some((c) =>
         c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === valueRole.id
       ),
     ).toBe(true);
@@ -397,7 +397,7 @@ describe("a composite-key table imports as the fact type it states", () => {
       PRIMARY KEY (currency, rate_date));`);
     expect(model.objectifiedFactTypes).toEqual([]);
     expect(
-      model.factTypes.flatMap((f) => f.constraints).some((c) => c.type === "external_uniqueness"),
+      model.everyConstraint().map(([c]) => c).some((c) => c.type === "external_uniqueness"),
     )
       .toBe(true);
   });

@@ -177,13 +177,13 @@ function nonLocalRuleIds(model: OrmModel, ce: Counterexample): Set<string> {
 
   const populated = new Set(ce.forbidden.map((f) => f.factTypeId));
   const out = new Set<string>();
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      const reaches = roleIdsOf(c).map((rid) => home.get(rid));
-      const outside = !populated.has(ft.id)
-        || reaches.some((ftId) => ftId === undefined || !populated.has(ftId));
-      if (outside) { for (const id of RULES_FROM_KIND[c.type]) out.add(id); }
-    }
+  // An internal constraint is placed in its fact type; an external one is
+  // placed in the model, so only the fact types it reaches decide.
+  for (const [c, placed] of model.everyConstraint()) {
+    const reaches = roleIdsOf(c).map((rid) => home.get(rid));
+    const outside = (placed !== undefined && !populated.has(placed.id))
+      || reaches.some((ftId) => ftId === undefined || !populated.has(ftId));
+    if (outside) { for (const id of RULES_FROM_KIND[c.type]) out.add(id); }
   }
   // Object cardinality is declared on the object type, not on a role, so
   // `roleIdsOf` cannot see it. It counts the whole object universe,

@@ -36,14 +36,16 @@ function composite(model: OrmModel) {
       const index = new Map(f.roles.map((r, i) => [r.id, i]));
       return {
         players: f.roles.map((r) => name(r.playerId)),
-        uniques: f.constraints.filter((c) => c.type === "internal_uniqueness")
+        uniques: f.internalConstraints.filter((c) => c.type === "internal_uniqueness")
           .map((c) => c.roleIds.map((id) => index.get(id)).sort()),
-        mandatory: f.constraints.filter((c) => c.type === "mandatory")
+        mandatory: f.internalConstraints.filter((c) => c.type === "mandatory")
           .map((c) => index.get(c.roleId)).sort(),
       };
     })),
     externalUniques: sorted(
-      facts.flatMap((f) => f.constraints).filter((c) => c.type === "external_uniqueness")
+      model.constraints.filter((c) =>
+        c.type === "external_uniqueness" && c.roleIds.some((id) => playerOf.has(id))
+      )
         .map((c) => c.roleIds.map((id) => playerOf.get(id) ?? "?").sort()),
     ),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),

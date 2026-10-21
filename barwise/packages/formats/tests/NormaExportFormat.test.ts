@@ -132,9 +132,7 @@ describe("NormaExportFormat", () => {
       expect(xml).toContain('Purpose="SameFactType"');
 
       const reimported = importNormaXml(xml);
-      const joins = reimported.factTypes.flatMap((ft) =>
-        ft.constraints.filter((c) => c.type === "join_equality")
-      );
+      const joins = reimported.constraints.filter((c) => c.type === "join_equality");
       expect(joins).toHaveLength(1);
       expect(joins[0]!.operands).toHaveLength(2);
     });

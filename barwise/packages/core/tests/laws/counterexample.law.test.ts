@@ -81,7 +81,12 @@ describe("coverage: the law reaches every constraint kind that has a generator",
  * Spec: `docs/specs/counterexample-stray-rules.spec.md`.
  */
 const LOCAL_STRAY_BASELINE = {
-  occurrences: 123,
+  // 123 until a constraint across fact types stopped having a host fact
+  // type (orm-format-3 WS3c): the 12 more are join exclusions whose
+  // generated host was unpopulated, which used to count them non-local.
+  // Their reach is all that decides now. The count rose because what it
+  // measures was corrected, not because a stray came back.
+  occurrences: 135,
   reasons: {
     // barwise-1017: the MODEL is contradictory at that role. A value
     // type declaring `integer` and enumerating {v3, v1, v2} admits

@@ -51,7 +51,7 @@ ${constraints}`;
 /** Constraint ids of ft-1, loaded from a whole document. */
 function idsIn(yaml: string): (string | undefined)[] {
   const model = new OrmYamlSerializer().deserialize(yaml);
-  return model.getFactType("ft-1")!.constraints.map((c) => c.id);
+  return model.getFactType("ft-1")!.internalConstraints.map((c) => c.id);
 }
 
 /** Constraint ids of ft-1, from its constraints list alone. */
@@ -61,7 +61,7 @@ function idsOf(constraints: string): (string | undefined)[] {
 
 function constraintIds(yaml: string): string[] {
   const model = new OrmYamlSerializer().deserialize(yaml);
-  return model.factTypes.flatMap((ft) => ft.constraints.map((c) => c.id!));
+  return model.everyConstraint().map(([c]) => c.id!);
 }
 
 describe("constraint ids a 2.0 file omits", () => {
@@ -205,7 +205,7 @@ describe("constraint ids a 2.0 file omits", () => {
           role: r-1
 `));
     const saved = serializer.serialize(model);
-    const derived = model.getFactType("ft-1")!.constraints[0]!.id!;
+    const derived = model.getFactType("ft-1")!.internalConstraints[0]!.id!;
     expect(saved).toContain(`id: ${derived}`);
     expect(idsIn(saved)).toEqual([derived]);
   });
@@ -238,7 +238,7 @@ describe("constraint ids a 2.0 file omits", () => {
         readings: ["{0} has {1}"],
         constraints: [{ type: "mandatory", roleId: "r-1" }],
       });
-      expect(ft.constraints[0]!.id).toBe("minted-1");
+      expect(ft.internalConstraints[0]!.id).toBe("minted-1");
     } finally {
       setIdGenerator(undefined);
     }

@@ -181,7 +181,7 @@ models:
           - not_null
           - accepted_values: { values: [A, B] }
 `]);
-    const values = model.factTypes.flatMap((f) => f.constraints)
+    const values = model.everyConstraint().map(([c]) => c)
       .filter((c) => c.type === "value_constraint");
     expect(values).toHaveLength(1);
     expect(values[0]).toMatchObject({ values: ["A", "B"] });
