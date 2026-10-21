@@ -159,6 +159,60 @@ export function isDanglingFactType(a: OrmModel, b: OrmModel, factTypeId: string)
   return !a.getFactType(factTypeId) && !b.getFactType(factTypeId);
 }
 
+/**
+ * How a diff pairs a constraint on one side with one on the other
+ * (orm-format-3, Open decision 4 as revised 2026-10-18).
+ *
+ * - `"id-first"`, the default: a constraint whose id occurs exactly once
+ *   on each side is paired by id, so an edit that keeps the id is one
+ *   `constraintsModified` change rather than a removal and an addition;
+ *   the rest are paired by content key. The fallback is what keeps a
+ *   transcript import working against its base: its ids are fresh, so
+ *   nothing pairs by id and everything falls through to content.
+ * - `"content"`: content keys only. For comparing independent LLM samples,
+ *   whose ids are unrelated by construction, so a coincidental id never
+ *   pairs two different constraints.
+ */
+export type ConstraintMatching = "id-first" | "content";
+
+/** How one diff pairs constraints, fixed once for the whole pair of models. */
+export interface ConstraintPairing {
+  readonly matching: ConstraintMatching;
+  /**
+   * Ids given to more than one constraint anywhere in each model
+   * (barwise-b2s). They pair nothing by id: uniqueness is a whole-model
+   * condition, so a list of one fact type's constraints cannot decide it.
+   */
+  readonly repeatedA: ReadonlySet<string>;
+  readonly repeatedB: ReadonlySet<string>;
+}
+
+/** The pairing for diffing `existing` against `incoming`. */
+export function constraintPairing(
+  existing: OrmModel,
+  incoming: OrmModel,
+  matching: ConstraintMatching,
+): ConstraintPairing {
+  // Content matching never reads the repeated ids, and the sample fold
+  // diffs every pair of samples, so it skips the two model walks.
+  if (matching !== "id-first") return { matching, repeatedA: NO_IDS, repeatedB: NO_IDS };
+  return { matching, repeatedA: repeatedIds(existing), repeatedB: repeatedIds(incoming) };
+}
+
+const NO_IDS: ReadonlySet<string> = new Set();
+
+/** The constraint ids that occur more than once in the model. */
+function repeatedIds(model: OrmModel): ReadonlySet<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const [c] of model.everyConstraint()) {
+    if (c.id === undefined) continue;
+    if (seen.has(c.id)) repeated.add(c.id);
+    seen.add(c.id);
+  }
+  return repeated;
+}
+
 export function diffFactType(
   a: FactType,
   b: FactType,
@@ -168,6 +222,7 @@ export function diffFactType(
     existing: roleHolders(existingModel),
     incoming: roleHolders(incomingModel),
   },
+  pairing: ConstraintPairing = constraintPairing(existingModel, incomingModel, "id-first"),
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
@@ -198,7 +253,8 @@ export function diffFactType(
 
   // Constraints -- pass both role arrays and both models' role-holder
   // indexes, so constraintKey can resolve role IDs to positions (stable
-  // across LLM re-extractions and imports).
+  // across LLM re-extractions and imports), or, for a pair joined by its
+  // constraint id, to the role ids themselves (see `pairRoleKeys`).
   const constraintDiff = diffConstraints(
     a.constraints,
     b.constraints,
@@ -206,6 +262,7 @@ export function diffFactType(
     b.roles,
     holders.existing,
     holders.incoming,
+    pairing,
   );
   changes.push(...constraintDiff);
 
@@ -269,15 +326,20 @@ function copy<T>(value: T): T {
  */
 function valueConstraintKey(vc: ValueConstraintDef | undefined): string {
   if (!vc) return "";
-  const values = vc.values.slice().sort().join(",");
+  // JSON-quoted, so a value holding a comma, a bar or ".." cannot read as
+  // two values or as a range.
+  const values = vc.values.slice().sort();
   const ranges = (vc.ranges ?? [])
     .map((r) =>
-      `${r.minInclusive === false ? "(" : "["}${r.min ?? ""}..${r.max ?? ""}`
-      + `${r.maxInclusive === false ? ")" : "]"}`
+      JSON.stringify([
+        r.minInclusive !== false,
+        r.min ?? "",
+        r.max ?? "",
+        r.maxInclusive !== false,
+      ])
     )
-    .sort()
-    .join(",");
-  return `${values}|${ranges}`;
+    .sort();
+  return JSON.stringify([values, ranges]);
 }
 
 /** A stable key for a derivation rule, or "" when absent (asserted). */
@@ -347,13 +409,46 @@ function roleKeys(
   };
 }
 
+/**
+ * The role keys for a constraint already paired by its own id, and only
+ * then: a role both models hold, once each, is keyed by its id as well as
+ * its `roleKeys` position. The pair's id already says the two are one
+ * constraint, so its roles' ids are evidence: by position alone, a
+ * constraint moved onto the role that took the old position kept its key
+ * (orm-format-3 WS3a-iii review). Position stays because readings refer
+ * to roles by it: in "Person is parent of Person" two roles can share a
+ * player and a name, so a reorder under the same reading changes what the
+ * constraint says while every per-role comparison of the fact type
+ * agrees. The position is `roleKeys`' own -- host position, or the other
+ * fact type's name and position there -- so no fact type id enters the
+ * key: the diff matches fact types by name, so a holder that changed only
+ * its id is the same fact type, and one renamed is a different one.
+ *
+ * The content pass uses `roleKeys` alone and never reads a role id: it
+ * pairs constraints whose ids say nothing, and keying by role id there
+ * would let a coincidental role id pair two different constraints, which
+ * is what content matching exists to rule out. Two functions rather than
+ * a flag, so the content pass cannot reach this one.
+ */
+function pairRoleKeys(
+  position: RoleKeys,
+  holders: RoleHolders,
+  otherHolders: RoleHolders,
+): RoleKeys {
+  return (id) =>
+    holders.get(id)?.length === 1 && otherHolders.get(id)?.length === 1
+      ? `i${JSON.stringify([id, position(id)])}`
+      : position(id);
+}
+
 function resolveRole(id: string, keys: RoleKeys): string {
   return keys(id);
 }
 
 /**
  * Produce a stable, comparable string key for a constraint, normalized
- * so that role IDs are replaced with positions (see `roleKeys`). This
+ * so that role IDs are replaced with positions, or for a pair joined by
+ * id with shared role ids (see `roleKeys` and `pairRoleKeys`). This
  * eliminates false-positive diffs caused by fresh UUIDs from LLM
  * re-extractions and imports.
  */
@@ -385,8 +480,9 @@ function constraintTypeKey(
     }
     case "value_constraint": {
       const role = c.roleId ? resolveRole(c.roleId, idxMap) : "";
-      const vals = [...c.values].sort().join(",");
-      return `VC:${role}:${vals}`;
+      // Both halves, as `valueConstraintKey` reads them: a range-only edit
+      // is a change to what the model permits (barwise-934, for roles).
+      return `VC:${role}:${valueConstraintKey(c)}`;
     }
     case "disjunctive_mandatory": {
       const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
@@ -450,17 +546,47 @@ function diffConstraints(
   rolesB: readonly Role[],
   holdersA: RoleHolders,
   holdersB: RoleHolders,
+  pairing: ConstraintPairing,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
   const idxMapA = roleKeys(rolesA, holdersA, holdersB);
   const idxMapB = roleKeys(rolesB, holdersB, holdersA);
 
-  const keysA = new Set(a.map((c) => constraintKey(c, idxMapA)));
-  const keysB = new Set(b.map((c) => constraintKey(c, idxMapB)));
+  // Pair by id first, where an id names exactly one constraint in each
+  // model. An id given twice anywhere in a model (barwise-b2s) pairs
+  // nothing, so those constraints fall through to content rather than
+  // pairing one of them arbitrarily. The id is optional in the type until
+  // WS3c, though every constraint in a model has one (barwise-nkq).
+  const paired = new Set<Constraint>();
+  const modified: { from: Constraint; to: Constraint; }[] = [];
+  if (pairing.matching === "id-first") {
+    // The key for comparing a pair joined by id; see `pairRoleKeys`.
+    const pairMapA = pairRoleKeys(idxMapA, holdersA, holdersB);
+    const pairMapB = pairRoleKeys(idxMapB, holdersB, holdersA);
+    const byIdB = new Map(
+      b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
+    );
+    for (const ca of a) {
+      if (ca.id === undefined || pairing.repeatedA.has(ca.id)) continue;
+      const cb = byIdB.get(ca.id);
+      if (!cb) continue;
+      paired.add(ca).add(cb);
+      if (constraintKey(ca, pairMapA) !== constraintKey(cb, pairMapB)) {
+        modified.push({ from: ca, to: cb });
+      }
+    }
+  }
+  const restA = a.filter((c) => !paired.has(c));
+  const restB = b.filter((c) => !paired.has(c));
 
-  const added = b.filter((c) => !keysA.has(constraintKey(c, idxMapB)));
-  const removed = a.filter((c) => !keysB.has(constraintKey(c, idxMapA)));
+  const keyA = new Map(restA.map((c) => [c, constraintKey(c, idxMapA)]));
+  const keyB = new Map(restB.map((c) => [c, constraintKey(c, idxMapB)]));
+  const keysA = new Set(keyA.values());
+  const keysB = new Set(keyB.values());
+
+  const added = restB.filter((c) => !keysA.has(keyB.get(c)!));
+  const removed = restA.filter((c) => !keysB.has(keyA.get(c)!));
 
   // The constraints themselves, copied: the prose renders only their
   // deduplicated type names, and that was the whole of what a consumer
@@ -470,6 +596,12 @@ function diffConstraints(
   }
   if (removed.length > 0) {
     changes.push({ change: "constraintsRemoved", constraints: removed.map(copy) });
+  }
+  if (modified.length > 0) {
+    changes.push({
+      change: "constraintsModified",
+      constraints: modified.map(({ from, to }) => ({ from: copy(from), to: copy(to) })),
+    });
   }
 
   return changes;

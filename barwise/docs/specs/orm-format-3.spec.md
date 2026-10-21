@@ -2,11 +2,11 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, and 3a-iii (id-first diff) 2026-10-21; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
-Last-updated: 2026-10-20
+Last-updated: 2026-10-21
 Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
@@ -1041,6 +1041,73 @@ Implementation notes (2026-10-19):
   - `ReferenceSource`'s constraint arm pairs an internal constraint with
     its fact type and one across fact types with none in the type, so
     `referenceDiagnostics` needs no assertion to read either.
+- **Id-first diff (3a-iii, 2026-10-21).**
+  - `diffModels(existing, incoming, { constraintMatching })` takes
+    `"id-first"` (the default) or `"content"`; `diffFactType` passes it
+    to `diffConstraints`. `barwise diff`, `history`, `merge`, the
+    transcript imports and MCP's diff and merge tools take the default
+    unchanged.
+  - Id-first pairs a constraint whose id occurs exactly once in each
+    model, within a fact type matched by name. A pair whose content key
+    differs is one `constraintsModified` change carrying both versions (rendered "constraints modified:
+    <kinds>", "<old> to <new>" for a kind that changed; breaking level
+    `caution`). The rest pair by content key, as before, and a pair held
+    out by id never also matches by content. An id given twice anywhere in
+    a model pairs nothing and falls through to content (barwise-b2s),
+    rather than pairing one copy arbitrarily; uniqueness is decided per
+    model, not per fact type. Two constraints that swap ids read as two
+    modifications, since under id-first the id is the constraint's
+    identity.
+  - A derived id is identity only as far as its derivation is stable. One
+    edge pairs unrelated constraints: a file states id D on a constraint
+    later edited, an id-less constraint whose content derives D steps to
+    another id while D is taken, and deleting the first hands D to the
+    second. That needs a stated id equal to another constraint's
+    derivation; it is not handled in 3a.
+  - A pair joined by id is compared with a key that reads each role both
+    models hold, once each, by its id as well as its position (its host
+    position, or its holder's name and position there); the content pass
+    keeps the positional key alone. By position alone, a constraint moved
+    onto the role that took the old position kept its key; the pair's id
+    makes its roles' ids evidence, so it reads them. Position stays
+    because readings address roles by it: two roles of a ring can share a
+    player and a name, so a reorder under one reading changes what the
+    constraint says while every per-role comparison agrees. A plain role
+    swap therefore reads as a modification of the constraints on those
+    roles, which is true of what they say. No fact type id is in the key,
+    so a fact type that changed only its id changes nothing, which is
+    what a merge leaves behind (an accepted fact type keeps the existing
+    id); a renamed holder is a different fact type to a diff that matches
+    by name, so it reads as a change. The content pass does not read
+    role ids, because there a role id is as coincidental as a constraint
+    id. The key's sorting and default folding hold in both, so a
+    reordered role list or `isPreferred: false` written out reads as no
+    change.
+  - A value constraint's content key now reads its ranges as well as its
+    values, JSON-quoted. It read values alone, so a range-only edit was
+    invisible in either mode (the role-level counterpart of barwise-934),
+    and joined them with commas, so `["a,b"]` keyed like `["a", "b"]`.
+  - Transcript imports keep the default safely: extraction fills ids
+    through `addConstraint`, which mints random UUIDs under the default
+    generator, so an import never shares an id with its base by accident
+    and falls through to content. A deterministic generator breaks that:
+    promptlab's `withDeterministicIds` mints reference-model ids from a
+    counter, so diffing two such references pairs constraints by mint
+    order. Nothing in the repository diffs two of them; a person running
+    `barwise diff` on them should pass content mode, which the CLI does
+    not yet expose (barwise-uy7).
+  - `sampleAgreement.ts` (the medoid fold and each sample's diff) and
+    `TranscriptProcessor.ts` (an alternative framing's diff) pass
+    `"content"`, through one shared `UNRELATED_IDS_DIFF`. The modes usually agree
+    on whether a fact type changed, so the fold's count rarely moves, but
+    not always: two constraints of equal content collapse under content
+    keys, so dropping one of them is a change by id and none by content.
+    A spy test pins both call sites; core's tests pin what each mode
+    pairs.
+  - Merge needed no change in 3a: it takes a modified fact type whole from
+    the chosen side, constraints included. A constraint whose 2.0 host
+    differs between the sides is still a removal and an addition until
+    3c's model-level delta.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

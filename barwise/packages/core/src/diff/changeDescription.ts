@@ -115,6 +115,12 @@ export type ChangeDescription =
   // told a consumer nothing about which roles the constraint covered.
   | { readonly change: "constraintsAdded"; readonly constraints: readonly Constraint[]; }
   | { readonly change: "constraintsRemoved"; readonly constraints: readonly Constraint[]; }
+  // A constraint paired by id whose content changed (orm-format-3, Open
+  // decision 4): both versions, so a consumer can see what moved.
+  | {
+    readonly change: "constraintsModified";
+    readonly constraints: readonly { readonly from: Constraint; readonly to: Constraint; }[];
+  }
   | {
     readonly change: "derivation";
     readonly from?: DerivationRule;
@@ -234,6 +240,17 @@ export function describeChange(change: ChangeDescription): string {
       return `constraints added: ${constraintTypes(change.constraints)}`;
     case "constraintsRemoved":
       return `constraints removed: ${constraintTypes(change.constraints)}`;
+    case "constraintsModified":
+      // A kind or modality that changed reads as both, so the prose does
+      // not hide that a mandatory became a frequency, or a necessity an
+      // obligation.
+      return `constraints modified: ${
+        distinctJoined(change.constraints.map((m) =>
+          kindName(m.from) === kindName(m.to)
+            ? kindName(m.to)
+            : `${kindName(m.from)} to ${kindName(m.to)}`
+        ))
+      }`;
     case "derivation":
       return "derivation changed";
     case "definition":
@@ -275,9 +292,19 @@ function describeInstanceChange(added: number, removed: number): string {
   return "instances reordered";
 }
 
-/** The deduplicated constraint type names, in first-seen order. */
+/** The distinct strings, in first-seen order, comma-joined. */
+function distinctJoined(names: readonly string[]): string {
+  return [...new Set(names)].join(", ");
+}
+
+/** A constraint's kind, with its modality when it is deontic. */
+function kindName(c: Constraint): string {
+  return c.modality === "deontic" ? `${c.type} (deontic)` : c.type;
+}
+
+/** The deduplicated constraint kinds, with modality, in first-seen order. */
 function constraintTypes(constraints: readonly Constraint[]): string {
-  return [...new Set(constraints.map((c) => c.type))].join(", ");
+  return distinctJoined(constraints.map(kindName));
 }
 
 /** Format a DataTypeDef for human-readable diff output. */

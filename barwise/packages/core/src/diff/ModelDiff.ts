@@ -16,6 +16,7 @@ import { classifyBreakingLevel } from "./breakingLevel.js";
 import { describeChange } from "./changeDescription.js";
 import type { DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
 import {
+  constraintPairing,
   diffDefinition,
   diffFactType,
   diffObjectType,
@@ -27,6 +28,15 @@ import {
   roleHolders,
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
+
+import type { ConstraintMatching } from "./elementDiff.js";
+export type { ConstraintMatching } from "./elementDiff.js";
+
+/** Options for {@link diffModels}. */
+export interface DiffOptions {
+  /** How constraints are paired; see {@link ConstraintMatching}. Default `"id-first"`. */
+  readonly constraintMatching?: ConstraintMatching;
+}
 
 export {
   deltaLabel,
@@ -58,12 +68,19 @@ export type {
  *
  * @param existing The model already on disk (reviewed/approved).
  * @param incoming The freshly extracted model from the LLM.
+ * @param options How constraints are paired; id-first by default.
  * @returns A list of deltas covering every element in either model.
  */
 export function diffModels(
   existing: OrmModel,
   incoming: OrmModel,
+  options: DiffOptions = {},
 ): ModelDiffResult {
+  const pairing = constraintPairing(
+    existing,
+    incoming,
+    options.constraintMatching ?? "id-first",
+  );
   const deltas: ModelDelta[] = [];
 
   // --- Object types ---
@@ -130,7 +147,7 @@ export function diffModels(
         breakingLevel: classifyBreakingLevel("removed", [], "fact_type"),
       });
     } else {
-      const changes = diffFactType(ft, match, existing, incoming, holders);
+      const changes = diffFactType(ft, match, existing, incoming, holders, pairing);
       const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
       deltas.push({
         kind,

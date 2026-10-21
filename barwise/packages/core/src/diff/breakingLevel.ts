@@ -62,6 +62,7 @@ const CHANGE_LEVEL = {
   dataTypeRemoved: "caution",
   constraintsAdded: "caution",
   constraintsRemoved: "caution",
+  constraintsModified: "caution",
   derivation: "caution",
 
   // A subtype fact's own fields. `isExclusive` and `isExhaustive` state

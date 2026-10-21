@@ -18,6 +18,7 @@
  */
 import type { OrmModel } from "@barwise/core";
 import { diffModels, type NamedElementType } from "@barwise/core/diff";
+import { UNRELATED_IDS_DIFF } from "./diffOptions.js";
 import type { Ambiguity } from "./ExtractionTypes.js";
 
 /** One element the samples do not agree on. */
@@ -61,7 +62,7 @@ function keyOf(elementType: string, name: string): string {
 
 /** Deltas that represent an actual difference between two models. */
 function differenceCount(a: OrmModel, b: OrmModel): number {
-  return diffModels(a, b).deltas.filter((d) => d.kind !== "unchanged").length;
+  return diffModels(a, b, UNRELATED_IDS_DIFF).deltas.filter((d) => d.kind !== "unchanged").length;
 }
 
 /**
@@ -112,7 +113,7 @@ export function computeSampleAgreement(models: readonly OrmModel[]): SampleAgree
   const naming = new Map<string, SampleDisagreement>();
   for (let i = 0; i < models.length; i++) {
     if (i === medoidIndex) continue;
-    const diff = diffModels(medoid, models[i]!);
+    const diff = diffModels(medoid, models[i]!, UNRELATED_IDS_DIFF);
     for (const d of diff.deltas) {
       // Object types and fact types only. The exclusion used to name
       // `definition` alone, which silently admitted every kind the diff

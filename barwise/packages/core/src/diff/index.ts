@@ -2,12 +2,14 @@
 export { type ChangeDescription, describeChange, type RoleSummary } from "./changeDescription.js";
 export {
   type BreakingLevel,
+  type ConstraintMatching,
   type DefinitionDelta,
   type DeltaJson,
   type DeltaKind,
   deltaLabel,
   deltaToJson,
   diffModels,
+  type DiffOptions,
   ELEMENT_TYPES,
   elementLabel,
   elementName,
