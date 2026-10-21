@@ -170,7 +170,9 @@ Options:
 
 With `--format json`, each delta carries `changes` (what changed, as
 data) beside `changeDescriptions` (the same, as sentences). The shape is
-the MCP `diff_models` tool's; docs/MCP.md shows an example.
+the MCP `diff_models` tool's; docs/MCP.md shows an example and says how
+constraints are paired (by id where both models share it, by content
+otherwise).
 
 ### merge
 

@@ -158,6 +158,26 @@ describe("what id-first pairing reads", () => {
     ]);
   });
 
+  it("reports nothing when the key moves but the constraint itself is unchanged", () => {
+    // The fact type's roles swap places under the same ids: the key, which
+    // reads roles by position, moves, and the constraint does not.
+    const a = drives([uc("c-1", ["r-1"])]);
+    const b = new OrmModel({ name: "M" });
+    b.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+    b.addObjectType({ id: "ot-c", name: "Car", kind: "entity", referenceMode: "vin" });
+    b.addFactType({
+      id: "ft-d",
+      name: "Person drives Car",
+      roles: [
+        { id: "r-2", name: "is driven by", playerId: "ot-c" },
+        { id: "r-1", name: "drives", playerId: "ot-p" },
+      ],
+      readings: ["{1} drives {0}"],
+      constraints: [uc("c-1", ["r-1"])],
+    });
+    expect(constraintChanges(a, b)).toEqual([]);
+  });
+
   it("names both kinds when an edit changes the kind", () => {
     const a = drives([{ id: "c-1", type: "mandatory", roleId: "r-1" }]);
     const b = drives([uc("c-1", ["r-1"])]);

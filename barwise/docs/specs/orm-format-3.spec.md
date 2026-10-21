@@ -1048,8 +1048,10 @@ Implementation notes (2026-10-19):
     transcript imports and MCP's diff and merge tools take the default
     unchanged.
   - Id-first pairs a constraint whose id occurs exactly once in each
-    model. A pair whose content key differs is one `constraintsModified`
-    change carrying both versions (rendered "constraints modified:
+    model. A pair whose content key and raw content both differ is one
+    `constraintsModified` change carrying both versions (the key alone
+    moves when the fact type's roles swap places or a holder is renamed,
+    with the constraint untouched) (rendered "constraints modified:
     <kinds>", "<old> to <new>" for a kind that changed; breaking level
     `caution`). The rest pair by content key, as before, and a pair held
     out by id never also matches by content. An id given twice anywhere in
@@ -1058,6 +1060,12 @@ Implementation notes (2026-10-19):
     model, not per fact type. Two constraints that swap ids read as two
     modifications, since under id-first the id is the constraint's
     identity.
+  - A derived id is identity only as far as its derivation is stable. One
+    edge pairs unrelated constraints: a file states id D on a constraint
+    later edited, an id-less constraint whose content derives D steps to
+    another id while D is taken, and deleting the first hands D to the
+    second. That needs a stated id equal to another constraint's
+    derivation; it is not handled in 3a.
   - A value constraint's content key now reads its ranges as well as its
     values. It read values alone, so a range-only edit was invisible in
     either mode: the role-level counterpart of barwise-934.

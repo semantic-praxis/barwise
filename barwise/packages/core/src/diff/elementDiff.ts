@@ -23,6 +23,7 @@ import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { canonicalJson } from "../serialization/derivedId.js";
 import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
 
 export function diffObjectType(
@@ -193,8 +194,13 @@ export function constraintPairing(
   incoming: OrmModel,
   matching: ConstraintMatching,
 ): ConstraintPairing {
+  // Content matching never reads the repeated ids, and the sample fold
+  // diffs every pair of samples, so it skips the two model walks.
+  if (matching === "content") return { matching, repeatedA: NO_IDS, repeatedB: NO_IDS };
   return { matching, repeatedA: repeatedIds(existing), repeatedB: repeatedIds(incoming) };
 }
+
+const NO_IDS: ReadonlySet<string> = new Set();
 
 /** The constraint ids that occur more than once in the model. */
 function repeatedIds(model: OrmModel): ReadonlySet<string> {
@@ -527,7 +533,16 @@ function diffConstraints(
       const cb = byIdB.get(ca.id);
       if (!cb) continue;
       paired.add(ca).add(cb);
-      if (keyA.get(ca) !== keyB.get(cb)) modified.push({ from: ca, to: cb });
+      // Modified only when both the content key and the constraint itself
+      // differ. The key reads roles by position or holder name, to bridge
+      // fresh ids; a pair already joined by id needs no bridge, so a role
+      // swap or a renamed holder that moves the key without touching the
+      // constraint is not a modification of it. The raw content alone is
+      // not enough either: the same roles under fresh ids differ in raw
+      // ids and agree by key.
+      if (keyA.get(ca) !== keyB.get(cb) && canonicalJson(ca) !== canonicalJson(cb)) {
+        modified.push({ from: ca, to: cb });
+      }
     }
   }
   const restA = a.filter((c) => !paired.has(c));
