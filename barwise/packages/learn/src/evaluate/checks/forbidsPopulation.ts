@@ -112,11 +112,19 @@ function constraintsUnderTest(
     }
   }
 
+  // Every constraint that applies to a carrier, each once: a candidate's
+  // external uniqueness or disjunctive mandatory spans its fact types
+  // wherever a 2.0 file nests it (orm-format-3, Open decision 9). It is
+  // paired with a carrier it touches; enforcement reads the fact type only
+  // for the kinds that live in one.
   const guards = CANDIDATE_GUARDS[kind];
+  const seen = new Set<Constraint>();
   const pairs: Array<{ ft: FactType; c: Constraint; }> = [];
   for (const ft of carriers.values()) {
-    for (const c of ft.constraints) {
-      if (guards.some((g) => g(c))) pairs.push({ ft, c });
+    for (const c of candidate.constraintsTouching(ft.id)) {
+      if (seen.has(c) || !guards.some((g) => g(c))) continue;
+      seen.add(c);
+      pairs.push({ ft, c });
     }
   }
   return pairs;
@@ -204,7 +212,8 @@ export function forbidsPopulation(
     return fail(`The reference model has no fact type named "${factTypeName}" (exercise error).`);
   }
 
-  const constraint = refFt.constraints.find(GUARDS[constraintKind]);
+  // Every kind GUARDS names lives in its fact type.
+  const constraint = refFt.internalConstraints.find(GUARDS[constraintKind]);
   if (!constraint) {
     return fail(
       `The reference fact type "${factTypeName}" has no ${constraintKind} constraint (exercise error).`,

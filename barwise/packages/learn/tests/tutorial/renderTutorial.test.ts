@@ -80,3 +80,26 @@ describe("renderTutorial honesty checks", () => {
       .toThrow(/already exists in the prior/);
   });
 });
+
+describe("renderTutorial over a constraint across fact types", () => {
+  it("motivates it whichever fact type a 2.0 file nests it under", () => {
+    // A disjunctive mandatory over two of Order's roles, nested under
+    // "Customer places Order", which it does not touch (orm-format-3, Open
+    // decision 9). The snapshot's population satisfies it.
+    const tutorial = loadWorked();
+    const steps = tutorial.steps.map((s) => {
+      if (s.id !== "freq-line-limit") return s;
+      s.modelInstance.getFactTypeByName("Customer places Order")!.addConstraint({
+        id: "c-dm-order",
+        type: "disjunctive_mandatory",
+        roleIds: ["r-includes-order", "r-status-order"],
+      });
+      return { ...s, motivation: { kind: "counterexample", constraintId: "c-dm-order" } as const };
+    });
+    const markdown = renderTutorial({ ...tutorial, steps }, { toolVersion: "0.0.0-test" });
+    expect(markdown).toContain(
+      "Rules out: a Order that plays none of the required roles -- e.g. Order#1 appears in "
+        + "Customer places Order but plays none of [r-includes-order, r-status-order]",
+    );
+  });
+});

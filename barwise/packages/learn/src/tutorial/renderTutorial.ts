@@ -183,18 +183,22 @@ function assertValidSnapshot(step: LoadedTutorialStep, model: OrmModel): void {
   }
 }
 
+/**
+ * The constraint with this id, and a fact type to hand the counterexample
+ * generator: its own for an internal one, and for one across fact types
+ * the first fact type it touches, which the generator does not read for
+ * those kinds (orm-format-3, Open decision 9). Undefined only when no
+ * constraint has the id, or one across fact types touches none.
+ */
 function findConstraint(
   model: OrmModel,
   constraintId: string,
 ): { constraint: Constraint; factType: FactType; } | undefined {
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (c.id === constraintId) {
-        return { constraint: c, factType: ft };
-      }
-    }
-  }
-  return undefined;
+  const inView = model.getConstraintInView(constraintId);
+  if (!inView) return undefined;
+  const [constraint, host] = inView;
+  const factType = host ?? model.factTypesOf(constraint)[0];
+  return factType ? { constraint, factType } : undefined;
 }
 
 function linkTo(id: string, stepTitles: ReadonlyMap<string, string>): string {

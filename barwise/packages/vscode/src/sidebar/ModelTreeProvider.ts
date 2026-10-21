@@ -147,7 +147,7 @@ export class ModelTreeProvider implements vscode.TreeDataProvider<ModelTreeItem>
 
 // ---- Tree builder ----
 
-function buildTree(model: OrmModel): ModelTreeItem[] {
+export function buildTree(model: OrmModel): ModelTreeItem[] {
   const categories: ModelTreeItem[] = [];
 
   // Entity types
@@ -240,8 +240,11 @@ function valueItem(ot: ValueType): ModelTreeItem {
 function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
   const reading = ft.readings[0]?.template ?? ft.name;
 
-  // Collect constraints as children.
-  const constraintChildren: ModelTreeItem[] = ft.constraints.map((c) =>
+  // Every constraint that applies to the fact type: its own, and each
+  // across fact types that names one of its roles, so a composite key
+  // shows under both fact types it spans rather than under whichever one
+  // a 2.0 file nests it in (orm-format-3, Open decision 9).
+  const constraintChildren: ModelTreeItem[] = model.constraintsTouching(ft.id).map((c) =>
     constraintItem(c, ft, model)
   );
 

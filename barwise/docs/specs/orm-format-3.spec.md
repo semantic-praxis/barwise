@@ -1109,6 +1109,27 @@ Implementation notes (2026-10-19):
     differs between the sides is still a removal and an addition until
     3c's model-level delta.
 
+- **3b lands one package group at a time (2026-10-21).** A probe that
+  renamed the getter and type-checked every package (then reverted) found
+  14 files outside core: llm 4, formats 4, diagram 2, learn 2, dbt 1,
+  vscode 1. 3b-i takes the three smallest, vscode, learn and dbt; diagram,
+  formats and llm follow, one PR each.
+- **vscode, learn and dbt (3b-i, 2026-10-21).**
+  - The sidebar's model tree lists `constraintsTouching` under each fact
+    type, so a composite key shows under both fact types it spans and not
+    under one it is only nested in.
+  - The gym's `forbids_population` reads each carrier's
+    `constraintsTouching`, each constraint once, so a candidate's external
+    uniqueness or disjunctive mandatory counts wherever its file nests it;
+    before, one nested under a fact type outside the carriers was missed.
+    The reference side reads `internalConstraints`, which is every kind
+    the check accepts.
+  - The tutorial renderer finds a motivation's constraint with
+    `getConstraintInView`, handing the generator a fact type the
+    constraint touches for one across fact types.
+  - dbt's three SQL-pattern checks read `internalConstraints`: each asks
+    about an internal kind only.
+
 ### 4. Format 3.0 (provisional: not yet grounded)
 
 One PR:
