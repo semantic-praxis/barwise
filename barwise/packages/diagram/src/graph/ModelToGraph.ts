@@ -26,7 +26,8 @@ import type {
  * record is total over every kind that is not a drawn `ConstraintKind`,
  * internal kinds included, so leaving one out of both is a compile error.
  * The internal kinds never reach the switch, which walks
- * `model.constraints`; their entries say where each is drawn instead.
+ * `model.constraints`; their entries document where each is drawn, and
+ * nothing checks that a badge loop actually draws it.
  */
 const NOT_DRAWN: Record<Exclude<Constraint["type"], ConstraintKind>, string> = {
   internal_uniqueness: "Phase 1: rendered inline as a uniqueness bar on the fact type",
@@ -109,24 +110,25 @@ function constraintNodeIds(
   for (const id of own) taken.add(id);
 
   const ids = new Map<Constraint, string>();
-  let unnamed = 0;
   const free = (base: string) => {
     let id = base;
     for (let n = 2; taken.has(id); n++) id = `${base}#${n}`;
     taken.add(id);
     return id;
   };
+  // Every stated id is settled before any id-less constraint is numbered,
+  // so a number never takes an id constraints share, wherever in the file
+  // the id-less one sits.
   for (const c of constraints) {
-    if (c.id !== undefined && own.has(c.id)) {
-      ids.set(c, c.id);
-    } else if (c.id !== undefined) {
-      ids.set(c, free(c.id));
-    } else {
-      let id: string;
-      do id = `constraint-${unnamed++}`; while (taken.has(id));
-      taken.add(id);
-      ids.set(c, id);
-    }
+    if (c.id !== undefined) ids.set(c, own.has(c.id) ? c.id : free(c.id));
+  }
+  let unnamed = 0;
+  for (const c of constraints) {
+    if (c.id !== undefined) continue;
+    let id: string;
+    do id = `constraint-${unnamed++}`; while (taken.has(id));
+    taken.add(id);
+    ids.set(c, id);
   }
   return ids;
 }
@@ -186,6 +188,9 @@ export function modelToGraph(
       annotations: otAnnotations?.length ? otAnnotations : undefined,
     });
   }
+
+  // The fact types that get a node: a constraint attaches only to these.
+  const drawnFactTypeIds = new Set<string>();
 
   // Create fact type nodes and edges (skip absorbed and filtered-out facts).
   for (const ft of model.factTypes) {
@@ -257,6 +262,7 @@ export function modelToGraph(
     const objectifiedEntityName = objectifiedMap.get(ft.id);
     const ftAnnotations = annotationMap?.get(ft.id);
 
+    drawnFactTypeIds.add(ft.id);
     nodes.push({
       kind: "fact_type",
       id: ft.id,
@@ -278,11 +284,6 @@ export function modelToGraph(
       });
     }
   }
-
-  // The fact types that got a node: a constraint attaches only to these.
-  const drawnFactTypeIds = new Set(
-    nodes.filter((n) => n.kind === "fact_type").map((n) => n.id),
-  );
 
   // Build role-to-fact-type lookup for constraint edge routing.
   const roleToFactType = new Map<string, string>();
