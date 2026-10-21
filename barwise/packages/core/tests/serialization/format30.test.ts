@@ -192,3 +192,40 @@ describe("a version between 2.0 and 3.0", () => {
     );
   });
 });
+
+describe("a 2.0 file that omits its constraint ids", () => {
+  // Pinned literals: the ids the 2.0 reader of the release before 3.0
+  // derived for this file, when a flag was part of the constraint it
+  // hashed. Hashing without the flag moved the NORMA ids of 271 flagged
+  // uniquenesses across the tracked corpus; only a before-and-after
+  // capture caught it.
+  const v20 = `orm_version: "2.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-c, name: Customer, kind: entity, reference_mode: nr }
+    - { id: ot-nr, name: CustomerNr, kind: value }
+  fact_types:
+    - id: ft-nr
+      name: Customer has CustomerNr
+      roles:
+        - { id: r-c, player: ot-c, role_name: has }
+        - { id: r-nr, player: ot-nr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-c] }
+        - { type: internal_uniqueness, roles: [r-nr], is_preferred: true }
+`;
+
+  it("derives the ids earlier releases gave it, the flag included", () => {
+    const model = yaml.deserialize(v20);
+    expect(model.getFactType("ft-nr")!.internalConstraints.map((c) => c.id)).toEqual([
+      "b55e8e65-fa16-8edd-92ed-08d0a611508e",
+      "bb330124-3808-8a8f-9650-02c81dfc37f0",
+    ]);
+    expect(model.preferredIdentifierRefs).toEqual([[
+      "ot-c",
+      "bb330124-3808-8a8f-9650-02c81dfc37f0",
+    ]]);
+  });
+});
