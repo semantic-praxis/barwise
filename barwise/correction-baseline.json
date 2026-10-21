@@ -589,6 +589,12 @@
       "caught_by": "execution",
       "note": "A compiler probe (getter renamed, every package type-checked) found 43 files in seven packages where a text search had counted 52 in nine."
     },
+    "orm-format-3::a2c9da29702b": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
+      "caught_by": "not-a-correction",
+      "note": "Implementation record for 3b-iv: the four llm files the 2026-10-18 probe named moved as planned; nothing in the draft was wrong."
+    },
     "orm-format-3::a484a5199bd7": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "the draft put all of this in one pr. the split costs a little: until 3c, ormmodel.constraints walks the fact types on every read, so a rule that calls constrain",
