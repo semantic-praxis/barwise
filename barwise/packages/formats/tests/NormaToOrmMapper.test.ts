@@ -627,8 +627,8 @@ describe("NormaToOrmMapper", () => {
       });
       const model = mapNormaToOrm(doc);
 
-      // External uniqueness should be attached to the first fact type
-      // containing a referenced role.
+      // One external uniqueness, spanning both fact types. Which fact type
+      // a 2.0 file nests it under is the serializer's to decide (3c-ii).
       const allConstraints = model.everyConstraint().map(([c]) => c);
       const extConstraints = allConstraints.filter(
         (c) => c.type === "external_uniqueness",
@@ -1758,8 +1758,8 @@ describe("NormaToOrmMapper", () => {
           roleSequences: [[], []],
         };
         const model = mapNormaToOrm(makeDocWithRef(exc));
-        const ft = model.factTypes[0]!;
-        expect(model.constraintsTouching(ft.id).some((c) => c.type === "exclusion")).toBe(false);
+        // The whole model: a constraint with no roles touches no fact type.
+        expect(model.constraints.some((c) => c.type === "exclusion")).toBe(false);
       });
 
       it("maps an exclusion constraint as exclusive-or when it carries the coupler ref on its own", () => {

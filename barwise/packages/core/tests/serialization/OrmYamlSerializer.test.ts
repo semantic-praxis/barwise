@@ -977,6 +977,9 @@ model:
         }
       }
 
+      // Constraints across fact types, which no fact type above compares.
+      expect(restored.constraints).toEqual(original.constraints);
+
       // Definitions
       expect(restored.definitions).toHaveLength(
         original.definitions.length,

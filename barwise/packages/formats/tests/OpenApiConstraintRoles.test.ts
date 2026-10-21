@@ -160,7 +160,9 @@ describe("R3: the reference-mode property is the entity's preferred identifier",
   function shape(model: OrmModel, ft: FactType): string[] {
     const player = (id: string) =>
       model.getObjectType(ft.roles.find((r) => r.id === id)!.playerId)!.name;
-    return ft.internalConstraints.map((c) => {
+    // Every constraint touching the fact type, so a stray constraint across
+    // fact types from the importer shows in the shape.
+    return model.constraintsTouching(ft.id).map((c) => {
       if (c.type === "mandatory") return `mandatory:${player(c.roleId)}`;
       if (c.type === "internal_uniqueness") {
         return `unique:${c.roleIds.map(player).join(",")}${c.isPreferred ? ":preferred" : ""}`;

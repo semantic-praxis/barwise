@@ -1243,7 +1243,10 @@ Implementation notes (2026-10-19):
     probe that renamed the getter in core's emitted declarations and
     type-checked the other eleven packages found no read (2026-10-21).
     Core's own readers are 3c's.
-- **3c lands as two PRs (2026-10-21).** The same probe, run with each
+
+Implementation notes (2026-10-21, WS3c):
+
+- **3c lands as two PRs.** The same probe, run with each
   package's tests included, found 273 test reads of the getter in 45
   files (core 88 in 21, formats 148 in 14, llm 21 in 3, dbt 12 in 5,
   cli 4 in 2), beside 9 source reads in 5 core files. The plan that

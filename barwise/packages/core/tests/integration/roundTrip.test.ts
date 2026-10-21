@@ -73,6 +73,9 @@ describe("Round-trip serialization integration", () => {
       serializer.serialize(original),
     );
 
+    // Constraints across fact types, which no fact type below compares.
+    expect(roundTripped.constraints).toEqual(original.constraints);
+
     for (const origFt of original.factTypes) {
       const rtFt = roundTripped.getFactType(origFt.id);
       expect(rtFt).toBeDefined();

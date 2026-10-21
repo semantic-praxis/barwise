@@ -178,7 +178,9 @@ function nonLocalRuleIds(model: OrmModel, ce: Counterexample): Set<string> {
   const populated = new Set(ce.forbidden.map((f) => f.factTypeId));
   const out = new Set<string>();
   // An internal constraint is placed in its fact type; an external one is
-  // placed in the model, so only the fact types it reaches decide.
+  // placed in the model, so only the fact types it reaches decide. One that
+  // reaches no role (a join operand with no steps, which the arbitrary does
+  // not generate) therefore counts as local whatever is populated.
   for (const [c, placed] of model.everyConstraint()) {
     const reaches = roleIdsOf(c).map((rid) => home.get(rid));
     const outside = (placed !== undefined && !populated.has(placed.id))

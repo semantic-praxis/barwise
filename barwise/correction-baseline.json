@@ -577,6 +577,12 @@
       "caught_by": "reasoning",
       "note": "Code review on PR #684 found the unheld-fact-type path in constraintsTouching wrong three ways across two rounds; it was dropped rather than patched again."
     },
+    "orm-format-3::5f6ecfc2e469": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
+      "caught_by": "reasoning",
+      "note": "The first 3b-iv note said a single draft could not put a duplicate under another fact type; /code-review on #699 showed an equality stated from each side does, and the equality check was made symmetric."
+    },
     "orm-format-3::83e024eb5943": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 72 external constraints, in 27 files. - every one comes after its host's internal constraints. - 26 sit on a fact type other than their first holder, in 17 fi",
@@ -594,12 +600,6 @@
       "excerpt": "the draft put all of this in one pr. the split costs a little: until 3c, ormmodel.constraints walks the fact types on every read, so a rule that calls constrain",
       "caught_by": "reasoning",
       "note": "Grounding the reader sites showed one PR would touch 43 source files, tens of test files and every host-naming output; the split keeps the compile-time check in 3c."
-    },
-    "orm-format-3::eefc17885271": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
-      "caught_by": "execution",
-      "note": "Two corrections in this record. The 3c split: the draft said removing the getter makes the compiler name every reader, but tsconfig excludes tests, and a probe with tests included found 273 test reads in 45 files. And the 3b-iv note first said a single draft could not duplicate a rule under another fact type; /code-review on #699 found the equality stated from each side."
     },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",
