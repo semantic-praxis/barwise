@@ -195,7 +195,7 @@ export function constraintPairing(
 ): ConstraintPairing {
   // Content matching never reads the repeated ids, and the sample fold
   // diffs every pair of samples, so it skips the two model walks.
-  if (matching === "content") return { matching, repeatedA: NO_IDS, repeatedB: NO_IDS };
+  if (matching !== "id-first") return { matching, repeatedA: NO_IDS, repeatedB: NO_IDS };
   return { matching, repeatedA: repeatedIds(existing), repeatedB: repeatedIds(incoming) };
 }
 
@@ -400,9 +400,7 @@ function roleKeys(
   const host = new Map(roles.map((r, i) => [r.id, `h${i}`]));
   const raw = (id: string) => `r${JSON.stringify(id)}`;
   return (id) => {
-    const mine = holders.get(id);
-    const theirs = otherHolders.get(id);
-    const homes = mine ?? theirs ?? [];
+    const homes = holders.get(id) ?? otherHolders.get(id) ?? [];
     if (homes.length !== 1) return raw(id);
     const own = host.get(id);
     if (own !== undefined) return own;
@@ -433,11 +431,10 @@ function roleKeys(
  * a flag, so the content pass cannot reach this one.
  */
 function pairRoleKeys(
-  roles: readonly Role[],
+  position: RoleKeys,
   holders: RoleHolders,
   otherHolders: RoleHolders,
 ): RoleKeys {
-  const position = roleKeys(roles, holders, otherHolders);
   return (id) =>
     holders.get(id)?.length === 1 && otherHolders.get(id)?.length === 1
       ? `i${JSON.stringify([id, position(id)])}`
@@ -565,12 +562,8 @@ function diffConstraints(
   const modified: { from: Constraint; to: Constraint; }[] = [];
   if (pairing.matching === "id-first") {
     // The key for comparing a pair joined by id; see `pairRoleKeys`.
-    // Built on the first pair, since an import with fresh ids pairs none.
-    let pairMaps: [RoleKeys, RoleKeys] | undefined;
-    const pairKeys = () => (pairMaps ??= [
-      pairRoleKeys(rolesA, holdersA, holdersB),
-      pairRoleKeys(rolesB, holdersB, holdersA),
-    ]);
+    const pairMapA = pairRoleKeys(idxMapA, holdersA, holdersB);
+    const pairMapB = pairRoleKeys(idxMapB, holdersB, holdersA);
     const byIdB = new Map(
       b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
     );
@@ -579,7 +572,6 @@ function diffConstraints(
       const cb = byIdB.get(ca.id);
       if (!cb) continue;
       paired.add(ca).add(cb);
-      const [pairMapA, pairMapB] = pairKeys();
       if (constraintKey(ca, pairMapA) !== constraintKey(cb, pairMapB)) {
         modified.push({ from: ca, to: cb });
       }

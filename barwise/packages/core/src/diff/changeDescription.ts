@@ -302,9 +302,9 @@ function kindName(c: Constraint): string {
   return c.modality === "deontic" ? `${c.type} (deontic)` : c.type;
 }
 
-/** The deduplicated constraint type names, in first-seen order. */
+/** The deduplicated constraint kinds, with modality, in first-seen order. */
 function constraintTypes(constraints: readonly Constraint[]): string {
-  return [...new Set(constraints.map((c) => c.type))].join(", ");
+  return [...new Set(constraints.map(kindName))].join(", ");
 }
 
 /** Format a DataTypeDef for human-readable diff output. */

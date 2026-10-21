@@ -1,3 +1,5 @@
+import type { DiffOptions } from "@barwise/core/diff";
+
 /**
  * How to diff two models extracted independently, whose ids are unrelated
  * by construction: pair constraints by content alone, so a coincidental id
@@ -6,4 +8,4 @@
  * `TranscriptProcessor` diffs an alternative framing, extracted beside the
  * primary rather than from it, against that primary.
  */
-export const UNRELATED_IDS_DIFF = { constraintMatching: "content" } as const;
+export const UNRELATED_IDS_DIFF = { constraintMatching: "content" } as const satisfies DiffOptions;

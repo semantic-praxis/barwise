@@ -386,6 +386,17 @@ describe("which key reads a role", () => {
 });
 
 describe("content-only constraint matching", () => {
+  it("names the modality in the added and removed prose too", () => {
+    const a = drives([{ id: "c-1", type: "mandatory", roleId: "r-1" }]);
+    const b = drives([{ id: "c-1", type: "mandatory", roleId: "r-1", modality: "deontic" }]);
+    const delta = diffModels(a, b, { constraintMatching: "content" }).deltas
+      .find((d) => d.elementType === "fact_type")!;
+    expect(delta.changeDescriptions).toEqual([
+      "constraints added: mandatory (deontic)",
+      "constraints removed: mandatory",
+    ]);
+  });
+
   it("never pairs two different constraints by a coincidental id", () => {
     const a = drives([uc("c-1", ["r-1"])]);
     const b = drives([uc("c-1", ["r-2"])]);
