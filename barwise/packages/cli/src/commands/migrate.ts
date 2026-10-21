@@ -10,7 +10,7 @@
 
 import { CURRENT_ORM_VERSION, type MigrationNote } from "@barwise/core";
 import type { Command } from "commander";
-import { renameSync, writeFileSync } from "node:fs";
+import { realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readFile, serializer } from "../workspace/io.js";
 
 interface MigrateOptions {
@@ -63,14 +63,22 @@ function migrateFile(file: string, check: boolean): FileOutcome {
     // refusing a fragment that names elements it does not define.
     const result = serializer.migrate(readFile(file), { lenient: true });
     if (result.from === CURRENT_ORM_VERSION) return { file, status: "current" };
-    const unplaceable = result.notes.filter((n) => n.kind === "flag-unplaceable");
-    if (unplaceable.length > 0) {
-      return { file, status: "error", error: `not migrated: ${unplaceable.map(note).join("; ")}` };
-    }
     const text = serializer.serialize(result.model);
     // A 2.0 file can hold what 3.0 refuses (two constraints sharing an id):
     // rewriting it would turn a file that loads into one that does not.
-    serializer.deserialize(text, { lenient: true });
+    try {
+      serializer.deserialize(text, { lenient: true });
+    } catch (err) {
+      return {
+        file,
+        status: "error",
+        error: `not migrated: its ${CURRENT_ORM_VERSION} form would not load: ${
+          (err as Error).message
+        }`,
+      };
+    }
+    const unplaceable = result.notes.find((n) => n.kind === "flags-unplaceable");
+    if (unplaceable) return { file, status: "error", error: `not migrated: ${note(unplaceable)}` };
     if (!check) replace(file, text);
     return {
       file,
@@ -83,11 +91,21 @@ function migrateFile(file: string, check: boolean): FileOutcome {
   }
 }
 
-/** Write beside the file, then rename over it, so an interrupted write leaves the original. */
+/**
+ * Write beside the file, then rename over it, so an interrupted write
+ * leaves the original. Through a symlink to the file it names, with its
+ * mode kept, so a linked model is migrated where it lives.
+ */
 function replace(file: string, text: string): void {
-  const temp = `${file}.migrating`;
-  writeFileSync(temp, text, "utf-8");
-  renameSync(temp, file);
+  const target = realpathSync(file);
+  const temp = `${target}.migrating`;
+  try {
+    writeFileSync(temp, text, { encoding: "utf-8", mode: statSync(target).mode });
+    renameSync(temp, target);
+  } catch (err) {
+    rmSync(temp, { force: true });
+    throw err;
+  }
 }
 
 function describe(o: FileOutcome): string {
@@ -109,8 +127,10 @@ function note(n: MigrationNote): string {
   switch (n.kind) {
     case "flag-dropped":
       return `dropped the is_preferred flag on constraint "${n.constraintId}" in "${n.factType}": it identifies no entity type`;
-    case "flag-unplaceable":
-      return `the is_preferred flag on constraint "${n.constraintId}" in "${n.factType}" names an object type this file does not define, so it cannot be placed without the file that does`;
+    case "flags-unplaceable":
+      return `it names elements it does not define (${
+        n.missing.map((id) => `"${id}"`).join(", ")
+      }) and carries is_preferred flags, which cannot be placed without them; migrate it as part of the whole model`;
     case "identifier-chosen":
       return `"${n.entity}" was named by ${
         n.others.length + 1

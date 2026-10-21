@@ -2,7 +2,17 @@
  * Tests for the migrate command (orm-format-3 WS4b-iii): one per
  * requirement in the spec, each through runCli.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,7 +132,7 @@ describe("barwise migrate", () => {
     const result = await runCli(["migrate", path]);
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe(
-      `${path}: Two constraints share the id "u-nr"; a constraint id names one constraint.\n`,
+      `${path}: not migrated: its 3.0 form would not load: Two constraints share the id "u-nr"; a constraint id names one constraint.\n`,
     );
     expect(readFileSync(path, "utf-8")).toBe(twice);
   });
@@ -137,7 +147,7 @@ describe("barwise migrate", () => {
     const result = await runCli(["migrate", path]);
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toContain(
-      `the is_preferred flag on constraint "u-nr" in "Customer has CustomerNr" names an object type this file does not define`,
+      `not migrated: it names elements it does not define ("ot-c") and carries is_preferred flags`,
     );
     expect(readFileSync(path, "utf-8")).toBe(fragment);
   });
@@ -148,6 +158,19 @@ describe("barwise migrate", () => {
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain(`unknown --format "jsno"`);
     expect(readFileSync(path, "utf-8")).toBe(V20);
+  });
+
+  it("migrates the file a symlink names, keeping the link and the file's mode", async () => {
+    const target = file("real.orm.yaml", V20);
+    chmodSync(target, 0o600);
+    const link = join(dir, "link.orm.yaml");
+    symlinkSync(target, link);
+    const result = await runCli(["migrate", link]);
+    expect(result.exitCode).toBe(0);
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readFileSync(target, "utf-8")).toMatch(/^orm_version: "3\.0"/);
+    expect(statSync(target).mode & 0o777).toBe(0o600);
+    expect(existsSync(`${target}.migrating`)).toBe(false);
   });
 
   it("prints one record per file with --format json", async () => {

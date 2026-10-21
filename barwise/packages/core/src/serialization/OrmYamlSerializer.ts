@@ -72,11 +72,13 @@ export type MigrationNote =
   /** A 2.0 `is_preferred` flag that identifies no entity, so it was dropped. */
   | { readonly kind: "flag-dropped"; readonly factType: string; readonly constraintId: string; }
   /**
-   * A 2.0 flag on a fact type whose roles name an object type the file does
-   * not define (a fragment, loaded leniently): whom it identifies is in the
-   * file that does, so the flag cannot be placed from this one.
+   * A file that names elements it does not define (`missing`, their ids:
+   * a fragment, or a typo, loaded leniently) and carries `is_preferred`
+   * flags. Whom a flag identifies can turn on what is missing (a player, an
+   * objectification), so none is placed with confidence; this is the only
+   * note such a file gets, and `barwise migrate` does not rewrite it.
    */
-  | { readonly kind: "flag-unplaceable"; readonly factType: string; readonly constraintId: string; }
+  | { readonly kind: "flags-unplaceable"; readonly missing: readonly string[]; }
   /** An entity two or more 2.0 flags named; the reference keeps `kept`. */
   | {
     readonly kind: "identifier-chosen";
@@ -179,8 +181,8 @@ export class OrmYamlSerializer {
     // state, and a 2.0 file saved writes 3.0 (orm-format-3 WS4b).
     if (version === LEGACY_ORM_VERSION) {
       this.check(this.validator.validateLegacyModel(doc));
-      const { model, placed } = readLegacy(doc as OrmYamlDocument, options);
-      return { model, from: from!, notes: migrationNotes(model, placed) };
+      const { model, placed, flags } = readLegacy(doc as OrmYamlDocument, options);
+      return { model, from: from!, notes: migrationNotes(model, placed, flags) };
     }
     if (version === CURRENT_ORM_VERSION) refuseMisplacedConstraints(doc);
     this.check(this.validator.validateModel(doc));
@@ -471,7 +473,7 @@ export function readDocument20(doc: OrmYamlDocument, options?: { lenient?: boole
 function readLegacy(
   doc: OrmYamlDocument,
   options?: { lenient?: boolean; },
-): { readonly model: OrmModel; readonly placed: PlacedFlags; } {
+): { readonly model: OrmModel; readonly placed: PlacedFlags; readonly flags: number; } {
   const model = new OrmModel({
     name: doc.model.name,
     domainContext: doc.model.domain_context,
@@ -531,24 +533,40 @@ function readLegacy(
   // names the objectifying type.
   readTail(model, doc, options);
   const placed = storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
-  return { model, placed };
+  return { model, placed, flags: flagged.size };
 }
 
 /**
  * What the 2.0 reader made of the flags it could not carry into the model
  * as they stood: a flag that identifies no entity, and an entity two or
- * more flags name, of which the stored reference keeps one.
+ * more flags name, of which the stored reference keeps one. In a file that
+ * names elements it does not define, the flags are not judged at all.
  */
-function migrationNotes(model: OrmModel, placed: PlacedFlags): MigrationNote[] {
+/** The ids a leniently loaded model names and does not define, sorted. */
+function missingReferences(model: OrmModel): string[] {
+  const missing = new Set<string>();
+  const object = (id: string) => {
+    if (!model.getObjectType(id)) missing.add(id);
+  };
+  for (const ft of model.factTypes) for (const r of ft.roles) object(r.playerId);
+  for (const sf of model.subtypeFacts) {
+    object(sf.subtypeId);
+    object(sf.supertypeId);
+  }
+  for (const oft of model.objectifiedFactTypes) {
+    object(oft.objectTypeId);
+    if (!model.getFactType(oft.factTypeId)) missing.add(oft.factTypeId);
+  }
+  return [...missing].sort();
+}
+
+function migrationNotes(model: OrmModel, placed: PlacedFlags, flags: number): MigrationNote[] {
+  const missing = missingReferences(model);
+  if (flags > 0 && missing.length > 0) return [{ kind: "flags-unplaceable", missing }];
   const notes: MigrationNote[] = [];
   for (const c of placed.dropped) {
     const factType = c.id === undefined ? undefined : model.getConstraintInView(c.id)?.[1];
-    const unplaceable = factType?.roles.some((r) => !model.getObjectType(r.playerId)) ?? false;
-    notes.push({
-      kind: unplaceable ? "flag-unplaceable" : "flag-dropped",
-      factType: factType?.name ?? "",
-      constraintId: c.id ?? "",
-    });
+    notes.push({ kind: "flag-dropped", factType: factType?.name ?? "", constraintId: c.id ?? "" });
   }
   for (const [entityId, candidates] of placed.candidates) {
     if (candidates.length < 2) continue;

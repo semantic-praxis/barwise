@@ -1805,8 +1805,10 @@ reader. The command rewrites files; the reader stays the migration.
   - When `--check` is given, the command shall write nothing, and exit 1
     if any file would be rewritten.
   - When a file cannot be read or does not load, its 3.0 form would not
-    load back, or it is a fragment whose flag names an object type it does
-    not define, the command shall report it, write nothing to it, go on
+    load back, or it names elements it does not define and carries
+    `is_preferred` flags (whom a flag identifies can turn on what is
+    missing, a player or an objectification, so none is placed from a
+    fragment), the command shall report it, write nothing to it, go on
     with the rest, and exit 2: the gate contract's "could not answer",
     which `--check`'s 1 must not be confused with.
   - `--format json` prints one record per file.
