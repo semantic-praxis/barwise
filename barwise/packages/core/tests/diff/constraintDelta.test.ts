@@ -140,6 +140,26 @@ describe("the constraint delta", () => {
     expect(d.roles).toEqual(["Room is in Building (for)", "Room has RoomNumber (for)"]);
   });
 
+  it("names a fact type once when both models hold one of that name", () => {
+    // The fragment's "Room is in Building" holds r-b but not r-room-in,
+    // which only the full model's holds; the constraint names both.
+    const fragment = new OrmModel({ name: "Rooms" });
+    fragment.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
+    fragment.addObjectType({ id: "ot-b", name: "Building", kind: "entity", referenceMode: "code" });
+    fragment.addFactType({
+      id: "ft-in",
+      name: "Room is in Building",
+      roles: [
+        { id: "m-room-in", name: "of", playerId: "ot-room" },
+        { id: "r-b", name: "for", playerId: "ot-b" },
+      ],
+      readings: ["{0} with {1}"],
+    });
+    fragment.addConstraint({ id: "x", type: "exclusion", roleIds: ["r-room-in", "r-b"] });
+    const [d] = only(rooms([]), fragment);
+    expect(d.factTypes).toEqual(["Room is in Building"]);
+  });
+
   it("is unchanged when only the role ids differ, as an import mints them", () => {
     const [d] = only(rooms([key()]), rooms([key(["m-b", "m-n"], "other")], "m"));
     expect(d.kind).toBe("unchanged");
