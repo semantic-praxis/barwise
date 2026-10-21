@@ -53,7 +53,6 @@ function holdsAny(ft: FactType, roleIds: readonly string[]): boolean {
  * The OrmModel enforces referential integrity: roles in fact types must
  * reference object types that exist in the model.
  */
-
 export class OrmModel {
   private _name: string;
   private _domainContext: string | undefined;
@@ -284,7 +283,10 @@ export class OrmModel {
    */
   constraintsTouchingNone(): readonly ExternalConstraint[] {
     const factTypes = this.factTypes;
-    return this.constraints.filter((c) => !factTypes.some((ft) => holdsAny(ft, roleIdsOf(c))));
+    return this.constraints.filter((c) => {
+      const roleIds = roleIdsOf(c);
+      return !factTypes.some((ft) => holdsAny(ft, roleIds));
+    });
   }
 
   /**

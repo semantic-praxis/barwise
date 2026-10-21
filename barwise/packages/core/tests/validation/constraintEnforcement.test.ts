@@ -118,6 +118,63 @@ describe("evaluateConstraintEnforcement", () => {
   });
 });
 
+/**
+ * Person has Status (s1, s2) and Person reports to Person (g1, g2), with
+ * a disjunctive mandatory over s1 and g1 nested under "Person has
+ * PersonId", which it does not touch. P2 has an id and plays neither role.
+ */
+function disjunctiveModel(): OrmModel {
+  const model = new OrmModel({ name: "Across" });
+  const person = model.addObjectType({ name: "Person", kind: "entity", referenceMode: "pid" });
+  const pid = model.addObjectType({ name: "PersonId", kind: "value" });
+  const status = model.addObjectType({ name: "Status", kind: "value" });
+  const idFt = model.addFactType({
+    name: "Person has PersonId",
+    roles: [
+      { name: "has", playerId: person.id, id: "id1" },
+      { name: "identifies", playerId: pid.id, id: "id2" },
+    ],
+    readings: ["{0} has {1}"],
+    constraints: [{ id: "dm", type: "disjunctive_mandatory", roleIds: ["s1", "g1"] }],
+  });
+  const statusFt = model.addFactType({
+    name: "Person has Status",
+    roles: [
+      { name: "has", playerId: person.id, id: "s1" },
+      { name: "is of", playerId: status.id, id: "s2" },
+    ],
+    readings: ["{0} has {1}"],
+  });
+  model.addFactType({
+    name: "Person reports to Person",
+    roles: [
+      { name: "reports to", playerId: person.id, id: "g1" },
+      { name: "is manager of", playerId: person.id, id: "g2" },
+    ],
+    readings: ["{0} reports to {1}"],
+  });
+  const ids = model.addPopulation({ factTypeId: idFt.id });
+  ids.addInstance({ roleValues: { id1: "P1", id2: "PID1" } });
+  ids.addInstance({ roleValues: { id1: "P2", id2: "PID2" } });
+  model.addPopulation({ factTypeId: statusFt.id })
+    .addInstance({ roleValues: { s1: "P1", s2: "active" } });
+  return model;
+}
+
+describe("evaluateConstraintEnforcement over a constraint across fact types", () => {
+  it("answers for the pair with no fact type, as the views return it", () => {
+    const model = disjunctiveModel();
+    const inView = model.getConstraintInView("dm")!;
+    expect(inView[1]).toBeUndefined();
+    const verdict = evaluateConstraintEnforcement(model, inView);
+    if (!verdict.enforced) throw new Error("expected enforced");
+    expect(verdict.rejects).toBe(true);
+    expect(verdict.diagnostics.map((d) => d.ruleId)).toEqual([
+      "population/disjunctive-mandatory-violation",
+    ]);
+  });
+});
+
 describe("evaluateConstraintEnforcement agrees with the model-wide sweep", () => {
   /**
    * The predicate and `populationValidationRules` share their inner helpers
@@ -144,6 +201,10 @@ describe("evaluateConstraintEnforcement agrees with the model-wide sweep", () =>
 
   it("agrees on a model with a uniqueness violation", () => {
     assertAgrees(twoUniquenessModel());
+  });
+
+  it("agrees on a disjunctive mandatory across fact types", () => {
+    assertAgrees(disjunctiveModel());
   });
 
   it("agrees on a model with violations of five kinds at once", () => {

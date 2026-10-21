@@ -1121,7 +1121,8 @@ Implementation notes (2026-10-19):
     resolve, which no fact type lists, goes under a new "Unattached
     Constraints" category, described by the role ids it names, rather
     than vanishing. Core's new `constraintsTouchingNone()` is that set; it
-    and `constraintsTouchingAny` read one `touches` predicate.
+    and `constraintsTouchingAny` read one `holdsAny` test, which
+    `factTypesHolding` reads too.
   - Core: `evaluateConstraintEnforcement(model, inView)` takes the
     `ConstraintInView` pair instead of a fact type and a constraint, and
     `generateCounterexampleInView` is exported beside
