@@ -571,6 +571,12 @@
       "caught_by": "execution",
       "note": "The sharpest of seven defects an offline rehearsal surfaced."
     },
+    "orm-format-3::00e64726ae0f": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- 3c-ii, storage. - ormmodel stores the constraints across fact types, in the order added, and ormmodel.addconstraint fills a missing id. facttype holds only it",
+      "caught_by": "execution",
+      "note": "Departures from the draft: a runtime probe (FactType throwing on external kinds) failed about 380 tests in ten packages, so the writers moved to 3c-iii behind a forward; merge leaves out a constraint whose fact type the merge took, silently as populations are; and the 2.0 save keeps a constraint with no holder under the first fact type rather than refusing it, which code review on the PR showed would fail merge and import saves."
+    },
     "orm-format-3::12ba2ab27572": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 3a lands as three prs, not one. measured against the list above, 3a still touched every core reader, every changed output with its consumers, and id-first dif",
@@ -582,12 +588,6 @@
       "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
       "caught_by": "reasoning",
       "note": "The first 3b-iv note said a single draft could not put a duplicate under another fact type; /code-review on #699 showed an equality stated from each side does, and the equality check was made symmetric."
-    },
-    "orm-format-3::81e74a48b0a5": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "- 3c-ii, storage. - ormmodel stores the constraints across fact types, in the order added, and ormmodel.addconstraint fills a missing id. facttype holds only it",
-      "caught_by": "execution",
-      "note": "Departures from the draft: a runtime probe (FactType throwing on external kinds) failed about 380 tests in ten packages, so the writers moved to 3c-iii behind a forward; merge leaves out a constraint whose fact type the merge took, silently as populations are; and the 2.0 save keeps a constraint with no holder under the first fact type rather than refusing it, which code review on the PR showed would fail merge and import saves."
     },
     "orm-format-3::83e024eb5943": {
       "spec": "orm-format-3.spec.md",

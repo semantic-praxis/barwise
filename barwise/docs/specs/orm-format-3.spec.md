@@ -1319,7 +1319,7 @@ Implementation notes (2026-10-21, WS3c-ii):
   - `getConstraintInView` with an id given twice (barwise-b2s) finds a
     fact type's own constraint before the model's, where file order
     decided; the two are stored apart.
-  - Sample agreement: measured with `scripts/measure-sample-medoids.mjs`
+  - Sample agreement: measured with `npm run measure:sample-medoids`
     against an llm build of the base commit and of this change, over the
     192 recorded payloads of the 10 eval cases. No case's medoid or
     disagreement count moved. The disagreement report still covers

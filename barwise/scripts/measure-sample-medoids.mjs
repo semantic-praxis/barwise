@@ -9,7 +9,7 @@
  * comparison is two runs of this script: one against an llm build of the
  * base commit, one against the change.
  *
- *   node scripts/measure-sample-medoids.mjs <llm dist dir> [payload dir]
+ *   npm run measure:sample-medoids -- <llm dist dir> [payload dir]
  *
  * Prints one JSON object keyed by case: samples, the medoid's index, the
  * number of disagreements and of stable elements. A payload that does not

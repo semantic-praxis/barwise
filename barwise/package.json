@@ -34,6 +34,7 @@
     "audit:duplication": "node scripts/audit-duplication.mjs",
     "mutate": "node scripts/mutate.mjs",
     "measure:comparison": "node scripts/measure-comparison.mjs",
+    "measure:sample-medoids": "node scripts/measure-sample-medoids.mjs",
     "fault-matrix": "node scripts/fault-matrix.mjs",
     "test:cli-checks": "bash test-plan/cli-checks.sh",
     "test:mcp-checks": "node test-plan/mcp-checks.mjs",
