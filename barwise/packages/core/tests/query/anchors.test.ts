@@ -80,6 +80,26 @@ describe("queryModel: anchors", () => {
     expect(a!.missingIdentifier).toBe(false);
   });
 
+  it("does not call an objectified type with no flag unidentified", () => {
+    const model = new OrmModel({ name: "M" });
+    model.addObjectType({ id: "ot-s", name: "Student", kind: "entity", referenceMode: "nr" });
+    model.addObjectType({ id: "ot-c", name: "Course", kind: "entity", referenceMode: "code" });
+    model.addObjectType({ id: "ot-e", name: "Enrollment", kind: "entity", referenceMode: "id" });
+    model.addFactType({
+      id: "ft-takes",
+      name: "Student takes Course",
+      roles: [
+        { id: "r-s", name: "takes", playerId: "ot-s" },
+        { id: "r-c", name: "is taken by", playerId: "ot-c" },
+      ],
+      readings: ["{0} takes {1}"],
+      constraints: [{ id: "u", type: "internal_uniqueness", roleIds: ["r-s", "r-c"] }],
+    });
+    model.addObjectifiedFactType({ id: "oft", factTypeId: "ft-takes", objectTypeId: "ot-e" });
+    const [a] = anchorsOf(runQuery(model, "anchors Enrollment"));
+    expect(a!.missingIdentifier).toBe(false);
+  });
+
   it("names only the covered roles' players for an objectified type", () => {
     // Signing objectifies a ternary and is identified by the uniqueness
     // over two of its roles; the third role's player identifies nothing.

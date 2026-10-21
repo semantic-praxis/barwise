@@ -663,7 +663,10 @@ describe("completenessWarnings", () => {
             { id: "b2", name: "is of", playerId: badge.id },
           ],
           readings: ["{0} has {1}", "{1} is of {0}"],
-          constraints: [{ type: "internal_uniqueness", roleIds: ["b1"], isPreferred: true }],
+          constraints: [
+            { type: "internal_uniqueness", roleIds: ["b1"], isPreferred: true },
+            { type: "internal_uniqueness", roleIds: ["b2"] },
+          ],
         });
       }
       return model;
@@ -719,7 +722,10 @@ describe("completenessWarnings", () => {
           { id: "r2", name: "is of", playerId: name.id },
         ],
         readings: ["{0} has {1}", "{1} is of {0}"],
-        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true },
+          { type: "internal_uniqueness", roleIds: ["r2"] },
+        ],
       });
 
       expect(conflicts(model)).toHaveLength(0);
@@ -744,7 +750,10 @@ describe("completenessWarnings", () => {
             { id: `v${i}`, name: "is of", playerId: value.id },
           ],
           readings: ["{0} has {1}", "{1} is of {0}"],
-          constraints: [{ type: "internal_uniqueness", roleIds: [`p${i}`], isPreferred: true }],
+          constraints: [
+            { type: "internal_uniqueness", roleIds: [`p${i}`], isPreferred: true },
+            { type: "internal_uniqueness", roleIds: [`v${i}`] },
+          ],
         });
       }
 

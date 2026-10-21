@@ -6,7 +6,7 @@
  */
 
 import type { RelationalSchema, Table } from "../mapping/RelationalSchema.js";
-import { preferredIdentifiers } from "../model/identification.js";
+import { preferredIdentifiers, preferredIdentifyingBinary } from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance } from "../model/Population.js";
 
@@ -122,17 +122,10 @@ export function renderPopulationAsOpenApiExamples(
       continue;
     }
 
-    // The binary that identifies the entity, when its identifier is one.
-    const identifying = identifiers.byEntity.get(objectType.id)?.factType;
-    if (
-      !identifying || identifying.roles.length !== 2
-      || !identifying.roles.some((r) => r.playerId === objectType.id)
-    ) {
-      continue;
-    }
-
-    // Get populations for the identifier fact type
-    for (const idFactType of [identifying]) {
+    // The binary to a value type that identifies the entity, the one the
+    // mapper keys it by.
+    const idFactType = preferredIdentifyingBinary(model, objectType, identifiers)?.factType;
+    if (idFactType) {
       const populations = model.populationsForFactType(idFactType.id);
       if (populations.length === 0) {
         continue;

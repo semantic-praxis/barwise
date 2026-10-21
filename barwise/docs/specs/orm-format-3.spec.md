@@ -1556,17 +1556,19 @@ that each keep the suite green). Closes barwise-loo and barwise-alg.
 Implementation notes (2026-10-21, WS4a):
 
 - **The rule.** `preferredIdentifiers(model)` in `model/identification.ts`
-  returns the map from each entity to its identifying uniqueness and the
-  inverse, computed once. Every reader listed above uses it, and
+  returns the map from each entity to its identifying uniqueness, the
+  inverse, and every flag naming each entity before the tie-break
+  (`candidates`), computed once. Every reader listed above uses it, and
   `preferredIdentifyingBinary` is its answer when that is an entity-value
-  binary. `identificationSources` still lists every flag, so
-  `completeness/multiple-preferred-identifiers` still fires, and fires
-  before the missing-identifier check; a test pins it. The
-  missing-identifier check reads the resolved answer, as the annotator,
-  the anchors and the mapper do, so all four agree on which entities have
-  an identifier.
-- **Two guards the rule needs.** A ring binary does not identify its
-  player by itself: the uncovered role's player must play none of the
+  binary. `identificationSources` reads the candidates, so
+  `completeness/multiple-preferred-identifiers` still fires on two flags
+  naming one entity, and fires before the missing-identifier check, but
+  no longer on a flag that names someone else; tests pin both.
+  `isIdentified` is the one answer to whether an entity has an identifier,
+  read by validation, the anchors, the annotator and NORMA export.
+- **Two guards the rule needs.** A flag leaving more than one role
+  uncovered identifies nothing, and a ring binary does not identify its
+  player by itself: the one uncovered role's player must play none of the
   covered roles. And in an entity-value binary whose flagged uniqueness is
   itself on the value's role, that one is the identifier, not another
   uniqueness listed before it on the same role.
@@ -1584,18 +1586,23 @@ Implementation notes (2026-10-21, WS4a):
   name's.
 - **What changed**, over the 88 tracked models that load, before and after,
   capturing each reader's output:
-  - validation: 5 models gain an `info` missing-identifier note, 8 in
-    all. Two are `order-management`'s Customer; six are auction-domain
-    entities defined in another domain, whose only flag here sat on a
-    neighbouring ternary and identified something else;
+  - validation, in 6 models: 27 `multiple-preferred-identifiers`
+    warnings go, every one counting a flag that identifies another entity,
+    and 9 `info` missing-identifier notes arrive. Two of the nine are
+    `order-management`'s Customer; seven are auction-domain entities
+    defined in another domain, whose only flag here sat on a neighbouring
+    ternary and identified something else. No entity in the corpus now has
+    two candidate identifiers: decision 8's four, to be fixed by hand in
+    WS5, were the literal reading handing the objectified ternaries' flags
+    to role players with their own binary, so WS5 has none to fix;
   - DDL: 2 models, the two `order-management` copies, where Customer's
     key moves from `name` to its reference mode's `customer_id`;
-  - query anchors: 8 models. Entities gain an identifier the importers'
-    convention used to hide (`shop`, the payments domain), and the
-    auction models' entities lose one the old rule borrowed from a
-    neighbouring ternary;
-  - annotator TODOs: 6 models, mostly objectified types that now have an
-    identifier;
+  - query anchors and annotator TODOs: 26 models each, through one
+    answer to "is this entity identified" (`isIdentified`): an identifying
+    uniqueness, an objectification, or an identifying subtype. 155
+    entities stop reading as unidentified -- objectified and subtype
+    entities, and those the importers' convention hid (`shop`, the
+    payments domain) -- and the nine above start;
   - diagram folding and `ModelContext`: the two `order-management` copies;
   - NORMA export: 31 models. 310 more `PreferredIdentifier` links, 30
     fewer synthesized reference-scheme expansions, because the real
@@ -1609,6 +1616,12 @@ Implementation notes (2026-10-21, WS4a):
   uniqueness when it draws a preferred identifier, which moves the
   counterexample stray ratchet from 135 to 141 (six new internal
   uniqueness counterexamples, all tripping rules already listed).
+- **promptlab.** The suite goes to 2.13.0: one recorded payload of 115,
+  `sonnet5-3-train/order-management-run4`, loses a false two-identifier
+  warning and rises 0.807143 to 0.832143.
+- barwise-jir records a NORMA export limitation this work exposed and did
+  not cause: an entity identified other than by a value binary has its
+  instances seated on a synthesized expansion.
 
 ### 5. Corpus, docs, release notes (provisional: not yet grounded)
 

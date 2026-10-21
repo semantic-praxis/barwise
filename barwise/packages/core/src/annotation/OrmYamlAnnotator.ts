@@ -22,7 +22,11 @@
  * idempotent via stripBarwiseComments().
  */
 
-import { type PreferredIdentifiers, preferredIdentifiers } from "../model/identification.js";
+import {
+  isIdentified,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+} from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import {
   type AnnotationSeverity,
@@ -352,7 +356,7 @@ function collectStructuralGaps(
   const identifiers = preferredIdentifiers(model);
   for (const ot of model.objectTypes) {
     // Entity types missing a preferred identifier.
-    if (ot.kind === "entity" && !hasPreferredIdentifier(ot, identifiers)) {
+    if (ot.kind === "entity" && !hasPreferredIdentifier(ot, model, identifiers)) {
       annotations.push({
         elementType: "object_type",
         elementName: ot.name,
@@ -374,16 +378,17 @@ function collectStructuralGaps(
 }
 
 /**
- * Check if an entity type has a formally declared preferred identifier.
- * A reference mode is just a naming hint; the real formalization is a
- * preferred uniqueness constraint that identifies this entity
- * (`preferredIdentifiers`).
+ * Check if an entity type has a formally declared identifier. A reference
+ * mode is just a naming hint; the real formalization is a preferred
+ * uniqueness that identifies this entity, an objectification, or an
+ * identifying subtype (`isIdentified`).
  */
 function hasPreferredIdentifier(
   entity: import("../model/ObjectType.js").ObjectType,
+  model: OrmModel,
   identifiers: PreferredIdentifiers,
 ): boolean {
-  return identifiers.byEntity.has(entity.id);
+  return isIdentified(model, entity.id, identifiers);
 }
 
 // ---------------------------------------------------------------------------

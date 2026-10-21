@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { InternalConstraint } from "../../src/model/Constraint.js";
-import { preferredIdentifiers } from "../../src/model/identification.js";
+import { isIdentified, preferredIdentifiers } from "../../src/model/identification.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
@@ -86,6 +86,26 @@ describe("preferredIdentifiers", () => {
     expect(identifierOf(model, "ot-p")).toBeUndefined();
   });
 
+  it("identifies nothing by a flag that leaves two roles uncovered", () => {
+    // "Person assigns Task to Person", flagged on Task: each Task has one
+    // (assigner, assignee) pair, which identifies no Person.
+    const model = new OrmModel({ name: "Work" });
+    model.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "ot-t", name: "Task", kind: "entity", referenceMode: "nr" });
+    model.addFactType({
+      id: "ft-assign",
+      name: "Person assigns Task to Person",
+      roles: [
+        { id: "r-by", name: "assigns", playerId: "ot-p" },
+        { id: "r-t", name: "is assigned", playerId: "ot-t" },
+        { id: "r-to", name: "to", playerId: "ot-p" },
+      ],
+      readings: ["{0} assigns {1} to {2}"],
+      constraints: [uc("u-t", ["r-t"], true)],
+    });
+    expect(preferredIdentifiers(model).byEntity.size).toBe(0);
+  });
+
   it("reads an entity-entity binary's flag as identifying the uncovered role's player", () => {
     const model = new OrmModel({ name: "Rooms" });
     model.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
@@ -161,6 +181,35 @@ describe("preferredIdentifiers", () => {
       const model = signing(["r-c", "r-a"]);
       expect(identifierOf(model, "ot-s")).toBe("u-sign");
       expect(identifierOf(model, "ot-o")).toBeUndefined();
+    });
+
+    it("is identified by its objectification with no flag at all", () => {
+      // The flag covers no role, so it names nobody; the objectification
+      // alone identifies Signing.
+      const unflagged = signing([]);
+      expect(isIdentified(unflagged, "ot-s")).toBe(true);
+      expect(isIdentified(unflagged, "ot-c")).toBe(false);
+    });
+
+    it("does not count its identifier toward a role player's flags", () => {
+      // Customer plays a covered role of the flag that identifies Signing;
+      // that flag is Signing's, so Customer has one candidate, not two.
+      const model = signing(["r-c", "r-a"]);
+      model.addObjectType({ id: "ot-cid", name: "CustomerId", kind: "value" });
+      model.addFactType({
+        id: "ft-cid",
+        name: "Customer has CustomerId",
+        roles: [
+          { id: "r-cc", name: "has", playerId: "ot-c" },
+          { id: "r-cid", name: "is of", playerId: "ot-cid" },
+        ],
+        readings: ["{0} has {1}"],
+        constraints: [uc("u-cc", ["r-cc"], true), uc("u-cid", ["r-cid"])],
+      });
+      expect(preferredIdentifiers(model).candidates.get("ot-c")?.length).toBe(1);
+      const fired = new ValidationEngine().validate(model)
+        .filter((d) => d.ruleId === RULE_ID.multiplePreferredIdentifiers);
+      expect(fired).toEqual([]);
     });
 
     it("keeps its own reference binary when both are flagged (Open decision 11)", () => {

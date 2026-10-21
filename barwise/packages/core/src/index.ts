@@ -92,6 +92,7 @@ export {
 } from "./model/id.js";
 export {
   type IdentifyingUniqueness,
+  isIdentified,
   type PreferredIdentifiers,
   preferredIdentifiers,
   preferredIdentifyingBinary,

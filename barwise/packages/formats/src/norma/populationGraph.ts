@@ -15,6 +15,7 @@
  * as NORMA writes them.
  */
 import {
+  isIdentified,
   type ObjectType,
   type OrmModel,
   type PreferredIdentifiers,
@@ -137,7 +138,7 @@ export function buildPopulationGraph(
     let seat = seatByEntity.get(entity.id);
     if (!seat) {
       seat = findIdentifyingSeat(model, entity, identifiers)
-        ?? synthesizeExpansion(graph, entity, identifiers.byEntity.has(entity.id));
+        ?? synthesizeExpansion(graph, entity, isIdentified(model, entity.id, identifiers));
       seatByEntity.set(entity.id, seat);
     }
     const valueInstanceId = internValueInstance(seat.valueTypeId, value);
@@ -210,9 +211,8 @@ function findIdentifyingSeat(
 ): IdentifyingSeat | undefined {
   const binary = preferredIdentifyingBinary(model, entity, identifiers);
   if (!binary) return undefined;
-  const valueRole = binary.factType.roles.find((r) => r !== binary.entityRole)!;
   return {
-    valueRoleId: toNormaId(valueRole.id),
+    valueRoleId: toNormaId(binary.valueRole.id),
     valueTypeId: toNormaId(binary.valuePlayer.id),
   };
 }
@@ -223,9 +223,10 @@ function findIdentifyingSeat(
  * preferred uniqueness (value role) plus uniqueness + simple mandatory
  * (entity role), and the PreferredIdentifier link. An entity the model
  * already identifies some other way (an n-ary or entity-entity
- * uniqueness) still needs a seat for its instance values, but keeps its
- * own PreferredIdentifier, so the synthesized uniqueness is not marked
- * preferred and no link is recorded for it.
+ * uniqueness, an objectification, an identifying subtype) still needs a
+ * seat for its instance values, but keeps its own identification, so the
+ * synthesized uniqueness is not marked preferred and no link is recorded
+ * for it.
  */
 function synthesizeExpansion(
   graph: PopulationGraph,

@@ -52,6 +52,49 @@ describe("NORMA export of a preferred identifier", () => {
     });
   }
 
+  it("does not mark an objectified entity's synthesized expansion preferred", () => {
+    // Enrollment objectifies "Student takes Course" and is identified by
+    // that; its instance values still need a seat, which must not claim to
+    // be its preferred identifier.
+    const model = new OrmModel({ name: "School" });
+    model.addObjectType({ id: "ot-s", name: "Student", kind: "entity", referenceMode: "nr" });
+    model.addObjectType({ id: "ot-c", name: "Course", kind: "entity", referenceMode: "code" });
+    model.addObjectType({ id: "ot-e", name: "Enrollment", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "ot-g", name: "Grade", kind: "value" });
+    model.addFactType({
+      id: "ft-takes",
+      name: "Student takes Course",
+      roles: [
+        { id: "r-s", name: "takes", playerId: "ot-s" },
+        { id: "r-c", name: "is taken by", playerId: "ot-c" },
+      ],
+      readings: ["{0} takes {1}"],
+      constraints: [{ id: "u-sc", type: "internal_uniqueness", roleIds: ["r-s", "r-c"] }],
+    });
+    model.addObjectifiedFactType({ id: "oft", factTypeId: "ft-takes", objectTypeId: "ot-e" });
+    model.addFactType({
+      id: "ft-grade",
+      name: "Enrollment earns Grade",
+      roles: [
+        { id: "r-e", name: "earns", playerId: "ot-e" },
+        { id: "r-g", name: "is earned by", playerId: "ot-g" },
+      ],
+      readings: ["{0} earns {1}"],
+      constraints: [{ id: "u-e", type: "internal_uniqueness", roleIds: ["r-e"] }],
+    });
+    model.addPopulation({ id: "pop", factTypeId: "ft-grade" })
+      .addInstance({ id: "i", roleValues: { "r-e": "E1", "r-g": "A" } });
+    const doc = writeOrmToNorma(model);
+    const preferred = doc.constraints
+      .filter((c) => c.type === "uniqueness" && c.isPreferred)
+      .map((c) => c.id)
+      .sort();
+    const linked = [...doc.entityTypes, ...doc.objectifiedTypes]
+      .flatMap((e) => e.preferredIdentifier ?? [])
+      .sort();
+    expect(preferred).toEqual(linked);
+  });
+
   it("marks only the real identifier preferred when a populated entity also gets an expansion", () => {
     // Room is identified by the uniqueness on Building's role (each
     // Building houses one Room), which is no value seat, so its instance

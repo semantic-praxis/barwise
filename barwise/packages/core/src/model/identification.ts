@@ -11,6 +11,7 @@ import type { Role } from "./Role.js";
 export interface PreferredIdentifyingBinary {
   readonly factType: FactType;
   readonly entityRole: Role;
+  readonly valueRole: Role;
   readonly valuePlayer: ValueType;
 }
 
@@ -117,8 +118,17 @@ export function identificationOrder(
 
 /** Which uniqueness identifies which entity type, both ways round. */
 export interface PreferredIdentifiers {
+  /** The one identifying uniqueness of each entity that has one. */
   readonly byEntity: ReadonlyMap<string, IdentifyingUniqueness>;
+  /** The inverse of `byEntity`, keyed by constraint id. */
   readonly byConstraint: ReadonlyMap<string, IdentifyingUniqueness>;
+  /**
+   * Every flag that names each entity, before the tie-break, in model
+   * order. Two or more is the modelling error
+   * `completeness/multiple-preferred-identifiers` reports; a flag that
+   * names another entity, or none, is not this entity's.
+   */
+  readonly candidates: ReadonlyMap<string, readonly IdentifyingUniqueness[]>;
 }
 
 /** The uniqueness constraint that identifies an entity type, and where it is. */
@@ -148,15 +158,15 @@ export interface IdentifyingUniqueness {
  * - a flagged uniqueness on either role of a binary between one entity
  *   and one value type identifies the entity, by the uniqueness on the
  *   value's role (and is dropped when there is none);
- * - otherwise, a flagged uniqueness whose uncovered roles are all played
- *   by one entity type, which plays none of the covered roles, identifies
- *   that entity (a ring binary does not identify its player by itself);
+ * - otherwise, a flagged uniqueness that leaves exactly one role
+ *   uncovered identifies that role's player, when it is an entity type
+ *   that plays none of the covered roles (a ring binary does not identify
+ *   its player by itself, and two uncovered roles identify nothing);
  * - anything else is dropped.
  *
- * Two flags naming one entity is a modelling error
- * (`completeness/multiple-preferred-identifiers`, which counts the flags
- * themselves through `identificationSources`, so this resolution cannot
- * hide it). The entity-value binary wins, so an objectified type with its
+ * Two flags naming one entity is a modelling error, kept visible in
+ * `candidates` for `completeness/multiple-preferred-identifiers`, so this
+ * resolution cannot hide it. The entity-value binary wins, so an objectified type with its
  * own reference scheme keeps the key the mapper gives it today (Open
  * decision 11); then the first in model order.
  *
@@ -169,9 +179,13 @@ export function preferredIdentifiers(model: OrmModel): PreferredIdentifiers {
     model.objectifiedFactTypes.map((oft) => [oft.factTypeId, oft.objectTypeId]),
   );
   const chosen = new Map<string, { readonly at: IdentifyingUniqueness; readonly rank: number; }>();
+  const candidates = new Map<string, IdentifyingUniqueness[]>();
   const offer = (at: IdentifyingUniqueness, rank: number): void => {
     const held = chosen.get(at.entityId);
     if (!held || rank < held.rank) chosen.set(at.entityId, { at, rank });
+    const list = candidates.get(at.entityId);
+    if (list) list.push(at);
+    else candidates.set(at.entityId, [at]);
   };
   const isEntity = (id: string) => model.getObjectType(id)?.kind === "entity";
 
@@ -201,12 +215,10 @@ export function preferredIdentifiers(model: OrmModel): PreferredIdentifiers {
         continue;
       }
 
-      const players = new Set(
-        factType.roles.filter((r) => !covered.has(r.id)).map((r) => r.playerId),
-      );
-      const [only] = players;
+      const uncovered = factType.roles.filter((r) => !covered.has(r.id));
+      const only = uncovered.length === 1 ? uncovered[0]!.playerId : undefined;
       const playsCovered = factType.roles.some((r) => covered.has(r.id) && r.playerId === only);
-      if (players.size === 1 && only !== undefined && isEntity(only) && !playsCovered) {
+      if (only !== undefined && isEntity(only) && !playsCovered) {
         offer({ entityId: only, constraint: c, factType }, 1);
       }
     }
@@ -217,7 +229,35 @@ export function preferredIdentifiers(model: OrmModel): PreferredIdentifiers {
   for (const at of byEntity.values()) {
     if (at.constraint.id !== undefined) byConstraint.set(at.constraint.id, at);
   }
-  return { byEntity, byConstraint };
+  return { byEntity, byConstraint, candidates };
+}
+
+/**
+ * Whether an entity type has an identifier at all: an identifying
+ * uniqueness (`preferredIdentifiers`), an objectification, or an
+ * identifying subtype fact whose supertype is itself identified. The one
+ * answer validation, the query anchors, the annotator and NORMA export
+ * read, so none of them calls an entity unidentified that another calls
+ * identified (orm-format-3 WS4a).
+ *
+ * The subtype arm recurses because inheriting from an unidentified
+ * supertype identifies nothing; a subtype cycle answers false, and
+ * `structural/subtype-cycle` reports it.
+ */
+export function isIdentified(
+  model: OrmModel,
+  entityId: string,
+  identifiers: PreferredIdentifiers = preferredIdentifiers(model),
+  seen: Set<string> = new Set(),
+): boolean {
+  if (seen.has(entityId)) return false;
+  seen.add(entityId);
+  if (identifiers.byEntity.has(entityId)) return true;
+  if (model.objectifiedFactTypes.some((oft) => oft.objectTypeId === entityId)) return true;
+  return model.subtypeFacts.some((sf) =>
+    sf.subtypeId === entityId && sf.providesIdentification
+    && isIdentified(model, sf.supertypeId, identifiers, seen)
+  );
 }
 
 /** The entity's and the value's roles of a binary between one of each. */
@@ -267,7 +307,12 @@ export function preferredIdentifyingBinary(
   if (!binary || binary.entityRole.playerId !== entity.id) return undefined;
   const valuePlayer = model.getObjectType(binary.valueRole.playerId);
   if (valuePlayer?.kind !== "value") return undefined;
-  return { factType: at.factType, entityRole: binary.entityRole, valuePlayer };
+  return {
+    factType: at.factType,
+    entityRole: binary.entityRole,
+    valueRole: binary.valueRole,
+    valuePlayer,
+  };
 }
 
 /**
@@ -310,15 +355,12 @@ export const IDENTIFICATION_SOURCE_LABEL: Record<IdentificationSource["kind"], s
 export function identificationSources(
   model: OrmModel,
   entity: ObjectType,
+  identifiers: PreferredIdentifiers = preferredIdentifiers(model),
 ): readonly IdentificationSource[] {
   const sources: IdentificationSource[] = [];
 
-  for (const ft of model.factTypesForObjectType(entity.id)) {
-    for (const c of ft.internalConstraints) {
-      if (c.type === "internal_uniqueness" && c.isPreferred) {
-        sources.push({ kind: "preferred-uniqueness", factTypeId: ft.id });
-      }
-    }
+  for (const at of identifiers.candidates.get(entity.id) ?? []) {
+    sources.push({ kind: "preferred-uniqueness", factTypeId: at.factType.id });
   }
 
   for (const oft of model.objectifiedFactTypes) {

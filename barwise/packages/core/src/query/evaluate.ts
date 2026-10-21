@@ -11,7 +11,11 @@ import { type Constraint, isMandatoryRole } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import { type ModelGraph, requireGraph } from "../model/graph.js";
-import { type PreferredIdentifiers, preferredIdentifiers } from "../model/identification.js";
+import {
+  isIdentified,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+} from "../model/identification.js";
 import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
@@ -444,7 +448,8 @@ class QueryContext {
       ...(referenceMode !== undefined ? { referenceMode } : {}),
       ...(preferredIdentifier !== undefined ? { preferredIdentifier } : {}),
       mandatoryRoles: [...mandatoryFactTypes].sort(),
-      missingIdentifier: preferredIdentifier === undefined,
+      // An objectification or an identifying subtype identifies too.
+      missingIdentifier: !isIdentified(this.model, entity.id, this.identifiers),
     };
   }
 

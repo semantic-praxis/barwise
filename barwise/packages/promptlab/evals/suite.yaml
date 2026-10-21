@@ -206,7 +206,24 @@
 # hard error since barwise-830. No model shipped in this repository
 # writes the vacuous form, so the eval corpus is the only place it
 # occurs, and it took a new rule to see it.
-version: 2.12.0
+#
+# 2.13.0 changes no case, no weight, no floor and no split. Same shape as
+# 2.11.0 and 2.12.0: a change OUTSIDE this file that moves what a score
+# means. `completeness/multiple-preferred-identifiers` now counts the
+# flags that name the entity under core's one identifier rule
+# (`preferredIdentifiers`, docs/specs/orm-format-3.spec.md WS4a,
+# barwise-971), where it counted any flag on any fact type the entity
+# played a role in -- including a flag that identifies the OTHER player.
+#
+# Exactly one payload moves, and it RISES, because the warning it loses
+# was false. On the recorded 20260828-1647 round,
+# sonnet5-3-train/order-management-run4.json no longer warns that Order
+# has two preferred identifiers: one of the two was a flag on a fact type
+# Order plays in that identifies another entity. It rises 0.807143 ->
+# 0.832143, and sonnet5-3-train's mean 0.891838 -> 0.893309. The other
+# 114 payloads are unchanged to six places. Rows either side of this line
+# are not comparable.
+version: 2.13.0
 
 # Re-fitted for the rated form, because rating changed what a weight
 # means. A weight is now the cost of a model in which EVERY element
