@@ -538,12 +538,17 @@ function sameUniquenessIn(
   const roles = c.roleIds.map((r) => (roleMap.has(r) ? roleMap.get(r)! : r));
   if (roles.some((r) => r === null)) return undefined;
   // Compared as sorted lists, so a role repeated on one side is not read
-  // as the same uniqueness.
+  // as the same uniqueness, and with the modality, as the diff's label is.
   const key = (ids: readonly (string | null)[]) => [...ids].sort().join("\u0000");
   const wanted = key(roles);
   for (const ft of merged.factTypes) {
     for (const u of ft.internalConstraints) {
-      if (isInternalUniqueness(u) && key(u.roleIds) === wanted) return u.id;
+      if (
+        isInternalUniqueness(u) && key(u.roleIds) === wanted
+        && (u.modality ?? "alethic") === (c.modality ?? "alethic")
+      ) {
+        return u.id;
+      }
     }
   }
   return undefined;

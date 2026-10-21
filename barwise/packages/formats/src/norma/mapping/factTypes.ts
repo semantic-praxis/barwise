@@ -179,10 +179,10 @@ function resolveConstraintsForFactType(
   const constraints: Constraint[] = [];
   const internalRefs = new Set(nft.internalConstraintRefs);
   // A uniqueness an entity's PreferredIdentifier names is never dropped as a
-  // duplicate, and nothing is dropped as a duplicate of it: the identifier
-  // must keep the constraint it names. Of the rest, one NORMA marks
-  // IsPreferred is compared only with others it marks, as it was while the
-  // flag rode on the mapped constraint, before format 3.0.
+  // duplicate: the identifier must keep the constraint it names. Any other
+  // is dropped as a duplicate of one held that is named, or that NORMA marks
+  // IsPreferred exactly as it does, as it was while the flag rode on the
+  // mapped constraint, before format 3.0.
   const keep = new Set<Constraint>();
   const preferred = new Set<Constraint>();
   const isPreferred = (nc: NormaConstraint) => nc.type === "uniqueness" && nc.isPreferred;
@@ -214,7 +214,7 @@ function resolveConstraintsForFactType(
     }
     const named = ctx.namedIdentifiers.has(source.id);
     const flagged = isPreferred(source);
-    const comparable = constraints.filter((c) => !keep.has(c) && preferred.has(c) === flagged);
+    const comparable = constraints.filter((c) => keep.has(c) || preferred.has(c) === flagged);
     if (!named && holdsSame(comparable, mapped)) continue;
     const added = { ...mapped, id: ids.claim(source) };
     if (named) keep.add(added);
