@@ -21,9 +21,9 @@ import {
   type ConstraintInView,
   type ConstraintSpec,
   type FactType,
+  isOverSubtypes,
   type OrmModel,
   roleIdsOf,
-  subtypeFactIdsOf,
 } from "@barwise/core";
 import { generateCounterexampleInView } from "@barwise/core/counterexample";
 import type { RelationalSchema } from "@barwise/core/mapping";
@@ -106,7 +106,7 @@ export function routeConstraints(
     // 2.0 subtype flags it replaces did (orm-format-3 WS4b); it names no
     // role, so it has no column or table here, and nothing below it reads
     // one.
-    if (subtypeFactIdsOf(c).length > 0) return;
+    if (isOverSubtypes(c)) return;
     if (c.type === "external_uniqueness") {
       const cols = c.roleIds.map((r) => columnForJoinedRole(r, model, schema));
       const resolved = cols.filter((r) => r !== undefined);

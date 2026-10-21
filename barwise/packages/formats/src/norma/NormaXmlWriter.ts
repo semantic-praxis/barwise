@@ -26,6 +26,7 @@ import {
   type Constraint,
   type DiagramLayout,
   type FactType,
+  isOverSubtypes,
   type JoinOperand,
   type ObjectType,
   type OrmModel,
@@ -159,7 +160,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   for (const c of model.constraints) {
     // A constraint over subtypes is written with the subtype facts, over
     // their supertype meta-roles (`writeSubtypeFacts`).
-    if (subtypeFactIdsOf(c).length > 0) continue;
+    if (isOverSubtypes(c)) continue;
     writeTopLevel(
       c,
       toNormaId(constraintId(c, "across fact types")),
@@ -756,7 +757,8 @@ function writeSubtypeFacts(
   // it names and no others: an exclusive-or as an exclusion and a
   // disjunctive mandatory, as NORMA states a partition. A group of one is
   // not written: NORMA reads a mandatory over one role as a simple one, and
-  // an exclusion over one states nothing. The ids keep the shape the
+  // an exclusion over one states nothing. "Each Person is an Employee" is
+  // therefore lost on export (barwise-yx8). The ids keep the shape the
   // flag-based writer gave them, so an export of a 2.0 file does not move;
   // a second constraint of one kind over one supertype takes its own id.
   const used = new Set<string>();
@@ -772,6 +774,9 @@ function writeSubtypeFacts(
     const named = subtypeFactIdsOf(c).flatMap((id) => metaRole.get(id) ?? []);
     if (named.length < 2) continue;
     const supertypeId = named[0]!.supertypeId;
+    // One over two supertypes, which validation reports, is no partition
+    // NORMA can read; it is not written.
+    if (named.some((m) => m.supertypeId !== supertypeId)) continue;
     const roles = named.map((m) => m.roleId);
     const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
     if (c.type === "exclusion" || c.type === "exclusive_or") {

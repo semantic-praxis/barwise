@@ -14,7 +14,16 @@
  * Returns a freshly constructed OrmModel (no mutation of inputs).
  */
 
-import { type ExternalConstraint, roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
+import {
+  type ExternalConstraint,
+  isOverSubtypes,
+  roleIdsOf,
+  subtypeFactIdsOf,
+  withoutSubtypeFacts,
+} from "../model/Constraint.js";
+
+/** Marks a subtype fact the merge left out, for `withoutSubtypeFacts`. */
+const LEFT_OUT = "\u0000left-out";
 import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
@@ -217,7 +226,7 @@ export function mergeModels(
   const placeConstraint = (delta: ConstraintDelta, isAccepted: boolean): void => {
     for (const chosen of candidatesOf(delta, isAccepted)) {
       if (!chosen) continue;
-      const placed = subtypeFactIdsOf(chosen).length > 0
+      const placed = isOverSubtypes(chosen)
         ? overMergedSubtypeFacts(chosen, chosen === delta.incoming)
         : overMergedRoles(chosen, chosen === delta.incoming);
       if (!placed) continue;
@@ -247,8 +256,9 @@ export function mergeModels(
   // Each subtype fact maps to the merged one with the same two ends, read in
   // the constraint's own model first and then the other, as a role's
   // source spans both. One the merge left out (a rejected addition, an
-  // accepted removal) takes the constraint with it, as a role does above;
-  // one neither model held is carried through for validation to report.
+  // accepted removal) leaves of the constraint what still holds without it,
+  // as `removeSubtypeFact` does; one neither model held is carried through
+  // for validation to report.
   const overMergedSubtypeFacts = (
     chosen: ExternalConstraint,
     fromIncoming: boolean,
@@ -271,17 +281,19 @@ export function mergeModels(
       const kept = merged.subtypeFacts.find((sf) =>
         sf.subtypeId === subtypeId && sf.supertypeId === supertypeId
       );
-      if (!kept) return undefined;
-      ids.push(kept.id);
+      ids.push(kept?.id ?? LEFT_OUT);
     }
-    return { ...chosen, subtypeFactIds: ids } as ExternalConstraint;
+    return withoutSubtypeFacts(
+      { ...chosen, subtypeFactIds: ids } as ExternalConstraint,
+      (id) => id === LEFT_OUT,
+    );
   };
   // A delta with a constraint over subtype facts on either side waits for
   // phase 4, which settles the merged subtype facts and their ids
   // (orm-format-3 WS4b); either side may be the one placed.
   const overSubtypes: [ConstraintDelta, number][] = [];
   for (const [delta, idx] of constraintDeltas) {
-    if ([delta.existing, delta.incoming].some((c) => c && subtypeFactIdsOf(c).length > 0)) {
+    if ([delta.existing, delta.incoming].some((c) => c && isOverSubtypes(c))) {
       overSubtypes.push([delta, idx]);
       continue;
     }

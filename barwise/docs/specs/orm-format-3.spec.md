@@ -1642,13 +1642,22 @@ Implementation notes (2026-10-21, WS4b-i, subtype constraints in memory):
 - **Step 3 has one home, and the 2.0 format keeps the flags.**
   `serialization/subtypeFlags.ts` converts flags to constraints
   (`subtypeConstraintsFromFlags`) and back (`subtypeFlagsFromConstraints`)
-  over plain records. The 2.0 loader, the 2.0 writer, the DDL annotation
-  v1 reader and writer, and NORMA import and export all call it, so a 2.0
-  file, a DDL export and a NORMA export write exactly what they wrote
-  before. Commit 3's migration reuses the same function. The writer is
-  lossy only where 2.0 cannot hold a constraint: two of one kind over one
-  supertype merge, and an exclusion over a single subtype fact, which
-  validation reports, is dropped on reload.
+  over plain records. The 2.0 loader and writer and the DDL annotation v1
+  reader and writer call it, so a 2.0 file and a DDL export write exactly
+  what they wrote before. Commit 3's migration reuses the same function.
+- **NORMA maps partitions one to one now, not in a later PR.** Each NORMA
+  exclusion or non-simple mandatory over supertype meta-roles imports as
+  one constraint over the subtype facts, with its modality and NORMA's id;
+  an exclusion and a mandatory over the same subtypes are one
+  exclusive-or. Export writes each constraint over its own subtype facts.
+  Code review found that going through the flags, in either direction,
+  merged two exclusions over one supertype into a wider one, dropped
+  modality, and wrote a partition over every subtype of a supertype. The
+  draft placed this in the later PR; it moved here because the flag path
+  was wrong, not only lossy. No tracked model has a partial group, so no
+  export moves. A disjunctive mandatory over one subtype is not written,
+  because NORMA reads a mandatory over one role as a simple one
+  (barwise-yx8).
 - **`removeSubtypeFact` keeps what still holds, rather than mirroring
   `removeFactType`.** The draft said it should drop a constraint "whose
   operand it was", as `removeFactType` drops one every role of which was
@@ -1661,14 +1670,9 @@ Implementation notes (2026-10-21, WS4b-i, subtype constraints in memory):
   not "each Person is a Female". An exclusion left over one subtype goes
   too. A first version narrowed every kind, which made a disjunctive
   mandatory or exclusive-or stronger than the modeller stated; code review
-  caught it.
-- **NORMA export writes a partition over the subtypes it names.** The
-  flag-based writer wrote the exclusion and mandatory over every subtype
-  meta-role of a supertype whenever any of them was flagged, so a
-  supertype with an unflagged subtype gained a rule nobody stated. It now
-  writes each constraint over its own subtype facts, keeping the old ids.
-  No tracked model has a partial group, so no export moves. A group of one
-  is still not written, which the one-to-one mapping in a later PR settles.
+  caught it. `withoutSubtypeFacts` in `model/Constraint.ts` holds the rule,
+  and the merge reads it too, so a subtype fact the merge leaves out
+  leaves the same constraint a removal by hand does.
 - **The 2.0 writer is lossy beyond the draft's two cases**, for models
   built in code or by a merge mixing two sides: modality, a stated id, and
   an exclusive-or beside a disjunctive mandatory over other subtypes,

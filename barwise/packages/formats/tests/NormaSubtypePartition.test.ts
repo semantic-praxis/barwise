@@ -46,6 +46,50 @@ describe("a constraint over subtypes through NORMA", () => {
     expect(partitions(roundTrip(model))).toEqual([{ type, subtypes: ["Male", "Female"] }]);
   });
 
+  it("keeps two exclusions over one supertype apart, and a deontic modality", () => {
+    // Read back as flags on each subtype, the two became one exclusion over
+    // all four, which says a Male is never a Child.
+    const model = new OrmModel({ name: "People" });
+    const person = model.addObjectType({ name: "Person", kind: "entity", referenceMode: "id" });
+    const ids = ["Male", "Female", "Adult", "Child"].map((name) => {
+      const ot = model.addObjectType({ name, kind: "entity", referenceMode: "id" });
+      return model.addSubtypeFact({ subtypeId: ot.id, supertypeId: person.id }).id;
+    });
+    model.addConstraint({ type: "exclusion", subtypeFactIds: [ids[0]!, ids[1]!] });
+    model.addConstraint({
+      type: "exclusion",
+      modality: "deontic",
+      subtypeFactIds: [ids[2]!, ids[3]!],
+    });
+    const back = roundTrip(model);
+    expect(partitions(back)).toEqual([
+      { type: "exclusion", subtypes: ["Male", "Female"] },
+      { type: "exclusion", subtypes: ["Adult", "Child"] },
+    ]);
+    expect(back.constraints.map((c) => c.modality ?? "alethic")).toEqual(["alethic", "deontic"]);
+  });
+
+  it("pairs an exclusion and a mandatory into an exclusive-or only over the same subtypes", () => {
+    const model = new OrmModel({ name: "People" });
+    const person = model.addObjectType({ name: "Person", kind: "entity", referenceMode: "id" });
+    const ids = ["Male", "Female", "Other"].map((name) => {
+      const ot = model.addObjectType({ name, kind: "entity", referenceMode: "id" });
+      return model.addSubtypeFact({ subtypeId: ot.id, supertypeId: person.id }).id;
+    });
+    model.addConstraint({ type: "exclusion", subtypeFactIds: [ids[0]!, ids[1]!] });
+    model.addConstraint({ type: "disjunctive_mandatory", subtypeFactIds: ids });
+    expect(partitions(roundTrip(model))).toEqual([
+      { type: "exclusion", subtypes: ["Male", "Female"] },
+      { type: "disjunctive_mandatory", subtypes: ["Male", "Female", "Other"] },
+    ]);
+  });
+
+  it("exports one with no subtype facts as nothing, rather than failing", () => {
+    const model = people("exclusion");
+    model.addConstraint({ type: "exclusion", subtypeFactIds: [] });
+    expect(() => writeOrmToNorma(model)).not.toThrow();
+  });
+
   it("is written over the meta-roles of the subtypes it names, and no others", () => {
     // Employee is a third subtype the exclusion does not name; writing it
     // over every subtype of Person would invent "no Employee is a Male".

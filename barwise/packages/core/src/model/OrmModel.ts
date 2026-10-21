@@ -2,8 +2,10 @@ import {
   type Constraint,
   type ExternalConstraint,
   type InternalConstraint,
+  isOverSubtypes,
   roleIdsOf,
   subtypeFactIdsOf,
+  withoutSubtypeFacts,
 } from "./Constraint.js";
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
@@ -302,9 +304,8 @@ export class OrmModel {
   constraintsTouchingNone(): readonly ExternalConstraint[] {
     const factTypes = this.factTypes;
     return this.constraints.filter((c) => {
-      const subtypeFactIds = subtypeFactIdsOf(c);
-      if (subtypeFactIds.length > 0) {
-        return !subtypeFactIds.some((id) => this._subtypeFacts.has(id));
+      if (isOverSubtypes(c)) {
+        return !subtypeFactIdsOf(c).some((id) => this._subtypeFacts.has(id));
       }
       const roleIds = roleIdsOf(c);
       return !factTypes.some((ft) => holdsAny(ft, roleIds));
@@ -530,18 +531,10 @@ export class OrmModel {
 
   /**
    * Remove a subtype fact from the model, and keep of each constraint over
-   * subtypes naming it only what still holds without it.
-   *
-   * An exclusion loses the one subtype: no Person is two of the rest still
-   * holds. A disjunctive mandatory goes: "each Person is at least one of
-   * Male, Female" with Male removed is not "each Person is a Female", a
-   * rule nobody stated. An exclusive-or keeps its exclusion half over the
-   * rest and loses the exhaustive one, for the same reason. An exclusion
-   * left over one subtype states nothing and goes too.
-   *
-   * Not left dangling, as `removeFactType` leaves a constraint's roles: a
-   * model holding an id that names nothing does not load after its next
-   * save.
+   * subtypes naming it only what still holds without it
+   * (`withoutSubtypeFacts`). Not left dangling, as `removeFactType` leaves
+   * a constraint's roles: a model holding an id that names nothing does not
+   * load after its next save.
    */
   removeSubtypeFact(id: string): void {
     if (!this._subtypeFacts.has(id)) {
@@ -549,20 +542,9 @@ export class OrmModel {
     }
     this._subtypeFacts.delete(id);
     for (let i = this._constraints.length - 1; i >= 0; i--) {
-      const c = this._constraints[i]!;
-      const ids = subtypeFactIdsOf(c);
-      if (!ids.includes(id)) continue;
-      const rest = ids.filter((sf) => sf !== id);
-      if (c.type === "disjunctive_mandatory" || rest.length < 2) {
-        this._constraints.splice(i, 1);
-      } else {
-        this._constraints[i] = {
-          ...(c.id !== undefined ? { id: c.id } : {}),
-          ...(c.modality !== undefined ? { modality: c.modality } : {}),
-          type: "exclusion",
-          subtypeFactIds: rest,
-        };
-      }
+      const kept = withoutSubtypeFacts(this._constraints[i]!, (sf) => sf === id);
+      if (kept === undefined) this._constraints.splice(i, 1);
+      else this._constraints[i] = kept;
     }
   }
 

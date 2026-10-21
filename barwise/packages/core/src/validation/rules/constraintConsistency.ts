@@ -219,7 +219,9 @@ function subtypeOperandConsistency(
       ),
     ];
   }
-  if (subtypeFactIds.length < min) {
+  // Distinct subtype facts: one named twice is still one subtype.
+  const count = new Set(subtypeFactIds).size;
+  if (count < min) {
     const supertype = supertypes[0] === undefined ? "its supertype" : nameOf(supertypes[0]);
     return [
       report(
@@ -228,7 +230,7 @@ function subtypeOperandConsistency(
         id,
         kind,
         supertype,
-        subtypeFactIds.length,
+        count,
         min,
       ),
     ];

@@ -466,10 +466,14 @@ function operandOf(
  * its keys with this (orm-format-3 WS4b).
  */
 function withSubtypeFacts(keys: RoleKeys, model: OrmModel, other: OrmModel): RoleKeys {
-  const nameOf = (id: string) => (model.getObjectType(id) ?? other.getObjectType(id))?.name ?? id;
   return (id) => {
-    const sf = model.getSubtypeFact(id) ?? other.getSubtypeFact(id);
-    return sf ? `s${JSON.stringify([nameOf(sf.subtypeId), nameOf(sf.supertypeId)])}` : keys(id);
+    // Its ends are named in the model that holds it: two files can give one
+    // id to different object types.
+    const owner = model.getSubtypeFact(id) ? model : other;
+    const sf = owner.getSubtypeFact(id);
+    if (!sf) return keys(id);
+    const nameOf = (ot: string) => owner.getObjectType(ot)?.name ?? ot;
+    return `s${JSON.stringify([nameOf(sf.subtypeId), nameOf(sf.supertypeId)])}`;
   };
 }
 

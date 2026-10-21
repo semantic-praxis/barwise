@@ -11,6 +11,7 @@ import { mergeModels } from "../../src/diff/ModelMerge.js";
 import { generateModelLineage } from "../../src/lineage/generate.js";
 import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 import { Verbalizer } from "../../src/verbalization/Verbalizer.js";
@@ -152,6 +153,39 @@ describe("a constraint over subtypes", () => {
       return fact && merged.getObjectType(fact.subtypeId)?.name;
     });
     expect(named).toEqual(["Male", "Female"]);
+  });
+
+  it("keeps what still holds when the merge leaves one of its subtype facts out", () => {
+    // The incoming model drops Other; the reviewer takes that and keeps the
+    // existing exclusive-or. No Person is both Male and Female still holds.
+    const { model: existing, sf } = people(["Male", "Female", "Other"]);
+    existing.addConstraint(over("exclusive_or", [sf["Male"]!, sf["Female"]!, sf["Other"]!]));
+    const { model: incoming } = people();
+    incoming.addConstraint(over("exclusive_or", [sf["Male"]!, sf["Female"]!]));
+    const { deltas } = diffModels(existing, incoming);
+    const accepted = new Set(
+      deltas.flatMap((d, i) => (d.elementType === "subtype_fact" ? [i] : [])),
+    );
+    const merged = mergeModels(existing, incoming, deltas, accepted);
+    expect(merged.constraints).toMatchObject([
+      { type: "exclusion", subtypeFactIds: [sf["Male"], sf["Female"]] },
+    ]);
+  });
+
+  it("counts a subtype named twice once", () => {
+    const { model, sf } = people();
+    model.addConstraint(over("exclusion", [sf["Male"]!, sf["Male"]!]));
+    expect(fired(model)).toContain(RULE_ID.subtypeConstraintTooFewSubtypes);
+  });
+
+  it("with no subtype facts at all is still over subtypes, saved as nothing rather than refused", () => {
+    const { model } = people();
+    model.addConstraint(over("exclusion", []));
+    expect(fired(model)).toContain(RULE_ID.subtypeConstraintTooFewSubtypes);
+    const serializer = new OrmYamlSerializer();
+    const text = serializer.serialize(model);
+    expect(text).not.toContain("subtype_facts: []");
+    expect(serializer.deserialize(text).constraints).toEqual([]);
   });
 
   it("stays out of the merge when its subtype facts are rejected", () => {

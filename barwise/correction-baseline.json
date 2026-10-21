@@ -625,12 +625,6 @@
       "caught_by": "reasoning",
       "note": "Grounding the reader sites showed one PR would touch 43 source files, tens of test files and every host-naming output; the split keeps the compile-time check in 3c."
     },
-    "orm-format-3::b398ee0f2240": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "- the operand. roleorsubtypeoperand makes exclusion, disjunctivemandatory and exclusiveor take roleids or subtypefactids, exactly one. roleidsof returns no role",
-      "caught_by": "execution",
-      "note": "Corrections to the WS4b draft. The compiler, once the flags were removed, showed the llm parser never wrote them, though the draft listed it among their writers. Writing the removeSubtypeFact cascade showed a dangling subtype fact id would make a model unloadable, so the operand is pruned instead; code review then caught that pruning every kind made a disjunctive mandatory or exclusive-or stronger, and the NORMA writer writing partitions over every subtype of a supertype."
-    },
     "orm-format-3::c99682fde87a": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 3c-iii, writers. - facttype.addconstraint and facttypeconfig.constraints take the internal kinds only, and the forward from 3c-ii is gone. a fact type still r",
@@ -642,6 +636,12 @@
       "excerpt": "- 3c lands as two prs. the same probe, run with each package's tests included, found 273 test reads of the getter in 45 files (core 88 in 21, formats 148 in 14,",
       "caught_by": "execution",
       "note": "The draft relied on removing the getter to make the compiler name every reader; tsconfig excludes tests, and a probe that renamed the getter and type-checked with tests included found 273 test reads in 45 files, so 3c split into a test-reader PR and the storage move."
+    },
+    "orm-format-3::dfa4326db4a0": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- the operand. roleorsubtypeoperand makes exclusion, disjunctivemandatory and exclusiveor take roleids or subtypefactids, exactly one. roleidsof returns no role",
+      "caught_by": "reasoning",
+      "note": "Corrections to the WS4b draft. The compiler showed the llm parser never wrote the flags the draft listed it as writing. A dangling subtype fact id would make a model unloadable, so removal prunes the operand; two code review rounds then caught that pruning every kind made a disjunctive mandatory or exclusive-or stronger, that NORMA wrote partitions over every subtype of a supertype, and that reading NORMA partitions back as flags merged two exclusions and dropped modality, which moved the one-to-one NORMA mapping forward into 4b-i."
     },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",

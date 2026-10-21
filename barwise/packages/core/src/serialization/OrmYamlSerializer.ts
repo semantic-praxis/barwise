@@ -3,7 +3,7 @@ import {
   type ExternalConstraint,
   isExternalConstraint,
   isInternalConstraint,
-  subtypeFactIdsOf,
+  isOverSubtypes,
 } from "../model/Constraint.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { withDerivedIds } from "./derivedId.js";
@@ -338,7 +338,7 @@ function lowerConstraints(model: OrmModel): ReadonlyMap<string, ExternalConstrai
   const byHost = new Map<string, ExternalConstraint[]>();
   for (const c of model.constraints) {
     // A constraint over subtypes is written as flags on its subtype facts.
-    if (subtypeFactIdsOf(c).length > 0) continue;
+    if (isOverSubtypes(c)) continue;
     const host = model.factTypesOf(c)[0] ?? model.factTypes[0];
     if (!host) {
       throw new Error(

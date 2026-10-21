@@ -629,6 +629,45 @@ export function subtypeFactIdsOf(c: Constraint): string[] {
 }
 
 /**
+ * Whether a constraint's operand is subtype facts rather than roles. The one
+ * test for it, so every reader agrees on a constraint whose subtype fact
+ * list is empty: it is over subtypes, and validation reports it as too few.
+ */
+export function isOverSubtypes(c: Constraint): boolean {
+  return (c.type === "disjunctive_mandatory" || c.type === "exclusion" || c.type === "exclusive_or")
+    && c.subtypeFactIds !== undefined;
+}
+
+/**
+ * What a constraint over subtypes still says once some of its subtype facts
+ * are gone, or undefined when it says nothing. An exclusion narrows: no
+ * Person is two of the rest still holds. An exclusive-or keeps its
+ * exclusion half over the rest. A disjunctive mandatory goes: "each Person
+ * is at least one of Male, Female" without Male is not "each Person is a
+ * Female", a rule nobody stated, and an exclusive-or's exhaustive half goes
+ * for the same reason. An exclusion left over fewer than two states nothing.
+ * One with none gone is returned as it is.
+ *
+ * `OrmModel.removeSubtypeFact` and the merge both read it, so a subtype
+ * fact removed by hand and one a merge leaves out leave the same rule.
+ */
+export function withoutSubtypeFacts(
+  c: ExternalConstraint,
+  gone: (subtypeFactId: string) => boolean,
+): ExternalConstraint | undefined {
+  const ids = subtypeFactIdsOf(c);
+  if (!ids.some(gone)) return c;
+  const rest = ids.filter((id) => !gone(id));
+  if (c.type === "disjunctive_mandatory" || rest.length < 2) return undefined;
+  return {
+    ...(c.id !== undefined ? { id: c.id } : {}),
+    ...(c.modality !== undefined ? { modality: c.modality } : {}),
+    type: "exclusion",
+    subtypeFactIds: rest,
+  };
+}
+
+/**
  * Every OBJECT TYPE id a constraint references.
  *
  * Only join constraints have any: each operand's role path is rooted at

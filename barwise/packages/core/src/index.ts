@@ -28,6 +28,7 @@ export {
   isJoinExclusion,
   isJoinSubset,
   isMandatoryRole,
+  isOverSubtypes,
   isRing,
   isSubset,
   isValueComparison,
@@ -51,6 +52,7 @@ export {
   type ValueComparisonConstraint,
   type ValueComparisonOperator,
   type ValueConstraint,
+  withoutSubtypeFacts,
 } from "./model/Constraint.js";
 export {
   ContextMapping,
