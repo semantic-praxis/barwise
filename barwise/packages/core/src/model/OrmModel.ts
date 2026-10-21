@@ -37,19 +37,22 @@ export interface OrmModelConfig {
 }
 
 /**
+ * Whether a fact type holds any of these roles: the one touch test behind
+ * `constraintsTouchingAny`, `constraintsTouchingNone` and
+ * `factTypesHolding` (so `factTypesOf` and `factTypesNaming`), so where a
+ * constraint is listed and which fact types name it cannot disagree.
+ */
+function holdsAny(ft: FactType, roleIds: readonly string[]): boolean {
+  return roleIds.some((rid) => ft.hasRole(rid));
+}
+
+/**
  * The root aggregate for an ORM model. Holds all object types, fact types,
  * and definitions, and provides query and mutation methods.
  *
  * The OrmModel enforces referential integrity: roles in fact types must
  * reference object types that exist in the model.
  */
-/**
- * Whether a constraint names one of the fact type's roles: the touch test
- * `constraintsTouchingAny` and `constraintsTouchingNone` share.
- */
-function touches(c: Constraint, ft: FactType): boolean {
-  return roleIdsOf(c).some((rid) => ft.hasRole(rid));
-}
 
 export class OrmModel {
   private _name: string;
@@ -263,7 +266,7 @@ export class OrmModel {
         touching.push([c, ft]);
       }
       for (const c of across) {
-        if (seen.has(c) || !touches(c, ft)) continue;
+        if (seen.has(c) || !holdsAny(ft, roleIdsOf(c))) continue;
         seen.add(c);
         touching.push([c, undefined]);
       }
@@ -276,11 +279,12 @@ export class OrmModel {
    * their roles resolve. No `constraintsTouchingAny` view lists them, so a
    * reader that shows constraints by fact type reads these too, or a
    * constraint left dangling by a renamed or deleted role disappears.
-   * Both read the one `touches` predicate, so a constraint is in exactly
-   * one of this and some fact type's view.
+   * Both read the one `holdsAny` test, so a constraint is in exactly one
+   * of this and some fact type's view.
    */
   constraintsTouchingNone(): readonly ExternalConstraint[] {
-    return this.constraints.filter((c) => !this.factTypes.some((ft) => touches(c, ft)));
+    const factTypes = this.factTypes;
+    return this.constraints.filter((c) => !factTypes.some((ft) => holdsAny(ft, roleIdsOf(c))));
   }
 
   /**
@@ -313,7 +317,7 @@ export class OrmModel {
    * verbalizer's role labels need.
    */
   factTypesHolding(roleIds: readonly string[]): readonly FactType[] {
-    return this.factTypes.filter((ft) => roleIds.some((rid) => ft.hasRole(rid)));
+    return this.factTypes.filter((ft) => holdsAny(ft, roleIds));
   }
 
   /** Look up a constraint of either placement by id. */
