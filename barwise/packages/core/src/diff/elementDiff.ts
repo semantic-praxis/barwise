@@ -175,6 +175,39 @@ export function isDanglingFactType(a: OrmModel, b: OrmModel, factTypeId: string)
  */
 export type ConstraintMatching = "id-first" | "content";
 
+/** How one diff pairs constraints, fixed once for the whole pair of models. */
+export interface ConstraintPairing {
+  readonly matching: ConstraintMatching;
+  /**
+   * Ids given to more than one constraint anywhere in each model
+   * (barwise-b2s). They pair nothing by id: uniqueness is a whole-model
+   * condition, so a list of one fact type's constraints cannot decide it.
+   */
+  readonly repeatedA: ReadonlySet<string>;
+  readonly repeatedB: ReadonlySet<string>;
+}
+
+/** The pairing for diffing `existing` against `incoming`. */
+export function constraintPairing(
+  existing: OrmModel,
+  incoming: OrmModel,
+  matching: ConstraintMatching,
+): ConstraintPairing {
+  return { matching, repeatedA: repeatedIds(existing), repeatedB: repeatedIds(incoming) };
+}
+
+/** The constraint ids that occur more than once in the model. */
+function repeatedIds(model: OrmModel): ReadonlySet<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const [c] of model.everyConstraint()) {
+    if (c.id === undefined) continue;
+    if (seen.has(c.id)) repeated.add(c.id);
+    seen.add(c.id);
+  }
+  return repeated;
+}
+
 export function diffFactType(
   a: FactType,
   b: FactType,
@@ -184,7 +217,7 @@ export function diffFactType(
     existing: roleHolders(existingModel),
     incoming: roleHolders(incomingModel),
   },
-  matching: ConstraintMatching = "id-first",
+  pairing: ConstraintPairing = constraintPairing(existingModel, incomingModel, "id-first"),
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
@@ -223,7 +256,7 @@ export function diffFactType(
     b.roles,
     holders.existing,
     holders.incoming,
-    matching,
+    pairing,
   );
   changes.push(...constraintDiff);
 
@@ -403,8 +436,9 @@ function constraintTypeKey(
     }
     case "value_constraint": {
       const role = c.roleId ? resolveRole(c.roleId, idxMap) : "";
-      const vals = [...c.values].sort().join(",");
-      return `VC:${role}:${vals}`;
+      // Both halves, as `valueConstraintKey` reads them: a range-only edit
+      // is a change to what the model permits (barwise-934, for roles).
+      return `VC:${role}:${valueConstraintKey(c)}`;
     }
     case "disjunctive_mandatory": {
       const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
@@ -468,39 +502,42 @@ function diffConstraints(
   rolesB: readonly Role[],
   holdersA: RoleHolders,
   holdersB: RoleHolders,
-  matching: ConstraintMatching,
+  pairing: ConstraintPairing,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
   const idxMapA = roleKeys(rolesA, holdersA, holdersB);
   const idxMapB = roleKeys(rolesB, holdersB, holdersA);
+  const keyA = new Map(a.map((c) => [c, constraintKey(c, idxMapA)]));
+  const keyB = new Map(b.map((c) => [c, constraintKey(c, idxMapB)]));
 
-  // Pair by id first, where an id names exactly one constraint on each
-  // side. An id given twice on one side (barwise-b2s) pairs nothing, so
-  // those constraints fall through to content rather than pairing one of
-  // them arbitrarily. A constraint with no id is never paired by id.
+  // Pair by id first, where an id names exactly one constraint in each
+  // model. An id given twice anywhere in a model (barwise-b2s) pairs
+  // nothing, so those constraints fall through to content rather than
+  // pairing one of them arbitrarily. A constraint with no id is never
+  // paired by id.
   const paired = new Set<Constraint>();
   const modified: { from: Constraint; to: Constraint; }[] = [];
-  if (matching === "id-first") {
-    const onceA = uniqueById(a);
-    const onceB = uniqueById(b);
-    for (const [id, ca] of onceA) {
-      const cb = onceB.get(id);
+  if (pairing.matching === "id-first") {
+    const byIdB = new Map(
+      b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
+    );
+    for (const ca of a) {
+      if (ca.id === undefined || pairing.repeatedA.has(ca.id)) continue;
+      const cb = byIdB.get(ca.id);
       if (!cb) continue;
       paired.add(ca).add(cb);
-      if (constraintKey(ca, idxMapA) !== constraintKey(cb, idxMapB)) {
-        modified.push({ from: ca, to: cb });
-      }
+      if (keyA.get(ca) !== keyB.get(cb)) modified.push({ from: ca, to: cb });
     }
   }
   const restA = a.filter((c) => !paired.has(c));
   const restB = b.filter((c) => !paired.has(c));
 
-  const keysA = new Set(restA.map((c) => constraintKey(c, idxMapA)));
-  const keysB = new Set(restB.map((c) => constraintKey(c, idxMapB)));
+  const keysA = new Set(restA.map((c) => keyA.get(c)));
+  const keysB = new Set(restB.map((c) => keyB.get(c)));
 
-  const added = restB.filter((c) => !keysA.has(constraintKey(c, idxMapB)));
-  const removed = restA.filter((c) => !keysB.has(constraintKey(c, idxMapA)));
+  const added = restB.filter((c) => !keysA.has(keyB.get(c)));
+  const removed = restA.filter((c) => !keysB.has(keyA.get(c)));
 
   // The constraints themselves, copied: the prose renders only their
   // deduplicated type names, and that was the whole of what a consumer
@@ -519,19 +556,6 @@ function diffConstraints(
   }
 
   return changes;
-}
-
-/** The constraints whose id occurs exactly once in the list, by id. */
-function uniqueById(constraints: readonly Constraint[]): Map<string, Constraint> {
-  const byId = new Map<string, Constraint>();
-  const repeated = new Set<string>();
-  for (const c of constraints) {
-    if (c.id === undefined) continue;
-    if (byId.has(c.id)) repeated.add(c.id);
-    else byId.set(c.id, c);
-  }
-  for (const id of repeated) byId.delete(id);
-  return byId;
 }
 
 /**

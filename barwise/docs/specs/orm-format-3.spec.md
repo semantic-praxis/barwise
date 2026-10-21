@@ -1047,22 +1047,31 @@ Implementation notes (2026-10-19):
     to `diffConstraints`. `barwise diff`, `history`, `merge`, the
     transcript imports and MCP's diff and merge tools take the default
     unchanged.
-  - Id-first pairs a constraint whose id occurs exactly once on each side.
-    A pair whose content key differs is one `constraintsModified` change
-    carrying both versions (rendered "constraints modified: <kinds>", by
-    the new version's kinds; breaking level `caution`). The rest pair by
-    content key, as before, and a pair held out by id never also matches
-    by content. An id given twice on one side pairs nothing and falls
-    through to content (barwise-b2s), rather than pairing one copy
-    arbitrarily.
+  - Id-first pairs a constraint whose id occurs exactly once in each
+    model. A pair whose content key differs is one `constraintsModified`
+    change carrying both versions (rendered "constraints modified:
+    <kinds>", "<old> to <new>" for a kind that changed; breaking level
+    `caution`). The rest pair by content key, as before, and a pair held
+    out by id never also matches by content. An id given twice anywhere in
+    a model pairs nothing and falls through to content (barwise-b2s),
+    rather than pairing one copy arbitrarily; uniqueness is decided per
+    model, not per fact type. Two constraints that swap ids read as two
+    modifications, since under id-first the id is the constraint's
+    identity.
+  - A value constraint's content key now reads its ranges as well as its
+    values. It read values alone, so a range-only edit was invisible in
+    either mode: the role-level counterpart of barwise-934.
   - Transcript imports keep the default safely: extraction fills ids
     through `addConstraint`, which mints random UUIDs, so an import never
     shares an id with its base by accident and falls through to content.
   - `sampleAgreement.ts` (the medoid fold and each sample's diff) and
     `TranscriptProcessor.ts` (an alternative framing's diff) pass
-    `"content"`. Neither count in the fold can tell the modes apart today,
-    since a fact type is "modified" either way; the framing's diff can,
-    and a spy test pins both call sites.
+    `"content"`, through one shared `SAMPLE_DIFF`. The modes usually agree
+    on whether a fact type changed, so the fold's count rarely moves, but
+    not always: two constraints of equal content collapse under content
+    keys, so dropping one of them is a change by id and none by content.
+    A spy test pins both call sites; core's tests pin what each mode
+    pairs.
   - Merge needed no change in 3a: it takes a modified fact type whole from
     the chosen side, constraints included. A constraint whose 2.0 host
     differs between the sides is still a removal and an addition until

@@ -241,7 +241,18 @@ export function describeChange(change: ChangeDescription): string {
     case "constraintsRemoved":
       return `constraints removed: ${constraintTypes(change.constraints)}`;
     case "constraintsModified":
-      return `constraints modified: ${constraintTypes(change.constraints.map((m) => m.to))}`;
+      // A kind that changed reads as both, so the prose does not hide that
+      // a mandatory became a frequency.
+      return `constraints modified: ${
+        [
+          ...new Set(
+            change.constraints.map((m) =>
+              m.from.type === m.to.type ? m.to.type : `${m.from.type} to ${m.to.type}`
+            ),
+          ),
+        ]
+          .join(", ")
+      }`;
     case "derivation":
       return "derivation changed";
     case "definition":

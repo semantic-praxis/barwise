@@ -130,9 +130,8 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
         to: { type: "exclusive_or", roleIds: ["r1", "r2"] },
       }],
     },
-    // Named by the new version's kind: an edit that changed the kind
-    // says what the constraint is now.
-    text: "constraints modified: exclusive_or",
+    // A kind that changed reads as both.
+    text: "constraints modified: exclusion to exclusive_or",
   },
   {
     sample: {

@@ -25,6 +25,7 @@ import type { ExtractionLogSink } from "./observe/extractionLog.js";
 import { emitExtractionRecord, summariseExtraction } from "./observe/extractionLog.js";
 import type { PromptArtifact } from "./prompt/artifacts/PromptArtifact.js";
 import { selectArtifact } from "./prompt/selectArtifact.js";
+import { SAMPLE_DIFF } from "./sampleAgreement.js";
 
 export interface ProcessorOptions {
   /** Name for the resulting model. Defaults to "Extracted Model". */
@@ -232,8 +233,8 @@ function buildCandidateFramings(
         ambiguityDescription: alt.ambiguity_description,
         model: altResult.model,
         // An alternative is an independent extraction, so its ids are
-        // unrelated to the primary's: pair constraints by content only.
-        diff: diffModels(primaryModel, altResult.model, { constraintMatching: "content" }),
+        // unrelated to the primary's.
+        diff: diffModels(primaryModel, altResult.model, SAMPLE_DIFF),
       });
     } catch (err) {
       warnings.push(

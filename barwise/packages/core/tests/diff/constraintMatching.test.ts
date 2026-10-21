@@ -115,6 +115,59 @@ describe("id-first constraint matching", () => {
   });
 });
 
+describe("what id-first pairing reads", () => {
+  it("reports a value constraint whose range alone changed", () => {
+    const vc = (max: string): Constraint => ({
+      id: "vc-1",
+      type: "value_constraint",
+      roleId: "r-2",
+      values: [],
+      ranges: [{ min: "1", max }],
+    });
+    expect(constraintChanges(drives([vc("10")]), drives([vc("5")])))
+      .toEqual([["constraintsModified", [["vc-1", "vc-1"]]]]);
+    // The same edit under fresh ids is a removal and an addition, not silence.
+    const fresh: Constraint = { ...vc("5"), id: "vc-2" };
+    expect(constraintChanges(drives([vc("10")]), drives([fresh]))).toEqual([
+      ["constraintsAdded", ["vc-2"]],
+      ["constraintsRemoved", ["vc-1"]],
+    ]);
+  });
+
+  it("pairs nothing by an id another fact type of the same model also uses", () => {
+    const a = drives([uc("c-1", ["r-1"])]);
+    const b = drives([uc("c-1", ["r-2"])]);
+    b.addFactType({
+      id: "ft-o",
+      name: "Person owns Car",
+      roles: [
+        { id: "r-3", name: "owns", playerId: "ot-p" },
+        { id: "r-4", name: "is owned by", playerId: "ot-c" },
+      ],
+      readings: ["{0} owns {1}"],
+      constraints: [uc("c-1", ["r-3"])],
+    });
+    expect(constraintChanges(a, b)).toEqual([
+      ["constraintsAdded", ["c-1"]],
+      ["constraintsRemoved", ["c-1"]],
+    ]);
+    // And the same with the repeat on the existing side.
+    expect(constraintChanges(b, a)).toEqual([
+      ["constraintsAdded", ["c-1"]],
+      ["constraintsRemoved", ["c-1"]],
+    ]);
+  });
+
+  it("names both kinds when an edit changes the kind", () => {
+    const a = drives([{ id: "c-1", type: "mandatory", roleId: "r-1" }]);
+    const b = drives([uc("c-1", ["r-1"])]);
+    const delta = diffModels(a, b).deltas.find((d) => d.elementType === "fact_type")!;
+    expect(delta.changeDescriptions).toEqual([
+      "constraints modified: mandatory to internal_uniqueness",
+    ]);
+  });
+});
+
 describe("content-only constraint matching", () => {
   it("never pairs two different constraints by a coincidental id", () => {
     const a = drives([uc("c-1", ["r-1"])]);

@@ -16,7 +16,7 @@ import { classifyBreakingLevel } from "./breakingLevel.js";
 import { describeChange } from "./changeDescription.js";
 import type { DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
 import {
-  type ConstraintMatching,
+  constraintPairing,
   diffDefinition,
   diffFactType,
   diffObjectType,
@@ -29,6 +29,7 @@ import {
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
+import type { ConstraintMatching } from "./elementDiff.js";
 export type { ConstraintMatching } from "./elementDiff.js";
 
 /** Options for {@link diffModels}. */
@@ -75,7 +76,11 @@ export function diffModels(
   incoming: OrmModel,
   options: DiffOptions = {},
 ): ModelDiffResult {
-  const matching = options.constraintMatching ?? "id-first";
+  const pairing = constraintPairing(
+    existing,
+    incoming,
+    options.constraintMatching ?? "id-first",
+  );
   const deltas: ModelDelta[] = [];
 
   // --- Object types ---
@@ -142,7 +147,7 @@ export function diffModels(
         breakingLevel: classifyBreakingLevel("removed", [], "fact_type"),
       });
     } else {
-      const changes = diffFactType(ft, match, existing, incoming, holders, matching);
+      const changes = diffFactType(ft, match, existing, incoming, holders, pairing);
       const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
       deltas.push({
         kind,

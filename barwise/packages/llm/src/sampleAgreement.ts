@@ -64,7 +64,7 @@ function keyOf(elementType: string, name: string): string {
  * comparison between them pairs constraints by content alone: a
  * coincidental id must never pair two different constraints.
  */
-const SAMPLE_DIFF = { constraintMatching: "content" } as const;
+export const SAMPLE_DIFF = { constraintMatching: "content" } as const;
 
 /** Deltas that represent an actual difference between two models. */
 function differenceCount(a: OrmModel, b: OrmModel): number {
