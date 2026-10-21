@@ -241,13 +241,16 @@ export function describeChange(change: ChangeDescription): string {
     case "constraintsRemoved":
       return `constraints removed: ${constraintTypes(change.constraints)}`;
     case "constraintsModified":
-      // A kind that changed reads as both, so the prose does not hide that
-      // a mandatory became a frequency.
+      // A kind or modality that changed reads as both, so the prose does
+      // not hide that a mandatory became a frequency, or a necessity an
+      // obligation.
       return `constraints modified: ${
         [
           ...new Set(
             change.constraints.map((m) =>
-              m.from.type === m.to.type ? m.to.type : `${m.from.type} to ${m.to.type}`
+              kindName(m.from) === kindName(m.to)
+                ? kindName(m.to)
+                : `${kindName(m.from)} to ${kindName(m.to)}`
             ),
           ),
         ]
@@ -292,6 +295,11 @@ function describeInstanceChange(added: number, removed: number): string {
   // Same tuples, different instance ids only: the population changed in
   // a way nothing downstream can observe, which is worth saying plainly.
   return "instances reordered";
+}
+
+/** A constraint's kind, with its modality when it is deontic. */
+function kindName(c: Constraint): string {
+  return c.modality === "deontic" ? `${c.type} (deontic)` : c.type;
 }
 
 /** The deduplicated constraint type names, in first-seen order. */

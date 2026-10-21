@@ -280,6 +280,15 @@ describe("what id-first pairing reads", () => {
     expect(constraintChanges(a, b)).toEqual([]);
   });
 
+  it("names the modality when an edit changes only that", () => {
+    const a = drives([{ id: "c-1", type: "mandatory", roleId: "r-1" }]);
+    const b = drives([{ id: "c-1", type: "mandatory", roleId: "r-1", modality: "deontic" }]);
+    const delta = diffModels(a, b).deltas.find((d) => d.elementType === "fact_type")!;
+    expect(delta.changeDescriptions).toEqual([
+      "constraints modified: mandatory to mandatory (deontic)",
+    ]);
+  });
+
   it("names both kinds when an edit changes the kind", () => {
     const a = drives([{ id: "c-1", type: "mandatory", roleId: "r-1" }]);
     const b = drives([uc("c-1", ["r-1"])]);

@@ -171,8 +171,7 @@ Options:
 With `--format json`, each delta carries `changes` (what changed, as
 data) beside `changeDescriptions` (the same, as sentences). The shape is
 the MCP `diff_models` tool's; docs/MCP.md shows an example and says how
-constraints are paired (within a fact type matched by name: by id where the id
-occurs exactly once in each model, by content otherwise).
+constraints are paired.
 
 ### merge
 
