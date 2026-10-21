@@ -1200,7 +1200,9 @@ Implementation notes (2026-10-19):
     across fact types now follow those from fact types' own. One whose
     roles resolve to nothing spills with no table, where it took its
     host's. An external uniqueness none of whose roles has a column spills
-    "the roles map to no column", to that same nearest table.
+    "the roles map to no column", to that same nearest table, and one
+    with some roles lacking a column spills "a role maps to no column",
+    where both used to read "more than one table".
   - The NORMA writer writes each fact type's own constraints from
     `internalConstraints`, and those across fact types once each from
     `model.constraints`, after every fact type's. The serializer groups

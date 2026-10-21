@@ -104,7 +104,9 @@ export function routeConstraints(
       const table = cols.find((r) => r !== undefined)?.table;
       if (table === undefined) {
         spill(inView, "the roles map to no column", nearestTable(inView));
-      } else if (cols.every((r) => r !== undefined && r.table === table)) {
+      } else if (cols.some((r) => r === undefined)) {
+        spill(inView, "a role maps to no column", table);
+      } else if (cols.every((r) => r!.table === table)) {
         const columnList = cols.map((r) => r!.column).join(", ");
         route("unique", `UNIQUE (${columnList})`, table, inView);
       } else {

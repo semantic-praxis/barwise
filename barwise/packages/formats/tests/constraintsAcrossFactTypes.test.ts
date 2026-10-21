@@ -91,9 +91,26 @@ describe("constraints across fact types in DDL routing", () => {
   it("spills to the first spanned fact type's table, whichever fact type nests it", () => {
     const routed = route(projects(leads));
     expect(route(projects(sponsors))).toEqual(routed);
-    const spill = routed.spilled.find((s) => s.reason === "not expressible in SQL DDL");
-    expect(spill?.tableName).toBe("person");
-    expect(spill?.reason).toBe("not expressible in SQL DDL");
+    const exclusion = routed.spilled.find((s) =>
+      s.spec.pseudocode.startsWith("no instance plays more than one of")
+    );
+    expect(exclusion?.tableName).toBe("person");
+    expect(exclusion?.reason).toBe("not expressible in SQL DDL");
+    expect(routed.clauses).toContainEqual(
+      expect.objectContaining({ tableName: "project", sql: "UNIQUE (person_id, fk_person_id)" }),
+    );
+  });
+
+  it("names a role with no column, and spills one with none to the nearest table", () => {
+    const model = projects(leads);
+    const real = model.getFactTypeByName(leads)!.roles.find((r) => r.name === "is led by")!.id;
+    const ft = model.getFactTypeByName(sponsors)!;
+    ft.addConstraint({ id: "c-half", type: "external_uniqueness", roleIds: ["r-ghost", real] });
+    ft.addConstraint({ id: "c-none", type: "external_uniqueness", roleIds: ["r-ghost", "r-gone"] });
+    const spills = route(model).spilled.map((s) => [s.reason, s.tableName]);
+    expect(spills).toContainEqual(["a role maps to no column", "project"]);
+    // No role resolves, so no fact type names it and no table is nearest.
+    expect(spills).toContainEqual(["the roles map to no column", undefined]);
   });
 });
 
