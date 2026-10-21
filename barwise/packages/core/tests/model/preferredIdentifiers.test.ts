@@ -235,12 +235,33 @@ describe("preferredIdentifiers", () => {
     expect(identifierOf(model, "ot-c")).toBe("u-nr");
   });
 
-  it("leaves the two-identifier diagnostic counting every flag", () => {
-    // Resolving two flags to one answer must not hide the modelling error.
-    const model = customer([uc("u-c", ["r-c"], true), uc("u-nr", ["r-nr"], true)]);
-    expect(identifierOf(model, "ot-c")).toBe("u-nr");
-    const fired = new ValidationEngine().validate(model)
+  const multiple = (model: OrmModel) =>
+    new ValidationEngine().validate(model)
       .filter((d) => d.ruleId === RULE_ID.multiplePreferredIdentifiers);
-    expect(fired).toHaveLength(1);
+
+  it("leaves the two-identifier diagnostic reporting two identifiers", () => {
+    // Resolving two to one answer must not hide the modelling error.
+    const model = customer([uc("u-c", ["r-c"], true), uc("u-nr", ["r-nr"])]);
+    model.addObjectType({ id: "ot-mail", name: "Email", kind: "value" });
+    model.addFactType({
+      id: "ft-mail",
+      name: "Customer has Email",
+      roles: [
+        { id: "r-c2", name: "has", playerId: "ot-c" },
+        { id: "r-mail", name: "is of", playerId: "ot-mail" },
+      ],
+      readings: ["{0} has {1}"],
+      constraints: [uc("u-c2", ["r-c2"]), uc("u-mail", ["r-mail"], true)],
+    });
+    expect(identifierOf(model, "ot-c")).toBe("u-nr");
+    expect(multiple(model)).toHaveLength(1);
+  });
+
+  it("counts one identifier when both roles of its binary are flagged", () => {
+    // The importers flag the value's role and extraction the entity's, so
+    // a merged model can carry both; they name one uniqueness.
+    const model = customer([uc("u-c", ["r-c"], true), uc("u-nr", ["r-nr"], true)]);
+    expect(preferredIdentifiers(model).candidates.get("ot-c")).toHaveLength(1);
+    expect(multiple(model)).toEqual([]);
   });
 });

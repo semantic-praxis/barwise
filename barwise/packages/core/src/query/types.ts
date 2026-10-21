@@ -140,8 +140,11 @@ export interface EntityAnchors {
   /** Names of fact types in which the entity plays a mandatory role. */
   readonly mandatoryRoles: readonly string[];
   /**
-   * True when the entity has no preferred-identifier uniqueness constraint
-   * -- its reference scheme is declared but not formalized into the model.
+   * True when the entity has no identifier at all (`isIdentified`): no
+   * preferred uniqueness that identifies it, no objectification and no
+   * identifying subtype -- its reference scheme is declared but not
+   * formalized into the model. An objectified or identifying-subtype
+   * entity is identified with `preferredIdentifier` absent.
    * (Entity types always have a reference mode, so this is the meaningful
    * missing-anchor signal.)
    */

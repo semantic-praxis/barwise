@@ -209,10 +209,11 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
  */
 function checkConflictingIdentification(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
+  const identifiers = preferredIdentifiers(model);
 
   for (const ot of model.objectTypes) {
     const kinds = new Set<IdentificationSource["kind"]>(
-      identificationSources(model, ot).map((s) => s.kind),
+      identificationSources(model, ot, identifiers).map((s) => s.kind),
     );
     if (!kinds.has("identifying-subtype") || kinds.size < 2) continue;
 

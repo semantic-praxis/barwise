@@ -1622,6 +1622,9 @@ Implementation notes (2026-10-21, WS4a):
 - barwise-jir records a NORMA export limitation this work exposed and did
   not cause: an entity identified other than by a value binary has its
   instances seated on a synthesized expansion.
+- barwise-pm7: a flag that identifies nobody is dropped without a
+  diagnostic naming it. The entity still gets the missing-identifier note
+  when nothing else identifies it.
 
 ### 5. Corpus, docs, release notes (provisional: not yet grounded)
 

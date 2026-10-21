@@ -22,11 +22,7 @@
  * idempotent via stripBarwiseComments().
  */
 
-import {
-  isIdentified,
-  type PreferredIdentifiers,
-  preferredIdentifiers,
-} from "../model/identification.js";
+import { isIdentified, preferredIdentifiers } from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import {
   type AnnotationSeverity,
@@ -355,8 +351,10 @@ function collectStructuralGaps(
 ): void {
   const identifiers = preferredIdentifiers(model);
   for (const ot of model.objectTypes) {
-    // Entity types missing a preferred identifier.
-    if (ot.kind === "entity" && !hasPreferredIdentifier(ot, model, identifiers)) {
+    // Entity types with no identifier: a reference mode is only a naming
+    // hint; a preferred uniqueness that identifies the entity, an
+    // objectification or an identifying subtype formalizes one.
+    if (ot.kind === "entity" && !isIdentified(model, ot.id, identifiers)) {
       annotations.push({
         elementType: "object_type",
         elementName: ot.name,
@@ -375,20 +373,6 @@ function collectStructuralGaps(
       });
     }
   }
-}
-
-/**
- * Check if an entity type has a formally declared identifier. A reference
- * mode is just a naming hint; the real formalization is a preferred
- * uniqueness that identifies this entity, an objectification, or an
- * identifying subtype (`isIdentified`).
- */
-function hasPreferredIdentifier(
-  entity: import("../model/ObjectType.js").ObjectType,
-  model: OrmModel,
-  identifiers: PreferredIdentifiers,
-): boolean {
-  return isIdentified(model, entity.id, identifiers);
 }
 
 // ---------------------------------------------------------------------------

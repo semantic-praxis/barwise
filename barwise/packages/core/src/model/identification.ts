@@ -183,9 +183,12 @@ export function preferredIdentifiers(model: OrmModel): PreferredIdentifiers {
   const offer = (at: IdentifyingUniqueness, rank: number): void => {
     const held = chosen.get(at.entityId);
     if (!held || rank < held.rank) chosen.set(at.entityId, { at, rank });
+    // One constraint is one candidate, however many flags reach it: an
+    // entity-value binary flagged on both roles names its value role's
+    // uniqueness twice.
     const list = candidates.get(at.entityId);
-    if (list) list.push(at);
-    else candidates.set(at.entityId, [at]);
+    if (!list) candidates.set(at.entityId, [at]);
+    else if (!list.some((held) => held.constraint === at.constraint)) list.push(at);
   };
   const isEntity = (id: string) => model.getObjectType(id)?.kind === "entity";
 
@@ -248,16 +251,42 @@ export function isIdentified(
   model: OrmModel,
   entityId: string,
   identifiers: PreferredIdentifiers = preferredIdentifiers(model),
-  seen: Set<string> = new Set(),
 ): boolean {
-  if (seen.has(entityId)) return false;
-  seen.add(entityId);
-  if (identifiers.byEntity.has(entityId)) return true;
-  if (model.objectifiedFactTypes.some((oft) => oft.objectTypeId === entityId)) return true;
-  return model.subtypeFacts.some((sf) =>
-    sf.subtypeId === entityId && sf.providesIdentification
-    && isIdentified(model, sf.supertypeId, identifiers, seen)
-  );
+  const { objectifying, supertypesOf } = otherSources(model, identifiers);
+  const walk = (id: string, seen: Set<string>): boolean => {
+    if (seen.has(id)) return false;
+    seen.add(id);
+    if (identifiers.byEntity.has(id) || objectifying.has(id)) return true;
+    return (supertypesOf.get(id) ?? []).some((sup) => walk(sup, seen));
+  };
+  return walk(entityId, new Set());
+}
+
+/**
+ * The objectifying and identifying-subtype sources, indexed once per
+ * `preferredIdentifiers` result, so a reader asking `isIdentified` for
+ * every entity reads the model once rather than once per entity.
+ */
+const otherSourcesCache = new WeakMap<PreferredIdentifiers, {
+  readonly objectifying: ReadonlySet<string>;
+  readonly supertypesOf: ReadonlyMap<string, readonly string[]>;
+}>();
+function otherSources(model: OrmModel, identifiers: PreferredIdentifiers) {
+  const held = otherSourcesCache.get(identifiers);
+  if (held) return held;
+  const supertypesOf = new Map<string, string[]>();
+  for (const sf of model.subtypeFacts) {
+    if (!sf.providesIdentification) continue;
+    const list = supertypesOf.get(sf.subtypeId);
+    if (list) list.push(sf.supertypeId);
+    else supertypesOf.set(sf.subtypeId, [sf.supertypeId]);
+  }
+  const built = {
+    objectifying: new Set(model.objectifiedFactTypes.map((oft) => oft.objectTypeId)),
+    supertypesOf,
+  };
+  otherSourcesCache.set(identifiers, built);
+  return built;
 }
 
 /** The entity's and the value's roles of a binary between one of each. */
@@ -335,10 +364,12 @@ export function preferredIdentifyingBinary(
  * this repository alone, none of them contradictory.
  *
  * A union rather than a count, because the diagnostic that reads this
- * names the kinds and a count cannot. The preferred-uniqueness arm
- * counts the same constraints `completenessWarnings` counts -- any
- * arity, over `factTypesForObjectType` -- so the two rules cannot
- * disagree about how many there are.
+ * names the kinds and a count cannot. The preferred-uniqueness arm is
+ * `preferredIdentifiers`' candidates for the entity: each flagged
+ * uniqueness that names it, before the tie-break, and not one that names
+ * another entity or none (orm-format-3 WS4a). `completenessWarnings`
+ * counts the same list, so the two rules cannot disagree about how many
+ * there are.
  */
 export type IdentificationSource =
   | { readonly kind: "preferred-uniqueness"; readonly factTypeId: string; }

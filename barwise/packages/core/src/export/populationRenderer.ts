@@ -6,7 +6,7 @@
  */
 
 import type { RelationalSchema, Table } from "../mapping/RelationalSchema.js";
-import { preferredIdentifiers, preferredIdentifyingBinary } from "../model/identification.js";
+import { preferredIdentifiers } from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance } from "../model/Population.js";
 
@@ -122,9 +122,13 @@ export function renderPopulationAsOpenApiExamples(
       continue;
     }
 
-    // The binary to a value type that identifies the entity, the one the
-    // mapper keys it by.
-    const idFactType = preferredIdentifyingBinary(model, objectType, identifiers)?.factType;
+    // The binary that identifies the entity, to a value type or another
+    // entity, as the example has always taken it.
+    const identifying = identifiers.byEntity.get(objectType.id)?.factType;
+    const idFactType = identifying?.roles.length === 2
+        && identifying.roles.some((r) => r.playerId === objectType.id)
+      ? identifying
+      : undefined;
     if (idFactType) {
       const populations = model.populationsForFactType(idFactType.id);
       if (populations.length === 0) {
