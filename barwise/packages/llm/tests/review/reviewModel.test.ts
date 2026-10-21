@@ -336,3 +336,34 @@ describe("reviewModel", () => {
     expect(captured!.userMessage).toContain("Definition: (none)"); // Order has no definition
   });
 });
+
+describe("reviewModel constraint summary", () => {
+  it("counts every constraint once, one across fact types included", async () => {
+    const model = new OrmModel({ name: "Fleet" });
+    model.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "ot-c", name: "Car", kind: "entity", referenceMode: "vin" });
+    for (const id of ["ft-owns", "ft-drives"]) {
+      model.addFactType({
+        id,
+        name: id,
+        roles: [
+          { id: `${id}-p`, name: "p", playerId: "ot-p" },
+          { id: `${id}-c`, name: "c", playerId: "ot-c" },
+        ],
+        readings: ["{0} with {1}"],
+        constraints: [{ type: "internal_uniqueness", roleIds: [`${id}-c`] }],
+      });
+    }
+    // Spans both fact types, nested under the first as a 2.0 file may.
+    model.getFactType("ft-owns")!.addConstraint({
+      type: "exclusion",
+      roleIds: ["ft-owns-p", "ft-drives-p"],
+    });
+    const { client, getCaptured } = createCapturingClient();
+    await reviewModel(model, client);
+    const message = getCaptured()!.userMessage;
+    expect(message).toContain("Total constraints: 3");
+    expect(message).toContain("- internal_uniqueness: 2");
+    expect(message).toContain("- exclusion: 1");
+  });
+});

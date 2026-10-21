@@ -159,10 +159,7 @@ export async function processTranscript(
         built: {
           objectTypes: result.model.objectTypes.length,
           factTypes: result.model.factTypes.length,
-          constraints: result.model.factTypes.reduce(
-            (n, ft) => n + ft.constraints.length,
-            0,
-          ),
+          constraints: result.model.everyConstraint().length,
         },
       }),
     );
