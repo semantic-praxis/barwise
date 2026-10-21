@@ -40,7 +40,7 @@ export function buildExistingModelContext(model: OrmModel): string {
   // Fact types (non-identifier only, to keep the context concise).
   const factTypes = model.factTypes.filter((ft) => {
     // Skip identifier fact types (they're implied by reference_mode).
-    const hasPreferred = ft.constraints.some(
+    const hasPreferred = ft.internalConstraints.some(
       (c) => c.type === "internal_uniqueness" && c.isPreferred,
     );
     return !hasPreferred || ft.arity > 2;

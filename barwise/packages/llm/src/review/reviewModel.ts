@@ -145,14 +145,11 @@ function serializeModelForReview(model: OrmModel, focus?: string): string {
     lines.push("");
   }
 
-  // Constraints summary
-  // Collect all constraints from fact types
-  const allConstraints: Array<{ type: string; }> = [];
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      allConstraints.push({ type: c.type });
-    }
-  }
+  // Constraints summary: every constraint once, those across fact types
+  // included wherever a 2.0 file nests them.
+  const allConstraints: Array<{ type: string; }> = model.everyConstraint().map(([c]) => ({
+    type: c.type,
+  }));
 
   if (allConstraints.length > 0) {
     lines.push("## Constraints");

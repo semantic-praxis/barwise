@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, and 3b-iii (formats) 2026-10-21; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1225,6 +1225,22 @@ Implementation notes (2026-10-19):
     type always has. Phase 1 still
     deduplicates within one fact type, which the "listed in two fact
     types" id test pins.
+
+- **llm (3b-iv, 2026-10-21).**
+  - The review prompt's constraint summary and the extraction log's
+    built count read `everyConstraint`, and `ModelContext`'s
+    identifier test reads `internalConstraints`; each counts or tests
+    the same constraints as before.
+  - The draft parser's duplicate check reads the fact type's
+    `internalConstraints` for a constraint of one fact type, and
+    `model.constraints` for one across fact types. Since the parser
+    resolves roles within the fact type the extraction names, a copy
+    under another fact type can only come from a model that already
+    nests one there, which a draft built from one response does not.
+  - With this, no source outside core reads `FactType.constraints`: a
+    probe that renamed the getter in core's emitted declarations and
+    type-checked the other eleven packages found no read (2026-10-21).
+    Core's own readers are 3c's.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 
