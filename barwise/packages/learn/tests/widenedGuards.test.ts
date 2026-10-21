@@ -148,8 +148,12 @@ describe("a candidate may express an internal uniqueness as an external one", ()
    * vendor there is no combination to collide. A candidate carrying
    * sample populations is the ordinary case, not a contrived one -- the
    * extraction prompt asks for them.
+   *
+   * `nest` picks the fact type a 2.0 file nests the key under: one it
+   * spans, or a third that has nothing to do with it. Neither changes which
+   * fact types the key applies to (orm-format-3, Open decision 9).
    */
-  function candidate(): OrmModel {
+  function candidate(nest: "number" | "unrelated" = "number"): OrmModel {
     const model = new OrmModel({ name: "cand" });
     const vendor = model.addObjectType({
       name: "Vendor",
@@ -174,7 +178,13 @@ describe("a candidate may express an internal uniqueness as an external one", ()
       ],
       readings: ["{0} operates in {1}"],
     });
-    numberFt.addConstraint({ type: "external_uniqueness", roleIds: ["cN", "gR"] });
+    const unrelatedFt = model.addFactType({
+      name: "Vendor is audited",
+      roles: [{ name: "is audited", playerId: vendor.id, id: "aV" }],
+      readings: ["{0} is audited"],
+    });
+    (nest === "number" ? numberFt : unrelatedFt)
+      .addConstraint({ type: "external_uniqueness", roleIds: ["cN", "gR"] });
 
     // The two vendors `forUniqueness` mints, both in one region.
     const pop = model.addPopulation({ factTypeId: regionFt.id });
@@ -184,12 +194,14 @@ describe("a candidate may express an internal uniqueness as an external one", ()
   }
 
   it("passes: the external uniqueness rejects the two vendors sharing a number", () => {
-    const result = forbidsPopulation(
-      candidate(),
-      reference(),
-      "Vendor has VendorNumber",
-      "internal_uniqueness",
-    );
-    expect(result.passed).toBe(true);
+    for (const nest of ["number", "unrelated"] as const) {
+      const result = forbidsPopulation(
+        candidate(nest),
+        reference(),
+        "Vendor has VendorNumber",
+        "internal_uniqueness",
+      );
+      expect(result.passed, nest).toBe(true);
+    }
   });
 });

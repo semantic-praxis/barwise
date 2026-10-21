@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, and 3a-iii (id-first diff) 2026-10-21; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, and 3b-i (vscode, learn and dbt readers) 2026-10-21; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1108,6 +1108,44 @@ Implementation notes (2026-10-19):
     the chosen side, constraints included. A constraint whose 2.0 host
     differs between the sides is still a removal and an addition until
     3c's model-level delta.
+
+- **3b lands one package group at a time (2026-10-21).** A probe that
+  renamed the getter and type-checked every package (then reverted) found
+  14 files outside core: llm 4, formats 4, diagram 2, learn 2, dbt 1,
+  vscode 1. 3b-i takes the three smallest, vscode, learn and dbt; diagram,
+  formats and llm follow, one PR each.
+- **vscode, learn and dbt (3b-i, 2026-10-21).**
+  - The sidebar's model tree lists `constraintsTouchingAny([ft.id])`,
+    pairs with their fact type, under each fact type, so a composite key shows under both fact types it spans and not
+    under one it is only nested in. A constraint none of whose roles
+    resolve, which no fact type lists, goes under a new "Unattached
+    Constraints" category, described by the role ids it names, rather
+    than vanishing. Core's new `constraintsTouchingNone()` is that set; it
+    and `constraintsTouchingAny` read one `holdsAny` test, which
+    `factTypesHolding` reads too.
+  - Core: `evaluateConstraintEnforcement(model, inView)` takes the
+    `ConstraintInView` pair instead of a fact type and a constraint, and
+    `generateCounterexampleInView` is exported beside
+    `generateCounterexampleForConstraint`. Both callers here held a
+    constraint across fact types and had to invent a fact type the check
+    never read; now they pass what `constraintsTouchingAny` and
+    `getConstraintInView` return.
+  - The gym's `forbids_population` reads `constraintsTouchingAny` over its
+    carriers, each constraint once, so a candidate's external
+    uniqueness or disjunctive mandatory counts wherever its file nests it;
+    before, one nested under a fact type outside the carriers was missed.
+    This also widens a known weakness: a disjunctive mandatory (for the
+    mandatory kind) or an external uniqueness (for the uniqueness kind)
+    touching a carrier counts whatever else it spans, as one nested under
+    it did before (barwise-ra1).
+    The reference side reads `internalConstraints`, which is every kind
+    the check accepts.
+  - The tutorial renderer finds a motivation's constraint with
+    `getConstraintInView` and hands the pair to
+    `generateCounterexampleInView`; its "already in the prior step" check
+    is `getConstraint`, by id alone.
+  - dbt's three SQL-pattern checks read `internalConstraints`: each asks
+    about an internal kind only.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

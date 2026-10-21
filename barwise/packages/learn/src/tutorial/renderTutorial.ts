@@ -15,8 +15,8 @@
  * it), and every step's snapshot must pass validation with no errors
  * (the learner never ends a step on a broken model).
  */
-import { type Constraint, type FactType, type OrmModel, ValidationEngine } from "@barwise/core";
-import { generateCounterexampleForConstraint } from "@barwise/core/counterexample";
+import { type OrmModel, ValidationEngine } from "@barwise/core";
+import { generateCounterexampleInView } from "@barwise/core/counterexample";
 import { Verbalizer } from "@barwise/core/verbalization";
 import type { LoadedTutorial, LoadedTutorialStep } from "./types.js";
 
@@ -139,28 +139,26 @@ function renderMotivation(step: LoadedTutorialStep, prior: OrmModel | undefined)
   }
 
   const constraintId = step.motivation.constraintId;
-  const found = findConstraint(step.modelInstance, constraintId);
+  // The constraint with its fact type when it lives in one, and with none
+  // when it spans fact types (orm-format-3, Open decision 9).
+  const found = step.modelInstance.getConstraintInView(constraintId);
   if (!found) {
     throw new TutorialRenderError(
       `step "${step.id}": constraint "${constraintId}" not found in its model snapshot`,
     );
   }
-  if (prior && findConstraint(prior, constraintId)) {
+  if (prior?.getConstraint(constraintId)) {
     throw new TutorialRenderError(
       `step "${step.id}": constraint "${constraintId}" already exists in the prior `
         + `step's model -- the motivation would be false`,
     );
   }
 
-  const ce = generateCounterexampleForConstraint(
-    found.constraint,
-    found.factType,
-    step.modelInstance,
-  );
+  const ce = generateCounterexampleInView(found, step.modelInstance);
   if (!ce) {
     throw new TutorialRenderError(
       `step "${step.id}": no counterexample could be generated for "${constraintId}" `
-        + `(constraint type "${found.constraint.type}")`,
+        + `(constraint type "${found[0].type}")`,
     );
   }
 
@@ -181,20 +179,6 @@ function assertValidSnapshot(step: LoadedTutorialStep, model: OrmModel): void {
         + errors.map((e) => `  - ${e.message}`).join("\n"),
     );
   }
-}
-
-function findConstraint(
-  model: OrmModel,
-  constraintId: string,
-): { constraint: Constraint; factType: FactType; } | undefined {
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      if (c.id === constraintId) {
-        return { constraint: c, factType: ft };
-      }
-    }
-  }
-  return undefined;
 }
 
 function linkTo(id: string, stepTitles: ReadonlyMap<string, string>): string {

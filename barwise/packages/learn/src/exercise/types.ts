@@ -97,7 +97,7 @@ export interface CheckGuidance {
  *   it compares meaning, not structure.
  * - `forbids_population` -- the candidate rejects the population the named
  *   reference constraint forbids. The evaluator derives that population
- *   from the reference model via `generateCounterexampleForConstraint`,
+ *   from the reference model via `generateCounterexampleInView`,
  *   maps it onto the candidate, and requires the candidate to reject it.
  * - `requires_element` -- a structural precondition, used sparingly to
  *   scaffold the brief.

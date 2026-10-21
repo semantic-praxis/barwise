@@ -51,7 +51,7 @@ type RoleValues = Record<string, string>;
 export function generateCounterexamples(model: OrmModel): Counterexample[] {
   const result: Counterexample[] = [];
   for (const inView of model.everyConstraint()) {
-    const ce = generateInView(inView, model);
+    const ce = generateCounterexampleInView(inView, model);
     if (ce) result.push(ce);
   }
   return result;
@@ -83,18 +83,22 @@ export function generateCounterexampleForConstraint(
   factType: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
-  return generateInView(
+  return generateCounterexampleInView(
     isExternalConstraint(constraint) ? [constraint, undefined] : [constraint, factType],
     model,
   );
 }
 
 /**
- * The dispatch. Only the kinds that live in a fact type are handed `ft`;
- * it is undefined for a constraint across fact types from
- * `everyConstraint`, which those kinds never read.
+ * The counterexample for one constraint, given as the pair
+ * `getConstraintInView`, `everyConstraint` and `constraintsTouchingAny`
+ * return: with the fact type it lives in, or with none for a constraint
+ * across fact types (orm-format-3, Open decision 9). Undefined when the
+ * constraint's kind has no generator or its roles do not resolve to a
+ * population that can violate it. Its `factTypeIds` are the fact types
+ * the constraint is named by, as its verbalization row names them.
  *
- * A switch rather than the chain of `is*` guards this used to be: eleven
+ * Inside, a switch rather than the chain of `is*` guards this used to be: eleven
  * guards covered eleven of the sixteen constraint kinds and the five
  * without one fell through to the same `return undefined` a guard that
  * simply failed to match produces, so a kind added to the union got no
@@ -106,7 +110,10 @@ export function generateCounterexampleForConstraint(
  * seventeenth member to `Constraint` failed to compile at six consumers
  * and NOT here, because a guard chain ending in a fallback cannot fail.
  */
-function generateInView(inView: ConstraintInView, model: OrmModel): Counterexample | undefined {
+export function generateCounterexampleInView(
+  inView: ConstraintInView,
+  model: OrmModel,
+): Counterexample | undefined {
   const [constraint, ft] = inView;
   const probe = probeFor(constraint, ft, model);
   if (!probe) return undefined;
@@ -117,7 +124,7 @@ function generateInView(inView: ConstraintInView, model: OrmModel): Counterexamp
 /** What each generator builds: a counterexample short of the fact types it names. */
 type Probe = Omit<Counterexample, "factTypeIds">;
 
-/** The switch `generateInView` documents. */
+/** The switch `generateCounterexampleInView` documents. */
 function probeFor(
   constraint: Constraint,
   ft: FactType | undefined,

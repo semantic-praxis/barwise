@@ -8,8 +8,6 @@
  * satisfied.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint } from "../../src/model/Constraint.js";
-import type { FactType } from "../../src/model/FactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { evaluateConstraintEnforcement } from "../../src/validation/constraintEnforcement.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
@@ -63,23 +61,16 @@ function twoUniquenessModel(): OrmModel {
   return model;
 }
 
-function constraintById(ft: FactType, id: string): Constraint {
-  const c = ft.constraints.find((x) => x.id === id);
-  if (!c) throw new Error(`no constraint ${id}`);
-  return c;
-}
-
 describe("evaluateConstraintEnforcement", () => {
   it("distinguishes a violated constraint from a satisfied one in the same model", () => {
     const model = twoUniquenessModel();
-    const ft = model.getFactTypeByName("Customer places Order")!;
 
     // The model-wide sweep reports one violation and cannot say which
     // constraint owns it -- both diagnostics would carry the population id.
     expect(populationValidationRules(model, graphFor(model))).toHaveLength(1);
 
-    const violated = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r2"));
-    const satisfied = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r1"));
+    const violated = evaluateConstraintEnforcement(model, model.getConstraintInView("uc-r2")!);
+    const satisfied = evaluateConstraintEnforcement(model, model.getConstraintInView("uc-r1")!);
 
     expect(violated).toEqual({
       enforced: true,
@@ -98,9 +89,8 @@ describe("evaluateConstraintEnforcement", () => {
       subsetRoleIds: ["r1"],
       supersetRoleIds: ["r2"],
     });
-    const subset = constraintById(ft, "sub-1");
 
-    const verdict = evaluateConstraintEnforcement(model, ft, subset);
+    const verdict = evaluateConstraintEnforcement(model, model.getConstraintInView("sub-1")!);
     // Not `rejects: false`: nothing here asked the question, and a caller
     // that read a bare boolean would record a pass it never measured.
     expect(verdict).toEqual({ enforced: false });
@@ -109,8 +99,7 @@ describe("evaluateConstraintEnforcement", () => {
 
   it("does not report violations belonging to another constraint of the same kind", () => {
     const model = twoUniquenessModel();
-    const ft = model.getFactTypeByName("Customer places Order")!;
-    const verdict = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r1"));
+    const verdict = evaluateConstraintEnforcement(model, model.getConstraintInView("uc-r1")!);
     if (!verdict.enforced) throw new Error("expected enforced");
     expect(verdict.diagnostics).toEqual([]);
   });
@@ -123,9 +112,66 @@ describe("evaluateConstraintEnforcement", () => {
     const clean = model.addPopulation({ factTypeId: ft.id });
     clean.addInstance({ id: "j1", roleValues: { r1: "C003", r2: "O2" } });
 
-    const violated = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r2"));
+    const violated = evaluateConstraintEnforcement(model, model.getConstraintInView("uc-r2")!);
     if (!violated.enforced) throw new Error("expected enforced");
     expect(violated.diagnostics).toHaveLength(1);
+  });
+});
+
+/**
+ * Person has Status (s1, s2) and Person reports to Person (g1, g2), with
+ * a disjunctive mandatory over s1 and g1 nested under "Person has
+ * PersonId", which it does not touch. P2 has an id and plays neither role.
+ */
+function disjunctiveModel(): OrmModel {
+  const model = new OrmModel({ name: "Across" });
+  const person = model.addObjectType({ name: "Person", kind: "entity", referenceMode: "pid" });
+  const pid = model.addObjectType({ name: "PersonId", kind: "value" });
+  const status = model.addObjectType({ name: "Status", kind: "value" });
+  const idFt = model.addFactType({
+    name: "Person has PersonId",
+    roles: [
+      { name: "has", playerId: person.id, id: "id1" },
+      { name: "identifies", playerId: pid.id, id: "id2" },
+    ],
+    readings: ["{0} has {1}"],
+    constraints: [{ id: "dm", type: "disjunctive_mandatory", roleIds: ["s1", "g1"] }],
+  });
+  const statusFt = model.addFactType({
+    name: "Person has Status",
+    roles: [
+      { name: "has", playerId: person.id, id: "s1" },
+      { name: "is of", playerId: status.id, id: "s2" },
+    ],
+    readings: ["{0} has {1}"],
+  });
+  model.addFactType({
+    name: "Person reports to Person",
+    roles: [
+      { name: "reports to", playerId: person.id, id: "g1" },
+      { name: "is manager of", playerId: person.id, id: "g2" },
+    ],
+    readings: ["{0} reports to {1}"],
+  });
+  const ids = model.addPopulation({ factTypeId: idFt.id });
+  ids.addInstance({ roleValues: { id1: "P1", id2: "PID1" } });
+  ids.addInstance({ roleValues: { id1: "P2", id2: "PID2" } });
+  model.addPopulation({ factTypeId: statusFt.id })
+    .addInstance({ roleValues: { s1: "P1", s2: "active" } });
+  return model;
+}
+
+describe("evaluateConstraintEnforcement over a constraint across fact types", () => {
+  it("answers for the pair with no fact type, as the views return it", () => {
+    const model = disjunctiveModel();
+    const inView = model.getConstraintInView("dm")!;
+    expect(inView[1]).toBeUndefined();
+    const verdict = evaluateConstraintEnforcement(model, inView);
+    if (!verdict.enforced) throw new Error("expected enforced");
+    expect(verdict.rejects).toBe(true);
+    expect(verdict.diagnostics.map((d) => d.ruleId)).toEqual([
+      "population/disjunctive-mandatory-violation",
+    ]);
   });
 });
 
@@ -139,13 +185,11 @@ describe("evaluateConstraintEnforcement agrees with the model-wide sweep", () =>
    */
   function assertAgrees(model: OrmModel): void {
     const fromPredicate: string[] = [];
-    for (const ft of model.factTypes) {
-      for (const c of ft.constraints) {
-        const verdict = evaluateConstraintEnforcement(model, ft, c);
-        if (!verdict.enforced) continue;
-        for (const d of verdict.diagnostics) {
-          fromPredicate.push(`${d.severity}|${d.ruleId}|${d.elementId}|${d.message}`);
-        }
+    for (const inView of model.everyConstraint()) {
+      const verdict = evaluateConstraintEnforcement(model, inView);
+      if (!verdict.enforced) continue;
+      for (const d of verdict.diagnostics) {
+        fromPredicate.push(`${d.severity}|${d.ruleId}|${d.elementId}|${d.message}`);
       }
     }
     const fromSweep = populationValidationRules(model, graphFor(model))
@@ -157,6 +201,10 @@ describe("evaluateConstraintEnforcement agrees with the model-wide sweep", () =>
 
   it("agrees on a model with a uniqueness violation", () => {
     assertAgrees(twoUniquenessModel());
+  });
+
+  it("agrees on a disjunctive mandatory across fact types", () => {
+    assertAgrees(disjunctiveModel());
   });
 
   it("agrees on a model with violations of five kinds at once", () => {

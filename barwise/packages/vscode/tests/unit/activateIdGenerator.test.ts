@@ -15,31 +15,17 @@
  */
 import { generateId, setIdGenerator } from "@barwise/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { inertValue } from "./helpers/inertModule.js";
 
-const inert = vi.hoisted(() => {
-  const make = (): unknown =>
-    new Proxy(function() {}, {
-      get: (_t, key) => {
-        if (key === "then") return undefined; // not a thenable
-        if (key === Symbol.toPrimitive) return () => "";
-        return make();
-      },
-      apply: () => make(),
-      construct: () => make() as object,
-    });
-  // A module namespace must be an object, not the callable stand-in.
-  // `has` answers yes because vitest checks each named import against it.
-  const module = (): object =>
-    new Proxy({}, {
-      get: (_t, key) => (key === "then" ? undefined : make()),
-      has: (_t, key) => key !== "then",
-    });
-  return { make, module };
-});
-
-vi.mock("vscode", () => inert.module());
-vi.mock("vscode-languageclient/node", () => inert.module());
-vi.mock("@vscode/chat-extension-utils", () => inert.module());
+vi.mock("vscode", async () => (await import("./helpers/inertModule.js")).inertModule());
+vi.mock(
+  "vscode-languageclient/node",
+  async () => (await import("./helpers/inertModule.js")).inertModule(),
+);
+vi.mock(
+  "@vscode/chat-extension-utils",
+  async () => (await import("./helpers/inertModule.js")).inertModule(),
+);
 
 const V7_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const V4_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -50,7 +36,7 @@ describe("activate", () => {
   it("installs the UUIDv7 id generator", async () => {
     expect(generateId()).toMatch(V4_SHAPE);
     const { activate } = await import("../../src/client/extension.js");
-    activate(inert.make() as Parameters<typeof activate>[0]);
+    activate(inertValue() as Parameters<typeof activate>[0]);
     expect(generateId()).toMatch(V7_SHAPE);
   }, 60_000);
   // Importing the whole extension graph is the slow part, and its time

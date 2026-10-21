@@ -37,6 +37,16 @@ export interface OrmModelConfig {
 }
 
 /**
+ * Whether a fact type holds any of these roles: the one touch test behind
+ * `constraintsTouchingAny`, `constraintsTouchingNone` and
+ * `factTypesHolding` (so `factTypesOf` and `factTypesNaming`), so where a
+ * constraint is listed and which fact types name it cannot disagree.
+ */
+function holdsAny(ft: FactType, roleIds: readonly string[]): boolean {
+  return roleIds.some((rid) => ft.hasRole(rid));
+}
+
+/**
  * The root aggregate for an ORM model. Holds all object types, fact types,
  * and definitions, and provides query and mutation methods.
  *
@@ -255,12 +265,28 @@ export class OrmModel {
         touching.push([c, ft]);
       }
       for (const c of across) {
-        if (seen.has(c) || !roleIdsOf(c).some((rid) => ft.hasRole(rid))) continue;
+        if (seen.has(c) || !holdsAny(ft, roleIdsOf(c))) continue;
         seen.add(c);
         touching.push([c, undefined]);
       }
     }
     return touching;
+  }
+
+  /**
+   * The constraints across fact types that touch no fact type: none of
+   * their roles resolve. No `constraintsTouchingAny` view lists them, so a
+   * reader that shows constraints by fact type reads these too, or a
+   * constraint left dangling by a renamed or deleted role disappears.
+   * Both read the one `holdsAny` test, so a constraint is in exactly one
+   * of this and some fact type's view.
+   */
+  constraintsTouchingNone(): readonly ExternalConstraint[] {
+    const factTypes = this.factTypes;
+    return this.constraints.filter((c) => {
+      const roleIds = roleIdsOf(c);
+      return !factTypes.some((ft) => holdsAny(ft, roleIds));
+    });
   }
 
   /**
@@ -293,7 +319,7 @@ export class OrmModel {
    * verbalizer's role labels need.
    */
   factTypesHolding(roleIds: readonly string[]): readonly FactType[] {
-    return this.factTypes.filter((ft) => roleIds.some((rid) => ft.hasRole(rid)));
+    return this.factTypes.filter((ft) => holdsAny(ft, roleIds));
   }
 
   /** Look up a constraint of either placement by id. */

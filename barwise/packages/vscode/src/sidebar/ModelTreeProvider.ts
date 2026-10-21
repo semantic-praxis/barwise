@@ -1,6 +1,7 @@
 import {
-  type Constraint,
+  type ConstraintInView,
   type EntityType,
+  type ExternalConstraint,
   type FactType,
   isDisjunctiveMandatory,
   isEntityType,
@@ -18,6 +19,7 @@ import {
   isValueType,
   type OrmModel,
   OrmYamlSerializer,
+  roleIdsOf,
   type SubtypeFact,
   type ValueType,
 } from "@barwise/core";
@@ -147,7 +149,7 @@ export class ModelTreeProvider implements vscode.TreeDataProvider<ModelTreeItem>
 
 // ---- Tree builder ----
 
-function buildTree(model: OrmModel): ModelTreeItem[] {
+export function buildTree(model: OrmModel): ModelTreeItem[] {
   const categories: ModelTreeItem[] = [];
 
   // Entity types
@@ -181,6 +183,25 @@ function buildTree(model: OrmModel): ModelTreeItem[] {
       children: model.factTypes.map((ft) => factTypeItem(ft, model)).sort((a, b) =>
         a.label.localeCompare(b.label)
       ),
+    });
+  }
+
+  // Constraints across fact types none of whose roles resolve, so no fact
+  // type lists them; without this a constraint left dangling by a renamed
+  // or deleted role would vanish from the tree just when it needs fixing.
+  // Each is described by the role ids it names, which the file states; a
+  // 2.0 file usually omits a constraint's own id, and the loader derives
+  // one that appears nowhere in it (barwise-7jq).
+  const unattached = model.constraintsTouchingNone();
+  if (unattached.length > 0) {
+    categories.push({
+      kind: "category",
+      label: "Unattached Constraints",
+      iconId: "warning",
+      children: unattached.map((c) => ({
+        ...externalConstraintItem(c),
+        description: [...new Set(roleIdsOf(c))].join(", "),
+      })),
     });
   }
 
@@ -240,9 +261,12 @@ function valueItem(ot: ValueType): ModelTreeItem {
 function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
   const reading = ft.readings[0]?.template ?? ft.name;
 
-  // Collect constraints as children.
-  const constraintChildren: ModelTreeItem[] = ft.constraints.map((c) =>
-    constraintItem(c, ft, model)
+  // Every constraint that applies to the fact type: its own, and each
+  // across fact types that names one of its roles, so a composite key
+  // shows under both fact types it spans rather than under whichever one
+  // a 2.0 file nests it in (orm-format-3, Open decision 9).
+  const constraintChildren: ModelTreeItem[] = model.constraintsTouchingAny([ft.id]).map(
+    constraintItem,
   );
 
   return {
@@ -254,11 +278,16 @@ function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
   };
 }
 
-function constraintItem(
-  c: Constraint,
-  ft: FactType,
-  _model: OrmModel,
-): ModelTreeItem {
+/**
+ * A constraint's row, from the pair a view returns: an internal constraint
+ * names its roles through the fact type it lives in, which the pair always
+ * carries for one; a constraint across fact types has none and needs none.
+ */
+function constraintItem(inView: ConstraintInView): ModelTreeItem {
+  // Split on the pair once, as the enforcement predicate does: narrowing
+  // the constraint does not narrow a destructured fact type.
+  if (inView[1] === undefined) return externalConstraintItem(inView[0]);
+  const [c, ft] = inView;
   if (isInternalUniqueness(c)) {
     const roleNames = c.roleIds
       .map((rid) => ft.roles.find((r) => r.id === rid)?.name)
@@ -276,21 +305,6 @@ function constraintItem(
       label: `Mandatory: ${role?.name ?? c.roleId}`,
     };
   }
-  if (isExternalUniqueness(c)) {
-    return { kind: "constraint", label: "External Uniqueness" };
-  }
-  if (isExclusion(c)) {
-    return { kind: "constraint", label: "Exclusion" };
-  }
-  if (isExclusiveOr(c)) {
-    return { kind: "constraint", label: "Exclusive-Or" };
-  }
-  if (isSubset(c)) {
-    return { kind: "constraint", label: "Subset" };
-  }
-  if (isEquality(c)) {
-    return { kind: "constraint", label: "Equality" };
-  }
   if (isFrequency(c)) {
     return {
       kind: "constraint",
@@ -300,15 +314,23 @@ function constraintItem(
   if (isRing(c)) {
     return { kind: "constraint", label: `Ring: ${c.ringType}` };
   }
-  if (isDisjunctiveMandatory(c)) {
-    return { kind: "constraint", label: "Disjunctive Mandatory" };
-  }
   if (isValueConstraint(c)) {
     const vals = c.values.slice(0, 3).join(", ");
     const more = c.values.length > 3 ? "..." : "";
     return { kind: "constraint", label: `Values: {${vals}${more}}` };
   }
   return { kind: "constraint", label: `Constraint: ${(c as { type: string; }).type}` };
+}
+
+/** A constraint across fact types' row: its kind, with no roles to name. */
+function externalConstraintItem(c: ExternalConstraint): ModelTreeItem {
+  if (isExternalUniqueness(c)) return { kind: "constraint", label: "External Uniqueness" };
+  if (isExclusion(c)) return { kind: "constraint", label: "Exclusion" };
+  if (isExclusiveOr(c)) return { kind: "constraint", label: "Exclusive-Or" };
+  if (isSubset(c)) return { kind: "constraint", label: "Subset" };
+  if (isEquality(c)) return { kind: "constraint", label: "Equality" };
+  if (isDisjunctiveMandatory(c)) return { kind: "constraint", label: "Disjunctive Mandatory" };
+  return { kind: "constraint", label: `Constraint: ${c.type}` };
 }
 
 function subtypeItem(sf: SubtypeFact, model: OrmModel): ModelTreeItem {
