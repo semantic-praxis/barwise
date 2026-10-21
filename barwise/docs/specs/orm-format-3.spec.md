@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), 4a implemented 2026-10-21, 4b split into PRs and 4b-i (constraints over subtypes in memory) implemented 2026-10-21; WS5 not started; open decisions 1 to 9
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), 4a implemented 2026-10-21, 4b split into PRs and 4b-i (constraints over subtypes in memory) implemented 2026-10-21, and 4b-ii (the stored identifier and format 3.0) 2026-10-21; `barwise migrate` next; WS5 not started; open decisions 1 to 9
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1698,6 +1698,89 @@ Implementation notes (2026-10-21, WS4b-i, subtype constraints in memory):
 - **The llm parser writes no flags.** The draft listed
   `llm/src/parse/subtypes.ts` among the flags' writers; it never set them.
   Its constraint dedupe now compares subtype operands as well as roles.
+
+Implementation notes (2026-10-21, WS4b-ii, the stored identifier and format 3.0):
+
+- **The reference and the format ship together.** WS4b-i's note planned
+  the stored reference and schema 3.0 as separate PRs. They cannot be:
+  a stored reference saved to 2.0 has to become a flag again, and the
+  2.0 flag cannot say which of a binary's two uniquenesses it means, so
+  the 286 entity-role flags of decision 8 would move to the value role on
+  the first save. One PR keeps every save lossless.
+- **The reference lives on the model, not on the object type.**
+  `OrmModel.preferredIdentifierOf`, `setPreferredIdentifier` and
+  `preferredIdentifierRefs` hold a map from entity to constraint id; the
+  draft's `ObjectType.preferredIdentifierId` would have needed the object
+  type to learn about constraints, and every removal path to reach into
+  object types. `removeObjectType`, `removeFactType` (its own
+  constraints) and `removeConstraint` clear a reference to what they
+  remove. `setPreferredIdentifier` refuses a value type and does not look
+  the constraint up, so a merge or a lenient load can carry a reference
+  validation then reports.
+- **One rule, split in two.** `identifiedBy` is decision 8 for one
+  constraint. The 2.0 reader and the llm parser place flags with it
+  (`placePreferredFlags`, `storePreferredFlags`); every reader checks a
+  stored reference against it (`resolvePreferredIdentifier`), so
+  `preferredIdentifiers` reads only the references and has no candidates.
+  `completeness/multiple-preferred-identifiers` is gone, because a stored
+  reference cannot name two identifiers; `completeness/preferred-identifier-invalid`
+  (an error) reports a reference that dangles, names something other than
+  an internal uniqueness, or names one that identifies another entity.
+  The release notes tell users to validate 2.0 files with their 2.x build
+  first, as the draft said.
+- **The migration reads the model, not the raw document.** A 2.0 file is
+  checked against the 2.0 schema, frozen as
+  `schemas/orm-model-2.0.schema.json`, and read by `readDocument20`: ids
+  derived (step 1), constraints placed by kind (step 2), subtype flags to
+  constraints (step 3), flags to references after objectifications
+  (step 4). Saving writes 3.0. Files below 2.0 migrate to 2.0 first, as
+  before. The draft's "pure step on the raw document" would have
+  restated, on YAML, the placement rules the model already enforces.
+- **A flag stays in the content an id is derived from.** Measurement
+  caught this: without it, the 271 flagged uniquenesses of id-less 2.0
+  files derived new ids, and their NORMA export ids moved. The reader
+  hashes the constraint with the flag, as earlier releases did, and drops
+  it once the id is fixed.
+- **What did not move, over the tracked corpus.** Every reader of the
+  identifier (88 loadable models), DDL and NORMA export (80), and all 115
+  promptlab payload scores are identical before and after. Each model's
+  old 2.0 save and its new 3.0 save load to the same model; one
+  (`C02-bank`) lists `model.constraints` in a different order, because
+  its 2.0 save nested an external uniqueness under a later fact type.
+  The promptlab reference models are regenerated as 3.0, and
+  `order-management` gains no reference: its flag on "Customer has Name"
+  identifies nothing, as WS4a recorded, and the llm parser now warns when
+  it drops one.
+- **Writers that set an identifier set the reference**: the dbt and DDL
+  importers' key, the OpenAPI importer's id property, NORMA's
+  `PreferredIdentifier` (its `IsPreferred` flags when the reference names
+  no internal uniqueness), the llm parser, and every package's
+  `ModelBuilder`.
+- **Deferred, each with an issue.** The DDL annotation stays v1 and keeps
+  writing flags through `subtypeFlags.ts` (barwise-n9n.q21). The
+  raw scripts (`trial/lib/`, `scripts/measure-comparison.mjs`,
+  `scripts/lib/malformed-score.mjs`) still build 2.0 documents, which load
+  unchanged, and move with the corpus in WS5 (barwise-n9n.psp). `barwise migrate` (decision
+  5, barwise-n9n.a6d) is its own PR next, because reporting the flags a file loses needs
+  the 2.0 reader to return them. An external uniqueness as an identifier
+  (barwise-alg) is still not stored.
+- **Code review found three places the flag had been doing a second job.**
+  Merge kept a reference only when the merged model held its id, but a
+  merged fact type can hold the other side's copy of the uniqueness, so a
+  transcript merged into its base lost every identifier; the merge now
+  follows the reference to the uniqueness over the same roles. NORMA
+  import read a flagged and an unflagged uniqueness over the same roles as
+  duplicates once the flag left the constraint, and could drop the one
+  `PreferredIdentifier` names; the dedupe still tells them apart. And
+  diff named an identifier's roles by role name, so a rename read as a
+  breaking change; it names them by position and player now.
+- **What the 2.0 reader drops, it drops silently.** Two flags naming one
+  entity resolve to one (decision 8 accepted this, and the corpus has
+  none), and a flag that identifies nothing is dropped. The model cannot
+  carry either, so no validation rule can see them after the load;
+  `barwise migrate` (barwise-n9n.a6d) is where they are reported.
+- **The schema's two constraint lists are a copy of `PLACEMENT`**, so
+  `tests/serialization/format30.test.ts` checks them against it.
 
 ### 5. Corpus, docs, release notes (provisional: not yet grounded)
 

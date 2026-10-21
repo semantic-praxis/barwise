@@ -6,7 +6,12 @@
  * tests checked that some uniqueness existed, which is how the importer
  * shipped with both constraints on the value's role.
  */
-import { type FactType, type OrmModel, ValidationEngine } from "@barwise/core";
+import {
+  type FactType,
+  type OrmModel,
+  preferredIdentifiers,
+  ValidationEngine,
+} from "@barwise/core";
 import { Verbalizer } from "@barwise/core/verbalization";
 import { describe, expect, it } from "vitest";
 import { OpenApiImportFormat } from "../src/openapi/OpenApiImportFormat.js";
@@ -162,10 +167,13 @@ describe("R3: the reference-mode property is the entity's preferred identifier",
       model.getObjectType(ft.roles.find((r) => r.id === id)!.playerId)!.name;
     // Every constraint touching the fact type, so a stray constraint across
     // fact types from the importer shows in the shape.
+    const preferred = new Set(preferredIdentifiers(model).byConstraint.keys());
     return model.constraintsTouching(ft.id).map((c) => {
       if (c.type === "mandatory") return `mandatory:${player(c.roleId)}`;
       if (c.type === "internal_uniqueness") {
-        return `unique:${c.roleIds.map(player).join(",")}${c.isPreferred ? ":preferred" : ""}`;
+        return `unique:${c.roleIds.map(player).join(",")}${
+          preferred.has(c.id!) ? ":preferred" : ""
+        }`;
       }
       return c.type;
     }).sort();

@@ -65,6 +65,7 @@ export type ChangeDescription =
   // --- Object types ---
   | { readonly change: "kind"; readonly from: ObjectTypeKind; readonly to: ObjectTypeKind; }
   | { readonly change: "referenceMode"; readonly from?: string; readonly to?: string; }
+  | { readonly change: "preferredIdentifier"; readonly from?: string; readonly to?: string; }
   | { readonly change: "sourceContext"; readonly from?: string; readonly to?: string; }
   | {
     readonly change: "valueConstraint";
@@ -208,6 +209,8 @@ export function describeChange(change: ChangeDescription): string {
       return `kind: ${change.from} -> ${change.to}`;
     case "referenceMode":
       return `reference mode: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+    case "preferredIdentifier":
+      return `preferred identifier: ${change.from ?? NONE} -> ${change.to ?? NONE}`;
     case "sourceContext":
       return `source context: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
     case "valueConstraint":

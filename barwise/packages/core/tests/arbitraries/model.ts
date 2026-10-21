@@ -59,6 +59,7 @@ import type {
   FactTypeConfig,
   RoleConfig,
 } from "../../src/model/FactType.js";
+import { storePreferredFlags } from "../../src/model/identification.js";
 import type { ObjectifiedFactTypeConfig } from "../../src/model/ObjectifiedFactType.js";
 import type {
   CardinalityRange,
@@ -384,6 +385,11 @@ export interface ModelPlan {
   readonly factTypes: readonly FactTypeConfig[];
   /** Constraints across fact types, which the model holds (orm-format-3 WS3c). */
   readonly constraints: readonly ExternalConstraint[];
+  /**
+   * The uniquenesses a 2.0 file would flag `is_preferred`, by id; `buildModel`
+   * places each on the entity it identifies (orm-format-3 WS4b).
+   */
+  readonly preferredFlags: readonly string[];
   readonly subtypeFacts: readonly SubtypeFactConfig[];
   readonly objectifiedFactTypes: readonly ObjectifiedFactTypeConfig[];
   readonly populations: readonly PopulationConfig[];
@@ -548,7 +554,7 @@ function toConstraint(
   raw: RawConstraint,
   skeletons: readonly FactTypeSkeleton[],
   index: number,
-): { ownerIndex: number; constraint: Constraint; } | null {
+): { ownerIndex: number; constraint: Constraint; flagged?: boolean; } | null {
   const ownerIndex = raw.ownerPick % skeletons.length;
   const owner = skeletons[ownerIndex]!;
   const roles = owner.roles;
@@ -570,11 +576,10 @@ function toConstraint(
           type: "internal_uniqueness",
           id,
           roleIds: ids,
-          // Never `false`: the serializer omits it, so a generated false
-          // would read back as absent.
-          ...(raw.flag ? { isPreferred: true } : {}),
           ...modality,
         },
+        // A 2.0 `is_preferred` flag, placed when the model is built.
+        ...(raw.flag ? { flagged: true } : {}),
       };
     }
     case "mandatory":
@@ -910,6 +915,7 @@ function withPreferredIdentifier(
   raw: RawModel,
   factTypes: readonly FactTypeConfig[],
   objectTypes: readonly ObjectTypeConfig[],
+  flagged: Set<string>,
 ): FactTypeConfig[] {
   const unchanged = [...factTypes];
   if (!raw.preferredIdentifier) return unchanged;
@@ -932,7 +938,7 @@ function withPreferredIdentifier(
     // manufacturing the diagnostic rather than the shape.
     const alreadyPreferred = factTypes.some((other) =>
       other.roles.some((r) => r.playerId === entityRole.playerId)
-      && (other.constraints ?? []).some((c) => c.type === "internal_uniqueness" && c.isPreferred)
+      && (other.constraints ?? []).some((c) => c.id !== undefined && flagged.has(c.id))
     );
     if (alreadyPreferred) return unchanged;
 
@@ -943,11 +949,12 @@ function withPreferredIdentifier(
     const onValue = (ft.constraints ?? []).some((c) =>
       c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === valueRole.id
     );
+    flagged.add(`pref${j}`);
     unchanged[j] = {
       ...ft,
       constraints: [
         ...(ft.constraints ?? []),
-        { type: "internal_uniqueness", roleIds: [entityRole.id!], isPreferred: true },
+        { type: "internal_uniqueness", id: `pref${j}`, roleIds: [entityRole.id!] },
         ...(onValue ? [] : [{ type: "internal_uniqueness" as const, roleIds: [valueRole.id!] }]),
       ],
     };
@@ -962,9 +969,13 @@ function toPlan(raw: RawModel): ModelPlan {
   const skeletons = toFactTypeSkeletons(raw.factTypes, objectTypes);
 
   const constraintsByOwner = new Map<number, Constraint[]>();
+  const flagged = new Set<string>();
   for (const [i, rawConstraint] of raw.constraints.entries()) {
     const materialised = toConstraint(rawConstraint, skeletons, i);
     if (!materialised) continue;
+    if (materialised.flagged && materialised.constraint.id !== undefined) {
+      flagged.add(materialised.constraint.id);
+    }
     const bucket = constraintsByOwner.get(materialised.ownerIndex) ?? [];
     bucket.push(materialised.constraint);
     constraintsByOwner.set(materialised.ownerIndex, bucket);
@@ -977,6 +988,7 @@ function toPlan(raw: RawModel): ModelPlan {
       constraints: (constraintsByOwner.get(j) ?? []).filter(isInternalConstraint),
     })),
     objectTypes,
+    flagged,
   );
   // Owner by owner, as each fact type once handed its own to the model, so
   // a seed draws the same model it did.
@@ -997,6 +1009,7 @@ function toPlan(raw: RawModel): ModelPlan {
     },
     objectTypes,
     factTypes,
+    preferredFlags: [...flagged],
     // After the constraints across fact types, as a 2.0 load orders them.
     constraints: [...constraints, ...overSubtypes],
     subtypeFacts,
@@ -1035,6 +1048,10 @@ export function buildModel(plan: ModelPlan): OrmModel {
   for (const config of plan.populations) model.addPopulation(config);
   for (const definition of plan.definitions) model.addDefinition(definition);
   for (const layout of plan.diagramLayouts) model.addDiagramLayout(layout);
+  // Last, as the 2.0 loader places them: an objectified fact type's flag
+  // names the objectifying type.
+  const flagged = new Set(plan.preferredFlags);
+  storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
   return model;
 }
 

@@ -45,15 +45,6 @@ export interface InternalUniquenessConstraint extends ConstraintBase {
   readonly type: "internal_uniqueness";
   /** Role ids within the same fact type. */
   readonly roleIds: readonly string[];
-  /**
-   * True if this uniqueness constraint is the preferred identifier for
-   * the entity type that plays the constrained role(s). The preferred
-   * identifier determines the primary key in relational mapping.
-   *
-   * At most one internal uniqueness constraint per entity type should
-   * be marked as preferred.
-   */
-  readonly isPreferred?: boolean;
 }
 
 /**
@@ -792,6 +783,15 @@ export type InternalConstraint = Extract<Constraint, { type: InternalKind; }>;
 
 /** The kinds that live in the model: their roles may span fact types. */
 export type ExternalConstraint = Exclude<Constraint, InternalConstraint>;
+
+/**
+ * Where a constraint of this kind lives, by its kind's name: for a reader
+ * of a raw document, which has a type string and no `Constraint` yet.
+ * Undefined for a name that is no kind.
+ */
+export function placementOf(type: string): "internal" | "external" | undefined {
+  return Object.hasOwn(PLACEMENT, type) ? PLACEMENT[type as keyof typeof PLACEMENT] : undefined;
+}
 
 /** Whether `c` lives in its fact type (see `PLACEMENT`). */
 export function isInternalConstraint(c: Constraint): c is InternalConstraint {

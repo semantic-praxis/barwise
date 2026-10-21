@@ -223,11 +223,10 @@ describe("spill classification", () => {
     // valueColumnForUniqueness always claimed the mapping realizes
     // everything else; this is the case that made the claim false.
     //
-    // The value-side constraint is added by hand rather than through
-    // `uniqueness: "both"`, which drops `isPreferred` on the floor: with
-    // the builder's own spelling the model has no preferred identifier,
-    // nothing is skipped, and this test passes with the guard removed.
-    // Found by watching the mutation NOT fail.
+    // The value-side constraint is added by hand and named as Guard's
+    // preferred identifier: with no stored reference the model has no
+    // preferred identifier, nothing is skipped, and this test passes with
+    // the guard removed. Found by watching the mutation NOT fail.
     const model = new ModelBuilder("Test")
       .withEntityType("Guard", { referenceMode: "badge_number" })
       .withValueType("BadgeNumber", { dataType: { name: "text", length: 10 } })
@@ -236,15 +235,16 @@ describe("spill classification", () => {
         role2: { player: "BadgeNumber", name: "is of" },
         uniqueness: "role1",
         mandatory: "role1",
-        isPreferred: true,
       })
       .build();
 
     const factType = model.getFactTypeByName("Guard has BadgeNumber")!;
     factType.addConstraint({
+      id: "c-badge",
       type: "internal_uniqueness",
       roleIds: [factType.roles[1]!.id],
     });
+    model.setPreferredIdentifier(model.getObjectTypeByName("Guard")!.id, "c-badge");
 
     const schema = new RelationalMapper().map(model);
     const guard = schema.tables.find((t) => t.name === "guard")!;

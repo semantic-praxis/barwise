@@ -26,7 +26,7 @@ describe("OrmYamlSerializer", () => {
       const model = new OrmModel({ name: "Empty Model" });
       const yaml = serializer.serialize(model);
 
-      expect(yaml).toContain('orm_version: "2.0"');
+      expect(yaml).toContain('orm_version: "3.0"');
       expect(yaml).toContain("name: Empty Model");
     });
 
@@ -404,7 +404,7 @@ describe("OrmYamlSerializer", () => {
       expect(yaml).not.toContain("data_type");
     });
 
-    it("serializes isPreferred on internal_uniqueness constraint", () => {
+    it("writes an entity's preferred identifier on the entity, by constraint id", () => {
       const model = new OrmModel({ name: "Test" });
       const customer = model.addObjectType({
         name: "Customer",
@@ -415,13 +415,14 @@ describe("OrmYamlSerializer", () => {
         name: "Customer has id",
         roles: [{ id: "r1", name: "has", playerId: customer.id }],
         readings: ["{0} has id"],
-        constraints: [
-          { type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true },
-        ],
+        constraints: [{ id: "u1", type: "internal_uniqueness", roleIds: ["r1"] }],
       });
+      model.setPreferredIdentifier(customer.id, "u1");
 
       const yaml = serializer.serialize(model);
-      expect(yaml).toContain("is_preferred: true");
+      expect(yaml).toContain("preferred_identifier: u1");
+      expect(yaml).not.toContain("is_preferred");
+      expect(serializer.deserialize(yaml).preferredIdentifierOf(customer.id)).toBe("u1");
     });
 
     it("omits is_preferred when false or undefined", () => {
@@ -606,7 +607,7 @@ model:
       expect(ot.dataType!.scale).toBe(2);
     });
 
-    it("deserializes isPreferred on internal_uniqueness constraint", () => {
+    it("reads a 2.0-era is_preferred flag by Open decision 8's rule", () => {
       const yaml = `
 orm_version: "1.0"
 model:
@@ -632,14 +633,10 @@ model:
 `;
       const model = serializer.deserialize(yaml);
 
-      const ft = model.factTypes[0]!;
-      const uc = ft.internalConstraints.find(
-        (c) => c.type === "internal_uniqueness",
-      );
-      expect(uc).toBeDefined();
-      if (uc?.type === "internal_uniqueness") {
-        expect(uc.isPreferred).toBe(true);
-      }
+      // A unary's uniqueness leaves no role uncovered, so the old flag
+      // names no entity (orm-format-3, Open decision 8) and is dropped.
+      expect(model.preferredIdentifierOf("ot-001")).toBeUndefined();
+      expect(model.factTypes[0]!.internalConstraints).toHaveLength(1);
     });
 
     it("deserializes internal_uniqueness without is_preferred", () => {
@@ -822,7 +819,7 @@ model:
       const yaml = `
 orm_version: "3.0"
 model:
-  name: "Test"
+  domain_context: "no name"
 `;
       expect(() => serializer.deserialize(yaml)).toThrow(
         DeserializationError,
@@ -1041,7 +1038,7 @@ model:
       const yaml = serializer.serialize(model);
 
       // The YAML should be readable and match the documented format.
-      expect(yaml).toContain('orm_version: "2.0"');
+      expect(yaml).toContain('orm_version: "3.0"');
       expect(yaml).toContain("name: Order Management");
       expect(yaml).toContain("domain_context: ecommerce");
       expect(yaml).toContain("id: ot-001");

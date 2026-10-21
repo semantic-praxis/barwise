@@ -45,7 +45,7 @@ export const RULE_ID = {
   missingPreferredIdentifier: "completeness/missing-preferred-identifier",
   missingValueTypeDataType: "completeness/missing-value-type-data-type",
   conflictingIdentification: "completeness/conflicting-identification",
-  multiplePreferredIdentifiers: "completeness/multiple-preferred-identifiers",
+  preferredIdentifierInvalid: "completeness/preferred-identifier-invalid",
   acrossFactTypesUnknownRole: "constraint/across-fact-types-unknown-role",
   cardinalityInvalidRole: "constraint/cardinality-invalid-role",
   cardinalityMaxLessThanMin: "constraint/cardinality-max-less-than-min",
@@ -204,12 +204,21 @@ const RULE_DESCRIPTORS = {
         `Object type "${otName}" inherits its identity from a supertype and also declares ${kinds}. Each object type should be identified once; the relational mapper picks one.`,
     },
   },
-  [RULE_ID.multiplePreferredIdentifiers]: {
-    severity: "warning",
-    description: "An entity type has more than one uniqueness constraint marked preferred.",
+  [RULE_ID.preferredIdentifierInvalid]: {
+    severity: "error",
+    description:
+      "An entity type names as its preferred identifier a constraint that does not identify it.",
     messages: {
-      default: (otName: string, preferredCount: number): string =>
-        `Entity type "${otName}" has ${preferredCount} preferred identifiers. Each entity should have exactly one.`,
+      dangling: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, and the model has no constraint with that id.`,
+      notUniqueness: (otName: string, constraintId: string, kind: string): string =>
+        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, but its kind is ${kind}; a preferred identifier is an internal uniqueness constraint${
+          kind === "external_uniqueness"
+            ? ", and an external uniqueness is not yet read as one"
+            : ""
+        }.`,
+      notThisEntity: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names uniqueness constraint "${constraintId}" as its preferred identifier, but that constraint does not identify "${otName}".`,
     },
   },
   [RULE_ID.acrossFactTypesUnknownRole]: {

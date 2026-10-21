@@ -954,13 +954,13 @@ test("heldout t2 passes a converted SubtypeFact and fails each defect on exactly
     const other = mkdtempSync(join(tmpdir(), "heldout-cwd-"));
     dirs.push(other);
     spawnSync("git", ["init", "-q", other]);
-    const schemaPath = join(SCRIPT, "../../packages/core/schemas/orm-model.schema.json");
+    const schemaPath = join(SCRIPT, "../../packages/core/schemas/orm-model-2.0.schema.json");
     const edited = JSON.parse(readFileSync(schemaPath, "utf8"));
     edited.definitions.subtype_fact.required = edited.definitions.subtype_fact.required
       .filter((k) => k !== "subtype");
     mkdirSync(join(other, "barwise/packages/core/schemas"), { recursive: true });
     writeFileSync(
-      join(other, "barwise/packages/core/schemas/orm-model.schema.json"),
+      join(other, "barwise/packages/core/schemas/orm-model-2.0.schema.json"),
       JSON.stringify(edited),
     );
     const fromOther = spawnSync(

@@ -46,6 +46,14 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
     text: `reference mode: "customer_id" -> "(none)"`,
   },
   {
+    sample: {
+      change: "preferredIdentifier",
+      from: '"Customer has Nr" (role 2: Nr)',
+      to: undefined,
+    },
+    text: 'preferred identifier: "Customer has Nr" (role 2: Nr) -> (none)',
+  },
+  {
     sample: { change: "sourceContext", from: undefined, to: "Sales" },
     text: `source context: "(none)" -> "Sales"`,
   },

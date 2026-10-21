@@ -10,6 +10,7 @@ import { runQuery } from "../../src/query/index.js";
 import { parseQuery } from "../../src/query/parse.js";
 import type { EntityAnchors, QueryResult } from "../../src/query/types.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { placeFlags } from "../helpers/placeFlags.js";
 
 /** A Customer with a fully-formed preferred identifier. */
 function identifiedModel(): OrmModel {
@@ -129,7 +130,7 @@ describe("queryModel: anchors", () => {
       }],
     });
     model.addObjectifiedFactType({ id: "oft", factTypeId: "ft-sign", objectTypeId: "ot-s" });
-    const [a] = anchorsOf(runQuery(model, "anchors Signing"));
+    const [a] = anchorsOf(runQuery(placeFlags(model), "anchors Signing"));
     expect(a!.preferredIdentifier?.identifierTypes).toEqual(["Customer", "Agreement"]);
   });
 

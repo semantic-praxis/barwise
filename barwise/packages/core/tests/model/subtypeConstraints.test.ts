@@ -178,14 +178,15 @@ describe("a constraint over subtypes", () => {
     expect(fired(model)).toContain(RULE_ID.subtypeConstraintTooFewSubtypes);
   });
 
-  it("with no subtype facts at all is still over subtypes, saved as nothing rather than refused", () => {
+  it("with no subtype facts at all is still over subtypes, saved and reloaded as it is", () => {
+    // Refusing the reload would lose the constraint validation reports.
     const { model } = people();
     model.addConstraint(over("exclusion", []));
     expect(fired(model)).toContain(RULE_ID.subtypeConstraintTooFewSubtypes);
     const serializer = new OrmYamlSerializer();
-    const text = serializer.serialize(model);
-    expect(text).not.toContain("subtype_facts: []");
-    expect(serializer.deserialize(text).constraints).toEqual([]);
+    const again = serializer.deserialize(serializer.serialize(model));
+    expect(again.constraints).toEqual(model.constraints);
+    expect(fired(again)).toContain(RULE_ID.subtypeConstraintTooFewSubtypes);
   });
 
   it("stays out of the merge when its subtype facts are rejected", () => {

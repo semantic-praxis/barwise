@@ -251,15 +251,21 @@ describe("TranscriptProcessor", () => {
       expect(nameOt!.dataType).toEqual({ name: "text", length: 100 });
     });
 
-    it("propagates is_preferred from fixture to model", () => {
+    it("drops the fixture's is_preferred flag that identifies nothing, and says so", () => {
+      // The fixture flags Customer's own role in "Customer has Name", and
+      // no uniqueness sits on Name's role, so by the identifier rule the
+      // flag names no entity (orm-format-3, Open decision 8). The model
+      // stores no reference for it, and the parser reports the drop.
       const response = loadFixture("responses/order-management.json");
       const result = parseExtractionFromJson(response, "Test");
 
       const ft = result.model.getFactTypeByName("Customer has Name");
       expect(ft).toBeDefined();
-      const uc = ft!.internalConstraints.find((c) => c.type === "internal_uniqueness");
-      expect(uc).toBeDefined();
-      expect(uc!.type === "internal_uniqueness" && uc!.isPreferred).toBe(true);
+      expect(ft!.internalConstraints.some((c) => c.type === "internal_uniqueness")).toBe(true);
+      expect(result.model.preferredIdentifierRefs).toEqual([]);
+      expect(result.warnings).toContain(
+        'A preferred uniqueness in fact type "Customer has Name" identifies no entity type; its preferred flag was dropped.',
+      );
     });
 
     it("records source references on provenance entries", () => {

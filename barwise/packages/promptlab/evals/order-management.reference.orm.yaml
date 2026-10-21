@@ -1,4 +1,4 @@
-orm_version: "2.0"
+orm_version: "3.0"
 model:
   name: order-management
   object_types:
@@ -117,7 +117,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7012-bc43-4a51585f666d
-          is_preferred: true
           id: 00000000-0000-7019-951c-232a31383f46
         - type: mandatory
           role: 00000000-0000-7012-bc43-4a51585f666d

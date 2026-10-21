@@ -583,6 +583,12 @@
       "caught_by": "reasoning",
       "note": "A scope call made at implementation: the first commit was green and reviewable alone, and 45 files is already a full review, so the draft's one PR became several."
     },
+    "orm-format-3::3ff644da0b62": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- the reference and the format ship together. ws4b-i's note planned the stored reference and schema 3.0 as separate prs. they cannot be: a stored reference save",
+      "caught_by": "reasoning",
+      "note": "Found while implementing: a stored reference saved to 2.0 must become a flag, which cannot say which of a binary's two uniquenesses it means, so the 286 entity-role flags would move on the first save. The two PRs became one."
+    },
     "orm-format-3::4b8c3c16bdc4": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "10. land 4a ahead of the format -- open; recommended: yes. raised by ws4's grounding (2026-10-21). the draft planned ws4 as one pr. - (a) recommended. 4a, the n",

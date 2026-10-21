@@ -16,6 +16,7 @@ import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import { renderDdl } from "../../src/mapping/renderers/ddl.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { placeFlags } from "../helpers/placeFlags.js";
 
 const mapper = new RelationalMapper();
 
@@ -315,7 +316,7 @@ describe("RelationalMapper", () => {
         readings: ["{0} has {1} at {2}"],
         constraints: constraints.map((c) => ({ type: "internal_uniqueness" as const, ...c })),
       });
-      return mapper.map(model).tables.find((t) =>
+      return mapper.map(placeFlags(model)).tables.find((t) =>
         t.name === "encounter_has_diagnosis_at_diagnosis_rank"
       )!;
     }
@@ -1324,7 +1325,7 @@ describe("RelationalMapper", () => {
         ],
       });
 
-      const schema = mapper.map(model);
+      const schema = mapper.map(placeFlags(model));
       const table = schema.tables.find((t) => t.name === "person")!;
       const pkCol = table.columns.find((c) => c.name === "person_code")!;
       const ddl = renderDdl(schema);

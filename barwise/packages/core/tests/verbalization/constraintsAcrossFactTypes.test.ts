@@ -9,11 +9,10 @@
  * broke.
  */
 import { describe, expect, it } from "vitest";
-import { parse, stringify } from "yaml";
 import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { Verbalizer } from "../../src/verbalization/Verbalizer.js";
+import { loadNestedUnder } from "../helpers/nestedUnder.js";
 
 /**
  * Room is identified by (Building, RoomNumber): the composite key is an
@@ -78,13 +77,8 @@ describe("verbalizeModel", () => {
   });
 
   it("is the same whichever fact type a 2.0 file nests the constraint under", () => {
-    // A save nests the key under ft-in, its first holder; move it to ft-nr.
-    const yaml = new OrmYamlSerializer();
-    const doc = parse(yaml.serialize(rooms("key")));
-    const [ftIn, ftNr] = doc.model.fact_types;
-    const at = ftIn.constraints.findIndex((c: { id: string; }) => c.id === "c-room-key");
-    ftNr.constraints.push(...ftIn.constraints.splice(at, 1));
-    const moved = yaml.deserialize(stringify(doc));
+    // Nested under ft-nr, the second fact type holding its roles.
+    const moved = loadNestedUnder(rooms("key"), "ft-nr");
     expect(moved.factTypes.map((ft) => ft.id)).toEqual(["ft-in", "ft-nr"]);
     const strip = (m: OrmModel) => new Verbalizer().verbalizeModel(m);
     expect(strip(moved)).toEqual(strip(rooms("key")));

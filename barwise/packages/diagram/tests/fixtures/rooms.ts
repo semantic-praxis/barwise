@@ -29,9 +29,10 @@ export function rooms(extra: ExternalConstraint[] = []): OrmModel {
     ],
     readings: ["{0} has {1}"],
     constraints: [
-      { id: "c-pref", type: "internal_uniqueness", roleIds: ["r-rid"], isPreferred: true },
+      { id: "c-pref", type: "internal_uniqueness", roleIds: ["r-rid"] },
     ],
   });
+  model.setPreferredIdentifier("ot-room", "c-pref");
   model.addFactType({
     id: "ft-in",
     name: "Room is in Building",

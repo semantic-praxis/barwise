@@ -13,22 +13,22 @@
  * One fact type carrying every fact type field, both readings, a
  * derivation, and one constraint of every kind with every field that kind
  * writes: an id on each (written after the body, which is part of what is
- * pinned), a deontic modality, a preferred uniqueness, a value constraint
+ * pinned), a deontic modality, a value constraint
  * with values and ranges, and frequency in both its one-role and many-role
  * forms. Whether every kind is here is checked against CONSTRAINT_TYPES
  * rather than trusted.
  *
- * The fact type's own constraints come first and those across fact types
- * after them: the model holds the second kind, and a 2.0 save writes each
- * one under its first holder after that fact type's own (orm-format-3
- * WS3c). Before, the list was written in the order it was built.
+ * The fact type's own constraints are written under it and those across
+ * fact types in the model's own list (orm-format-3 WS4b, format 3.0).
+ * Before 3.0, a save wrote each across-fact-type constraint under its first
+ * holder, after that fact type's own.
  */
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { CONSTRAINT_TYPES } from "../../src/model/Constraint.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
-const EXPECTED = `orm_version: "2.0"
+const EXPECTED = `orm_version: "3.0"
 model:
   name: Layout
   object_types:
@@ -56,7 +56,6 @@ model:
           roles:
             - r-knower
             - r-known
-          is_preferred: true
           id: c-iuc
         - type: mandatory
           role: r-knower
@@ -100,101 +99,102 @@ model:
           min: 0
           max: 9
           id: c-card
-        - type: external_uniqueness
-          roles:
-            - r-knower
-            - r-known
-          id: c-euc
-        - type: disjunctive_mandatory
-          roles:
-            - r-knower
-            - r-known
-          id: c-dm
-        - type: exclusion
-          roles:
-            - r-knower
-            - r-known
-          id: c-excl
-        - type: exclusive_or
-          roles:
-            - r-knower
-            - r-known
-          id: c-xor
-        - type: subset
-          subset_roles:
-            - r-knower
-          superset_roles:
-            - r-known
-          id: c-subset
-        - type: equality
-          roles_1:
-            - r-knower
-          roles_2:
-            - r-known
-          id: c-eq
-        - type: join_subset
-          subset:
-            path:
-              root: ot-person
-              steps:
-                - entry: r-knower
-                  exit: r-known
-            projection:
-              - 0
-              - 1
-          superset:
-            path:
-              root: ot-person
-              steps:
-                - entry: r-known
-                  exit: r-knower
-            projection:
-              - 1
-              - 0
-          id: c-jsub
-        - type: join_equality
-          operands:
-            - path:
-                root: ot-person
-                steps:
-                  - entry: r-knower
-                    exit: r-known
-              projection:
-                - 0
-                - 1
-            - path:
-                root: ot-person
-                steps:
-                  - entry: r-known
-                    exit: r-knower
-              projection:
-                - 1
-                - 0
-          id: c-jeq
-        - type: join_exclusion
-          operands:
-            - path:
-                root: ot-person
-                steps:
-                  - entry: r-knower
-                    exit: r-known
-              projection:
-                - 0
-                - 1
-            - path:
-                root: ot-person
-                steps:
-                  - entry: r-known
-                    exit: r-knower
-              projection:
-                - 1
-                - 0
-          id: c-jex
       derivation:
         kind: semiderived
         expression: Person knows Person if Person works with Person.
         storage: derived_and_stored
         is_formal: true
+  constraints:
+    - type: external_uniqueness
+      roles:
+        - r-knower
+        - r-known
+      id: c-euc
+    - type: disjunctive_mandatory
+      roles:
+        - r-knower
+        - r-known
+      id: c-dm
+    - type: exclusion
+      roles:
+        - r-knower
+        - r-known
+      id: c-excl
+    - type: exclusive_or
+      roles:
+        - r-knower
+        - r-known
+      id: c-xor
+    - type: subset
+      subset_roles:
+        - r-knower
+      superset_roles:
+        - r-known
+      id: c-subset
+    - type: equality
+      roles_1:
+        - r-knower
+      roles_2:
+        - r-known
+      id: c-eq
+    - type: join_subset
+      subset:
+        path:
+          root: ot-person
+          steps:
+            - entry: r-knower
+              exit: r-known
+        projection:
+          - 0
+          - 1
+      superset:
+        path:
+          root: ot-person
+          steps:
+            - entry: r-known
+              exit: r-knower
+        projection:
+          - 1
+          - 0
+      id: c-jsub
+    - type: join_equality
+      operands:
+        - path:
+            root: ot-person
+            steps:
+              - entry: r-knower
+                exit: r-known
+          projection:
+            - 0
+            - 1
+        - path:
+            root: ot-person
+            steps:
+              - entry: r-known
+                exit: r-knower
+          projection:
+            - 1
+            - 0
+      id: c-jeq
+    - type: join_exclusion
+      operands:
+        - path:
+            root: ot-person
+            steps:
+              - entry: r-knower
+                exit: r-known
+          projection:
+            - 0
+            - 1
+        - path:
+            root: ot-person
+            steps:
+              - entry: r-known
+                exit: r-knower
+          projection:
+            - 1
+            - 0
+      id: c-jex
 `;
 
 describe("fact type YAML layout", () => {
@@ -205,8 +205,11 @@ describe("fact type YAML layout", () => {
   });
 
   it("holds one constraint of every kind, so every kind's layout is pinned", () => {
-    const constraints: { type: string; role?: string; roles?: string[]; }[] =
-      parse(EXPECTED).model.fact_types[0].constraints;
+    const doc = parse(EXPECTED).model;
+    const constraints: { type: string; role?: string; roles?: string[]; }[] = [
+      ...doc.fact_types[0].constraints,
+      ...doc.constraints,
+    ];
     expect(new Set(constraints.map((c) => c.type))).toEqual(new Set(CONSTRAINT_TYPES));
     const frequencies = constraints.filter((c) => c.type === "frequency");
     expect(frequencies.map((c) => ("role" in c ? "role" : "roles"))).toEqual(["role", "roles"]);

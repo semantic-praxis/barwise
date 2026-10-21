@@ -12,8 +12,8 @@
   "properties": {
     "orm_version": {
       "type": "string",
-      "const": "2.0",
-      "description": "Schema version. Must be \"2.0\" for this schema revision."
+      "const": "3.0",
+      "description": "Schema version. Must be \"3.0\" for this schema revision."
     },
     "model": {
       "type": "object",
@@ -49,6 +49,13 @@
             "$ref": "#/definitions/fact_type"
           },
           "description": "The fact types (relationships) in this model."
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/external_constraint"
+          },
+          "description": "Constraints that live in the model rather than in one fact type: across fact types, or over subtypes."
         },
         "subtype_facts": {
           "type": "array",
@@ -160,6 +167,11 @@
         "cardinality": {
           "$ref": "#/definitions/cardinality_range_def",
           "description": "Bound on this object type's population (number of instances)."
+        },
+        "preferred_identifier": {
+          "type": "string",
+          "minLength": 1,
+          "description": "An entity type's preferred identifier: the id of the uniqueness constraint that identifies it."
         }
       },
       "if": {
@@ -177,6 +189,11 @@
           "data_type": false,
           "value_constraint": false,
           "default_value": false
+        }
+      },
+      "else": {
+        "properties": {
+          "preferred_identifier": false
         }
       }
     },
@@ -404,667 +421,6 @@
         }
       }
     },
-    "constraint": {
-      "type": "object",
-      "required": [
-        "type"
-      ],
-      "oneOf": [
-        {
-          "properties": {
-            "type": {
-              "const": "internal_uniqueness"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "roles": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 1,
-              "description": "Role ids within the same fact type."
-            },
-            "is_preferred": {
-              "type": "boolean",
-              "description": "True if this uniqueness constraint is the preferred identifier for the entity type."
-            }
-          },
-          "required": [
-            "type",
-            "roles"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "mandatory"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "role": {
-              "type": "string",
-              "minLength": 1,
-              "description": "The single role id that is mandatory."
-            }
-          },
-          "required": [
-            "type",
-            "role"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "external_uniqueness"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "roles": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 1,
-              "description": "Role ids spanning multiple fact types."
-            }
-          },
-          "required": [
-            "type",
-            "roles"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "value_constraint"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "role": {
-              "type": "string",
-              "minLength": 1,
-              "description": "The role id this constraint applies to."
-            },
-            "values": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1,
-              "description": "Allowed enumerated values."
-            },
-            "ranges": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/value_range_def"
-              },
-              "minItems": 1,
-              "description": "Allowed value ranges (inclusive/exclusive, possibly open-ended)."
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "anyOf": [
-            {
-              "required": [
-                "values"
-              ]
-            },
-            {
-              "required": [
-                "ranges"
-              ]
-            }
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "disjunctive_mandatory"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "roles": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 2,
-              "description": "Two or more role ids (may span fact types)."
-            }
-          },
-          "required": [
-            "type",
-            "roles"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "exclusion"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "roles": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 2,
-              "description": "Two or more role ids (may span fact types)."
-            }
-          },
-          "required": [
-            "type",
-            "roles"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "exclusive_or"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "roles": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 2,
-              "description": "Two or more role ids (may span fact types)."
-            }
-          },
-          "required": [
-            "type",
-            "roles"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "subset"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "subset_roles": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 1,
-              "description": "Role ids forming the subset side."
-            },
-            "superset_roles": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 1,
-              "description": "Role ids forming the superset side."
-            }
-          },
-          "required": [
-            "type",
-            "subset_roles",
-            "superset_roles"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "equality"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "roles_1": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 1,
-              "description": "First role sequence."
-            },
-            "roles_2": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 1,
-              "description": "Second role sequence."
-            }
-          },
-          "required": [
-            "type",
-            "roles_1",
-            "roles_2"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "ring"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "role_1": {
-              "type": "string",
-              "minLength": 1,
-              "description": "First role id."
-            },
-            "role_2": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Second role id."
-            },
-            "ring_type": {
-              "type": "string",
-              "enum": [
-                "irreflexive",
-                "asymmetric",
-                "antisymmetric",
-                "intransitive",
-                "acyclic",
-                "symmetric",
-                "transitive",
-                "purely_reflexive"
-              ],
-              "description": "The ring property being constrained."
-            }
-          },
-          "required": [
-            "type",
-            "role_1",
-            "role_2",
-            "ring_type"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "frequency"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "role": {
-              "type": "string",
-              "minLength": 1,
-              "description": "The single role being frequency-constrained (legacy single-role form)."
-            },
-            "roles": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 1,
-              "description": "The role sequence being frequency-constrained (a combination)."
-            },
-            "min": {
-              "type": "integer",
-              "minimum": 1,
-              "description": "Minimum occurrences."
-            },
-            "max": {
-              "oneOf": [
-                {
-                  "type": "integer",
-                  "minimum": 1
-                },
-                {
-                  "type": "string",
-                  "const": "unbounded"
-                }
-              ],
-              "description": "Maximum occurrences, or \"unbounded\"."
-            }
-          },
-          "required": [
-            "type",
-            "min",
-            "max"
-          ],
-          "anyOf": [
-            {
-              "required": [
-                "role"
-              ]
-            },
-            {
-              "required": [
-                "roles"
-              ]
-            }
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "value_comparison"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "role_1": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Left-hand role id."
-            },
-            "role_2": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Right-hand role id."
-            },
-            "operator": {
-              "type": "string",
-              "enum": [
-                "<",
-                "<=",
-                "=",
-                "<>",
-                ">=",
-                ">"
-              ],
-              "description": "value(role_1) <operator> value(role_2) must hold for every instance."
-            }
-          },
-          "required": [
-            "type",
-            "role_1",
-            "role_2",
-            "operator"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "cardinality"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "role": {
-              "type": "string",
-              "minLength": 1,
-              "description": "The unary role whose occurrence count is bounded."
-            },
-            "min": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Minimum number of object instances playing the role."
-            },
-            "max": {
-              "oneOf": [
-                {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                {
-                  "type": "string",
-                  "const": "unbounded"
-                }
-              ],
-              "description": "Maximum number of instances, or \"unbounded\"."
-            }
-          },
-          "required": [
-            "type",
-            "role",
-            "min",
-            "max"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "join_subset"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "subset": {
-              "$ref": "#/definitions/join_operand_def",
-              "description": "The operand whose projected tuples must be contained in the superset's."
-            },
-            "superset": {
-              "$ref": "#/definitions/join_operand_def",
-              "description": "The operand whose projected tuples contain the subset's."
-            }
-          },
-          "required": [
-            "type",
-            "subset",
-            "superset"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "join_equality"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "operands": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/join_operand_def"
-              },
-              "minItems": 2,
-              "description": "Two or more operands whose projected tuple sets must be equal."
-            }
-          },
-          "required": [
-            "type",
-            "operands"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "properties": {
-            "type": {
-              "const": "join_exclusion"
-            },
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for constraint traceability."
-            },
-            "modality": {
-              "type": "string",
-              "enum": [
-                "alethic",
-                "deontic"
-              ],
-              "description": "Alethic (necessity, the default) or deontic (obligation)."
-            },
-            "operands": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/join_operand_def"
-              },
-              "minItems": 2,
-              "description": "Two or more operands whose projected tuple sets must be pairwise disjoint."
-            }
-          },
-          "required": [
-            "type",
-            "operands"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
     "fact_type": {
       "type": "object",
       "required": [
@@ -1113,9 +469,9 @@
         "constraints": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/constraint"
+            "$ref": "#/definitions/internal_constraint"
           },
-          "description": "Constraints on this fact type."
+          "description": "The fact type's own constraints: the internal kinds only."
         },
         "derivation": {
           "$ref": "#/definitions/derivation_rule_def",
@@ -1185,16 +541,6 @@
           "type": "boolean",
           "default": true,
           "description": "Whether the subtype uses the supertype's reference scheme for identification."
-        },
-        "is_exclusive": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether the subtypes of this supertype are mutually exclusive. When true, no supertype instance can be an instance of more than one subtype in the partition group."
-        },
-        "is_exhaustive": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether the subtypes of this supertype are exhaustive (cover all instances). When true, every supertype instance must be an instance of at least one subtype in the partition group."
         },
         "defining_rule": {
           "$ref": "#/definitions/derivation_rule_def",
@@ -1364,6 +710,767 @@
           }
         }
       }
+    },
+    "internal_constraint": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "description": "A constraint that lives in its fact type: every role it names is one of that fact type's roles.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "internal_uniqueness"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "description": "Role ids within the same fact type."
+            }
+          },
+          "required": [
+            "type",
+            "roles",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "mandatory"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The single role id that is mandatory."
+            }
+          },
+          "required": [
+            "type",
+            "role",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "value_constraint"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The role id this constraint applies to."
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "description": "Allowed enumerated values."
+            },
+            "ranges": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/value_range_def"
+              },
+              "minItems": 1,
+              "description": "Allowed value ranges (inclusive/exclusive, possibly open-ended)."
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "values"
+              ]
+            },
+            {
+              "required": [
+                "ranges"
+              ]
+            }
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ring"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role_1": {
+              "type": "string",
+              "minLength": 1,
+              "description": "First role id."
+            },
+            "role_2": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Second role id."
+            },
+            "ring_type": {
+              "type": "string",
+              "enum": [
+                "irreflexive",
+                "asymmetric",
+                "antisymmetric",
+                "intransitive",
+                "acyclic",
+                "symmetric",
+                "transitive",
+                "purely_reflexive"
+              ],
+              "description": "The ring property being constrained."
+            }
+          },
+          "required": [
+            "type",
+            "role_1",
+            "role_2",
+            "ring_type",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "frequency"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The single role being frequency-constrained (legacy single-role form)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "description": "The role sequence being frequency-constrained (a combination)."
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Minimum occurrences."
+            },
+            "max": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "string",
+                  "const": "unbounded"
+                }
+              ],
+              "description": "Maximum occurrences, or \"unbounded\"."
+            }
+          },
+          "required": [
+            "type",
+            "min",
+            "max",
+            "id"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "role"
+              ]
+            },
+            {
+              "required": [
+                "roles"
+              ]
+            }
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "value_comparison"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role_1": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Left-hand role id."
+            },
+            "role_2": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Right-hand role id."
+            },
+            "operator": {
+              "type": "string",
+              "enum": [
+                "<",
+                "<=",
+                "=",
+                "<>",
+                ">=",
+                ">"
+              ],
+              "description": "value(role_1) <operator> value(role_2) must hold for every instance."
+            }
+          },
+          "required": [
+            "type",
+            "role_1",
+            "role_2",
+            "operator",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "cardinality"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The unary role whose occurrence count is bounded."
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum number of object instances playing the role."
+            },
+            "max": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "const": "unbounded"
+                }
+              ],
+              "description": "Maximum number of instances, or \"unbounded\"."
+            }
+          },
+          "required": [
+            "type",
+            "role",
+            "min",
+            "max",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "external_constraint": {
+      "type": "object",
+      "required": [
+        "type",
+        "id"
+      ],
+      "description": "A constraint that lives in the model: its roles may span fact types, or it constrains subtypes.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "external_uniqueness"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "description": "Role ids spanning multiple fact types."
+            }
+          },
+          "required": [
+            "type",
+            "roles",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "disjunctive_mandatory"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 2,
+              "description": "Two or more role ids (may span fact types)."
+            },
+            "subtype_facts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0,
+              "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "roles"
+              ]
+            },
+            {
+              "required": [
+                "subtype_facts"
+              ]
+            }
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "exclusion"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 2,
+              "description": "Two or more role ids (may span fact types)."
+            },
+            "subtype_facts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0,
+              "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "roles"
+              ]
+            },
+            {
+              "required": [
+                "subtype_facts"
+              ]
+            }
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "exclusive_or"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 2,
+              "description": "Two or more role ids (may span fact types)."
+            },
+            "subtype_facts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0,
+              "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "roles"
+              ]
+            },
+            {
+              "required": [
+                "subtype_facts"
+              ]
+            }
+          ]
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "subset"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "subset_roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "description": "Role ids forming the subset side."
+            },
+            "superset_roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "description": "Role ids forming the superset side."
+            }
+          },
+          "required": [
+            "type",
+            "subset_roles",
+            "superset_roles",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "equality"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles_1": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "description": "First role sequence."
+            },
+            "roles_2": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "description": "Second role sequence."
+            }
+          },
+          "required": [
+            "type",
+            "roles_1",
+            "roles_2",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "join_subset"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "subset": {
+              "$ref": "#/definitions/join_operand_def",
+              "description": "The operand whose projected tuples must be contained in the superset's."
+            },
+            "superset": {
+              "$ref": "#/definitions/join_operand_def",
+              "description": "The operand whose projected tuples contain the subset's."
+            }
+          },
+          "required": [
+            "type",
+            "subset",
+            "superset",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "join_equality"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "operands": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/join_operand_def"
+              },
+              "minItems": 2,
+              "description": "Two or more operands whose projected tuple sets must be equal."
+            }
+          },
+          "required": [
+            "type",
+            "operands",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "join_exclusion"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "operands": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/join_operand_def"
+              },
+              "minItems": 2,
+              "description": "Two or more operands whose projected tuple sets must be pairwise disjoint."
+            }
+          },
+          "required": [
+            "type",
+            "operands",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

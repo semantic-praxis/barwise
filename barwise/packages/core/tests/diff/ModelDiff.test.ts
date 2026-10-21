@@ -11,11 +11,12 @@
  *     valueConstraint, readings, role names, role players, constraints)
  */
 import { describe, expect, it } from "vitest";
-import { parse, stringify } from "yaml";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { loadNestedUnder } from "../helpers/nestedUnder.js";
+import { placeFlags } from "../helpers/placeFlags.js";
 
 function baseModel() {
   return new ModelBuilder("Test")
@@ -636,7 +637,9 @@ describe("diffModels", () => {
     expect(ftDelta!.changeDescriptions.some((c) => c.includes("constraints"))).toBe(true);
   });
 
-  it("detects isPreferred flip as a real change", () => {
+  it("reports a changed preferred identifier once, as a breaking change to the entity", () => {
+    // The reference is the entity's (orm-format-3 WS4b): the fact type's
+    // constraints are the same on both sides.
     const existing = new ModelBuilder("Test")
       .withEntityType("Customer", { referenceMode: "customer_id" })
       .withEntityType("Order", { referenceMode: "order_number" })
@@ -676,13 +679,71 @@ describe("diffModels", () => {
       ],
     });
 
-    const result = diffModels(existing, incoming);
+    const result = diffModels(placeFlags(existing), incoming);
     const ftDelta = result.deltas.find(
       (d) => d.elementType === "fact_type" && d.name === "Customer places Order",
     );
-    expect(ftDelta).toBeDefined();
-    expect(ftDelta!.kind).toBe("modified");
-    expect(ftDelta!.changeDescriptions.some((c) => c.includes("constraints"))).toBe(true);
+    expect(ftDelta!.kind).toBe("unchanged");
+    const otDelta = result.deltas.find(
+      (d) => d.elementType === "object_type" && d.name === "Customer",
+    );
+    expect(otDelta).toMatchObject({ kind: "modified", breakingLevel: "breaking" });
+    expect(otDelta!.changeDescriptions).toEqual([
+      'preferred identifier: "Customer places Order" (role 2: Order) -> (none)',
+    ]);
+  });
+
+  it("reports no preferred identifier change when the uniqueness lists its roles in another order", () => {
+    const build = (roleIds: string[]) => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({ id: "s", name: "Student", kind: "entity", referenceMode: "nr" });
+      model.addObjectType({ id: "c", name: "Course", kind: "entity", referenceMode: "code" });
+      model.addObjectType({ id: "e", name: "Enrollment", kind: "entity", referenceMode: "id" });
+      model.addFactType({
+        id: "ft",
+        name: "Student takes Course",
+        roles: [{ id: "r-s", name: "takes", playerId: "s" }, {
+          id: "r-c",
+          name: "is taken by",
+          playerId: "c",
+        }],
+        readings: ["{0} takes {1}"],
+        constraints: [{ id: "u", type: "internal_uniqueness", roleIds }],
+      });
+      model.addObjectifiedFactType({ factTypeId: "ft", objectTypeId: "e" });
+      model.setPreferredIdentifier("e", "u");
+      return model;
+    };
+    const result = diffModels(build(["r-s", "r-c"]), build(["r-c", "r-s"]));
+    const enrollment = result.deltas.find((d) =>
+      d.elementType === "object_type" && d.name === "Enrollment"
+    );
+    expect(enrollment?.kind).toBe("unchanged");
+  });
+
+  it("reports no preferred identifier change when only a role of the identifying fact type is renamed", () => {
+    const build = (roleName: string) => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({ id: "ot-c", name: "Customer", kind: "entity", referenceMode: "id" });
+      model.addObjectType({ id: "ot-cid", name: "CustomerId", kind: "value" });
+      model.addFactType({
+        id: "ft",
+        name: "Customer has CustomerId",
+        roles: [
+          { id: "r-c", name: "has", playerId: "ot-c" },
+          { id: "r-cid", name: roleName, playerId: "ot-cid" },
+        ],
+        readings: ["{0} has {1}"],
+        constraints: [{ id: "u-cid", type: "internal_uniqueness", roleIds: ["r-cid"] }],
+      });
+      model.setPreferredIdentifier("ot-c", "u-cid");
+      return model;
+    };
+    const result = diffModels(build("is of"), build("identifies"));
+    const customer = result.deltas.find((d) =>
+      d.elementType === "object_type" && d.name === "Customer"
+    );
+    expect(customer?.kind).toBe("unchanged");
   });
 
   it("reports no diff for Phase 2 constraints with different role IDs", () => {
@@ -1715,20 +1776,7 @@ describe("a constraint over roles of other fact types", () => {
     // nested it says nothing, and merge applies the constraint's own delta.
     const nested = (host: string) => {
       const m = model("number");
-      const c = m.constraints[0]!;
-      const yaml = new OrmYamlSerializer();
-      const doc = parse(yaml.serialize(m));
-      for (const ft of doc.model.fact_types) {
-        ft.constraints = (ft.constraints ?? []).filter((x: { type: string; }) => x.type !== c.type);
-        if (ft.constraints.length === 0) delete ft.constraints;
-      }
-      const target = doc.model.fact_types.find((ft: { name: string; }) => ft.name === host);
-      target.constraints = [...(target.constraints ?? []), {
-        type: c.type,
-        roles: (c as { roleIds: string[]; }).roleIds,
-        id: c.id,
-      }];
-      return yaml.deserialize(stringify(doc));
+      return loadNestedUnder(m, m.getFactTypeByName(host)!.id);
     };
     const a = nested("Room has RoomNumber");
     const b = nested("Room is in Building");

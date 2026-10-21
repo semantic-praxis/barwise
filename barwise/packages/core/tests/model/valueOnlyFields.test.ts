@@ -58,7 +58,7 @@ describe("value-only fields", () => {
 
     it(`the schema rejects ${snake(field)} on an entity type, naming the type and the field`, () => {
       const result = validator.validateModel({
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           object_types: [{
@@ -96,7 +96,7 @@ describe("value-only fields", () => {
       VALUE_ONLY_FIELDS.map(([f]) => [snake(f), SAMPLES[f]!.yaml]),
     );
     const result = validator.validateModel({
-      orm_version: "2.0",
+      orm_version: "3.0",
       model: {
         name: "Test",
         object_types: [{ id: "ot-1", name: "Rating", kind: "value", ...fields }],

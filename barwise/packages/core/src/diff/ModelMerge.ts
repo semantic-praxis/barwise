@@ -16,6 +16,7 @@
 
 import {
   type ExternalConstraint,
+  isInternalUniqueness,
   isOverSubtypes,
   roleIdsOf,
   subtypeFactIdsOf,
@@ -487,10 +488,70 @@ export function mergeModels(
     });
   }
 
+  // Phase 6b: preferred identifiers, now that every constraint is placed.
+  // Each entity takes its reference from the side the reviewer kept: a
+  // changed identifier is part of the entity's modification, accepted or
+  // rejected with it, not a second reference. The merged fact type may
+  // hold the other side's copy of that uniqueness, under the other side's
+  // id (an LLM extraction shares no ids with its base), so a reference the
+  // merged model lacks is followed to the uniqueness over the same roles.
+  // One whose constraint the merge left out goes, so the merged model
+  // names nothing it lacks.
+  for (const [delta, idx] of otDeltas) {
+    const takeIncoming = (delta.kind === "added" || delta.kind === "modified")
+      && accepted.has(idx);
+    const source = takeIncoming ? delta.incoming : delta.existing;
+    if (!source) continue;
+    const mergedId = takeIncoming && delta.kind === "added"
+      ? incomingIdToMergedId.get(source.id) ?? source.id
+      : (delta.existing ?? source).id;
+    const side = takeIncoming ? incoming : existing;
+    const ref = side.preferredIdentifierOf(source.id);
+    if (ref === undefined || merged.getObjectType(mergedId)?.kind !== "entity") continue;
+    const held = merged.getConstraint(ref)
+      ? ref
+      : sameUniquenessIn(merged, side, ref, takeIncoming ? incomingRoleIdToMergedId : roleIdMap);
+    if (held !== undefined) merged.setPreferredIdentifier(mergedId, held);
+  }
+
   // Phase 7: the one kind the diff deliberately does not model.
   carryUnmodelledElements(merged, existing);
 
   return merged;
+}
+
+/**
+ * The id of the merged model's internal uniqueness over the roles that
+ * `constraintId` covers in `side`, its role ids translated through
+ * `roleMap` (an id with no entry is unchanged). Undefined when the
+ * constraint is not an internal uniqueness, a role did not survive the
+ * merge, or no uniqueness covers exactly those roles.
+ */
+function sameUniquenessIn(
+  merged: OrmModel,
+  side: OrmModel,
+  constraintId: string,
+  roleMap: ReadonlyMap<string, string | null>,
+): string | undefined {
+  const c = side.getConstraint(constraintId);
+  if (!c || !isInternalUniqueness(c)) return undefined;
+  const roles = c.roleIds.map((r) => (roleMap.has(r) ? roleMap.get(r)! : r));
+  if (roles.some((r) => r === null)) return undefined;
+  // Compared as sorted lists, so a role repeated on one side is not read
+  // as the same uniqueness, and with the modality, as the diff's label is.
+  const key = (ids: readonly (string | null)[]) => [...ids].sort().join("\u0000");
+  const wanted = key(roles);
+  for (const ft of merged.factTypes) {
+    for (const u of ft.internalConstraints) {
+      if (
+        isInternalUniqueness(u) && key(u.roleIds) === wanted
+        && (u.modality ?? "alethic") === (c.modality ?? "alethic")
+      ) {
+        return u.id;
+      }
+    }
+  }
+  return undefined;
 }
 
 /**

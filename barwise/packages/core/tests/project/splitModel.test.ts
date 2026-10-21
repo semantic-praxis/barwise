@@ -398,9 +398,9 @@ model:
     expect(identity.constraintsTouching(born.id)).toHaveLength(0);
     expect(
       result.warnings.some((w) =>
-        w.includes('Dropped a "join_equality" constraint')
-        && w.includes('"Person was born in Country"')
-        && w.includes('"identity"')
+        // A constraint across fact types is the model's, with no host fact
+        // type to name (orm-format-3 WS4b): the warning names the domain.
+        w.includes('Dropped a "join_equality" constraint from domain "identity"')
       ),
     ).toBe(true);
   });

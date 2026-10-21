@@ -1,4 +1,4 @@
-orm_version: "2.0"
+orm_version: "3.0"
 model:
   name: subscription-billing
   object_types:
@@ -6,6 +6,7 @@ model:
       name: Account
       kind: entity
       reference_mode: account_number
+      preferred_identifier: 00000000-0000-704a-840b-121920272e35
       definition: A customer account in the system, identified by an account number. Every account has a unique 6-digit sequential identifier that is never reused; if an account closes and the same company returns, they receive a new account number.
     - id: 00000000-0000-7002-8c53-5a61686f767d
       name: AccountNumber
@@ -18,6 +19,7 @@ model:
       name: Subscription
       kind: entity
       reference_mode: subscription_id
+      preferred_identifier: 00000000-0000-704d-a168-6f767d848b92
       definition: The agreement that an account pays a specified amount on a specified billing cycle for a specified product. Identified by a subscription ID prefixed with SUB.
     - id: 00000000-0000-7004-8a91-989fa6adb4bb
       name: SubscriptionID
@@ -30,6 +32,7 @@ model:
       name: Product
       kind: entity
       reference_mode: product_code
+      preferred_identifier: 00000000-0000-7050-bec5-ccd3dae1e8ef
       definition: "A product offered by the company. Currently three products exist: CORE, ANALYTICS, and CONNECT."
     - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
       name: ProductCode
@@ -47,6 +50,7 @@ model:
       name: PricePlan
       kind: entity
       reference_mode: plan_code
+      preferred_identifier: 00000000-0000-7053-9b22-2930373e454c
       definition: The billing artefact that specifies the price and billing frequency. Identified by plan code (e.g., CORE-MO-49, CORE-AN-490). Each price plan entitles exactly one feature bundle.
       aliases:
         - billing plan
@@ -61,6 +65,7 @@ model:
       name: FeatureBundle
       kind: entity
       reference_mode: bundle_name
+      preferred_identifier: 00000000-0000-7056-b87f-868d949ba2a9
       definition: The feature set or tier that a customer receives. Identified by name. Examples include Starter, Professional, and Enterprise. Each bundle specifies how many seats, whether API access is included, whether SSO is included, etc.
     - id: 00000000-0000-700a-844b-525960676e75
       name: BundleName
@@ -73,6 +78,7 @@ model:
       name: PlanChange
       kind: entity
       reference_mode: change_id
+      preferred_identifier: 00000000-0000-7059-95dc-e3eaf1f8ff06
       definition: A record of a subscription plan change, capturing the subscription, the new price plan, the effective date, the date it was requested, and who requested it. Allows subscription plan history to be tracked.
     - id: 00000000-0000-700c-8289-90979ea5acb3
       name: ChangeID
@@ -147,7 +153,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7014-ba81-888f969da4ab
-          is_preferred: true
           id: 00000000-0000-7049-a5ec-f3fa01080f16
         - type: internal_uniqueness
           roles:
@@ -172,7 +177,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7017-97de-e5ecf3fa0108
-          is_preferred: true
           id: 00000000-0000-704c-8249-50575e656c73
         - type: internal_uniqueness
           roles:
@@ -197,7 +201,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701a-b43b-424950575e65
-          is_preferred: true
           id: 00000000-0000-704f-9fa6-adb4bbc2c9d0
         - type: internal_uniqueness
           roles:
@@ -222,7 +225,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-701d-9198-9fa6adb4bbc2
-          is_preferred: true
           id: 00000000-0000-7052-bc03-0a11181f262d
         - type: internal_uniqueness
           roles:
@@ -247,7 +249,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7020-aef5-fc030a11181f
-          is_preferred: true
           id: 00000000-0000-7055-9960-676e757c838a
         - type: internal_uniqueness
           roles:
@@ -272,7 +273,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7023-8b52-5960676e757c
-          is_preferred: true
           id: 00000000-0000-7058-b6bd-c4cbd2d9e0e7
         - type: internal_uniqueness
           roles:

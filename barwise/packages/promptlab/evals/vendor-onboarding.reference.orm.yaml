@@ -1,4 +1,4 @@
-orm_version: "2.0"
+orm_version: "3.0"
 model:
   name: vendor-onboarding
   object_types:
@@ -6,6 +6,7 @@ model:
       name: Vendor
       kind: entity
       reference_mode: vendor_number
+      preferred_identifier: 00000000-0000-7042-8c13-1a21282f363d
       definition: A supplier of goods or services to the organization, identified by a unique vendor number assigned at record creation.
     - id: 00000000-0000-7002-8c53-5a61686f767d
       name: VendorNumber
@@ -96,6 +97,7 @@ model:
       name: Region
       kind: entity
       reference_mode: region_code
+      preferred_identifier: 00000000-0000-704e-8087-8e959ca3aab1
       definition: "A geographic region served by vendors: EMEA, APAC, NA, or LATAM."
     - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
       name: RegionCode
@@ -114,6 +116,7 @@ model:
       name: RiskReview
       kind: entity
       reference_mode: review_id
+      preferred_identifier: 00000000-0000-7052-bc03-0a11181f262d
       definition: A compliance risk assessment of a vendor, completed and signed off before the vendor can be activated.
     - id: 00000000-0000-700f-9fe6-edf4fb020910
       name: ReviewID
@@ -126,6 +129,7 @@ model:
       name: PurchaseOrder
       kind: entity
       reference_mode: po_number
+      preferred_identifier: 00000000-0000-7056-b87f-868d949ba2a9
       definition: A request to purchase goods or services from a vendor, identified by a unique PO number.
     - id: 00000000-0000-7011-9d24-2b323940474e
       name: PONumber
@@ -163,7 +167,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7015-99a0-a7aeb5bcc3ca
-          is_preferred: true
           id: 00000000-0000-7041-adf4-fb020910171e
         - type: internal_uniqueness
           roles:
@@ -232,12 +235,6 @@ model:
         - type: mandatory
           role: 00000000-0000-701e-b0b7-bec5ccd3dae1
           id: 00000000-0000-7049-a5ec-f3fa01080f16
-        - type: subset
-          subset_roles:
-            - 00000000-0000-703a-941b-222930373e45
-          superset_roles:
-            - 00000000-0000-701e-b0b7-bec5ccd3dae1
-          id: 00000000-0000-705e-b077-7e858c939aa1
     - id: 00000000-0000-7020-aef5-fc030a11181f
       name: Vendor has SpendTier
       roles:
@@ -291,7 +288,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7027-87ce-d5dce3eaf1f8
-          is_preferred: true
           id: 00000000-0000-704d-a168-6f767d848b92
         - type: internal_uniqueness
           roles:
@@ -342,7 +338,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7030-9ee5-ecf3fa01080f
-          is_preferred: true
           id: 00000000-0000-7051-9de4-ebf2f900070e
         - type: internal_uniqueness
           roles:
@@ -384,7 +379,6 @@ model:
         - type: internal_uniqueness
           roles:
             - 00000000-0000-7036-989f-a6adb4bbc2c9
-          is_preferred: true
           id: 00000000-0000-7055-9960-676e757c838a
         - type: internal_uniqueness
           roles:
@@ -453,3 +447,10 @@ model:
         - type: mandatory
           role: 00000000-0000-703f-afb6-bdc4cbd2d9e0
           id: 00000000-0000-705d-9158-5f666d747b82
+  constraints:
+    - type: subset
+      subset_roles:
+        - 00000000-0000-703a-941b-222930373e45
+      superset_roles:
+        - 00000000-0000-701e-b0b7-bec5ccd3dae1
+      id: 00000000-0000-705e-b077-7e858c939aa1

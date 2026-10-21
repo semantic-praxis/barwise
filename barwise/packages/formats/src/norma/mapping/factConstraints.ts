@@ -154,14 +154,9 @@ function mapUniquenessConstraint(
   if (relevantRoles.length === 0) return undefined;
 
   if (nc.isInternal) {
-    const result: Constraint = {
-      type: "internal_uniqueness",
-      roleIds: relevantRoles,
-    };
-    if (nc.isPreferred) {
-      return { ...result, isPreferred: true } as Constraint;
-    }
-    return result;
+    // Whether it is an entity's preferred identifier is the entity's to
+    // say (`mapPreferredIdentifiers`), not the constraint's.
+    return { type: "internal_uniqueness", roleIds: relevantRoles };
   } else {
     return {
       type: "external_uniqueness",

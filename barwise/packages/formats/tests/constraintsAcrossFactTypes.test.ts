@@ -88,23 +88,36 @@ function build(host: Host): OrmModel {
 /**
  * `model` read back from a 2.0 file that nests the constraints `ids`
  * under `host`, after its own: in memory such a constraint belongs to the
- * model (WS3c), so the nesting is only a 2.0 file's to vary.
+ * model (WS3c), so the nesting is only a 2.0 file's to vary. A save writes
+ * 3.0, which lists them in the model and names each preferred identifier on
+ * its entity; the 2.0 form nests the one and flags the other.
  */
 function nestedUnder(model: OrmModel, host: Host, ids: readonly string[]): OrmModel {
   const yaml = new OrmYamlSerializer();
-  type NestedFactType = { name: string; constraints?: { id: string; }[]; };
-  const doc = parse(yaml.serialize(model)) as { model: { fact_types: NestedFactType[]; }; };
+  type Raw = { id: string; is_preferred?: boolean; };
+  type NestedFactType = { name: string; constraints?: Raw[]; };
+  const doc = parse(yaml.serialize(model)) as {
+    orm_version: string;
+    model: {
+      fact_types: NestedFactType[];
+      constraints?: Raw[];
+      object_types?: { preferred_identifier?: string; }[];
+    };
+  };
+  doc.orm_version = "2.0";
   const fts = doc.model.fact_types;
-  const moved = ids.map((id) =>
-    fts.flatMap((ft) => ft.constraints ?? []).find((c) => c.id === id)!
-  );
-  for (const ft of fts) {
-    const own = (ft.constraints ?? []).filter((c) => !ids.includes(c.id));
-    if (own.length > 0) ft.constraints = own;
-    else delete ft.constraints;
-  }
+  const modelLevel = doc.model.constraints ?? [];
+  delete doc.model.constraints;
+  const moved = ids.map((id) => modelLevel.find((c) => c.id === id)!);
   const target = fts.find((ft) => ft.name === host)!;
   target.constraints = [...(target.constraints ?? []), ...moved];
+  const byId = new Map(fts.flatMap((ft) => ft.constraints ?? []).map((c) => [c.id, c]));
+  for (const ot of doc.model.object_types ?? []) {
+    const ref = ot.preferred_identifier;
+    delete ot.preferred_identifier;
+    const c = ref === undefined ? undefined : byId.get(ref);
+    if (c) c.is_preferred = true;
+  }
   return yaml.deserialize(stringify(doc));
 }
 

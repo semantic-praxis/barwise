@@ -1,3 +1,4 @@
+import type { OrmYamlConstraint } from "./constraint.js";
 import type { OrmYamlDefinition } from "./definition.js";
 import type { OrmYamlDiagramLayout } from "./diagram.js";
 import type { OrmYamlFactType } from "./factType.js";
@@ -19,6 +20,8 @@ export interface OrmYamlDocument {
     note?: string;
     object_types?: OrmYamlObjectType[];
     fact_types?: OrmYamlFactType[];
+    /** 3.0: the model's own constraints, across fact types or over subtypes. */
+    constraints?: OrmYamlConstraint[];
     subtype_facts?: OrmYamlSubtypeFact[];
     objectified_fact_types?: OrmYamlObjectifiedFactType[];
     populations?: OrmYamlPopulation[];

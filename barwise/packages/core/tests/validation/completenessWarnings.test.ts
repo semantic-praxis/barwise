@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { completenessWarnings } from "../../src/validation/rules/completenessWarnings.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { placeFlags } from "../helpers/placeFlags.js";
 
 describe("completenessWarnings", () => {
   it("produces no diagnostics for a well-defined model", () => {
@@ -448,7 +449,7 @@ describe("completenessWarnings", () => {
         providesIdentification: true,
       });
 
-      const missing = completenessWarnings(model).filter(
+      const missing = completenessWarnings(placeFlags(model)).filter(
         (d) => d.ruleId === "completeness/missing-preferred-identifier",
       );
       expect(missing).toHaveLength(0);
@@ -531,7 +532,10 @@ describe("completenessWarnings", () => {
       expect(missing).toHaveLength(0);
     });
 
-    it("warns when entity type has multiple preferred identifiers", () => {
+    it("stores one identifier when two flags name one entity, and reports neither", () => {
+      // A stored reference names one constraint, so two identifiers for one
+      // entity cannot be stated (orm-format-3 WS4b); the 2.0 reader keeps
+      // the first, as Open decision 8 says.
       const model = new ModelBuilder("Test")
         .withEntityType("Customer", {
           referenceMode: "customer_id",
@@ -559,14 +563,66 @@ describe("completenessWarnings", () => {
         })
         .build();
 
-      const diagnostics = completenessWarnings(model);
-      const multiple = diagnostics.filter(
-        (d) => d.ruleId === "completeness/multiple-preferred-identifiers",
+      const customer = model.getObjectTypeByName("Customer")!;
+      expect(model.preferredIdentifierOf(customer.id)).toBeDefined();
+      const identifier = completenessWarnings(model).filter((d) =>
+        d.ruleId === "completeness/missing-preferred-identifier"
+        || d.ruleId === "completeness/preferred-identifier-invalid"
       );
-      expect(multiple).toHaveLength(1);
-      expect(multiple[0]!.severity).toBe("warning");
-      expect(multiple[0]!.message).toContain("Customer");
-      expect(multiple[0]!.message).toContain("2");
+      expect(identifier).toEqual([]);
+    });
+
+    describe("a stored reference that identifies nothing", () => {
+      /** Customer has CustomerId, both roles unique, and a reference to `ref`. */
+      function referencing(ref: string) {
+        const model = new OrmModel({ name: "Test" });
+        model.addObjectType({ id: "c", name: "Customer", kind: "entity", referenceMode: "id" });
+        model.addObjectType({ id: "v", name: "CustomerId", kind: "value" });
+        model.addFactType({
+          id: "ft",
+          name: "Customer has CustomerId",
+          roles: [{ id: "rc", name: "has", playerId: "c" }, {
+            id: "rv",
+            name: "is of",
+            playerId: "v",
+          }],
+          readings: ["{0} has {1}"],
+          constraints: [
+            { id: "u-c", type: "internal_uniqueness", roleIds: ["rc"] },
+            { id: "u-v", type: "internal_uniqueness", roleIds: ["rv"] },
+            { id: "m-c", type: "mandatory", roleId: "rc" },
+          ],
+        });
+        model.setPreferredIdentifier("c", ref);
+        return completenessWarnings(model).filter((d) =>
+          d.ruleId === "completeness/preferred-identifier-invalid"
+          || d.ruleId === "completeness/missing-preferred-identifier"
+        );
+      }
+
+      it("accepts the value role's uniqueness", () => {
+        expect(referencing("u-v")).toEqual([]);
+      });
+
+      it("reports a constraint the model lacks", () => {
+        const found = referencing("gone");
+        expect(found.map((d) => [d.ruleId, d.severity])).toEqual([
+          ["completeness/preferred-identifier-invalid", "error"],
+        ]);
+        expect(found[0]!.message).toContain("no constraint with that id");
+      });
+
+      it("reports a constraint that is not a uniqueness, naming its kind", () => {
+        expect(referencing("m-c")[0]!.message).toBe(
+          'Entity type "Customer" names constraint "m-c" as its preferred identifier, but its kind is '
+            + "mandatory; a preferred identifier is an internal uniqueness constraint.",
+        );
+      });
+
+      it("reports a uniqueness that identifies something else", () => {
+        // The entity's own role: a CustomerId could belong to two customers.
+        expect(referencing("u-c")[0]!.message).toContain("does not identify");
+      });
     });
 
     it("does not check value types for preferred identifiers", () => {
@@ -669,7 +725,7 @@ describe("completenessWarnings", () => {
           ],
         });
       }
-      return model;
+      return placeFlags(model);
     }
 
     const conflicts = (model: OrmModel) =>
@@ -731,9 +787,9 @@ describe("completenessWarnings", () => {
       expect(conflicts(model)).toHaveLength(0);
     });
 
-    it("leaves two preferred uniqueness constraints to the rule that owns them", () => {
-      // One kind, twice: `multiple-preferred-identifiers` reports it and
-      // this rule must not, or a reader sees one problem described twice.
+    it("reports no conflict for two flags of one kind", () => {
+      // Two flags place one stored identifier (orm-format-3 WS4b): one kind,
+      // once, which is no conflict.
       const model = new OrmModel({ name: "Test" });
       const person = model.addObjectType({
         name: "Person",
@@ -757,11 +813,9 @@ describe("completenessWarnings", () => {
         });
       }
 
-      const diagnostics = completenessWarnings(model);
+      placeFlags(model);
       expect(conflicts(model)).toHaveLength(0);
-      expect(
-        diagnostics.filter((d) => d.ruleId === "completeness/multiple-preferred-identifiers"),
-      ).toHaveLength(1);
+      expect(model.preferredIdentifierOf(person.id)).toBeDefined();
     });
   });
 });

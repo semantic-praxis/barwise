@@ -316,10 +316,11 @@ describe("NORMA XML Import integration", () => {
     it("imports preferred identifier flag on uniqueness constraints", () => {
       // PersonHasPersonId should have a uniqueness constraint marked as preferred.
       const personHasId = model.getFactTypeByName("PersonHasPersonId")!;
-      const preferredUcs = personHasId.internalConstraints.filter(
-        (c) => c.type === "internal_uniqueness" && c.isPreferred,
+      const person = model.getObjectTypeByName("Person")!;
+      const stored = personHasId.internalConstraints.find(
+        (c) => c.id === model.preferredIdentifierOf(person.id),
       );
-      expect(preferredUcs.length).toBeGreaterThanOrEqual(1);
+      expect(stored?.type).toBe("internal_uniqueness");
     });
 
     it("does not import implied mandatory constraints as explicit constraints", () => {

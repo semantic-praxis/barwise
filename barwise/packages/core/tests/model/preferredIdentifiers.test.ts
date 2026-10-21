@@ -1,23 +1,40 @@
 /**
  * One answer to "which uniqueness identifies which entity type"
- * (orm-format-3, Open decision 8 and WS4a; barwise-971). Each flag reads
- * as naming the entity the roles opposite the uniqueness identify, so the
- * two conventions in use -- importers flag the value's role, extraction
- * flags the entity's -- give the same answer.
+ * (orm-format-3, Open decision 8, WS4a and WS4b; barwise-971). A 2.0
+ * `is_preferred` flag reads as naming the entity the roles opposite the
+ * uniqueness identify, so the two conventions in use -- importers flag the
+ * value's role, extraction flags the entity's -- give the same answer.
+ * Each case builds a model with flags, places them as the 2.0 reader does
+ * (`storePreferredFlags`), and reads the stored answer.
  */
 import { describe, expect, it } from "vitest";
 import type { InternalConstraint } from "../../src/model/Constraint.js";
-import { isIdentified, preferredIdentifiers } from "../../src/model/identification.js";
+import {
+  isIdentified,
+  placePreferredFlags,
+  preferredIdentifiers,
+  storePreferredFlags,
+} from "../../src/model/identification.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { RULE_ID } from "../../src/validation/ruleId.js";
-import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 
-const uc = (id: string, roles: string[], preferred = false): InternalConstraint => ({
+/**
+ * A uniqueness, flagged `is_preferred` as a 2.0 file would flag it. The
+ * flag rides on the object, which the fact type stores as given, so each
+ * model carries its own flags; the model type no longer has the field.
+ */
+type Flagged = InternalConstraint & { readonly isPreferred?: boolean; };
+const uc = (id: string, roles: string[], preferred = false): Flagged => ({
   id,
   type: "internal_uniqueness",
   roleIds: roles,
   ...(preferred ? { isPreferred: true } : {}),
 });
+const isFlagged = (c: InternalConstraint) => (c as Flagged).isPreferred === true;
+/** Place the flags, as the 2.0 reader does, and return the model. */
+const placed = (model: OrmModel) => {
+  storePreferredFlags(model, isFlagged);
+  return model;
+};
 
 /** Customer has CustomerNumber, with `constraints` on it. */
 function customer(constraints: InternalConstraint[]): OrmModel {
@@ -38,7 +55,9 @@ function customer(constraints: InternalConstraint[]): OrmModel {
 }
 
 const identifierOf = (model: OrmModel, entity: string) =>
-  preferredIdentifiers(model).byEntity.get(entity)?.constraint.id;
+  preferredIdentifiers(placed(model)).byEntity.get(entity)?.constraint.id;
+const candidatesOf = (model: OrmModel, entity: string) =>
+  placePreferredFlags(model, isFlagged).candidates.get(entity);
 
 describe("preferredIdentifiers", () => {
   it("reads a flag on either role of an entity-value binary as the value role's uniqueness", () => {
@@ -55,7 +74,7 @@ describe("preferredIdentifiers", () => {
   });
 
   it("gives the inverse, from the uniqueness to the entity", () => {
-    const model = customer([uc("u-c", ["r-c"], true), uc("u-nr", ["r-nr"])]);
+    const model = placed(customer([uc("u-c", ["r-c"], true), uc("u-nr", ["r-nr"])]));
     expect(preferredIdentifiers(model).byConstraint.get("u-nr")?.entityId).toBe("ot-c");
     expect(preferredIdentifiers(model).byConstraint.has("u-c")).toBe(false);
   });
@@ -206,10 +225,9 @@ describe("preferredIdentifiers", () => {
         readings: ["{0} has {1}"],
         constraints: [uc("u-cc", ["r-cc"], true), uc("u-cid", ["r-cid"])],
       });
-      expect(preferredIdentifiers(model).candidates.get("ot-c")?.length).toBe(1);
-      const fired = new ValidationEngine().validate(model)
-        .filter((d) => d.ruleId === RULE_ID.multiplePreferredIdentifiers);
-      expect(fired).toEqual([]);
+      expect(candidatesOf(model, "ot-c")?.length).toBe(1);
+      expect(identifierOf(model, "ot-c")).toBe("u-cid");
+      expect(identifierOf(model, "ot-s")).toBe("u-sign");
     });
 
     it("keeps its own reference binary when both are flagged (Open decision 11)", () => {
@@ -235,12 +253,10 @@ describe("preferredIdentifiers", () => {
     expect(identifierOf(model, "ot-c")).toBe("u-nr");
   });
 
-  const multiple = (model: OrmModel) =>
-    new ValidationEngine().validate(model)
-      .filter((d) => d.ruleId === RULE_ID.multiplePreferredIdentifiers);
-
-  it("leaves the two-identifier diagnostic reporting two identifiers", () => {
-    // Resolving two to one answer must not hide the modelling error.
+  it("keeps both flags naming one entity as candidates, and stores the first", () => {
+    // A 2.0 file can name two identifiers for one entity; the stored
+    // reference holds one, so the placement keeps both for a caller that
+    // reports the second (the llm parser does).
     const model = customer([uc("u-c", ["r-c"], true), uc("u-nr", ["r-nr"])]);
     model.addObjectType({ id: "ot-mail", name: "Email", kind: "value" });
     model.addFactType({
@@ -253,15 +269,15 @@ describe("preferredIdentifiers", () => {
       readings: ["{0} has {1}"],
       constraints: [uc("u-c2", ["r-c2"]), uc("u-mail", ["r-mail"], true)],
     });
+    expect(candidatesOf(model, "ot-c")?.map((at) => at.constraint.id)).toEqual(["u-nr", "u-mail"]);
     expect(identifierOf(model, "ot-c")).toBe("u-nr");
-    expect(multiple(model)).toHaveLength(1);
   });
 
   it("counts one identifier when both roles of its binary are flagged", () => {
     // The importers flag the value's role and extraction the entity's, so
     // a merged model can carry both; they name one uniqueness.
     const model = customer([uc("u-c", ["r-c"], true), uc("u-nr", ["r-nr"], true)]);
-    expect(preferredIdentifiers(model).candidates.get("ot-c")).toHaveLength(1);
-    expect(multiple(model)).toEqual([]);
+    expect(candidatesOf(model, "ot-c")).toHaveLength(1);
+    expect(identifierOf(model, "ot-c")).toBe("u-nr");
   });
 });

@@ -199,20 +199,37 @@ describe("a candidate may express an internal uniqueness as an external one", ()
     );
   }
 
-  /** `model` read back from a 2.0 file nesting constraint `id` under `host`. */
+  /**
+   * `model` read back from a 2.0 file nesting constraint `id` under `host`.
+   * A save writes 3.0, where the external uniqueness sits in the model's own
+   * list and each preferred identifier is a reference on its entity; the 2.0
+   * form nests the one and flags the other.
+   */
   function nestedUnder(model: OrmModel, host: string, id: string): OrmModel {
     const yaml = new OrmYamlSerializer();
-    type NestedFactType = { name: string; constraints?: { id: string; }[]; };
-    const doc = parse(yaml.serialize(model)) as { model: { fact_types: NestedFactType[]; }; };
+    type Raw = { id: string; is_preferred?: boolean; };
+    type NestedFactType = { name: string; constraints?: Raw[]; };
+    const doc = parse(yaml.serialize(model)) as {
+      orm_version: string;
+      model: {
+        fact_types: NestedFactType[];
+        constraints?: Raw[];
+        object_types?: { preferred_identifier?: string; }[];
+      };
+    };
+    doc.orm_version = "2.0";
     const fts = doc.model.fact_types;
-    const moved = fts.flatMap((ft) => ft.constraints ?? []).find((c) => c.id === id)!;
-    for (const ft of fts) {
-      const own = (ft.constraints ?? []).filter((c) => c.id !== id);
-      if (own.length > 0) ft.constraints = own;
-      else delete ft.constraints;
-    }
+    const moved = (doc.model.constraints ?? []).find((c) => c.id === id)!;
+    delete doc.model.constraints;
     const target = fts.find((ft) => ft.name === host)!;
     target.constraints = [...(target.constraints ?? []), moved];
+    const byId = new Map(fts.flatMap((ft) => ft.constraints ?? []).map((c) => [c.id, c]));
+    for (const ot of doc.model.object_types ?? []) {
+      const ref = ot.preferred_identifier;
+      delete ot.preferred_identifier;
+      const c = ref === undefined ? undefined : byId.get(ref);
+      if (c) c.is_preferred = true;
+    }
     return yaml.deserialize(stringify(doc));
   }
 

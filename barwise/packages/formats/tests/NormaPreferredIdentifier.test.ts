@@ -4,9 +4,12 @@
  * flags the entity's role ("each Customer has at most one number"); the
  * reference scheme NORMA means is the uniqueness on the value's role, and
  * the export used to write no `PreferredIdentifier` for such a model while
- * marking the entity-role uniqueness preferred.
+ * marking the entity-role uniqueness preferred. Since WS4b-ii the model
+ * stores the reference, and a 2.0 flag on either role is placed on the
+ * value role's uniqueness when it is read (`storePreferredFlags`); the
+ * two flag positions below are that placement.
  */
-import { type InternalConstraint, OrmModel } from "@barwise/core";
+import { type InternalConstraint, OrmModel, storePreferredFlags } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { writeOrmToNorma } from "../src/norma/NormaXmlWriter.js";
 
@@ -19,13 +22,11 @@ function customer(flagOn: "entity" | "value"): OrmModel {
       id: "u-c",
       type: "internal_uniqueness",
       roleIds: ["r-c"],
-      ...(flagOn === "entity" ? { isPreferred: true } : {}),
     },
     {
       id: "u-nr",
       type: "internal_uniqueness",
       roleIds: ["r-nr"],
-      ...(flagOn === "value" ? { isPreferred: true } : {}),
     },
   ];
   model.addFactType({
@@ -38,6 +39,8 @@ function customer(flagOn: "entity" | "value"): OrmModel {
     readings: ["{0} has {1}"],
     constraints,
   });
+  const flagged = flagOn === "entity" ? "u-c" : "u-nr";
+  storePreferredFlags(model, (c) => c.id === flagged);
   return model;
 }
 
@@ -115,9 +118,9 @@ describe("NORMA export of a preferred identifier", () => {
         id: "u-b",
         type: "internal_uniqueness",
         roleIds: ["r-b"],
-        isPreferred: true,
       }],
     });
+    model.setPreferredIdentifier("ot-room", "u-b");
     model.addPopulation({ id: "pop", factTypeId: "ft-in" })
       .addInstance({ id: "i", roleValues: { "r-room": "R1", "r-b": "B1" } });
     // Building, populated and unidentified, gets a synthesized identifier

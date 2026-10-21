@@ -68,6 +68,8 @@ export class OrmModel {
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
   private readonly _constraints: ExternalConstraint[] = [];
+  /** Each entity's preferred identifier, by constraint id (orm-format-3 WS4b). */
+  private readonly _preferredIdentifiers: Map<string, string> = new Map();
 
   constructor(config: OrmModelConfig) {
     if (!config.name || config.name.trim().length === 0) {
@@ -179,7 +181,51 @@ export class OrmModel {
     }
 
     this._objectTypes.delete(id);
+    this._preferredIdentifiers.delete(id);
     this.pruneDiagramReferences(id);
+  }
+
+  // ---- Preferred identifiers ----
+
+  /**
+   * The id of the uniqueness constraint an entity names as its preferred
+   * identifier, if it names one (orm-format-3, Open decision 3). Stored,
+   * not inferred: `preferredIdentifiers` reads it, checks the constraint
+   * identifies the entity, and every reader takes its answer from there.
+   */
+  preferredIdentifierOf(entityId: string): string | undefined {
+    return this._preferredIdentifiers.get(entityId);
+  }
+
+  /**
+   * Name an entity's preferred identifier, or clear it with `undefined`.
+   * The constraint is not looked up: one that does not exist, or does not
+   * identify the entity, is validation's to report, as a dangling role
+   * is, so a merge or a lenient load can carry one through.
+   * @throws If the object type does not exist or is not an entity type.
+   */
+  setPreferredIdentifier(entityId: string, constraintId: string | undefined): void {
+    const ot = this._objectTypes.get(entityId);
+    if (!ot) throw new Error(`Object type with id "${entityId}" not found.`);
+    if (ot.kind !== "entity") {
+      throw new Error(
+        `"${ot.name}" is a ${ot.kind} type; only an entity type has a preferred identifier.`,
+      );
+    }
+    if (constraintId === undefined) this._preferredIdentifiers.delete(entityId);
+    else this._preferredIdentifiers.set(entityId, constraintId);
+  }
+
+  /** Every stored preferred identifier, as [entity id, constraint id], in insertion order. */
+  get preferredIdentifierRefs(): readonly (readonly [string, string])[] {
+    return [...this._preferredIdentifiers];
+  }
+
+  /** Clear every reference to a constraint that is gone. */
+  private dropPreferredIdentifiersTo(constraintIds: ReadonlySet<string>): void {
+    for (const [entityId, constraintId] of this._preferredIdentifiers) {
+      if (constraintIds.has(constraintId)) this._preferredIdentifiers.delete(entityId);
+    }
   }
 
   // ---- Fact Types ----
@@ -226,6 +272,7 @@ export class OrmModel {
   removeConstraint(constraint: ExternalConstraint): void {
     const i = this._constraints.indexOf(constraint);
     if (i >= 0) this._constraints.splice(i, 1);
+    if (constraint.id !== undefined) this.dropPreferredIdentifiersTo(new Set([constraint.id]));
   }
 
   /**
@@ -445,6 +492,12 @@ export class OrmModel {
     }
 
     this._factTypes.delete(id);
+    // An entity identified by one of its constraints is no longer: the
+    // reference goes with the constraint, so a saved model does not name a
+    // constraint that does not exist.
+    this.dropPreferredIdentifiersTo(
+      new Set(ft.internalConstraints.flatMap((c) => (c.id === undefined ? [] : [c.id]))),
+    );
     // A constraint across fact types every role of which was here goes with
     // it. One that also spans another fact type stays, its roles here now
     // dangling, so validation reports it rather than a rule over the fact

@@ -1,4 +1,5 @@
 import { Ajv, type ErrorObject } from "ajv";
+import legacyOrmModelSchema from "../../schemas/orm-model-2.0.schema.json" with { type: "json" };
 import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
 
 /**
@@ -25,10 +26,20 @@ export interface SchemaError {
  */
 export class SchemaValidator {
   private readonly validate;
+  private readonly ajv = new Ajv({ allErrors: true });
+  private legacy?: ReturnType<Ajv["compile"]>;
 
   constructor() {
-    const ajv = new Ajv({ allErrors: true });
-    this.validate = ajv.compile(ormModelSchema);
+    this.validate = this.ajv.compile(ormModelSchema);
+  }
+
+  /**
+   * Validate a 2.0 document against the 2.0 schema, before the 2.0 reader
+   * reads it into the model. Compiled on first use: most loads are 3.0.
+   */
+  validateLegacyModel(data: unknown): SchemaValidationResult {
+    this.legacy ??= this.ajv.compile(legacyOrmModelSchema);
+    return this.report(this.legacy, data);
   }
 
   /**
@@ -36,13 +47,17 @@ export class SchemaValidator {
    * orm-model.schema.json schema.
    */
   validateModel(data: unknown): SchemaValidationResult {
-    const valid = this.validate(data);
+    return this.report(this.validate, data);
+  }
+
+  private report(validate: ReturnType<Ajv["compile"]>, data: unknown): SchemaValidationResult {
+    const valid = validate(data);
 
     if (valid) {
       return { valid: true, errors: [] };
     }
 
-    const errors: SchemaError[] = (this.validate.errors ?? []).map(
+    const errors: SchemaError[] = (validate.errors ?? []).map(
       (err: ErrorObject) => {
         // A `false` property schema forbids a field outright (an entity
         // type's `data_type`); ajv's own wording, "boolean schema is false",

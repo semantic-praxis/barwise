@@ -18,7 +18,7 @@ describe("SchemaValidator", () => {
   describe("valid documents", () => {
     it("accepts a minimal valid document", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: { name: "Test" },
       };
 
@@ -29,7 +29,7 @@ describe("SchemaValidator", () => {
 
     it("accepts a document with all fields populated", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Order Management",
           domain_context: "ecommerce",
@@ -59,8 +59,8 @@ describe("SchemaValidator", () => {
               ],
               readings: ["{0} places {1}", "{1} is placed by {0}"],
               constraints: [
-                { type: "internal_uniqueness", roles: ["r-002"] },
-                { type: "mandatory", role: "r-002" },
+                { id: "c-1", type: "internal_uniqueness", roles: ["r-002"] },
+                { id: "c-2", type: "mandatory", role: "r-002" },
               ],
             },
           ],
@@ -81,7 +81,7 @@ describe("SchemaValidator", () => {
 
     it("accepts external_uniqueness constraints", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -90,10 +90,10 @@ describe("SchemaValidator", () => {
               name: "Test Fact",
               roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
               readings: ["{0} test"],
-              constraints: [
-                { type: "external_uniqueness", roles: ["r-001", "r-002"] },
-              ],
             },
+          ],
+          constraints: [
+            { id: "c-1", type: "external_uniqueness", roles: ["r-001", "r-002"] },
           ],
         },
       };
@@ -104,7 +104,7 @@ describe("SchemaValidator", () => {
 
     it("accepts value_constraint constraints with optional role", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -114,7 +114,7 @@ describe("SchemaValidator", () => {
               roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
               readings: ["{0} test"],
               constraints: [
-                { type: "value_constraint", values: ["X", "Y"], role: "r-001" },
+                { id: "c-1", type: "value_constraint", values: ["X", "Y"], role: "r-001" },
               ],
             },
           ],
@@ -127,7 +127,7 @@ describe("SchemaValidator", () => {
 
     it("accepts value_constraint without role", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -137,7 +137,7 @@ describe("SchemaValidator", () => {
               roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
               readings: ["{0} test"],
               constraints: [
-                { type: "value_constraint", values: ["X", "Y"] },
+                { id: "c-1", type: "value_constraint", values: ["X", "Y"] },
               ],
             },
           ],
@@ -158,13 +158,13 @@ describe("SchemaValidator", () => {
     });
 
     it("rejects a document missing model", () => {
-      const doc = { orm_version: "2.0" };
+      const doc = { orm_version: "3.0" };
       const result = validator.validateModel(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects a document missing model name", () => {
-      const doc = { orm_version: "2.0", model: {} };
+      const doc = { orm_version: "3.0", model: {} };
       const result = validator.validateModel(doc);
       expect(result.valid).toBe(false);
     });
@@ -175,7 +175,7 @@ describe("SchemaValidator", () => {
     describe("naming the element an error is in", () => {
       it("adds the name of the nearest model element to the message", () => {
         const result = validator.validateModel({
-          orm_version: "2.0",
+          orm_version: "3.0",
           model: {
             name: "Test",
             object_types: [
@@ -193,7 +193,7 @@ describe("SchemaValidator", () => {
 
       it("adds nothing when the element has no name, or the error is on the model", () => {
         const unnamed = validator.validateModel({
-          orm_version: "2.0",
+          orm_version: "3.0",
           model: {
             name: "Test",
             object_types: [{ id: "ot-1", name: "  ", kind: "value", colour: 1 }],
@@ -204,7 +204,7 @@ describe("SchemaValidator", () => {
           message: "must NOT have additional properties",
         });
         const top = validator.validateModel({
-          orm_version: "2.0",
+          orm_version: "3.0",
           model: { name: "Test", colour: 1 },
         });
         expect(top.errors).toContainEqual({
@@ -216,7 +216,7 @@ describe("SchemaValidator", () => {
 
     it("rejects an entity type without reference_mode", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           object_types: [
@@ -230,14 +230,50 @@ describe("SchemaValidator", () => {
     });
 
     it("rejects a wrong orm_version", () => {
-      const doc = { orm_version: "3.0", model: { name: "Test" } };
+      const doc = { orm_version: "2.0", model: { name: "Test" } };
       const result = validator.validateModel(doc);
       expect(result.valid).toBe(false);
     });
 
-    it("rejects additional properties at the top level", () => {
+    it("checks a 2.0 document against the frozen 2.0 schema", () => {
+      // A 2.0 file is read by the 2.0 reader; the current schema refuses it.
       const doc = {
         orm_version: "2.0",
+        model: {
+          name: "Test",
+          fact_types: [{
+            id: "ft-001",
+            name: "Test Fact",
+            roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
+            readings: ["{0} test"],
+            constraints: [{ type: "internal_uniqueness", roles: ["r-001"], is_preferred: true }],
+          }],
+        },
+      };
+      expect(validator.validateLegacyModel(doc).valid).toBe(true);
+      expect(validator.validateModel(doc).valid).toBe(false);
+    });
+
+    it("refuses a constraint without an id in 3.0", () => {
+      const doc = {
+        orm_version: "3.0",
+        model: {
+          name: "Test",
+          fact_types: [{
+            id: "ft-001",
+            name: "Test Fact",
+            roles: [{ id: "r-001", player: "ot-001", role_name: "test" }],
+            readings: ["{0} test"],
+            constraints: [{ type: "internal_uniqueness", roles: ["r-001"] }],
+          }],
+        },
+      };
+      expect(validator.validateModel(doc).valid).toBe(false);
+    });
+
+    it("rejects additional properties at the top level", () => {
+      const doc = {
+        orm_version: "3.0",
         model: { name: "Test" },
         extra: "not allowed",
       };
@@ -247,7 +283,7 @@ describe("SchemaValidator", () => {
 
     it("rejects a fact type with no roles", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [
@@ -262,7 +298,7 @@ describe("SchemaValidator", () => {
 
     it("rejects a fact type with no readings", () => {
       const doc = {
-        orm_version: "2.0",
+        orm_version: "3.0",
         model: {
           name: "Test",
           fact_types: [

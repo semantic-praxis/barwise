@@ -44,6 +44,9 @@ const CHANGE_LEVEL = {
   kind: "breaking",
   arity: "breaking",
   rolePlayer: "breaking",
+  // The identifying uniqueness is the entity's key in the relational
+  // mapping, so a different one moves the primary key (orm-format-3 WS4b).
+  preferredIdentifier: "breaking",
 
   // Which populations are legal, or what a generated schema carries. A
   // reference mode and a data type reach generated schemas; a value

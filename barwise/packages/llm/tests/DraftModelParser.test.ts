@@ -541,7 +541,10 @@ describe("DraftModelParser", () => {
       const ft = result.model.getFactTypeByName("Customer places Order");
       const uc = ft?.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(uc).toBeDefined();
-      expect(uc?.type === "internal_uniqueness" && uc.isPreferred).toBe(true);
+      // The flag is stored as the identifier of the entity its roles'
+      // opposite identify: Customer, the role it leaves uncovered.
+      const customer = result.model.getObjectTypeByName("Customer")!;
+      expect(result.model.preferredIdentifierOf(customer.id)).toBe(uc!.id);
       expect(result.constraintProvenance[0]?.applied).toBe(true);
     });
 

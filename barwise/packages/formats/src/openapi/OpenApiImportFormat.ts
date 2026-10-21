@@ -358,7 +358,6 @@ export class OpenApiImportFormat implements ImportFormat {
       constraints.push({
         type: "internal_uniqueness",
         roleIds: [role1Id],
-        isPreferred: false,
       });
 
       // Mandatory constraint if property is required
@@ -478,9 +477,12 @@ export class OpenApiImportFormat implements ImportFormat {
       const entityRoleId = generateId();
       const valueRoleId = generateId();
 
+      // A key's value-role uniqueness is the entity's preferred identifier,
+      // named on the entity once the fact type exists (orm-format-3 WS4b).
+      const identifyingId = generateId();
       const constraints: InternalConstraint[] = isKey
         ? [
-          { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
+          { id: identifyingId, type: "internal_uniqueness", roleIds: [valueRoleId] },
           { type: "internal_uniqueness", roleIds: [entityRoleId] },
           { type: "mandatory", roleId: entityRoleId },
         ]
@@ -499,6 +501,7 @@ export class OpenApiImportFormat implements ImportFormat {
         constraints,
         definition: propDef.description,
       });
+      if (isKey) model.setPreferredIdentifier(entityType.id, identifyingId);
     } catch (err) {
       warnings.push(
         `Failed to create fact type for property ${propName}: ${

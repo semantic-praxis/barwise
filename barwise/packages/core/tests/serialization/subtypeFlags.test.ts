@@ -134,17 +134,19 @@ model:
     });
   });
 
-  it("saves the constraint back as flags, and reloads to the same id", () => {
+  it("saves it as a 3.0 constraint over the subtype facts, and reloads to the same id", () => {
     const model = serializer.deserialize(yaml);
     const saved = serializer.serialize(model);
-    expect(saved).toContain("is_exclusive: true");
-    expect(saved).toContain("is_exhaustive: true");
-    expect(saved).not.toContain("subtype_facts:\n        -");
+    expect(saved).not.toContain("is_exclusive");
+    expect(saved).not.toContain("is_exhaustive");
+    expect(saved).toContain(
+      "  constraints:\n    - type: exclusive_or\n      subtype_facts:\n        - sf-m\n        - sf-f\n      id: ",
+    );
     const again = serializer.deserialize(saved);
     expect(again.constraints.map((c) => c.id)).toEqual(model.constraints.map((c) => c.id));
   });
 
-  it("saves a constraint built in code as flags, with no fact type to nest it under", () => {
+  it("saves a constraint built in code, with no fact type to nest it under", () => {
     const model = new OrmModel({ name: "People" });
     const p = model.addObjectType({ id: "p", name: "Person", kind: "entity", referenceMode: "id" });
     const m = model.addObjectType({ id: "m", name: "Male", kind: "entity", referenceMode: "id" });
