@@ -189,15 +189,19 @@ export function diffModels(
       ? "modified"
       : "unchanged";
     const named = pair.incoming ?? pair.existing!;
-    // Its fact types and roles are read against its own model, then the
-    // other, as its key is: a lenient fragment can name a role only the
-    // full model holds.
-    const model = pair.incoming ? incoming : existing;
-    const [own, other] = pair.incoming
-      ? [holders.incoming, holders.existing]
-      : [holders.existing, holders.incoming];
-    const holderOf = (id: string) => own.get(id)?.[0] ?? other.get(id)?.[0];
+    // Each role is read against its own model, then the other, as its key
+    // is: a lenient fragment can name a role only the full model holds. Its
+    // fact types are every holder of those roles, in model order (own model
+    // first), which is how validation and verbalization name its span; its
+    // role labels use the first holder. One lookup serves both, so the two
+    // cannot disagree.
+    const [ownModel, otherModel, own, other] = pair.incoming
+      ? [incoming, existing, holders.incoming, holders.existing]
+      : [existing, incoming, holders.existing, holders.incoming];
     const roleIds = roleIdsOf(named);
+    const holdersOf = (id: string) => own.get(id) ?? other.get(id) ?? [];
+    const spanned = new Set(roleIds.flatMap(holdersOf));
+    const order = [...ownModel.factTypes, ...otherModel.factTypes];
     const changes = pair.modified && pair.existing && pair.incoming
       ? [{
         change: "constraintsModified" as const,
@@ -208,13 +212,9 @@ export function diffModels(
       kind,
       elementType: "constraint",
       constraintType: named.type,
-      // As validation and verbalization name its span (every holder, in
-      // model order), from the other model when its own holds none of them.
-      factTypes: (model.factTypesOf(named).length > 0
-        ? model.factTypesOf(named)
-        : (pair.incoming ? existing : incoming).factTypesOf(named)).map((ft) => ft.name),
+      factTypes: order.filter((ft) => spanned.has(ft)).map((ft) => ft.name),
       roles: roleIds.map((id) => {
-        const holder = holderOf(id);
+        const holder = holdersOf(id)[0];
         return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;
       }),
       ...(pair.existing ? { existing: pair.existing } : {}),
