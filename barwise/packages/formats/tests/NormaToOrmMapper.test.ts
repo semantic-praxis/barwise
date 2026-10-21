@@ -410,6 +410,32 @@ describe("NormaToOrmMapper", () => {
       expect(model.preferredIdentifierOf(model.getObjectTypeByName("Customer")!.id)).toBe("_uc1");
     });
 
+    it("keeps the uniqueness a PreferredIdentifier names beside an identical IsPreferred one", () => {
+      const marked: NormaConstraint = {
+        type: "uniqueness",
+        id: "_uc0",
+        name: "UC0",
+        isInternal: true,
+        isPreferred: true,
+        roleRefs: ["_ft1_r2"],
+      };
+      const named: NormaConstraint = { ...marked, id: "_uc1", name: "UC1", isPreferred: false };
+      const doc = makeDoc({
+        entityTypes: [
+          { ...makeEntity("_et1", "Customer", "Id"), preferredIdentifier: "_uc1" },
+          makeEntity("_et2", "Order", "Number"),
+        ],
+        factTypes: [
+          makeBinaryFactType("_ft1", "CustomerPlacesOrder", "_et1", "_et2", {
+            internalConstraintRefs: ["_uc0", "_uc1"],
+          }),
+        ],
+        constraints: [marked, named],
+      });
+      const model = mapNormaToOrm(doc);
+      expect(model.preferredIdentifierOf(model.getObjectTypeByName("Customer")!.id)).toBe("_uc1");
+    });
+
     it("stores no identifier when the uniqueness is not preferred", () => {
       const uc: NormaConstraint = {
         type: "uniqueness",

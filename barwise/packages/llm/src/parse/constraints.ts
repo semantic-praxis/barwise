@@ -431,7 +431,7 @@ export function parseConstraints(
 function isDuplicateConstraint(
   model: OrmModel,
   ft: FactType,
-  candidate: Constraint,
+  candidate: Exclude<Constraint, { type: "internal_uniqueness"; }>,
 ): boolean {
   const held: readonly Constraint[] = isExternalConstraint(candidate)
     ? model.constraints

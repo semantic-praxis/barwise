@@ -858,12 +858,15 @@ export function diffDefinition(a: Definition, b: Definition): ChangeDescription[
 
 /**
  * An entity's preferred identifier, named by content: the identifying
- * fact type and the roles its uniqueness covers, or the stored id when the
- * reference identifies nothing (validation reports that). A role is named
- * by its position and its player (`playerName`, so a lenient fragment
- * names a player it takes from the other side), in position order: renaming
- * a role, or listing the uniqueness's roles in another order, leaves the
- * identifier what it was.
+ * fact type, the roles its uniqueness covers, and its modality when
+ * deontic, or the stored id when the reference identifies nothing
+ * (validation reports that). A role is named by its position and its
+ * player (`playerName`, so a lenient fragment names a player it takes from
+ * the other side), sorted by position with any repeat kept, as
+ * `constraintKey` keys a uniqueness: renaming a role, or listing the roles
+ * in another order, leaves the identifier what it was. A role id the fact
+ * type lacks is named as such rather than by its id, which two models built
+ * apart do not share.
  */
 function preferredIdentifierLabel(
   model: OrmModel,
@@ -873,13 +876,14 @@ function preferredIdentifierLabel(
   const resolved = resolvePreferredIdentifier(model, entityId);
   if (resolved.ok) {
     const { factType, constraint } = resolved.at;
-    const roles = factType.roles.flatMap((r, at) =>
-      constraint.roleIds.includes(r.id)
-        ? [`role ${at + 1}: ${playerName(model, r.playerId, other)}`]
-        : []
+    const at = (id: string) => factType.roles.findIndex((r) => r.id === id);
+    const roles = constraint.roleIds.map(at).sort((x, y) => x - y).map((i) =>
+      i < 0
+        ? "a role the fact type lacks"
+        : `role ${i + 1}: ${playerName(model, factType.roles[i]!.playerId, other)}`
     );
-    const stray = constraint.roleIds.filter((id) => !factType.hasRole(id));
-    return `"${factType.name}" (${[...roles, ...stray].join(", ")})`;
+    const modality = constraint.modality === "deontic" ? ", deontic" : "";
+    return `"${factType.name}" (${roles.join(", ")}${modality})`;
   }
   const stored = model.preferredIdentifierOf(entityId);
   return stored === undefined ? undefined : `constraint "${stored}"`;

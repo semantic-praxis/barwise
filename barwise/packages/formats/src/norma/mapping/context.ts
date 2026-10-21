@@ -41,6 +41,8 @@ export interface NormaMappingContext {
   readonly xorPairs: ExclusiveOrPairs;
   /** The one place a mapped constraint gets its id. */
   readonly constraintIds: ConstraintIdAllocator;
+  /** Every constraint id an entity's PreferredIdentifier names. */
+  readonly namedIdentifiers: ReadonlySet<string>;
 }
 
 /**

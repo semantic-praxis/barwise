@@ -98,6 +98,9 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
     processedRefs: collectProcessedRefs(doc),
     xorPairs,
     constraintIds: createConstraintIdAllocator(doc, xorPairs),
+    namedIdentifiers: new Set(
+      [...doc.entityTypes, ...doc.objectifiedTypes].flatMap((et) => et.preferredIdentifier ?? []),
+    ),
   };
 
   mapObjectTypes(ctx);
