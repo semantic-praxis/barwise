@@ -577,6 +577,12 @@
       "caught_by": "reasoning",
       "note": "Code review on PR #684 found the unheld-fact-type path in constraintsTouching wrong three ways across two rounds; it was dropped rather than patched again."
     },
+    "orm-format-3::273a7981c0d9": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "## open decisions (1 to 9 resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18; 10 settled at grounding on 2026-10-21, keeping the draft's plan",
+      "caught_by": "reasoning",
+      "note": "WS4 grounding first split WS4 into three PRs; code review of that draft traced 2.0 content lost both ways between them, so decision 10 settled on the draft plan, one PR in three commits. The grounding also corrected the reader count (nine, not five), the subtype corpus split (six and eight), the DDL v1-only reader and NORMA dropping PreferredIdentifier."
+    },
     "orm-format-3::5f6ecfc2e469": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
@@ -595,12 +601,6 @@
       "caught_by": "execution",
       "note": "Counting through the loader instead of matching role ids as text gave 26 constraints off their first holder in 17 files, not 27 in 18."
     },
-    "orm-format-3::8550101822a5": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "ws4 lands as three prs, and only the last changes the file format (open decision 10). the draft kept ws4 in one pr so that no build between prs could save a 2.0",
-      "caught_by": "reasoning",
-      "note": "Grounding WS4 against the code: the one-PR plan guarded against a 2.0 save losing in-memory state, which holds only for states a 2.0 file cannot express; with every writer using the 2.0 loader rule, 4a and 4b can land first. Measured readers (nine, not five), the two flag conventions and the DDL v1-only reader came from code reads."
-    },
     "orm-format-3::8b1e291984ea": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "cli, mcp, promptlab, code-analysis and diagram-ui do not read the getter, though cli, mcp and vscode read a host through core outputs that change (below). the d",
@@ -612,12 +612,6 @@
       "excerpt": "the draft put all of this in one pr. the split costs a little: until 3c, ormmodel.constraints walks the fact types on every read, so a rule that calls constrain",
       "caught_by": "reasoning",
       "note": "Grounding the reader sites showed one PR would touch 43 source files, tens of test files and every host-naming output; the split keeps the compile-time check in 3c."
-    },
-    "orm-format-3::bbf730bb66b8": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "10. ws4 in one pr, or three -- open; recommended: three, as ws4 is written. raised by ws4's grounding (2026-10-21). - (a) three prs: the preferred-identifier re",
-      "caught_by": "reasoning",
-      "note": "The open decision that records the split above; the draft had settled WS4 as one PR without an open decision."
     },
     "orm-format-3::c99682fde87a": {
       "spec": "orm-format-3.spec.md",
