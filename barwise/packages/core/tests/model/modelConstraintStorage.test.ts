@@ -88,12 +88,13 @@ describe("constraints across fact types on the model", () => {
     expect(model.constraints).toEqual([]);
   });
 
-  it("drops one with a fact type it touches, wherever a file nested it", () => {
-    // Nested under ft-nr; removing ft-in, which it also touches, used to
-    // leave it dangling.
-    const model = rooms([key]);
+  it("drops one with the fact type holding all its roles, and keeps one spanning another", () => {
+    // The key also spans ft-nr, so it stays with its ft-in role dangling,
+    // for validation to report; the exclusion lies wholly in ft-in.
+    const inside: Constraint = { id: "c-inside", type: "exclusion", roleIds: ["r-room-in", "r-b"] };
+    const model = rooms([key, inside]);
     model.removeFactType("ft-in");
-    expect(model.constraints).toEqual([]);
+    expect(model.constraints.map((c) => c.id)).toEqual(["c-key"]);
   });
 });
 

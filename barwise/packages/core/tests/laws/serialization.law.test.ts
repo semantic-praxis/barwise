@@ -95,6 +95,12 @@ describe("law: serialization is lossless", () => {
 
         expect(objectTypeProjections(restored)).toEqual(objectTypeProjections(model));
         expect(factTypeProjections(restored)).toEqual(factTypeProjections(model));
+        // The constraints across fact types, which no fact type's projection
+        // holds since the model stores them (orm-format-3 WS3c). By id: the
+        // 2.0 save groups them under their first holders, so the order can
+        // change and the content may not.
+        const byId = (m: OrmModel) => [...m.constraints].sort((a, b) => a.id!.localeCompare(b.id!));
+        expect(byId(restored)).toEqual(byId(model));
       }),
       { seed: SEED, numRuns: RUNS },
     );

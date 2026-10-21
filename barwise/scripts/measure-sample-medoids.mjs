@@ -11,9 +11,12 @@
  *
  *   npm run measure:sample-medoids -- <llm dist dir> [payload dir]
  *
- * Prints one JSON object keyed by case: samples, the medoid's index, the
- * number of disagreements and of stable elements. A payload that does not
- * parse is skipped, so the sample count is part of the answer.
+ * Prints one JSON object keyed by case: samples, the medoid's index and the
+ * payload it came from, the number of disagreements and of stable elements.
+ * A payload that does not parse is skipped, so the sample count is part of
+ * the answer. A case's samples are every recorded run of it, across arms,
+ * models and dates: a coarse sample, but the same one on both sides of the
+ * comparison, which is what the comparison asks of it.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -50,9 +53,11 @@ for (const f of files) {
 const report = {};
 for (const [name, paths] of [...byCase].sort(([a], [b]) => a.localeCompare(b))) {
   const models = [];
+  const used = [];
   for (const p of paths) {
     try {
       models.push(parseDraftModel(JSON.parse(fs.readFileSync(p, "utf8")), name).model);
+      used.push(path.relative(payloadRoot, p));
     } catch {
       // Skipped: the sample count reports it.
     }
@@ -62,6 +67,7 @@ for (const [name, paths] of [...byCase].sort(([a], [b]) => a.localeCompare(b))) 
   report[name] = {
     samples: models.length,
     medoid: agreement.medoidIndex,
+    medoidPayload: used[agreement.medoidIndex],
     disagreements: agreement.disagreements.length,
     stable: agreement.stable,
   };

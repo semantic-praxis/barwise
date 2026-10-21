@@ -201,8 +201,13 @@ export function diffModels(
       elementType: "constraint",
       constraintType: named.type,
       factTypes: model.factTypesOf(named).map((ft) => ft.name),
+      // Resolved against its own model, then the other, as its key is: a
+      // lenient fragment can name a role only the full model holds.
       roles: roleIdsOf(named).map((id) => {
-        const holder = model.factTypes.find((ft) => ft.hasRole(id));
+        const [own, other] = pair.incoming
+          ? [holders.incoming, holders.existing]
+          : [holders.existing, holders.incoming];
+        const holder = own.get(id)?.[0] ?? other.get(id)?.[0];
         return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;
       }),
       ...(pair.existing ? { existing: pair.existing } : {}),

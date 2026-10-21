@@ -274,8 +274,11 @@ export function elementName(delta: ModelDelta): string {
     // constraint's own order: two constraints of one kind over the same
     // fact types differ in their roles, or the review panel would offer two
     // identical checkboxes, as it did for populations.
-    case "constraint":
-      return `${delta.constraintType.replace(/_/g, " ")} over ${delta.roles.join(", ")}`;
+    case "constraint": {
+      const shown = delta.incoming ?? delta.existing;
+      const modality = shown?.modality === "deontic" ? " (deontic)" : "";
+      return `${delta.constraintType.replace(/_/g, " ")}${modality} over ${delta.roles.join(", ")}`;
+    }
     // The flag is part of the identity, so it belongs in the name. The
     // description is NOT part of the identity -- it is prose, and keying
     // on it would turn a rewording into a delete plus an insert -- but

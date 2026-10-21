@@ -449,10 +449,12 @@ export class OrmModel {
     }
 
     this._factTypes.delete(id);
-    // A constraint across fact types that touches the removed fact type
-    // cannot hold any more, wherever a 2.0 file nested it; it used to go
-    // only when nested here, and stay dangling when nested elsewhere.
-    for (const c of this._constraints.filter((c) => holdsAny(ft, roleIdsOf(c)))) {
+    // A constraint across fact types every role of which was here goes with
+    // it. One that also spans another fact type stays, its roles here now
+    // dangling, so validation reports it rather than a rule over the fact
+    // types still present disappearing without a word; it used to go only
+    // when a 2.0 file nested it here.
+    for (const c of this._constraints.filter((c) => roleIdsOf(c).every((r) => ft.hasRole(r)))) {
       this.removeConstraint(c);
     }
     this.pruneDiagramReferences(id);

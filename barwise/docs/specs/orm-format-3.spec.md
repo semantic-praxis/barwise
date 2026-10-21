@@ -1281,9 +1281,11 @@ Implementation notes (2026-10-21, WS3c-ii):
     `OrmModel.addConstraint`, narrows `FactType.addConstraint` and
     `FactTypeConfig.constraints` to the internal kinds, removes the
     forward, and lands the type test.
-  - `removeFactType` drops every constraint across fact types touching
-    the removed fact type. Before, one went only when nested there, and
-    one nested elsewhere was left dangling.
+  - `removeFactType` drops a constraint across fact types every role of
+    which was in the removed fact type. One that also spans another stays,
+    its roles there dangling, so validation reports it; before, one went
+    when nested there whatever else it spanned, and one nested elsewhere
+    stayed.
   - The 2.0 save writes each under the first fact type, in model order,
     holding one of its roles, after that fact type's own constraints. One
     none of whose roles is in a fact type goes under the first fact type:
@@ -1291,6 +1293,10 @@ Implementation notes (2026-10-21, WS3c-ii):
     merge carries one through, so a refusal would fail the save of every
     model holding one, `barwise import transcript` and MCP's merge
     included. Only a model with no fact type refuses, naming the id.
+    A model whose file nests one off its first holder, or lists one
+    before its host's own, therefore saves to different text unchanged,
+    once, and `hashModel` (lineage) reads that as a model change: an
+    export recorded before the upgrade reads stale until re-exported.
     `factTypeLayout.test.ts` changed order only: its fixture interleaved
     the two kinds in one list. One promptlab reference
     (`vendor-onboarding`) moved one subset to its first holder.
@@ -1321,7 +1327,9 @@ Implementation notes (2026-10-21, WS3c-ii):
     decided; the two are stored apart.
   - Sample agreement: measured with `npm run measure:sample-medoids`
     against an llm build of the base commit and of this change, over the
-    192 recorded payloads of the 10 eval cases. No case's medoid or
+    192 recorded payloads of the 10 eval cases, each case's samples
+    being every recorded run of it across arms, models and dates. No
+    case's medoid or
     disagreement count moved. The disagreement report still covers
     object types and fact types only, so a disagreement on a constraint
     across fact types is counted toward the medoid but not reported

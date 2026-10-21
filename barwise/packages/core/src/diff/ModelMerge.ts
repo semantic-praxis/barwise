@@ -27,7 +27,7 @@ import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
-import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
+import { isDanglingFactType, isDanglingPlayer, roleHolders } from "./elementDiff.js";
 import type {
   ConstraintDelta,
   DefinitionDelta,
@@ -199,9 +199,8 @@ export function mergeModels(
     .map((d, i) => [d, i] as const)
     .filter(([d]) => d.elementType === "constraint") as [ConstraintDelta, number][];
 
-  const rolesOf = (m: OrmModel) => new Set(m.factTypes.flatMap((ft) => ft.roles.map((r) => r.id)));
-  const mergedRoles = rolesOf(merged);
-  const sourceRoles = new Set([...rolesOf(existing), ...rolesOf(incoming)]);
+  const mergedRoles = roleHolders(merged);
+  const sourceRoles = new Set([...roleHolders(existing).keys(), ...roleHolders(incoming).keys()]);
   for (const [delta, idx] of constraintDeltas) {
     const isAccepted = accepted.has(idx);
     // In order of preference: an accepted modification whose incoming
@@ -706,12 +705,12 @@ function resolveFactTypeId(
 
 /**
  * Remap ids inside constraints from the source model's id space to the
- * merged model's id space. Role ids are preserved verbatim by the merge
- * (every fact type keeps its source role ids), so role references pass
- * through. The one id space the merge does rewrite is object types --
- * matched-by-name elements keep the existing model's id -- so join
- * constraints, whose operand paths carry a root object-type id, remap
- * that root here.
+ * merged model's id space, for object types: matched-by-name elements
+ * keep the existing model's id, so join constraints, whose operand paths
+ * carry a root object-type id, remap that root here. Role ids are the
+ * caller's: a fact type keeps its source role ids, so its own constraints
+ * pass through, and phase 2b translates a constraint across fact types
+ * first (`mapRoleIds`), since its roles may come from another source.
  */
 function remapConstraintIds<C extends import("../model/Constraint.js").Constraint>(
   constraints: readonly C[],
