@@ -253,7 +253,8 @@ export function diffFactType(
 
   // Constraints -- pass both role arrays and both models' role-holder
   // indexes, so constraintKey can resolve role IDs to positions (stable
-  // across LLM re-extractions and imports).
+  // across LLM re-extractions and imports), or, for a pair joined by its
+  // constraint id, to the role ids themselves (see `roleKeys`).
   const constraintDiff = diffConstraints(
     a.constraints,
     b.constraints,
@@ -384,12 +385,15 @@ export function roleHolders(model: OrmModel): RoleHolders {
  *
  * `byId` is for a constraint already paired by its own id, and only
  * then: a role both models hold, once each, is keyed by its id and its
- * holder's name. The pair's id already says the two are one constraint,
+ * holder's id. The pair's id already says the two are one constraint,
  * so its roles' ids are evidence, and position would misread them: a
  * role swap moved the key of a constraint nothing touched, and a
  * constraint moved onto the role that took the old position kept its key
- * (orm-format-3 WS3a-iii review). The holder's name is in the key so a
- * role moved to another fact type still reads as a change. The content
+ * (orm-format-3 WS3a-iii review). Position is deliberately absent: a role
+ * reordered within its fact type is the same role, and the fact type's
+ * own `rolePlayer` and `roleName` changes report the reorder. The
+ * holder's id, not its name, is in the key, so a role moved to another
+ * fact type reads as a change and a holder renamed does not. The content
  * pass never keys by id: it pairs constraints whose ids say nothing, and
  * keying by role id there would let a coincidental role id pair two
  * different constraints, which is what content matching exists to rule
@@ -416,7 +420,7 @@ function roleKeys(
     const mine = holders.get(id);
     const theirs = otherHolders.get(id);
     if (byId && mine?.length === 1 && theirs?.length === 1) {
-      return `i${JSON.stringify([id, mine[0]!.name])}`;
+      return `i${JSON.stringify([id, mine[0]!.id])}`;
     }
     const homes = mine ?? theirs ?? [];
     if (homes.length !== 1) return raw(id);
@@ -538,11 +542,6 @@ function diffConstraints(
 
   const idxMapA = roleKeys(rolesA, holdersA, holdersB);
   const idxMapB = roleKeys(rolesB, holdersB, holdersA);
-  const keyA = new Map(a.map((c) => [c, constraintKey(c, idxMapA)]));
-  const keyB = new Map(b.map((c) => [c, constraintKey(c, idxMapB)]));
-  // The key for comparing a pair joined by id; see `roleKeys`.
-  const pairMapA = roleKeys(rolesA, holdersA, holdersB, true);
-  const pairMapB = roleKeys(rolesB, holdersB, holdersA, true);
 
   // Pair by id first, where an id names exactly one constraint in each
   // model. An id given twice anywhere in a model (barwise-b2s) pairs
@@ -552,6 +551,9 @@ function diffConstraints(
   const paired = new Set<Constraint>();
   const modified: { from: Constraint; to: Constraint; }[] = [];
   if (pairing.matching === "id-first") {
+    // The key for comparing a pair joined by id; see `roleKeys`.
+    const pairMapA = roleKeys(rolesA, holdersA, holdersB, true);
+    const pairMapB = roleKeys(rolesB, holdersB, holdersA, true);
     const byIdB = new Map(
       b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
     );
@@ -568,11 +570,13 @@ function diffConstraints(
   const restA = a.filter((c) => !paired.has(c));
   const restB = b.filter((c) => !paired.has(c));
 
-  const keysA = new Set(restA.map((c) => keyA.get(c)));
-  const keysB = new Set(restB.map((c) => keyB.get(c)));
+  const keyA = new Map(restA.map((c) => [c, constraintKey(c, idxMapA)]));
+  const keyB = new Map(restB.map((c) => [c, constraintKey(c, idxMapB)]));
+  const keysA = new Set(keyA.values());
+  const keysB = new Set(keyB.values());
 
-  const added = restB.filter((c) => !keysA.has(keyB.get(c)));
-  const removed = restA.filter((c) => !keysB.has(keyA.get(c)));
+  const added = restB.filter((c) => !keysA.has(keyB.get(c)!));
+  const removed = restA.filter((c) => !keysB.has(keyA.get(c)!));
 
   // The constraints themselves, copied: the prose renders only their
   // deduplicated type names, and that was the whole of what a consumer

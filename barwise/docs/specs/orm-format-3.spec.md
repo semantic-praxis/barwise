@@ -1065,7 +1065,7 @@ Implementation notes (2026-10-19):
     second. That needs a stated id equal to another constraint's
     derivation; it is not handled in 3a.
   - A pair joined by id is compared with a key that reads each role both
-    models hold, once each, by its id and its holder's name; the content
+    models hold, once each, by its id and its holder's id; the content
     pass keeps the positional key. By position, a role swap under
     unchanged ids moved the key of a constraint nothing touched, and a
     constraint moved onto the role that took the old position kept its

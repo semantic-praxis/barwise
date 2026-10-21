@@ -158,7 +158,7 @@ describe("what id-first pairing reads", () => {
     ]);
   });
 
-  it("reports nothing when the key moves but the constraint itself is unchanged", () => {
+  it("reports nothing for an id-joined pair whose roles only swapped places", () => {
     // The fact type's roles swap places under the same ids. By position the
     // constraint's role moved; a pair joined by id reads its role by id,
     // and the role it names is the one it named before.
@@ -282,30 +282,40 @@ describe("which key reads a role", () => {
     ]);
   });
 
-  it("reads a role moved to another fact type as a change of a pair joined by id", () => {
-    // An external uniqueness hosted on "Person drives Car" spans r-1 and a
-    // role of a second fact type; that role keeps its id and moves from
-    // "Person owns Car" to "Person rents Car".
-    const twoFacts = (second: string) => {
-      const m = drives([]);
+  /**
+   * Person drives Car, Person owns Car (ft-2) and Person rents Car (ft-3),
+   * with an external uniqueness on "drives" spanning r-2 and r-4; `r4Host`
+   * holds r-4, the other holds r-5, and ft-2 is named `ft2Name`.
+   */
+  const threeFacts = (r4Host: "ft-2" | "ft-3", ft2Name = "Person owns Car") => {
+    const m = drives([]);
+    for (const [id, name] of [["ft-2", ft2Name], ["ft-3", "Person rents Car"]] as const) {
       m.addFactType({
-        id: "ft-2",
-        name: second,
+        id,
+        name,
         roles: [
-          { id: "r-3", name: "x", playerId: "ot-p" },
-          { id: "r-4", name: "y", playerId: "ot-c" },
+          { id: `${id}-p`, name: "x", playerId: "ot-p" },
+          { id: r4Host === id ? "r-4" : "r-5", name: "y", playerId: "ot-c" },
         ],
         readings: ["{0} x {1}"],
       });
-      m.getFactType("ft-d")!.addConstraint({
-        id: "eu-1",
-        type: "external_uniqueness",
-        roleIds: ["r-2", "r-4"],
-      });
-      return m;
-    };
-    expect(constraintChanges(twoFacts("Person owns Car"), twoFacts("Person rents Car")))
+    }
+    m.getFactType("ft-d")!.addConstraint({
+      id: "eu-1",
+      type: "external_uniqueness",
+      roleIds: ["r-2", "r-4"],
+    });
+    return m;
+  };
+
+  it("reads a role moved to another fact type as a change of a pair joined by id", () => {
+    expect(constraintChanges(threeFacts("ft-2"), threeFacts("ft-3")))
       .toEqual([["constraintsModified", [["eu-1", "eu-1"]]]]);
+  });
+
+  it("reads a renamed holder as no change of a pair joined by id", () => {
+    expect(constraintChanges(threeFacts("ft-2"), threeFacts("ft-2", "Person leases Car")))
+      .toEqual([]);
   });
 });
 
