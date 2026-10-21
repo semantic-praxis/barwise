@@ -50,7 +50,10 @@ function composite(model: OrmModel) {
         // resolves nowhere, which shows as "?" rather than dropping out.
         && c.roleIds.some((id) => playerOf.has(id) || !anyRole.has(id))
       )
-        .map((c) => c.roleIds.map((id) => playerOf.get(id) ?? "?").sort()),
+        // A role elsewhere in the model and one that resolves nowhere differ.
+        .map((c) =>
+          c.roleIds.map((id) => playerOf.get(id) ?? (anyRole.has(id) ? "(other)" : "?")).sort()
+        ),
     ),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
   };
