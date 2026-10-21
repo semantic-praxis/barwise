@@ -577,6 +577,18 @@
       "caught_by": "reasoning",
       "note": "Code review on PR #684 found the unheld-fact-type path in constraintsTouching wrong three ways across two rounds; it was dropped rather than patched again."
     },
+    "orm-format-3::4b8c3c16bdc4": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "10. land 4a ahead of the format -- open; recommended: yes. raised by ws4's grounding (2026-10-21). the draft planned ws4 as one pr. - (a) recommended. 4a, the n",
+      "caught_by": "reasoning",
+      "note": "Open decision raised by WS4 grounding: the draft planned one PR; 4a ahead stores nothing new, so the draft guarantee holds. Left open for the owner, with the rejected storage split recorded as option (c)."
+    },
+    "orm-format-3::5bb2cdde76e1": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "ws4 is two prs: 4a changes only how the preferred identifier is read, and 4b changes what is stored and the file format (open decision 10). the draft kept ws4 i",
+      "caught_by": "reasoning",
+      "note": "WS4 grounding against the code, then three code-review rounds of the grounding. A first split (storing the reference and subtype constraints ahead of the format, written back to 2.0 flags) was traced to lose content both ways; the split that stands moves only the read side (4a) ahead. Also corrected: nine identifier readers not five, six/eight subtype groups, DDL v1-only reader, NORMA discarding PreferredIdentifier, roleIdsOf callers, splitModel and model.constraints, the multiple-identifier diagnostic, decision 8 key-move conflict (decision 11)."
+    },
     "orm-format-3::5f6ecfc2e469": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
