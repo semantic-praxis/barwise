@@ -2,6 +2,7 @@ import {
   IDENTIFICATION_SOURCE_LABEL,
   type IdentificationSource,
   identificationSources,
+  preferredIdentifiers,
 } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
@@ -169,6 +170,11 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
   }
   const countOf = (id: string, kind: IdentificationSource["kind"]): number =>
     (sourcesOf.get(id) ?? []).filter((s) => s.kind === kind).length;
+  // Whether a flag identifies this entity is `preferredIdentifiers`'
+  // answer, as every other reader takes it: a flag that names another
+  // entity, or names none, does not identify this one. The MULTIPLE arm
+  // keeps counting the flags themselves, which is what it reports.
+  const identifiers = preferredIdentifiers(model);
 
   /**
    * Is this entity identified, directly or through its subtype chain?
@@ -182,7 +188,8 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
     if (seen.has(id)) return false; // subtype cycle: structural rule reports it
     seen.add(id);
     const sources = sourcesOf.get(id) ?? [];
-    if (sources.some((s) => s.kind !== "identifying-subtype")) return true;
+    if (identifiers.byEntity.has(id)) return true;
+    if (sources.some((s) => s.kind === "objectification")) return true;
     return sources.some(
       (s) => s.kind === "identifying-subtype" && isIdentified(s.supertypeId, seen),
     );
@@ -192,12 +199,14 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
     if (ot.kind !== "entity") continue;
     const preferredCount = countOf(ot.id, "preferred-uniqueness");
 
-    if (preferredCount === 0 && !isIdentified(ot.id, new Set())) {
-      diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));
-    } else if (preferredCount > 1) {
+    // Two flags first: they are what the modeller has to fix, whether or
+    // not either one resolves to an identifier.
+    if (preferredCount > 1) {
       diagnostics.push(
         report(RULE_ID.multiplePreferredIdentifiers, "default", ot.id, ot.name, preferredCount),
       );
+    } else if (!isIdentified(ot.id, new Set())) {
+      diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));
     }
   }
 

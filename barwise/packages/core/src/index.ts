@@ -90,7 +90,12 @@ export {
   uuidv7FromParts,
   type Uuidv7Sources,
 } from "./model/id.js";
-export { type IdentifyingUniqueness, preferredIdentifiers } from "./model/identification.js";
+export {
+  type IdentifyingUniqueness,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+  preferredIdentifyingBinary,
+} from "./model/identification.js";
 export { ModelElement } from "./model/ModelElement.js";
 export {
   ObjectifiedFactType,

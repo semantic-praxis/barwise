@@ -124,16 +124,15 @@ export function renderPopulationAsOpenApiExamples(
 
     // The binary that identifies the entity, when its identifier is one.
     const identifying = identifiers.byEntity.get(objectType.id)?.factType;
-    const idFactTypes = identifying && identifying.roles.length === 2
-        && identifying.roles.some((r) => r.playerId === objectType.id)
-      ? [identifying]
-      : [];
-    if (idFactTypes.length === 0) {
+    if (
+      !identifying || identifying.roles.length !== 2
+      || !identifying.roles.some((r) => r.playerId === objectType.id)
+    ) {
       continue;
     }
 
-    // Get populations for identifier fact types
-    for (const idFactType of idFactTypes) {
+    // Get populations for the identifier fact type
+    for (const idFactType of [identifying]) {
       const populations = model.populationsForFactType(idFactType.id);
       if (populations.length === 0) {
         continue;

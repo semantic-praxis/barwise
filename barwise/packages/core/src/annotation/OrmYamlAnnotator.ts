@@ -22,7 +22,7 @@
  * idempotent via stripBarwiseComments().
  */
 
-import { preferredIdentifiers } from "../model/identification.js";
+import { type PreferredIdentifiers, preferredIdentifiers } from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import {
   type AnnotationSeverity,
@@ -381,7 +381,7 @@ function collectStructuralGaps(
  */
 function hasPreferredIdentifier(
   entity: import("../model/ObjectType.js").ObjectType,
-  identifiers: ReturnType<typeof preferredIdentifiers>,
+  identifiers: PreferredIdentifiers,
 ): boolean {
   return identifiers.byEntity.has(entity.id);
 }

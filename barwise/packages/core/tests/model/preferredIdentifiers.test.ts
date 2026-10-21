@@ -60,6 +60,32 @@ describe("preferredIdentifiers", () => {
     expect(preferredIdentifiers(model).byConstraint.has("u-c")).toBe(false);
   });
 
+  it("takes the flagged uniqueness when it is itself on the value's role", () => {
+    // A second uniqueness on the same role, listed first, must not take
+    // the place of the one the modeller flagged.
+    const model = customer([
+      { ...uc("u-other", ["r-nr"]), modality: "deontic" },
+      uc("u-nr", ["r-nr"], true),
+    ]);
+    expect(identifierOf(model, "ot-c")).toBe("u-nr");
+  });
+
+  it("does not let a ring binary identify its player by itself", () => {
+    const model = new OrmModel({ name: "Family" });
+    model.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+    model.addFactType({
+      id: "ft-parent",
+      name: "Person is parent of Person",
+      roles: [
+        { id: "r-parent", name: "is parent of", playerId: "ot-p" },
+        { id: "r-child", name: "is child of", playerId: "ot-p" },
+      ],
+      readings: ["{0} is parent of {1}"],
+      constraints: [uc("u-parent", ["r-parent"], true)],
+    });
+    expect(identifierOf(model, "ot-p")).toBeUndefined();
+  });
+
   it("reads an entity-entity binary's flag as identifying the uncovered role's player", () => {
     const model = new OrmModel({ name: "Rooms" });
     model.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
@@ -117,6 +143,13 @@ describe("preferredIdentifiers", () => {
       }
       return model;
     }
+
+    it("is not identified by a flagged uniqueness over fewer than all but one role", () => {
+      // One role of three cannot identify a ternary's objectification; the
+      // flag falls to the rule for the roles it leaves uncovered, which are
+      // played by two entity types, so it names nobody.
+      expect(identifierOf(signing(["r-c"]), "ot-s")).toBeUndefined();
+    });
 
     it("is identified by its flagged spanning uniqueness", () => {
       expect(identifierOf(signing(["r-c", "r-a", "r-o"]), "ot-s")).toBe("u-sign");

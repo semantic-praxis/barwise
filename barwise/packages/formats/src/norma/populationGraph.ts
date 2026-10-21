@@ -17,7 +17,9 @@
 import {
   type ObjectType,
   type OrmModel,
+  type PreferredIdentifiers,
   preferredIdentifiers,
+  preferredIdentifyingBinary,
   referenceModeOf,
 } from "@barwise/core";
 import { derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
@@ -60,7 +62,7 @@ interface IdentifyingSeat {
 
 export function buildPopulationGraph(
   model: OrmModel,
-  identifiers: ReturnType<typeof preferredIdentifiers> = preferredIdentifiers(model),
+  identifiers: PreferredIdentifiers = preferredIdentifiers(model),
 ): PopulationGraph {
   const graph: PopulationGraph = {
     valueInstancesByOwner: new Map(),
@@ -134,8 +136,8 @@ export function buildPopulationGraph(
     if (existing) return existing;
     let seat = seatByEntity.get(entity.id);
     if (!seat) {
-      seat = findIdentifyingSeat(model, entity.id, identifiers)
-        ?? synthesizeExpansion(graph, entity);
+      seat = findIdentifyingSeat(model, entity, identifiers)
+        ?? synthesizeExpansion(graph, entity, identifiers.byEntity.has(entity.id));
       seatByEntity.set(entity.id, seat);
     }
     const valueInstanceId = internValueInstance(seat.valueTypeId, value);
@@ -198,28 +200,20 @@ export function buildPopulationGraph(
 }
 
 /**
- * The model's explicit identifying seat for an entity: the binary that
- * identifies it (`preferredIdentifiers`), when that is a single-role
- * uniqueness on a value-typed role with the entity on the other role.
+ * The model's explicit identifying seat for an entity: the binary to a
+ * value type that identifies it (core's `preferredIdentifyingBinary`).
  */
 function findIdentifyingSeat(
   model: OrmModel,
-  entityId: string,
-  identifiers: ReturnType<typeof preferredIdentifiers>,
+  entity: ObjectType,
+  identifiers: PreferredIdentifiers,
 ): IdentifyingSeat | undefined {
-  const at = identifiers.byEntity.get(entityId);
-  if (!at || at.factType.roles.length !== 2 || at.constraint.roleIds.length !== 1) {
-    return undefined;
-  }
-  const ft = at.factType;
-  const valueRole = ft.roles.find((r) => r.id === at.constraint.roleIds[0]);
-  const entityRole = ft.roles.find((r) => r.id !== at.constraint.roleIds[0]);
-  if (!valueRole || !entityRole || entityRole.playerId !== entityId) return undefined;
-  const player = model.getObjectType(valueRole.playerId);
-  if (player?.kind !== "value") return undefined;
+  const binary = preferredIdentifyingBinary(model, entity, identifiers);
+  if (!binary) return undefined;
+  const valueRole = binary.factType.roles.find((r) => r !== binary.entityRole)!;
   return {
     valueRoleId: toNormaId(valueRole.id),
-    valueTypeId: toNormaId(player.id),
+    valueTypeId: toNormaId(binary.valuePlayer.id),
   };
 }
 
@@ -227,11 +221,16 @@ function findIdentifyingSeat(
  * Synthesize the reference-scheme expansion NORMA persists for an
  * identified entity: the injected value type, the identifying fact, its
  * preferred uniqueness (value role) plus uniqueness + simple mandatory
- * (entity role), and the PreferredIdentifier link.
+ * (entity role), and the PreferredIdentifier link. An entity the model
+ * already identifies some other way (an n-ary or entity-entity
+ * uniqueness) still needs a seat for its instance values, but keeps its
+ * own PreferredIdentifier, so the synthesized uniqueness is not marked
+ * preferred and no link is recorded for it.
  */
 function synthesizeExpansion(
   graph: PopulationGraph,
   entity: ObjectType,
+  identified: boolean,
 ): IdentifyingSeat {
   const base = toNormaId(entity.id);
   const valueTypeId = derivedNormaId(base, "_idvt");
@@ -284,7 +283,7 @@ function synthesizeExpansion(
       id: preferredUcId,
       name: "",
       isInternal: true,
-      isPreferred: true,
+      isPreferred: !identified,
       roleRefs: [valueRoleId],
     },
     {
@@ -304,7 +303,7 @@ function synthesizeExpansion(
       roleRefs: [entityRoleId],
     },
   );
-  graph.syntheticPreferredIdByEntity.set(base, preferredUcId);
+  if (!identified) graph.syntheticPreferredIdByEntity.set(base, preferredUcId);
   graph.extraPlayedRolesByOwner.set(entity.id, [entityRoleId]);
 
   return { valueRoleId, valueTypeId };

@@ -11,7 +11,7 @@ import { type Constraint, isMandatoryRole } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import { type ModelGraph, requireGraph } from "../model/graph.js";
-import { preferredIdentifiers } from "../model/identification.js";
+import { type PreferredIdentifiers, preferredIdentifiers } from "../model/identification.js";
 import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
@@ -77,7 +77,7 @@ export function queryModel(model: OrmModel, query: ModelQuery): QueryResult {
  */
 class QueryContext {
   private readonly verbalizer = new Verbalizer();
-  private identifiers: ReturnType<typeof preferredIdentifiers> | undefined;
+  private identifiers: PreferredIdentifiers | undefined;
 
   constructor(
     private readonly model: OrmModel,
@@ -421,8 +421,11 @@ class QueryContext {
     const identifying = this.identifiers.byEntity.get(entity.id);
     const preferredIdentifier: EntityAnchors["preferredIdentifier"] = identifying && {
       factType: identifying.factType.name,
+      // The roles the uniqueness covers: for an objectified type
+      // identified by all but one role, the uncovered one identifies
+      // nothing.
       identifierTypes: identifying.factType.roles
-        .filter((r) => r.playerId !== entity.id)
+        .filter((r) => identifying.constraint.roleIds.includes(r.id) && r.playerId !== entity.id)
         .map((r) => this.graph.player(r).name),
     };
     const mandatoryFactTypes = new Set<string>();

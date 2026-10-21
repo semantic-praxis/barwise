@@ -38,13 +38,13 @@ describe("completenessWarnings", () => {
       .withBinaryFactType("Customer has CustomerId", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "is of" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .withBinaryFactType("Order has OrderNumber", {
         role1: { player: "Order", name: "has" },
         role2: { player: "OrderNumber", name: "is of" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .withBinaryFactType("Customer places Order", {
@@ -422,6 +422,7 @@ describe("completenessWarnings", () => {
         readings: ["{0} has {1}", "{1} identifies {0}"],
         constraints: [
           { type: "internal_uniqueness", roleIds: ["p1"], isPreferred: true },
+          { type: "internal_uniqueness", roleIds: ["p2"] },
         ] as never,
       });
       const employee = model.addObjectType({
@@ -484,6 +485,27 @@ describe("completenessWarnings", () => {
       ).toBe(true);
     });
 
+    it("reports an entity whose only flag identifies nothing, as every other reader does", () => {
+      // order-management's Customer: the flag is on Customer's role and no
+      // uniqueness covers Name's, so a Name could belong to two customers
+      // and identify neither (preferredIdentifiers, orm-format-3 WS4a).
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .withValueType("Name", { dataType: { name: "text" } })
+        .withBinaryFactType("Customer has Name", {
+          role1: { player: "Customer", name: "has" },
+          role2: { player: "Name", name: "is of" },
+          uniqueness: "role1",
+          isPreferred: true,
+        })
+        .build();
+      const missing = completenessWarnings(model)
+        .filter((d) => d.ruleId === "completeness/missing-preferred-identifier");
+      expect(missing.map((d) => d.message)).toEqual([
+        expect.stringContaining('"Customer"'),
+      ]);
+    });
+
     it("does not report entity types with a preferred identifier", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("Customer", {
@@ -497,7 +519,7 @@ describe("completenessWarnings", () => {
         .withBinaryFactType("Customer has CustomerId", {
           role1: { player: "Customer", name: "has" },
           role2: { player: "CustomerId", name: "is of" },
-          uniqueness: "role1",
+          uniqueness: "both",
           isPreferred: true,
         })
         .build();
@@ -526,13 +548,13 @@ describe("completenessWarnings", () => {
         .withBinaryFactType("Customer has CustomerId", {
           role1: { player: "Customer", name: "has" },
           role2: { player: "CustomerId", name: "is of" },
-          uniqueness: "role1",
+          uniqueness: "both",
           isPreferred: true,
         })
         .withBinaryFactType("Customer has ExternalCode", {
           role1: { player: "Customer", name: "has" },
           role2: { player: "ExternalCode", name: "is of" },
-          uniqueness: "role1",
+          uniqueness: "both",
           isPreferred: true,
         })
         .build();
@@ -557,7 +579,7 @@ describe("completenessWarnings", () => {
         .withBinaryFactType("Customer has Name", {
           role1: { player: "Customer", name: "has" },
           role2: { player: "Name", name: "is of" },
-          uniqueness: "role1",
+          uniqueness: "both",
           isPreferred: true,
         })
         .build();

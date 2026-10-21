@@ -115,6 +115,12 @@ export function identificationOrder(
   return { order };
 }
 
+/** Which uniqueness identifies which entity type, both ways round. */
+export interface PreferredIdentifiers {
+  readonly byEntity: ReadonlyMap<string, IdentifyingUniqueness>;
+  readonly byConstraint: ReadonlyMap<string, IdentifyingUniqueness>;
+}
+
 /** The uniqueness constraint that identifies an entity type, and where it is. */
 export interface IdentifyingUniqueness {
   readonly entityId: string;
@@ -134,9 +140,8 @@ export interface IdentifyingUniqueness {
  * ORM and NORMA's `PreferredIdentifier` mean it, as naming the entity the
  * roles opposite the uniqueness identify:
  *
- * - a flagged uniqueness on an objectified fact type identifies the
- *   objectifying type, whether it spans every role or, as NORMA allows, all
- *   but one (Open decision 8 named only the spanning case; the auction
+ * - a flagged uniqueness on an objectified fact type that spans every
+ *   role, or, as NORMA allows, all but one, identifies the objectifying type (Open decision 8 named only the spanning case; the auction
  *   models' objectified ternaries are identified by a two-role uniqueness,
  *   and reading those flags as naming the third role's player made an
  *   entity with its own reference scheme the claimant);
@@ -144,7 +149,8 @@ export interface IdentifyingUniqueness {
  *   and one value type identifies the entity, by the uniqueness on the
  *   value's role (and is dropped when there is none);
  * - otherwise, a flagged uniqueness whose uncovered roles are all played
- *   by one entity type identifies that entity;
+ *   by one entity type, which plays none of the covered roles, identifies
+ *   that entity (a ring binary does not identify its player by itself);
  * - anything else is dropped.
  *
  * Two flags naming one entity is a modelling error
@@ -158,10 +164,7 @@ export interface IdentifyingUniqueness {
  * or a constraint rather than an entity: calling a per-entity lookup
  * inside a loop over fact types would make each of them quadratic.
  */
-export function preferredIdentifiers(model: OrmModel): {
-  readonly byEntity: ReadonlyMap<string, IdentifyingUniqueness>;
-  readonly byConstraint: ReadonlyMap<string, IdentifyingUniqueness>;
-} {
+export function preferredIdentifiers(model: OrmModel): PreferredIdentifiers {
   const objectifying = new Map(
     model.objectifiedFactTypes.map((oft) => [oft.factTypeId, oft.objectTypeId]),
   );
@@ -178,17 +181,19 @@ export function preferredIdentifiers(model: OrmModel): {
       const covered = new Set(c.roleIds);
 
       const objectType = objectifying.get(factType.id);
-      if (objectType) {
+      if (objectType && covered.size >= factType.roles.length - 1) {
         if (isEntity(objectType)) offer({ entityId: objectType, constraint: c, factType }, 1);
         continue;
       }
 
       const binary = entityValueRoles(model, factType);
       if (binary) {
-        const onValue = factType.internalConstraints.find(
-          (u): u is InternalUniquenessConstraint =>
-            isInternalUniqueness(u) && u.roleIds.length === 1
-            && u.roleIds[0] === binary.valueRole.id,
+        // The flagged one itself when it is on the value's role, so a
+        // second uniqueness there does not take its place.
+        const onValueRole = (u: InternalUniquenessConstraint) =>
+          u.roleIds.length === 1 && u.roleIds[0] === binary.valueRole.id;
+        const onValue = onValueRole(c) ? c : factType.internalConstraints.find(
+          (u): u is InternalUniquenessConstraint => isInternalUniqueness(u) && onValueRole(u),
         );
         if (onValue) {
           offer({ entityId: binary.entityRole.playerId, constraint: onValue, factType }, 0);
@@ -200,7 +205,8 @@ export function preferredIdentifiers(model: OrmModel): {
         factType.roles.filter((r) => !covered.has(r.id)).map((r) => r.playerId),
       );
       const [only] = players;
-      if (players.size === 1 && only !== undefined && isEntity(only)) {
+      const playsCovered = factType.roles.some((r) => covered.has(r.id) && r.playerId === only);
+      if (players.size === 1 && only !== undefined && isEntity(only) && !playsCovered) {
         offer({ entityId: only, constraint: c, factType }, 1);
       }
     }

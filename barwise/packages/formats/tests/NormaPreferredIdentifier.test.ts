@@ -51,4 +51,43 @@ describe("NORMA export of a preferred identifier", () => {
       expect(preferred[0]!.type === "uniqueness" && preferred[0]!.roleRefs).toEqual(["_r-nr"]);
     });
   }
+
+  it("marks only the real identifier preferred when a populated entity also gets an expansion", () => {
+    // Room is identified by the uniqueness on Building's role (each
+    // Building houses one Room), which is no value seat, so its instance
+    // values get a synthesized expansion; that expansion's uniqueness must
+    // not become a second preferred one.
+    const model = new OrmModel({ name: "Rooms" });
+    model.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "ot-b", name: "Building", kind: "entity", referenceMode: "code" });
+    model.addFactType({
+      id: "ft-in",
+      name: "Room is in Building",
+      roles: [
+        { id: "r-room", name: "is in", playerId: "ot-room" },
+        { id: "r-b", name: "houses", playerId: "ot-b" },
+      ],
+      readings: ["{0} is in {1}"],
+      constraints: [{
+        id: "u-b",
+        type: "internal_uniqueness",
+        roleIds: ["r-b"],
+        isPreferred: true,
+      }],
+    });
+    model.addPopulation({ id: "pop", factTypeId: "ft-in" })
+      .addInstance({ id: "i", roleValues: { "r-room": "R1", "r-b": "B1" } });
+    // Building, populated and unidentified, gets a synthesized identifier
+    // of its own; Room keeps the real one. Every preferred uniqueness is
+    // exactly one entity's PreferredIdentifier.
+    const doc = writeOrmToNorma(model);
+    const room = doc.entityTypes.find((e) => e.name === "Room")!;
+    expect(room.preferredIdentifier).toBe("_u-b");
+    const preferred = doc.constraints
+      .filter((c) => c.type === "uniqueness" && c.isPreferred)
+      .map((c) => c.id)
+      .sort();
+    const linked = doc.entityTypes.flatMap((e) => e.preferredIdentifier ?? []).sort();
+    expect(preferred).toEqual(linked);
+  });
 });

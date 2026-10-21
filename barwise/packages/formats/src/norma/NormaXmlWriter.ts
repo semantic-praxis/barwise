@@ -29,6 +29,7 @@ import {
   type JoinOperand,
   type ObjectType,
   type OrmModel,
+  type PreferredIdentifiers,
   preferredIdentifiers,
   pureObjectifyingEntityIds,
   type Role,
@@ -245,7 +246,7 @@ function collectPlayedRoles(model: OrmModel): Map<string, NormaId[]> {
  * WS4a), which is NORMA's own reading of a reference scheme.
  */
 function collectPreferredIdentifiers(
-  identifiers: ReturnType<typeof preferredIdentifiers>,
+  identifiers: PreferredIdentifiers,
 ): Map<string, string> {
   return new Map(
     [...identifiers.byEntity].map((

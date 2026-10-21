@@ -80,6 +80,39 @@ describe("queryModel: anchors", () => {
     expect(a!.missingIdentifier).toBe(false);
   });
 
+  it("names only the covered roles' players for an objectified type", () => {
+    // Signing objectifies a ternary and is identified by the uniqueness
+    // over two of its roles; the third role's player identifies nothing.
+    const model = new OrmModel({ name: "M" });
+    for (
+      const [id, name] of [["ot-c", "Customer"], ["ot-o", "Organization"], [
+        "ot-a",
+        "Agreement",
+      ], ["ot-s", "Signing"]] as const
+    ) {
+      model.addObjectType({ id, name, kind: "entity", referenceMode: "id" });
+    }
+    model.addFactType({
+      id: "ft-sign",
+      name: "Customer signs Agreement for Organization",
+      roles: [
+        { id: "r-c", name: "signs", playerId: "ot-c" },
+        { id: "r-a", name: "is signed", playerId: "ot-a" },
+        { id: "r-o", name: "for", playerId: "ot-o" },
+      ],
+      readings: ["{0} signs {1} for {2}"],
+      constraints: [{
+        id: "u",
+        type: "internal_uniqueness",
+        roleIds: ["r-c", "r-a"],
+        isPreferred: true,
+      }],
+    });
+    model.addObjectifiedFactType({ id: "oft", factTypeId: "ft-sign", objectTypeId: "ot-s" });
+    const [a] = anchorsOf(runQuery(model, "anchors Signing"));
+    expect(a!.preferredIdentifier?.identifierTypes).toEqual(["Customer", "Agreement"]);
+  });
+
   it("lists every entity type (and only entity types) for the bare query", () => {
     const anchors = anchorsOf(runQuery(identifiedModel(), "anchors"));
     expect(anchors.map((a) => a.entity)).toEqual(["Customer"]);

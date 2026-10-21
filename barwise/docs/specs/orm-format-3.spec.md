@@ -1560,11 +1560,19 @@ Implementation notes (2026-10-21, WS4a):
   inverse, computed once. Every reader listed above uses it, and
   `preferredIdentifyingBinary` is its answer when that is an entity-value
   binary. `identificationSources` still lists every flag, so
-  `completeness/multiple-preferred-identifiers` still fires; a test pins
-  it.
+  `completeness/multiple-preferred-identifiers` still fires, and fires
+  before the missing-identifier check; a test pins it. The
+  missing-identifier check reads the resolved answer, as the annotator,
+  the anchors and the mapper do, so all four agree on which entities have
+  an identifier.
+- **Two guards the rule needs.** A ring binary does not identify its
+  player by itself: the uncovered role's player must play none of the
+  covered roles. And in an entity-value binary whose flagged uniqueness is
+  itself on the value's role, that one is the identifier, not another
+  uniqueness listed before it on the same role.
 - **Decision 8, refined.** A flagged uniqueness on an objectified fact type
-  identifies the objectifying type whether or not it spans every role.
-  Decision 8 named only the spanning case. The auction models' four
+  identifies the objectifying type when it spans every role or all but
+  one. Decision 8 named only the spanning case. The auction models' four
   objectified ternaries, each in two copies, are identified by a two-role
   uniqueness, as NORMA allows. Read literally, decision 8 handed those
   eight flags to the third role's player, an entity that has its own
@@ -1576,7 +1584,10 @@ Implementation notes (2026-10-21, WS4a):
   name's.
 - **What changed**, over the 88 tracked models that load, before and after,
   capturing each reader's output:
-  - validation: no model changed;
+  - validation: 5 models gain an `info` missing-identifier note, 8 in
+    all. Two are `order-management`'s Customer; six are auction-domain
+    entities defined in another domain, whose only flag here sat on a
+    neighbouring ternary and identified something else;
   - DDL: 2 models, the two `order-management` copies, where Customer's
     key moves from `name` to its reference mode's `customer_id`;
   - query anchors: 8 models. Entities gain an identifier the importers'
