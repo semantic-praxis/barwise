@@ -1161,7 +1161,9 @@ Implementation notes (2026-10-19):
     numbered. Which of two same-id constraints is suffixed follows file
     order. Internal constraint ids are not reserved: a badge has no node
     id, and reserving them would rename a node whenever an internal
-    constraint with its id was added.
+    constraint with its id was added. Nor are the ids of kinds never drawn
+    (the join kinds), so an undrawn constraint cannot push a suffix onto a
+    drawn one.
   - `modelToGraph` walks `model.constraints` and draws a constraint when
     it touches a fact type that got a node, with edges to drawn fact
     types only. One touching only absorbed fact types, only fact types a

@@ -86,8 +86,11 @@ export interface ModelToGraphOptions {
  * one colliding with an element, it gets the first `#2`, `#3` free of
  * every id reserved here. An internal constraint's id is not reserved: its
  * badge has no node id to collide with, and reserving it would rename an
- * existing node whenever an internal constraint with that id was added; which of two same-id constraints is suffixed follows
- * file order. An id-less constraint, which construction rules out
+ * existing node whenever an internal constraint with that id was added.
+ * Nor is that of a kind never drawn (`NOT_DRAWN`), which no view shows.
+ *
+ * Which of two same-id constraints is suffixed follows file order. An
+ * id-less constraint, which construction rules out
  * (barwise-nkq) though the type allows it until WS3c, is numbered.
  */
 function constraintNodeIds(
@@ -306,7 +309,10 @@ export function modelToGraph(
   // absorbed into a reference mode or left out of a neighbourhood view.
 
   const across = model.constraints;
-  const nodeIds = constraintNodeIds(model, across);
+  const nodeIds = constraintNodeIds(
+    model,
+    across.filter((c) => !Object.hasOwn(NOT_DRAWN, c.type)),
+  );
 
   /**
    * Draw a constraint as a node with an edge to each of its roles whose fact

@@ -102,6 +102,12 @@ describe("constraint nodes across fact types", () => {
     expect(ids).toEqual(["c-key", "c-pref"]);
   });
 
+  it("leaves an id to the drawn constraint when one never drawn shares it", () => {
+    // Walked first, under "Room has RoomId"; join constraints have no glyph.
+    const undrawn: Constraint = { id: "c-key", type: "join_exclusion", operands: [] };
+    expect(constraintPart(rooms("ft-in", [undrawn])).nodes.map((n) => n.id)).toEqual(["c-key"]);
+  });
+
   it("never issues a node id another node holds, and leaves a unique stated id to its owner", () => {
     // Under "Room has RoomId", walked first: an id equal to a fact type's,
     // a twin of the key, and an exclusive-or whose own unique id is what a
