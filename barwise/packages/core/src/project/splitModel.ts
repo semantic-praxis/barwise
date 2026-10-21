@@ -10,7 +10,7 @@
  * and each output document is re-checked by deserializing it.
  */
 
-import { parse, stringify } from "yaml";
+import { stringify } from "yaml";
 import { roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
 import type { OrmModel } from "../model/OrmModel.js";
@@ -233,7 +233,7 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
     );
   }
 
-  const doc = parse(stringify(writeDocument(source), { lineWidth: 0 })) as RawModelDoc;
+  const doc = writeDocument(source) as unknown as RawModelDoc;
   const model = doc.model;
   const modelConstraints = model.constraints ?? [];
   const objectTypes = model.object_types ?? [];

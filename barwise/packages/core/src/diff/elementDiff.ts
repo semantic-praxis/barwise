@@ -859,13 +859,19 @@ export function diffDefinition(a: Definition, b: Definition): ChangeDescription[
 /**
  * An entity's preferred identifier, named by content: the identifying
  * fact type and the roles its uniqueness covers, or the stored id when the
- * reference identifies nothing (validation reports that).
+ * reference identifies nothing (validation reports that). A role is named
+ * by its position and its player, the way `diffFactType` pairs roles, not
+ * by its role name: renaming a role leaves the identifier what it was.
  */
 function preferredIdentifierLabel(model: OrmModel, entityId: string): string | undefined {
   const resolved = resolvePreferredIdentifier(model, entityId);
   if (resolved.ok) {
     const { factType, constraint } = resolved.at;
-    const roles = constraint.roleIds.map((id) => factType.getRoleById(id)?.name ?? id);
+    const roles = constraint.roleIds.map((id) => {
+      const at = factType.roles.findIndex((r) => r.id === id);
+      const player = model.getObjectType(factType.roles[at]?.playerId ?? "")?.name ?? id;
+      return `role ${at + 1}: ${player}`;
+    });
     return `"${factType.name}" (${roles.join(", ")})`;
   }
   const stored = model.preferredIdentifierOf(entityId);

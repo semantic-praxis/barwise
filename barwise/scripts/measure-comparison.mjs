@@ -52,8 +52,11 @@ import { keeps, preservations, refusals } from "./lib/schema-cases.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
 
 const BARWISE = join(REPO_ROOT, "barwise");
+// The 2.0 schema, frozen when 3.0 landed: the trial tasks and the malformed
+// fixtures were grounded on 2.0 documents, so their cases come from the 2.0
+// schema whatever the current format is (orm-format-3 WS4b-ii).
 const SCORER_SCHEMA = fileURLToPath(
-  new URL("../packages/core/schemas/orm-model.schema.json", import.meta.url),
+  new URL("../packages/core/schemas/orm-model-2.0.schema.json", import.meta.url),
 );
 const CLI_DIST = join(BARWISE, "packages/cli/dist/index.js");
 const CLI_BUNDLE = join(BARWISE, "packages/cli/dist/bundle/index.cjs");

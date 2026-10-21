@@ -10,6 +10,7 @@ import {
   applyMigrations,
   compareOrmVersions,
   CURRENT_ORM_VERSION,
+  LEGACY_ORM_VERSION,
   type OrmVersionMigration,
   planMigration,
 } from "../../src/serialization/schemaVersion.js";
@@ -98,8 +99,14 @@ describe("applyMigrations", () => {
   });
 });
 
-describe("CURRENT_ORM_VERSION", () => {
-  it("is the version the planner treats as the target", () => {
-    expect(planMigration(CURRENT_ORM_VERSION)).toEqual({ ok: true, steps: [] });
+describe("the planner's target", () => {
+  it("is 2.0, the last version a raw-document step reaches", () => {
+    expect(planMigration(LEGACY_ORM_VERSION)).toEqual({ ok: true, steps: [] });
+    const fromOld = planMigration("1.0");
+    expect(fromOld.ok && fromOld.steps.at(-1)?.to).toBe(LEGACY_ORM_VERSION);
+  });
+
+  it("is not the current version, which only the model reaches", () => {
+    expect(planMigration(CURRENT_ORM_VERSION)).toEqual({ ok: false, reason: "newer" });
   });
 });

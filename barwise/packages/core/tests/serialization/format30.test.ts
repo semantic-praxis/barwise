@@ -181,3 +181,14 @@ describe("a stored preferred identifier", () => {
     expect(model.preferredIdentifierRefs).toEqual([["ot-c", "u-cid"]]);
   });
 });
+
+describe("a version between 2.0 and 3.0", () => {
+  it("is refused as one no release wrote, not as one from a newer build", () => {
+    const doc = parse(yaml.serialize(shop()));
+    doc.orm_version = "2.1";
+    expect(() => yaml.deserialize(stringify(doc))).toThrow(
+      'Unsupported orm_version "2.1" (this build reads 3.0): no migration path is available; '
+        + "re-export from a compatible version.",
+    );
+  });
+});

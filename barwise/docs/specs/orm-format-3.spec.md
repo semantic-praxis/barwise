@@ -1764,6 +1764,21 @@ Implementation notes (2026-10-21, WS4b-ii, the stored identifier and format 3.0)
   5, barwise-n9n.a6d) is its own PR next, because reporting the flags a file loses needs
   the 2.0 reader to return them. An external uniqueness as an identifier
   (barwise-alg) is still not stored.
+- **Code review found three places the flag had been doing a second job.**
+  Merge kept a reference only when the merged model held its id, but a
+  merged fact type can hold the other side's copy of the uniqueness, so a
+  transcript merged into its base lost every identifier; the merge now
+  follows the reference to the uniqueness over the same roles. NORMA
+  import read a flagged and an unflagged uniqueness over the same roles as
+  duplicates once the flag left the constraint, and could drop the one
+  `PreferredIdentifier` names; the dedupe still tells them apart. And
+  diff named an identifier's roles by role name, so a rename read as a
+  breaking change; it names them by position and player now.
+- **What the 2.0 reader drops, it drops silently.** Two flags naming one
+  entity resolve to one (decision 8 accepted this, and the corpus has
+  none), and a flag that identifies nothing is dropped. The model cannot
+  carry either, so no validation rule can see them after the load;
+  `barwise migrate` (barwise-n9n.a6d) is where they are reported.
 - **The schema's two constraint lists are a copy of `PLACEMENT`**, so
   `tests/serialization/format30.test.ts` checks them against it.
 

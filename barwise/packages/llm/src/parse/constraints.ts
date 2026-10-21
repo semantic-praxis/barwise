@@ -437,16 +437,10 @@ function isDuplicateConstraint(
   const held: readonly Constraint[] = isExternalConstraint(candidate)
     ? model.constraints
     : ft.internalConstraints;
+  // One rule for a held uniqueness: the uniqueness pass asks `heldUniqueness`
+  // which constraint a duplicate's flag lands on.
   if (candidate.type === "internal_uniqueness") {
-    const candidateRoles = [...candidate.roleIds].sort();
-    return held.some((existing) => {
-      if (existing.type !== "internal_uniqueness") return false;
-      const existingRoles = [...existing.roleIds].sort();
-      return (
-        existingRoles.length === candidateRoles.length
-        && existingRoles.every((id, i) => id === candidateRoles[i])
-      );
-    });
+    return heldUniqueness(ft, candidate.roleIds) !== undefined;
   }
   if (candidate.type === "mandatory") {
     return held.some(

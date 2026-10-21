@@ -612,8 +612,11 @@ describe("completenessWarnings", () => {
         expect(found[0]!.message).toContain("no constraint with that id");
       });
 
-      it("reports a constraint that is not a uniqueness", () => {
-        expect(referencing("m-c")[0]!.message).toContain("mandatory constraint");
+      it("reports a constraint that is not a uniqueness, naming its kind", () => {
+        expect(referencing("m-c")[0]!.message).toBe(
+          'Entity type "Customer" names constraint "m-c" as its preferred identifier, but its kind is '
+            + "mandatory; a preferred identifier is an internal uniqueness constraint.",
+        );
       });
 
       it("reports a uniqueness that identifies something else", () => {

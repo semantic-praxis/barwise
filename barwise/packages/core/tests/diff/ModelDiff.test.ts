@@ -689,8 +689,33 @@ describe("diffModels", () => {
     );
     expect(otDelta).toMatchObject({ kind: "modified", breakingLevel: "breaking" });
     expect(otDelta!.changeDescriptions).toEqual([
-      'preferred identifier: "Customer places Order" (is placed by) -> (none)',
+      'preferred identifier: "Customer places Order" (role 2: Order) -> (none)',
     ]);
+  });
+
+  it("reports no preferred identifier change when only a role of the identifying fact type is renamed", () => {
+    const build = (roleName: string) => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({ id: "ot-c", name: "Customer", kind: "entity", referenceMode: "id" });
+      model.addObjectType({ id: "ot-cid", name: "CustomerId", kind: "value" });
+      model.addFactType({
+        id: "ft",
+        name: "Customer has CustomerId",
+        roles: [
+          { id: "r-c", name: "has", playerId: "ot-c" },
+          { id: "r-cid", name: roleName, playerId: "ot-cid" },
+        ],
+        readings: ["{0} has {1}"],
+        constraints: [{ id: "u-cid", type: "internal_uniqueness", roleIds: ["r-cid"] }],
+      });
+      model.setPreferredIdentifier("ot-c", "u-cid");
+      return model;
+    };
+    const result = diffModels(build("is of"), build("identifies"));
+    const customer = result.deltas.find((d) =>
+      d.elementType === "object_type" && d.name === "Customer"
+    );
+    expect(customer?.kind).toBe("unchanged");
   });
 
   it("reports no diff for Phase 2 constraints with different role IDs", () => {

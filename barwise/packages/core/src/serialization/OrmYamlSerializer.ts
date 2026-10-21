@@ -181,7 +181,13 @@ export class OrmYamlSerializer {
       throw new DeserializationError(versionErrorMessage(version, { ok: false, reason: "newer" }));
     }
     if (version === LEGACY_ORM_VERSION) return { doc: raw, version };
-    const plan = planMigration(version, LEGACY_ORM_VERSION);
+    // Between 2.0 and 3.0 there is nothing to read: no release wrote it.
+    if (compareOrmVersions(version, LEGACY_ORM_VERSION) > 0) {
+      throw new DeserializationError(
+        versionErrorMessage(version, { ok: false, reason: "unknown" }),
+      );
+    }
+    const plan = planMigration(version);
     if (!plan.ok) {
       throw new DeserializationError(versionErrorMessage(version, plan));
     }

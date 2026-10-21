@@ -93,7 +93,10 @@ export function compareOrmVersions(a: string, b: string): number {
 }
 
 /**
- * Plan the migration from `version` to `current`.
+ * Plan the raw-document migration from `version` to `current`, which
+ * defaults to 2.0: the last version a step on the raw document reaches.
+ * 2.0 to 3.0 is not a step here; the 2.0 reader reads a 2.0 document into
+ * the model, and the model saves as 3.0 (orm-format-3 WS4b).
  *
  * Pure: `current` and `migrations` are injectable so the planner can be
  * exercised with synthetic versions in tests. Returns the ordered steps
@@ -105,7 +108,7 @@ export function compareOrmVersions(a: string, b: string): number {
  */
 export function planMigration(
   version: string,
-  current: string = CURRENT_ORM_VERSION,
+  current: string = LEGACY_ORM_VERSION,
   migrations: readonly OrmVersionMigration[] = ORM_VERSION_MIGRATIONS,
 ): MigrationPlan {
   if (version === current) return { ok: true, steps: [] };

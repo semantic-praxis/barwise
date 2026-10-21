@@ -212,7 +212,11 @@ const RULE_DESCRIPTORS = {
       dangling: (otName: string, constraintId: string): string =>
         `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, and the model has no constraint with that id.`,
       notUniqueness: (otName: string, constraintId: string, kind: string): string =>
-        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, but it is a ${kind} constraint; a preferred identifier is a uniqueness constraint.`,
+        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, but its kind is ${kind}; a preferred identifier is an internal uniqueness constraint${
+          kind === "external_uniqueness"
+            ? ", and an external uniqueness is not yet read as one"
+            : ""
+        }.`,
       notThisEntity: (otName: string, constraintId: string): string =>
         `Entity type "${otName}" names uniqueness constraint "${constraintId}" as its preferred identifier, but that constraint does not identify "${otName}".`,
     },

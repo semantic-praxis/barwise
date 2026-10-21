@@ -29,6 +29,7 @@ import {
   identificationOrder,
   preferredIdentifiers,
   preferredIdentifyingBinary,
+  resolvePreferredIdentifier,
 } from "../model/identification.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import {
@@ -815,8 +816,16 @@ function associativeKey(
   columns: readonly Column[],
 ): string[] {
   const uniqueness = ft.internalConstraints.filter((c) => c.type === "internal_uniqueness");
-  const { byConstraint } = preferredIdentifiers(model);
-  const chosen = uniqueness.find((c) => c.id !== undefined && byConstraint.has(c.id))
+  // Only the references naming one of this fact type's uniquenesses are
+  // resolved: `preferredIdentifiers(model)` resolves every entity's, and
+  // this runs once per associative or absorbed fact type.
+  const ids = new Set(uniqueness.map((c) => c.id));
+  const identifying = new Set(
+    model.preferredIdentifierRefs
+      .filter(([entityId, id]) => ids.has(id) && resolvePreferredIdentifier(model, entityId).ok)
+      .map(([, id]) => id),
+  );
+  const chosen = uniqueness.find((c) => c.id !== undefined && identifying.has(c.id))
     ?? uniqueness[0];
   if (!chosen) return columns.map((c) => c.name);
   return chosen.roleIds.flatMap((id) => roleColumns.get(id) ?? []);

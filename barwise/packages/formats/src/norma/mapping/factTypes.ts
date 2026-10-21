@@ -11,7 +11,7 @@ import {
   type OrmModel,
   type RoleConfig,
 } from "@barwise/core";
-import type { NormaFactType } from "../NormaXmlTypes.js";
+import type { NormaConstraint, NormaFactType } from "../NormaXmlTypes.js";
 import {
   type ConstraintIdAllocator,
   type NormaMappingContext,
@@ -178,6 +178,12 @@ function resolveConstraintsForFactType(
   const { constraintById, constraintIds: ids, xorPairs } = ctx;
   const constraints: Constraint[] = [];
   const internalRefs = new Set(nft.internalConstraintRefs);
+  // NORMA's IsPreferred no longer rides on the mapped constraint, but it
+  // still tells two uniquenesses over the same roles apart, as it did when
+  // it did: the preferred one may be the one an entity's
+  // PreferredIdentifier names, so neither may stand in for the other.
+  const preferred = new Set<Constraint>();
+  const isPreferred = (nc: NormaConstraint) => nc.type === "uniqueness" && nc.isPreferred;
 
   for (const ref of internalRefs) {
     const nc = constraintById.get(ref);
@@ -204,8 +210,11 @@ function resolveConstraintsForFactType(
       if (xor) constraints.push(xor);
       continue;
     }
-    if (holdsSame(constraints, mapped)) continue;
-    constraints.push({ ...mapped, id: ids.claim(source) });
+    const flagged = isPreferred(source);
+    if (holdsSame(constraints.filter((c) => preferred.has(c) === flagged), mapped)) continue;
+    const added = { ...mapped, id: ids.claim(source) };
+    if (flagged) preferred.add(added);
+    constraints.push(added);
   }
 
   return constraints;

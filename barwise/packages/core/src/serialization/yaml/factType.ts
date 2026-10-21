@@ -38,9 +38,9 @@ function serializeRole(role: Role): OrmYamlRole {
 }
 
 /**
- * @param across The constraints across fact types this fact type carries in
- *   a 2.0 file, written after its own: the model holds them, and 2.0 nests
- *   each under one fact type (`lowerConstraints`).
+ * A fact type with its own constraints, the internal kinds. The model's
+ * constraints across fact types are written to `model.constraints` by
+ * `writeDocument`, not here (format 3.0).
  */
 export function serializeFactType(ft: FactType): OrmYamlFactType {
   const result: OrmYamlFactType = {

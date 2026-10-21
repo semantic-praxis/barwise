@@ -1357,3 +1357,62 @@ describe("mergeModels carries preferred identifiers (orm-format-3 WS4b-ii)", () 
       .toEqual([["ot-c", "u-cid"]]);
   });
 });
+
+describe("mergeModels follows a preferred identifier across sides with different ids", () => {
+  /**
+   * The same Customer model under ids prefixed `p`, as an LLM extraction
+   * and its base would hold it: nothing shared but content.
+   */
+  function shop(p: string, opts: { definition?: string; reading?: string; } = {}): OrmModel {
+    const model = new OrmModel({ name: "Shop" });
+    model.addObjectType({
+      id: `${p}c`,
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "id",
+      ...(opts.definition ? { definition: opts.definition } : {}),
+    });
+    model.addObjectType({ id: `${p}cid`, name: "CustomerId", kind: "value" });
+    model.addFactType({
+      id: `${p}ft`,
+      name: "Customer has CustomerId",
+      roles: [
+        { id: `${p}r-c`, name: "has", playerId: `${p}c` },
+        { id: `${p}r-cid`, name: "is of", playerId: `${p}cid` },
+      ],
+      readings: [opts.reading ?? "{0} has {1}"],
+      constraints: [
+        { id: `${p}u-c`, type: "internal_uniqueness", roleIds: [`${p}r-c`] },
+        { id: `${p}u-cid`, type: "internal_uniqueness", roleIds: [`${p}r-cid`] },
+      ],
+    });
+    model.setPreferredIdentifier(`${p}c`, `${p}u-cid`);
+    return model;
+  }
+
+  it("keeps the identifier when the entity takes the incoming side and the fact type the existing", () => {
+    const existing = shop("e-");
+    const incoming = shop("i-", { definition: "A buyer." });
+    const { deltas } = diffModels(existing, incoming);
+    const ot = deltas.findIndex((d) => d.elementType === "object_type" && d.kind === "modified");
+    expect(ot).toBeGreaterThanOrEqual(0);
+    expect(deltas.find((d) => d.elementType === "fact_type")?.kind).toBe("unchanged");
+
+    const merged = mergeModels(existing, incoming, deltas, new Set([ot]));
+    expect(merged.preferredIdentifierRefs).toEqual([["e-c", "e-u-cid"]]);
+  });
+
+  it("keeps the identifier when the entity stays and the fact type takes the incoming side", () => {
+    const existing = shop("e-");
+    const incoming = shop("i-", { reading: "{0} is known by {1}" });
+    const { deltas } = diffModels(existing, incoming);
+    const ft = deltas.findIndex((d) => d.elementType === "fact_type" && d.kind === "modified");
+    expect(ft).toBeGreaterThanOrEqual(0);
+
+    const merged = mergeModels(existing, incoming, deltas, new Set([ft]));
+    const [[entity, ref]] = merged.preferredIdentifierRefs as [[string, string]];
+    expect(entity).toBe("e-c");
+    const c = merged.getConstraint(ref);
+    expect(c?.type === "internal_uniqueness" && c.roleIds).toEqual(["i-r-cid"]);
+  });
+});
