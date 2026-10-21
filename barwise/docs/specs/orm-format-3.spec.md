@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 and split into 4a to 4c (Open decision 10, open), none implemented; WS5 not started; open decisions 1 to 9
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -289,7 +289,7 @@ every time until then.
 | `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags    | keeps ids; places by kind; partition constraints 1:1; preferred both ways   |
 | `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`             | node id = constraint id                                                     |
 | `llm/src/parse/`                                          | attaches constraints to fact types                | places by kind through the model API                                        |
-| tracked `.orm.yaml` files (113)                           | 2.0                                               | rewritten as 3.0 by the migration, in WS5                                   |
+| tracked `.orm.yaml` files (115)                           | 2.0                                               | rewritten as 3.0 by the migration, in WS5                                   |
 | `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)          | corrected in WS5                                                            |
 | `docs/adr/`                                               | ADR 0001 "inline and local"                       | ADR 0003 amends it for external constraints                                 |
 
@@ -308,7 +308,7 @@ and it is stated in the file from its first save. The extraction format in
 `isExclusive` and `isExhaustive` per subtype fact
 (`formats/src/ddl/barwiseAnnotation.ts`: declared at lines 51-52, written
 at 165-166, checked by the reader at 335-336), under a
-`-- barwise:v1` prefix whose reader already matches any version. WS4 moves
+`-- barwise:v1` prefix whose reader accepts v1 only (corrected at WS4's grounding: it skips any other version with a warning, and requires both flags). WS4 moves
 it to v2, writing the partition constraints, and keeps a v1 reader that
 converts the flags with the migration's step 3, so DDL already exported
 still imports.
@@ -1371,28 +1371,122 @@ Implementation notes (2026-10-21, WS3c-iii):
     defect that keeps only the first fact type's nested constraints
     fails 15 of the reworked tests.
 
-### 4. Format 3.0 (provisional: not yet grounded)
+### 4. Format 3.0 (grounded 2026-10-21)
 
-One PR:
+**WS4 lands as three PRs, and only the last changes the file format**
+(Open decision 10). The draft kept WS4 in one PR so that no build between
+PRs could save a 2.0 file that drops what memory holds. That risk exists
+only for an in-memory state a 2.0 file cannot express. 4a and 4b add new
+in-memory shapes, but in each PR every writer builds them by the same
+rule the 2.0 loader applies to the flags. A 2.0 save writes them back as
+flags, and reading those flags gives the same model. Each of those PRs
+checks that with a corpus law: load, save, load gives the same model. 4c
+then adds what only 3.0 can express. The cost: the one-PR plan reviewed a
+single change of meaning; this one reviews three, and a reader of 4a sees
+a reference with no file syntax of its own.
 
-- `orm_version` 3.0 and the schema: ids required, the two `oneOf`s,
-  `model.constraints`, `subtype_facts` operands, `preferred_identifier`,
-  the flags removed;
-- the 2.0-to-3.0 migration, steps 1 to 5, and the 3.0 serializer;
-- subtype constraints in memory: `exclusion`, `disjunctive_mandatory` and
-  `exclusive_or` accept subtype facts in place of roles (Open decision 2),
-  with the validation in step 3;
-- the preferred-identifier reference in memory (Open decisions 3 and 8),
-  read by the mapper and `identification.ts`, which closes barwise-971 by
-  giving the five rules one answer to read;
-- NORMA import and export placing by kind and mapping partition constraints
-  one to one; the DDL annotation's v1 to v2 move.
+**4a. The preferred identifier, by reference in memory** (Open decisions 3
+and 8). Closes barwise-971.
 
-Closes barwise-loo and barwise-alg.
+- `EntityType` gains `preferredIdentifierId`, the id of a uniqueness
+  constraint. One function in `model/identification.ts` answers "which
+  constraint identifies this entity", and every reader of `isPreferred`
+  reads it instead. Grounding found nine readers, not the five barwise-971
+  lists, each with its own rule:
+  - the query anchors (`query/evaluate.ts`);
+  - the population renderer (`export/populationRenderer.ts`);
+  - the annotator (`annotation/OrmYamlAnnotator.ts`);
+  - `identificationSources` and, through it, `completenessWarnings`;
+  - `preferredIdentifyingBinary`, which sets the mapper's key type;
+  - `absorbedReferenceModes` (diagram, NORMA diagrams and export);
+  - NORMA's `findIdentifyingSeat` and `collectPreferredIdentifiers`;
+  - llm's `ModelContext`.
+
+  `RelationalMapper.associativeKey`, diff's constraint key and the VS Code
+  badge read the flag to describe a constraint rather than to find an
+  identifier; they read whether the constraint is some entity's
+  reference.
+- Two conventions meet here, and decision 8's rule exists because of
+  them. The importers (dbt, DDL, OpenAPI, NORMA synthesis) flag the
+  uniqueness on the value's role. The extraction prompt, and
+  `Constraint.ts`'s own doc comment, flag the entity's role. A query anchor
+  therefore finds no identifier on an imported model, and NORMA export
+  finds none on an extracted one.
+- On a 2.0 load, decision 8's rule turns the flags into references. On a
+  2.0 save, each reference is written as `is_preferred: true` on the
+  constraint it names. A file whose flags sit on the entity's role
+  therefore saves to different text once, the flag moving to the value's
+  role, and `hashModel` reads that as a change. The four flags the rule
+  cannot place are dropped on that save, as the migration would drop them.
+- Writers set the reference through the model API: the four importers,
+  the llm parser (which translates the extraction's `is_preferred` with
+  the same rule, as Scope says) and NORMA import.
+- In 4a a reference names an internal uniqueness only, because a 2.0 file
+  has no flag on an external one. NORMA import keeps reading the flag, as
+  today; its `PreferredIdentifier`, parsed and then discarded today, is
+  read in 4c.
+- **Acceptance:** before and after, run `barwise validate` and the
+  relational mapping over every tracked model. Every change in a
+  diagnostic, a table's key or a query's anchor is listed in the PR,
+  because converging nine rules changes some of them by design. The
+  corpus law above holds.
+
+**4b. Subtype constraints in memory** (Open decision 2, option a).
+
+- `exclusion`, `disjunctive_mandatory` and `exclusive_or` take either
+  `roleIds` or `subtypeFactIds`. Fourteen files read those kinds'
+  `roleIds` directly and eight more through `roleIdsOf`. Each handles the
+  subtype operand; the compiler finds them once `roleIds` is optional on
+  those three kinds.
+- `SubtypeFact.isExclusive` and `isExhaustive` are removed from memory. On
+  a 2.0 load, the migration's step 3 builds the constraints. On a 2.0 save
+  they go back to the flags: an `exclusive_or` sets both on each of its
+  subtype facts, an `exclusion` sets `is_exclusive`, and a
+  `disjunctive_mandatory` sets `is_exhaustive`. The corpus has 14 flagged
+  groups, none mixed: five become an `exclusive_or` and nine an
+  `exclusion`.
+- Nothing reads the flags for meaning today. No validation rule, no
+  mapper code and no verbalization does. The readers are diff, NORMA,
+  the DDL annotation and the VS Code tree. 4b adds verbalization ("each
+  Person is at most one of: Male, Female") and the counts step 3 gives
+  validation: one subtype fact or more in `disjunctive_mandatory`, two or
+  more in `exclusion` and `exclusive_or`.
+- NORMA import and the DDL annotation keep mapping through the flags'
+  meaning in 4b, so two partitions of one supertype stay flattened, as
+  today. Mapping them one to one would reach a state a 2.0 file cannot
+  hold, so it is 4c's.
+- **Acceptance:** the corpus law holds, with a fixture for each of step
+  3's cases.
+
+**4c. The 3.0 format.** Closes barwise-loo and barwise-alg.
+
+- The schema: `orm_version` const `"3.0"`, constraint ids required, an
+  internal `oneOf` under fact types and an external one in a new
+  `model.constraints`, the `subtype_facts` operand, `preferred_identifier`
+  on entity types, and the flags removed. `OrmYamlDocument` follows.
+- The migration, a pure step on the raw document registered in
+  `schemaVersion.ts` after 1.1 to 2.0. Steps 1 to 5 run as listed under
+  Target architecture. Step 1 reuses `derivedId.ts` (`withDerivedIds`), so
+  a migrated file's ids are the ids WS2 already gives it on load.
+- The 3.0 serializer. A load refuses a constraint in the wrong place and a
+  duplicate id, naming the constraint. `lowerConstraints` goes.
+- NORMA maps partition constraints one to one and reads and writes
+  `PreferredIdentifier` both ways, an external uniqueness included. The
+  DDL annotation moves to v2. Its reader matches only v1 today, skipping
+  any other version with a warning and requiring both flags to be
+  booleans, so v2 needs a reader change as well as a writer, and the v1
+  reader converts the flags with step 3.
+- Raw-document readers: `splitModel` migrates before it walks
+  `fact_types[].constraints`, and the annotator's section reset list
+  learns `constraints`. `hashModel` changes for every file once, so
+  lineage manifests recorded before 3.0 read stale until re-exported; the
+  release notes say so.
+- `barwise migrate` (Open decision 5) with its capability-matrix row.
+- **Acceptance:** the risks below, with the corpus rewritten in WS5.
 
 ### 5. Corpus, docs, release notes (provisional: not yet grounded)
 
-The tracked 113 files rewritten by the migration (a script under `scripts/`,
+The tracked 115 files (113 when drafted) rewritten by the migration (a script under `scripts/`,
 or the CLI command of Open decision 5); `docs/NORMA_VS_ORM_YAML.md` corrected
 (barwise-hnb); CLI and format docs; release notes naming the migration and
 listing what step 4 drops. It can share WS4's PR if the radius allows.
@@ -1412,7 +1506,7 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 - **Verbalization output** moves external constraints into their own section;
   golden files change in WS3.
 
-## Open decisions (all resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18)
+## Open decisions (1 to 9 resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18; 10 open)
 
 1. **ADR 0003 amends ADR 0001's "inline and local" -- resolved 2026-10-17 by the owner: yes,
    as recommended.** Recommend: yes, as
@@ -1564,6 +1658,23 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
      on their anchor. But it keeps the arbitrary host alive in every
      output under a new name, and the anchor moves whenever a role edit
      changes which fact type comes first.
+
+10. **WS4 in one PR, or three -- open; recommended: three, as WS4 is
+    written.** Raised by WS4's grounding (2026-10-21).
+    - **(a)** Three PRs: the preferred-identifier reference (4a) and
+      subtype constraints (4b) in memory, each reachable only from a 2.0
+      file's flags and written back as them, then the 3.0 format (4c).
+      Recommended. Each PR is reviewable on its own: 4a alone moves nine
+      readers and changes diagnostics by design. The corpus law
+      (load, save, load) is what holds the draft's concern, and it is
+      checked rather than argued.
+    - **(b)** One PR, as drafted. A single change of meaning to review,
+      and no in-memory state without its 3.0 syntax. The PR would touch
+      every reader of both flags, the schema, the migration, NORMA and
+      the DDL annotation at once, more than WS3c's 72 files.
+
+    Proceeding on (a) in the owner's absence; 4a is its first PR, and
+    reverting to (b) means holding 4a and 4b unmerged until 4c is ready.
 
 ## Risks and testing
 
