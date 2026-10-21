@@ -294,7 +294,7 @@ function FactTypeDetail(props: {
       {detail && detail.constraints.length > 0 && (
         <Field label={`Constraints (${detail.constraints.length})`}>
           {detail.constraints.map((c, i) => (
-            <div key={c.id ?? i} className="inspector-constraint">
+            <div key={i} className="inspector-constraint">
               {c.type.replace(/_/g, " ")}
             </div>
           ))}

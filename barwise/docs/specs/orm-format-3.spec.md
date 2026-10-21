@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, and 3b-i (vscode, learn and dbt readers) 2026-10-21; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, and 3b-ii (diagram) 2026-10-21; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1146,6 +1146,47 @@ Implementation notes (2026-10-19):
     is `getConstraint`, by id alone.
   - dbt's three SQL-pattern checks read `internalConstraints`: each asks
     about an internal kind only.
+
+- **Diagram (3b-ii, 2026-10-21).**
+  - A constraint node takes its constraint's own id, where a counter
+    numbered them `constraint-0`, `constraint-1` in walk order, so a
+    selection, a view or a diff names the same node however the file
+    orders its constraints. Node ids are decided once from the whole
+    model, so a constraint has the same node id in every view and whether
+    or not a view draws it: a constraint keeps its own id when no other
+    constraint and no element of the model holds it, and otherwise (a
+    second constraint's copy, barwise-b2s, or an element's id) gets the
+    first `#2`, `#3` free of every reserved id, the unique stated ones
+    included. An id-less constraint, which construction rules out, is
+    numbered. Which of two same-id constraints is suffixed follows file
+    order. Internal constraint ids are not reserved: a badge has no node
+    id, and reserving them would rename a node whenever an internal
+    constraint with its id was added. Nor are the ids of kinds never drawn
+    (those `NOT_DRAWN` lists), so an undrawn constraint cannot push a suffix onto a
+    drawn one.
+  - `modelToGraph` walks `model.constraints` and draws a constraint when
+    it touches a fact type that got a node, with edges to drawn fact
+    types only. One touching only absorbed fact types, only fact types a
+    neighbourhood view leaves out, or none at all is not drawn. It used
+    to skip any constraint nested under an absorbed fact type, whatever
+    it spanned, and to draw the rest whatever the view, including
+    floating nodes and edges to fact types with no node.
+  - `NOT_DRAWN` is total over every kind that is not drawn, internal
+    kinds included, so the barwise-869 compile check still covers kinds
+    the constraint-node walk no longer sees.
+  - The four per-fact-type badge reads (uniqueness, mandatory, frequency,
+    ring) read `internalConstraints`.
+  - The webview's model summary calls `constraintsTouching` per fact
+    type, the core authority, so its tree badge and inspector agree with
+    the sidebar. Its order changes with it: the fact type's own
+    constraints first, then those across fact types, where it was file
+    order under the nesting fact type.
+  - A ghost preview that widens a view's filter can now bring in a
+    constraint, which renders solid beside its dimmed fact type: ghost
+    ids name elements, not constraint nodes (barwise-ejs). Before, every
+    constraint was drawn solid in every view. A
+    constraint touching no fact type is in no list; the sidebar shows it
+    and the webview has no place for it yet (barwise-f2r).
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

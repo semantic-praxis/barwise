@@ -1,5 +1,6 @@
 import {
   absorbedReferenceModes,
+  type Constraint,
   type OrmModel,
   pureObjectifyingEntityIds,
   referenceModeOf,
@@ -21,23 +22,14 @@ import type {
 /**
  * Constraint kinds deliberately not drawn as dedicated constraint
  * nodes, each with the reason. A new Constraint member must be added
- * either to the drawn cases in the constraint-node switch or here --
- * the switch's default indexes this record over the exact complement
- * of the drawn kinds, so leaving it out of both is a compile error.
+ * either to the drawn cases in the constraint-node switch or here: the
+ * record is total over every kind that is not a drawn `ConstraintKind`,
+ * internal kinds included, so leaving one out of both is a compile error.
+ * The internal kinds never reach the switch, which walks
+ * `model.constraints`; their entries document where each is drawn, and
+ * nothing checks that a badge loop actually draws it.
  */
-const NOT_DRAWN: Record<
-  | "internal_uniqueness"
-  | "mandatory"
-  | "value_constraint"
-  | "frequency"
-  | "ring"
-  | "value_comparison"
-  | "cardinality"
-  | "join_subset"
-  | "join_equality"
-  | "join_exclusion",
-  string
-> = {
+const NOT_DRAWN: Record<Exclude<Constraint["type"], ConstraintKind>, string> = {
   internal_uniqueness: "Phase 1: rendered inline as a uniqueness bar on the fact type",
   mandatory: "Phase 1: rendered inline as a mandatory dot on the role connector",
   value_constraint: "Phase 1: rendered inline on the object type",
@@ -81,6 +73,69 @@ export interface ModelToGraphOptions {
     readonly factTypeIds: ReadonlySet<string>;
     readonly subtypeFactIds: ReadonlySet<string>;
   };
+}
+
+/**
+ * The node id of every constraint across fact types, decided once from the
+ * whole model, so a constraint's node has the same id in every view and
+ * whether or not the view draws it.
+ *
+ * A constraint keeps its own id when no other constraint across fact types
+ * and no element of the model (object type, fact type, subtype fact) holds
+ * it. Otherwise, for a second constraint with the same id (barwise-b2s) or
+ * one colliding with an element, it gets the first `#2`, `#3` free of
+ * every id reserved here. An internal constraint's id is not reserved: its
+ * badge has no node id to collide with, and reserving it would rename an
+ * existing node whenever an internal constraint with that id was added.
+ * Nor is that of a kind never drawn (`NOT_DRAWN`), which no view shows.
+ *
+ * Which of two same-id constraints is suffixed follows file order. An
+ * id-less constraint, which construction rules out
+ * (barwise-nkq) though the type allows it until WS3c, is numbered.
+ */
+function constraintNodeIds(
+  model: OrmModel,
+  constraints: readonly Constraint[],
+): ReadonlyMap<Constraint, string> {
+  const taken = new Set<string>([
+    ...model.objectTypes.map((ot) => ot.id),
+    ...model.factTypes.map((ft) => ft.id),
+    ...model.subtypeFacts.map((sf) => sf.id),
+  ]);
+  const uses = new Map<string, number>();
+  for (const c of constraints) {
+    if (c.id !== undefined) uses.set(c.id, (uses.get(c.id) ?? 0) + 1);
+  }
+  // A stated id held by exactly one constraint and no element is that
+  // constraint's own, reserved before any suffix is handed out.
+  const own = new Set<string>();
+  for (const [id, count] of uses) {
+    if (count === 1 && !taken.has(id)) own.add(id);
+  }
+  for (const id of own) taken.add(id);
+
+  const ids = new Map<Constraint, string>();
+  const free = (base: string) => {
+    let id = base;
+    for (let n = 2; taken.has(id); n++) id = `${base}#${n}`;
+    taken.add(id);
+    return id;
+  };
+  // Every stated id is settled before any id-less constraint is numbered,
+  // so a number never takes an id constraints share, wherever in the file
+  // the id-less one sits.
+  for (const c of constraints) {
+    if (c.id !== undefined) ids.set(c, own.has(c.id) ? c.id : free(c.id));
+  }
+  let unnamed = 0;
+  for (const c of constraints) {
+    if (c.id !== undefined) continue;
+    let id: string;
+    do id = `constraint-${unnamed++}`; while (taken.has(id));
+    taken.add(id);
+    ids.set(c, id);
+  }
+  return ids;
 }
 
 /**
@@ -139,15 +194,20 @@ export function modelToGraph(
     });
   }
 
+  // The fact types that get a node: a constraint attaches only to these.
+  const drawnFactTypeIds = new Set<string>();
+
   // Create fact type nodes and edges (skip absorbed and filtered-out facts).
   for (const ft of model.factTypes) {
     if (absorbedFactTypeIds.has(ft.id)) continue;
     if (filter && !filter.factTypeIds.has(ft.id)) continue;
+    // The badges read the kinds that live in the fact type, once.
+    const internal = ft.internalConstraints;
     // Determine which roles have single-role internal uniqueness.
     const singleRoleUniqueIds = new Set<string>();
     let hasSpanning = false;
 
-    for (const c of ft.constraints) {
+    for (const c of internal) {
       if (c.type === "internal_uniqueness") {
         if (c.roleIds.length === 1 && c.roleIds[0]) {
           singleRoleUniqueIds.add(c.roleIds[0]);
@@ -159,7 +219,7 @@ export function modelToGraph(
 
     // Determine which roles are mandatory.
     const mandatoryRoleIds = new Set<string>();
-    for (const c of ft.constraints) {
+    for (const c of internal) {
       if (c.type === "mandatory") {
         mandatoryRoleIds.add(c.roleId);
       }
@@ -167,7 +227,7 @@ export function modelToGraph(
 
     // Collect frequency constraints per role.
     const frequencyByRole = new Map<string, { min: number; max: number | "unbounded"; }>();
-    for (const c of ft.constraints) {
+    for (const c of internal) {
       // Single-role frequency renders as a per-role badge; a multi-role
       // (role-sequence) frequency has no single-role anchor and is skipped.
       if (c.type === "frequency" && c.roleIds.length === 1) {
@@ -177,7 +237,7 @@ export function modelToGraph(
 
     // Detect ring constraint (at most one per fact type).
     let ringConstraint: FactTypeNode["ringConstraint"];
-    for (const c of ft.constraints) {
+    for (const c of internal) {
       if (c.type === "ring") {
         ringConstraint = {
           label: RING_TYPE_LABELS[c.ringType],
@@ -207,6 +267,7 @@ export function modelToGraph(
     const objectifiedEntityName = objectifiedMap.get(ft.id);
     const ftAnnotations = annotationMap?.get(ft.id);
 
+    drawnFactTypeIds.add(ft.id);
     nodes.push({
       kind: "fact_type",
       id: ft.id,
@@ -239,73 +300,87 @@ export function modelToGraph(
 
   // Extract constraints that are rendered as circled symbol nodes.
   // This covers external uniqueness, exclusion, exclusive-or,
-  // disjunctive mandatory, subset, and equality constraints.
-  let constraintIndex = 0;
+  // disjunctive mandatory, subset, and equality constraints. Each node
+  // takes its constraint's own id, so a selection, a view or a diff names
+  // the same node whatever order the file lists constraints in
+  // (orm-format-3, Open decision 9); a counter used to number them.
+  // Drawn only where it attaches to a fact type with a node, with edges to
+  // those fact types only: none floats, and no edge points at a fact type
+  // absorbed into a reference mode or left out of a neighbourhood view.
 
-  /** Helper: create a constraint node and edges for a set of role ids. */
+  const across = model.constraints;
+  const nodeIds = constraintNodeIds(
+    model,
+    across.filter((c) => !Object.hasOwn(NOT_DRAWN, c.type)),
+  );
+
+  /**
+   * Draw a constraint as a node with an edge to each of its roles whose fact
+   * type got a node (both sides for subset/equality). One with no such role
+   * has nothing to attach to, absorbed, filtered out or dangling, and is not
+   * drawn.
+   */
   function addConstraintNode(
+    c: Constraint,
     kind: ConstraintKind,
     roleIds: readonly string[],
     supersetRoleIds?: readonly string[],
   ): void {
-    const constraintId = `constraint-${constraintIndex++}`;
-    const node: ConstraintNode = {
-      kind: "constraint",
-      id: constraintId,
-      constraintKind: kind,
-      roleIds: [...roleIds],
-      supersetRoleIds: supersetRoleIds ? [...supersetRoleIds] : undefined,
-    };
-    nodes.push(node);
-
-    // Create edges to all covered roles (both sides for subset/equality).
     const allRoleIds = supersetRoleIds
       ? [...roleIds, ...supersetRoleIds]
       : roleIds;
-    for (const roleId of allRoleIds) {
+    const attached = allRoleIds.flatMap((roleId) => {
       const factTypeId = roleToFactType.get(roleId);
-      if (factTypeId) {
-        constraintEdges.push({
-          constraintNodeId: constraintId,
-          factTypeNodeId: factTypeId,
-          roleId,
-        });
-      }
+      return factTypeId && drawnFactTypeIds.has(factTypeId) ? [{ factTypeId, roleId }] : [];
+    });
+    if (attached.length === 0) return;
+
+    const constraintId = nodeIds.get(c)!;
+    nodes.push(
+      {
+        kind: "constraint",
+        id: constraintId,
+        constraintKind: kind,
+        roleIds: [...roleIds],
+        supersetRoleIds: supersetRoleIds ? [...supersetRoleIds] : undefined,
+      } satisfies ConstraintNode,
+    );
+    for (const { factTypeId, roleId } of attached) {
+      constraintEdges.push({ constraintNodeId: constraintId, factTypeNodeId: factTypeId, roleId });
     }
   }
 
-  for (const ft of model.factTypes) {
-    if (absorbedFactTypeIds.has(ft.id)) continue;
-    for (const c of ft.constraints) {
-      switch (c.type) {
-        case "external_uniqueness":
-          addConstraintNode("external_uniqueness", c.roleIds);
-          break;
-        case "exclusion":
-          addConstraintNode("exclusion", c.roleIds);
-          break;
-        case "exclusive_or":
-          addConstraintNode("exclusive_or", c.roleIds);
-          break;
-        case "disjunctive_mandatory":
-          addConstraintNode("disjunctive_mandatory", c.roleIds);
-          break;
-        case "subset":
-          addConstraintNode("subset", c.subsetRoleIds, c.supersetRoleIds);
-          break;
-        case "equality":
-          addConstraintNode("equality", c.roleIds1, c.roleIds2);
-          break;
-        default: {
-          // Narrowed to exactly the kinds declared not-drawn below; a
-          // new Constraint member missing from both the cases above
-          // and NOT_DRAWN fails to compile instead of silently not
-          // rendering (barwise-869: the join/comparison/cardinality
-          // kinds were undrawn with nothing recording the intent).
-          const reason: string = NOT_DRAWN[c.type];
-          void reason;
-          break;
-        }
+  // Every constraint across fact types, once, wherever a 2.0 file nests
+  // it: the nesting fact type used to decide whether it was drawn at all.
+  for (const c of across) {
+    switch (c.type) {
+      case "external_uniqueness":
+        addConstraintNode(c, "external_uniqueness", c.roleIds);
+        break;
+      case "exclusion":
+        addConstraintNode(c, "exclusion", c.roleIds);
+        break;
+      case "exclusive_or":
+        addConstraintNode(c, "exclusive_or", c.roleIds);
+        break;
+      case "disjunctive_mandatory":
+        addConstraintNode(c, "disjunctive_mandatory", c.roleIds);
+        break;
+      case "subset":
+        addConstraintNode(c, "subset", c.subsetRoleIds, c.supersetRoleIds);
+        break;
+      case "equality":
+        addConstraintNode(c, "equality", c.roleIds1, c.roleIds2);
+        break;
+      default: {
+        // Narrowed to the external kinds not drawn, the join kinds today.
+        // NOT_DRAWN's type is the compile check for every kind, internal
+        // ones included: a new member missing from both the cases above
+        // and that record fails to compile instead of silently not
+        // rendering (barwise-869).
+        const reason: string = NOT_DRAWN[c.type];
+        void reason;
+        break;
       }
     }
   }

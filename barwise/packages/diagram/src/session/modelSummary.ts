@@ -114,7 +114,10 @@ export function buildModelSummary(model: OrmModel): ModelSummary {
         playerName: playerNames[i]!,
       })),
       readings: ft.readings.map((reading) => renderReading(reading.template, playerNames)),
-      constraints: ft.constraints.map((c) => ({
+      // Every constraint that applies to the fact type, as the sidebar and
+      // describe list them: a constraint across fact types under each
+      // fact type it spans, not under the one a 2.0 file nests it in.
+      constraints: model.constraintsTouching(ft.id).map((c) => ({
         ...(c.id !== undefined && { id: c.id }),
         type: c.type,
       })),
