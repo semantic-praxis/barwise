@@ -43,7 +43,7 @@ describe("createProgram", () => {
   it("registers every command, in the order --help lists them, when none is named", async () => {
     const program = await createProgram("0.0.0-test");
     expect(program.commands.map((c) => c.name())).toEqual(COMMAND_NAMES);
-    expect(COMMAND_NAMES).toHaveLength(18);
+    expect(COMMAND_NAMES).toHaveLength(19);
   });
 
   it("registers every command for a name it does not know", async () => {
@@ -78,7 +78,7 @@ describe("src/cli.ts", () => {
       )
       .map((f) => f.replace(/\.ts$/, ".js"));
     const missing = registering.filter((f) => !source.includes(`import("./commands/${f}")`));
-    expect(registering).toHaveLength(18);
+    expect(registering).toHaveLength(19);
     expect(missing).toEqual([]);
   });
 });

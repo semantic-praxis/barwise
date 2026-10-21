@@ -229,3 +229,58 @@ model:
     ]]);
   });
 });
+
+describe("migrate", () => {
+  const twoFlags = `orm_version: "2.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-c, name: Customer, kind: entity, reference_mode: nr }
+    - { id: ot-nr, name: CustomerNr, kind: value }
+    - { id: ot-n, name: Name, kind: value }
+    - { id: ot-e, name: Email, kind: value }
+  fact_types:
+    - id: ft-nr
+      name: Customer has CustomerNr
+      roles:
+        - { id: r-c, player: ot-c, role_name: has }
+        - { id: r-nr, player: ot-nr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: u-nr, type: internal_uniqueness, roles: [r-nr], is_preferred: true }
+    - id: ft-e
+      name: Customer has Email
+      roles:
+        - { id: r-ce, player: ot-c, role_name: has }
+        - { id: r-e, player: ot-e, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: u-e, type: internal_uniqueness, roles: [r-e], is_preferred: true }
+    - id: ft-n
+      name: Customer has Name
+      roles:
+        - { id: r-cn, player: ot-c, role_name: has }
+        - { id: r-n, player: ot-n, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: u-cn, type: internal_uniqueness, roles: [r-cn], is_preferred: true }
+`;
+
+  it("names each flag the 2.0 reader dropped, and the identifier it kept of several", () => {
+    const result = yaml.migrate(twoFlags);
+    expect(result.from).toBe("2.0");
+    expect(result.notes).toEqual([
+      { kind: "flag-dropped", factType: "Customer has Name", constraintId: "u-cn" },
+      { kind: "identifier-chosen", entity: "Customer", kept: "u-nr", others: ["u-e"] },
+    ]);
+    expect(result.model.preferredIdentifierOf("ot-c")).toBe("u-nr");
+  });
+
+  it("reports nothing for a 3.0 file, and the same model deserialize gives", () => {
+    const text = yaml.serialize(shop());
+    const result = yaml.migrate(text);
+    expect(result.from).toBe("3.0");
+    expect(result.notes).toEqual([]);
+    expect(yaml.serialize(result.model)).toBe(yaml.serialize(yaml.deserialize(text)));
+  });
+});

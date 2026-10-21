@@ -6,7 +6,7 @@ import {
   isInternalConstraint,
   placementOf,
 } from "../model/Constraint.js";
-import { storePreferredFlags } from "../model/identification.js";
+import { type PlacedFlags, storePreferredFlags } from "../model/identification.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
@@ -75,6 +75,26 @@ function versionErrorMessage(
  * schema. The deserializer validates incoming YAML against the schema
  * before constructing the model.
  */
+/** What reading a file changed beyond its format (`OrmYamlSerializer.migrate`). */
+export type MigrationNote =
+  /** A 2.0 `is_preferred` flag that identifies no entity, so it was dropped. */
+  | { readonly kind: "flag-dropped"; readonly factType: string; readonly constraintId: string; }
+  /** An entity two or more 2.0 flags named; the reference keeps `kept`. */
+  | {
+    readonly kind: "identifier-chosen";
+    readonly entity: string;
+    readonly kept: string;
+    readonly others: readonly string[];
+  };
+
+/** A file read into the model, with the version it stated and its notes. */
+export interface MigrationResult {
+  readonly model: OrmModel;
+  /** The `orm_version` the file stated. */
+  readonly from: string | undefined;
+  readonly notes: readonly MigrationNote[];
+}
+
 export class OrmYamlSerializer {
   /**
    * Compiled on first use, not in the constructor.
@@ -133,7 +153,22 @@ export class OrmYamlSerializer {
    *   used to (barwise-997).
    */
   deserialize(yaml: string, options?: { lenient?: boolean; }): OrmModel {
+    return this.migrate(yaml, options).model;
+  }
+
+  /**
+   * `deserialize`, saying where the file came from and what reading it
+   * changed beyond its format: the version it states, and each 2.0
+   * `is_preferred` flag the model could not carry as written
+   * (`MigrationNote`). A 3.0 file has no notes. `barwise migrate` reports
+   * them; every other caller wants only the model (orm-format-3 WS4b-iii).
+   */
+  migrate(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
     const raw = parse(yaml) as unknown;
+    const stated = typeof raw === "object" && raw !== null
+      ? (raw as { orm_version?: unknown; }).orm_version
+      : undefined;
+    const from = typeof stated === "string" ? stated : undefined;
     const { doc, version } = this.bringToReadableVersion(raw);
 
     // A 2.0 file is read by the 2.0 reader, against the 2.0 schema frozen
@@ -142,11 +177,12 @@ export class OrmYamlSerializer {
     // state, and a 2.0 file saved writes 3.0 (orm-format-3 WS4b).
     if (version === LEGACY_ORM_VERSION) {
       this.check(this.validator.validateLegacyModel(doc));
-      return readDocument20(doc as OrmYamlDocument, options);
+      const { model, placed } = readLegacy(doc as OrmYamlDocument, options);
+      return { model, from, notes: migrationNotes(model, placed) };
     }
     if (version === CURRENT_ORM_VERSION) refuseMisplacedConstraints(doc);
     this.check(this.validator.validateModel(doc));
-    return this.fromDocument(doc as OrmYamlDocument, options);
+    return { model: this.fromDocument(doc as OrmYamlDocument, options), from, notes: [] };
   }
 
   private check(result: SchemaValidationResult): void {
@@ -419,6 +455,14 @@ function isPlacedKind(c: unknown, where: "internal" | "external"): c is { type: 
  *   no entity is dropped; two naming one entity resolve as that rule says.
  */
 export function readDocument20(doc: OrmYamlDocument, options?: { lenient?: boolean; }): OrmModel {
+  return readLegacy(doc, options).model;
+}
+
+/** `readDocument20`, with what step 4 made of the file's flags. */
+function readLegacy(
+  doc: OrmYamlDocument,
+  options?: { lenient?: boolean; },
+): { readonly model: OrmModel; readonly placed: PlacedFlags; } {
   const model = new OrmModel({
     name: doc.model.name,
     domainContext: doc.model.domain_context,
@@ -477,6 +521,32 @@ export function readDocument20(doc: OrmYamlDocument, options?: { lenient?: boole
   // Objectifications before the flags: an objectified fact type's flag
   // names the objectifying type.
   readTail(model, doc, options);
-  storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
-  return model;
+  const placed = storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
+  return { model, placed };
+}
+
+/**
+ * What the 2.0 reader made of the flags it could not carry into the model
+ * as they stood: a flag that identifies no entity, and an entity two or
+ * more flags name, of which the stored reference keeps one.
+ */
+function migrationNotes(model: OrmModel, placed: PlacedFlags): MigrationNote[] {
+  const notes: MigrationNote[] = [];
+  for (const c of placed.dropped) {
+    const factType = c.id === undefined ? undefined : model.getConstraintInView(c.id)?.[1];
+    notes.push({ kind: "flag-dropped", factType: factType?.name ?? "", constraintId: c.id ?? "" });
+  }
+  for (const [entityId, candidates] of placed.candidates) {
+    if (candidates.length < 2) continue;
+    const kept = placed.byEntity.get(entityId)!.constraint.id ?? "";
+    notes.push({
+      kind: "identifier-chosen",
+      entity: model.getObjectType(entityId)?.name ?? entityId,
+      kept,
+      others: candidates.flatMap((at) =>
+        at.constraint.id !== undefined && at.constraint.id !== kept ? [at.constraint.id] : []
+      ),
+    });
+  }
+  return notes;
 }

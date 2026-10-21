@@ -198,6 +198,35 @@ Options:
 - `--output <file>` -- write the merged model to a file instead of stdout
 - `--format <yaml|json>` -- output format (default: yaml)
 
+### migrate
+
+Rewrite `.orm.yaml` files in place as the current format (3.0).
+
+```sh
+barwise migrate model.orm.yaml
+barwise migrate domains/*.orm.yaml
+barwise migrate --check models/*.orm.yaml
+```
+
+Every barwise build reads older files without this command: a 2.0 file
+loads unchanged and is written as 3.0 on its next save. `migrate` does
+that rewrite for every named file at once, and says what reading each
+one changed beyond the format. A 2.0 `is_preferred` flag that identifies
+no entity type is dropped, and of two flags that name one entity type,
+one is kept. Each is printed under its file. Run `barwise validate` with
+your 2.x build first if you want to see those cases before they are
+resolved.
+
+This is the one command that modifies its inputs. A file already at 3.0
+is left untouched. A file that cannot be read or does not load is
+reported, the rest are still migrated, and the command exits 1.
+
+Options:
+
+- `--check` -- write nothing; exit 1 if any file would be rewritten
+- `--format <text|json>` -- output format (default: text); json prints one
+  record per file
+
 ### review
 
 Review a model's semantic quality using an LLM. Distinct from
