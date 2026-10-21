@@ -180,6 +180,10 @@ export function diffModels(
   }
 
   // --- Constraints across fact types ---
+  // Model order, the constraint's own model first, for naming the fact
+  // types each spans.
+  const incomingFirst = [...incoming.factTypes, ...existing.factTypes];
+  const existingFirst = [...existing.factTypes, ...incoming.factTypes];
   for (const pair of pairModelConstraints(existing, incoming, holders, pairing)) {
     const kind: DeltaKind = !pair.existing
       ? "added"
@@ -195,13 +199,12 @@ export function diffModels(
     // first), which is how validation and verbalization name its span; its
     // role labels use the first holder. One lookup serves both, so the two
     // cannot disagree.
-    const [ownModel, otherModel, own, other] = pair.incoming
-      ? [incoming, existing, holders.incoming, holders.existing]
-      : [existing, incoming, holders.existing, holders.incoming];
+    const [order, own, other] = pair.incoming
+      ? [incomingFirst, holders.incoming, holders.existing]
+      : [existingFirst, holders.existing, holders.incoming];
     const roleIds = roleIdsOf(named);
     const holdersOf = (id: string) => own.get(id) ?? other.get(id) ?? [];
     const spanned = new Set(roleIds.flatMap(holdersOf));
-    const order = [...ownModel.factTypes, ...otherModel.factTypes];
     const changes = pair.modified && pair.existing && pair.incoming
       ? [{
         change: "constraintsModified" as const,
@@ -212,7 +215,8 @@ export function diffModels(
       kind,
       elementType: "constraint",
       constraintType: named.type,
-      factTypes: order.filter((ft) => spanned.has(ft)).map((ft) => ft.name),
+      // By name, once: a fragment's fact type and the full model's can share it.
+      factTypes: [...new Set(order.filter((ft) => spanned.has(ft)).map((ft) => ft.name))],
       roles: roleIds.map((id) => {
         const holder = holdersOf(id)[0];
         return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;
