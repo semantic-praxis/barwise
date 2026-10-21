@@ -9,7 +9,7 @@
  * mutation of the model it was computed from. See the module comment on
  * `changeDescription.ts` for why.
  */
-import type { Constraint, JoinOperand } from "../model/Constraint.js";
+import type { Constraint, ExternalConstraint, JoinOperand } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
 import {
@@ -255,9 +255,11 @@ export function diffFactType(
   // indexes, so constraintKey can resolve role IDs to positions (stable
   // across LLM re-extractions and imports), or, for a pair joined by its
   // constraint id, to the role ids themselves (see `pairRoleKeys`).
+  // A fact type's own constraints only: one across fact types is the
+  // model's, and its own delta (`pairModelConstraints`) reports it.
   const constraintDiff = diffConstraints(
-    a.constraints,
-    b.constraints,
+    a.internalConstraints,
+    b.internalConstraints,
     a.roles,
     b.roles,
     holders.existing,
@@ -539,6 +541,41 @@ function operandKey(o: JoinOperand): string {
   return `${path}#${o.projection.join(",")}`;
 }
 
+/**
+ * The constraints of `a` paired by id with one of `b`, where an id names
+ * exactly one constraint in each model, and whether the pair says
+ * something different. An id given twice anywhere in a model
+ * (barwise-b2s) pairs nothing, so those constraints fall through to
+ * content rather than pairing one of them arbitrarily. Content matching
+ * pairs nothing here. One function for a fact type's own constraints and
+ * the model's, so the two cannot come to pair differently.
+ */
+function pairById<C extends Constraint>(
+  a: readonly C[],
+  b: readonly C[],
+  keysA: RoleKeys,
+  keysB: RoleKeys,
+  holdersA: RoleHolders,
+  holdersB: RoleHolders,
+  pairing: ConstraintPairing,
+): Map<C, { readonly to: C; readonly changed: boolean; }> {
+  const pairs = new Map<C, { readonly to: C; readonly changed: boolean; }>();
+  if (pairing.matching !== "id-first") return pairs;
+  // The key for comparing a pair joined by id; see `pairRoleKeys`.
+  const pairA = pairRoleKeys(keysA, holdersA, holdersB);
+  const pairB = pairRoleKeys(keysB, holdersB, holdersA);
+  const byIdB = new Map(
+    b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
+  );
+  for (const ca of a) {
+    if (ca.id === undefined || pairing.repeatedA.has(ca.id)) continue;
+    const cb = byIdB.get(ca.id);
+    if (!cb) continue;
+    pairs.set(ca, { to: cb, changed: constraintKey(ca, pairA) !== constraintKey(cb, pairB) });
+  }
+  return pairs;
+}
+
 function diffConstraints(
   a: readonly Constraint[],
   b: readonly Constraint[],
@@ -560,22 +597,11 @@ function diffConstraints(
   // WS3c, though every constraint in a model has one (barwise-nkq).
   const paired = new Set<Constraint>();
   const modified: { from: Constraint; to: Constraint; }[] = [];
-  if (pairing.matching === "id-first") {
-    // The key for comparing a pair joined by id; see `pairRoleKeys`.
-    const pairMapA = pairRoleKeys(idxMapA, holdersA, holdersB);
-    const pairMapB = pairRoleKeys(idxMapB, holdersB, holdersA);
-    const byIdB = new Map(
-      b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
-    );
-    for (const ca of a) {
-      if (ca.id === undefined || pairing.repeatedA.has(ca.id)) continue;
-      const cb = byIdB.get(ca.id);
-      if (!cb) continue;
-      paired.add(ca).add(cb);
-      if (constraintKey(ca, pairMapA) !== constraintKey(cb, pairMapB)) {
-        modified.push({ from: ca, to: cb });
-      }
-    }
+  for (
+    const [ca, { to, changed }] of pairById(a, b, idxMapA, idxMapB, holdersA, holdersB, pairing)
+  ) {
+    paired.add(ca).add(to);
+    if (changed) modified.push({ from: ca, to });
   }
   const restA = a.filter((c) => !paired.has(c));
   const restB = b.filter((c) => !paired.has(c));
@@ -605,6 +631,64 @@ function diffConstraints(
   }
 
   return changes;
+}
+
+/** One constraint across fact types matched, or not, between two models. */
+export interface ConstraintPair {
+  readonly existing?: ExternalConstraint;
+  readonly incoming?: ExternalConstraint;
+  /** Paired by id and saying something different. */
+  readonly modified: boolean;
+}
+
+/**
+ * Match the constraints across fact types of two models one to one
+ * (orm-format-3 WS3c): by id first, as `diffConstraints` does, then by
+ * content. With no host, every role is keyed by its fact type's name and
+ * position there (`roleKeys` given no host roles), so the key no longer
+ * depends on where a 2.0 file nested the constraint. Content pairs are
+ * taken one for one, so a second identical copy in one model reads as
+ * added or removed, where a fact type's list compares keys as a set.
+ * Existing order first, then what only the incoming model has.
+ */
+export function pairModelConstraints(
+  existing: OrmModel,
+  incoming: OrmModel,
+  holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; },
+  pairing: ConstraintPairing,
+): ConstraintPair[] {
+  const a = existing.constraints;
+  const b = incoming.constraints;
+  const keysA = roleKeys([], holders.existing, holders.incoming);
+  const keysB = roleKeys([], holders.incoming, holders.existing);
+  const pairOf = new Map<ExternalConstraint, ConstraintPair>();
+  const taken = new Set<ExternalConstraint>();
+  const byId = pairById(a, b, keysA, keysB, holders.existing, holders.incoming, pairing);
+  for (const [ca, { to, changed }] of byId) {
+    taken.add(to);
+    pairOf.set(ca, { existing: ca, incoming: to, modified: changed });
+  }
+  const byKeyB = new Map<string, ExternalConstraint[]>();
+  for (const cb of b) {
+    if (taken.has(cb)) continue;
+    const key = constraintKey(cb, keysB);
+    const list = byKeyB.get(key);
+    if (list) list.push(cb);
+    else byKeyB.set(key, [cb]);
+  }
+  for (const ca of a) {
+    if (pairOf.has(ca)) continue;
+    const cb = byKeyB.get(constraintKey(ca, keysA))?.shift();
+    if (cb) taken.add(cb);
+    pairOf.set(
+      ca,
+      cb ? { existing: ca, incoming: cb, modified: false } : { existing: ca, modified: false },
+    );
+  }
+  return [
+    ...a.map((ca) => pairOf.get(ca)!),
+    ...b.filter((cb) => !taken.has(cb)).map((cb) => ({ incoming: cb, modified: false })),
+  ];
 }
 
 /**

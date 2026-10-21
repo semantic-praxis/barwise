@@ -135,6 +135,9 @@ const REMOVAL_LEVEL = {
   subtype_fact: "breaking",
   objectified_fact_type: "breaking",
   population: "caution",
+  // A constraint is a rule on populations, not shape: removing one reads
+  // as `constraintsRemoved` on a fact type did.
+  constraint: "caution",
 } as const satisfies Record<ElementType, BreakingLevel>;
 
 export function classifyBreakingLevel(
@@ -142,7 +145,10 @@ export function classifyBreakingLevel(
   changes: readonly ChangeDescription[],
   elementType: ElementType,
 ): BreakingLevel {
-  if (kind === "unchanged" || kind === "added") return "safe";
+  if (kind === "unchanged") return "safe";
+  // Adding a constraint narrows what a model admits, as `constraintsAdded`
+  // on a fact type did; adding any other element widens it.
+  if (kind === "added") return elementType === "constraint" ? "caution" : "safe";
   if (kind === "removed") return REMOVAL_LEVEL[elementType];
 
   // Modified: classify each change and take the most severe.

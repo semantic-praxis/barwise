@@ -1,6 +1,7 @@
 /**
  * Delta and result types produced by the model diff engine.
  */
+import type { ExternalConstraint } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { FactType } from "../model/FactType.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
@@ -143,13 +144,40 @@ export interface PopulationDelta extends DeltaCommon {
   readonly incoming?: Population;
 }
 
+/**
+ * A constraint across fact types (orm-format-3 WS3c). It lives in the
+ * model, not in any fact type, so it has a delta of its own: before the
+ * move it was a change to whichever fact type a 2.0 file nested it under,
+ * and a constraint whose host differed between the two sides read as
+ * removed from one fact type and added to another.
+ *
+ * It has no name, so it is named by its kind and the fact types it spans.
+ */
+export interface ConstraintDelta extends DeltaCommon {
+  readonly elementType: "constraint";
+  readonly constraintType: ExternalConstraint["type"];
+  /**
+   * The names of the fact types it spans, in model order, from the
+   * incoming side when it has one: what a person reads it by.
+   */
+  readonly factTypes: readonly string[];
+  /**
+   * Its roles in its own order, each as "fact type (role)", or the raw id
+   * of one no fact type holds, from the same side as `factTypes`.
+   */
+  readonly roles: readonly string[];
+  readonly existing?: ExternalConstraint;
+  readonly incoming?: ExternalConstraint;
+}
+
 export type ModelDelta =
   | ObjectTypeDelta
   | FactTypeDelta
   | DefinitionDelta
   | SubtypeFactDelta
   | ObjectifiedFactTypeDelta
-  | PopulationDelta;
+  | PopulationDelta
+  | ConstraintDelta;
 
 /**
  * Which kind of element a delta is about.
@@ -185,6 +213,7 @@ const ELEMENT_LABEL = {
   subtype_fact: "Subtype fact",
   objectified_fact_type: "Objectification",
   population: "Population",
+  constraint: "Constraint",
 } as const satisfies Record<ElementType, string>;
 
 /** Every element kind a delta can be about. Derived from the label table. */
@@ -241,6 +270,12 @@ export function elementName(delta: ModelDelta): string {
       return `${delta.subtype.name} is a subtype of ${delta.supertype.name}`;
     case "objectified_fact_type":
       return `${delta.objectType.name} objectifies ${delta.factType.name}`;
+    // Its kind and its roles, each by its fact type and role name, in the
+    // constraint's own order: two constraints of one kind over the same
+    // fact types differ in their roles, or the review panel would offer two
+    // identical checkboxes, as it did for populations.
+    case "constraint":
+      return `${delta.constraintType.replace(/_/g, " ")} over ${delta.roles.join(", ")}`;
     // The flag is part of the identity, so it belongs in the name. The
     // description is NOT part of the identity -- it is prose, and keying
     // on it would turn a rewording into a delete plus an insert -- but

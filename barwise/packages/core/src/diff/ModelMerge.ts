@@ -14,6 +14,7 @@
  * Returns a freshly constructed OrmModel (no mutation of inputs).
  */
 
+import { type ExternalConstraint, roleIdsOf } from "../model/Constraint.js";
 import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
@@ -28,6 +29,7 @@ import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
 import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
 import type {
+  ConstraintDelta,
   DefinitionDelta,
   FactTypeDelta,
   ModelDelta,
@@ -184,6 +186,53 @@ export function mergeModels(
         recordIncomingRoleRemap(incomingRoleIdToMergedId, delta.incoming!, delta.existing!);
       }
       incomingFtIdToMergedId.set(delta.incoming!.id, delta.existing!.id);
+    }
+  }
+
+  // Phase 2b: constraints across fact types (orm-format-3 WS3c). After
+  // fact types, because each names their roles, and the role ids it
+  // carries are its source model's: an existing constraint goes through
+  // `roleIdMap` where a fact type took the incoming roles, an incoming
+  // one through `incomingRoleIdToMergedId` where a fact type kept the
+  // existing ones.
+  const constraintDeltas = deltas
+    .map((d, i) => [d, i] as const)
+    .filter(([d]) => d.elementType === "constraint") as [ConstraintDelta, number][];
+
+  const rolesOf = (m: OrmModel) => new Set(m.factTypes.flatMap((ft) => ft.roles.map((r) => r.id)));
+  const mergedRoles = rolesOf(merged);
+  const sourceRoles = new Set([...rolesOf(existing), ...rolesOf(incoming)]);
+  for (const [delta, idx] of constraintDeltas) {
+    const isAccepted = accepted.has(idx);
+    // In order of preference: an accepted modification whose incoming
+    // version names a role the merge took falls back to the existing one,
+    // which the reviewer did not ask to remove.
+    const candidates = delta.kind === "unchanged"
+      ? [delta.existing]
+      : delta.kind === "added"
+      ? (isAccepted ? [delta.incoming] : [])
+      : delta.kind === "removed"
+      ? (isAccepted ? [] : [delta.existing])
+      : (isAccepted ? [delta.incoming, delta.existing] : [delta.existing]);
+    for (const chosen of candidates) {
+      if (!chosen) continue;
+      const fromIncoming = chosen === delta.incoming;
+      const remapped = remapConstraintIds(
+        [mapRoleIds(chosen, fromIncoming ? incomingRoleIdToMergedId : roleIdMap)],
+        merged,
+        incomingIdToMergedId,
+      )[0] as ExternalConstraint;
+      // A role the merged model does not hold, where one of the two models
+      // did, was taken by the merge itself: a rejected fact type addition
+      // or an accepted removal. The constraint goes with it, as a
+      // population does, rather than surviving with a dangling role. A
+      // role neither model ever held is the file's own dangling reference
+      // and is carried through, so validation reports it.
+      const lost = roleIdsOf(remapped).some((id) => !mergedRoles.has(id) && sourceRoles.has(id));
+      if (lost) continue;
+      // A modification is paired by id, so either side carries the existing id.
+      merged.addConstraint(remapped);
+      break;
     }
   }
 
@@ -592,7 +641,7 @@ function addFactTypeToMerged(
       ...r,
       playerId: resolvePlayerId(merged, r.playerId, incomingIdToMergedId, source),
     })),
-    constraints: remapConstraintIds(source.constraints, source, merged, incomingIdToMergedId),
+    constraints: remapConstraintIds(source.internalConstraints, merged, incomingIdToMergedId),
   };
 
   merged.addFactType(config);
@@ -664,13 +713,12 @@ function resolveFactTypeId(
  * constraints, whose operand paths carry a root object-type id, remap
  * that root here.
  */
-function remapConstraintIds(
-  constraints: readonly import("../model/Constraint.js").Constraint[],
-  _source: import("../model/FactType.js").FactType,
+function remapConstraintIds<C extends import("../model/Constraint.js").Constraint>(
+  constraints: readonly C[],
   merged: OrmModel,
   idMap: Map<string, string>,
-): import("../model/Constraint.js").Constraint[] {
-  return constraints.map((c) => {
+): C[] {
+  return constraints.map((c): C => {
     if (c.type === "join_subset") {
       return {
         ...c,
@@ -686,6 +734,34 @@ function remapConstraintIds(
     }
     return c;
   });
+}
+
+/**
+ * Rewrite every role id a constraint names through a role remap, in
+ * whatever field its kind keeps them (join paths included): the walk is
+ * over the constraint's values rather than a list of its fields, so a
+ * kind added later is covered. A role mapped to null keeps its id, and
+ * the caller's role check decides what that means. Only role ids are
+ * keys of the map, so no other string can match.
+ */
+function mapRoleIds<C extends import("../model/Constraint.js").Constraint>(
+  constraint: C,
+  roleIdMap: ReadonlyMap<string, string | null>,
+): C {
+  if (roleIdMap.size === 0) return constraint;
+  const walk = (value: unknown, key: string | undefined): unknown => {
+    if (typeof value === "string") {
+      if (key === "id" || key === "type" || key === "modality") return value;
+      const mapped = roleIdMap.get(value);
+      return mapped === undefined || mapped === null ? value : mapped;
+    }
+    if (Array.isArray(value)) return value.map((v) => walk(v, key));
+    if (value !== null && typeof value === "object") {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, walk(v, k)]));
+    }
+    return value;
+  };
+  return walk(constraint, undefined) as C;
 }
 
 /**

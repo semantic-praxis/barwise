@@ -11,6 +11,7 @@
  *     valueConstraint, readings, role names, role players, constraints)
  */
 import { describe, expect, it } from "vitest";
+import { parse, stringify } from "yaml";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
@@ -1541,10 +1542,13 @@ describe("diffModels", () => {
     };
 
     const result = diffModels(make("pc-country"), make("pc-country-2"));
-    const delta = result.deltas.find(
-      (d) => d.kind === "modified" && d.elementType === "fact_type" && d.name?.includes("citizen"),
+    // A join constraint spans fact types, so it is the model's and has a
+    // delta of its own (WS3c). Built in code twice, its ids differ, so the
+    // changed path reads as one removed and one added rather than modified.
+    const kinds = result.deltas.flatMap((d) =>
+      d.elementType === "constraint" && d.constraintType === "join_equality" ? [d.kind] : []
     );
-    expect(delta).toBeDefined();
+    expect(kinds.sort()).toEqual(["added", "removed"]);
   });
 });
 
@@ -1591,9 +1595,19 @@ describe("a constraint over roles of other fact types", () => {
     const yaml = new OrmYamlSerializer();
     return yaml.deserialize(yaml.serialize(m).replace(/::role(\d)/g, "::minted-$1"));
   };
+  // A constraint across fact types has its own delta since WS3c; read an
+  // added or removed one as the change kind a fact type used to report.
   const constraintChanges = (a: OrmModel, b: OrmModel) =>
     diffModels(a, b).deltas.flatMap((d) =>
-      d.changes.filter((c) => c.change === "constraintsAdded" || c.change === "constraintsRemoved")
+      d.elementType === "constraint"
+        ? d.kind === "added"
+          ? [{ change: "constraintsAdded" }]
+          : d.kind === "removed"
+          ? [{ change: "constraintsRemoved" }]
+          : []
+        : d.changes.filter((c) =>
+          c.change === "constraintsAdded" || c.change === "constraintsRemoved"
+        )
     );
 
   it("is unchanged when only the role ids differ", () => {
@@ -1694,11 +1708,29 @@ describe("a constraint over roles of other fact types", () => {
     ).toEqual(["constraintsAdded", "constraintsRemoved"]);
   });
 
-  it("that moved to another host still reads as removed from one and added to the other", () => {
-    // Not host-independent, on purpose: merge rebuilds fact types from
-    // deltas, so a move reported nowhere could be dropped (see the spec's
-    // open decision).
-    expect(constraintChanges(model("number"), model("name")).map((c) => c.change).sort())
-      .toEqual(["constraintsAdded", "constraintsRemoved"]);
+  it("that a 2.0 file nests under another fact type is the same constraint", () => {
+    // Host-independent since WS3c: the model holds it, so where a file
+    // nested it says nothing, and merge applies the constraint's own delta.
+    const nested = (host: string) => {
+      const m = model("number");
+      const c = m.constraints[0]!;
+      const yaml = new OrmYamlSerializer();
+      const doc = parse(yaml.serialize(m));
+      for (const ft of doc.model.fact_types) {
+        ft.constraints = (ft.constraints ?? []).filter((x: { type: string; }) => x.type !== c.type);
+        if (ft.constraints.length === 0) delete ft.constraints;
+      }
+      const target = doc.model.fact_types.find((ft: { name: string; }) => ft.name === host);
+      target.constraints = [...(target.constraints ?? []), {
+        type: c.type,
+        roles: (c as { roleIds: string[]; }).roleIds,
+        id: c.id,
+      }];
+      return yaml.deserialize(stringify(doc));
+    };
+    const a = nested("Room has RoomNumber");
+    const b = nested("Room is in Building");
+    expect(constraintChanges(a, b)).toEqual([]);
+    expect(diffModels(a, b).hasChanges).toBe(false);
   });
 });

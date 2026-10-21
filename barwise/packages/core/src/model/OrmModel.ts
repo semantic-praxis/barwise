@@ -2,13 +2,12 @@ import {
   type Constraint,
   type ExternalConstraint,
   type InternalConstraint,
-  isExternalConstraint,
-  isInternalConstraint,
   roleIdsOf,
 } from "./Constraint.js";
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
+import { generateId } from "./id.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
@@ -65,6 +64,7 @@ export class OrmModel {
   private readonly _populations: Map<string, Population> = new Map();
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
+  private readonly _constraints: ExternalConstraint[] = [];
 
   constructor(config: OrmModelConfig) {
     if (!config.name || config.name.trim().length === 0) {
@@ -195,20 +195,34 @@ export class OrmModel {
 
   /**
    * The constraints that live in the model: the external kinds, whose roles
-   * may span fact types (orm-format-3, placement by kind). Until storage
-   * moves (WS3c) they are read from the fact types a 2.0 file nests them
-   * under, in fact type order and then list order -- the order a reader
-   * walking every fact type's list met them in, so a reader of the external
-   * kinds alone that switches to this list reports in the same order. A
-   * reader of every kind that moves to `internalConstraints` plus this
-   * list does not: a view of one fact type says its own constraints first,
-   * and a whole-model view says every fact type's own constraints before
-   * any of these. (A reader that skipped some fact types, as the
-   * diagram skips absorbed ones, now sees the constraints nested under them
-   * too.)
+   * may span fact types (orm-format-3, placement by kind), in the order they
+   * were added. A 2.0 file's are added as its fact types load, so they keep
+   * file order: by the fact type nesting each, then by position.
    */
   get constraints(): readonly ExternalConstraint[] {
-    return this.factTypes.flatMap((ft) => ft.constraints.filter(isExternalConstraint));
+    return this._constraints;
+  }
+
+  /**
+   * Add a constraint across fact types to the model, giving it an id from
+   * the installed generator when it has none, as `FactType.addConstraint`
+   * does for its own (barwise-nkq). Its roles are not checked: a lenient
+   * load or a fragment can name a role the model does not hold, and
+   * validation reports it.
+   */
+  addConstraint(constraint: ExternalConstraint): ExternalConstraint {
+    const stored = constraint.id ? constraint : { ...constraint, id: generateId() };
+    this._constraints.push(stored);
+    return stored;
+  }
+
+  /**
+   * Remove a constraint across fact types by identity, as merge and the
+   * fact type removal below need.
+   */
+  removeConstraint(constraint: ExternalConstraint): void {
+    const i = this._constraints.indexOf(constraint);
+    if (i >= 0) this._constraints.splice(i, 1);
   }
 
   /**
@@ -333,17 +347,16 @@ export class OrmModel {
    * by (`factTypesNaming`), never the fact type a 2.0 file nests it under.
    */
   getConstraintInView(id: string): ConstraintInView | undefined {
-    // One pass over the stored lists, stopping at the first match, so the
-    // first constraint with this id in file order wins whatever its
-    // placement, as `getConstraint` always answered (duplicate ids are
-    // barwise-b2s).
+    // A fact type's own constraints first, then the model's, stopping at
+    // the first match. With an id given twice (barwise-b2s) an internal
+    // constraint now wins over an external one, where file order used to
+    // decide; the two placements are stored apart since WS3c.
     for (const ft of this._factTypes.values()) {
-      for (const c of ft.constraints) {
-        if (c.id !== id) continue;
-        return isInternalConstraint(c) ? [c, ft] : [c, undefined];
-      }
+      const c = ft.internalConstraints.find((c) => c.id === id);
+      if (c) return [c, ft];
     }
-    return undefined;
+    const c = this._constraints.find((c) => c.id === id);
+    return c ? [c, undefined] : undefined;
   }
 
   /** Look up a fact type by name. */
@@ -398,7 +411,20 @@ export class OrmModel {
       }
     }
 
-    const ft = new FactType(config);
+    const owner: { built?: FactType; } = {};
+    const ft = new FactType(config, (c) => {
+      // Built and since removed: the model no longer owns it, so it has no
+      // model to give a constraint to.
+      const built = owner.built;
+      if (built && this._factTypes.get(built.id) !== built) {
+        throw new Error(
+          `Fact type "${built.name}" is no longer in model "${this._name}"; `
+            + `its ${c.type} constraint has nowhere to go.`,
+        );
+      }
+      this.addConstraint(c);
+    });
+    owner.built = ft;
     this._factTypes.set(ft.id, ft);
     return ft;
   }
@@ -423,6 +449,12 @@ export class OrmModel {
     }
 
     this._factTypes.delete(id);
+    // A constraint across fact types that touches the removed fact type
+    // cannot hold any more, wherever a 2.0 file nested it; it used to go
+    // only when nested here, and stay dangling when nested elsewhere.
+    for (const c of this._constraints.filter((c) => holdsAny(ft, roleIdsOf(c)))) {
+      this.removeConstraint(c);
+    }
     this.pruneDiagramReferences(id);
   }
 

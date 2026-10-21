@@ -8,6 +8,7 @@
  * comparisons, breaking-level classification, and synonym detection live
  * in sibling modules.
  */
+import { roleIdsOf } from "../model/Constraint.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Population } from "../model/Population.js";
@@ -24,6 +25,7 @@ import {
   diffSubtypeFact,
   factTypeName,
   instancesKey,
+  pairModelConstraints,
   playerName,
   roleHolders,
 } from "./elementDiff.js";
@@ -48,6 +50,7 @@ export {
 } from "./deltas.js";
 export type {
   BreakingLevel,
+  ConstraintDelta,
   DefinitionDelta,
   DeltaJson,
   DeltaKind,
@@ -174,6 +177,40 @@ export function diffModels(
         breakingLevel: classifyBreakingLevel("added", [], "fact_type"),
       });
     }
+  }
+
+  // --- Constraints across fact types ---
+  for (const pair of pairModelConstraints(existing, incoming, holders, pairing)) {
+    const kind: DeltaKind = !pair.existing
+      ? "added"
+      : !pair.incoming
+      ? "removed"
+      : pair.modified
+      ? "modified"
+      : "unchanged";
+    const named = pair.incoming ?? pair.existing!;
+    const model = pair.incoming ? incoming : existing;
+    const changes = pair.modified && pair.existing && pair.incoming
+      ? [{
+        change: "constraintsModified" as const,
+        constraints: [{ from: structuredClone(pair.existing), to: structuredClone(pair.incoming) }],
+      }]
+      : [];
+    deltas.push({
+      kind,
+      elementType: "constraint",
+      constraintType: named.type,
+      factTypes: model.factTypesOf(named).map((ft) => ft.name),
+      roles: roleIdsOf(named).map((id) => {
+        const holder = model.factTypes.find((ft) => ft.hasRole(id));
+        return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;
+      }),
+      ...(pair.existing ? { existing: pair.existing } : {}),
+      ...(pair.incoming ? { incoming: pair.incoming } : {}),
+      changes,
+      changeDescriptions: changes.map(describeChange),
+      breakingLevel: classifyBreakingLevel(kind, changes, "constraint"),
+    });
   }
 
   // --- Definitions ---

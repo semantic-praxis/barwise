@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split in two 2026-10-21, 3c-i (test readers) implemented; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers) and 3c-ii (storage, diff and merge) implemented, 3c-iii (writers) not started; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1261,6 +1261,71 @@ Implementation notes (2026-10-21, WS3c):
   the writers, diff's constraint delta and merge, which cannot be
   separated: once a fact type no longer holds its external
   constraints, diff's per-fact-type deltas no longer see them.
+
+Implementation notes (2026-10-21, WS3c-ii):
+
+- **3c-ii, storage.**
+  - `OrmModel` stores the constraints across fact types, in the order
+    added, and `OrmModel.addConstraint` fills a missing id.
+    `FactType` holds only its own; `FactType.constraints` is gone.
+  - The writers did not move in this PR. A runtime probe (a fact type
+    throwing on any external kind) failed about 380 tests across ten
+    packages, the 2.0 loader among them, so moving every writer to
+    `OrmModel.addConstraint` at once would bury the storage change.
+    Instead a fact type built by `OrmModel.addFactType` hands an external
+    constraint to the model, from its config or from
+    `FactType.addConstraint`, and one built on its own refuses one.
+    That forward is what keeps the 2.0 loader working unchanged: it adds
+    fact types after `withDerivedIds`, so derived ids do not move, and
+    the constraints keep file order. **3c-iii** moves the writers to
+    `OrmModel.addConstraint`, narrows `FactType.addConstraint` and
+    `FactTypeConfig.constraints` to the internal kinds, removes the
+    forward, and lands the type test.
+  - `removeFactType` drops every constraint across fact types touching
+    the removed fact type. Before, one went only when nested there, and
+    one nested elsewhere was left dangling.
+  - The 2.0 save writes each under the first fact type, in model order,
+    holding one of its roles, after that fact type's own constraints. One
+    none of whose roles is in a fact type goes under the first fact type:
+    the draft said the save refuses it, but a lenient load reads one and
+    merge carries one through, so a refusal would fail the save of every
+    model holding one, `barwise import transcript` and MCP's merge
+    included. Only a model with no fact type refuses, naming the id.
+    `factTypeLayout.test.ts` changed order only: its fixture interleaved
+    the two kinds in one list. One promptlab reference
+    (`vendor-onboarding`) moved one subset to its first holder.
+  - Diff: `ConstraintDelta`, `elementType: "constraint"`, carrying the fact types it spans and
+    named by its kind and its roles ("fact type (role)", in its own order),
+    with the four kinds: by fact types alone, two exclusions over the same
+    two fact types read alike in the review panel. Pairing is by
+    id, then by content keyed with no host (every role by its fact type's
+    name and position), taken one to one, so a second identical copy reads
+    as added or removed where a fact type's list compares keys as a set.
+    Added and removed read `caution`, as `constraintsAdded` and
+    `constraintsRemoved` on a fact type did; a fact type's delta now
+    compares its own constraints only. A constraint whose 2.0 host
+    differs between the sides is now unchanged.
+  - Merge applies the delta after fact types. An existing constraint's
+    roles go through the remap for fact types that took the incoming
+    roles, an incoming one's through the remap for fact types that kept
+    the existing roles. One naming a role the merge itself took (a
+    rejected fact type addition, an accepted removal) is left out
+    silently, as a population depending on it is; the draft said merge
+    reports one it skips, and it does not, because that population
+    precedent already covers the case and the reviewer made the
+    decision. One naming a role neither model held is carried through, so
+    validation reports it. An accepted modification whose incoming version
+    needs a fact type the merge left out keeps the existing version.
+  - `getConstraintInView` with an id given twice (barwise-b2s) finds a
+    fact type's own constraint before the model's, where file order
+    decided; the two are stored apart.
+  - Sample agreement: measured with `scripts/measure-sample-medoids.mjs`
+    against an llm build of the base commit and of this change, over the
+    192 recorded payloads of the 10 eval cases. No case's medoid or
+    disagreement count moved. The disagreement report still covers
+    object types and fact types only, so a disagreement on a constraint
+    across fact types is counted toward the medoid but not reported
+    (barwise-avb).
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

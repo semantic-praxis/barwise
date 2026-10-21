@@ -232,6 +232,12 @@ model:
         - type: mandatory
           role: 00000000-0000-701e-b0b7-bec5ccd3dae1
           id: 00000000-0000-7049-a5ec-f3fa01080f16
+        - type: subset
+          subset_roles:
+            - 00000000-0000-703a-941b-222930373e45
+          superset_roles:
+            - 00000000-0000-701e-b0b7-bec5ccd3dae1
+          id: 00000000-0000-705e-b077-7e858c939aa1
     - id: 00000000-0000-7020-aef5-fc030a11181f
       name: Vendor has SpendTier
       roles:
@@ -407,12 +413,6 @@ model:
         - type: mandatory
           role: 00000000-0000-7039-b5fc-030a11181f26
           id: 00000000-0000-7059-95dc-e3eaf1f8ff06
-        - type: subset
-          subset_roles:
-            - 00000000-0000-703a-941b-222930373e45
-          superset_roles:
-            - 00000000-0000-701e-b0b7-bec5ccd3dae1
-          id: 00000000-0000-705e-b077-7e858c939aa1
     - id: 00000000-0000-703b-b33a-41484f565d64
       name: PurchaseOrder has Amount
       roles:

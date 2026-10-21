@@ -42,8 +42,17 @@ function constraintChanges(
   b: OrmModel,
   options?: Parameters<typeof diffModels>[2],
 ) {
-  const delta = diffModels(a, b, options).deltas.find((d) => d.elementType === "fact_type")!;
-  return delta.changes.flatMap((c: ChangeDescription) => {
+  const deltas = diffModels(a, b, options).deltas;
+  // A constraint across fact types has its own delta since WS3c; it reads
+  // here as the change its fact type used to report.
+  const across = deltas.flatMap((d): ChangeDescription[] => {
+    if (d.elementType !== "constraint") return [];
+    if (d.kind === "added") return [{ change: "constraintsAdded", constraints: [d.incoming!] }];
+    if (d.kind === "removed") return [{ change: "constraintsRemoved", constraints: [d.existing!] }];
+    return [...d.changes];
+  });
+  const delta = deltas.find((d) => d.elementType === "fact_type")!;
+  return [...delta.changes, ...across].flatMap((c: ChangeDescription) => {
     switch (c.change) {
       case "constraintsAdded":
       case "constraintsRemoved":
@@ -372,6 +381,9 @@ describe("which key reads a role", () => {
     // id and takes the incoming roles.
     const reId = (m: OrmModel) => {
       const ft2 = m.getFactType("ft-2")!;
+      // Removing a fact type drops the constraints across fact types that
+      // touch it; a merge adds them back through their own deltas.
+      const touching = m.constraints.filter((c) => m.factTypesOf(c).includes(ft2));
       m.removeFactType("ft-2");
       m.addFactType({
         id: "ft-2b",
@@ -379,6 +391,7 @@ describe("which key reads a role", () => {
         roles: ft2.roles.map((r) => ({ id: r.id, name: r.name, playerId: r.playerId })),
         readings: ft2.readings.map((r) => r.template),
       });
+      for (const c of touching) m.addConstraint(c);
       return m;
     };
     expect(constraintChanges(threeFacts("ft-2"), reId(threeFacts("ft-2")))).toEqual([]);

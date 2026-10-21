@@ -17,6 +17,11 @@
  * with values and ranges, and frequency in both its one-role and many-role
  * forms. Whether every kind is here is checked against CONSTRAINT_TYPES
  * rather than trusted.
+ *
+ * The fact type's own constraints come first and those across fact types
+ * after them: the model holds the second kind, and a 2.0 save writes each
+ * one under its first holder after that fact type's own (orm-format-3
+ * WS3c). Before, the list was written in the order it was built.
  */
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
@@ -57,11 +62,6 @@ model:
           role: r-knower
           id: c-mandatory
           modality: deontic
-        - type: external_uniqueness
-          roles:
-            - r-knower
-            - r-known
-          id: c-euc
         - type: value_constraint
           values:
             - A
@@ -73,33 +73,6 @@ model:
               max_inclusive: false
           role: r-known
           id: c-value
-        - type: disjunctive_mandatory
-          roles:
-            - r-knower
-            - r-known
-          id: c-dm
-        - type: exclusion
-          roles:
-            - r-knower
-            - r-known
-          id: c-excl
-        - type: exclusive_or
-          roles:
-            - r-knower
-            - r-known
-          id: c-xor
-        - type: subset
-          subset_roles:
-            - r-knower
-          superset_roles:
-            - r-known
-          id: c-subset
-        - type: equality
-          roles_1:
-            - r-knower
-          roles_2:
-            - r-known
-          id: c-eq
         - type: ring
           role_1: r-knower
           role_2: r-known
@@ -127,6 +100,38 @@ model:
           min: 0
           max: 9
           id: c-card
+        - type: external_uniqueness
+          roles:
+            - r-knower
+            - r-known
+          id: c-euc
+        - type: disjunctive_mandatory
+          roles:
+            - r-knower
+            - r-known
+          id: c-dm
+        - type: exclusion
+          roles:
+            - r-knower
+            - r-known
+          id: c-excl
+        - type: exclusive_or
+          roles:
+            - r-knower
+            - r-known
+          id: c-xor
+        - type: subset
+          subset_roles:
+            - r-knower
+          superset_roles:
+            - r-known
+          id: c-subset
+        - type: equality
+          roles_1:
+            - r-knower
+          roles_2:
+            - r-known
+          id: c-eq
         - type: join_subset
           subset:
             path:
