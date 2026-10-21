@@ -89,7 +89,13 @@ const LOCAL_STRAY_BASELINE = {
   // join-exclusion-violation, and no other kind moved.
   // Their reach is all that decides now. The count rose because what it
   // measures was corrected, not because a stray came back.
-  occurrences: 135,
+  // 141 from 135 when the arbitrary's preferred identifier gained the
+  // uniqueness on its value's role, without which it identifies nothing
+  // (orm-format-3 WS4a). The per-pair diff: all six are new
+  // internal_uniqueness counterexamples, tripping rules already listed
+  // (value-type data type 2, join exclusion 2, value-type domain 1, value
+  // comparison 1); no other kind moved.
+  occurrences: 141,
   reasons: {
     // barwise-1017: the MODEL is contradictory at that role. A value
     // type declaring `integer` and enumerating {v3, v1, v2} admits

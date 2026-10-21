@@ -7,10 +7,15 @@
  * returns a `not-found` result rather than throwing.
  */
 
-import { type Constraint, isInternalUniqueness, isMandatoryRole } from "../model/Constraint.js";
+import { type Constraint, isMandatoryRole } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import { type ModelGraph, requireGraph } from "../model/graph.js";
+import {
+  isIdentified,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+} from "../model/identification.js";
 import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
@@ -76,6 +81,7 @@ export function queryModel(model: OrmModel, query: ModelQuery): QueryResult {
  */
 class QueryContext {
   private readonly verbalizer = new Verbalizer();
+  private identifiers: PreferredIdentifiers | undefined;
 
   constructor(
     private readonly model: OrmModel,
@@ -415,22 +421,21 @@ class QueryContext {
 
   /** Compute the identification anchors of a single entity type. */
   private entityAnchors(entity: ObjectType): EntityAnchors {
-    let preferredIdentifier: EntityAnchors["preferredIdentifier"];
+    this.identifiers ??= preferredIdentifiers(this.model);
+    const identifying = this.identifiers.byEntity.get(entity.id);
+    const preferredIdentifier: EntityAnchors["preferredIdentifier"] = identifying && {
+      factType: identifying.factType.name,
+      // The roles the uniqueness covers: for an objectified type
+      // identified by all but one role, the uncovered one identifies
+      // nothing.
+      identifierTypes: identifying.factType.roles
+        .filter((r) => identifying.constraint.roleIds.includes(r.id) && r.playerId !== entity.id)
+        .map((r) => this.graph.player(r).name),
+    };
     const mandatoryFactTypes = new Set<string>();
 
     for (const ft of this.model.factTypesForObjectType(entity.id)) {
       for (const c of ft.internalConstraints) {
-        if (
-          preferredIdentifier === undefined
-          && isInternalUniqueness(c)
-          && c.isPreferred
-          && c.roleIds.some((rid) => ft.getRoleById(rid)?.playerId === entity.id)
-        ) {
-          const identifierTypes = ft.roles
-            .filter((r) => r.playerId !== entity.id)
-            .map((r) => this.graph.player(r).name);
-          preferredIdentifier = { factType: ft.name, identifierTypes };
-        }
         if (isMandatoryRole(c) && ft.getRoleById(c.roleId)?.playerId === entity.id) {
           mandatoryFactTypes.add(ft.name);
         }
@@ -443,7 +448,8 @@ class QueryContext {
       ...(referenceMode !== undefined ? { referenceMode } : {}),
       ...(preferredIdentifier !== undefined ? { preferredIdentifier } : {}),
       mandatoryRoles: [...mandatoryFactTypes].sort(),
-      missingIdentifier: preferredIdentifier === undefined,
+      // An objectification or an identifying subtype identifies too.
+      missingIdentifier: !isIdentified(this.model, entity.id, this.identifiers),
     };
   }
 

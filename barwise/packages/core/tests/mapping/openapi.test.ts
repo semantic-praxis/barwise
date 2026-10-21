@@ -171,7 +171,10 @@ describe("OpenAPI renderer", () => {
           { id: "r2", name: "is of", playerId: customerId.id },
         ],
         readings: ["{0} has {1}", "{1} is of {0}"],
-        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true },
+          { type: "internal_uniqueness", roleIds: ["r2"] },
+        ],
       });
       const pop = model.addPopulation({ factTypeId: idFt.id });
       pop.addInstance({ roleValues: { r1: "C001", r2: "C001" } });
@@ -208,7 +211,10 @@ describe("OpenAPI renderer", () => {
           { id: "r2", name: "is of", playerId: email.id },
         ],
         readings: ["{0} has {1}", "{1} is of {0}"],
-        constraints: [{ type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true }],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: ["r1"], isPreferred: true },
+          { type: "internal_uniqueness", roleIds: ["r2"] },
+        ],
       });
       const pop = model.addPopulation({ factTypeId: idFt.id });
       pop.addInstance({ roleValues: { r1: "C001", r2: "c001@example.com" } });

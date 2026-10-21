@@ -295,9 +295,12 @@ export class ModelBuilder {
             });
             break;
           case "both":
+            // A preferred flag goes on role1, as "role1" puts it; an
+            // entity-value binary is identified whichever role carries it.
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role1Id],
+              ...(preferred ? { isPreferred: true } : {}),
             });
             constraints.push({
               type: "internal_uniqueness",

@@ -38,13 +38,13 @@ describe("ValidationEngine", () => {
       .withBinaryFactType("Customer has CustomerId", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "is of" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .withBinaryFactType("Order has OrderNumber", {
         role1: { player: "Order", name: "has" },
         role2: { player: "OrderNumber", name: "is of" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .withBinaryFactType("Customer places Order", {

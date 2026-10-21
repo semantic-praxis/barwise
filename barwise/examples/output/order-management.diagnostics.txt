@@ -1,4 +1,5 @@
 [warning] completeness/fact-type-without-constraints: Fact type "Order contains Product" has no constraints. Most fact types need at least a uniqueness constraint.
 [info] completeness/missing-value-type-data-type: Value type "OrderStatus" has no data type. The relational mapper will default to TEXT.
+[info] completeness/missing-preferred-identifier: Entity type "Customer" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
 [info] completeness/missing-preferred-identifier: Entity type "Order" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
 [info] completeness/missing-preferred-identifier: Entity type "Product" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.

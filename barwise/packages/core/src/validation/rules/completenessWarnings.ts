@@ -2,6 +2,8 @@ import {
   IDENTIFICATION_SOURCE_LABEL,
   type IdentificationSource,
   identificationSources,
+  isIdentified,
+  preferredIdentifiers,
 } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
@@ -132,72 +134,43 @@ function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
 }
 
 /**
- * Each entity type should have exactly one preferred identifier
- * (an internal uniqueness constraint with isPreferred = true on one
- * of its identifying fact types). Zero means the relational mapper
- * must guess; more than one is contradictory.
+ * Each entity type should have exactly one preferred identifier. Zero
+ * means the relational mapper must guess; more than one is contradictory.
  *
- * What counts as identified is `identificationSources`, not a second
- * enumeration written here. It was one, and it knew about a preferred
- * uniqueness constraint and an identifying subtype fact but not about
- * objectification -- so 25 objectified entity types across this
- * repository were told the mapper must guess their key, while
- * `settleObjectifiedKey` was building it from the absorbed columns and
- * `identificationGraph` was treating the objectification as an
- * identifying edge (barwise-972). An entity that objectifies a fact
- * type is identified BY that fact type; that is what objectification
- * means.
+ * Both halves read core's answers rather than an enumeration written
+ * here (orm-format-3 WS4a). Whether the entity is identified is
+ * `isIdentified` -- an identifying uniqueness, an objectification, or an
+ * identifying subtype of an identified supertype -- the same question the
+ * query anchors, the annotator and NORMA export ask. A second enumeration
+ * here once left 25 objectified entity types reported as unidentified
+ * while the mapper keyed them by their objectification (barwise-972), and
+ * once counted any flag on a fact type the entity played as its own.
  *
- * `checkConflictingIdentification`, twenty lines down this same file,
- * was already reading the shared owner. Two rules in one file
- * disagreeing about what identifies an entity is the shape the
- * duplication rule exists to catch.
- *
- * The MULTIPLE arm still counts preferred uniqueness alone. Objectifying
- * a fact type and also carrying a reference scheme is ordinary ORM --
- * "Review has ReviewId" on a Review that objectifies "Reviewer reviews
- * Paper" -- so counting other kinds here would charge good modelling,
- * which is the measurement recorded on `identificationSources` itself.
+ * The MULTIPLE arm counts the flags that name this entity
+ * (`identificationSources`, from `preferredIdentifiers`' candidates),
+ * before the tie-break that picks one, so resolving them cannot hide the
+ * error, and it runs first: two flags are what the modeller has to fix.
+ * It counts preferred uniqueness alone. Objectifying a fact type and also
+ * carrying a reference scheme is ordinary ORM -- "Review has ReviewId" on a
+ * Review that objectifies "Reviewer reviews Paper" -- so counting other
+ * kinds here would charge good modelling, which is the measurement
+ * recorded on `identificationSources` itself.
  */
 function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-
-  const sourcesOf = new Map<string, readonly IdentificationSource[]>();
-  for (const ot of model.objectTypes) {
-    if (ot.kind !== "entity") continue;
-    sourcesOf.set(ot.id, identificationSources(model, ot));
-  }
-  const countOf = (id: string, kind: IdentificationSource["kind"]): number =>
-    (sourcesOf.get(id) ?? []).filter((s) => s.kind === kind).length;
-
-  /**
-   * Is this entity identified, directly or through its subtype chain?
-   *
-   * The subtype arm recurses because `identificationSources` reports an
-   * identifying subtype fact without asking whether the SUPERTYPE is
-   * itself identified -- inheriting from an unidentified parent
-   * identifies nothing.
-   */
-  const isIdentified = (id: string, seen: Set<string>): boolean => {
-    if (seen.has(id)) return false; // subtype cycle: structural rule reports it
-    seen.add(id);
-    const sources = sourcesOf.get(id) ?? [];
-    if (sources.some((s) => s.kind !== "identifying-subtype")) return true;
-    return sources.some(
-      (s) => s.kind === "identifying-subtype" && isIdentified(s.supertypeId, seen),
-    );
-  };
+  const identifiers = preferredIdentifiers(model);
 
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity") continue;
-    const preferredCount = countOf(ot.id, "preferred-uniqueness");
+    const preferredCount = identificationSources(model, ot, identifiers)
+      .filter((s) => s.kind === "preferred-uniqueness").length;
 
-    if (preferredCount === 0 && !isIdentified(ot.id, new Set())) {
-      diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));
-    } else if (preferredCount > 1) {
+    if (preferredCount > 1) {
       diagnostics.push(
         report(RULE_ID.multiplePreferredIdentifiers, "default", ot.id, ot.name, preferredCount),
       );
+    } else if (!isIdentified(model, ot.id, identifiers)) {
+      diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));
     }
   }
 
@@ -236,10 +209,11 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
  */
 function checkConflictingIdentification(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
+  const identifiers = preferredIdentifiers(model);
 
   for (const ot of model.objectTypes) {
     const kinds = new Set<IdentificationSource["kind"]>(
-      identificationSources(model, ot).map((s) => s.kind),
+      identificationSources(model, ot, identifiers).map((s) => s.kind),
     );
     if (!kinds.has("identifying-subtype") || kinds.size < 2) continue;
 

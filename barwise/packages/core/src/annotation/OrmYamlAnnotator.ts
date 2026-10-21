@@ -22,7 +22,7 @@
  * idempotent via stripBarwiseComments().
  */
 
-import { isInternalUniqueness } from "../model/Constraint.js";
+import { isIdentified, preferredIdentifiers } from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import {
   type AnnotationSeverity,
@@ -349,9 +349,12 @@ function collectStructuralGaps(
   model: OrmModel,
   annotations: OrmAnnotation[],
 ): void {
+  const identifiers = preferredIdentifiers(model);
   for (const ot of model.objectTypes) {
-    // Entity types missing a preferred identifier.
-    if (ot.kind === "entity" && !hasPreferredIdentifier(ot, model)) {
+    // Entity types with no identifier: a reference mode is only a naming
+    // hint; a preferred uniqueness that identifies the entity, an
+    // objectification or an identifying subtype formalizes one.
+    if (ot.kind === "entity" && !isIdentified(model, ot.id, identifiers)) {
       annotations.push({
         elementType: "object_type",
         elementName: ot.name,
@@ -370,30 +373,6 @@ function collectStructuralGaps(
       });
     }
   }
-}
-
-/**
- * Check if an entity type has a formally declared preferred identifier.
- * A reference mode is just a naming hint; the real formalization is a
- * uniqueness constraint marked `isPreferred` on a binary fact type
- * where this entity plays one of the roles.
- */
-function hasPreferredIdentifier(
-  entity: import("../model/ObjectType.js").ObjectType,
-  model: OrmModel,
-): boolean {
-  for (const ft of model.factTypes) {
-    const playsRole = ft.roles.some((r) => r.playerId === entity.id);
-    if (!playsRole) continue;
-
-    for (const c of ft.internalConstraints) {
-      if (isInternalUniqueness(c) && c.isPreferred) {
-        return true;
-      }
-    }
-  }
-
-  return false;
 }
 
 // ---------------------------------------------------------------------------

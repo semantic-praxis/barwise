@@ -19,8 +19,26 @@ function identifiedModel(): OrmModel {
     .withBinaryFactType("Customer has CustomerId", {
       role1: { player: "Customer", name: "has" },
       role2: { player: "CustomerId", name: "identifies" },
-      uniqueness: "role1",
+      uniqueness: "both",
       mandatory: "role1",
+      isPreferred: true,
+    })
+    .build();
+}
+
+/**
+ * The importers' convention: the preferred flag on the value's role. The
+ * anchor used to require the flag on a role the entity plays, so an
+ * imported model reported every entity as having no identifier.
+ */
+function importedModel(): OrmModel {
+  return new ModelBuilder("M")
+    .withEntityType("Customer", { referenceMode: "customer_id" })
+    .withValueType("CustomerId")
+    .withBinaryFactType("CustomerId identifies Customer", {
+      role1: { player: "CustomerId", name: "identifies" },
+      role2: { player: "Customer", name: "has" },
+      uniqueness: "both",
       isPreferred: true,
     })
     .build();
@@ -51,6 +69,68 @@ describe("queryModel: anchors", () => {
     });
     expect(a.mandatoryRoles).toEqual(["Customer has CustomerId"]);
     expect(a.missingIdentifier).toBe(false);
+  });
+
+  it("finds the identifier when the flag is on the value's role, as importers put it", () => {
+    const [a] = anchorsOf(runQuery(importedModel(), "anchors Customer"));
+    expect(a!.preferredIdentifier).toEqual({
+      factType: "CustomerId identifies Customer",
+      identifierTypes: ["CustomerId"],
+    });
+    expect(a!.missingIdentifier).toBe(false);
+  });
+
+  it("does not call an objectified type with no flag unidentified", () => {
+    const model = new OrmModel({ name: "M" });
+    model.addObjectType({ id: "ot-s", name: "Student", kind: "entity", referenceMode: "nr" });
+    model.addObjectType({ id: "ot-c", name: "Course", kind: "entity", referenceMode: "code" });
+    model.addObjectType({ id: "ot-e", name: "Enrollment", kind: "entity", referenceMode: "id" });
+    model.addFactType({
+      id: "ft-takes",
+      name: "Student takes Course",
+      roles: [
+        { id: "r-s", name: "takes", playerId: "ot-s" },
+        { id: "r-c", name: "is taken by", playerId: "ot-c" },
+      ],
+      readings: ["{0} takes {1}"],
+      constraints: [{ id: "u", type: "internal_uniqueness", roleIds: ["r-s", "r-c"] }],
+    });
+    model.addObjectifiedFactType({ id: "oft", factTypeId: "ft-takes", objectTypeId: "ot-e" });
+    const [a] = anchorsOf(runQuery(model, "anchors Enrollment"));
+    expect(a!.missingIdentifier).toBe(false);
+  });
+
+  it("names only the covered roles' players for an objectified type", () => {
+    // Signing objectifies a ternary and is identified by the uniqueness
+    // over two of its roles; the third role's player identifies nothing.
+    const model = new OrmModel({ name: "M" });
+    for (
+      const [id, name] of [["ot-c", "Customer"], ["ot-o", "Organization"], [
+        "ot-a",
+        "Agreement",
+      ], ["ot-s", "Signing"]] as const
+    ) {
+      model.addObjectType({ id, name, kind: "entity", referenceMode: "id" });
+    }
+    model.addFactType({
+      id: "ft-sign",
+      name: "Customer signs Agreement for Organization",
+      roles: [
+        { id: "r-c", name: "signs", playerId: "ot-c" },
+        { id: "r-a", name: "is signed", playerId: "ot-a" },
+        { id: "r-o", name: "for", playerId: "ot-o" },
+      ],
+      readings: ["{0} signs {1} for {2}"],
+      constraints: [{
+        id: "u",
+        type: "internal_uniqueness",
+        roleIds: ["r-c", "r-a"],
+        isPreferred: true,
+      }],
+    });
+    model.addObjectifiedFactType({ id: "oft", factTypeId: "ft-sign", objectTypeId: "ot-s" });
+    const [a] = anchorsOf(runQuery(model, "anchors Signing"));
+    expect(a!.preferredIdentifier?.identifierTypes).toEqual(["Customer", "Agreement"]);
   });
 
   it("lists every entity type (and only entity types) for the bare query", () => {

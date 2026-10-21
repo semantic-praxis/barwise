@@ -28,13 +28,13 @@ function buildModel() {
     .withBinaryFactType("Student has StudentId", {
       role1: { player: "Student", name: "has" },
       role2: { player: "StudentId", name: "is of" },
-      uniqueness: "role1",
+      uniqueness: "both",
       isPreferred: true,
     })
     .withBinaryFactType("Course has CourseCode", {
       role1: { player: "Course", name: "has" },
       role2: { player: "CourseCode", name: "is of" },
-      uniqueness: "role1",
+      uniqueness: "both",
       isPreferred: true,
     })
     .withBinaryFactType("Student enrolls in Course", {
@@ -76,7 +76,7 @@ describe("collectAnnotations", () => {
       .withBinaryFactType("Customer has Name", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "Name", name: "is of" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .build();
@@ -383,7 +383,7 @@ describe("annotateOrmYaml", () => {
       .withBinaryFactType("Customer has Name", {
         role1: { player: "Customer", name: "has" },
         role2: { player: "Name", name: "is of" },
-        uniqueness: "role1",
+        uniqueness: "both",
         isPreferred: true,
       })
       .build();

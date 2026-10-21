@@ -14,7 +14,15 @@
  * attribute. The identifying fact's own instances stay implicit, exactly
  * as NORMA writes them.
  */
-import { type ObjectType, type OrmModel, referenceModeOf } from "@barwise/core";
+import {
+  isIdentified,
+  type ObjectType,
+  type OrmModel,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+  preferredIdentifyingBinary,
+  referenceModeOf,
+} from "@barwise/core";
 import { derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
 import type {
   NormaConstraint,
@@ -53,7 +61,10 @@ interface IdentifyingSeat {
   readonly valueTypeId: NormaId;
 }
 
-export function buildPopulationGraph(model: OrmModel): PopulationGraph {
+export function buildPopulationGraph(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers = preferredIdentifiers(model),
+): PopulationGraph {
   const graph: PopulationGraph = {
     valueInstancesByOwner: new Map(),
     entityInstancesByOwner: new Map(),
@@ -126,7 +137,8 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
     if (existing) return existing;
     let seat = seatByEntity.get(entity.id);
     if (!seat) {
-      seat = findIdentifyingSeat(model, entity.id) ?? synthesizeExpansion(graph, entity);
+      seat = findIdentifyingSeat(model, entity, identifiers)
+        ?? synthesizeExpansion(graph, entity, isIdentified(model, entity.id, identifiers));
       seatByEntity.set(entity.id, seat);
     }
     const valueInstanceId = internValueInstance(seat.valueTypeId, value);
@@ -189,43 +201,37 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
 }
 
 /**
- * The model's explicit identifying seat for an entity: a binary fact where
- * a preferred single-role internal uniqueness covers a value-typed role and
- * the entity plays the other role.
+ * The model's explicit identifying seat for an entity: the binary to a
+ * value type that identifies it (core's `preferredIdentifyingBinary`).
  */
 function findIdentifyingSeat(
   model: OrmModel,
-  entityId: string,
+  entity: ObjectType,
+  identifiers: PreferredIdentifiers,
 ): IdentifyingSeat | undefined {
-  for (const ft of model.factTypes) {
-    if (ft.roles.length !== 2) continue;
-    for (const c of ft.internalConstraints) {
-      if (c.type !== "internal_uniqueness" || !c.isPreferred || c.roleIds.length !== 1) {
-        continue;
-      }
-      const valueRole = ft.roles.find((r) => r.id === c.roleIds[0]);
-      const entityRole = ft.roles.find((r) => r.id !== c.roleIds[0]);
-      if (!valueRole || !entityRole || entityRole.playerId !== entityId) continue;
-      const player = model.getObjectType(valueRole.playerId);
-      if (player?.kind !== "value") continue;
-      return {
-        valueRoleId: toNormaId(valueRole.id),
-        valueTypeId: toNormaId(player.id),
-      };
-    }
-  }
-  return undefined;
+  const binary = preferredIdentifyingBinary(model, entity, identifiers);
+  if (!binary) return undefined;
+  return {
+    valueRoleId: toNormaId(binary.valueRole.id),
+    valueTypeId: toNormaId(binary.valuePlayer.id),
+  };
 }
 
 /**
  * Synthesize the reference-scheme expansion NORMA persists for an
  * identified entity: the injected value type, the identifying fact, its
  * preferred uniqueness (value role) plus uniqueness + simple mandatory
- * (entity role), and the PreferredIdentifier link.
+ * (entity role), and the PreferredIdentifier link. An entity the model
+ * already identifies some other way (an n-ary or entity-entity
+ * uniqueness, an objectification, an identifying subtype) still needs a
+ * seat for its instance values, but keeps its own identification, so the
+ * synthesized uniqueness is not marked preferred and no link is recorded
+ * for it.
  */
 function synthesizeExpansion(
   graph: PopulationGraph,
   entity: ObjectType,
+  identified: boolean,
 ): IdentifyingSeat {
   const base = toNormaId(entity.id);
   const valueTypeId = derivedNormaId(base, "_idvt");
@@ -278,7 +284,7 @@ function synthesizeExpansion(
       id: preferredUcId,
       name: "",
       isInternal: true,
-      isPreferred: true,
+      isPreferred: !identified,
       roleRefs: [valueRoleId],
     },
     {
@@ -298,7 +304,7 @@ function synthesizeExpansion(
       roleRefs: [entityRoleId],
     },
   );
-  graph.syntheticPreferredIdByEntity.set(base, preferredUcId);
+  if (!identified) graph.syntheticPreferredIdByEntity.set(base, preferredUcId);
   graph.extraPlayedRolesByOwner.set(entity.id, [entityRoleId]);
 
   return { valueRoleId, valueTypeId };

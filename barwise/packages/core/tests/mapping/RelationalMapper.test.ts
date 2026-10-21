@@ -705,7 +705,7 @@ describe("RelationalMapper", () => {
         .withBinaryFactType("Patient has MedicalRecordNumber", {
           role1: { player: "Patient", name: "has" },
           role2: { player: "MedicalRecordNumber", name: "is of" },
-          uniqueness: "role1",
+          uniqueness: "both",
           mandatory: "role1",
           isPreferred: true,
         })

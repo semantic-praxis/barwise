@@ -1,3 +1,4 @@
+import { type InternalUniquenessConstraint, isInternalUniqueness } from "./Constraint.js";
 import type { FactType } from "./FactType.js";
 import type { ObjectType, ValueType } from "./ObjectType.js";
 import type { OrmModel } from "./OrmModel.js";
@@ -10,6 +11,7 @@ import type { Role } from "./Role.js";
 export interface PreferredIdentifyingBinary {
   readonly factType: FactType;
   readonly entityRole: Role;
+  readonly valueRole: Role;
   readonly valuePlayer: ValueType;
 }
 
@@ -114,6 +116,194 @@ export function identificationOrder(
   return { order };
 }
 
+/** Which uniqueness identifies which entity type, both ways round. */
+export interface PreferredIdentifiers {
+  /** The one identifying uniqueness of each entity that has one. */
+  readonly byEntity: ReadonlyMap<string, IdentifyingUniqueness>;
+  /** The inverse of `byEntity`, keyed by constraint id. */
+  readonly byConstraint: ReadonlyMap<string, IdentifyingUniqueness>;
+  /**
+   * Every flag that names each entity, before the tie-break, in model
+   * order. Two or more is the modelling error
+   * `completeness/multiple-preferred-identifiers` reports; a flag that
+   * names another entity, or none, is not this entity's.
+   */
+  readonly candidates: ReadonlyMap<string, readonly IdentifyingUniqueness[]>;
+}
+
+/** The uniqueness constraint that identifies an entity type, and where it is. */
+export interface IdentifyingUniqueness {
+  readonly entityId: string;
+  readonly constraint: InternalUniquenessConstraint;
+  readonly factType: FactType;
+}
+
+/**
+ * Which uniqueness identifies which entity type: one answer for every
+ * reader (orm-format-3, Open decision 8 and WS4a; barwise-971).
+ *
+ * Nine modules used to answer "which constraint is this entity's
+ * preferred identifier" with nine rules, and the two conventions for
+ * where the `isPreferred` flag sits meant each one found nothing on some
+ * models: the importers flag the uniqueness on the value's role, the
+ * extraction prompt flags the entity's role. This reads each flag the way
+ * ORM and NORMA's `PreferredIdentifier` mean it, as naming the entity the
+ * roles opposite the uniqueness identify:
+ *
+ * - a flagged uniqueness on an objectified fact type that spans every
+ *   role, or, as NORMA allows, all but one, identifies the objectifying type (Open decision 8 named only the spanning case; the auction
+ *   models' objectified ternaries are identified by a two-role uniqueness,
+ *   and reading those flags as naming the third role's player made an
+ *   entity with its own reference scheme the claimant);
+ * - a flagged uniqueness on either role of a binary between one entity
+ *   and one value type identifies the entity, by the uniqueness on the
+ *   value's role (and is dropped when there is none);
+ * - otherwise, a flagged uniqueness that leaves exactly one role
+ *   uncovered identifies that role's player, when it is an entity type
+ *   that plays none of the covered roles (a ring binary does not identify
+ *   its player by itself, and two uncovered roles identify nothing);
+ * - anything else is dropped.
+ *
+ * Two flags naming one entity is a modelling error, kept visible in
+ * `candidates` for `completeness/multiple-preferred-identifiers`, so this
+ * resolution cannot hide it. The entity-value binary wins, so an objectified type with its
+ * own reference scheme keeps the key the mapper gives it today (Open
+ * decision 11); then the first in model order.
+ *
+ * `byConstraint` is the inverse, for readers that ask about a fact type
+ * or a constraint rather than an entity: calling a per-entity lookup
+ * inside a loop over fact types would make each of them quadratic.
+ */
+export function preferredIdentifiers(model: OrmModel): PreferredIdentifiers {
+  const objectifying = new Map(
+    model.objectifiedFactTypes.map((oft) => [oft.factTypeId, oft.objectTypeId]),
+  );
+  const chosen = new Map<string, { readonly at: IdentifyingUniqueness; readonly rank: number; }>();
+  const candidates = new Map<string, IdentifyingUniqueness[]>();
+  const offer = (at: IdentifyingUniqueness, rank: number): void => {
+    const held = chosen.get(at.entityId);
+    if (!held || rank < held.rank) chosen.set(at.entityId, { at, rank });
+    // One constraint is one candidate, however many flags reach it: an
+    // entity-value binary flagged on both roles names its value role's
+    // uniqueness twice.
+    const list = candidates.get(at.entityId);
+    if (!list) candidates.set(at.entityId, [at]);
+    else if (!list.some((held) => held.constraint === at.constraint)) list.push(at);
+  };
+  const isEntity = (id: string) => model.getObjectType(id)?.kind === "entity";
+
+  for (const factType of model.factTypes) {
+    for (const c of factType.internalConstraints) {
+      if (!isInternalUniqueness(c) || !c.isPreferred) continue;
+      const covered = new Set(c.roleIds);
+
+      const objectType = objectifying.get(factType.id);
+      if (objectType && covered.size >= factType.roles.length - 1) {
+        if (isEntity(objectType)) offer({ entityId: objectType, constraint: c, factType }, 1);
+        continue;
+      }
+
+      const binary = entityValueRoles(model, factType);
+      if (binary) {
+        // The flagged one itself when it is on the value's role, so a
+        // second uniqueness there does not take its place.
+        const onValueRole = (u: InternalUniquenessConstraint) =>
+          u.roleIds.length === 1 && u.roleIds[0] === binary.valueRole.id;
+        const onValue = onValueRole(c) ? c : factType.internalConstraints.find(
+          (u): u is InternalUniquenessConstraint => isInternalUniqueness(u) && onValueRole(u),
+        );
+        if (onValue) {
+          offer({ entityId: binary.entityRole.playerId, constraint: onValue, factType }, 0);
+        }
+        continue;
+      }
+
+      const uncovered = factType.roles.filter((r) => !covered.has(r.id));
+      const only = uncovered.length === 1 ? uncovered[0]!.playerId : undefined;
+      const playsCovered = factType.roles.some((r) => covered.has(r.id) && r.playerId === only);
+      if (only !== undefined && isEntity(only) && !playsCovered) {
+        offer({ entityId: only, constraint: c, factType }, 1);
+      }
+    }
+  }
+
+  const byEntity = new Map([...chosen].map(([id, { at }]) => [id, at]));
+  const byConstraint = new Map<string, IdentifyingUniqueness>();
+  for (const at of byEntity.values()) {
+    if (at.constraint.id !== undefined) byConstraint.set(at.constraint.id, at);
+  }
+  return { byEntity, byConstraint, candidates };
+}
+
+/**
+ * Whether an entity type has an identifier at all: an identifying
+ * uniqueness (`preferredIdentifiers`), an objectification, or an
+ * identifying subtype fact whose supertype is itself identified. The one
+ * answer validation, the query anchors, the annotator and NORMA export
+ * read, so none of them calls an entity unidentified that another calls
+ * identified (orm-format-3 WS4a).
+ *
+ * The subtype arm recurses because inheriting from an unidentified
+ * supertype identifies nothing; a subtype cycle answers false, and
+ * `structural/subtype-cycle` reports it.
+ */
+export function isIdentified(
+  model: OrmModel,
+  entityId: string,
+  identifiers: PreferredIdentifiers = preferredIdentifiers(model),
+): boolean {
+  const { objectifying, supertypesOf } = otherSources(model, identifiers);
+  const walk = (id: string, seen: Set<string>): boolean => {
+    if (seen.has(id)) return false;
+    seen.add(id);
+    if (identifiers.byEntity.has(id) || objectifying.has(id)) return true;
+    return (supertypesOf.get(id) ?? []).some((sup) => walk(sup, seen));
+  };
+  return walk(entityId, new Set());
+}
+
+/**
+ * The objectifying and identifying-subtype sources, indexed once per
+ * `preferredIdentifiers` result, so a reader asking `isIdentified` for
+ * every entity reads the model once rather than once per entity.
+ */
+const otherSourcesCache = new WeakMap<PreferredIdentifiers, {
+  readonly objectifying: ReadonlySet<string>;
+  readonly supertypesOf: ReadonlyMap<string, readonly string[]>;
+}>();
+function otherSources(model: OrmModel, identifiers: PreferredIdentifiers) {
+  const held = otherSourcesCache.get(identifiers);
+  if (held) return held;
+  const supertypesOf = new Map<string, string[]>();
+  for (const sf of model.subtypeFacts) {
+    if (!sf.providesIdentification) continue;
+    const list = supertypesOf.get(sf.subtypeId);
+    if (list) list.push(sf.supertypeId);
+    else supertypesOf.set(sf.subtypeId, [sf.supertypeId]);
+  }
+  const built = {
+    objectifying: new Set(model.objectifiedFactTypes.map((oft) => oft.objectTypeId)),
+    supertypesOf,
+  };
+  otherSourcesCache.set(identifiers, built);
+  return built;
+}
+
+/** The entity's and the value's roles of a binary between one of each. */
+function entityValueRoles(
+  model: OrmModel,
+  factType: FactType,
+): { readonly entityRole: Role; readonly valueRole: Role; } | undefined {
+  if (factType.arity !== 2) return undefined;
+  const [r1, r2] = factType.roles;
+  if (!r1 || !r2) return undefined;
+  const k1 = model.getObjectType(r1.playerId)?.kind;
+  const k2 = model.getObjectType(r2.playerId)?.kind;
+  if (k1 === "entity" && k2 === "value") return { entityRole: r1, valueRole: r2 };
+  if (k1 === "value" && k2 === "entity") return { entityRole: r2, valueRole: r1 };
+  return undefined;
+}
+
 /**
  * The binary fact type that identifies an entity type, when it has one.
  *
@@ -131,42 +321,27 @@ export function identificationOrder(
  * value column: one identification, two columns, on 109 entities across
  * 15 shipped models (barwise-967).
  *
- * The rule is the mapper's existing pass 1, unchanged, so no model's
- * primary-key type moves: a binary carrying any preferred internal
- * uniqueness constraint, in which this entity plays a role and the
- * other player is a value type, first in model order. Four other
- * modules compute "the preferred identifier" with four subtly different
- * rules; converging them changes diagnostics on shipped models and is
- * tracked separately.
+ * It is `preferredIdentifiers`' answer when that answer is such a
+ * binary. Pass the result of `preferredIdentifiers` when calling this for
+ * many entities, so the model is read once.
  */
 export function preferredIdentifyingBinary(
   model: OrmModel,
   entity: ObjectType,
+  identifiers = preferredIdentifiers(model),
 ): PreferredIdentifyingBinary | undefined {
-  for (const factType of model.factTypes) {
-    if (factType.arity !== 2) continue;
-    const preferred = factType.internalConstraints.some(
-      (c) => c.type === "internal_uniqueness" && c.isPreferred,
-    );
-    if (!preferred) continue;
-
-    const [role1, role2] = factType.roles;
-    if (!role1 || !role2) continue;
-
-    const entityRole = role1.playerId === entity.id
-      ? role1
-      : role2.playerId === entity.id
-      ? role2
-      : undefined;
-    if (!entityRole) continue;
-
-    const otherRole = entityRole === role1 ? role2 : role1;
-    const valuePlayer = model.getObjectType(otherRole.playerId);
-    if (valuePlayer?.kind !== "value") continue;
-
-    return { factType, entityRole, valuePlayer };
-  }
-  return undefined;
+  const at = identifiers.byEntity.get(entity.id);
+  if (!at) return undefined;
+  const binary = entityValueRoles(model, at.factType);
+  if (!binary || binary.entityRole.playerId !== entity.id) return undefined;
+  const valuePlayer = model.getObjectType(binary.valueRole.playerId);
+  if (valuePlayer?.kind !== "value") return undefined;
+  return {
+    factType: at.factType,
+    entityRole: binary.entityRole,
+    valueRole: binary.valueRole,
+    valuePlayer,
+  };
 }
 
 /**
@@ -189,10 +364,12 @@ export function preferredIdentifyingBinary(
  * this repository alone, none of them contradictory.
  *
  * A union rather than a count, because the diagnostic that reads this
- * names the kinds and a count cannot. The preferred-uniqueness arm
- * counts the same constraints `completenessWarnings` counts -- any
- * arity, over `factTypesForObjectType` -- so the two rules cannot
- * disagree about how many there are.
+ * names the kinds and a count cannot. The preferred-uniqueness arm is
+ * `preferredIdentifiers`' candidates for the entity: each flagged
+ * uniqueness that names it, before the tie-break, and not one that names
+ * another entity or none (orm-format-3 WS4a). `completenessWarnings`
+ * counts the same list, so the two rules cannot disagree about how many
+ * there are.
  */
 export type IdentificationSource =
   | { readonly kind: "preferred-uniqueness"; readonly factTypeId: string; }
@@ -209,15 +386,12 @@ export const IDENTIFICATION_SOURCE_LABEL: Record<IdentificationSource["kind"], s
 export function identificationSources(
   model: OrmModel,
   entity: ObjectType,
+  identifiers: PreferredIdentifiers = preferredIdentifiers(model),
 ): readonly IdentificationSource[] {
   const sources: IdentificationSource[] = [];
 
-  for (const ft of model.factTypesForObjectType(entity.id)) {
-    for (const c of ft.internalConstraints) {
-      if (c.type === "internal_uniqueness" && c.isPreferred) {
-        sources.push({ kind: "preferred-uniqueness", factTypeId: ft.id });
-      }
-    }
+  for (const at of identifiers.candidates.get(entity.id) ?? []) {
+    sources.push({ kind: "preferred-uniqueness", factTypeId: at.factType.id });
   }
 
   for (const oft of model.objectifiedFactTypes) {

@@ -25,7 +25,11 @@
  */
 
 import type { FactType } from "../model/FactType.js";
-import { identificationOrder, preferredIdentifyingBinary } from "../model/identification.js";
+import {
+  identificationOrder,
+  preferredIdentifiers,
+  preferredIdentifyingBinary,
+} from "../model/identification.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import {
   type DataTypeDef,
@@ -93,6 +97,7 @@ export class RelationalMapper {
 
     // Phase 0: one table per entity type, carrying its identifying key
     // unless phase 1 is going to replace that key anyway.
+    const identifiers = preferredIdentifiers(model);
     for (const ot of model.objectTypes) {
       if (!isEntityType(ot)) continue;
 
@@ -112,7 +117,7 @@ export class RelationalMapper {
       // entity. An entity that absorbs an objectification takes no
       // phase-0 column at all, so its binary is not spent and phase 2
       // maps it as an ordinary column.
-      const preferred = preferredIdentifyingBinary(model, ot);
+      const preferred = preferredIdentifyingBinary(model, ot, identifiers);
       // No fallback behind `ot.referenceMode`. There used to be one -- a
       // snake-cased "<name>_id" default for an entity type with no
       // reference mode -- for a state the constructor already refused, so

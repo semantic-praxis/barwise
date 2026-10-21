@@ -19,6 +19,7 @@ import {
   isValueType,
   type OrmModel,
   OrmYamlSerializer,
+  preferredIdentifiers,
   roleIdsOf,
   type SubtypeFact,
   type ValueType,
@@ -151,6 +152,9 @@ export class ModelTreeProvider implements vscode.TreeDataProvider<ModelTreeItem>
 
 export function buildTree(model: OrmModel): ModelTreeItem[] {
   const categories: ModelTreeItem[] = [];
+  // The uniquenesses that identify an entity, by core's one rule, so the
+  // badge marks what every other reader calls the preferred identifier.
+  const preferred = new Set(preferredIdentifiers(model).byConstraint.keys());
 
   // Entity types
   const entities = model.objectTypes.filter(isEntityType);
@@ -180,7 +184,7 @@ export function buildTree(model: OrmModel): ModelTreeItem[] {
       kind: "category",
       label: "Fact Types",
       iconId: "symbol-event",
-      children: model.factTypes.map((ft) => factTypeItem(ft, model)).sort((a, b) =>
+      children: model.factTypes.map((ft) => factTypeItem(ft, model, preferred)).sort((a, b) =>
         a.label.localeCompare(b.label)
       ),
     });
@@ -258,15 +262,19 @@ function valueItem(ot: ValueType): ModelTreeItem {
   };
 }
 
-function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
+function factTypeItem(
+  ft: FactType,
+  model: OrmModel,
+  preferred: ReadonlySet<string>,
+): ModelTreeItem {
   const reading = ft.readings[0]?.template ?? ft.name;
 
   // Every constraint that applies to the fact type: its own, and each
   // across fact types that names one of its roles, so a composite key
   // shows under both fact types it spans rather than under whichever one
   // a 2.0 file nests it in (orm-format-3, Open decision 9).
-  const constraintChildren: ModelTreeItem[] = model.constraintsTouchingAny([ft.id]).map(
-    constraintItem,
+  const constraintChildren: ModelTreeItem[] = model.constraintsTouchingAny([ft.id]).map((c) =>
+    constraintItem(c, preferred)
   );
 
   return {
@@ -283,7 +291,10 @@ function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
  * names its roles through the fact type it lives in, which the pair always
  * carries for one; a constraint across fact types has none and needs none.
  */
-function constraintItem(inView: ConstraintInView): ModelTreeItem {
+function constraintItem(
+  inView: ConstraintInView,
+  preferred: ReadonlySet<string>,
+): ModelTreeItem {
   // Split on the pair once, as the enforcement predicate does: narrowing
   // the constraint does not narrow a destructured fact type.
   if (inView[1] === undefined) return externalConstraintItem(inView[0]);
@@ -292,10 +303,10 @@ function constraintItem(inView: ConstraintInView): ModelTreeItem {
     const roleNames = c.roleIds
       .map((rid) => ft.roles.find((r) => r.id === rid)?.name)
       .filter(Boolean);
-    const preferred = c.isPreferred ? " (preferred)" : "";
+    const badge = c.id !== undefined && preferred.has(c.id) ? " (preferred)" : "";
     return {
       kind: "constraint",
-      label: `Uniqueness: ${roleNames.join(", ")}${preferred}`,
+      label: `Uniqueness: ${roleNames.join(", ")}${badge}`,
     };
   }
   if (isMandatoryRole(c)) {
