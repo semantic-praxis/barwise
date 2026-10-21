@@ -420,8 +420,9 @@ Compare two ORM models and return structural deltas.
 by `change` (`definition`, `aliases`, `dataTypeChanged`, `readings`,
 `constraintsAdded`, and so on), usually with the `from` and `to`
 values. `constraintsModified` is the exception: it carries
-`constraints: [{ from, to }]`, one pair per constraint. A constraint
-whose id occurs once in each model is paired by id, so an edit that
+`constraints: [{ from, to }]`, one pair per constraint. Within a fact type
+matched by name, a constraint whose id occurs once in each model is paired
+by id, so an edit that
 keeps the id is one `constraintsModified` entry; the rest are paired by
 content, so a model with fresh ids still matches its base.
 `changeDescriptions` is the same list rendered as sentences.

@@ -9,7 +9,7 @@
  * mutation of the model it was computed from. See the module comment on
  * `changeDescription.ts` for why.
  */
-import type { Constraint, JoinOperand } from "../model/Constraint.js";
+import { type Constraint, type JoinOperand, roleIdsOf } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
 import {
@@ -524,6 +524,20 @@ function diffConstraints(
   // paired by id.
   const paired = new Set<Constraint>();
   const modified: { from: Constraint; to: Constraint; }[] = [];
+  // A pair joined by id is compared as itself when every role it names is
+  // in both models: the role ids are then shared, so the raw content says
+  // exactly what changed. The content key reads roles by position or
+  // holder name instead, to bridge fresh ids, and that bridge misreads a
+  // shared role: a role swap moves the key of a constraint nothing
+  // touched, and a retarget onto the role that moved into the old
+  // position leaves the key where it was. Only a pair naming a role one
+  // model lacks falls back to the key.
+  const shared = (c: Constraint) =>
+    roleIdsOf(c).every((id) => holdersA.has(id) && holdersB.has(id));
+  const pairChanged = (ca: Constraint, cb: Constraint) =>
+    shared(ca) && shared(cb)
+      ? canonicalJson(ca) !== canonicalJson(cb)
+      : keyA.get(ca) !== keyB.get(cb);
   if (pairing.matching === "id-first") {
     const byIdB = new Map(
       b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
@@ -533,16 +547,7 @@ function diffConstraints(
       const cb = byIdB.get(ca.id);
       if (!cb) continue;
       paired.add(ca).add(cb);
-      // Modified only when both the content key and the constraint itself
-      // differ. The key reads roles by position or holder name, to bridge
-      // fresh ids; a pair already joined by id needs no bridge, so a role
-      // swap or a renamed holder that moves the key without touching the
-      // constraint is not a modification of it. The raw content alone is
-      // not enough either: the same roles under fresh ids differ in raw
-      // ids and agree by key.
-      if (keyA.get(ca) !== keyB.get(cb) && canonicalJson(ca) !== canonicalJson(cb)) {
-        modified.push({ from: ca, to: cb });
-      }
+      if (pairChanged(ca, cb)) modified.push({ from: ca, to: cb });
     }
   }
   const restA = a.filter((c) => !paired.has(c));

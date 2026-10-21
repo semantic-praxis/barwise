@@ -178,6 +178,47 @@ describe("what id-first pairing reads", () => {
     expect(constraintChanges(a, b)).toEqual([]);
   });
 
+  it("reports a retarget onto the role that moved into the old position", () => {
+    // Person is parent of Person: the roles swap places and the mandatory
+    // moves from parent to child. By position nothing moved; by role id
+    // the constraint now constrains the other role.
+    const ring = (order: [string, string], target: string) => {
+      const m = new OrmModel({ name: "M" });
+      m.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+      const role = { "r-p": "is parent of", "r-c": "is child of" } as Record<string, string>;
+      m.addFactType({
+        id: "ft-r",
+        name: "Person is parent of Person",
+        roles: order.map((id) => ({ id, name: role[id]!, playerId: "ot-p" })),
+        readings: ["{0} is parent of {1}"],
+        constraints: [{ id: "c-1", type: "mandatory", roleId: target }],
+      });
+      return m;
+    };
+    expect(constraintChanges(ring(["r-p", "r-c"], "r-p"), ring(["r-c", "r-p"], "r-c")))
+      .toEqual([["constraintsModified", [["c-1", "c-1"]]]]);
+  });
+
+  it("falls back to the key for a pair whose roles one model lacks", () => {
+    // Same constraint id over fresh role ids at the same positions: the raw
+    // role ids differ, and by position nothing changed.
+    const a = drives([uc("c-1", ["r-1"])]);
+    const b = new OrmModel({ name: "M" });
+    b.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+    b.addObjectType({ id: "ot-c", name: "Car", kind: "entity", referenceMode: "vin" });
+    b.addFactType({
+      id: "ft-d",
+      name: "Person drives Car",
+      roles: [
+        { id: "r-9", name: "drives", playerId: "ot-p" },
+        { id: "r-8", name: "is driven by", playerId: "ot-c" },
+      ],
+      readings: ["{0} drives {1}"],
+      constraints: [uc("c-1", ["r-9"])],
+    });
+    expect(constraintChanges(a, b)).toEqual([]);
+  });
+
   it("names both kinds when an edit changes the kind", () => {
     const a = drives([{ id: "c-1", type: "mandatory", roleId: "r-1" }]);
     const b = drives([uc("c-1", ["r-1"])]);

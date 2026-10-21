@@ -1048,10 +1048,13 @@ Implementation notes (2026-10-19):
     transcript imports and MCP's diff and merge tools take the default
     unchanged.
   - Id-first pairs a constraint whose id occurs exactly once in each
-    model. A pair whose content key and raw content both differ is one
-    `constraintsModified` change carrying both versions (the key alone
-    moves when the fact type's roles swap places or a holder is renamed,
-    with the constraint untouched) (rendered "constraints modified:
+    model, within a fact type matched by name. A pair is compared as
+    itself (its raw content) when every role it names is in both models,
+    and by content key only when one model lacks a role: the key reads
+    roles by position to bridge fresh ids, and on shared roles that bridge
+    misreads a role swap as a change and a retarget onto the role that
+    moved into the old position as none. A pair that differs is one
+    `constraintsModified` change carrying both versions (rendered "constraints modified:
     <kinds>", "<old> to <new>" for a kind that changed; breaking level
     `caution`). The rest pair by content key, as before, and a pair held
     out by id never also matches by content. An id given twice anywhere in
@@ -1070,8 +1073,14 @@ Implementation notes (2026-10-19):
     values. It read values alone, so a range-only edit was invisible in
     either mode: the role-level counterpart of barwise-934.
   - Transcript imports keep the default safely: extraction fills ids
-    through `addConstraint`, which mints random UUIDs, so an import never
-    shares an id with its base by accident and falls through to content.
+    through `addConstraint`, which mints random UUIDs under the default
+    generator, so an import never shares an id with its base by accident
+    and falls through to content. A deterministic generator breaks that:
+    promptlab's `withDeterministicIds` mints reference-model ids from a
+    counter, so diffing two such references pairs constraints by mint
+    order. Nothing in the repository diffs two of them; a person running
+    `barwise diff` on them should pass content mode, which the CLI does
+    not yet expose (barwise-uy7).
   - `sampleAgreement.ts` (the medoid fold and each sample's diff) and
     `TranscriptProcessor.ts` (an alternative framing's diff) pass
     `"content"`, through one shared `SAMPLE_DIFF`. The modes usually agree
