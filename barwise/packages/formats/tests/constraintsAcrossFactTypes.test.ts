@@ -92,10 +92,9 @@ describe("constraints across fact types in NORMA", () => {
   const exportXml = (model: OrmModel) => serializeNormaDocument(writeOrmToNorma(model));
 
   it("writes the same document whichever fact type nests it", () => {
-    // A pin more than a change: the serializer groups constraints by
-    // element type, and `model.constraints` follows nesting order until
-    // 3c, so the writer that walked each host's list gave this document
-    // too. What it guards is the one walk that now writes them.
+    // For an exclusion alone the old writer gave this document too: the
+    // serializer groups constraints by element type and no exclusion is
+    // internal. What it guards is the one walk that now writes them.
     const xml = exportXml(projects(leads));
     expect(exportXml(projects(sponsors))).toBe(xml);
     expect(xml.match(/id="_c-lead-or-sponsor"/g)).toHaveLength(1);

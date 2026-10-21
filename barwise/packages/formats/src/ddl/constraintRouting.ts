@@ -257,12 +257,13 @@ function buildConstraintSpec(
 ): ConstraintSpec {
   const [c, ft] = inView;
   // The fact type it lives in, or the ones it spans: never a 2.0 host.
-  const named = model.factTypesNaming(inView).map((f) => f.name).join(", ");
+  const names = model.factTypesNaming(inView).map((f) => `"${f.name}"`);
+  const named = names.length > 0 ? names.join(", ") : "no fact type (its roles do not resolve)";
   let verbalization: string;
   try {
     verbalization = verbalizer.reportInView(inView, model).verbalization;
   } catch {
-    verbalization = `${c.type} constraint on "${named}"`;
+    verbalization = `${c.type} constraint on ${named}`;
   }
 
   let example: string;
@@ -277,7 +278,7 @@ function buildConstraintSpec(
 
   return {
     verbalization,
-    pseudocode: constraintPseudocode(c, ft, named, model),
+    pseudocode: constraintPseudocode(c, ft, ft?.name ?? named, model),
     example,
   };
 }

@@ -251,7 +251,7 @@ function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
         if (constrainedRoleIds.has(role.id)) continue;
         const player = model.getObjectType(role.playerId);
         if (player && player.kind === "entity") {
-          result.set(player.id, toNormaId(constraintId(c, `on fact type "${ft.name}"`)));
+          result.set(player.id, toNormaId(constraintId(c, onFactType(ft))));
         }
       }
     }
@@ -317,7 +317,7 @@ function writeFactType(
     if (c.type === "cardinality") continue;
     const written = writeTopLevel(
       c,
-      toNormaId(constraintId(c, `on fact type "${ft.name}"`)),
+      toNormaId(constraintId(c, onFactType(ft))),
       constraints,
       seen,
     );
@@ -346,9 +346,10 @@ function writeFactType(
 
 /**
  * Append `c` to the document's top-level constraints under `ownId`, and
- * return the id written, or undefined when nothing was: an unwritable kind,
- * or a repeated id, which is dropped whole so no InternalConstraints entry
- * may name it a second time either.
+ * return the id written (for an exclusive-or, its exclusion half's), or
+ * undefined when nothing was: an unwritable kind, or a repeated id, which
+ * is dropped whole so no InternalConstraints entry may name it a second
+ * time either.
  */
 function writeTopLevel(
   c: Constraint,
@@ -384,7 +385,7 @@ function writeTopLevel(
       roleRefs: c.roleIds.map(toNormaId),
       exclusiveOrExclusionRef: ownId,
     });
-    return undefined;
+    return ownId;
   }
   const written = writeConstraint(c, ownId);
   if (!written || seen.has(written.id)) return undefined;
@@ -411,7 +412,7 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
     ...(card
       ? {
         cardinality: {
-          id: toNormaId(constraintId(card, `on fact type "${ft.name}"`)),
+          id: toNormaId(constraintId(card, onFactType(ft))),
           ranges: [{ from: card.min, ...(card.max !== "unbounded" ? { to: card.max } : {}) }],
           ...(card.modality === "deontic" ? { modality: "deontic" as const } : {}),
         },
@@ -455,6 +456,10 @@ function listedInInternalConstraints(c: Constraint): boolean {
  * than inventing the positional `<ft>_c<i>` id it once fell back to,
  * which moved when a constraint was inserted before it.
  */
+function onFactType(ft: FactType): string {
+  return `on fact type "${ft.name}"`;
+}
+
 function constraintId(c: Constraint, where: string): string {
   if (!c.id) {
     throw new Error(`A ${c.type} constraint ${where} has no id.`);

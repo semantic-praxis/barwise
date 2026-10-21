@@ -1195,18 +1195,27 @@ Implementation notes (2026-10-19):
     fact type nesting it; its `ConstraintSpec` verbalization and
     counterexample come from `reportInView` and
     `generateCounterexampleInView`, and the pseudocode and the
-    verbalization's fallback name the fact types it spans.
+    verbalization's fallback name the fact types it spans. Clause and
+    spill order change with the walk: a table's clauses from constraints
+    across fact types now follow those from fact types' own. One whose
+    roles resolve to nothing spills with no table, where it took its
+    host's.
   - The NORMA writer writes each fact type's own constraints from
     `internalConstraints`, and those across fact types once each from
-    `model.constraints`, after every fact type's. The document does not
-    change: the serializer groups constraints by element type, and
-    `model.constraints` follows nesting order until 3c.
+    `model.constraints`, after every fact type's. The serializer groups
+    constraints by element type, so only groups holding both placements
+    change order: an external uniqueness now follows every internal one,
+    and a disjunctive mandatory every simple one, where each sat after
+    its host's.
     `populationGraph`, the preferred-identifier map and the role's
     mandatory and cardinality reads take `internalConstraints`.
   - NORMA import's phase 3 keeps a constraint across fact types only when
     no constraint anywhere in the model says the same thing; it used to
     check only the fact type phase 3 attaches it to, so a copy phase 1
-    had attached to another fact type was kept twice. Phase 1 still
+    had attached to another fact type was kept twice. `holdsSame` now
+    compares kinds before content, since the check covers the model. A
+    copy dropped this way loses its NORMA id, as one dropped within a fact
+    type always has. Phase 1 still
     deduplicates within one fact type, which the "listed in two fact
     types" id test pins.
 

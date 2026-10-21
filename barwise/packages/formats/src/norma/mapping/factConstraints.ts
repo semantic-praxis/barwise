@@ -76,7 +76,9 @@ export function withModality(nc: NormaConstraint, mapped: Constraint): Constrain
 export function holdsSame(held: readonly Constraint[], candidate: Constraint): boolean {
   const content = (c: Constraint) => canonicalJson({ ...c, id: undefined });
   const key = content(candidate);
-  return held.some((c) => content(c) === key);
+  // The kind first: phase 3 checks every constraint across fact types in
+  // the model, and most of them cannot match.
+  return held.some((c) => c.type === candidate.type && content(c) === key);
 }
 
 type ExclusiveOr = Extract<Constraint, { type: "exclusive_or"; }>;
