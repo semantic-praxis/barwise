@@ -577,6 +577,12 @@
       "caught_by": "reasoning",
       "note": "Code review on PR #684 found the unheld-fact-type path in constraintsTouching wrong three ways across two rounds; it was dropped rather than patched again."
     },
+    "orm-format-3::5f6ecfc2e469": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
+      "caught_by": "reasoning",
+      "note": "The first 3b-iv note said a single draft could not put a duplicate under another fact type; /code-review on #699 showed an equality stated from each side does, and the equality check was made symmetric."
+    },
     "orm-format-3::83e024eb5943": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 72 external constraints, in 27 files. - every one comes after its host's internal constraints. - 26 sit on a fact type other than their first holder, in 17 fi",
@@ -588,12 +594,6 @@
       "excerpt": "cli, mcp, promptlab, code-analysis and diagram-ui do not read the getter, though cli, mcp and vscode read a host through core outputs that change (below). the d",
       "caught_by": "execution",
       "note": "A compiler probe (getter renamed, every package type-checked) found 43 files in seven packages where a text search had counted 52 in nine."
-    },
-    "orm-format-3::a2c9da29702b": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "- llm (3b-iv, 2026-10-21). - the review prompt's constraint summary and the extraction log's built count read everyconstraint, and modelcontext's identifier tes",
-      "caught_by": "not-a-correction",
-      "note": "Implementation record for 3b-iv: the four llm files the 2026-10-18 probe named moved as planned; nothing in the draft was wrong."
     },
     "orm-format-3::a484a5199bd7": {
       "spec": "orm-format-3.spec.md",

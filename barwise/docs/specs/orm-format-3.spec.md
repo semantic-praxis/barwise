@@ -1233,10 +1233,12 @@ Implementation notes (2026-10-19):
     the same constraints as before.
   - The draft parser's duplicate check reads the fact type's
     `internalConstraints` for a constraint of one fact type, and
-    `model.constraints` for one across fact types. Since the parser
-    resolves roles within the fact type the extraction names, a copy
-    under another fact type can only come from a model that already
-    nests one there, which a draft built from one response does not.
+    `model.constraints` for one across fact types. Exclusion,
+    exclusive-or, disjunctive mandatory and external uniqueness resolve
+    every role within the fact type the extraction names, so a copy
+    elsewhere comes only from a model that already nests one there; an
+    equality spans two, and the same equality stated from each fact type
+    is a duplicate a single draft reaches, so its check is now symmetric.
   - With this, no source outside core reads `FactType.constraints`: a
     probe that renamed the getter in core's emitted declarations and
     type-checked the other eleven packages found no read (2026-10-21).
