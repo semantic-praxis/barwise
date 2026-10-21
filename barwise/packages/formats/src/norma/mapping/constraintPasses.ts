@@ -7,7 +7,7 @@
  * in any fact's InternalConstraints. Each pass finds the unprocessed
  * constraints of one family and attaches them to the owning fact type.
  */
-import type { Constraint, FactType } from "@barwise/core";
+import { type Constraint, type FactType, isExternalConstraint } from "@barwise/core";
 import type { NormaConstraint } from "../NormaXmlTypes.js";
 import type { NormaMappingContext } from "./context.js";
 import {
@@ -259,8 +259,11 @@ function addMultiFactTypeConstraints(ctx: NormaMappingContext): void {
 }
 
 /**
- * Add `mapped`, with `nc`'s modality and its claimed id, unless `ft`
- * already holds a constraint saying exactly the same thing (`holdsSame`).
+ * Add `mapped`, with `nc`'s modality and its claimed id, unless the model
+ * already holds a constraint saying exactly the same thing (`holdsSame`):
+ * `ft` for a constraint of one fact type, and anywhere for one across fact
+ * types, whichever fact type it was nested under (orm-format-3, Open
+ * decision 9).
  */
 function addUnlessHeld(
   ctx: NormaMappingContext,
@@ -269,7 +272,8 @@ function addUnlessHeld(
   mapped: Constraint,
 ): void {
   const candidate = withModality(nc, mapped);
-  if (holdsSame(ft.constraints, candidate)) return;
+  const held = isExternalConstraint(candidate) ? ctx.model.constraints : ft.internalConstraints;
+  if (holdsSame(held, candidate)) return;
   ft.addConstraint({ ...candidate, id: ctx.constraintIds.claim(nc) });
 }
 

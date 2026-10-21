@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, and 3b-ii (diagram) 2026-10-21; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, and 3b-iii (formats) 2026-10-21; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1187,6 +1187,28 @@ Implementation notes (2026-10-19):
     constraint was drawn solid in every view. A
     constraint touching no fact type is in no list; the sidebar shows it
     and the webview has no place for it yet (barwise-f2r).
+
+- **Formats (3b-iii, 2026-10-21).**
+  - DDL routing walks `everyConstraint`. A constraint across fact types
+    that spills goes to the table of the first fact type it spans, in
+    model order, that has one, where it went to the table nearest the
+    fact type nesting it; its `ConstraintSpec` verbalization and
+    counterexample come from `reportInView` and
+    `generateCounterexampleInView`, and the pseudocode and the
+    verbalization's fallback name the fact types it spans.
+  - The NORMA writer writes each fact type's own constraints from
+    `internalConstraints`, and those across fact types once each from
+    `model.constraints`, after every fact type's. The document does not
+    change: the serializer groups constraints by element type, and
+    `model.constraints` follows nesting order until 3c.
+    `populationGraph`, the preferred-identifier map and the role's
+    mandatory and cardinality reads take `internalConstraints`.
+  - NORMA import's phase 3 keeps a constraint across fact types only when
+    no constraint anywhere in the model says the same thing; it used to
+    check only the fact type phase 3 attaches it to, so a copy phase 1
+    had attached to another fact type was kept twice. Phase 1 still
+    deduplicates within one fact type, which the "listed in two fact
+    types" id test pins.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

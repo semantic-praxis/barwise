@@ -16,8 +16,14 @@
  * routing.
  */
 
-import type { Constraint, ConstraintSpec, FactType, OrmModel } from "@barwise/core";
-import { generateCounterexampleForConstraint } from "@barwise/core/counterexample";
+import type {
+  Constraint,
+  ConstraintInView,
+  ConstraintSpec,
+  FactType,
+  OrmModel,
+} from "@barwise/core";
+import { generateCounterexampleInView } from "@barwise/core/counterexample";
 import type { RelationalSchema } from "@barwise/core/mapping";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
 import type { DialectCapabilityProfile } from "./dialectCapabilities.js";
@@ -61,11 +67,11 @@ export function routeConstraints(
   const spilled: SpilledConstraint[] = [];
   const verbalizer = new ConstraintVerbalizer();
 
-  const spill = (c: Constraint, ft: FactType, reason: string, tableName?: string): void => {
+  const spill = (inView: ConstraintInView, reason: string, tableName?: string): void => {
     spilled.push({
       tableName,
       reason,
-      spec: buildConstraintSpec(c, ft, model, verbalizer),
+      spec: buildConstraintSpec(inView, model, verbalizer),
     });
   };
 
@@ -73,14 +79,12 @@ export function routeConstraints(
     capability: "unique" | "check",
     clauseSql: string,
     tableName: string,
-    c: Constraint,
-    ft: FactType,
+    inView: ConstraintInView,
   ): void => {
     const channel = profile[capability];
     if (channel === "absent") {
       spill(
-        c,
-        ft,
+        inView,
         `${capability === "check" ? "CHECK" : "UNIQUE"} is not supported by ${dialectName}`,
         tableName,
       );
@@ -89,83 +93,96 @@ export function routeConstraints(
     clauses.push({ tableName, sql: clauseSql, channel });
   };
 
-  for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
-      switch (c.type) {
-        // Realized structurally by the relational mapping.
-        case "mandatory":
-          break;
-
-        case "internal_uniqueness": {
-          // The only uniqueness the mapping does not realize is a
-          // single-role constraint on the value side of an
-          // entity-value binary (a secondary unique column).
-          const col = c.roleIds.length === 1
-            ? valueColumnForUniqueness(c.roleIds[0]!, ft, model, schema)
-            : undefined;
-          // ... unless the mapping realized it as the primary key after
-          // all. Since barwise-967 the identifying binary IS the key, so
-          // routing its uniqueness would emit
-          // `UNIQUE (medical_record_number)` beside
-          // `PRIMARY KEY (medical_record_number)` -- a clause the primary
-          // key already enforces.
-          if (col && !isPrimaryKey(col, schema)) {
-            route("unique", `UNIQUE (${col.column})`, col.table, c, ft);
-          }
-          // An n-ary fact type's table is keyed on one of its uniqueness
-          // constraints; any other one is a UNIQUE on the same table
-          // (barwise-kgh). "Encounter has Diagnosis at DiagnosisRank" is
-          // keyed on (encounter, diagnosis) and unique on (encounter, rank).
-          if (ft.arity > 2) {
-            const spanned = associativeColumns(c.roleIds, schema);
-            if (spanned && !isWholePrimaryKey(spanned, schema)) {
-              route("unique", `UNIQUE (${spanned.columns.join(", ")})`, spanned.table, c, ft);
-            }
-          }
-          break;
-        }
-
-        case "external_uniqueness": {
-          const cols = c.roleIds.map((r) => columnForJoinedRole(r, model, schema));
-          const table = cols[0]?.table;
-          if (
-            table !== undefined
-            && cols.every((r) => r !== undefined && r.table === table)
-          ) {
-            const columnList = cols.map((r) => r!.column).join(", ");
-            route("unique", `UNIQUE (${columnList})`, table, c, ft);
-          } else {
-            spill(c, ft, "the roles map to more than one table", table);
-          }
-          break;
-        }
-
-        case "value_constraint": {
-          routeValueConstraint(c, ft);
-          break;
-        }
-
-        case "value_comparison": {
-          const col1 = columnForRole(c.roleId1, model, schema);
-          const col2 = columnForRole(c.roleId2, model, schema);
-          if (col1 && col2 && col1.table === col2.table) {
-            route(
-              "check",
-              `CHECK (${col1.column} ${c.operator} ${col2.column})`,
-              col1.table,
-              c,
-              ft,
-            );
-          } else {
-            spill(c, ft, "the compared roles map to different tables", col1?.table);
-          }
-          break;
-        }
-
-        default:
-          spill(c, ft, "not expressible in SQL DDL", tableForFactType(ft, model, schema));
-          break;
+  // A constraint across fact types is placed by the fact types it spans,
+  // never by the one a 2.0 file nests it under (orm-format-3, Open
+  // decision 9): its spill goes to the table of the first of them, in
+  // model order, that has one.
+  const routeAcross = (inView: ConstraintInView): void => {
+    const [c] = inView;
+    if (c.type === "external_uniqueness") {
+      const cols = c.roleIds.map((r) => columnForJoinedRole(r, model, schema));
+      const table = cols[0]?.table;
+      if (
+        table !== undefined
+        && cols.every((r) => r !== undefined && r.table === table)
+      ) {
+        const columnList = cols.map((r) => r!.column).join(", ");
+        route("unique", `UNIQUE (${columnList})`, table, inView);
+      } else {
+        spill(inView, "the roles map to more than one table", table);
       }
+      return;
+    }
+    const nearest = model.factTypesNaming(inView)
+      .map((f) => tableForFactType(f, model, schema))
+      .find((t) => t !== undefined);
+    spill(inView, "not expressible in SQL DDL", nearest);
+  };
+
+  for (const inView of model.everyConstraint()) {
+    const [c, ft] = inView;
+    if (ft === undefined) {
+      routeAcross(inView);
+      continue;
+    }
+    switch (c.type) {
+      // Realized structurally by the relational mapping.
+      case "mandatory":
+        break;
+
+      case "internal_uniqueness": {
+        // The only uniqueness the mapping does not realize is a
+        // single-role constraint on the value side of an
+        // entity-value binary (a secondary unique column).
+        const col = c.roleIds.length === 1
+          ? valueColumnForUniqueness(c.roleIds[0]!, ft, model, schema)
+          : undefined;
+        // ... unless the mapping realized it as the primary key after
+        // all. Since barwise-967 the identifying binary IS the key, so
+        // routing its uniqueness would emit
+        // `UNIQUE (medical_record_number)` beside
+        // `PRIMARY KEY (medical_record_number)` -- a clause the primary
+        // key already enforces.
+        if (col && !isPrimaryKey(col, schema)) {
+          route("unique", `UNIQUE (${col.column})`, col.table, inView);
+        }
+        // An n-ary fact type's table is keyed on one of its uniqueness
+        // constraints; any other one is a UNIQUE on the same table
+        // (barwise-kgh). "Encounter has Diagnosis at DiagnosisRank" is
+        // keyed on (encounter, diagnosis) and unique on (encounter, rank).
+        if (ft.arity > 2) {
+          const spanned = associativeColumns(c.roleIds, schema);
+          if (spanned && !isWholePrimaryKey(spanned, schema)) {
+            route("unique", `UNIQUE (${spanned.columns.join(", ")})`, spanned.table, inView);
+          }
+        }
+        break;
+      }
+
+      case "value_constraint": {
+        routeValueConstraint(c, ft);
+        break;
+      }
+
+      case "value_comparison": {
+        const col1 = columnForRole(c.roleId1, model, schema);
+        const col2 = columnForRole(c.roleId2, model, schema);
+        if (col1 && col2 && col1.table === col2.table) {
+          route(
+            "check",
+            `CHECK (${col1.column} ${c.operator} ${col2.column})`,
+            col1.table,
+            inView,
+          );
+        } else {
+          spill(inView, "the compared roles map to different tables", col1?.table);
+        }
+        break;
+      }
+
+      default:
+        spill(inView, "not expressible in SQL DDL", tableForFactType(ft, model, schema));
+        break;
     }
   }
 
@@ -207,10 +224,11 @@ export function routeConstraints(
     const roleId = c.roleId ?? valueRoleOf(ft, model);
     const col = roleId ? columnForRole(roleId, model, schema) : undefined;
     const predicate = col ? renderValuePredicate(col.column, c.values, c.ranges) : "";
+    const inView: ConstraintInView = [c, ft];
     if (col && predicate) {
-      route("check", `CHECK (${predicate})`, col.table, c, ft);
+      route("check", `CHECK (${predicate})`, col.table, inView);
     } else {
-      spill(c, ft, "the constrained role maps to no single column", col?.table);
+      spill(inView, "the constrained role maps to no single column", col?.table);
     }
   }
 }
@@ -233,21 +251,23 @@ function dedupeBy<T>(items: readonly T[], key: (item: T) => string): T[] {
 // ---------------------------------------------------------------------------
 
 function buildConstraintSpec(
-  c: Constraint,
-  ft: FactType,
+  inView: ConstraintInView,
   model: OrmModel,
   verbalizer: ConstraintVerbalizer,
 ): ConstraintSpec {
+  const [c, ft] = inView;
+  // The fact type it lives in, or the ones it spans: never a 2.0 host.
+  const named = model.factTypesNaming(inView).map((f) => f.name).join(", ");
   let verbalization: string;
   try {
-    verbalization = verbalizer.verbalize(c, ft, model).text;
+    verbalization = verbalizer.reportInView(inView, model).verbalization;
   } catch {
-    verbalization = `${c.type} constraint on "${ft.name}"`;
+    verbalization = `${c.type} constraint on "${named}"`;
   }
 
   let example: string;
   try {
-    const ce = generateCounterexampleForConstraint(c, ft, model);
+    const ce = generateCounterexampleInView(inView, model);
     example = ce
       ? `Forbidden: ${ce.text}`
       : "No concrete example available; see the verbalization.";
@@ -257,7 +277,7 @@ function buildConstraintSpec(
 
   return {
     verbalization,
-    pseudocode: constraintPseudocode(c, ft, model),
+    pseudocode: constraintPseudocode(c, ft, named, model),
     example,
   };
 }
@@ -267,8 +287,12 @@ function buildConstraintSpec(
  * implement the constraint in query logic, a dbt test, or application
  * code.
  */
-function constraintPseudocode(c: Constraint, ft: FactType, model: OrmModel): string {
-  const fact = ft.name;
+function constraintPseudocode(
+  c: Constraint,
+  ft: FactType | undefined,
+  fact: string,
+  model: OrmModel,
+): string {
   switch (c.type) {
     case "ring": {
       const templates: Record<string, string> = {
@@ -349,7 +373,11 @@ function rangeText(
 }
 
 /** Human-readable labels for a role sequence: "Player.roleName" each. */
-function roleLabels(roleIds: readonly string[], ft: FactType, model: OrmModel): string {
+function roleLabels(
+  roleIds: readonly string[],
+  ft: FactType | undefined,
+  model: OrmModel,
+): string {
   return roleIds
     .map((roleId) => {
       const { role } = findRole(roleId, ft, model) ?? {};
