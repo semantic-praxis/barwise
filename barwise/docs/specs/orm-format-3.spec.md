@@ -1174,7 +1174,11 @@ Implementation notes (2026-10-19):
     ring) read `internalConstraints`.
   - The webview's model summary calls `constraintsTouching` per fact
     type, the core authority, so its tree badge and inspector agree with
-    the sidebar. A
+    the sidebar.
+  - A ghost preview that widens a view's filter can now bring in a
+    constraint, which renders solid beside its dimmed fact type: ghost
+    ids name elements, not constraint nodes (barwise-ejs). Before, every
+    constraint was drawn solid in every view. A
     constraint touching no fact type is in no list; the sidebar shows it
     and the webview has no place for it yet (barwise-f2r).
 

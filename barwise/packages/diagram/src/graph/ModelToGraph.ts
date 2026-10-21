@@ -87,13 +87,15 @@ export interface ModelToGraphOptions {
  * file order. An id-less constraint, which construction rules out
  * (barwise-nkq) though the type allows it until WS3c, is numbered.
  */
-function constraintNodeIds(model: OrmModel): ReadonlyMap<Constraint, string> {
+function constraintNodeIds(
+  model: OrmModel,
+  constraints: readonly Constraint[],
+): ReadonlyMap<Constraint, string> {
   const taken = new Set<string>([
     ...model.objectTypes.map((ot) => ot.id),
     ...model.factTypes.map((ft) => ft.id),
     ...model.subtypeFacts.map((sf) => sf.id),
   ]);
-  const constraints = model.constraints;
   const uses = new Map<string, number>();
   for (const c of constraints) {
     if (c.id !== undefined) uses.set(c.id, (uses.get(c.id) ?? 0) + 1);
@@ -120,9 +122,10 @@ function constraintNodeIds(model: OrmModel): ReadonlyMap<Constraint, string> {
     } else if (c.id !== undefined) {
       ids.set(c, free(c.id));
     } else {
-      let base: string;
-      do base = `constraint-${unnamed++}`; while (taken.has(base));
-      ids.set(c, free(base));
+      let id: string;
+      do id = `constraint-${unnamed++}`; while (taken.has(id));
+      taken.add(id);
+      ids.set(c, id);
     }
   }
   return ids;
@@ -299,7 +302,8 @@ export function modelToGraph(
   // those fact types only: none floats, and no edge points at a fact type
   // absorbed into a reference mode or left out of a neighbourhood view.
 
-  const nodeIds = constraintNodeIds(model);
+  const across = model.constraints;
+  const nodeIds = constraintNodeIds(model, across);
 
   /**
    * Draw a constraint as a node with an edge to each of its roles whose fact
@@ -339,7 +343,7 @@ export function modelToGraph(
 
   // Every constraint across fact types, once, wherever a 2.0 file nests
   // it: the nesting fact type used to decide whether it was drawn at all.
-  for (const c of model.constraints) {
+  for (const c of across) {
     switch (c.type) {
       case "external_uniqueness":
         addConstraintNode(c, "external_uniqueness", c.roleIds);
@@ -360,11 +364,11 @@ export function modelToGraph(
         addConstraintNode(c, "equality", c.roleIds1, c.roleIds2);
         break;
       default: {
-        // Narrowed to exactly the kinds declared not-drawn below; a
-        // new Constraint member missing from both the cases above
-        // and NOT_DRAWN fails to compile instead of silently not
-        // rendering (barwise-869: the join/comparison/cardinality
-        // kinds were undrawn with nothing recording the intent).
+        // Narrowed to the external kinds not drawn, the join kinds today.
+        // NOT_DRAWN's type is the compile check for every kind, internal
+        // ones included: a new member missing from both the cases above
+        // and that record fails to compile instead of silently not
+        // rendering (barwise-869).
         const reason: string = NOT_DRAWN[c.type];
         void reason;
         break;
