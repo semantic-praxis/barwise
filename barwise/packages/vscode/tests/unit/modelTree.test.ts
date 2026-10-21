@@ -7,26 +7,7 @@
 import { OrmModel } from "@barwise/core";
 import { describe, expect, it, vi } from "vitest";
 
-const inert = vi.hoisted(() => {
-  const make = (): unknown =>
-    new Proxy(function() {}, {
-      get: (_t, key) => {
-        if (key === "then") return undefined;
-        if (key === Symbol.toPrimitive) return () => "";
-        return make();
-      },
-      apply: () => make(),
-      construct: () => make() as object,
-    });
-  const module = (): object =>
-    new Proxy({}, {
-      get: (_t, key) => (key === "then" ? undefined : make()),
-      has: (_t, key) => key !== "then",
-    });
-  return { module };
-});
-
-vi.mock("vscode", () => inert.module());
+vi.mock("vscode", async () => (await import("./helpers/inertModule.js")).inertModule());
 
 const { buildTree } = await import("../../src/sidebar/ModelTreeProvider.js");
 
@@ -65,6 +46,18 @@ function constraintsByFactType(model: OrmModel): Record<string, string[]> {
 }
 
 describe("model tree constraints", () => {
+  it("lists a constraint touching no fact type under Unattached Constraints", () => {
+    const model = rooms("ft-area");
+    model.getFactType("ft-area")!.addConstraint({
+      id: "c-gone",
+      type: "exclusion",
+      roleIds: ["r-gone", "r-lost"],
+    });
+    const unattached = buildTree(model).find((c) => c.label === "Unattached Constraints");
+    expect(unattached?.children?.map((c) => c.label)).toEqual(["Exclusion"]);
+    expect(buildTree(rooms("ft-area")).map((c) => c.label)).not.toContain("Unattached Constraints");
+  });
+
   it("lists a key under each fact type it spans, whichever fact type nests it", () => {
     for (const host of ["ft-in", "ft-nr", "ft-area"] as const) {
       expect(constraintsByFactType(rooms(host)), host).toEqual({

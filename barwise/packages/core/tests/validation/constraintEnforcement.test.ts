@@ -8,8 +8,6 @@
  * satisfied.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint } from "../../src/model/Constraint.js";
-import type { FactType } from "../../src/model/FactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { evaluateConstraintEnforcement } from "../../src/validation/constraintEnforcement.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
@@ -63,23 +61,16 @@ function twoUniquenessModel(): OrmModel {
   return model;
 }
 
-function constraintById(ft: FactType, id: string): Constraint {
-  const c = ft.constraints.find((x) => x.id === id);
-  if (!c) throw new Error(`no constraint ${id}`);
-  return c;
-}
-
 describe("evaluateConstraintEnforcement", () => {
   it("distinguishes a violated constraint from a satisfied one in the same model", () => {
     const model = twoUniquenessModel();
-    const ft = model.getFactTypeByName("Customer places Order")!;
 
     // The model-wide sweep reports one violation and cannot say which
     // constraint owns it -- both diagnostics would carry the population id.
     expect(populationValidationRules(model, graphFor(model))).toHaveLength(1);
 
-    const violated = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r2"));
-    const satisfied = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r1"));
+    const violated = evaluateConstraintEnforcement(model, model.getConstraintInView("uc-r2")!);
+    const satisfied = evaluateConstraintEnforcement(model, model.getConstraintInView("uc-r1")!);
 
     expect(violated).toEqual({
       enforced: true,
@@ -98,9 +89,8 @@ describe("evaluateConstraintEnforcement", () => {
       subsetRoleIds: ["r1"],
       supersetRoleIds: ["r2"],
     });
-    const subset = constraintById(ft, "sub-1");
 
-    const verdict = evaluateConstraintEnforcement(model, ft, subset);
+    const verdict = evaluateConstraintEnforcement(model, model.getConstraintInView("sub-1")!);
     // Not `rejects: false`: nothing here asked the question, and a caller
     // that read a bare boolean would record a pass it never measured.
     expect(verdict).toEqual({ enforced: false });
@@ -109,8 +99,7 @@ describe("evaluateConstraintEnforcement", () => {
 
   it("does not report violations belonging to another constraint of the same kind", () => {
     const model = twoUniquenessModel();
-    const ft = model.getFactTypeByName("Customer places Order")!;
-    const verdict = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r1"));
+    const verdict = evaluateConstraintEnforcement(model, model.getConstraintInView("uc-r1")!);
     if (!verdict.enforced) throw new Error("expected enforced");
     expect(verdict.diagnostics).toEqual([]);
   });
@@ -123,7 +112,7 @@ describe("evaluateConstraintEnforcement", () => {
     const clean = model.addPopulation({ factTypeId: ft.id });
     clean.addInstance({ id: "j1", roleValues: { r1: "C003", r2: "O2" } });
 
-    const violated = evaluateConstraintEnforcement(model, ft, constraintById(ft, "uc-r2"));
+    const violated = evaluateConstraintEnforcement(model, model.getConstraintInView("uc-r2")!);
     if (!violated.enforced) throw new Error("expected enforced");
     expect(violated.diagnostics).toHaveLength(1);
   });
@@ -139,13 +128,11 @@ describe("evaluateConstraintEnforcement agrees with the model-wide sweep", () =>
    */
   function assertAgrees(model: OrmModel): void {
     const fromPredicate: string[] = [];
-    for (const ft of model.factTypes) {
-      for (const c of ft.constraints) {
-        const verdict = evaluateConstraintEnforcement(model, ft, c);
-        if (!verdict.enforced) continue;
-        for (const d of verdict.diagnostics) {
-          fromPredicate.push(`${d.severity}|${d.ruleId}|${d.elementId}|${d.message}`);
-        }
+    for (const inView of model.everyConstraint()) {
+      const verdict = evaluateConstraintEnforcement(model, inView);
+      if (!verdict.enforced) continue;
+      for (const d of verdict.diagnostics) {
+        fromPredicate.push(`${d.severity}|${d.ruleId}|${d.elementId}|${d.message}`);
       }
     }
     const fromSweep = populationValidationRules(model, graphFor(model))

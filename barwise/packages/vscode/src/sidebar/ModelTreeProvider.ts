@@ -184,6 +184,19 @@ export function buildTree(model: OrmModel): ModelTreeItem[] {
     });
   }
 
+  // Constraints across fact types none of whose roles resolve, so no fact
+  // type lists them; without this a constraint left dangling by a renamed
+  // or deleted role would vanish from the tree just when it needs fixing.
+  const unattached = model.constraints.filter((c) => model.factTypesOf(c).length === 0);
+  if (unattached.length > 0) {
+    categories.push({
+      kind: "category",
+      label: "Unattached Constraints",
+      iconId: "warning",
+      children: unattached.map((c) => constraintItem(c, undefined, model)),
+    });
+  }
+
   // Subtype facts
   if (model.subtypeFacts.length > 0) {
     categories.push({
@@ -259,12 +272,12 @@ function factTypeItem(ft: FactType, model: OrmModel): ModelTreeItem {
 
 function constraintItem(
   c: Constraint,
-  ft: FactType,
+  ft: FactType | undefined,
   _model: OrmModel,
 ): ModelTreeItem {
   if (isInternalUniqueness(c)) {
     const roleNames = c.roleIds
-      .map((rid) => ft.roles.find((r) => r.id === rid)?.name)
+      .map((rid) => ft?.roles.find((r) => r.id === rid)?.name)
       .filter(Boolean);
     const preferred = c.isPreferred ? " (preferred)" : "";
     return {
@@ -273,7 +286,7 @@ function constraintItem(
     };
   }
   if (isMandatoryRole(c)) {
-    const role = ft.roles.find((r) => r.id === c.roleId);
+    const role = ft?.roles.find((r) => r.id === c.roleId);
     return {
       kind: "constraint",
       label: `Mandatory: ${role?.name ?? c.roleId}`,

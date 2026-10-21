@@ -1117,16 +1117,26 @@ Implementation notes (2026-10-19):
 - **vscode, learn and dbt (3b-i, 2026-10-21).**
   - The sidebar's model tree lists `constraintsTouching` under each fact
     type, so a composite key shows under both fact types it spans and not
-    under one it is only nested in.
-  - The gym's `forbids_population` reads each carrier's
-    `constraintsTouching`, each constraint once, so a candidate's external
+    under one it is only nested in. A constraint none of whose roles
+    resolve, which no fact type lists, goes under a new "Unattached
+    Constraints" category rather than vanishing.
+  - Core: `evaluateConstraintEnforcement(model, inView)` takes the
+    `ConstraintInView` pair instead of a fact type and a constraint, and
+    `generateCounterexampleInView` is exported beside
+    `generateCounterexampleForConstraint`. Both callers here held a
+    constraint across fact types and had to invent a fact type the check
+    never read; now they pass what `constraintsTouchingAny` and
+    `getConstraintInView` return.
+  - The gym's `forbids_population` reads `constraintsTouchingAny` over its
+    carriers, each constraint once, so a candidate's external
     uniqueness or disjunctive mandatory counts wherever its file nests it;
     before, one nested under a fact type outside the carriers was missed.
     The reference side reads `internalConstraints`, which is every kind
     the check accepts.
   - The tutorial renderer finds a motivation's constraint with
-    `getConstraintInView`, handing the generator a fact type the
-    constraint touches for one across fact types.
+    `getConstraintInView` and hands the pair to
+    `generateCounterexampleInView`; its "already in the prior step" check
+    is `getConstraint`, by id alone.
   - dbt's three SQL-pattern checks read `internalConstraints`: each asks
     about an internal kind only.
 

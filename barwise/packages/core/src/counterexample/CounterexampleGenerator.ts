@@ -51,7 +51,7 @@ type RoleValues = Record<string, string>;
 export function generateCounterexamples(model: OrmModel): Counterexample[] {
   const result: Counterexample[] = [];
   for (const inView of model.everyConstraint()) {
-    const ce = generateInView(inView, model);
+    const ce = generateCounterexampleInView(inView, model);
     if (ce) result.push(ce);
   }
   return result;
@@ -83,7 +83,7 @@ export function generateCounterexampleForConstraint(
   factType: FactType,
   model: OrmModel,
 ): Counterexample | undefined {
-  return generateInView(
+  return generateCounterexampleInView(
     isExternalConstraint(constraint) ? [constraint, undefined] : [constraint, factType],
     model,
   );
@@ -106,7 +106,10 @@ export function generateCounterexampleForConstraint(
  * seventeenth member to `Constraint` failed to compile at six consumers
  * and NOT here, because a guard chain ending in a fallback cannot fail.
  */
-function generateInView(inView: ConstraintInView, model: OrmModel): Counterexample | undefined {
+export function generateCounterexampleInView(
+  inView: ConstraintInView,
+  model: OrmModel,
+): Counterexample | undefined {
   const [constraint, ft] = inView;
   const probe = probeFor(constraint, ft, model);
   if (!probe) return undefined;
@@ -117,7 +120,7 @@ function generateInView(inView: ConstraintInView, model: OrmModel): Counterexamp
 /** What each generator builds: a counterexample short of the fact types it names. */
 type Probe = Omit<Counterexample, "factTypeIds">;
 
-/** The switch `generateInView` documents. */
+/** The switch `generateCounterexampleInView` documents. */
 function probeFor(
   constraint: Constraint,
   ft: FactType | undefined,

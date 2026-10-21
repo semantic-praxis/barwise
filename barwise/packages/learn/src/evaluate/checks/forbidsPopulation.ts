@@ -1,5 +1,6 @@
 import {
   type Constraint,
+  type ConstraintInView,
   evaluateConstraintEnforcement,
   type FactType,
   isDisjunctiveMandatory,
@@ -102,7 +103,7 @@ function constraintsUnderTest(
   correspondents: readonly FactType[],
   configs: readonly PopulationConfig[],
   kind: ConstraintKind,
-): Array<{ readonly ft: FactType; readonly c: Constraint; }> {
+): readonly ConstraintInView[] {
   const carriers = new Map<string, FactType>();
   for (const ft of correspondents) carriers.set(ft.id, ft);
   if (kind !== "mandatory") {
@@ -114,20 +115,10 @@ function constraintsUnderTest(
 
   // Every constraint that applies to a carrier, each once: a candidate's
   // external uniqueness or disjunctive mandatory spans its fact types
-  // wherever a 2.0 file nests it (orm-format-3, Open decision 9). It is
-  // paired with a carrier it touches; enforcement reads the fact type only
-  // for the kinds that live in one.
+  // wherever a 2.0 file nests it (orm-format-3, Open decision 9).
   const guards = CANDIDATE_GUARDS[kind];
-  const seen = new Set<Constraint>();
-  const pairs: Array<{ ft: FactType; c: Constraint; }> = [];
-  for (const ft of carriers.values()) {
-    for (const c of candidate.constraintsTouching(ft.id)) {
-      if (seen.has(c) || !guards.some((g) => g(c))) continue;
-      seen.add(c);
-      pairs.push({ ft, c });
-    }
-  }
-  return pairs;
+  return candidate.constraintsTouchingAny([...carriers.keys()])
+    .filter(([c]) => guards.some((g) => g(c)));
 }
 
 /**
@@ -156,13 +147,13 @@ function constraintsUnderTest(
 function candidateRejects(
   candidate: OrmModel,
   configs: PopulationConfig[],
-  under: ReadonlyArray<{ readonly ft: FactType; readonly c: Constraint; }>,
+  under: readonly ConstraintInView[],
 ): boolean {
   if (under.length === 0) return false;
 
-  const errorCounts = (ft: FactType, c: Constraint): Map<string, number> => {
+  const errorCounts = (inView: ConstraintInView): Map<string, number> => {
     const counts = new Map<string, number>();
-    const verdict = evaluateConstraintEnforcement(candidate, ft, c);
+    const verdict = evaluateConstraintEnforcement(candidate, inView);
     if (!verdict.enforced) return counts;
     for (const d of verdict.diagnostics) {
       if (d.severity !== "error") continue;
@@ -172,13 +163,13 @@ function candidateRejects(
     return counts;
   };
 
-  const before = under.map(({ ft, c }) => errorCounts(ft, c));
+  const before = under.map(errorCounts);
   const addedIds: string[] = [];
   try {
     for (const cfg of configs) addedIds.push(candidate.addPopulation(cfg).id);
-    for (const [i, { ft, c }] of under.entries()) {
+    for (const [i, inView] of under.entries()) {
       const was = before[i]!;
-      for (const [key, count] of errorCounts(ft, c)) {
+      for (const [key, count] of errorCounts(inView)) {
         if (count > (was.get(key) ?? 0)) return true;
       }
     }

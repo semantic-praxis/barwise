@@ -8,8 +8,7 @@ import {
   isRing,
   isValueConstraint,
 } from "../model/Constraint.js";
-import type { FactType } from "../model/FactType.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import type { Diagnostic } from "./Diagnostic.js";
 import {
   disjunctiveMandatoryViolationsFor,
@@ -61,13 +60,18 @@ export type EnforcementVerdict =
  * `model` is required and not an oversight: `buildObjectUniverse` is
  * closed-world over every population, so enforcement is not decidable from a
  * constraint and its fact type alone.
+ *
+ * The constraint comes as the pair `getConstraintInView` and
+ * `constraintsTouchingAny` return: with its fact type when it lives in
+ * one, and with none when it spans fact types (orm-format-3, Open decision
+ * 9). It took a fact type for every kind until WS3b, so a caller holding a
+ * constraint across fact types had to invent one the check never read.
  */
 export function evaluateConstraintEnforcement(
   model: OrmModel,
-  factType: FactType,
-  constraint: Constraint,
+  inView: ConstraintInView,
 ): EnforcementVerdict {
-  const diagnostics = violationsFor(model, factType, constraint);
+  const diagnostics = violationsFor(model, inView);
   if (diagnostics === undefined) return { enforced: false };
   return { enforced: true, rejects: diagnostics.length > 0, diagnostics };
 }
@@ -88,13 +92,17 @@ export function evaluateConstraintEnforcement(
  */
 function violationsFor(
   model: OrmModel,
-  ft: FactType,
-  c: Constraint,
+  inView: ConstraintInView,
 ): Diagnostic[] | undefined {
+  if (inView[1] === undefined) {
+    const c: Constraint = inView[0];
+    if (isExternalUniqueness(c)) return externalUniquenessViolationsFor(model, c);
+    if (isDisjunctiveMandatory(c)) return disjunctiveMandatoryViolationsFor(model, c);
+    return undefined;
+  }
+  const [c, ft] = inView;
   if (isInternalUniqueness(c)) return uniquenessViolationsFor(model, ft.id, c);
-  if (isExternalUniqueness(c)) return externalUniquenessViolationsFor(model, c);
   if (isMandatoryRole(c)) return mandatoryViolationsFor(model, ft, c);
-  if (isDisjunctiveMandatory(c)) return disjunctiveMandatoryViolationsFor(model, c);
   if (isValueConstraint(c)) return valueConstraintViolationsFor(model, ft.id, c);
   if (isFrequency(c)) return frequencyViolationsFor(model, ft.id, c);
   if (isRing(c)) return ringViolationsFor(model, ft.id, c);
