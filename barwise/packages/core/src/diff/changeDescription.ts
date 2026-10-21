@@ -115,6 +115,12 @@ export type ChangeDescription =
   // told a consumer nothing about which roles the constraint covered.
   | { readonly change: "constraintsAdded"; readonly constraints: readonly Constraint[]; }
   | { readonly change: "constraintsRemoved"; readonly constraints: readonly Constraint[]; }
+  // A constraint paired by id whose content changed (orm-format-3, Open
+  // decision 4): both versions, so a consumer can see what moved.
+  | {
+    readonly change: "constraintsModified";
+    readonly constraints: readonly { readonly from: Constraint; readonly to: Constraint; }[];
+  }
   | {
     readonly change: "derivation";
     readonly from?: DerivationRule;
@@ -234,6 +240,8 @@ export function describeChange(change: ChangeDescription): string {
       return `constraints added: ${constraintTypes(change.constraints)}`;
     case "constraintsRemoved":
       return `constraints removed: ${constraintTypes(change.constraints)}`;
+    case "constraintsModified":
+      return `constraints modified: ${constraintTypes(change.constraints.map((m) => m.to))}`;
     case "derivation":
       return "derivation changed";
     case "definition":

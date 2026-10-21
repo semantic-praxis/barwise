@@ -159,6 +159,22 @@ export function isDanglingFactType(a: OrmModel, b: OrmModel, factTypeId: string)
   return !a.getFactType(factTypeId) && !b.getFactType(factTypeId);
 }
 
+/**
+ * How a diff pairs a constraint on one side with one on the other
+ * (orm-format-3, Open decision 4 as revised 2026-10-18).
+ *
+ * - `"id-first"`, the default: a constraint whose id occurs exactly once
+ *   on each side is paired by id, so an edit that keeps the id is one
+ *   `constraintsModified` change rather than a removal and an addition;
+ *   the rest are paired by content key. The fallback is what keeps a
+ *   transcript import working against its base: its ids are fresh, so
+ *   nothing pairs by id and everything falls through to content.
+ * - `"content"`: content keys only. For comparing independent LLM samples,
+ *   whose ids are unrelated by construction, so a coincidental id never
+ *   pairs two different constraints.
+ */
+export type ConstraintMatching = "id-first" | "content";
+
 export function diffFactType(
   a: FactType,
   b: FactType,
@@ -168,6 +184,7 @@ export function diffFactType(
     existing: roleHolders(existingModel),
     incoming: roleHolders(incomingModel),
   },
+  matching: ConstraintMatching = "id-first",
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
@@ -206,6 +223,7 @@ export function diffFactType(
     b.roles,
     holders.existing,
     holders.incoming,
+    matching,
   );
   changes.push(...constraintDiff);
 
@@ -450,17 +468,39 @@ function diffConstraints(
   rolesB: readonly Role[],
   holdersA: RoleHolders,
   holdersB: RoleHolders,
+  matching: ConstraintMatching,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
   const idxMapA = roleKeys(rolesA, holdersA, holdersB);
   const idxMapB = roleKeys(rolesB, holdersB, holdersA);
 
-  const keysA = new Set(a.map((c) => constraintKey(c, idxMapA)));
-  const keysB = new Set(b.map((c) => constraintKey(c, idxMapB)));
+  // Pair by id first, where an id names exactly one constraint on each
+  // side. An id given twice on one side (barwise-b2s) pairs nothing, so
+  // those constraints fall through to content rather than pairing one of
+  // them arbitrarily. A constraint with no id is never paired by id.
+  const paired = new Set<Constraint>();
+  const modified: { from: Constraint; to: Constraint; }[] = [];
+  if (matching === "id-first") {
+    const onceA = uniqueById(a);
+    const onceB = uniqueById(b);
+    for (const [id, ca] of onceA) {
+      const cb = onceB.get(id);
+      if (!cb) continue;
+      paired.add(ca).add(cb);
+      if (constraintKey(ca, idxMapA) !== constraintKey(cb, idxMapB)) {
+        modified.push({ from: ca, to: cb });
+      }
+    }
+  }
+  const restA = a.filter((c) => !paired.has(c));
+  const restB = b.filter((c) => !paired.has(c));
 
-  const added = b.filter((c) => !keysA.has(constraintKey(c, idxMapB)));
-  const removed = a.filter((c) => !keysB.has(constraintKey(c, idxMapA)));
+  const keysA = new Set(restA.map((c) => constraintKey(c, idxMapA)));
+  const keysB = new Set(restB.map((c) => constraintKey(c, idxMapB)));
+
+  const added = restB.filter((c) => !keysA.has(constraintKey(c, idxMapB)));
+  const removed = restA.filter((c) => !keysB.has(constraintKey(c, idxMapA)));
 
   // The constraints themselves, copied: the prose renders only their
   // deduplicated type names, and that was the whole of what a consumer
@@ -471,8 +511,27 @@ function diffConstraints(
   if (removed.length > 0) {
     changes.push({ change: "constraintsRemoved", constraints: removed.map(copy) });
   }
+  if (modified.length > 0) {
+    changes.push({
+      change: "constraintsModified",
+      constraints: modified.map(({ from, to }) => ({ from: copy(from), to: copy(to) })),
+    });
+  }
 
   return changes;
+}
+
+/** The constraints whose id occurs exactly once in the list, by id. */
+function uniqueById(constraints: readonly Constraint[]): Map<string, Constraint> {
+  const byId = new Map<string, Constraint>();
+  const repeated = new Set<string>();
+  for (const c of constraints) {
+    if (c.id === undefined) continue;
+    if (byId.has(c.id)) repeated.add(c.id);
+    else byId.set(c.id, c);
+  }
+  for (const id of repeated) byId.delete(id);
+  return byId;
 }
 
 /**

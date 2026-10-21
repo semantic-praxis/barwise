@@ -231,7 +231,9 @@ function buildCandidateFramings(
         rationale: alt.rationale,
         ambiguityDescription: alt.ambiguity_description,
         model: altResult.model,
-        diff: diffModels(primaryModel, altResult.model),
+        // An alternative is an independent extraction, so its ids are
+        // unrelated to the primary's: pair constraints by content only.
+        diff: diffModels(primaryModel, altResult.model, { constraintMatching: "content" }),
       });
     } catch (err) {
       warnings.push(

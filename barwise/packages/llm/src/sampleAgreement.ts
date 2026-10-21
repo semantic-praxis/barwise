@@ -59,9 +59,16 @@ function keyOf(elementType: string, name: string): string {
   return `${elementType} ${name}`;
 }
 
+/**
+ * Independent samples have unrelated ids by construction, so every
+ * comparison between them pairs constraints by content alone: a
+ * coincidental id must never pair two different constraints.
+ */
+const SAMPLE_DIFF = { constraintMatching: "content" } as const;
+
 /** Deltas that represent an actual difference between two models. */
 function differenceCount(a: OrmModel, b: OrmModel): number {
-  return diffModels(a, b).deltas.filter((d) => d.kind !== "unchanged").length;
+  return diffModels(a, b, SAMPLE_DIFF).deltas.filter((d) => d.kind !== "unchanged").length;
 }
 
 /**
@@ -112,7 +119,7 @@ export function computeSampleAgreement(models: readonly OrmModel[]): SampleAgree
   const naming = new Map<string, SampleDisagreement>();
   for (let i = 0; i < models.length; i++) {
     if (i === medoidIndex) continue;
-    const diff = diffModels(medoid, models[i]!);
+    const diff = diffModels(medoid, models[i]!, SAMPLE_DIFF);
     for (const d of diff.deltas) {
       // Object types and fact types only. The exclusion used to name
       // `definition` alone, which silently admitted every kind the diff

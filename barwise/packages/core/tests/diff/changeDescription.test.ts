@@ -124,6 +124,18 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
   },
   {
     sample: {
+      change: "constraintsModified",
+      constraints: [{
+        from: { type: "exclusion", roleIds: ["r1", "r2"] },
+        to: { type: "exclusive_or", roleIds: ["r1", "r2"] },
+      }],
+    },
+    // Named by the new version's kind: an edit that changed the kind
+    // says what the constraint is now.
+    text: "constraints modified: exclusive_or",
+  },
+  {
+    sample: {
       change: "derivation",
       from: undefined,
       to: { kind: "derived", expression: "x", isFormal: false },

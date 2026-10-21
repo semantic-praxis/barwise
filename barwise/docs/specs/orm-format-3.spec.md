@@ -2,11 +2,11 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, and 3a-iii (id-first diff) 2026-10-21; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
-Last-updated: 2026-10-20
+Last-updated: 2026-10-21
 Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
@@ -1041,6 +1041,32 @@ Implementation notes (2026-10-19):
   - `ReferenceSource`'s constraint arm pairs an internal constraint with
     its fact type and one across fact types with none in the type, so
     `referenceDiagnostics` needs no assertion to read either.
+- **Id-first diff (3a-iii, 2026-10-21).**
+  - `diffModels(existing, incoming, { constraintMatching })` takes
+    `"id-first"` (the default) or `"content"`; `diffFactType` passes it
+    to `diffConstraints`. `barwise diff`, `history`, `merge`, the
+    transcript imports and MCP's diff and merge tools take the default
+    unchanged.
+  - Id-first pairs a constraint whose id occurs exactly once on each side.
+    A pair whose content key differs is one `constraintsModified` change
+    carrying both versions (rendered "constraints modified: <kinds>", by
+    the new version's kinds; breaking level `caution`). The rest pair by
+    content key, as before, and a pair held out by id never also matches
+    by content. An id given twice on one side pairs nothing and falls
+    through to content (barwise-b2s), rather than pairing one copy
+    arbitrarily.
+  - Transcript imports keep the default safely: extraction fills ids
+    through `addConstraint`, which mints random UUIDs, so an import never
+    shares an id with its base by accident and falls through to content.
+  - `sampleAgreement.ts` (the medoid fold and each sample's diff) and
+    `TranscriptProcessor.ts` (an alternative framing's diff) pass
+    `"content"`. Neither count in the fold can tell the modes apart today,
+    since a fact type is "modified" either way; the framing's diff can,
+    and a spy test pins both call sites.
+  - Merge needed no change in 3a: it takes a modified fact type whole from
+    the chosen side, constraints included. A constraint whose 2.0 host
+    differs between the sides is still a removal and an addition until
+    3c's model-level delta.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 
