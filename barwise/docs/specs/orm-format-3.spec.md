@@ -1064,15 +1064,17 @@ Implementation notes (2026-10-19):
     another id while D is taken, and deleting the first hands D to the
     second. That needs a stated id equal to another constraint's
     derivation; it is not handled in 3a.
-  - The content key reads a role both models hold, once each, by its own
-    id; position remains the bridge only for a role one model lacks (an
-    import, an LLM sample). Keyed by position, a role swap under unchanged
-    ids moved the key of every constraint on those roles, and a constraint
-    moved onto the role that took the old position kept its key. This
-    applies to content matching too, so a role swap no longer reads as a
-    constraint change in either mode. The key's sorting and default
-    folding are untouched, so a reordered role list or `isPreferred:
-    false` written out still reads as no change.
+  - A pair joined by id is compared with a key that reads each role both
+    models hold, once each, by its id and its holder's name; the content
+    pass keeps the positional key. By position, a role swap under
+    unchanged ids moved the key of a constraint nothing touched, and a
+    constraint moved onto the role that took the old position kept its
+    key; the pair's id makes its roles' ids evidence, so it reads them.
+    The content pass does not, because there a role id is as
+    coincidental as a constraint id: keying by it would let content mode
+    pair two different constraints, which is what that mode rules out.
+    The key's sorting and default folding hold in both, so a reordered
+    role list or `isPreferred: false` written out reads as no change.
   - A value constraint's content key now reads its ranges as well as its
     values, JSON-quoted. It read values alone, so a range-only edit was
     invisible in either mode (the role-level counterpart of barwise-934),

@@ -382,13 +382,18 @@ export function roleHolders(model: OrmModel): RoleHolders {
  * lenient fragment can name a role only the full model defines, and
  * keying it by raw id on one side alone would report a false change.
  *
- * A role both models hold, once each, is keyed by its own id: the id
- * already names the same role on both sides, and position would misread
- * it. Keyed by position, a role swap under unchanged ids moved the key of
- * every constraint on those roles, and a constraint moved onto the role
- * that took the old position kept its key (orm-format-3 WS3a-iii review).
- * Position is the bridge for fresh ids, so it is kept for a role one
- * model lacks -- an import against its base, an LLM sample.
+ * `byId` is for a constraint already paired by its own id, and only
+ * then: a role both models hold, once each, is keyed by its id and its
+ * holder's name. The pair's id already says the two are one constraint,
+ * so its roles' ids are evidence, and position would misread them: a
+ * role swap moved the key of a constraint nothing touched, and a
+ * constraint moved onto the role that took the old position kept its key
+ * (orm-format-3 WS3a-iii review). The holder's name is in the key so a
+ * role moved to another fact type still reads as a change. The content
+ * pass never keys by id: it pairs constraints whose ids say nothing, and
+ * keying by role id there would let a coincidental role id pair two
+ * different constraints, which is what content matching exists to rule
+ * out.
  *
  * An id more than one fact type holds is ambiguous, as `graphOf` treats
  * it, host included; like an id neither model holds, it keeps its raw id
@@ -400,6 +405,7 @@ function roleKeys(
   roles: readonly Role[],
   holders: RoleHolders,
   otherHolders: RoleHolders,
+  byId = false,
 ): RoleKeys {
   // Each kind of key carries its own tag, and the free text in it is
   // JSON-quoted, so a raw id can never read as a resolved one: a dangling
@@ -409,7 +415,9 @@ function roleKeys(
   return (id) => {
     const mine = holders.get(id);
     const theirs = otherHolders.get(id);
-    if (mine?.length === 1 && theirs?.length === 1) return `i${JSON.stringify(id)}`;
+    if (byId && mine?.length === 1 && theirs?.length === 1) {
+      return `i${JSON.stringify([id, mine[0]!.name])}`;
+    }
     const homes = mine ?? theirs ?? [];
     if (homes.length !== 1) return raw(id);
     const own = host.get(id);
@@ -425,7 +433,8 @@ function resolveRole(id: string, keys: RoleKeys): string {
 
 /**
  * Produce a stable, comparable string key for a constraint, normalized
- * so that role IDs are replaced with positions (see `roleKeys`). This
+ * so that role IDs are replaced with positions, or for a pair joined by
+ * id with shared role ids (see `roleKeys`). This
  * eliminates false-positive diffs caused by fresh UUIDs from LLM
  * re-extractions and imports.
  */
@@ -531,6 +540,9 @@ function diffConstraints(
   const idxMapB = roleKeys(rolesB, holdersB, holdersA);
   const keyA = new Map(a.map((c) => [c, constraintKey(c, idxMapA)]));
   const keyB = new Map(b.map((c) => [c, constraintKey(c, idxMapB)]));
+  // The key for comparing a pair joined by id; see `roleKeys`.
+  const pairMapA = roleKeys(rolesA, holdersA, holdersB, true);
+  const pairMapB = roleKeys(rolesB, holdersB, holdersA, true);
 
   // Pair by id first, where an id names exactly one constraint in each
   // model. An id given twice anywhere in a model (barwise-b2s) pairs
@@ -548,7 +560,9 @@ function diffConstraints(
       const cb = byIdB.get(ca.id);
       if (!cb) continue;
       paired.add(ca).add(cb);
-      if (keyA.get(ca) !== keyB.get(cb)) modified.push({ from: ca, to: cb });
+      if (constraintKey(ca, pairMapA) !== constraintKey(cb, pairMapB)) {
+        modified.push({ from: ca, to: cb });
+      }
     }
   }
   const restA = a.filter((c) => !paired.has(c));

@@ -159,8 +159,9 @@ describe("what id-first pairing reads", () => {
   });
 
   it("reports nothing when the key moves but the constraint itself is unchanged", () => {
-    // The fact type's roles swap places under the same ids: the key, which
-    // reads roles by position, moves, and the constraint does not.
+    // The fact type's roles swap places under the same ids. By position the
+    // constraint's role moved; a pair joined by id reads its role by id,
+    // and the role it names is the one it named before.
     const a = drives([uc("c-1", ["r-1"])]);
     const b = new OrmModel({ name: "M" });
     b.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
@@ -246,6 +247,65 @@ describe("what id-first pairing reads", () => {
     expect(delta.changeDescriptions).toEqual([
       "constraints modified: mandatory to internal_uniqueness",
     ]);
+  });
+});
+
+describe("which key reads a role", () => {
+  /** Person drives Car with the role ids in `order`, and a mandatory on r-1. */
+  const swapped = (order: [string, string]) => {
+    const m = new OrmModel({ name: "M" });
+    m.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+    m.addObjectType({ id: "ot-c", name: "Car", kind: "entity", referenceMode: "vin" });
+    m.addFactType({
+      id: "ft-d",
+      name: "Person drives Car",
+      roles: [
+        { id: order[0], name: "drives", playerId: "ot-p" },
+        { id: order[1], name: "is driven by", playerId: "ot-c" },
+      ],
+      readings: ["{0} drives {1}"],
+      constraints: [{ id: "c-1", type: "mandatory", roleId: "r-1" }],
+    });
+    return m;
+  };
+
+  it("keys by position in the content pass, so a coincidental role id pairs nothing", () => {
+    // r-1 is the driver's role in one model and the car's in the other: a
+    // different role under the same id, and a different constraint.
+    expect(
+      constraintChanges(swapped(["r-1", "r-2"]), swapped(["r-2", "r-1"]), {
+        constraintMatching: "content",
+      }),
+    ).toEqual([
+      ["constraintsAdded", ["c-1"]],
+      ["constraintsRemoved", ["c-1"]],
+    ]);
+  });
+
+  it("reads a role moved to another fact type as a change of a pair joined by id", () => {
+    // An external uniqueness hosted on "Person drives Car" spans r-1 and a
+    // role of a second fact type; that role keeps its id and moves from
+    // "Person owns Car" to "Person rents Car".
+    const twoFacts = (second: string) => {
+      const m = drives([]);
+      m.addFactType({
+        id: "ft-2",
+        name: second,
+        roles: [
+          { id: "r-3", name: "x", playerId: "ot-p" },
+          { id: "r-4", name: "y", playerId: "ot-c" },
+        ],
+        readings: ["{0} x {1}"],
+      });
+      m.getFactType("ft-d")!.addConstraint({
+        id: "eu-1",
+        type: "external_uniqueness",
+        roleIds: ["r-2", "r-4"],
+      });
+      return m;
+    };
+    expect(constraintChanges(twoFacts("Person owns Car"), twoFacts("Person rents Car")))
+      .toEqual([["constraintsModified", [["eu-1", "eu-1"]]]]);
   });
 });
 
