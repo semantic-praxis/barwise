@@ -2,8 +2,9 @@
  * A constraint over subtypes through NORMA (orm-format-3 WS4b). NORMA
  * states a partition as an exclusion and a disjunctive mandatory over the
  * supertype meta-roles; the model states it as a constraint over the
- * subtype facts. Until commit 3 maps them one to one, both directions go
- * through the 2.0 flags' conversion, so a partition must survive the trip.
+ * subtype facts. Each maps to the other one to one, with its modality, so a
+ * partition survives the trip as the constraint it was, not as flags on
+ * each subtype that a second partition of the same supertype would widen.
  */
 import { type ExternalConstraint, OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
