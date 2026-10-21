@@ -67,18 +67,16 @@ function versionErrorMessage(
   return `${head} ${advice[plan.reason]}`;
 }
 
-/**
- * Serializes OrmModel instances to YAML strings and deserializes
- * YAML strings back to OrmModel instances.
- *
- * The serializer produces YAML that conforms to the orm-model.schema.json
- * schema. The deserializer validates incoming YAML against the schema
- * before constructing the model.
- */
 /** What reading a file changed beyond its format (`OrmYamlSerializer.migrate`). */
 export type MigrationNote =
   /** A 2.0 `is_preferred` flag that identifies no entity, so it was dropped. */
   | { readonly kind: "flag-dropped"; readonly factType: string; readonly constraintId: string; }
+  /**
+   * A 2.0 flag on a fact type whose roles name an object type the file does
+   * not define (a fragment, loaded leniently): whom it identifies is in the
+   * file that does, so the flag cannot be placed from this one.
+   */
+  | { readonly kind: "flag-unplaceable"; readonly factType: string; readonly constraintId: string; }
   /** An entity two or more 2.0 flags named; the reference keeps `kept`. */
   | {
     readonly kind: "identifier-chosen";
@@ -90,11 +88,19 @@ export type MigrationNote =
 /** A file read into the model, with the version it stated and its notes. */
 export interface MigrationResult {
   readonly model: OrmModel;
-  /** The `orm_version` the file stated. */
-  readonly from: string | undefined;
+  /** The `orm_version` the file stated; a file without one fails to load. */
+  readonly from: string;
   readonly notes: readonly MigrationNote[];
 }
 
+/**
+ * Serializes OrmModel instances to YAML strings and deserializes
+ * YAML strings back to OrmModel instances.
+ *
+ * The serializer produces YAML that conforms to the orm-model.schema.json
+ * schema. The deserializer validates incoming YAML against the schema
+ * before constructing the model.
+ */
 export class OrmYamlSerializer {
   /**
    * Compiled on first use, not in the constructor.
@@ -165,11 +171,7 @@ export class OrmYamlSerializer {
    */
   migrate(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
     const raw = parse(yaml) as unknown;
-    const stated = typeof raw === "object" && raw !== null
-      ? (raw as { orm_version?: unknown; }).orm_version
-      : undefined;
-    const from = typeof stated === "string" ? stated : undefined;
-    const { doc, version } = this.bringToReadableVersion(raw);
+    const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
     // A 2.0 file is read by the 2.0 reader, against the 2.0 schema frozen
     // when 3.0 landed; a 3.0 file by the 3.0 reader. Reading 2.0 directly
@@ -178,11 +180,11 @@ export class OrmYamlSerializer {
     if (version === LEGACY_ORM_VERSION) {
       this.check(this.validator.validateLegacyModel(doc));
       const { model, placed } = readLegacy(doc as OrmYamlDocument, options);
-      return { model, from, notes: migrationNotes(model, placed) };
+      return { model, from: from!, notes: migrationNotes(model, placed) };
     }
     if (version === CURRENT_ORM_VERSION) refuseMisplacedConstraints(doc);
     this.check(this.validator.validateModel(doc));
-    return { model: this.fromDocument(doc as OrmYamlDocument, options), from, notes: [] };
+    return { model: this.fromDocument(doc as OrmYamlDocument, options), from: from!, notes: [] };
   }
 
   private check(result: SchemaValidationResult): void {
@@ -206,17 +208,20 @@ export class OrmYamlSerializer {
    * {@link DeserializationError} describing whether the file is too new or
    * simply unreachable.
    */
-  private bringToReadableVersion(raw: unknown): { doc: unknown; version: unknown; } {
-    if (typeof raw !== "object" || raw === null) return { doc: raw, version: undefined };
+  private bringToReadableVersion(
+    raw: unknown,
+  ): { doc: unknown; version: unknown; stated: string | undefined; } {
+    if (typeof raw !== "object" || raw === null) {
+      return { doc: raw, version: undefined, stated: undefined };
+    }
     const doc = raw as Record<string, unknown>;
     const version = doc.orm_version;
-    if (typeof version !== "string" || version === CURRENT_ORM_VERSION) {
-      return { doc: raw, version };
-    }
+    if (typeof version !== "string") return { doc: raw, version, stated: undefined };
+    if (version === CURRENT_ORM_VERSION) return { doc: raw, version, stated: version };
     if (compareOrmVersions(version, CURRENT_ORM_VERSION) > 0) {
       throw new DeserializationError(versionErrorMessage(version, { ok: false, reason: "newer" }));
     }
-    if (version === LEGACY_ORM_VERSION) return { doc: raw, version };
+    if (version === LEGACY_ORM_VERSION) return { doc: raw, version, stated: version };
     // Between 2.0 and 3.0 there is nothing to read: no release wrote it.
     if (compareOrmVersions(version, LEGACY_ORM_VERSION) > 0) {
       throw new DeserializationError(
@@ -227,7 +232,11 @@ export class OrmYamlSerializer {
     if (!plan.ok) {
       throw new DeserializationError(versionErrorMessage(version, plan));
     }
-    return { doc: applyMigrations(doc, plan.steps), version: LEGACY_ORM_VERSION };
+    return {
+      doc: applyMigrations(doc, plan.steps),
+      version: LEGACY_ORM_VERSION,
+      stated: version,
+    };
   }
 
   // -- Internal: model -> document --
@@ -534,7 +543,12 @@ function migrationNotes(model: OrmModel, placed: PlacedFlags): MigrationNote[] {
   const notes: MigrationNote[] = [];
   for (const c of placed.dropped) {
     const factType = c.id === undefined ? undefined : model.getConstraintInView(c.id)?.[1];
-    notes.push({ kind: "flag-dropped", factType: factType?.name ?? "", constraintId: c.id ?? "" });
+    const unplaceable = factType?.roles.some((r) => !model.getObjectType(r.playerId)) ?? false;
+    notes.push({
+      kind: unplaceable ? "flag-unplaceable" : "flag-dropped",
+      factType: factType?.name ?? "",
+      constraintId: c.id ?? "",
+    });
   }
   for (const [entityId, candidates] of placed.candidates) {
     if (candidates.length < 2) continue;

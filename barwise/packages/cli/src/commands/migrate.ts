@@ -10,7 +10,7 @@
 
 import { CURRENT_ORM_VERSION, type MigrationNote } from "@barwise/core";
 import type { Command } from "commander";
-import { writeFileSync } from "node:fs";
+import { renameSync, writeFileSync } from "node:fs";
 import { readFile, serializer } from "../workspace/io.js";
 
 interface MigrateOptions {
@@ -37,14 +37,22 @@ export function registerMigrateCommand(program: Command): void {
     .option("--check", "Write nothing; exit 1 if any file would be rewritten")
     .option("--format <format>", "Output format (text or json)", "text")
     .action((files: string[], opts: MigrateOptions) => {
+      if (opts.format !== "text" && opts.format !== "json") {
+        process.stderr.write(`Error: unknown --format "${opts.format}"; use text or json.\n`);
+        process.exitCode = 2;
+        return;
+      }
       const outcomes = files.map((file) => migrateFile(file, opts.check === true));
       process.stdout.write(
         opts.format === "json"
           ? `${JSON.stringify(outcomes, null, 2)}\n`
           : outcomes.map(describe).join(""),
       );
-      const failed = outcomes.some((o) => o.status === "error" || o.status === "would-migrate");
-      if (failed) process.exitCode = 1;
+      // 2 when a file could not be answered for, which a caller must not
+      // read as "needs migrating" (the gate contract, root CLAUDE.md); 1
+      // when --check found a file to rewrite.
+      if (outcomes.some((o) => o.status === "error")) process.exitCode = 2;
+      else if (outcomes.some((o) => o.status === "would-migrate")) process.exitCode = 1;
     });
 }
 
@@ -55,16 +63,31 @@ function migrateFile(file: string, check: boolean): FileOutcome {
     // refusing a fragment that names elements it does not define.
     const result = serializer.migrate(readFile(file), { lenient: true });
     if (result.from === CURRENT_ORM_VERSION) return { file, status: "current" };
-    if (!check) writeFileSync(file, serializer.serialize(result.model), "utf-8");
+    const unplaceable = result.notes.filter((n) => n.kind === "flag-unplaceable");
+    if (unplaceable.length > 0) {
+      return { file, status: "error", error: `not migrated: ${unplaceable.map(note).join("; ")}` };
+    }
+    const text = serializer.serialize(result.model);
+    // A 2.0 file can hold what 3.0 refuses (two constraints sharing an id):
+    // rewriting it would turn a file that loads into one that does not.
+    serializer.deserialize(text, { lenient: true });
+    if (!check) replace(file, text);
     return {
       file,
       status: check ? "would-migrate" : "migrated",
-      from: result.from ?? "(none)",
+      from: result.from,
       notes: result.notes,
     };
   } catch (err) {
     return { file, status: "error", error: (err as Error).message };
   }
+}
+
+/** Write beside the file, then rename over it, so an interrupted write leaves the original. */
+function replace(file: string, text: string): void {
+  const temp = `${file}.migrating`;
+  writeFileSync(temp, text, "utf-8");
+  renameSync(temp, file);
 }
 
 function describe(o: FileOutcome): string {
@@ -83,9 +106,16 @@ function describe(o: FileOutcome): string {
 }
 
 function note(n: MigrationNote): string {
-  return n.kind === "flag-dropped"
-    ? `dropped the is_preferred flag on constraint "${n.constraintId}" in "${n.factType}": it identifies no entity type`
-    : `"${n.entity}" had ${n.others.length + 1} preferred identifiers; kept "${n.kept}", dropped ${
-      n.others.map((id) => `"${id}"`).join(", ")
-    }`;
+  switch (n.kind) {
+    case "flag-dropped":
+      return `dropped the is_preferred flag on constraint "${n.constraintId}" in "${n.factType}": it identifies no entity type`;
+    case "flag-unplaceable":
+      return `the is_preferred flag on constraint "${n.constraintId}" in "${n.factType}" names an object type this file does not define, so it cannot be placed without the file that does`;
+    case "identifier-chosen":
+      return `"${n.entity}" was named by ${
+        n.others.length + 1
+      } preferred identifiers; kept "${n.kept}", and ${
+        n.others.map((id) => `"${id}"`).join(", ")
+      } ${n.others.length === 1 ? "is" : "are"} no longer preferred`;
+  }
 }

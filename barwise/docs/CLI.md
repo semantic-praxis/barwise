@@ -217,9 +217,17 @@ one is kept. Each is printed under its file. Run `barwise validate` with
 your 2.x build first if you want to see those cases before they are
 resolved.
 
-This is the one command that modifies its inputs. A file already at 3.0
-is left untouched. A file that cannot be read or does not load is
-reported, the rest are still migrated, and the command exits 1.
+This is the one command that modifies its inputs. The file is written
+from the model, so YAML comments and hand layout in it are not kept. A
+file already at 3.0 is left untouched. A file is not written, and is
+reported, when it cannot be read or does not load, when its 3.0 form would
+not load back (2.0 allowed two constraints to share an id), or when it is
+a fragment whose `is_preferred` flag names an object type defined in
+another file. The rest are still migrated.
+
+Exit codes: 0 when every file was migrated or already current; 1 under
+`--check` when a file would be rewritten; 2 when any file could not be
+migrated, or `--format` is unknown.
 
 Options:
 

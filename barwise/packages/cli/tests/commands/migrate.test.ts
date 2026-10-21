@@ -91,12 +91,12 @@ describe("barwise migrate", () => {
     expect((await runCli(["migrate", "--check", path])).exitCode).toBe(0);
   });
 
-  it("reports a file that does not load, goes on with the rest, and exits 1", async () => {
+  it("reports a file that does not load, goes on with the rest, and exits 2", async () => {
     const broken = file("broken.orm.yaml", 'orm_version: "2.0"\nmodel: {}\n');
     const good = file("shop.orm.yaml", V20);
     const missing = join(dir, "missing.orm.yaml");
     const result = await runCli(["migrate", broken, missing, good]);
-    expect(result.exitCode).toBe(1);
+    expect(result.exitCode).toBe(2);
     const lines = result.stdout.split("\n");
     expect(lines[0]).toMatch(new RegExp(`^${broken}: YAML does not conform`));
     expect(lines[1]).toBe(`${missing}: File not found: ${missing}`);
@@ -113,6 +113,41 @@ describe("barwise migrate", () => {
     const result = await runCli(["migrate", path]);
     expect(result.exitCode).toBe(0);
     expect(readFileSync(path, "utf-8")).toContain("ft-typo");
+  });
+
+  it("refuses a 2.0 file whose rewrite would not load, and leaves it untouched", async () => {
+    // 2.0 accepted two constraints sharing an id; 3.0 refuses them.
+    const twice = V20.replace("id: u-cn,", "id: u-nr,");
+    const path = file("twice.orm.yaml", twice);
+    const result = await runCli(["migrate", path]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe(
+      `${path}: Two constraints share the id "u-nr"; a constraint id names one constraint.\n`,
+    );
+    expect(readFileSync(path, "utf-8")).toBe(twice);
+  });
+
+  it("refuses a fragment whose flag names an object type it does not define", async () => {
+    // Customer is defined in the file this fragment merges into.
+    const fragment = V20.replace(
+      "    - { id: ot-c, name: Customer, kind: entity, reference_mode: nr }\n",
+      "",
+    );
+    const path = file("fragment.orm.yaml", fragment);
+    const result = await runCli(["migrate", path]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain(
+      `the is_preferred flag on constraint "u-nr" in "Customer has CustomerNr" names an object type this file does not define`,
+    );
+    expect(readFileSync(path, "utf-8")).toBe(fragment);
+  });
+
+  it("refuses an unknown --format before touching any file", async () => {
+    const path = file("shop.orm.yaml", V20);
+    const result = await runCli(["migrate", "--format", "jsno", path]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain(`unknown --format "jsno"`);
+    expect(readFileSync(path, "utf-8")).toBe(V20);
   });
 
   it("prints one record per file with --format json", async () => {
