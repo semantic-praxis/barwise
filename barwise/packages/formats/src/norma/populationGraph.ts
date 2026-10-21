@@ -199,7 +199,7 @@ function findIdentifyingSeat(
 ): IdentifyingSeat | undefined {
   for (const ft of model.factTypes) {
     if (ft.roles.length !== 2) continue;
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type !== "internal_uniqueness" || !c.isPreferred || c.roleIds.length !== 1) {
         continue;
       }

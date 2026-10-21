@@ -145,6 +145,17 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
     const { norma } = writeFactType(ft, constraints, seenConstraintIds, popGraph);
     factTypes.push(norma);
   }
+  // Constraints across fact types are top-level only, written once each
+  // after every fact type's own, whichever fact type a 2.0 file nested
+  // them under (orm-format-3, Open decision 9).
+  for (const c of model.constraints) {
+    writeTopLevel(
+      c,
+      toNormaId(constraintId(c, "across fact types")),
+      constraints,
+      seenConstraintIds,
+    );
+  }
 
   // Synthesized reference-scheme expansions for populated entities: the
   // injected value type (text-typed), the identifying fact (with its
@@ -232,7 +243,7 @@ function collectPlayedRoles(model: OrmModel): Map<string, NormaId[]> {
 function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
   const result = new Map<string, string>();
   for (const ft of model.factTypes) {
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type !== "internal_uniqueness" || !c.isPreferred) continue;
       const constrainedRoleIds = new Set(c.roleIds);
       // The identified entity plays the role(s) NOT in the uniqueness set.
@@ -240,7 +251,7 @@ function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
         if (constrainedRoleIds.has(role.id)) continue;
         const player = model.getObjectType(role.playerId);
         if (player && player.kind === "entity") {
-          result.set(player.id, toNormaId(constraintId(c, ft)));
+          result.set(player.id, toNormaId(constraintId(c, onFactType(ft))));
         }
       }
     }
@@ -300,52 +311,20 @@ function writeFactType(
   }));
 
   const internalRefs: NormaId[] = [];
-  for (const c of ft.constraints) {
+  for (const c of ft.internalConstraints) {
     // Carried on the role (writeRole), which writes it under its own id;
     // never a top-level constraint, so it has no place in this loop.
     if (c.type === "cardinality") continue;
-    const ownId = toNormaId(constraintId(c, ft));
-    if (c.type === "exclusive_or") {
-      // NORMA has no single xor element: the native encoding is an
-      // exclusion + disjunctive mandatory pair joined by mutual coupler
-      // refs. Both halves are multi-fact, so neither is internal.
-      const mandatoryId = derivedNormaId(ownId, "_xormand");
-      // Either half's id already written makes this a repeat, dropped whole.
-      if (seen.has(ownId) || seen.has(mandatoryId)) continue;
-      seen.add(ownId);
-      seen.add(mandatoryId);
-      const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
-      constraints.push({
-        type: "exclusion",
-        id: ownId,
-        name: "",
-        ...modality,
-        roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
-        exclusiveOrMandatoryRef: mandatoryId,
-      });
-      constraints.push({
-        type: "mandatory",
-        id: mandatoryId,
-        name: "",
-        ...modality,
-        isSimple: false,
-        isImplied: false,
-        roleRefs: c.roleIds.map(toNormaId),
-        exclusiveOrExclusionRef: ownId,
-      });
-      continue;
-    }
-    const written = writeConstraint(c, ownId);
-    if (!written) continue;
-    // A repeated id is dropped whole: its constraint is not written, so no
-    // InternalConstraints entry may name it a second time either.
-    if (seen.has(written.id)) continue;
-    seen.add(written.id);
-    constraints.push(written);
+    const written = writeTopLevel(
+      c,
+      toNormaId(constraintId(c, onFactType(ft))),
+      constraints,
+      seen,
+    );
     // Internal (single-fact) constraints are referenced from the fact's
-    // InternalConstraints; multi-fact constraints are top-level only.
-    if (listedInInternalConstraints(c)) {
-      internalRefs.push(written.id);
+    // InternalConstraints; the rest of its kinds are top-level only.
+    if (written !== undefined && listedInInternalConstraints(c)) {
+      internalRefs.push(written);
     }
   }
 
@@ -365,11 +344,61 @@ function writeFactType(
   };
 }
 
+/**
+ * Append `c` to the document's top-level constraints under `ownId`, and
+ * return the id written (for an exclusive-or, its exclusion half's), or
+ * undefined when nothing was: an unwritable kind, or a repeated id, which
+ * is dropped whole so no InternalConstraints entry may name it a second
+ * time either.
+ */
+function writeTopLevel(
+  c: Constraint,
+  ownId: NormaId,
+  constraints: NormaConstraint[],
+  seen: Set<string>,
+): NormaId | undefined {
+  if (c.type === "exclusive_or") {
+    // NORMA has no single xor element: the native encoding is an
+    // exclusion + disjunctive mandatory pair joined by mutual coupler
+    // refs. Both halves are multi-fact, so neither is internal.
+    const mandatoryId = derivedNormaId(ownId, "_xormand");
+    // Either half's id already written makes this a repeat, dropped whole.
+    if (seen.has(ownId) || seen.has(mandatoryId)) return undefined;
+    seen.add(ownId);
+    seen.add(mandatoryId);
+    const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
+    constraints.push({
+      type: "exclusion",
+      id: ownId,
+      name: "",
+      ...modality,
+      roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
+      exclusiveOrMandatoryRef: mandatoryId,
+    });
+    constraints.push({
+      type: "mandatory",
+      id: mandatoryId,
+      name: "",
+      ...modality,
+      isSimple: false,
+      isImplied: false,
+      roleRefs: c.roleIds.map(toNormaId),
+      exclusiveOrExclusionRef: ownId,
+    });
+    return ownId;
+  }
+  const written = writeConstraint(c, ownId);
+  if (!written || seen.has(written.id)) return undefined;
+  seen.add(written.id);
+  constraints.push(written);
+  return written.id;
+}
+
 function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRole {
-  const isMandatory = ft.constraints.some(
+  const isMandatory = ft.internalConstraints.some(
     (c) => c.type === "mandatory" && c.roleId === role.id,
   );
-  const card = ft.constraints.find(
+  const card = ft.internalConstraints.find(
     (c): c is CardinalityConstraint => c.type === "cardinality" && c.roleId === role.id,
   );
   const roleInstances = popGraph.roleDeclsByRole.get(toNormaId(role.id));
@@ -383,7 +412,7 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
     ...(card
       ? {
         cardinality: {
-          id: toNormaId(constraintId(card, ft)),
+          id: toNormaId(constraintId(card, onFactType(ft))),
           ranges: [{ from: card.min, ...(card.max !== "unbounded" ? { to: card.max } : {}) }],
           ...(card.modality === "deontic" ? { modality: "deontic" as const } : {}),
         },
@@ -427,9 +456,13 @@ function listedInInternalConstraints(c: Constraint): boolean {
  * than inventing the positional `<ft>_c<i>` id it once fell back to,
  * which moved when a constraint was inserted before it.
  */
-function constraintId(c: Constraint, ft: FactType): string {
+function onFactType(ft: FactType): string {
+  return `on fact type "${ft.name}"`;
+}
+
+function constraintId(c: Constraint, where: string): string {
   if (!c.id) {
-    throw new Error(`A ${c.type} constraint on fact type "${ft.name}" has no id.`);
+    throw new Error(`A ${c.type} constraint ${where} has no id.`);
   }
   return c.id;
 }

@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, and 3b-ii (diagram) 2026-10-21; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, and 3b-iii (formats) 2026-10-21; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1187,6 +1187,44 @@ Implementation notes (2026-10-19):
     constraint was drawn solid in every view. A
     constraint touching no fact type is in no list; the sidebar shows it
     and the webview has no place for it yet (barwise-f2r).
+
+- **Formats (3b-iii, 2026-10-21).**
+  - DDL routing walks `everyConstraint`. A constraint across fact types
+    that spills goes to the table of the first fact type it spans, in
+    model order, that has one, where it went to the table nearest the
+    fact type nesting it; its `ConstraintSpec` verbalization and
+    counterexample come from `reportInView` and
+    `generateCounterexampleInView`, and the pseudocode and the
+    verbalization's fallback name the fact types it spans. Clause and
+    spill order change with the walk: a table's clauses from constraints
+    across fact types now follow those from fact types' own. One whose
+    roles resolve to nothing spills with no table, where it took its
+    host's. An external uniqueness that cannot be one UNIQUE clause still spills
+    beside its first resolved column; one with no column at all spills
+    "the roles map to no column" to the nearest table. A key missing a
+    column says "a role maps to no column" (with "more than one table"
+    too when its columns span tables), where it used to read only "more
+    than one table".
+  - The NORMA writer writes each fact type's own constraints from
+    `internalConstraints`, and those across fact types once each from
+    `model.constraints`, after every fact type's. The serializer groups
+    constraints by element type, so only groups holding both placements
+    change order: an external uniqueness now follows every internal one,
+    and a disjunctive mandatory every simple one, where each sat after
+    its host's. Where an internal and an external constraint share an id
+    (barwise-b2s), the writer keeps the internal one, as every fact
+    type's own are written first; file order used to decide.
+    `populationGraph`, the preferred-identifier map and the role's
+    mandatory and cardinality reads take `internalConstraints`.
+  - NORMA import's phase 3 keeps a constraint across fact types only when
+    no constraint anywhere in the model says the same thing; it used to
+    check only the fact type phase 3 attaches it to, so a copy phase 1
+    had attached to another fact type was kept twice. `holdsSame` now
+    compares kinds before content, since the check covers the model. A
+    copy dropped this way loses its NORMA id, as one dropped within a fact
+    type always has. Phase 1 still
+    deduplicates within one fact type, which the "listed in two fact
+    types" id test pins.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 
