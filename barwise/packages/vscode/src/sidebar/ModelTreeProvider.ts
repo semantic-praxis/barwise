@@ -18,6 +18,7 @@ import {
   isValueType,
   type OrmModel,
   OrmYamlSerializer,
+  roleIdsOf,
   type SubtypeFact,
   type ValueType,
 } from "@barwise/core";
@@ -187,7 +188,9 @@ export function buildTree(model: OrmModel): ModelTreeItem[] {
   // Constraints across fact types none of whose roles resolve, so no fact
   // type lists them; without this a constraint left dangling by a renamed
   // or deleted role would vanish from the tree just when it needs fixing.
-  // Each is described by its id, the one thing that finds it in the file.
+  // Each is described by the role ids it names, which the file states; a
+  // 2.0 file usually omits a constraint's own id, and the loader derives
+  // one that appears nowhere in it (barwise-7jq).
   const unattached = model.constraintsTouchingNone();
   if (unattached.length > 0) {
     categories.push({
@@ -196,7 +199,7 @@ export function buildTree(model: OrmModel): ModelTreeItem[] {
       iconId: "warning",
       children: unattached.map((c) => ({
         ...constraintItem([c, undefined]),
-        description: c.id,
+        description: roleIdsOf(c).join(", "),
       })),
     });
   }
