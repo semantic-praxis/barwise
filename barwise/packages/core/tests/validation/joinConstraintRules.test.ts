@@ -7,7 +7,7 @@
  * satisfaction is a separate rule.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint, JoinOperand } from "../../src/model/Constraint.js";
+import type { ExternalConstraint, JoinOperand } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { joinConstraintRules } from "../../src/validation/rules/joinConstraintRules.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
@@ -21,7 +21,7 @@ const citizenOf: JoinOperand = {
   projection: [0, 1],
 };
 
-function buildModel(constraint: Constraint): OrmModel {
+function buildModel(constraint: ExternalConstraint): OrmModel {
   const model = new OrmModel({ name: "Test" });
   const person = model.addObjectType({
     id: "ot-person",
@@ -49,8 +49,8 @@ function buildModel(constraint: Constraint): OrmModel {
       { name: "has citizen", playerId: country.id, id: "pc-country" },
     ],
     readings: ["{0} is citizen of {1}"],
-    constraints: [constraint],
   });
+  model.addConstraint(constraint);
   return model;
 }
 
@@ -144,7 +144,7 @@ describe("joinConstraintRules", () => {
       referenceMode: "person_id",
     });
     model.addObjectType({ name: "Country", kind: "entity", referenceMode: "country_code" });
-    const ft = model.addFactType({
+    model.addFactType({
       name: "Person is citizen of Country",
       roles: [
         { name: "is citizen of", playerId: person.id, id: "pc-person" },
@@ -152,10 +152,10 @@ describe("joinConstraintRules", () => {
       ],
       readings: ["{0} is citizen of {1}"],
     });
-    // addConstraint fills a missing id, as the fact type constructor does
-    // (barwise-nkq), so the diagnostic names the constraint, not its host.
+    // addConstraint fills a missing id (barwise-nkq), so the diagnostic
+    // names the constraint, not a fact type.
     const bad: JoinOperand = { path: { root: "ot-missing", steps: [] }, projection: [0] };
-    ft.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
+    model.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
     const filled = model.constraints.at(-1)!.id;
     expect(filled).toEqual(expect.any(String));
 

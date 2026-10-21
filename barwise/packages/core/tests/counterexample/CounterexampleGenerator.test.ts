@@ -329,7 +329,7 @@ describe("cross-fact-type counterexamples", () => {
       })
       .build();
     const home = model.getFactTypeByName("Person has HomePhone")!;
-    home.addConstraint({
+    model.addConstraint({
       type: "disjunctive_mandatory",
       roleIds: ["Person has HomePhone::role1", "Person has MobilePhone::role1"],
     });
@@ -359,7 +359,7 @@ describe("cross-fact-type counterexamples", () => {
   it("forbids a spanning exclusion (a value in two excluded roles)", () => {
     const model = drivesRidesModel();
     const drives = model.getFactTypeByName("Person drives Car")!;
-    drives.addConstraint({
+    model.addConstraint({
       type: "exclusion",
       roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
     });
@@ -373,7 +373,7 @@ describe("cross-fact-type counterexamples", () => {
   it("forbids a spanning exclusive-or (a value in both roles)", () => {
     const model = drivesRidesModel();
     const drives = model.getFactTypeByName("Person drives Car")!;
-    drives.addConstraint({
+    model.addConstraint({
       type: "exclusive_or",
       roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
     });
@@ -398,7 +398,7 @@ describe("cross-fact-type counterexamples", () => {
       })
       .build();
     const teaches = model.getFactTypeByName("Person teaches Course")!;
-    teaches.addConstraint({
+    model.addConstraint({
       type: "subset",
       subsetRoleIds: ["Person teaches Course::role1", "Person teaches Course::role2"],
       supersetRoleIds: [
@@ -432,7 +432,7 @@ describe("cross-fact-type counterexamples", () => {
   it("forbids a shared combination for an external uniqueness", () => {
     const model = roomModel();
     const inBuilding = model.getFactTypeByName("Room is in Building")!;
-    inBuilding.addConstraint({
+    model.addConstraint({
       type: "external_uniqueness",
       roleIds: ["Room is in Building::role2", "Room has RoomNumber::role2"],
     });
@@ -451,7 +451,7 @@ describe("cross-fact-type counterexamples", () => {
     const model = roomModel();
     const inBuilding = model.getFactTypeByName("Room is in Building")!;
     // Both constrained roles share a fact type -> no single common object.
-    inBuilding.addConstraint({
+    model.addConstraint({
       type: "external_uniqueness",
       roleIds: ["Room is in Building::role1", "Room is in Building::role2"],
     });
@@ -476,7 +476,7 @@ describe("cross-fact-type counterexamples", () => {
       })
       .build();
     const manages = model.getFactTypeByName("Person manages Dept")!;
-    manages.addConstraint({
+    model.addConstraint({
       type: "equality",
       roleIds1: ["Person manages Dept::role1", "Person manages Dept::role2"],
       roleIds2: ["Person works in Dept::role1", "Person works in Dept::role2"],
@@ -539,7 +539,7 @@ function buildConstraintRichModel(): OrmModel {
     { player: bus.id, role: "is ridden by", id: "r2" },
   );
   drives.addConstraint({ type: "internal_uniqueness", roleIds: ["d1"] });
-  drives.addConstraint({ type: "exclusion", roleIds: ["d1", "r1"] });
+  m.addConstraint({ type: "exclusion", roleIds: ["d1", "r1"] });
 
   // value constraint (role-level)
   const carRating = bf(
@@ -574,7 +574,7 @@ function buildConstraintRichModel(): OrmModel {
   hasPersonId.addConstraint({ type: "mandatory", roleId: "pid1" });
 
   // disjunctive mandatory across two fact types
-  const home = bf(
+  bf(
     "Person has HomePhone",
     { player: person.id, role: "has", id: "hp1" },
     { player: phone.id, role: "is home of", id: "hp2" },
@@ -584,10 +584,10 @@ function buildConstraintRichModel(): OrmModel {
     { player: person.id, role: "has", id: "mp1" },
     { player: phone.id, role: "is mobile of", id: "mp2" },
   );
-  home.addConstraint({ type: "disjunctive_mandatory", roleIds: ["hp1", "mp1"] });
+  m.addConstraint({ type: "disjunctive_mandatory", roleIds: ["hp1", "mp1"] });
 
   // subset (spanning)
-  const teaches = bf(
+  bf(
     "Person teaches Course",
     { player: person.id, role: "teaches", id: "te1" },
     { player: course.id, role: "is taught by", id: "te2" },
@@ -597,14 +597,14 @@ function buildConstraintRichModel(): OrmModel {
     { player: person.id, role: "enrolled in", id: "en1" },
     { player: course.id, role: "enrolls", id: "en2" },
   );
-  teaches.addConstraint({
+  m.addConstraint({
     type: "subset",
     subsetRoleIds: ["te1", "te2"],
     supersetRoleIds: ["en1", "en2"],
   });
 
   // equality (spanning)
-  const manages = bf(
+  bf(
     "Person manages Dept",
     { player: person.id, role: "manages", id: "mg1" },
     { player: dept.id, role: "is managed by", id: "mg2" },
@@ -614,10 +614,10 @@ function buildConstraintRichModel(): OrmModel {
     { player: person.id, role: "works in", id: "wk1" },
     { player: dept.id, role: "employs", id: "wk2" },
   );
-  manages.addConstraint({ type: "equality", roleIds1: ["mg1", "mg2"], roleIds2: ["wk1", "wk2"] });
+  m.addConstraint({ type: "equality", roleIds1: ["mg1", "mg2"], roleIds2: ["wk1", "wk2"] });
 
   // external uniqueness (Room by Building + RoomNumber)
-  const inBuilding = bf(
+  bf(
     "Room is in Building",
     { player: room.id, role: "is in", id: "rb1" },
     { player: building.id, role: "houses", id: "rb2" },
@@ -627,7 +627,7 @@ function buildConstraintRichModel(): OrmModel {
     { player: room.id, role: "has", id: "rn1" },
     { player: roomNumber.id, role: "numbers", id: "rn2" },
   );
-  inBuilding.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2"] });
+  m.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2"] });
 
   return m;
 }

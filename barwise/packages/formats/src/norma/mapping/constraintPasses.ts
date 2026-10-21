@@ -164,7 +164,7 @@ function addDisjunctiveMandatoryConstraints(ctx: NormaMappingContext): void {
     // paired exclusion is skipped in addMultiFactTypeConstraints.
     if (xorPairs.exclusiveOrIds.has(nc.id)) {
       const xor = exclusiveOrToAdd(ids, nc, exclusiveOrFromMandatory(nc));
-      if (xor) ft.addConstraint(xor);
+      if (xor) model.addConstraint(xor);
       continue;
     }
 
@@ -231,7 +231,7 @@ function addMultiFactTypeConstraints(ctx: NormaMappingContext): void {
         if (!mapped) continue;
         if (mapped.type === "exclusive_or") {
           const xor = exclusiveOrToAdd(ctx.constraintIds, nc, mapped);
-          if (xor) ft.addConstraint(xor);
+          if (xor) model.addConstraint(xor);
           break;
         }
 
@@ -272,9 +272,13 @@ function addUnlessHeld(
   mapped: Constraint,
 ): void {
   const candidate = withModality(nc, mapped);
-  const held = isExternalConstraint(candidate) ? ctx.model.constraints : ft.internalConstraints;
-  if (holdsSame(held, candidate)) return;
-  ft.addConstraint({ ...candidate, id: ctx.constraintIds.claim(nc) });
+  if (isExternalConstraint(candidate)) {
+    if (holdsSame(ctx.model.constraints, candidate)) return;
+    ctx.model.addConstraint({ ...candidate, id: ctx.constraintIds.claim(nc) });
+  } else {
+    if (holdsSame(ft.internalConstraints, candidate)) return;
+    ft.addConstraint({ ...candidate, id: ctx.constraintIds.claim(nc) });
+  }
 }
 
 /**

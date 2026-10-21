@@ -127,7 +127,13 @@ it, so knip sees an unused file where there is a live edge.
   `OrmModel.getConstraint`. Since WS3c the model stores the external kinds
   (`OrmModel.addConstraint`); a fact type holds only its own, and a 2.0
   save writes each external one under the first fact type holding one of
-  its roles (`docs/specs/orm-format-3.spec.md`, WS3).
+  its roles (`docs/specs/orm-format-3.spec.md`, WS3). `FactType.addConstraint`
+  and `FactTypeConfig.constraints` take the internal kinds only, pinned by
+  `tests/types/constraintPlacement.test-d.ts`, and refuse an external one at
+  run time as well, for a value whose type was asserted: one stored there
+  would be invisible to every reader of the model's constraints. The 2.0
+  loader is the one place that still sees both kinds under a fact type,
+  and it splits them after deriving ids.
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class
   hierarchies.

@@ -358,7 +358,7 @@ describe("which key reads a role", () => {
         readings: ["{0} x {1}"],
       });
     }
-    m.getFactType("ft-d")!.addConstraint({
+    m.addConstraint({
       id: "eu-1",
       type: "external_uniqueness",
       roleIds: ["r-2", "r-4"],

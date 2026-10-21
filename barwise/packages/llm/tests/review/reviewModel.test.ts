@@ -354,8 +354,8 @@ describe("reviewModel constraint summary", () => {
         constraints: [{ type: "internal_uniqueness", roleIds: [`${id}-c`] }],
       });
     }
-    // Spans both fact types, nested under the first as a 2.0 file may.
-    model.getFactType("ft-owns")!.addConstraint({
+    // Spans both fact types, so it lives in the model.
+    model.addConstraint({
       type: "exclusion",
       roleIds: ["ft-owns-p", "ft-drives-p"],
     });

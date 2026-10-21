@@ -82,8 +82,7 @@ describe("evaluateConstraintEnforcement", () => {
 
   it("reports `enforced: false` for a kind it has no per-constraint form for", () => {
     const model = twoUniquenessModel();
-    const ft = model.getFactTypeByName("Customer places Order")!;
-    ft.addConstraint({
+    model.addConstraint({
       type: "subset",
       id: "sub-1",
       subsetRoleIds: ["r1"],
@@ -120,8 +119,8 @@ describe("evaluateConstraintEnforcement", () => {
 
 /**
  * Person has Status (s1, s2) and Person reports to Person (g1, g2), with
- * a disjunctive mandatory over s1 and g1 nested under "Person has
- * PersonId", which it does not touch. P2 has an id and plays neither role.
+ * a disjunctive mandatory over s1 and g1 on the model. P2 has an id
+ * (Person has PersonId) and plays neither role.
  */
 function disjunctiveModel(): OrmModel {
   const model = new OrmModel({ name: "Across" });
@@ -135,7 +134,6 @@ function disjunctiveModel(): OrmModel {
       { name: "identifies", playerId: pid.id, id: "id2" },
     ],
     readings: ["{0} has {1}"],
-    constraints: [{ id: "dm", type: "disjunctive_mandatory", roleIds: ["s1", "g1"] }],
   });
   const statusFt = model.addFactType({
     name: "Person has Status",
@@ -153,6 +151,7 @@ function disjunctiveModel(): OrmModel {
     ],
     readings: ["{0} reports to {1}"],
   });
+  model.addConstraint({ id: "dm", type: "disjunctive_mandatory", roleIds: ["s1", "g1"] });
   const ids = model.addPopulation({ factTypeId: idFt.id });
   ids.addInstance({ roleValues: { id1: "P1", id2: "PID1" } });
   ids.addInstance({ roleValues: { id1: "P2", id2: "PID2" } });

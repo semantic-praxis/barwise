@@ -2,8 +2,7 @@
  * The read API for placement by kind (docs/specs/orm-format-3.spec.md, WS3a):
  * `FactType.internalConstraints`, `OrmModel.constraints`,
  * `OrmModel.constraintsTouching`, `OrmModel.constraintsTouchingAny` and
- * `OrmModel.getConstraint`, while storage
- * still nests every constraint under a fact type. The order assertions are
+ * `OrmModel.getConstraint`. The order assertions are
  * the point of the derived list: a reader that moves from walking each fact
  * type's list to `model.constraints` must meet the constraints in the order
  * it met them before.
@@ -20,8 +19,8 @@ import { OrmModel } from "../../src/model/OrmModel.js";
 /**
  * Three fact types around Room: Room is in Building, Room has RoomNumber,
  * Room has Area. The composite key (Building, RoomNumber) is an external
- * uniqueness hosted under the second fact type, as a 2.0 file might nest
- * it, while touching the first and second.
+ * uniqueness touching the first and second; the model holds it, as it
+ * holds every constraint across fact types.
  */
 function rooms() {
   const model = new OrmModel({ name: "Facilities" });
@@ -62,7 +61,6 @@ function rooms() {
     readings: ["{0} has {1}"],
     constraints: [
       { id: "c-one-nr", type: "internal_uniqueness", roleIds: ["r-3"] },
-      { id: "c-room-key", type: "external_uniqueness", roleIds: ["r-2", "r-4"] },
     ],
   });
   const hasArea = model.addFactType({
@@ -73,11 +71,14 @@ function rooms() {
       { id: "r-6", name: "is of", playerId: area.id },
     ],
     readings: ["{0} has {1}"],
-    constraints: [
-      { id: "c-one-area", type: "internal_uniqueness", roleIds: ["r-5"] },
-      // Hosted on the third fact type, spanning the first and third.
-      { id: "c-in-or-area", type: "disjunctive_mandatory", roleIds: ["r-1", "r-5"] },
-    ],
+    constraints: [{ id: "c-one-area", type: "internal_uniqueness", roleIds: ["r-5"] }],
+  });
+  model.addConstraint({ id: "c-room-key", type: "external_uniqueness", roleIds: ["r-2", "r-4"] });
+  // Spanning the first and third.
+  model.addConstraint({
+    id: "c-in-or-area",
+    type: "disjunctive_mandatory",
+    roleIds: ["r-1", "r-5"],
   });
   return { model, inBuilding, hasNumber, hasArea };
 }
@@ -108,15 +109,25 @@ describe("placement guards", () => {
 });
 
 describe("FactType.internalConstraints", () => {
-  it("keeps the internal kinds in list order and leaves out the external ones", () => {
-    const { hasNumber, hasArea } = rooms();
+  it("keeps the internal kinds in list order", () => {
+    const { inBuilding, hasNumber } = rooms();
+    expect(ids(inBuilding.internalConstraints)).toEqual(["c-one-building", "c-in-mandatory"]);
     expect(ids(hasNumber.internalConstraints)).toEqual(["c-one-nr"]);
-    expect(ids(hasArea.internalConstraints)).toEqual(["c-one-area"]);
+  });
+
+  it("refuses an external kind, which lives in the model, whatever its type was asserted to be", () => {
+    // A parsed file can reach the fact type with a type the compiler took
+    // on trust; stored here, no reader of the model's constraints would see it.
+    const { model, hasNumber } = rooms();
+    const key = { id: "c-other-key", type: "external_uniqueness", roleIds: ["r-2", "r-4"] };
+    expect(() => hasNumber.addConstraint(key as never)).toThrow(/OrmModel\.addConstraint/);
+    expect(ids(hasNumber.internalConstraints)).toEqual(["c-one-nr"]);
+    expect(ids(model.constraints)).toEqual(["c-room-key", "c-in-or-area"]);
   });
 });
 
 describe("OrmModel.constraints", () => {
-  it("lists the external kinds in fact type order, then list order", () => {
+  it("lists the external kinds in the order added", () => {
     const { model } = rooms();
     expect(ids(model.constraints)).toEqual(["c-room-key", "c-in-or-area"]);
   });
@@ -130,8 +141,8 @@ describe("OrmModel.constraints", () => {
 describe("OrmModel.constraintsTouching", () => {
   it("gives a fact type its internal constraints, then each external one naming its roles", () => {
     const { model } = rooms();
-    // The key is hosted under ft-nr but names r-2, a role of ft-in; the
-    // disjunctive mandatory is hosted under ft-area and names r-1.
+    // The key names r-2, a role of ft-in, and the disjunctive mandatory
+    // names r-1.
     expect(ids(model.constraintsTouching("ft-in"))).toEqual([
       "c-one-building",
       "c-in-mandatory",
@@ -179,9 +190,9 @@ describe("OrmModel.constraintsTouchingAny", () => {
 
 describe("OrmModel.constraintsTouchingNone", () => {
   it("is exactly the constraints across fact types no fact type's view lists", () => {
-    const { model, hasArea } = rooms();
-    hasArea.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] });
-    hasArea.addConstraint({ id: "c-half", type: "exclusion", roleIds: ["r-1", "r-z"] });
+    const { model } = rooms();
+    model.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] });
+    model.addConstraint({ id: "c-half", type: "exclusion", roleIds: ["r-1", "r-z"] });
     const viewed = new Set(
       model.constraintsTouchingAny(model.factTypes.map((ft) => ft.id))
         .map(([c]) => c.id),

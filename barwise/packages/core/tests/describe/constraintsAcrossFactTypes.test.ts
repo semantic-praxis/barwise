@@ -10,15 +10,17 @@
 import { describe, expect, it } from "vitest";
 import { describeDomain } from "../../src/describe/describeDomain.js";
 import type { DomainDescription } from "../../src/describe/types.js";
-import type { Constraint } from "../../src/model/Constraint.js";
+import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { loadNestedUnder } from "../helpers/nestedUnder.js";
 
 /**
- * Room is in Building, Room has RoomNumber, Room has Area; the composite key
- * over the first two nests in `host`, which may be the third.
+ * Room is in Building, Room has RoomNumber, Room has Area, with the composite
+ * key over the first two, loaded from a 2.0 file that nests the key under
+ * `host`.
  */
 function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
-  const key: Constraint = {
+  const key: ExternalConstraint = {
     id: "c-room-key",
     type: "external_uniqueness",
     roleIds: ["r-2", "r-4"],
@@ -43,7 +45,6 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
     readings: ["{0} is in {1}"],
     constraints: [
       { id: "c-one-building", type: "internal_uniqueness", roleIds: ["r-1"] },
-      ...(host === "ft-in" ? [key] : []),
     ],
   });
   model.addFactType({
@@ -56,7 +57,6 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
     readings: ["{0} has {1}"],
     constraints: [
       { id: "c-one-nr", type: "internal_uniqueness", roleIds: ["r-3"] },
-      ...(host === "ft-nr" ? [key] : []),
     ],
   });
   model.addFactType({
@@ -67,9 +67,9 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
       { id: "r-6", name: "is of", playerId: "ot-area" },
     ],
     readings: ["{0} has {1}"],
-    constraints: host === "ft-area" ? [key] : [],
   });
-  return model;
+  model.addConstraint(key);
+  return loadNestedUnder(model, host);
 }
 
 const KEY = {

@@ -19,11 +19,11 @@
 import {
   claimValueTypeName,
   type ConceptualDataTypeName,
-  type Constraint,
   generateId,
   type ImportFormat,
   type ImportOptions,
   type ImportResult,
+  type InternalConstraint,
   type ObjectType,
   OrmModel,
 } from "@barwise/core";
@@ -478,7 +478,7 @@ export class OpenApiImportFormat implements ImportFormat {
       const entityRoleId = generateId();
       const valueRoleId = generateId();
 
-      const constraints: Constraint[] = isKey
+      const constraints: InternalConstraint[] = isKey
         ? [
           { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
           { type: "internal_uniqueness", roleIds: [entityRoleId] },

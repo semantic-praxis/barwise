@@ -24,13 +24,13 @@
 
 import {
   claimValueTypeName,
-  type Constraint,
   type DataTypeDef,
   type FactType,
   generateId,
   type ImportFormat,
   type ImportOptions,
   type ImportResult,
+  type InternalConstraint,
   type ObjectType,
   OrmModel,
   type ValueConstraintDef,
@@ -567,7 +567,7 @@ export class DdlImportFormat implements ImportFormat {
         const reason = unexpressible(cols);
         if (reason) return reason;
         const parts = cols.map((c) => (taken?.get(c) ?? binaries.get(columnKey(table.name, c)))!);
-        parts[0]!.factType.addConstraint({
+        model.addConstraint({
           type: "external_uniqueness",
           roleIds: [...new Set(parts.map((p) => p.farRoleId))],
         });
@@ -1015,7 +1015,7 @@ export class DdlImportFormat implements ImportFormat {
     // Minted, never built from names (importer-role-ids.spec.md).
     const entityRoleId = generateId();
     const valueRoleId = generateId();
-    const constraints: Constraint[] = [
+    const constraints: InternalConstraint[] = [
       { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
       { type: "internal_uniqueness", roleIds: [entityRoleId] },
       { type: "mandatory", roleId: entityRoleId },
@@ -1134,7 +1134,10 @@ export class DdlImportFormat implements ImportFormat {
     );
     if (annotation) {
       const rowRoleId = generateId();
-      const constraints: Constraint[] = [{ type: "internal_uniqueness", roleIds: [rowRoleId] }];
+      const constraints: InternalConstraint[] = [{
+        type: "internal_uniqueness",
+        roleIds: [rowRoleId],
+      }];
       if (!column.nullable) constraints.push({ type: "mandatory", roleId: rowRoleId });
       const farRoleId = generateId();
       const factType = model.addFactType(
@@ -1233,7 +1236,7 @@ export class DdlImportFormat implements ImportFormat {
       const entityRoleId = generateId();
       const valueRoleId = generateId();
 
-      const constraints: Constraint[] = [
+      const constraints: InternalConstraint[] = [
         { type: "internal_uniqueness", roleIds: [entityRoleId] },
       ];
       if (!column.nullable) {
@@ -1367,7 +1370,7 @@ export class DdlImportFormat implements ImportFormat {
     }
 
     const roleIds = relationship.roles.map(() => generateId());
-    const constraints: Constraint[] = [];
+    const constraints: InternalConstraint[] = [];
     const uniqueOver = (idx: number[] | undefined) => {
       if (!idx) return;
       const over = idx.map((i) => roleIds[i]!);
@@ -1897,7 +1900,7 @@ function annotatedFactType(
   otherPlayerId: string,
   rowRoleId: string,
   otherRoleId: string,
-  constraints: Constraint[],
+  constraints: InternalConstraint[],
 ) {
   const role = (i: 0 | 1) =>
     i === annotation.rowRole

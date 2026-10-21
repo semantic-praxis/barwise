@@ -50,12 +50,11 @@ describe("graphOf: references that do not resolve", () => {
     expect(found.from.factType?.id).toBe(ft.id);
   });
 
-  it("gives a constraint across fact types no fact type, whichever one nests it", () => {
+  it("gives a constraint across fact types no fact type", () => {
     const model = simpleModel();
     const ft = model.factTypes[0]!;
-    // Nested under the first fact type, as a 2.0 file might, but an
-    // exclusion lives in no fact type (orm-format-3, Open decision 9).
-    ft.addConstraint({ type: "exclusion", roleIds: [ft.roles[0]!.id, "gone"], id: "c-excl" });
+    // An exclusion lives in no fact type (orm-format-3, Open decision 9).
+    model.addConstraint({ type: "exclusion", roleIds: [ft.roles[0]!.id, "gone"], id: "c-excl" });
 
     const result = graphOf(model);
     if (result.ok) throw new Error("expected an unresolved reference");
@@ -132,7 +131,7 @@ describe("graphOf: references that do not resolve", () => {
     const model = simpleModel();
     const ft = model.factTypes[0]!;
     const step = { entry: ft.roles[0]!.id, exit: ft.roles[1]!.id };
-    ft.addConstraint({
+    model.addConstraint({
       type: "join_equality",
       id: "je",
       operands: [
@@ -221,7 +220,7 @@ describe("graphOf: a built graph is total", () => {
       .build();
 
     const [ft1, ft2] = model.factTypes;
-    ft1!.addConstraint({
+    model.addConstraint({
       type: "external_uniqueness",
       id: "eu",
       roleIds: [ft1!.roles[1]!.id, ft2!.roles[1]!.id],

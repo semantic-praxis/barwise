@@ -131,7 +131,11 @@ describe("isInternalConstraint agrees with what validation reports", () => {
     it(`${kind}: classification matches the engine`, () => {
       const { model, foreign, foreign2 } = twoFactTypes();
       const fresh = constraintsByKind(foreign, foreign2)[kind as Constraint["type"]]!;
-      model.factTypes[0]!.addConstraint({ ...fresh, id: `c-${kind}` } as Constraint);
+      // Each placement goes where it lives: an internal kind on the first
+      // fact type, naming the other's roles, an external one on the model.
+      const c = { ...fresh, id: `c-${kind}` } as Constraint;
+      if (isInternalConstraint(c)) model.factTypes[0]!.addConstraint(c);
+      else model.addConstraint(c);
 
       const reportsInvalidRole = new ValidationEngine().validate(model)
         .some((d) => d.ruleId.endsWith("-invalid-role"));

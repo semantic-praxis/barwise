@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers) and 3c-ii (storage, diff and merge) implemented, 3c-iii (writers) not started; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1336,6 +1336,40 @@ Implementation notes (2026-10-21, WS3c-ii):
     object types and fact types only, so a disagreement on a constraint
     across fact types is counted toward the medoid but not reported
     (barwise-avb).
+
+Implementation notes (2026-10-21, WS3c-iii):
+
+- **3c-iii, writers.**
+  - `FactType.addConstraint` and `FactTypeConfig.constraints` take the
+    internal kinds only, and the forward from 3c-ii is gone. A fact type
+    still refuses an external kind at run time, naming
+    `OrmModel.addConstraint`: the type is asserted, not checked, for a
+    parsed value, and one stored there would be read by nothing that
+    reads the model's constraints. The type test is
+    `tests/types/constraintPlacement.test-d.ts`, which also pins
+    `OrmModel.addConstraint` to the external kinds.
+  - Source writers, found by the narrowed types: the 2.0 loader, NORMA
+    phases 1 and 3, the DDL importer's composite unique, and the llm
+    parser's external branches now call `OrmModel.addConstraint`. dbt
+    and the OpenAPI importer build internal kinds only and were retyped.
+    `ModelMerge` already used `model.addConstraint` from 3c-ii, which the
+    draft did not foresee.
+  - The 2.0 loader is the one place both kinds still meet under a fact
+    type. It derives ids under the nesting fact type, as before, then
+    gives the fact type its own and adds the external ones to the model
+    after every fact type, in file order. `model.constraints` reads in
+    the same order as under the forward, and no derived id moves.
+  - Test writers: 52 files across seven packages. Tests whose point was
+    "whichever fact type nests it" built the same model on every pass
+    once a model built in code has no host, so they now save, nest the
+    constraint under each host in the file, and load: a core test helper
+    (`tests/helpers/nestedUnder.ts`) and one small copy each in formats,
+    learn and vscode, and a hand-written document in diagram, which has no
+    `yaml` dependency. Validation's fixture cannot go through a file,
+    because the schema refuses the malformed constraints it exists to
+    hold, so its passes vary only the order of addition. A planted loader
+    defect that keeps only the first fact type's nested constraints
+    fails 15 of the reworked tests.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

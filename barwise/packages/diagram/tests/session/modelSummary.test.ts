@@ -6,7 +6,7 @@ import { OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { ModelBuilder } from "../../../core/tests/helpers/ModelBuilder.js";
 import { buildModelSummary } from "../../src/session/modelSummary.js";
-import { rooms } from "../fixtures/rooms.js";
+import { roomsFile } from "../fixtures/rooms.js";
 
 function orderModel() {
   return new ModelBuilder("Orders")
@@ -146,7 +146,7 @@ describe("buildModelSummary", () => {
 describe("model summary across fact types", () => {
   it("lists the key under each fact type it spans, whichever fact type nests it", () => {
     for (const host of ["ft-in", "ft-nr", "ft-id"] as const) {
-      const summary = buildModelSummary(rooms(host));
+      const summary = buildModelSummary(roomsFile(host));
       const byFactType = Object.fromEntries(
         summary.factTypes.map((ft) => [ft.id, ft.constraints.map((c) => c.id)]),
       );

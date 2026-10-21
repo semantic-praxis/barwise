@@ -7,7 +7,7 @@
  * population.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint } from "../../src/model/Constraint.js";
+import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
 import { graphFor } from "../helpers/graphFor.js";
@@ -22,7 +22,7 @@ interface BornCitizen {
  * Build the two-fact-type Person/Country model with the given join
  * constraint, and populate born-in / citizen-of facts from `rows`.
  */
-function buildModel(constraint: Constraint, rows: BornCitizen[]): OrmModel {
+function buildModel(constraint: ExternalConstraint, rows: BornCitizen[]): OrmModel {
   const model = new OrmModel({ name: "Test" });
   const person = model.addObjectType({
     id: "ot-person",
@@ -50,8 +50,8 @@ function buildModel(constraint: Constraint, rows: BornCitizen[]): OrmModel {
       { name: "has citizen", playerId: country.id, id: "pc-country" },
     ],
     readings: ["{0} is citizen of {1}"],
-    constraints: [constraint],
   });
+  model.addConstraint(constraint);
 
   const bornPop = model.addPopulation({ factTypeId: bornFt.id });
   const citPop = model.addPopulation({ factTypeId: citFt.id });

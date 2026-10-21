@@ -1,22 +1,21 @@
 /**
  * Constraints across fact types are stored on the model (orm-format-3
- * WS3c): added by `OrmModel.addConstraint`, lifted out of a fact type's
- * config as it is added, handed over by `FactType.addConstraint`, dropped
- * with a fact type they touch, and written by a 2.0 save under their first
- * holder.
+ * WS3c): added by `OrmModel.addConstraint` and refused by a fact type,
+ * dropped with a fact type holding all their roles, and written by a 2.0
+ * save under their first holder.
  */
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import type { Constraint } from "../../src/model/Constraint.js";
+import type { ExternalConstraint, InternalConstraint } from "../../src/model/Constraint.js";
 import { setIdGenerator } from "../../src/model/id.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
 /**
  * Room is in Building (ft-in) and Room has RoomNumber (ft-nr), with an
- * internal uniqueness on each; `nested` goes in ft-nr's config.
+ * internal uniqueness on each, and `across` in the model.
  */
-function rooms(nested: Constraint[] = []): OrmModel {
+function rooms(across: ExternalConstraint[] = []): OrmModel {
   const model = new OrmModel({ name: "Rooms" });
   model.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
   model.addObjectType({ id: "ot-b", name: "Building", kind: "entity", referenceMode: "code" });
@@ -39,25 +38,43 @@ function rooms(nested: Constraint[] = []): OrmModel {
       { id: "r-n", name: "is of", playerId: "ot-nr" },
     ],
     readings: ["{0} has {1}"],
-    constraints: [{ id: "c-nr", type: "internal_uniqueness", roleIds: ["r-room-nr"] }, ...nested],
+    constraints: [{ id: "c-nr", type: "internal_uniqueness", roleIds: ["r-room-nr"] }],
   });
+  for (const c of across) model.addConstraint(c);
   return model;
 }
 
-const key: Constraint = { id: "c-key", type: "external_uniqueness", roleIds: ["r-b", "r-n"] };
+const key: ExternalConstraint = {
+  id: "c-key",
+  type: "external_uniqueness",
+  roleIds: ["r-b", "r-n"],
+};
 
 describe("constraints across fact types on the model", () => {
-  it("lifts one out of a fact type's config into the model", () => {
-    const model = rooms([key]);
-    expect(model.constraints).toEqual([key]);
-    expect(model.getFactType("ft-nr")!.internalConstraints.map((c) => c.id)).toEqual(["c-nr"]);
+  // The types refuse both; these are for a value whose type was asserted,
+  // which would otherwise sit where no reader of the model's looks.
+  const asserted = key as unknown as InternalConstraint;
+
+  it("refuses one in a fact type's config, naming where it goes", () => {
+    const model = rooms();
+    expect(() =>
+      model.addFactType({
+        id: "ft-x",
+        name: "Room is wide",
+        roles: [{ id: "r-w", name: "is wide", playerId: "ot-room" }],
+        readings: ["{0} is wide"],
+        constraints: [asserted],
+      })
+    ).toThrow(/external_uniqueness.*OrmModel\.addConstraint/);
+    expect(model.constraints).toEqual([]);
   });
 
-  it("takes one handed to a fact type of the model", () => {
+  it("refuses one handed to a fact type, and keeps the fact type's own", () => {
     const model = rooms();
-    model.getFactType("ft-in")!.addConstraint(key);
-    expect(model.constraints).toEqual([key]);
-    expect(model.getFactType("ft-in")!.internalConstraints.map((c) => c.id)).toEqual(["c-in"]);
+    const ft = model.getFactType("ft-in")!;
+    expect(() => ft.addConstraint(asserted)).toThrow(/OrmModel\.addConstraint/);
+    expect(ft.internalConstraints.map((c) => c.id)).toEqual(["c-in"]);
+    expect(model.constraints).toEqual([]);
   });
 
   it("gives one added without an id a fresh id, in the order added", () => {
@@ -80,18 +97,14 @@ describe("constraints across fact types on the model", () => {
     expect(model.getConstraintInView("c-nr")?.[1]?.id).toBe("ft-nr");
   });
 
-  it("refuses one handed to a fact type the model no longer holds", () => {
-    const model = rooms();
-    const ft = model.getFactType("ft-in")!;
-    model.removeFactType("ft-in");
-    expect(() => ft.addConstraint(key)).toThrow(/no longer in model/);
-    expect(model.constraints).toEqual([]);
-  });
-
   it("drops one with the fact type holding all its roles, and keeps one spanning another", () => {
     // The key also spans ft-nr, so it stays with its ft-in role dangling,
     // for validation to report; the exclusion lies wholly in ft-in.
-    const inside: Constraint = { id: "c-inside", type: "exclusion", roleIds: ["r-room-in", "r-b"] };
+    const inside: ExternalConstraint = {
+      id: "c-inside",
+      type: "exclusion",
+      roleIds: ["r-room-in", "r-b"],
+    };
     const model = rooms([key, inside]);
     model.removeFactType("ft-in");
     expect(model.constraints.map((c) => c.id)).toEqual(["c-key"]);
@@ -115,8 +128,7 @@ describe("a 2.0 save of constraints across fact types", () => {
     );
 
   it("writes one under its first holder, after that fact type's own", () => {
-    // Nested under ft-nr in memory, but ft-in is the first fact type
-    // holding one of its roles.
+    // ft-in is the first fact type holding one of its roles.
     expect(nestedIn(yaml.serialize(rooms([key])))).toEqual({
       "ft-in": ["c-in", "c-key"],
       "ft-nr": ["c-nr"],

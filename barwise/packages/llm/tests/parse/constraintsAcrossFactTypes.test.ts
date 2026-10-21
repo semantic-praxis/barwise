@@ -39,9 +39,9 @@ const exclusion: InferredConstraint = {
 describe("parseConstraints across fact types", () => {
   it("skips a rule the model already holds under another fact type", () => {
     const model = fleet();
-    // Nested under "Person owns Car", as a 2.0 file may; its roles are
-    // all in "Person drives Car".
-    model.getFactType("ft-owns")!.addConstraint({
+    // In the model, as a 2.0 file nesting it under "Person owns Car" loads;
+    // its roles are all in "Person drives Car".
+    model.addConstraint({
       type: "exclusion",
       roleIds: ["ft-drives-p", "ft-drives-c"],
     });

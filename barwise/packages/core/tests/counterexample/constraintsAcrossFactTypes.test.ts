@@ -11,13 +11,19 @@ import {
   generateCounterexampleForConstraint,
   generateCounterexamples,
 } from "../../src/counterexample/CounterexampleGenerator.js";
-import type { Constraint } from "../../src/model/Constraint.js";
+import {
+  type Constraint,
+  type ExternalConstraint,
+  isInternalConstraint,
+} from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { counterexampleRoundTripFailure } from "../helpers/counterexampleRules.js";
+import { loadNestedUnder } from "../helpers/nestedUnder.js";
 
 /**
- * Person drives Car, Person rides Bus, Person walks in Park. The constraint
- * given is nested under `host`, which may be a fact type it does not touch.
+ * Person drives Car, Person rides Bus, Person walks in Park, with `c`, loaded
+ * from a 2.0 file that nests it under `host`. A constraint of one fact type
+ * is that fact type's own, so `host` places it only when it is `host`'s.
  */
 function commute(host: "ft-drives" | "ft-rides" | "ft-walks", c: Constraint): OrmModel {
   const model = new OrmModel({ name: "Commute" });
@@ -38,12 +44,13 @@ function commute(host: "ft-drives" | "ft-rides" | "ft-walks", c: Constraint): Or
         { id: `r-${n}b`, name: `is ${verb} by`, playerId: other },
       ],
       readings: [`{0} ${verb} {1}`],
-      constraints: host === id ? [c] : [],
+      constraints: host === id && isInternalConstraint(c) ? [c] : [],
     });
   fact("ft-drives", "Person drives Car", "drives", "ot-car", 1);
   fact("ft-rides", "Person rides Bus", "rides", "ot-bus", 2);
   fact("ft-walks", "Person walks in Park", "walks in", "ot-park", 3);
-  return model;
+  if (!isInternalConstraint(c)) model.addConstraint(c);
+  return loadNestedUnder(model, host);
 }
 
 const EXCL: Constraint = { id: "c-excl", type: "exclusion", roleIds: ["r-1a", "r-2a"] };
@@ -155,8 +162,8 @@ describe("counterexamples over constraints across fact types", () => {
   });
 });
 
-/** One binary fact type, Person mentors Person, nesting the constraint given. */
-function reviews(c: (ft: string) => Constraint): OrmModel {
+/** One binary fact type, Person mentors Person, with the constraint given. */
+function reviews(c: () => ExternalConstraint): OrmModel {
   const model = new OrmModel({ name: "Reviews" });
   model.addObjectType({ id: "ot-person", name: "Person", kind: "entity", referenceMode: "id" });
   model.addFactType({
@@ -167,8 +174,8 @@ function reviews(c: (ft: string) => Constraint): OrmModel {
       { id: "r-mentee", name: "is mentored by", playerId: "ot-person" },
     ],
     readings: ["{0} mentors {1}"],
-    constraints: [c("ft-pair")],
   });
+  model.addConstraint(c());
   return model;
 }
 
@@ -212,8 +219,13 @@ describe("subset and equality within one fact type (barwise-0od)", () => {
       constraints: [
         { id: "vc-from", type: "value_constraint", roleId: "r-from", values: ["x", "y"] },
         { id: "vc-to", type: "value_constraint", roleId: "r-to", values: ["x"] },
-        { id: "c-sub", type: "subset", subsetRoleIds: ["r-from"], supersetRoleIds: ["r-to"] },
       ],
+    });
+    model.addConstraint({
+      id: "c-sub",
+      type: "subset",
+      subsetRoleIds: ["r-from"],
+      supersetRoleIds: ["r-to"],
     });
     expect(generateCounterexamples(model).map((c) => c.constraintId)).toContain("c-sub");
     expect(counterexampleRoundTripFailure(model)).toBeUndefined();
@@ -232,14 +244,12 @@ describe("subset and equality within one fact type (barwise-0od)", () => {
         { id: "r-3", name: "is recommended to", playerId: "ot-person" },
       ],
       readings: ["{0} recommends {1} to {2}"],
-      constraints: [
-        {
-          id: "c-sub",
-          type: "subset",
-          subsetRoleIds: ["r-1", "r-2"],
-          supersetRoleIds: ["r-1", "r-3"],
-        },
-      ],
+    });
+    model.addConstraint({
+      id: "c-sub",
+      type: "subset",
+      subsetRoleIds: ["r-1", "r-2"],
+      supersetRoleIds: ["r-1", "r-3"],
     });
     expect(generateCounterexamples(model).map((c) => c.constraintId)).toEqual(["c-sub"]);
     expect(counterexampleRoundTripFailure(model)).toBeUndefined();

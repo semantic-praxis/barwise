@@ -674,12 +674,10 @@ describe("ConstraintVerbalizer", () => {
           { name: "of", playerId: fname.id, id: "r2" },
         ],
         readings: ["{0} has {1}", "{1} of {0}"],
-        constraints: [
-          {
-            type: "external_uniqueness",
-            roleIds: ["r2", "r-other-ft"],
-          },
-        ],
+      });
+      model.addConstraint({
+        type: "external_uniqueness",
+        roleIds: ["r2", "r-other-ft"],
       });
 
       const v = verbalizer.verbalizeAll(ft.id, model);
@@ -709,9 +707,6 @@ describe("ConstraintVerbalizer", () => {
           { name: "houses", playerId: building.id, id: "rb2" },
         ],
         readings: ["{0} is in {1}", "{1} houses {0}"],
-        constraints: [
-          { type: "external_uniqueness", roleIds: ["rb2", "rn2"] },
-        ],
       });
       model.addFactType({
         name: "Room has RoomNumber",
@@ -721,6 +716,7 @@ describe("ConstraintVerbalizer", () => {
         ],
         readings: ["{0} has {1}", "{1} numbers {0}"],
       });
+      model.addConstraint({ type: "external_uniqueness", roleIds: ["rb2", "rn2"] });
 
       const v = verbalizer.verbalizeAll(inBuilding.id, model);
       const text = v.find((x) => x.text.includes("combination of"))!.text;
@@ -750,10 +746,8 @@ describe("ConstraintVerbalizer", () => {
           { id: "rc", name: "of c", playerId: c.id },
         ],
         readings: ["{0} has {1}, {2}, and {3}"],
-        constraints: [
-          { type: "external_uniqueness", roleIds: ["ra", "rb", "rc"] },
-        ],
       });
+      model.addConstraint({ type: "external_uniqueness", roleIds: ["ra", "rb", "rc"] });
 
       const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v[0]!.text).toBe(

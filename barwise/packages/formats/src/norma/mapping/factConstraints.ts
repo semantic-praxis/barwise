@@ -8,6 +8,7 @@
 import {
   canonicalJson,
   type Constraint,
+  type ExternalConstraint,
   type JoinOperand,
   type ValueComparisonOperator,
 } from "@barwise/core";
@@ -51,7 +52,7 @@ export function mapNormaConstraint(
  * so whether a constraint keeps its modality never depends on whether a
  * fact type lists it.
  */
-export function withModality(nc: NormaConstraint, mapped: Constraint): Constraint {
+export function withModality<C extends Constraint>(nc: NormaConstraint, mapped: C): C {
   return nc.modality === "deontic" ? { ...mapped, modality: "deontic" } : mapped;
 }
 
@@ -97,7 +98,7 @@ export function exclusiveOrToAdd(
   ids: ConstraintIdAllocator,
   nc: NormaConstraint,
   mapped: ExclusiveOr,
-): Constraint | undefined {
+): ExternalConstraint | undefined {
   const id = ids.buildExclusiveOr(nc, mapped.roleIds);
   return id === undefined ? undefined : { ...withModality(nc, mapped), id };
 }

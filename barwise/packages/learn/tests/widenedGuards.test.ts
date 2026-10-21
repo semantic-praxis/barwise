@@ -14,8 +14,9 @@
  * Both are reachable. The external-uniqueness case took a specific
  * shape to reach, and the shape is the point: see its comment.
  */
-import { OrmModel } from "@barwise/core";
+import { OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { describe, expect, it } from "vitest";
+import { parse, stringify } from "yaml";
 import { forbidsPopulation } from "../src/evaluate/checks/forbidsPopulation.js";
 
 describe("a candidate may express a mandatory as a disjunctive mandatory", () => {
@@ -68,7 +69,7 @@ describe("a candidate may express a mandatory as a disjunctive mandatory", () =>
     const number = model.addObjectType({ name: "VendorNumber", kind: "value" });
     const alias = model.addObjectType({ name: "VendorAlias", kind: "value" });
     const region = model.addObjectType({ name: "Region", kind: "value" });
-    const numberFt = model.addFactType({
+    model.addFactType({
       name: "Vendor has VendorNumber",
       roles: [
         { name: "has", playerId: vendor.id, id: "cV" },
@@ -94,7 +95,7 @@ describe("a candidate may express a mandatory as a disjunctive mandatory", () =>
     });
     // Declared after both phone-style fact types exist, because its
     // roles span them.
-    numberFt.addConstraint({ type: "disjunctive_mandatory", roleIds: ["cV", "aV"] });
+    model.addConstraint({ type: "disjunctive_mandatory", roleIds: ["cV", "aV"] });
     return model;
   }
 
@@ -151,7 +152,9 @@ describe("a candidate may express an internal uniqueness as an external one", ()
    *
    * `nest` picks the fact type a 2.0 file nests the key under: one it
    * spans, or a third that has nothing to do with it. Neither changes which
-   * fact types the key applies to (orm-format-3, Open decision 9).
+   * fact types the key applies to (orm-format-3, Open decision 9). In
+   * memory the key belongs to the model (WS3c), so the model is read back
+   * from such a file.
    */
   function candidate(nest: "number" | "unrelated" = "number"): OrmModel {
     const model = new OrmModel({ name: "cand" });
@@ -162,7 +165,7 @@ describe("a candidate may express an internal uniqueness as an external one", ()
     });
     const number = model.addObjectType({ name: "VendorNumber", kind: "value" });
     const region = model.addObjectType({ name: "Region", kind: "value" });
-    const numberFt = model.addFactType({
+    model.addFactType({
       name: "Vendor has VendorNumber",
       roles: [
         { name: "has", playerId: vendor.id, id: "cV" },
@@ -178,19 +181,39 @@ describe("a candidate may express an internal uniqueness as an external one", ()
       ],
       readings: ["{0} operates in {1}"],
     });
-    const unrelatedFt = model.addFactType({
+    model.addFactType({
       name: "Vendor is audited",
       roles: [{ name: "is audited", playerId: vendor.id, id: "aV" }],
       readings: ["{0} is audited"],
     });
-    (nest === "number" ? numberFt : unrelatedFt)
-      .addConstraint({ type: "external_uniqueness", roleIds: ["cN", "gR"] });
+    model.addConstraint({ id: "c-key", type: "external_uniqueness", roleIds: ["cN", "gR"] });
 
     // The two vendors `forUniqueness` mints, both in one region.
     const pop = model.addPopulation({ factTypeId: regionFt.id });
     pop.addInstance({ roleValues: { gV: "Vendor#1", gR: "EMEA" } });
     pop.addInstance({ roleValues: { gV: "Vendor#2", gR: "EMEA" } });
-    return model;
+    return nestedUnder(
+      model,
+      nest === "number" ? "Vendor has VendorNumber" : "Vendor is audited",
+      "c-key",
+    );
+  }
+
+  /** `model` read back from a 2.0 file nesting constraint `id` under `host`. */
+  function nestedUnder(model: OrmModel, host: string, id: string): OrmModel {
+    const yaml = new OrmYamlSerializer();
+    type NestedFactType = { name: string; constraints?: { id: string; }[]; };
+    const doc = parse(yaml.serialize(model)) as { model: { fact_types: NestedFactType[]; }; };
+    const fts = doc.model.fact_types;
+    const moved = fts.flatMap((ft) => ft.constraints ?? []).find((c) => c.id === id)!;
+    for (const ft of fts) {
+      const own = (ft.constraints ?? []).filter((c) => c.id !== id);
+      if (own.length > 0) ft.constraints = own;
+      else delete ft.constraints;
+    }
+    const target = fts.find((ft) => ft.name === host)!;
+    target.constraints = [...(target.constraints ?? []), moved];
+    return yaml.deserialize(stringify(doc));
   }
 
   it("passes: the external uniqueness rejects the two vendors sharing a number", () => {

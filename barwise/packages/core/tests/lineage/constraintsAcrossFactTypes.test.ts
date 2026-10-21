@@ -8,17 +8,19 @@
 import { describe, expect, it } from "vitest";
 import { generateDdlLineage, generateModelLineage } from "../../src/lineage/generate.js";
 import type { RelationalSchema } from "../../src/mapping/RelationalSchema.js";
-import type { Constraint } from "../../src/model/Constraint.js";
+import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { loadNestedUnder } from "../helpers/nestedUnder.js";
 
 type Host = "ft-in" | "ft-nr" | "ft-area" | "ft-campus";
 
 /**
  * Room is in Building, Room has RoomNumber, Room has Area, and Campus has
- * Area, which no Room plays in; the key nests in `host`.
+ * Area, which no Room plays in, with the key, loaded from a 2.0 file that
+ * nests the key under `host`.
  */
 function rooms(host: Host): OrmModel {
-  const key: Constraint = {
+  const key: ExternalConstraint = {
     id: "c-room-key",
     type: "external_uniqueness",
     roleIds: ["r-2", "r-4"],
@@ -50,13 +52,13 @@ function rooms(host: Host): OrmModel {
         { id: b, name: "s", playerId: other },
       ],
       readings: [`{0} ${name} {1}`],
-      constraints: host === id ? [key] : [],
     });
   fact("ft-in", "Room is in Building", "r-1", "r-2", "ot-building");
   fact("ft-nr", "Room has RoomNumber", "r-3", "r-4", "ot-nr");
   fact("ft-area", "Room has Area", "r-5", "r-6", "ot-area");
   fact("ft-campus", "Campus has Area", "r-7", "r-8", "ot-area", "ot-campus");
-  return model;
+  model.addConstraint(key);
+  return loadNestedUnder(model, host);
 }
 
 /** A room table whose foreign key traces to `constraintId`. */
@@ -106,8 +108,8 @@ describe("lineage over constraints across fact types", () => {
 
   it("labels a constraint none of whose roles resolve without an empty span", () => {
     const model = rooms("ft-in");
-    // Nested anywhere, a constraint across fact types with no roles has no span.
-    model.getFactType("ft-in")!.addConstraint({
+    // A constraint across fact types with no roles has no span.
+    model.addConstraint({
       id: "c-empty",
       type: "external_uniqueness",
       roleIds: [],

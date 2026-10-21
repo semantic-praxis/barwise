@@ -2,7 +2,7 @@
  * Phase 3: create fact types with roles and constraints.
  */
 
-import { type Constraint, generateId } from "@barwise/core";
+import { generateId, type InternalConstraint } from "@barwise/core";
 import { compositeRoleColumns } from "./compositeKeys.js";
 import { buildConstraints, hasTest } from "./constraints.js";
 import type { DbtMapperContext } from "./context.js";
@@ -108,7 +108,7 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       const fkCol = m.columns.find((c) => c.name === rel.columnName);
       const isMandatory = fkCol ? hasTest(fkCol, "not_null") : false;
 
-      const constraints: Constraint[] = [
+      const constraints: InternalConstraint[] = [
         // The FK side (role2) gets uniqueness -- each target entity appears
         // at most once per source entity in this relationship.
         // This is a heuristic: many-to-one is the common case.

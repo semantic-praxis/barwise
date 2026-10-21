@@ -1,5 +1,9 @@
 import { parse, stringify } from "yaml";
-import type { ExternalConstraint } from "../model/Constraint.js";
+import {
+  type ExternalConstraint,
+  isExternalConstraint,
+  isInternalConstraint,
+} from "../model/Constraint.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
@@ -253,16 +257,21 @@ export class OrmYamlSerializer {
     const factTypes = (doc.model.fact_types ?? []).map(deserializeFactType);
     // Every id the file states, then each one derived as it is.
     const takenConstraintIds = new Set(
-      factTypes.flatMap((ft) =>
-        (ft.constraints ?? []).flatMap((c) => c.id === undefined ? [] : [c.id])
-      ),
+      factTypes.flatMap((ft) => ft.constraints.flatMap((c) => c.id === undefined ? [] : [c.id])),
     );
-    for (const ft of factTypes) {
+    // A constraint across fact types is derived under the fact type the
+    // file nests it in, as it always was, and then stored on the model, in
+    // file order.
+    const across: ExternalConstraint[] = [];
+    for (const { config, constraints } of factTypes) {
+      const derived = withDerivedIds(config.id!, constraints, takenConstraintIds);
       model.addFactType(
-        { ...ft, constraints: withDerivedIds(ft.id!, ft.constraints ?? [], takenConstraintIds) },
+        { ...config, constraints: derived.filter(isInternalConstraint) },
         { skipPlayerValidation: options?.lenient },
       );
+      across.push(...derived.filter(isExternalConstraint));
     }
+    for (const c of across) model.addConstraint(c);
 
     // Add subtype facts (after object types and fact types).
     for (const sfDoc of doc.model.subtype_facts ?? []) {

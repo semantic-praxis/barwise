@@ -59,7 +59,7 @@ const UUID_SHAPED = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 describe("a subset constraint whose superset role is in another fact type", () => {
   it("names the player and the fact type, not the raw role id", () => {
     const { model, localRoleId, foreignRoleId } = twoFactTypesOverOneEntity();
-    model.factTypes[0]!.addConstraint({
+    model.addConstraint({
       type: "subset",
       subsetRoleIds: [localRoleId],
       supersetRoleIds: [foreignRoleId],
@@ -82,7 +82,7 @@ describe("a subset constraint whose superset role is in another fact type", () =
   it("leaves a wholly local subset constraint unqualified", () => {
     const { model } = twoFactTypesOverOneEntity();
     const ft = model.factTypes[0]!;
-    model.factTypes[0]!.addConstraint({
+    model.addConstraint({
       type: "subset",
       subsetRoleIds: [ft.roles[0]!.id],
       supersetRoleIds: [ft.roles[1]!.id],
@@ -96,7 +96,7 @@ describe("a subset constraint whose superset role is in another fact type", () =
 
   it("names an equality constraint's foreign side too", () => {
     const { model, localRoleId, foreignRoleId } = twoFactTypesOverOneEntity();
-    model.factTypes[0]!.addConstraint({
+    model.addConstraint({
       type: "equality",
       roleIds1: [localRoleId],
       roleIds2: [foreignRoleId],
@@ -117,7 +117,7 @@ describe("a subset constraint whose superset role is in another fact type", () =
     // qualification -- but they had the same local-only lookup, and
     // would have printed the raw id for the foreign role.
     const { model, localRoleId, foreignRoleId } = twoFactTypesOverOneEntity();
-    model.factTypes[0]!.addConstraint({
+    model.addConstraint({
       type: "disjunctive_mandatory",
       roleIds: [localRoleId, foreignRoleId],
       id: "c-disj",

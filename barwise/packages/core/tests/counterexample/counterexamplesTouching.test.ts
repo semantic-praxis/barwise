@@ -31,9 +31,8 @@ function drivesRidesWalks() {
       role2: { player: "Park", name: "is walked in by" },
     })
     .build();
-  const drives = model.getFactTypeByName("Person drives Car")!;
-  // Nested under "drives", touching "rides" too, and not "walks".
-  drives.addConstraint({
+  // Touching "drives" and "rides", and not "walks".
+  model.addConstraint({
     id: "c-excl",
     type: "exclusion",
     roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],

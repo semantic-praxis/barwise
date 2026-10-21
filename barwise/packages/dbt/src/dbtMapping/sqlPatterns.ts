@@ -30,7 +30,7 @@
  * are never duplicated.
  */
 
-import type { Constraint, FactType, OrmModel } from "@barwise/core";
+import type { FactType, InternalConstraint, OrmModel } from "@barwise/core";
 import type { SqlPatternContext } from "@barwise/core/sql";
 import type { ReportBuilder } from "../DbtImportReport.js";
 import { toPascalCase } from "./naming.js";
@@ -101,7 +101,11 @@ function mergeColumnPatterns(
 
   const apply = (
     column: string,
-    build: (entityRoleId: string, valueRoleId: string, ft: FactType) => Constraint | undefined,
+    build: (
+      entityRoleId: string,
+      valueRoleId: string,
+      ft: FactType,
+    ) => InternalConstraint | undefined,
     message: (ft: FactType) => string,
   ): void => {
     const ft = factTypeForColumn(model, entityId, entityName, column);

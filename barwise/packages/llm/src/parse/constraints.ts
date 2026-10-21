@@ -4,6 +4,7 @@
 
 import {
   type Constraint,
+  type ExternalConstraint,
   type FactType,
   isExternalConstraint,
   type OrmModel,
@@ -180,7 +181,7 @@ export function parseConstraints(
           }] in fact type "${ic.fact_type}".`,
         });
       } else {
-        const constraint: Constraint = {
+        const constraint: ExternalConstraint = {
           type: ic.type,
           roleIds,
         };
@@ -193,7 +194,7 @@ export function parseConstraints(
             skipReason: `Duplicate constraint (identical ${ic.type} already present).`,
           });
         } else {
-          ft.addConstraint(constraint);
+          model.addConstraint(constraint);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -372,7 +373,7 @@ export function parseConstraints(
             `${ic.type} constraint requires matching arity: got ${subsetRoleIds.length} vs ${supersetRoleIds.length}.`,
         });
       } else {
-        const constraint: Constraint = ic.type === "subset"
+        const constraint: ExternalConstraint = ic.type === "subset"
           ? { type: "subset", subsetRoleIds, supersetRoleIds }
           : { type: "equality", roleIds1: subsetRoleIds, roleIds2: supersetRoleIds };
 
@@ -385,7 +386,7 @@ export function parseConstraints(
             skipReason: `Duplicate constraint (identical ${ic.type} already present).`,
           });
         } else {
-          ft.addConstraint(constraint);
+          model.addConstraint(constraint);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,

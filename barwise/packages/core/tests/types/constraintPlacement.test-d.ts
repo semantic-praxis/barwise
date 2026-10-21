@@ -12,6 +12,8 @@ import type {
   ExternalConstraint,
   InternalConstraint,
 } from "../../src/model/Constraint.js";
+import type { FactType, FactTypeConfig } from "../../src/model/FactType.js";
+import type { OrmModel } from "../../src/model/OrmModel.js";
 
 describe("constraint placement types", () => {
   it("InternalConstraint holds exactly the kinds that live in a fact type", () => {
@@ -43,5 +45,15 @@ describe("constraint placement types", () => {
   it("the two placements partition the union", () => {
     expectTypeOf<InternalConstraint | ExternalConstraint>().toEqualTypeOf<Constraint>();
     expectTypeOf<Extract<InternalConstraint, ExternalConstraint>>().toEqualTypeOf<never>();
+  });
+
+  // WS3c: a fact type takes only its own kinds, and the model only the
+  // others, so a writer that puts one in the wrong place does not compile.
+  it("a fact type takes only the internal kinds, and the model only the external ones", () => {
+    expectTypeOf<Parameters<FactType["addConstraint"]>[0]>().toEqualTypeOf<InternalConstraint>();
+    expectTypeOf<FactTypeConfig["constraints"]>().toEqualTypeOf<
+      readonly InternalConstraint[] | undefined
+    >();
+    expectTypeOf<Parameters<OrmModel["addConstraint"]>[0]>().toEqualTypeOf<ExternalConstraint>();
   });
 });

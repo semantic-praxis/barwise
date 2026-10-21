@@ -469,14 +469,14 @@ describe("Lineage Generation", () => {
         ],
         readings: ["{0} recommends {1}"],
       });
-      // addConstraint skips construction-time validation, so a single
-      // fact type can carry one of every constraint kind for this check
-      // -- these are not meant to form a semantically coherent model.
-      ft.addConstraint({ id: "c1", type: "external_uniqueness", roleIds: ["r1"] });
+      // addConstraint skips construction-time validation, so one fact
+      // type and its model can carry one of every constraint kind for this
+      // check -- these are not meant to form a semantically coherent model.
+      model.addConstraint({ id: "c1", type: "external_uniqueness", roleIds: ["r1"] });
       ft.addConstraint({ id: "c2", type: "value_constraint", roleId: "r1", values: ["a", "b"] });
-      ft.addConstraint({ id: "c3", type: "disjunctive_mandatory", roleIds: ["r1", "r2"] });
-      ft.addConstraint({ id: "c4", type: "exclusion", roleIds: ["r1", "r2"] });
-      ft.addConstraint({ id: "c5", type: "exclusive_or", roleIds: ["r1", "r2"] });
+      model.addConstraint({ id: "c3", type: "disjunctive_mandatory", roleIds: ["r1", "r2"] });
+      model.addConstraint({ id: "c4", type: "exclusion", roleIds: ["r1", "r2"] });
+      model.addConstraint({ id: "c5", type: "exclusive_or", roleIds: ["r1", "r2"] });
       ft.addConstraint({ id: "c6", type: "frequency", roleIds: ["r1"], min: 1, max: 2 });
       ft.addConstraint({
         id: "c7",
@@ -485,13 +485,13 @@ describe("Lineage Generation", () => {
         roleId2: "r2",
         ringType: "irreflexive",
       });
-      ft.addConstraint({
+      model.addConstraint({
         id: "c8",
         type: "subset",
         subsetRoleIds: ["r1"],
         supersetRoleIds: ["r2"],
       });
-      ft.addConstraint({ id: "c9", type: "equality", roleIds1: ["r1"], roleIds2: ["r2"] });
+      model.addConstraint({ id: "c9", type: "equality", roleIds1: ["r1"], roleIds2: ["r2"] });
       // value_comparison falls into the generic-labeled default case.
       ft.addConstraint({
         id: "c10",

@@ -4,7 +4,13 @@
  * Creates each fact type with its roles (preserving NORMA role ids),
  * readings, and the constraints its InternalConstraints section references.
  */
-import type { Constraint, OrmModel, RoleConfig } from "@barwise/core";
+import {
+  type Constraint,
+  isExternalConstraint,
+  isInternalConstraint,
+  type OrmModel,
+  type RoleConfig,
+} from "@barwise/core";
 import type { NormaFactType } from "../NormaXmlTypes.js";
 import {
   type ConstraintIdAllocator,
@@ -55,7 +61,7 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
       name: nft.name || generateFactTypeName(nft, objectTypeIdMap, model),
       roles,
       readings,
-      constraints,
+      constraints: constraints.filter(isInternalConstraint),
       definition: nft.definition,
       note: nft.note,
       ...(nft.derivationRule
@@ -72,6 +78,10 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
         }
         : {}),
     });
+
+    // NORMA lists a constraint across fact types under a fact type it
+    // spans; the model holds it (orm-format-3 WS3c), in the order read.
+    for (const c of constraints.filter(isExternalConstraint)) model.addConstraint(c);
 
     factTypeIdMap.set(nft.id, ft.id);
 

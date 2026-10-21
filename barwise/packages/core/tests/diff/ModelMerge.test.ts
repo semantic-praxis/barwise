@@ -868,25 +868,6 @@ describe("mergeModels", () => {
       readings: ["{0} was born in {1}"],
       constraints: [
         { type: "internal_uniqueness", roleIds: ["r-born-person"] },
-        {
-          type: "join_equality",
-          operands: [
-            {
-              path: {
-                root: person.id,
-                steps: [{ entry: "r-born-person", exit: "r-born-country" }],
-              },
-              projection: [0, 1],
-            },
-            {
-              path: {
-                root: person.id,
-                steps: [{ entry: "r-citizen-person", exit: "r-citizen-country" }],
-              },
-              projection: [0, 1],
-            },
-          ],
-        },
       ],
     });
     incoming.addFactType({
@@ -898,6 +879,25 @@ describe("mergeModels", () => {
       readings: ["{0} is a citizen of {1}"],
       constraints: [
         { type: "internal_uniqueness", roleIds: ["r-citizen-person", "r-citizen-country"] },
+      ],
+    });
+    incoming.addConstraint({
+      type: "join_equality",
+      operands: [
+        {
+          path: {
+            root: person.id,
+            steps: [{ entry: "r-born-person", exit: "r-born-country" }],
+          },
+          projection: [0, 1],
+        },
+        {
+          path: {
+            root: person.id,
+            steps: [{ entry: "r-citizen-person", exit: "r-citizen-country" }],
+          },
+          projection: [0, 1],
+        },
       ],
     });
 
