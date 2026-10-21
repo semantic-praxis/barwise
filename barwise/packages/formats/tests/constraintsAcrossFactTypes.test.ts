@@ -101,14 +101,15 @@ describe("constraints across fact types in DDL routing", () => {
     );
   });
 
-  it("names a role with no column, and spills one with none to the nearest table", () => {
+  it("spills a key missing a column to the nearest table, and one naming no fact type to none", () => {
     const model = projects(leads);
     const real = model.getFactTypeByName(leads)!.roles.find((r) => r.name === "is led by")!.id;
     const ft = model.getFactTypeByName(sponsors)!;
     ft.addConstraint({ id: "c-half", type: "external_uniqueness", roleIds: ["r-ghost", real] });
     ft.addConstraint({ id: "c-none", type: "external_uniqueness", roleIds: ["r-ghost", "r-gone"] });
     const spills = route(model).spilled.map((s) => [s.reason, s.tableName]);
-    expect(spills).toContainEqual(["a role maps to no column", "project"]);
+    // Its one real role is in "Person leads Project", whose table is person.
+    expect(spills).toContainEqual(["a role maps to no column", "person"]);
     // No role resolves, so no fact type names it and no table is nearest.
     expect(spills).toContainEqual(["the roles map to no column", undefined]);
   });

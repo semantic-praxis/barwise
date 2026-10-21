@@ -101,16 +101,17 @@ export function routeConstraints(
     const [c] = inView;
     if (c.type === "external_uniqueness") {
       const cols = c.roleIds.map((r) => columnForJoinedRole(r, model, schema));
-      const table = cols.find((r) => r !== undefined)?.table;
-      if (table === undefined) {
+      const resolved = cols.filter((r) => r !== undefined);
+      const tables = new Set(resolved.map((r) => r.table));
+      if (tables.size > 1) {
+        spill(inView, "the roles map to more than one table", nearestTable(inView));
+      } else if (resolved.length === 0) {
         spill(inView, "the roles map to no column", nearestTable(inView));
-      } else if (cols.some((r) => r === undefined)) {
-        spill(inView, "a role maps to no column", table);
-      } else if (cols.every((r) => r!.table === table)) {
-        const columnList = cols.map((r) => r!.column).join(", ");
-        route("unique", `UNIQUE (${columnList})`, table, inView);
+      } else if (resolved.length < cols.length) {
+        spill(inView, "a role maps to no column", nearestTable(inView));
       } else {
-        spill(inView, "the roles map to more than one table", table);
+        const columnList = resolved.map((r) => r.column).join(", ");
+        route("unique", `UNIQUE (${columnList})`, resolved[0]!.table, inView);
       }
       return;
     }
