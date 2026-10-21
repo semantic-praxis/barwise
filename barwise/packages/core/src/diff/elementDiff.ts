@@ -254,7 +254,7 @@ export function diffFactType(
   // Constraints -- pass both role arrays and both models' role-holder
   // indexes, so constraintKey can resolve role IDs to positions (stable
   // across LLM re-extractions and imports), or, for a pair joined by its
-  // constraint id, to the role ids themselves (see `roleKeys`).
+  // constraint id, to the role ids themselves (see `pairRoleKeys`).
   const constraintDiff = diffConstraints(
     a.constraints,
     b.constraints,
@@ -448,7 +448,7 @@ function resolveRole(id: string, keys: RoleKeys): string {
 /**
  * Produce a stable, comparable string key for a constraint, normalized
  * so that role IDs are replaced with positions, or for a pair joined by
- * id with shared role ids (see `roleKeys`). This
+ * id with shared role ids (see `roleKeys` and `pairRoleKeys`). This
  * eliminates false-positive diffs caused by fresh UUIDs from LLM
  * re-extractions and imports.
  */

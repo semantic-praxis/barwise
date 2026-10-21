@@ -245,16 +245,11 @@ export function describeChange(change: ChangeDescription): string {
       // not hide that a mandatory became a frequency, or a necessity an
       // obligation.
       return `constraints modified: ${
-        [
-          ...new Set(
-            change.constraints.map((m) =>
-              kindName(m.from) === kindName(m.to)
-                ? kindName(m.to)
-                : `${kindName(m.from)} to ${kindName(m.to)}`
-            ),
-          ),
-        ]
-          .join(", ")
+        distinctJoined(change.constraints.map((m) =>
+          kindName(m.from) === kindName(m.to)
+            ? kindName(m.to)
+            : `${kindName(m.from)} to ${kindName(m.to)}`
+        ))
       }`;
     case "derivation":
       return "derivation changed";
@@ -297,6 +292,11 @@ function describeInstanceChange(added: number, removed: number): string {
   return "instances reordered";
 }
 
+/** The distinct strings, in first-seen order, comma-joined. */
+function distinctJoined(names: readonly string[]): string {
+  return [...new Set(names)].join(", ");
+}
+
 /** A constraint's kind, with its modality when it is deontic. */
 function kindName(c: Constraint): string {
   return c.modality === "deontic" ? `${c.type} (deontic)` : c.type;
@@ -304,7 +304,7 @@ function kindName(c: Constraint): string {
 
 /** The deduplicated constraint kinds, with modality, in first-seen order. */
 function constraintTypes(constraints: readonly Constraint[]): string {
-  return [...new Set(constraints.map(kindName))].join(", ");
+  return distinctJoined(constraints.map(kindName));
 }
 
 /** Format a DataTypeDef for human-readable diff output. */
