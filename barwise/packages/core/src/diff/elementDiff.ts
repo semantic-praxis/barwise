@@ -9,7 +9,7 @@
  * mutation of the model it was computed from. See the module comment on
  * `changeDescription.ts` for why.
  */
-import { type Constraint, type JoinOperand, roleIdsOf } from "../model/Constraint.js";
+import type { Constraint, JoinOperand } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
 import {
@@ -23,7 +23,6 @@ import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
 import type { Role } from "../model/Role.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
-import { canonicalJson } from "../serialization/derivedId.js";
 import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
 
 export function diffObjectType(
@@ -326,15 +325,20 @@ function copy<T>(value: T): T {
  */
 function valueConstraintKey(vc: ValueConstraintDef | undefined): string {
   if (!vc) return "";
-  const values = vc.values.slice().sort().join(",");
+  // JSON-quoted, so a value holding a comma, a bar or ".." cannot read as
+  // two values or as a range.
+  const values = vc.values.slice().sort();
   const ranges = (vc.ranges ?? [])
     .map((r) =>
-      `${r.minInclusive === false ? "(" : "["}${r.min ?? ""}..${r.max ?? ""}`
-      + `${r.maxInclusive === false ? ")" : "]"}`
+      JSON.stringify([
+        r.minInclusive !== false,
+        r.min ?? null,
+        r.max ?? null,
+        r.maxInclusive !== false,
+      ])
     )
-    .sort()
-    .join(",");
-  return `${values}|${ranges}`;
+    .sort();
+  return JSON.stringify([values, ranges]);
 }
 
 /** A stable key for a derivation rule, or "" when absent (asserted). */
@@ -378,6 +382,14 @@ export function roleHolders(model: OrmModel): RoleHolders {
  * lenient fragment can name a role only the full model defines, and
  * keying it by raw id on one side alone would report a false change.
  *
+ * A role both models hold, once each, is keyed by its own id: the id
+ * already names the same role on both sides, and position would misread
+ * it. Keyed by position, a role swap under unchanged ids moved the key of
+ * every constraint on those roles, and a constraint moved onto the role
+ * that took the old position kept its key (orm-format-3 WS3a-iii review).
+ * Position is the bridge for fresh ids, so it is kept for a role one
+ * model lacks -- an import against its base, an LLM sample.
+ *
  * An id more than one fact type holds is ambiguous, as `graphOf` treats
  * it, host included; like an id neither model holds, it keeps its raw id
  * rather than naming one holder. `graphOf` itself cannot serve here: it
@@ -395,7 +407,10 @@ function roleKeys(
   const host = new Map(roles.map((r, i) => [r.id, `h${i}`]));
   const raw = (id: string) => `r${JSON.stringify(id)}`;
   return (id) => {
-    const homes = holders.get(id) ?? otherHolders.get(id) ?? [];
+    const mine = holders.get(id);
+    const theirs = otherHolders.get(id);
+    if (mine?.length === 1 && theirs?.length === 1) return `i${JSON.stringify(id)}`;
+    const homes = mine ?? theirs ?? [];
     if (homes.length !== 1) return raw(id);
     const own = host.get(id);
     if (own !== undefined) return own;
@@ -524,20 +539,6 @@ function diffConstraints(
   // paired by id.
   const paired = new Set<Constraint>();
   const modified: { from: Constraint; to: Constraint; }[] = [];
-  // A pair joined by id is compared as itself when every role it names is
-  // in both models: the role ids are then shared, so the raw content says
-  // exactly what changed. The content key reads roles by position or
-  // holder name instead, to bridge fresh ids, and that bridge misreads a
-  // shared role: a role swap moves the key of a constraint nothing
-  // touched, and a retarget onto the role that moved into the old
-  // position leaves the key where it was. Only a pair naming a role one
-  // model lacks falls back to the key.
-  const shared = (c: Constraint) =>
-    roleIdsOf(c).every((id) => holdersA.has(id) && holdersB.has(id));
-  const pairChanged = (ca: Constraint, cb: Constraint) =>
-    shared(ca) && shared(cb)
-      ? canonicalJson(ca) !== canonicalJson(cb)
-      : keyA.get(ca) !== keyB.get(cb);
   if (pairing.matching === "id-first") {
     const byIdB = new Map(
       b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
@@ -547,7 +548,7 @@ function diffConstraints(
       const cb = byIdB.get(ca.id);
       if (!cb) continue;
       paired.add(ca).add(cb);
-      if (pairChanged(ca, cb)) modified.push({ from: ca, to: cb });
+      if (keyA.get(ca) !== keyB.get(cb)) modified.push({ from: ca, to: cb });
     }
   }
   const restA = a.filter((c) => !paired.has(c));

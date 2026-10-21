@@ -1,8 +1,10 @@
 # A constraint's diff key names every role by position, not only its host's
 
-Status: Implemented -- the one workstream landed with this spec
+Status: Implemented -- the one workstream landed with this spec; amended
+2026-10-21 by orm-format-3 WS3a-iii, which keys a role both models hold by
+its own id and keeps position as the bridge for a role one model lacks
 Created: 2026-10-07
-Last-updated: 2026-10-07
+Last-updated: 2026-10-21
 Tracking: barwise-b7z (join constraints: barwise-q8x; host independence: barwise-iuj); found by `ddl-round-trip-fixed-point.spec.md`,
 workstream 6
 

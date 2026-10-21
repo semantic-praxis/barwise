@@ -219,6 +219,26 @@ describe("what id-first pairing reads", () => {
     expect(constraintChanges(a, b)).toEqual([]);
   });
 
+  it("reads a reordered role list or a default written out as no change", () => {
+    expect(
+      constraintChanges(drives([uc("c-1", ["r-1", "r-2"])]), drives([uc("c-1", ["r-2", "r-1"])])),
+    )
+      .toEqual([]);
+    const written: Constraint = { ...uc("c-1", ["r-1"]), isPreferred: false, modality: "alethic" };
+    expect(constraintChanges(drives([uc("c-1", ["r-1"])]), drives([written]))).toEqual([]);
+  });
+
+  it("tells a value holding a comma from two values", () => {
+    const vc = (values: string[]): Constraint => ({
+      id: "vc-1",
+      type: "value_constraint",
+      roleId: "r-2",
+      values,
+    });
+    expect(constraintChanges(drives([vc(["a,b"])]), drives([vc(["a", "b"])])))
+      .toEqual([["constraintsModified", [["vc-1", "vc-1"]]]]);
+  });
+
   it("names both kinds when an edit changes the kind", () => {
     const a = drives([{ id: "c-1", type: "mandatory", roleId: "r-1" }]);
     const b = drives([uc("c-1", ["r-1"])]);

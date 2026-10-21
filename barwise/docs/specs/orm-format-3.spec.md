@@ -1048,13 +1048,8 @@ Implementation notes (2026-10-19):
     transcript imports and MCP's diff and merge tools take the default
     unchanged.
   - Id-first pairs a constraint whose id occurs exactly once in each
-    model, within a fact type matched by name. A pair is compared as
-    itself (its raw content) when every role it names is in both models,
-    and by content key only when one model lacks a role: the key reads
-    roles by position to bridge fresh ids, and on shared roles that bridge
-    misreads a role swap as a change and a retarget onto the role that
-    moved into the old position as none. A pair that differs is one
-    `constraintsModified` change carrying both versions (rendered "constraints modified:
+    model, within a fact type matched by name. A pair whose content key
+    differs is one `constraintsModified` change carrying both versions (rendered "constraints modified:
     <kinds>", "<old> to <new>" for a kind that changed; breaking level
     `caution`). The rest pair by content key, as before, and a pair held
     out by id never also matches by content. An id given twice anywhere in
@@ -1069,9 +1064,19 @@ Implementation notes (2026-10-19):
     another id while D is taken, and deleting the first hands D to the
     second. That needs a stated id equal to another constraint's
     derivation; it is not handled in 3a.
+  - The content key reads a role both models hold, once each, by its own
+    id; position remains the bridge only for a role one model lacks (an
+    import, an LLM sample). Keyed by position, a role swap under unchanged
+    ids moved the key of every constraint on those roles, and a constraint
+    moved onto the role that took the old position kept its key. This
+    applies to content matching too, so a role swap no longer reads as a
+    constraint change in either mode. The key's sorting and default
+    folding are untouched, so a reordered role list or `isPreferred:
+    false` written out still reads as no change.
   - A value constraint's content key now reads its ranges as well as its
-    values. It read values alone, so a range-only edit was invisible in
-    either mode: the role-level counterpart of barwise-934.
+    values, JSON-quoted. It read values alone, so a range-only edit was
+    invisible in either mode (the role-level counterpart of barwise-934),
+    and joined them with commas, so `["a,b"]` keyed like `["a", "b"]`.
   - Transcript imports keep the default safely: extraction fills ids
     through `addConstraint`, which mints random UUIDs under the default
     generator, so an import never shares an id with its base by accident
