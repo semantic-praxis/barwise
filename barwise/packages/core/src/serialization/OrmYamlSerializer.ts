@@ -6,7 +6,7 @@ import {
   isInternalConstraint,
   placementOf,
 } from "../model/Constraint.js";
-import { storePreferredFlags } from "../model/identification.js";
+import { type PlacedFlags, storePreferredFlags } from "../model/identification.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
@@ -65,6 +65,34 @@ function versionErrorMessage(
   };
   const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
   return `${head} ${advice[plan.reason]}`;
+}
+
+/** What reading a file changed beyond its format (`OrmYamlSerializer.migrate`). */
+export type MigrationNote =
+  /** A 2.0 `is_preferred` flag that identifies no entity, so it was dropped. */
+  | { readonly kind: "flag-dropped"; readonly factType: string; readonly constraintId: string; }
+  /**
+   * A file that names elements it does not define (`missing`, their ids:
+   * a fragment, or a typo, loaded leniently) and carries `is_preferred`
+   * flags. Whom a flag identifies can turn on what is missing (a player, an
+   * objectification), so none is placed with confidence; this is the only
+   * note such a file gets, and `barwise migrate` does not rewrite it.
+   */
+  | { readonly kind: "flags-unplaceable"; readonly missing: readonly string[]; }
+  /** An entity two or more 2.0 flags named; the reference keeps `kept`. */
+  | {
+    readonly kind: "identifier-chosen";
+    readonly entity: string;
+    readonly kept: string;
+    readonly others: readonly string[];
+  };
+
+/** A file read into the model, with the version it stated and its notes. */
+export interface MigrationResult {
+  readonly model: OrmModel;
+  /** The `orm_version` the file stated; a file without one fails to load. */
+  readonly from: string;
+  readonly notes: readonly MigrationNote[];
 }
 
 /**
@@ -133,8 +161,19 @@ export class OrmYamlSerializer {
    *   used to (barwise-997).
    */
   deserialize(yaml: string, options?: { lenient?: boolean; }): OrmModel {
+    return this.migrate(yaml, options).model;
+  }
+
+  /**
+   * `deserialize`, saying where the file came from and what reading it
+   * changed beyond its format: the version it states, and each 2.0
+   * `is_preferred` flag the model could not carry as written
+   * (`MigrationNote`). A 3.0 file has no notes. `barwise migrate` reports
+   * them; every other caller wants only the model (orm-format-3 WS4b-iii).
+   */
+  migrate(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
     const raw = parse(yaml) as unknown;
-    const { doc, version } = this.bringToReadableVersion(raw);
+    const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
     // A 2.0 file is read by the 2.0 reader, against the 2.0 schema frozen
     // when 3.0 landed; a 3.0 file by the 3.0 reader. Reading 2.0 directly
@@ -142,11 +181,12 @@ export class OrmYamlSerializer {
     // state, and a 2.0 file saved writes 3.0 (orm-format-3 WS4b).
     if (version === LEGACY_ORM_VERSION) {
       this.check(this.validator.validateLegacyModel(doc));
-      return readDocument20(doc as OrmYamlDocument, options);
+      const { model, placed, flags } = readLegacy(doc as OrmYamlDocument, options);
+      return { model, from: from!, notes: migrationNotes(model, placed, flags) };
     }
     if (version === CURRENT_ORM_VERSION) refuseMisplacedConstraints(doc);
     this.check(this.validator.validateModel(doc));
-    return this.fromDocument(doc as OrmYamlDocument, options);
+    return { model: this.fromDocument(doc as OrmYamlDocument, options), from: from!, notes: [] };
   }
 
   private check(result: SchemaValidationResult): void {
@@ -170,17 +210,20 @@ export class OrmYamlSerializer {
    * {@link DeserializationError} describing whether the file is too new or
    * simply unreachable.
    */
-  private bringToReadableVersion(raw: unknown): { doc: unknown; version: unknown; } {
-    if (typeof raw !== "object" || raw === null) return { doc: raw, version: undefined };
+  private bringToReadableVersion(
+    raw: unknown,
+  ): { doc: unknown; version: unknown; stated: string | undefined; } {
+    if (typeof raw !== "object" || raw === null) {
+      return { doc: raw, version: undefined, stated: undefined };
+    }
     const doc = raw as Record<string, unknown>;
     const version = doc.orm_version;
-    if (typeof version !== "string" || version === CURRENT_ORM_VERSION) {
-      return { doc: raw, version };
-    }
+    if (typeof version !== "string") return { doc: raw, version, stated: undefined };
+    if (version === CURRENT_ORM_VERSION) return { doc: raw, version, stated: version };
     if (compareOrmVersions(version, CURRENT_ORM_VERSION) > 0) {
       throw new DeserializationError(versionErrorMessage(version, { ok: false, reason: "newer" }));
     }
-    if (version === LEGACY_ORM_VERSION) return { doc: raw, version };
+    if (version === LEGACY_ORM_VERSION) return { doc: raw, version, stated: version };
     // Between 2.0 and 3.0 there is nothing to read: no release wrote it.
     if (compareOrmVersions(version, LEGACY_ORM_VERSION) > 0) {
       throw new DeserializationError(
@@ -191,7 +234,11 @@ export class OrmYamlSerializer {
     if (!plan.ok) {
       throw new DeserializationError(versionErrorMessage(version, plan));
     }
-    return { doc: applyMigrations(doc, plan.steps), version: LEGACY_ORM_VERSION };
+    return {
+      doc: applyMigrations(doc, plan.steps),
+      version: LEGACY_ORM_VERSION,
+      stated: version,
+    };
   }
 
   // -- Internal: model -> document --
@@ -419,6 +466,14 @@ function isPlacedKind(c: unknown, where: "internal" | "external"): c is { type: 
  *   no entity is dropped; two naming one entity resolve as that rule says.
  */
 export function readDocument20(doc: OrmYamlDocument, options?: { lenient?: boolean; }): OrmModel {
+  return readLegacy(doc, options).model;
+}
+
+/** `readDocument20`, with what step 4 made of the file's flags. */
+function readLegacy(
+  doc: OrmYamlDocument,
+  options?: { lenient?: boolean; },
+): { readonly model: OrmModel; readonly placed: PlacedFlags; readonly flags: number; } {
   const model = new OrmModel({
     name: doc.model.name,
     domainContext: doc.model.domain_context,
@@ -477,6 +532,56 @@ export function readDocument20(doc: OrmYamlDocument, options?: { lenient?: boole
   // Objectifications before the flags: an objectified fact type's flag
   // names the objectifying type.
   readTail(model, doc, options);
-  storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
-  return model;
+  const placed = storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
+  return { model, placed, flags: flagged.size };
+}
+
+/** The ids a leniently loaded model names and does not define, sorted. */
+function missingReferences(model: OrmModel): string[] {
+  const missing = new Set<string>();
+  const object = (id: string) => {
+    if (!model.getObjectType(id)) missing.add(id);
+  };
+  for (const ft of model.factTypes) for (const r of ft.roles) object(r.playerId);
+  for (const sf of model.subtypeFacts) {
+    object(sf.subtypeId);
+    object(sf.supertypeId);
+  }
+  for (const oft of model.objectifiedFactTypes) {
+    object(oft.objectTypeId);
+    if (!model.getFactType(oft.factTypeId)) missing.add(oft.factTypeId);
+  }
+  for (const p of model.populations) {
+    if (!model.getFactType(p.factTypeId)) missing.add(p.factTypeId);
+  }
+  return [...missing].sort();
+}
+
+/**
+ * What the 2.0 reader made of the flags it could not carry into the model
+ * as they stood: a flag that identifies no entity, and an entity two or
+ * more flags name, of which the stored reference keeps one. In a file that
+ * names elements it does not define, the flags are not judged at all.
+ */
+function migrationNotes(model: OrmModel, placed: PlacedFlags, flags: number): MigrationNote[] {
+  const missing = missingReferences(model);
+  if (flags > 0 && missing.length > 0) return [{ kind: "flags-unplaceable", missing }];
+  const notes: MigrationNote[] = [];
+  for (const c of placed.dropped) {
+    const factType = c.id === undefined ? undefined : model.getConstraintInView(c.id)?.[1];
+    notes.push({ kind: "flag-dropped", factType: factType?.name ?? "", constraintId: c.id ?? "" });
+  }
+  for (const [entityId, candidates] of placed.candidates) {
+    if (candidates.length < 2) continue;
+    const kept = placed.byEntity.get(entityId)!.constraint.id ?? "";
+    notes.push({
+      kind: "identifier-chosen",
+      entity: model.getObjectType(entityId)?.name ?? entityId,
+      kept,
+      others: candidates.flatMap((at) =>
+        at.constraint.id !== undefined && at.constraint.id !== kept ? [at.constraint.id] : []
+      ),
+    });
+  }
+  return notes;
 }

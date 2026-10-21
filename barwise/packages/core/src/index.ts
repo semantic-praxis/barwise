@@ -173,6 +173,8 @@ export {
 } from "./serialization/MappingSerializer.js";
 export {
   DeserializationError,
+  type MigrationNote,
+  type MigrationResult,
   OrmYamlSerializer,
   readDocument20,
   writeDocument,

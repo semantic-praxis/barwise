@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), 4a implemented 2026-10-21, 4b split into PRs and 4b-i (constraints over subtypes in memory) implemented 2026-10-21, and 4b-ii (the stored identifier and format 3.0) 2026-10-21; `barwise migrate` next; WS5 not started; open decisions 1 to 9
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), 4a implemented 2026-10-21, 4b split into PRs and 4b-i (constraints over subtypes in memory) implemented 2026-10-21, 4b-ii (the stored identifier and format 3.0) 2026-10-21, and 4b-iii (`barwise migrate`) 2026-10-21; WS5 not started; open decisions 1 to 9
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1781,6 +1781,50 @@ Implementation notes (2026-10-21, WS4b-ii, the stored identifier and format 3.0)
   `barwise migrate` (barwise-n9n.a6d) is where they are reported.
 - **The schema's two constraint lists are a copy of `PLACEMENT`**, so
   `tests/serialization/format30.test.ts` checks them against it.
+
+### 4b-iii. `barwise migrate` (grounded 2026-10-21)
+
+Open decision 5 asked for the command; WS4b-ii left it for its own PR,
+because what a 2.0 file loses on load is known only inside the 2.0
+reader. The command rewrites files; the reader stays the migration.
+
+- **Core.** `OrmYamlSerializer.migrate(yaml)` returns the model, the
+  version the file stated, and what the 2.0 reader could not carry: each
+  `is_preferred` flag that identifies no entity, and each entity whose
+  flags named more than one identifier, with the one kept. Both come from
+  `placePreferredFlags`, which `readDocument20` already calls and whose
+  `dropped` and `candidates` it discarded. `deserialize` is `migrate`'s
+  model, so the two cannot disagree. Nothing new is read: a 3.0 file
+  reports nothing, and a file below 2.0 reports what its 2.0 form loses.
+- **CLI.** `barwise migrate <files...>`:
+  - When a named file states a version below 3.0, the command shall
+    rewrite it in place as 3.0 and print the version it came from and
+    every note the reader returned.
+  - When a file already states 3.0, the command shall leave it untouched
+    and say so.
+  - When `--check` is given, the command shall write nothing, and exit 1
+    if any file would be rewritten.
+  - When a file cannot be read or does not load, its 3.0 form would not
+    load back, or it names elements it does not define and carries
+    `is_preferred` flags (whom a flag identifies can turn on what is
+    missing, a player or an objectification, so none is placed from a
+    fragment), the command shall report it, write nothing to it, go on
+    with the rest, and exit 2: the gate contract's "could not answer",
+    which `--check`'s 1 must not be confused with.
+  - `--format json` prints one record per file.
+  - It loads leniently, as `barwise validate` does: a fragment naming an
+    element it does not define is rewritten with the reference intact, for
+    validation to report. Run over the 115 tracked files with `--check`, 78
+    would migrate, 10 are current, and the 27 refused are the deliberately
+    malformed fixtures under `core/tests/fixtures/malformed/`; the one note
+    is `order-management`'s dropped flag that WS4a recorded.
+- **Surfaces.** CLI only, a deliberate capability-matrix row: it rewrites
+  files, and MCP and VS Code already write 3.0 on the next save of a file
+  they edit. It is the one CLI command that modifies its inputs, and the
+  row says so beside `merge`'s.
+- **Acceptance:** command tests through `runCli` for each requirement
+  above, a core test that the notes name the flags `placePreferredFlags`
+  drops, and a `docs/CLI.md` entry.
 
 ### 5. Corpus, docs, release notes (provisional: not yet grounded)
 

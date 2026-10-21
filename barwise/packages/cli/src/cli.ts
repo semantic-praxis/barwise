@@ -66,6 +66,10 @@ const COMMANDS: readonly CommandEntry[] = [
     register: async (p) => (await import("./commands/diff.js")).registerDiffCommand(p),
   },
   {
+    name: "migrate",
+    register: async (p) => (await import("./commands/migrate.js")).registerMigrateCommand(p),
+  },
+  {
     name: "merge",
     register: async (p) => (await import("./commands/merge.js")).registerMergeCommand(p),
   },
