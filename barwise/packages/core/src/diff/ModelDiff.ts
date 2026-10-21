@@ -192,6 +192,7 @@ export function diffModels(
     // Its fact types and roles are read against its own model, then the
     // other, as its key is: a lenient fragment can name a role only the
     // full model holds.
+    const model = pair.incoming ? incoming : existing;
     const [own, other] = pair.incoming
       ? [holders.incoming, holders.existing]
       : [holders.existing, holders.incoming];
@@ -207,7 +208,11 @@ export function diffModels(
       kind,
       elementType: "constraint",
       constraintType: named.type,
-      factTypes: [...new Set(roleIds.flatMap((id) => holderOf(id)?.name ?? []))],
+      // As validation and verbalization name its span (every holder, in
+      // model order), from the other model when its own holds none of them.
+      factTypes: (model.factTypesOf(named).length > 0
+        ? model.factTypesOf(named)
+        : (pair.incoming ? existing : incoming).factTypesOf(named)).map((ft) => ft.name),
       roles: roleIds.map((id) => {
         const holder = holderOf(id);
         return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;

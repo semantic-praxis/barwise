@@ -157,9 +157,9 @@ export interface ConstraintDelta extends DeltaCommon {
   readonly elementType: "constraint";
   readonly constraintType: ExternalConstraint["type"];
   /**
-   * The names of the fact types its roles are in, in role order, read
-   * against the incoming side when it has one and then the other side:
-   * what a person reads it by.
+   * The names of the fact types it spans, in model order, as validation and
+   * verbalization name them, from the incoming side when it has one, and
+   * from the other side when its own holds none of its roles.
    */
   readonly factTypes: readonly string[];
   /**
