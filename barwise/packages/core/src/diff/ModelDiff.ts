@@ -8,6 +8,7 @@
  * comparisons, breaking-level classification, and synonym detection live
  * in sibling modules.
  */
+import { roleIdsOf } from "../model/Constraint.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { Population } from "../model/Population.js";
@@ -24,6 +25,7 @@ import {
   diffSubtypeFact,
   factTypeName,
   instancesKey,
+  pairModelConstraints,
   playerName,
   roleHolders,
 } from "./elementDiff.js";
@@ -48,6 +50,7 @@ export {
 } from "./deltas.js";
 export type {
   BreakingLevel,
+  ConstraintDelta,
   DefinitionDelta,
   DeltaJson,
   DeltaKind,
@@ -174,6 +177,56 @@ export function diffModels(
         breakingLevel: classifyBreakingLevel("added", [], "fact_type"),
       });
     }
+  }
+
+  // --- Constraints across fact types ---
+  // Model order, the constraint's own model first, for naming the fact
+  // types each spans.
+  const incomingFirst = [...incoming.factTypes, ...existing.factTypes];
+  const existingFirst = [...existing.factTypes, ...incoming.factTypes];
+  for (const pair of pairModelConstraints(existing, incoming, holders, pairing)) {
+    const kind: DeltaKind = !pair.existing
+      ? "added"
+      : !pair.incoming
+      ? "removed"
+      : pair.modified
+      ? "modified"
+      : "unchanged";
+    const named = pair.incoming ?? pair.existing!;
+    // Each role is read against its own model, then the other, as its key
+    // is: a lenient fragment can name a role only the full model holds. Its
+    // fact types are every holder of those roles, in model order (own model
+    // first), which is how validation and verbalization name its span; its
+    // role labels use the first holder. One lookup serves both, so the two
+    // cannot disagree.
+    const [order, own, other] = pair.incoming
+      ? [incomingFirst, holders.incoming, holders.existing]
+      : [existingFirst, holders.existing, holders.incoming];
+    const roleIds = roleIdsOf(named);
+    const holdersOf = (id: string) => own.get(id) ?? other.get(id) ?? [];
+    const spanned = new Set(roleIds.flatMap(holdersOf));
+    const changes = pair.modified && pair.existing && pair.incoming
+      ? [{
+        change: "constraintsModified" as const,
+        constraints: [{ from: structuredClone(pair.existing), to: structuredClone(pair.incoming) }],
+      }]
+      : [];
+    deltas.push({
+      kind,
+      elementType: "constraint",
+      constraintType: named.type,
+      // By name, once: a fragment's fact type and the full model's can share it.
+      factTypes: [...new Set(order.filter((ft) => spanned.has(ft)).map((ft) => ft.name))],
+      roles: roleIds.map((id) => {
+        const holder = holdersOf(id)[0];
+        return holder ? `${holder.name} (${holder.getRoleById(id)!.name})` : id;
+      }),
+      ...(pair.existing ? { existing: pair.existing } : {}),
+      ...(pair.incoming ? { incoming: pair.incoming } : {}),
+      changes,
+      changeDescriptions: changes.map(describeChange),
+      breakingLevel: classifyBreakingLevel(kind, changes, "constraint"),
+    });
   }
 
   // --- Definitions ---

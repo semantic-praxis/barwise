@@ -124,8 +124,10 @@ it, so knip sees an unused file where there is a live edge.
   `constraintsTouchingAny` for a view of several fact types, which says a
   constraint spanning two of them once, and `everyConstraint` for the whole
   model) and
-  `OrmModel.getConstraint`, not `FactType.constraints`, which WS3c removes
-  (`docs/specs/orm-format-3.spec.md`, WS3).
+  `OrmModel.getConstraint`. Since WS3c the model stores the external kinds
+  (`OrmModel.addConstraint`); a fact type holds only its own, and a 2.0
+  save writes each external one under the first fact type holding one of
+  its roles (`docs/specs/orm-format-3.spec.md`, WS3).
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class
   hierarchies.

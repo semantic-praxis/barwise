@@ -1,5 +1,10 @@
 import type { Complete } from "../util/complete.js";
-import { type Constraint, type InternalConstraint, isInternalConstraint } from "./Constraint.js";
+import {
+  type Constraint,
+  type ExternalConstraint,
+  type InternalConstraint,
+  isInternalConstraint,
+} from "./Constraint.js";
 import { generateId } from "./id.js";
 import { ModelElement } from "./ModelElement.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
@@ -69,13 +74,21 @@ export interface FactTypeConfig {
 export class FactType extends ModelElement {
   private readonly _roles: Role[];
   private readonly _readings: ReadingOrder[];
-  private readonly _constraints: Constraint[];
+  private readonly _constraints: InternalConstraint[];
+  private readonly _toModel: ((c: ExternalConstraint) => void) | undefined;
   private _definition: string | undefined;
   private _note: string | undefined;
   private _derivation: DerivationRule | undefined;
 
-  constructor(config: FactTypeConfig) {
+  /**
+   * @param toModel Where a constraint across fact types goes: the model
+   *   that owns this fact type stores them (orm-format-3 WS3c), and
+   *   `OrmModel.addFactType` passes its own `addConstraint`. A fact type
+   *   built on its own has no model to hold one, so it refuses one.
+   */
+  constructor(config: FactTypeConfig, toModel?: (c: ExternalConstraint) => void) {
     super(config.name, config.id);
+    this._toModel = toModel;
 
     if (config.roles.length === 0) {
       throw new Error(
@@ -105,7 +118,8 @@ export class FactType extends ModelElement {
     }
 
     this._readings = config.readings.map((template) => ({ template }));
-    this._constraints = (config.constraints ?? []).map(withId);
+    this._constraints = [];
+    for (const c of config.constraints ?? []) this.addConstraint(c);
     this._definition = config.definition;
     this._note = config.note;
     this._derivation = config.derivation;
@@ -121,20 +135,14 @@ export class FactType extends ModelElement {
     return this._readings;
   }
 
-  /** The constraints on this fact type. */
-  get constraints(): readonly Constraint[] {
-    return this._constraints;
-  }
-
   /**
    * The constraints that live in this fact type: the internal kinds, whose
-   * roles are all its own. Until storage moves (orm-format-3 WS3c) the list
-   * above also holds the external kinds a 2.0 file nests here; this view and
-   * `OrmModel.constraints` are how a reader asks for one placement or the
-   * other, so that the move changes no reader.
+   * roles are all its own. One across fact types lives in the model
+   * (`OrmModel.constraints`), whichever fact type a 2.0 file nests it
+   * under (orm-format-3 WS3c).
    */
   get internalConstraints(): readonly InternalConstraint[] {
-    return this._constraints.filter(isInternalConstraint);
+    return this._constraints;
   }
 
   /** The arity (number of roles). */
@@ -179,9 +187,24 @@ export class FactType extends ModelElement {
    * in code is new, so a fresh id is right (barwise-nkq); without one, every
    * output that names a constraint by id would have nothing to name it by
    * until the model was saved and reloaded.
+   *
+   * A constraint across fact types is handed to the owning model, which
+   * stores it; a 2.0 file and the writers not yet moved to
+   * `OrmModel.addConstraint` still nest one here, and this is what keeps
+   * them working until WS3c-iii narrows the parameter.
    */
   addConstraint(constraint: Constraint): void {
-    this._constraints.push(withId(constraint));
+    if (isInternalConstraint(constraint)) {
+      this._constraints.push(withId(constraint));
+      return;
+    }
+    if (!this._toModel) {
+      throw new Error(
+        `A ${constraint.type} constraint spans fact types and lives in a model; `
+          + `fact type "${this.name}" has none. Add it with OrmModel.addConstraint.`,
+      );
+    }
+    this._toModel(constraint);
   }
 
   /** Get all role ids that reference a given object type (by player id). */
@@ -195,7 +218,7 @@ export class FactType extends ModelElement {
  * generator. The one rule both ways into a fact type follow, so the
  * constructor and `addConstraint` cannot drift apart again (barwise-nkq).
  */
-function withId(c: Constraint): Constraint {
+function withId<C extends Constraint>(c: C): C {
   return c.id ? c : { ...c, id: generateId() };
 }
 
@@ -220,7 +243,7 @@ export function toFactTypeConfig(ft: FactType): FactTypeConfig {
       return role;
     }),
     readings: ft.readings.map((r) => r.template),
-    constraints: ft.constraints,
+    constraints: ft.internalConstraints,
     definition: ft.definition,
     note: ft.note,
     derivation: ft.derivation,

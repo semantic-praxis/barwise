@@ -126,7 +126,7 @@ describe("FactType", () => {
     expect(ft.rolesForPlayer("nobody")).toHaveLength(0);
   });
 
-  it("accepts and stores constraints", () => {
+  it("accepts and stores its own constraints", () => {
     const ft = new FactType({
       name: "Test",
       roles: [
@@ -140,7 +140,22 @@ describe("FactType", () => {
       ],
     });
 
-    expect(ft.constraints).toHaveLength(2);
+    expect(ft.internalConstraints.map((c) => c.type)).toEqual(["internal_uniqueness", "mandatory"]);
+  });
+
+  it("refuses a constraint across fact types when it has no model to hold it", () => {
+    const ft = new FactType({
+      name: "Test",
+      roles: [
+        { name: "r1", playerId: player1Id, id: "role-1" },
+        { name: "r2", playerId: player2Id, id: "role-2" },
+      ],
+      readings: ["{0} test {1}"],
+    });
+    expect(() => ft.addConstraint({ type: "exclusion", roleIds: ["role-1", "role-2"] })).toThrow(
+      /lives in a model/,
+    );
+    expect(ft.internalConstraints).toEqual([]);
   });
 
   it("allows adding constraints after construction", () => {
@@ -153,9 +168,9 @@ describe("FactType", () => {
       readings: ["{0} test {1}"],
     });
 
-    expect(ft.constraints).toHaveLength(0);
+    expect(ft.internalConstraints).toHaveLength(0);
     ft.addConstraint({ type: "mandatory", roleId: "role-1" });
-    expect(ft.constraints).toHaveLength(1);
+    expect(ft.internalConstraints.map((c) => c.type)).toEqual(["mandatory"]);
   });
 
   it("stores a definition", () => {

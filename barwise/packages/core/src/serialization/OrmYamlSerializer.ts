@@ -1,4 +1,5 @@
 import { parse, stringify } from "yaml";
+import type { ExternalConstraint } from "../model/Constraint.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
@@ -191,8 +192,11 @@ export class OrmYamlSerializer {
     }
 
     const factTypes = model.factTypes;
+    // Before the guard: a model with constraints and no fact type must
+    // refuse, not drop them.
+    const across = lowerConstraints(model);
     if (factTypes.length > 0) {
-      doc.model.fact_types = factTypes.map((ft) => serializeFactType(ft));
+      doc.model.fact_types = factTypes.map((ft) => serializeFactType(ft, across.get(ft.id)));
     }
 
     const subtypeFacts = model.subtypeFacts;
@@ -299,4 +303,31 @@ export class OrmYamlSerializer {
 
     return model;
   }
+}
+
+/**
+ * Where a 2.0 file nests each constraint across fact types: under the first
+ * fact type, in model order, holding one of its roles, after that fact
+ * type's own constraints (orm-format-3 WS3c). One whose roles all dangle
+ * goes under the first fact type, so the file keeps it and validation still
+ * reports it: a lenient load reads one, merge carries one through, and a
+ * refusal here would fail the save of every model holding one. Only a model
+ * with no fact type has nowhere to put one, and the save refuses that by id
+ * rather than writing a file that drops it.
+ */
+function lowerConstraints(model: OrmModel): ReadonlyMap<string, ExternalConstraint[]> {
+  const byHost = new Map<string, ExternalConstraint[]>();
+  for (const c of model.constraints) {
+    const host = model.factTypesOf(c)[0] ?? model.factTypes[0];
+    if (!host) {
+      throw new Error(
+        `Cannot save the ${c.type} constraint "${c.id ?? "(no id)"}": the model has no `
+          + "fact type, and format 2.0 nests every constraint under one.",
+      );
+    }
+    const list = byHost.get(host.id);
+    if (list) list.push(c);
+    else byHost.set(host.id, [c]);
+  }
+  return byHost;
 }
