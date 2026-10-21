@@ -5,7 +5,6 @@ import {
   pureObjectifyingEntityIds,
   referenceModeOf,
   type RingType,
-  roleIdsOf,
 } from "@barwise/core";
 import type {
   ConstraintEdge,
@@ -242,79 +241,87 @@ export function modelToGraph(
   // takes its constraint's own id, so a selection, a view or a diff names
   // the same node whatever order the file lists constraints in
   // (orm-format-3, Open decision 9); a counter used to number them.
+  // Drawn only where it attaches to a fact type with a node, with edges to
+  // those fact types only: none floats, and no edge points at a fact type
+  // absorbed into a reference mode or left out of a neighbourhood view.
 
-  /** Helper: create a constraint node and edges for a set of role ids. */
+  // Node ids already taken, by object types and fact types first. A
+  // constraint's node takes its own id unless that is taken: by another
+  // node kind, or by a second constraint with the same id (barwise-b2s),
+  // which then gets the first free `#2`, `#3`. Which of two same-id
+  // constraints keeps the plain id follows file order; unique ids are what
+  // make it order-free. An id-less constraint, which construction rules out
+  // (barwise-nkq) though the type allows it until WS3c, is numbered.
+  const issued = new Set(nodes.map((n) => n.id));
+  let unnamed = 0;
+  function nodeIdFor(c: Constraint): string {
+    let base = c.id;
+    if (base === undefined) {
+      do base = `constraint-${unnamed++}`; while (issued.has(base));
+    }
+    let id = base;
+    for (let n = 2; issued.has(id); n++) id = `${base}#${n}`;
+    issued.add(id);
+    return id;
+  }
+
+  /**
+   * Draw a constraint as a node with an edge to each of its roles whose fact
+   * type got a node (both sides for subset/equality). One with no such role
+   * has nothing to attach to, absorbed, filtered out or dangling, and is not
+   * drawn; its id is then not used up.
+   */
   function addConstraintNode(
-    constraintId: string,
+    c: Constraint,
     kind: ConstraintKind,
     roleIds: readonly string[],
     supersetRoleIds?: readonly string[],
   ): void {
-    const node: ConstraintNode = {
-      kind: "constraint",
-      id: constraintId,
-      constraintKind: kind,
-      roleIds: [...roleIds],
-      supersetRoleIds: supersetRoleIds ? [...supersetRoleIds] : undefined,
-    };
-    nodes.push(node);
-
-    // Create edges to all covered roles (both sides for subset/equality).
     const allRoleIds = supersetRoleIds
       ? [...roleIds, ...supersetRoleIds]
       : roleIds;
-    for (const roleId of allRoleIds) {
+    const attached = allRoleIds.flatMap((roleId) => {
       const factTypeId = roleToFactType.get(roleId);
-      if (factTypeId && drawnFactTypeIds.has(factTypeId)) {
-        constraintEdges.push({
-          constraintNodeId: constraintId,
-          factTypeNodeId: factTypeId,
-          roleId,
-        });
-      }
+      return factTypeId && drawnFactTypeIds.has(factTypeId) ? [{ factTypeId, roleId }] : [];
+    });
+    if (attached.length === 0) return;
+
+    const constraintId = nodeIdFor(c);
+    nodes.push(
+      {
+        kind: "constraint",
+        id: constraintId,
+        constraintKind: kind,
+        roleIds: [...roleIds],
+        supersetRoleIds: supersetRoleIds ? [...supersetRoleIds] : undefined,
+      } satisfies ConstraintNode,
+    );
+    for (const { factTypeId, roleId } of attached) {
+      constraintEdges.push({ constraintNodeId: constraintId, factTypeNodeId: factTypeId, roleId });
     }
   }
 
-  // Every constraint across fact types that touches a fact type with a
-  // node, once. One absorbed into a reference mode, filtered out of a
-  // neighbourhood view, or left dangling by a deleted role has nothing to
-  // attach to, so it is not drawn as a floating node, and its edges go to
-  // drawn fact types only. The fact type a 2.0 file nests it under decides
-  // nothing: it used to decide whether the constraint was drawn at all.
-  const usedIds = new Map<string, number>();
-  let unnamed = 0;
+  // Every constraint across fact types, once, wherever a 2.0 file nests
+  // it: the nesting fact type used to decide whether it was drawn at all.
   for (const c of model.constraints) {
-    const drawn = roleIdsOf(c).some((rid) => {
-      const ftId = roleToFactType.get(rid);
-      return ftId !== undefined && drawnFactTypeIds.has(ftId);
-    });
-    if (!drawn) continue;
-    // The constraint's own id names its node. Two constraints sharing one
-    // (barwise-b2s) would collapse into one node, so a repeat is
-    // suffixed; one without an id, which construction rules out
-    // (barwise-nkq) though the type allows it until WS3c, is numbered.
-    const base = c.id ?? `constraint-${unnamed++}`;
-    const seen = usedIds.get(base) ?? 0;
-    usedIds.set(base, seen + 1);
-    const id = seen === 0 ? base : `${base}#${seen + 1}`;
     switch (c.type) {
       case "external_uniqueness":
-        addConstraintNode(id, "external_uniqueness", c.roleIds);
+        addConstraintNode(c, "external_uniqueness", c.roleIds);
         break;
       case "exclusion":
-        addConstraintNode(id, "exclusion", c.roleIds);
+        addConstraintNode(c, "exclusion", c.roleIds);
         break;
       case "exclusive_or":
-        addConstraintNode(id, "exclusive_or", c.roleIds);
+        addConstraintNode(c, "exclusive_or", c.roleIds);
         break;
       case "disjunctive_mandatory":
-        addConstraintNode(id, "disjunctive_mandatory", c.roleIds);
+        addConstraintNode(c, "disjunctive_mandatory", c.roleIds);
         break;
       case "subset":
-        addConstraintNode(id, "subset", c.subsetRoleIds, c.supersetRoleIds);
+        addConstraintNode(c, "subset", c.subsetRoleIds, c.supersetRoleIds);
         break;
       case "equality":
-        addConstraintNode(id, "equality", c.roleIds1, c.roleIds2);
+        addConstraintNode(c, "equality", c.roleIds1, c.roleIds2);
         break;
       default: {
         // Narrowed to exactly the kinds declared not-drawn below; a
