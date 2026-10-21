@@ -2,8 +2,8 @@
 
 Status: Implemented -- the one workstream landed with this spec; amended
 2026-10-21 by orm-format-3 WS3a-iii: a constraint already paired by its own
-id is compared with a key that reads a role both models hold by its id and
-holder; the content pass keys by position as this spec says
+id is compared with a key that reads a role both models hold by its id as
+well as its position; the content pass keys by position as this spec says
 Created: 2026-10-07
 Last-updated: 2026-10-21
 Tracking: barwise-b7z (join constraints: barwise-q8x; host independence: barwise-iuj); found by `ddl-round-trip-fixed-point.spec.md`,

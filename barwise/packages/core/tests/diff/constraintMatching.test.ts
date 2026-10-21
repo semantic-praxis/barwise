@@ -158,10 +158,10 @@ describe("what id-first pairing reads", () => {
     ]);
   });
 
-  it("reports nothing for an id-joined pair whose roles only swapped places", () => {
-    // The fact type's roles swap places under the same ids. By position the
-    // constraint's role moved; a pair joined by id reads its role by id,
-    // and the role it names is the one it named before.
+  it("reads a role that swapped places as a change of an id-joined pair", () => {
+    // The fact type's roles swap places under the same ids. The constraint
+    // names the same role, now at the other position, which a reading
+    // addresses it by.
     const a = drives([uc("c-1", ["r-1"])]);
     const b = new OrmModel({ name: "M" });
     b.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
@@ -176,7 +176,7 @@ describe("what id-first pairing reads", () => {
       readings: ["{1} drives {0}"],
       constraints: [uc("c-1", ["r-1"])],
     });
-    expect(constraintChanges(a, b)).toEqual([]);
+    expect(constraintChanges(a, b)).toEqual([["constraintsModified", [["c-1", "c-1"]]]]);
   });
 
   it("reports a retarget onto the role that moved into the old position", () => {
@@ -238,6 +238,46 @@ describe("what id-first pairing reads", () => {
     });
     expect(constraintChanges(drives([vc(["a,b"])]), drives([vc(["a", "b"])])))
       .toEqual([["constraintsModified", [["vc-1", "vc-1"]]]]);
+  });
+
+  it("reads a reorder of a ring's look-alike roles as a change of an id-joined pair", () => {
+    // Both roles are played by Person and share a name, and the reading is
+    // unchanged, so only position says the uniqueness moved from the
+    // parent's place to the child's.
+    const ring = (order: [string, string]) => {
+      const m = new OrmModel({ name: "M" });
+      m.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+      m.addFactType({
+        id: "ft-r",
+        name: "Person is parent of Person",
+        roles: order.map((id) => ({ id, name: "is related to", playerId: "ot-p" })),
+        readings: ["{0} is parent of {1}"],
+        constraints: [uc("c-1", ["r-p"])],
+      });
+      return m;
+    };
+    const a = ring(["r-p", "r-c"]);
+    const b = ring(["r-c", "r-p"]);
+    const delta = diffModels(a, b).deltas.find((d) => d.elementType === "fact_type")!;
+    expect(delta.changes.map((c) => c.change)).toEqual(["constraintsModified"]);
+  });
+
+  it("reads a holder that changed only its id as no change of the host's own roles", () => {
+    const a = drives([uc("c-1", ["r-1"])]);
+    const b = new OrmModel({ name: "M" });
+    b.addObjectType({ id: "ot-p", name: "Person", kind: "entity", referenceMode: "id" });
+    b.addObjectType({ id: "ot-c", name: "Car", kind: "entity", referenceMode: "vin" });
+    b.addFactType({
+      id: "ft-drives",
+      name: "Person drives Car",
+      roles: [
+        { id: "r-1", name: "drives", playerId: "ot-p" },
+        { id: "r-2", name: "is driven by", playerId: "ot-c" },
+      ],
+      readings: ["{0} drives {1}"],
+      constraints: [uc("c-1", ["r-1"])],
+    });
+    expect(constraintChanges(a, b)).toEqual([]);
   });
 
   it("names both kinds when an edit changes the kind", () => {

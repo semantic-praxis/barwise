@@ -384,16 +384,18 @@ export function roleHolders(model: OrmModel): RoleHolders {
  * keying it by raw id on one side alone would report a false change.
  *
  * `byId` is for a constraint already paired by its own id, and only
- * then: a role both models hold, once each, is keyed by its id and its
- * holder's id. The pair's id already says the two are one constraint,
- * so its roles' ids are evidence, and position would misread them: a
- * role swap moved the key of a constraint nothing touched, and a
- * constraint moved onto the role that took the old position kept its key
- * (orm-format-3 WS3a-iii review). Position is deliberately absent: a role
- * reordered within its fact type is the same role, and the fact type's
- * own `rolePlayer` and `roleName` changes report the reorder. The
- * holder's id, not its name, is in the key, so a role moved to another
- * fact type reads as a change and a holder renamed does not. The content
+ * then: a role both models hold, once each, is keyed by its id as well as
+ * its position. The pair's id already says the two are one constraint,
+ * so its roles' ids are evidence: by position alone, a constraint moved
+ * onto the role that took the old position kept its key (orm-format-3
+ * WS3a-iii review). Position stays because readings refer to roles by
+ * it: in "Person is parent of Person" two roles can share a player and a
+ * name, so a reorder under the same reading changes what the constraint
+ * says while every per-role comparison of the fact type agrees. A role of
+ * the host is keyed by its host position, so the host's own id never
+ * enters the key; a role of another fact type by that fact type's id and
+ * its position there, so a role moved to another fact type reads as a
+ * change and a holder renamed does not. The content
  * pass never keys by id: it pairs constraints whose ids say nothing, and
  * keying by role id there would let a coincidental role id pair two
  * different constraints, which is what content matching exists to rule
@@ -420,7 +422,11 @@ function roleKeys(
     const mine = holders.get(id);
     const theirs = otherHolders.get(id);
     if (byId && mine?.length === 1 && theirs?.length === 1) {
-      return `i${JSON.stringify([id, mine[0]!.id])}`;
+      const at = host.get(id);
+      const home = mine[0]!;
+      return at !== undefined
+        ? `i${JSON.stringify([id, at])}`
+        : `i${JSON.stringify([id, home.id, home.roles.findIndex((r) => r.id === id)])}`;
     }
     const homes = mine ?? theirs ?? [];
     if (homes.length !== 1) return raw(id);
@@ -552,8 +558,12 @@ function diffConstraints(
   const modified: { from: Constraint; to: Constraint; }[] = [];
   if (pairing.matching === "id-first") {
     // The key for comparing a pair joined by id; see `roleKeys`.
-    const pairMapA = roleKeys(rolesA, holdersA, holdersB, true);
-    const pairMapB = roleKeys(rolesB, holdersB, holdersA, true);
+    // Built on the first pair, since an import with fresh ids pairs none.
+    let pairMaps: [RoleKeys, RoleKeys] | undefined;
+    const pairKeys = () => (pairMaps ??= [
+      roleKeys(rolesA, holdersA, holdersB, true),
+      roleKeys(rolesB, holdersB, holdersA, true),
+    ]);
     const byIdB = new Map(
       b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
     );
@@ -562,6 +572,7 @@ function diffConstraints(
       const cb = byIdB.get(ca.id);
       if (!cb) continue;
       paired.add(ca).add(cb);
+      const [pairMapA, pairMapB] = pairKeys();
       if (constraintKey(ca, pairMapA) !== constraintKey(cb, pairMapB)) {
         modified.push({ from: ca, to: cb });
       }
