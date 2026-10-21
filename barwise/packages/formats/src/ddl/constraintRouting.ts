@@ -101,11 +101,10 @@ export function routeConstraints(
     const [c] = inView;
     if (c.type === "external_uniqueness") {
       const cols = c.roleIds.map((r) => columnForJoinedRole(r, model, schema));
-      const table = cols[0]?.table;
-      if (
-        table !== undefined
-        && cols.every((r) => r !== undefined && r.table === table)
-      ) {
+      const table = cols.find((r) => r !== undefined)?.table;
+      if (table === undefined) {
+        spill(inView, "the roles map to no column", nearestTable(inView));
+      } else if (cols.every((r) => r !== undefined && r.table === table)) {
         const columnList = cols.map((r) => r!.column).join(", ");
         route("unique", `UNIQUE (${columnList})`, table, inView);
       } else {
@@ -113,10 +112,15 @@ export function routeConstraints(
       }
       return;
     }
-    const nearest = model.factTypesNaming(inView)
-      .map((f) => tableForFactType(f, model, schema))
-      .find((t) => t !== undefined);
-    spill(inView, "not expressible in SQL DDL", nearest);
+    spill(inView, "not expressible in SQL DDL", nearestTable(inView));
+  };
+
+  const nearestTable = (inView: ConstraintInView): string | undefined => {
+    for (const f of model.factTypesNaming(inView)) {
+      const table = tableForFactType(f, model, schema);
+      if (table !== undefined) return table;
+    }
+    return undefined;
   };
 
   for (const inView of model.everyConstraint()) {
@@ -256,13 +260,13 @@ function buildConstraintSpec(
   verbalizer: ConstraintVerbalizer,
 ): ConstraintSpec {
   const [c, ft] = inView;
-  // The fact type it lives in, or the ones it spans: never a 2.0 host.
-  const names = model.factTypesNaming(inView).map((f) => `"${f.name}"`);
-  const named = names.length > 0 ? names.join(", ") : "no fact type (its roles do not resolve)";
   let verbalization: string;
   try {
     verbalization = verbalizer.reportInView(inView, model).verbalization;
   } catch {
+    // The fact type it lives in, or the ones it spans: never a 2.0 host.
+    const names = model.factTypesNaming(inView).map((f) => `"${f.name}"`);
+    const named = names.length > 0 ? names.join(", ") : "no fact type (its roles do not resolve)";
     verbalization = `${c.type} constraint on ${named}`;
   }
 
@@ -278,7 +282,7 @@ function buildConstraintSpec(
 
   return {
     verbalization,
-    pseudocode: constraintPseudocode(c, ft, ft?.name ?? named, model),
+    pseudocode: constraintPseudocode(c, ft, model),
     example,
   };
 }
@@ -288,12 +292,9 @@ function buildConstraintSpec(
  * implement the constraint in query logic, a dbt test, or application
  * code.
  */
-function constraintPseudocode(
-  c: Constraint,
-  ft: FactType | undefined,
-  fact: string,
-  model: OrmModel,
-): string {
+function constraintPseudocode(c: Constraint, ft: FactType | undefined, model: OrmModel): string {
+  // Every kind that reads it is internal, so has a fact type.
+  const fact = ft?.name ?? "";
   switch (c.type) {
     case "ring": {
       const templates: Record<string, string> = {

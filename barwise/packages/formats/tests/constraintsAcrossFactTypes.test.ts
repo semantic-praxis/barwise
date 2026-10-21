@@ -29,9 +29,12 @@ type Host = typeof leads | typeof sponsors;
 
 /**
  * No Person both leads and sponsors a Project: an exclusion over a role of
- * each fact type, nested under `host`. The two fact types' nearest tables
- * differ (person for the first, project for the second), which is what
- * used to make the nesting visible in the DDL.
+ * each fact type, and an external uniqueness over the projects one person
+ * leads and sponsors, both nested under `host`. The two fact types'
+ * nearest tables differ (person for the first, project for the second),
+ * which is what used to make the nesting visible in the DDL; each fact
+ * type's own uniqueness is what made it visible in NORMA, whose
+ * uniqueness group holds both placements.
  */
 function projects(host: Host): OrmModel {
   // Element ids from a counter, so two builds differ only where `host` does.
@@ -66,7 +69,13 @@ function build(host: Host): OrmModel {
     type: "exclusion",
     roleIds: [roleOf(leads, "leads"), roleOf(sponsors, "sponsors")],
   };
+  const key: Constraint = {
+    id: "c-led-and-sponsored",
+    type: "external_uniqueness",
+    roleIds: [roleOf(leads, "is led by"), roleOf(sponsors, "is sponsored by")],
+  };
   model.getFactTypeByName(host)!.addConstraint(exclusion);
+  model.getFactTypeByName(host)!.addConstraint(key);
   return model;
 }
 
@@ -82,7 +91,7 @@ describe("constraints across fact types in DDL routing", () => {
   it("spills to the first spanned fact type's table, whichever fact type nests it", () => {
     const routed = route(projects(leads));
     expect(route(projects(sponsors))).toEqual(routed);
-    const spill = routed.spilled.find((s) => s.spec.verbalization.includes("leads"));
+    const spill = routed.spilled.find((s) => s.reason === "not expressible in SQL DDL");
     expect(spill?.tableName).toBe("person");
     expect(spill?.reason).toBe("not expressible in SQL DDL");
   });
@@ -92,12 +101,12 @@ describe("constraints across fact types in NORMA", () => {
   const exportXml = (model: OrmModel) => serializeNormaDocument(writeOrmToNorma(model));
 
   it("writes the same document whichever fact type nests it", () => {
-    // For an exclusion alone the old writer gave this document too: the
-    // serializer groups constraints by element type and no exclusion is
-    // internal. What it guards is the one walk that now writes them.
+    // The old writer put the external uniqueness after its host's own, so
+    // the uniqueness group's order followed the host.
     const xml = exportXml(projects(leads));
     expect(exportXml(projects(sponsors))).toBe(xml);
     expect(xml.match(/id="_c-lead-or-sponsor"/g)).toHaveLength(1);
+    expect(xml.match(/id="_c-led-and-sponsored"/g)).toHaveLength(1);
   });
 
   it("imports one copy of a rule two hosts would each have kept", () => {

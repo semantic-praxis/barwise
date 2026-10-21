@@ -58,8 +58,11 @@ export function withModality(nc: NormaConstraint, mapped: Constraint): Constrain
 /**
  * True when `held` already has a constraint saying exactly what
  * `candidate` says: same kind, fields, role order and modality, id aside.
- * The one duplicate rule for every phase, so whether a constraint survives
- * never depends on whether a fact type lists it.
+ * The one duplicate rule for every phase. What it is checked against is the
+ * caller's: phase 1 passes one fact type's list, and phase 3 passes the
+ * fact type for a constraint of one fact type and the whole model for one
+ * across fact types, so until 3c places by kind, a copy two fact types'
+ * InternalConstraints both list survives phase 1.
  *
  * Per-kind checks over a few fields used to stand here, and they drifted --
  * a subset compared only its subset roles, an equality only its first
