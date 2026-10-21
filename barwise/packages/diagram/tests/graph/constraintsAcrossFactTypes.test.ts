@@ -6,63 +6,9 @@
  * when that fact type was a reference mode absorbed into its entity.
  */
 import type { Constraint } from "@barwise/core";
-import { OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { modelToGraph } from "../../src/graph/ModelToGraph.js";
-import { buildModelSummary } from "../../src/session/modelSummary.js";
-
-type Host = "ft-id" | "ft-in" | "ft-nr";
-
-/**
- * Room (identified by RoomId through the absorbed "Room has RoomId") is in
- * Building and has RoomNumber; the composite key over Building and
- * RoomNumber nests in `host`, and `extra` adds constraints to "Room has
- * RoomId".
- */
-function rooms(host: Host, extra: Constraint[] = []): OrmModel {
-  const key: Constraint = { id: "c-key", type: "external_uniqueness", roleIds: ["r-b", "r-n"] };
-  const nest = (id: Host) => (host === id ? [key] : []);
-  const model = new OrmModel({ name: "Facilities" });
-  model.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
-  model.addObjectType({ id: "ot-rid", name: "RoomId", kind: "value" });
-  model.addObjectType({ id: "ot-b", name: "Building", kind: "entity", referenceMode: "code" });
-  model.addObjectType({ id: "ot-nr", name: "RoomNumber", kind: "value" });
-  model.addFactType({
-    id: "ft-id",
-    name: "Room has RoomId",
-    roles: [
-      { id: "r-room-id", name: "has", playerId: "ot-room" },
-      { id: "r-rid", name: "identifies", playerId: "ot-rid" },
-    ],
-    readings: ["{0} has {1}"],
-    constraints: [
-      { id: "c-pref", type: "internal_uniqueness", roleIds: ["r-rid"], isPreferred: true },
-      ...nest("ft-id"),
-      ...extra,
-    ],
-  });
-  model.addFactType({
-    id: "ft-in",
-    name: "Room is in Building",
-    roles: [
-      { id: "r-room-in", name: "is in", playerId: "ot-room" },
-      { id: "r-b", name: "houses", playerId: "ot-b" },
-    ],
-    readings: ["{0} is in {1}"],
-    constraints: nest("ft-in"),
-  });
-  model.addFactType({
-    id: "ft-nr",
-    name: "Room has RoomNumber",
-    roles: [
-      { id: "r-room-nr", name: "has", playerId: "ot-room" },
-      { id: "r-n", name: "is of", playerId: "ot-nr" },
-    ],
-    readings: ["{0} has {1}"],
-    constraints: nest("ft-nr"),
-  });
-  return model;
-}
+import { rooms } from "../fixtures/rooms.js";
 
 /** The constraint nodes and their edges, which is all a constraint draws. */
 function constraintPart(model: OrmModel, options?: Parameters<typeof modelToGraph>[1]) {
@@ -150,6 +96,12 @@ describe("constraint nodes across fact types", () => {
     expect(ids).toEqual(["c-key", "c-key#2"]);
   });
 
+  it("does not take the id of an internal constraint", () => {
+    const samePref: Constraint = { id: "c-pref", type: "exclusion", roleIds: ["r-b", "r-n"] };
+    const ids = constraintPart(rooms("ft-in", [samePref])).nodes.map((n) => n.id).sort();
+    expect(ids).toEqual(["c-key", "c-pref#2"]);
+  });
+
   it("never issues a node id another node holds, and leaves a unique stated id to its owner", () => {
     // Under "Room has RoomId", walked first: an id equal to a fact type's,
     // a twin of the key, and an exclusive-or whose own unique id is what a
@@ -187,21 +139,5 @@ describe("constraint nodes across fact types", () => {
     }).nodes.map((n) => n.id);
     expect(full).toEqual(["c-key", "c-key#2"]);
     expect(view).toEqual(["c-key#2"]);
-  });
-});
-
-describe("model summary across fact types", () => {
-  it("lists the key under each fact type it spans, whichever fact type nests it", () => {
-    for (const host of ["ft-in", "ft-nr", "ft-id"] as const) {
-      const summary = buildModelSummary(rooms(host));
-      const byFactType = Object.fromEntries(
-        summary.factTypes.map((ft) => [ft.id, ft.constraints.map((c) => c.id)]),
-      );
-      expect(byFactType, host).toEqual({
-        "ft-id": ["c-pref"],
-        "ft-in": ["c-key"],
-        "ft-nr": ["c-key"],
-      });
-    }
   });
 });

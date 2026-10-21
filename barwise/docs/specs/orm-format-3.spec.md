@@ -1155,7 +1155,8 @@ Implementation notes (2026-10-19):
     model, so a constraint has the same node id in every view and whether
     or not a view draws it: a constraint keeps its own id when no other
     constraint and no element of the model holds it, and otherwise (a
-    second constraint's copy, barwise-b2s, or an element's id) gets the
+    second constraint's copy, barwise-b2s, an element's id, or an
+    internal constraint's, though badges have no node id) gets the
     first `#2`, `#3` free of every reserved id, the unique stated ones
     included. An id-less constraint, which construction rules out, is
     numbered. Which of two same-id constraints is suffixed follows file
@@ -1174,7 +1175,9 @@ Implementation notes (2026-10-19):
     ring) read `internalConstraints`.
   - The webview's model summary calls `constraintsTouching` per fact
     type, the core authority, so its tree badge and inspector agree with
-    the sidebar.
+    the sidebar. Its order changes with it: the fact type's own
+    constraints first, then those across fact types, where it was file
+    order under the nesting fact type.
   - A ghost preview that widens a view's filter can now bring in a
     constraint, which renders solid beside its dimmed fact type: ghost
     ids name elements, not constraint nodes (barwise-ejs). Before, every

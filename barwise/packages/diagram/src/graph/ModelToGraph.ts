@@ -83,8 +83,8 @@ export interface ModelToGraphOptions {
  * A constraint keeps its own id when no other constraint and no element of
  * the model (object type, fact type, subtype fact) holds it. Otherwise,
  * for a second constraint with the same id (barwise-b2s) or one colliding
- * with an element, it gets the first `#2`, `#3` free of every id
- * reserved here; which of two same-id constraints is suffixed follows
+ * with an element or an internal constraint, it gets the first `#2`, `#3`
+ * free of every id reserved here; which of two same-id constraints is suffixed follows
  * file order. An id-less constraint, which construction rules out
  * (barwise-nkq) though the type allows it until WS3c, is numbered.
  */
@@ -96,6 +96,11 @@ function constraintNodeIds(
     ...model.objectTypes.map((ot) => ot.id),
     ...model.factTypes.map((ft) => ft.id),
     ...model.subtypeFacts.map((sf) => sf.id),
+    // Drawn as badges, not nodes, but an id still names one constraint:
+    // a selection or diff resolving it must not find two.
+    ...model.factTypes.flatMap((ft) =>
+      ft.internalConstraints.flatMap((c) => (c.id === undefined ? [] : [c.id]))
+    ),
   ]);
   const uses = new Map<string, number>();
   for (const c of constraints) {
