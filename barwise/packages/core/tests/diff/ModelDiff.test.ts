@@ -693,6 +693,34 @@ describe("diffModels", () => {
     ]);
   });
 
+  it("reports no preferred identifier change when the uniqueness lists its roles in another order", () => {
+    const build = (roleIds: string[]) => {
+      const model = new OrmModel({ name: "Test" });
+      model.addObjectType({ id: "s", name: "Student", kind: "entity", referenceMode: "nr" });
+      model.addObjectType({ id: "c", name: "Course", kind: "entity", referenceMode: "code" });
+      model.addObjectType({ id: "e", name: "Enrollment", kind: "entity", referenceMode: "id" });
+      model.addFactType({
+        id: "ft",
+        name: "Student takes Course",
+        roles: [{ id: "r-s", name: "takes", playerId: "s" }, {
+          id: "r-c",
+          name: "is taken by",
+          playerId: "c",
+        }],
+        readings: ["{0} takes {1}"],
+        constraints: [{ id: "u", type: "internal_uniqueness", roleIds }],
+      });
+      model.addObjectifiedFactType({ factTypeId: "ft", objectTypeId: "e" });
+      model.setPreferredIdentifier("e", "u");
+      return model;
+    };
+    const result = diffModels(build(["r-s", "r-c"]), build(["r-c", "r-s"]));
+    const enrollment = result.deltas.find((d) =>
+      d.elementType === "object_type" && d.name === "Enrollment"
+    );
+    expect(enrollment?.kind).toBe("unchanged");
+  });
+
   it("reports no preferred identifier change when only a role of the identifying fact type is renamed", () => {
     const build = (roleName: string) => {
       const model = new OrmModel({ name: "Test" });

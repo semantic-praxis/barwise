@@ -425,9 +425,8 @@ export function parseConstraints(
  * Check whether a structurally identical constraint already exists: on the
  * fact type for one of its own, anywhere in the model for one across fact
  * types (orm-format-3, Open decision 9), whichever fact type holds it.
- * Two internal_uniqueness constraints are duplicates if they cover the same set
- * of role IDs. A uniqueness is checked by `heldUniqueness` instead, so a
- * flagged duplicate can flag the one already present.
+ * A uniqueness is not checked here but by `heldUniqueness`, so a flagged
+ * duplicate can flag the one already present.
  */
 function isDuplicateConstraint(
   model: OrmModel,
@@ -437,11 +436,6 @@ function isDuplicateConstraint(
   const held: readonly Constraint[] = isExternalConstraint(candidate)
     ? model.constraints
     : ft.internalConstraints;
-  // One rule for a held uniqueness: the uniqueness pass asks `heldUniqueness`
-  // which constraint a duplicate's flag lands on.
-  if (candidate.type === "internal_uniqueness") {
-    return heldUniqueness(ft, candidate.roleIds) !== undefined;
-  }
   if (candidate.type === "mandatory") {
     return held.some(
       (existing) =>

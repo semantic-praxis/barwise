@@ -59,8 +59,8 @@ export function diffObjectType(
   // Compared by what the identifier is, not by its constraint's id: two
   // models built apart (an import, independent LLM samples) give the same
   // uniqueness different ids.
-  const fromId = preferredIdentifierLabel(existingModel, a.id);
-  const toId = preferredIdentifierLabel(incomingModel, b.id);
+  const fromId = preferredIdentifierLabel(existingModel, a.id, incomingModel);
+  const toId = preferredIdentifierLabel(incomingModel, b.id, existingModel);
   if (fromId !== toId) {
     changes.push({ change: "preferredIdentifier", from: fromId, to: toId });
   }
@@ -860,19 +860,26 @@ export function diffDefinition(a: Definition, b: Definition): ChangeDescription[
  * An entity's preferred identifier, named by content: the identifying
  * fact type and the roles its uniqueness covers, or the stored id when the
  * reference identifies nothing (validation reports that). A role is named
- * by its position and its player, the way `diffFactType` pairs roles, not
- * by its role name: renaming a role leaves the identifier what it was.
+ * by its position and its player (`playerName`, so a lenient fragment
+ * names a player it takes from the other side), in position order: renaming
+ * a role, or listing the uniqueness's roles in another order, leaves the
+ * identifier what it was.
  */
-function preferredIdentifierLabel(model: OrmModel, entityId: string): string | undefined {
+function preferredIdentifierLabel(
+  model: OrmModel,
+  entityId: string,
+  other: OrmModel,
+): string | undefined {
   const resolved = resolvePreferredIdentifier(model, entityId);
   if (resolved.ok) {
     const { factType, constraint } = resolved.at;
-    const roles = constraint.roleIds.map((id) => {
-      const at = factType.roles.findIndex((r) => r.id === id);
-      const player = model.getObjectType(factType.roles[at]?.playerId ?? "")?.name ?? id;
-      return `role ${at + 1}: ${player}`;
-    });
-    return `"${factType.name}" (${roles.join(", ")})`;
+    const roles = factType.roles.flatMap((r, at) =>
+      constraint.roleIds.includes(r.id)
+        ? [`role ${at + 1}: ${playerName(model, r.playerId, other)}`]
+        : []
+    );
+    const stray = constraint.roleIds.filter((id) => !factType.hasRole(id));
+    return `"${factType.name}" (${[...roles, ...stray].join(", ")})`;
   }
   const stored = model.preferredIdentifierOf(entityId);
   return stored === undefined ? undefined : `constraint "${stored}"`;

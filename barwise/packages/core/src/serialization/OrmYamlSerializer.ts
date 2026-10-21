@@ -187,7 +187,7 @@ export class OrmYamlSerializer {
         versionErrorMessage(version, { ok: false, reason: "unknown" }),
       );
     }
-    const plan = planMigration(version);
+    const plan = planMigration(version, LEGACY_ORM_VERSION);
     if (!plan.ok) {
       throw new DeserializationError(versionErrorMessage(version, plan));
     }

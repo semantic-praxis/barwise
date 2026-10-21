@@ -11,7 +11,7 @@ import {
   type OrmModel,
   type RoleConfig,
 } from "@barwise/core";
-import type { NormaConstraint, NormaFactType } from "../NormaXmlTypes.js";
+import type { NormaConstraint, NormaDocument, NormaFactType } from "../NormaXmlTypes.js";
 import {
   type ConstraintIdAllocator,
   type NormaMappingContext,
@@ -162,6 +162,20 @@ function roleCardinalityConstraints(
   return constraints;
 }
 
+const namedByDoc = new WeakMap<NormaDocument, ReadonlySet<string>>();
+
+/** Every constraint id an entity's PreferredIdentifier names, once per document. */
+function namedIdentifiers(doc: NormaDocument): ReadonlySet<string> {
+  let named = namedByDoc.get(doc);
+  if (!named) {
+    named = new Set(
+      [...doc.entityTypes, ...doc.objectifiedTypes].flatMap((et) => et.preferredIdentifier ?? []),
+    );
+    namedByDoc.set(doc, named);
+  }
+  return named;
+}
+
 /**
  * Resolve NORMA constraints that belong to a specific fact type
  * by matching the fact type's internalConstraintRefs against the
@@ -178,12 +192,14 @@ function resolveConstraintsForFactType(
   const { constraintById, constraintIds: ids, xorPairs } = ctx;
   const constraints: Constraint[] = [];
   const internalRefs = new Set(nft.internalConstraintRefs);
-  // NORMA's IsPreferred no longer rides on the mapped constraint, but it
-  // still tells two uniquenesses over the same roles apart, as it did when
-  // it did: the preferred one may be the one an entity's
-  // PreferredIdentifier names, so neither may stand in for the other.
+  // A uniqueness an entity's PreferredIdentifier names, or that NORMA marks
+  // IsPreferred, is never read as a duplicate of one that is neither: the
+  // identifier must keep the constraint it names. IsPreferred rode on the
+  // mapped constraint until format 3.0, which is what kept them apart then.
+  const named = namedIdentifiers(ctx.doc);
   const preferred = new Set<Constraint>();
-  const isPreferred = (nc: NormaConstraint) => nc.type === "uniqueness" && nc.isPreferred;
+  const isPreferred = (nc: NormaConstraint) =>
+    named.has(nc.id) || (nc.type === "uniqueness" && nc.isPreferred);
 
   for (const ref of internalRefs) {
     const nc = constraintById.get(ref);

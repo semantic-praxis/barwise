@@ -537,15 +537,13 @@ function sameUniquenessIn(
   if (!c || !isInternalUniqueness(c)) return undefined;
   const roles = c.roleIds.map((r) => (roleMap.has(r) ? roleMap.get(r)! : r));
   if (roles.some((r) => r === null)) return undefined;
-  const wanted = new Set(roles);
+  // Compared as sorted lists, so a role repeated on one side is not read
+  // as the same uniqueness.
+  const key = (ids: readonly (string | null)[]) => [...ids].sort().join("\u0000");
+  const wanted = key(roles);
   for (const ft of merged.factTypes) {
     for (const u of ft.internalConstraints) {
-      if (
-        isInternalUniqueness(u) && u.roleIds.length === wanted.size
-        && u.roleIds.every((r) => wanted.has(r))
-      ) {
-        return u.id;
-      }
+      if (isInternalUniqueness(u) && key(u.roleIds) === wanted) return u.id;
     }
   }
   return undefined;

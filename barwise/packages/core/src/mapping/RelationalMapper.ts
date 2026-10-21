@@ -27,9 +27,9 @@
 import type { FactType } from "../model/FactType.js";
 import {
   identificationOrder,
+  type PreferredIdentifiers,
   preferredIdentifiers,
   preferredIdentifyingBinary,
-  resolvePreferredIdentifier,
 } from "../model/identification.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import {
@@ -162,7 +162,7 @@ export class RelationalMapper {
     for (const entityId of order) {
       const oft = objectifiedByType.get(entityId);
       if (settleable && this.absorbsAKey(oft, model)) {
-        this.settleObjectifiedKey(oft!, model, settling);
+        this.settleObjectifiedKey(oft!, model, settling, identifiers);
         // An entity that both objectifies a fact type and is an
         // identified subtype declares its identity twice. Objectification
         // wins, being the more specific statement, and the subtype fact
@@ -194,9 +194,9 @@ export class RelationalMapper {
       if (ft.arity === 1) {
         this.mapUnaryFactType(ft, model, entityTables);
       } else if (ft.arity === 2) {
-        this.mapBinaryFactType(ft, model, entityTables, associativeTables);
+        this.mapBinaryFactType(ft, model, entityTables, associativeTables, identifiers);
       } else {
-        this.mapNaryFactType(ft, model, entityTables, associativeTables);
+        this.mapNaryFactType(ft, model, entityTables, associativeTables, identifiers);
       }
     }
 
@@ -256,6 +256,7 @@ export class RelationalMapper {
     model: OrmModel,
     entityTables: Map<string, MutableTable>,
     associativeTables: MutableTable[],
+    identifiers: PreferredIdentifiers,
   ): void {
     const role1 = ft.roles[0]!;
     const role2 = ft.roles[1]!;
@@ -321,11 +322,11 @@ export class RelationalMapper {
         );
       } else {
         // Neither or both mandatory: separate associative table.
-        this.createAssociativeTable(ft, model, entityTables, associativeTables);
+        this.createAssociativeTable(ft, model, entityTables, associativeTables, identifiers);
       }
     } else {
       // No uniqueness (spanning or none): associative table.
-      this.createAssociativeTable(ft, model, entityTables, associativeTables);
+      this.createAssociativeTable(ft, model, entityTables, associativeTables, identifiers);
     }
   }
 
@@ -337,8 +338,9 @@ export class RelationalMapper {
     model: OrmModel,
     entityTables: Map<string, MutableTable>,
     associativeTables: MutableTable[],
+    identifiers: PreferredIdentifiers,
   ): void {
-    this.createAssociativeTable(ft, model, entityTables, associativeTables);
+    this.createAssociativeTable(ft, model, entityTables, associativeTables, identifiers);
   }
 
   /**
@@ -521,6 +523,7 @@ export class RelationalMapper {
     model: OrmModel,
     entityTables: Map<string, MutableTable>,
     associativeTables: MutableTable[],
+    identifiers: PreferredIdentifiers,
   ): void {
     const columns: Column[] = [];
     const foreignKeys: ForeignKey[] = [];
@@ -534,7 +537,7 @@ export class RelationalMapper {
       // uniqueness constraint (PR #580 review).
       primaryKey: {
         columnNames: ft.arity > 2
-          ? associativeKey(ft, model, roleColumns, columns)
+          ? associativeKey(ft, identifiers, roleColumns, columns)
           : columns.map((c) => c.name),
       },
       foreignKeys,
@@ -648,6 +651,7 @@ export class RelationalMapper {
     oft: ObjectifiedFactType,
     model: OrmModel,
     tables: Map<string, SettlingTable>,
+    identifiers: PreferredIdentifiers,
   ): void {
     const entityTable = tables.get(oft.objectTypeId);
     const factType = model.getFactType(oft.factTypeId);
@@ -670,7 +674,7 @@ export class RelationalMapper {
       entityTable.primaryKey = {
         columnNames: associativeKey(
           factType,
-          model,
+          identifiers,
           roleColumns,
           entityTable.columns.filter((c) => absorbed.includes(c.name)),
         ),
@@ -811,21 +815,12 @@ function pushColumn(columns: Column[], column: Column, alternative?: string): st
  */
 function associativeKey(
   ft: FactType,
-  model: OrmModel,
+  { byConstraint }: PreferredIdentifiers,
   roleColumns: ReadonlyMap<string, readonly string[]>,
   columns: readonly Column[],
 ): string[] {
   const uniqueness = ft.internalConstraints.filter((c) => c.type === "internal_uniqueness");
-  // Only the references naming one of this fact type's uniquenesses are
-  // resolved: `preferredIdentifiers(model)` resolves every entity's, and
-  // this runs once per associative or absorbed fact type.
-  const ids = new Set(uniqueness.map((c) => c.id));
-  const identifying = new Set(
-    model.preferredIdentifierRefs
-      .filter(([entityId, id]) => ids.has(id) && resolvePreferredIdentifier(model, entityId).ok)
-      .map(([, id]) => id),
-  );
-  const chosen = uniqueness.find((c) => c.id !== undefined && identifying.has(c.id))
+  const chosen = uniqueness.find((c) => c.id !== undefined && byConstraint.has(c.id))
     ?? uniqueness[0];
   if (!chosen) return columns.map((c) => c.name);
   return chosen.roleIds.flatMap((id) => roleColumns.get(id) ?? []);
