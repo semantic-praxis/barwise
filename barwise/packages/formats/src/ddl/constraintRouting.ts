@@ -96,22 +96,30 @@ export function routeConstraints(
   // A constraint across fact types is placed by the fact types it spans,
   // never by the one a 2.0 file nests it under (orm-format-3, Open
   // decision 9): its spill goes to the table of the first of them, in
-  // model order, that has one.
+  // model order, that has one -- except an external uniqueness with a
+  // column, noted beside that column as it always was.
   const routeAcross = (inView: ConstraintInView): void => {
     const [c] = inView;
     if (c.type === "external_uniqueness") {
       const cols = c.roleIds.map((r) => columnForJoinedRole(r, model, schema));
       const resolved = cols.filter((r) => r !== undefined);
-      const tables = new Set(resolved.map((r) => r.table));
-      if (tables.size > 1) {
-        spill(inView, "the roles map to more than one table", nearestTable(inView));
-      } else if (resolved.length === 0) {
+      if (resolved.length === 0) {
         spill(inView, "the roles map to no column", nearestTable(inView));
-      } else if (resolved.length < cols.length) {
-        spill(inView, "a role maps to no column", nearestTable(inView));
+        return;
+      }
+      // A key that is not one clause is noted beside the columns it has.
+      const table = resolved[0]!.table;
+      const problems = [
+        ...(new Set(resolved.map((r) => r.table)).size > 1
+          ? ["the roles map to more than one table"]
+          : []),
+        ...(resolved.length < cols.length ? ["a role maps to no column"] : []),
+      ];
+      if (problems.length > 0) {
+        spill(inView, problems.join(", and "), table);
       } else {
         const columnList = resolved.map((r) => r.column).join(", ");
-        route("unique", `UNIQUE (${columnList})`, resolved[0]!.table, inView);
+        route("unique", `UNIQUE (${columnList})`, table, inView);
       }
       return;
     }

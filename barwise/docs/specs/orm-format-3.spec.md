@@ -1199,11 +1199,12 @@ Implementation notes (2026-10-19):
     spill order change with the walk: a table's clauses from constraints
     across fact types now follow those from fact types' own. One whose
     roles resolve to nothing spills with no table, where it took its
-    host's. An external uniqueness that cannot be one UNIQUE clause spills to
-    that same nearest table, where it went to its first role's: "the
-    roles map to more than one table" when its columns do, else "the
-    roles map to no column" or "a role maps to no column", where both of
-    those used to read "more than one table".
+    host's. An external uniqueness that cannot be one UNIQUE clause still spills
+    beside its first resolved column; one with no column at all spills
+    "the roles map to no column" to the nearest table. A key missing a
+    column says "a role maps to no column" (with "more than one table"
+    too when its columns span tables), where it used to read only "more
+    than one table".
   - The NORMA writer writes each fact type's own constraints from
     `internalConstraints`, and those across fact types once each from
     `model.constraints`, after every fact type's. The serializer groups
