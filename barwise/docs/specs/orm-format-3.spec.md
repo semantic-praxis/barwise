@@ -1446,7 +1446,8 @@ decision 8; its own PR). Closes barwise-971.
   of the nine readers' outputs: `barwise validate`, the relational
   mapping, query anchors, the population renderer, the annotator's
   comments, diagram and NORMA diagram shapes, NORMA export (including the
-  synthesized expansions `findIdentifyingSeat` builds) and `ModelContext`'s
+  synthesized expansions `findIdentifyingSeat` builds and the
+  `IsPreferred` attributes), the VS Code badge, and `ModelContext`'s
   prompt text. Every change is listed in the PR, because converging nine
   rules changes some of them by design. How a model loads and saves does
   not change.
