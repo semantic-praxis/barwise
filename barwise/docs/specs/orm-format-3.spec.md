@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decision 10 open), not implemented; WS5 not started; open decisions 1 to 9
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), not implemented; WS5 not started; open decisions 1 to 9
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1377,8 +1377,9 @@ Implementation notes (2026-10-21, WS3c-iii):
 and 4b changes what is stored and the file format** (Open decision 10).
 The draft kept WS4 in one PR so that no build between PRs could save a 2.0
 file that loses what memory holds. 4a stores nothing new: it computes
-today's answer from today's flags, so a 2.0 file round-trips exactly as
-it does now. Everything that changes storage stays in 4b, as drafted.
+today's answer from today's flags, so a 2.0 file loads and saves exactly as it does now; what
+changes is what the nine readers answer, and so what their outputs say.
+Everything that changes storage stays in 4b, as drafted.
 
 Grounding first tried a different split, with the reference and the
 subtype constraints stored in memory ahead of the format and written back
@@ -1402,11 +1403,14 @@ because it compares models after the first load.
 **4a. One answer to "which constraint identifies this entity"** (Open
 decision 8; its own PR). Closes barwise-971.
 
-- A function in `model/identification.ts` applies decision 8's rule to
-  today's flags and returns the identifying uniqueness for an entity, or
-  none. Every reader that asks which constraint identifies an entity reads
-  it. Grounding found nine such readers, not the five barwise-971 lists,
-  each with its own rule:
+- `model/identification.ts` gains one model-wide answer: decision 8's
+  rule applied once to today's flags, giving a map from each entity to its
+  identifying uniqueness and the inverse, from a uniqueness to the entity
+  it identifies. Readers that ask per fact type or per constraint use the
+  inverse rather than calling a per-entity function in a loop, which would
+  make each of them quadratic. Every reader that asks which constraint
+  identifies an entity reads it. Grounding found nine such readers, not
+  the five barwise-971 lists, each with its own rule:
   - the query anchors (`query/evaluate.ts`);
   - the population renderer (`export/populationRenderer.ts`);
   - the annotator (`annotation/OrmYamlAnnotator.ts`);
@@ -1421,19 +1425,31 @@ decision 8; its own PR). Closes barwise-971.
   role. The extraction prompt, and `Constraint.ts`'s own doc comment, flag
   the entity's role. A query anchor therefore finds no identifier on an
   imported model, and NORMA export finds none on an extracted one.
-- Readers that ask about a constraint rather than an entity keep reading
-  the flag in 4a: `RelationalMapper.associativeKey`, diff's constraint
-  key, the VS Code badge and NORMA export's `writeConstraint` (NORMA's
-  per-uniqueness `IsPreferred`). 4b moves them.
-- The llm parser's duplicate check drops a preferred duplicate of an
-  unflagged uniqueness together with its flag, although its comment says
-  it promotes it. 4a makes it promote, or the entity loses its
-  identifier.
-- **Acceptance:** before and after, run `barwise validate` and the
-  relational mapping over every tracked model. Every change in a
-  diagnostic, a table's key or a query's anchor is listed in the PR,
-  because converging nine rules changes some of them by design. No
-  serialized file changes.
+- `completeness/multiple-preferred-identifiers` keeps counting every flag.
+  Decision 8's rule resolves two flagged identifiers to one, so a check
+  that read only the resolved answer could never fire, and the release
+  notes' advice to validate with a 2.x build before upgrading would find
+  nothing. `identificationSources` therefore lists every flag, as today,
+  and only the readers that need one answer use the resolved map.
+- Two readers describe a constraint as an identifier and move with the
+  entity side, or the outputs contradict themselves: NORMA export's
+  `writeConstraint` writes `IsPreferred` from the inverse map, so it marks
+  the uniqueness `PreferredIdentifier` names, and the VS Code badge marks
+  the same one. `RelationalMapper.associativeKey` and diff's constraint
+  key describe the stored flag and keep reading it until 4b.
+- Decision 8 says no table's key moves, but its "first in document order"
+  tie-break can move one: an objectified type with a flagged spanning
+  uniqueness that also has its own flagged reference binary is named by
+  both flags, and when the fact type comes first the mapper loses the
+  reference binary it keys on today. Open decision 11 settles which wins.
+- **Acceptance:** before and after, over every tracked model, capture each
+  of the nine readers' outputs: `barwise validate`, the relational
+  mapping, query anchors, the population renderer, the annotator's
+  comments, diagram and NORMA diagram shapes, NORMA export (including the
+  synthesized expansions `findIdentifyingSeat` builds) and `ModelContext`'s
+  prompt text. Every change is listed in the PR, because converging nine
+  rules changes some of them by design. How a model loads and saves does
+  not change.
 
 **4b. The 3.0 format, with what only it can store** (one PR, in commits
 that each keep the suite green). Closes barwise-loo and barwise-alg.
@@ -1446,8 +1462,13 @@ that each keep the suite green). Closes barwise-loo and barwise-alg.
     today, an external uniqueness included) and the llm parser, which
     translates the extraction's `is_preferred` with decision 8's rule, as
     Scope says.
-  - The four constraint-side readers above read whether a constraint is
-    some entity's reference. Diff drops the flag from its constraint key
+  - The llm parser's duplicate check drops a preferred duplicate of an
+    unflagged uniqueness together with its flag, although its comment
+    says it promotes it. With the reference stored on the entity, the
+    parser sets the reference to the existing uniqueness instead, so
+    the entity keeps its identifier and no constraint has to be replaced.
+  - `associativeKey` and diff's constraint key read whether a constraint
+    is some entity's reference. Diff drops the flag from its constraint key
     and reports a changed identifier once, as a change to the entity,
     rated breaking where the key moves.
   - `ModelMerge` remaps the reference with the constraint ids, and leaves
@@ -1467,8 +1488,19 @@ that each keep the suite green). Closes barwise-loo and barwise-alg.
     error. So `roleIdsOf` stays for role operands, a sibling returns the
     subtype facts, and each caller decides which it needs.
   - `SubtypeFact.isExclusive` and `isExhaustive` are removed. Their
-    readers move to the constraints: diff, NORMA import and export, the
-    DDL annotation (both directions) and the VS Code tree.
+    readers move to the constraints: diff, with its `subtypeExclusive` and
+    `subtypeExhaustive` change kinds and their breaking levels; NORMA
+    export; the DDL annotation writer; the VS Code tree; and
+    `toSubtypeFactConfig`, which `ModelMerge` copies subtype facts with.
+    Their writers create constraints instead: the DDL importer, NORMA
+    import (`mapping/subtypes.ts`) and the llm parser
+    (`parse/subtypes.ts`).
+  - `OrmModel`'s removals cascade: `removeSubtypeFact` drops a subtype
+    constraint whose operand it was, as `removeFactType` drops a
+    constraint every role of which was in it, and `removeFactType` and
+    `removeObjectType` clear an entity's `preferredIdentifierId` when its
+    constraint goes. Without that, an MCP or VS Code edit leaves a model
+    that fails to load after its next save.
   - The corpus has 14 flagged groups, none mixed: six become an
     `exclusive_or` and eight an `exclusion` (counted by supertype over
     every tracked file).
@@ -1477,8 +1509,8 @@ that each keep the suite green). Closes barwise-loo and barwise-alg.
     is at most one of: Male, Female") and the counts step 3 gives
     validation: one subtype fact or more in `disjunctive_mandatory`, two
     or more in `exclusion` and `exclusive_or`.
-  - Tests pin that verbalization, validation, diff, merge and split each
-    see a subtype constraint.
+  - Tests pin that verbalization, validation, diff, merge, split and the
+    removals above each see a subtype constraint.
 - **The schema**: `orm_version` const `"3.0"`, constraint ids required, an
   internal `oneOf` under fact types and an external one in a new
   `model.constraints`, the `subtype_facts` operand, `preferred_identifier`
@@ -1504,6 +1536,11 @@ that each keep the suite green). Closes barwise-loo and barwise-alg.
     fact-type loop gives today. A `preferred_identifier` naming a dropped
     constraint is dropped with a warning too.
   - The annotator's section reset list learns `constraints`.
+  - Scripts that read the flags on raw YAML: `trial/lib/model.mjs` and
+    `trial/lib/generators/norma.mjs` pick keys by `is_preferred`, and
+    `scripts/measure-comparison.mjs` builds 2.0 documents with
+    `is_exclusive`. Nothing compiles them against the schema, so each is
+    moved to 3.0 here, before WS5 rewrites the corpus they read.
   - `hashModel` hashes the serialized model, so it changes for every file
     once, at load. Lineage manifests recorded before 3.0 read stale until
     re-exported, and the release notes say so.
@@ -1537,7 +1574,7 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 - **Verbalization output** moves external constraints into their own section;
   golden files change in WS3.
 
-## Open decisions (1 to 9 resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18; 10 open)
+## Open decisions (1 to 9 resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18; 10 and 11 open)
 
 1. **ADR 0003 amends ADR 0001's "inline and local" -- resolved 2026-10-17 by the owner: yes,
    as recommended.** Recommend: yes, as
@@ -1704,6 +1741,19 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
     - **(c)** Considered and rejected at grounding: storing the reference
       and the subtype constraints in memory ahead of the format, written
       back to 2.0 flags. It loses content both ways (WS4).
+
+11. **Which identifier wins when two flags name one entity -- open;
+    recommended: the reference binary.** Raised by WS4's grounding
+    (2026-10-21). Decision 8 resolves two flagged identifiers for one
+    entity by document order, and also promises that no table's key
+    moves. The two disagree for an objectified type that has its own
+    flagged reference binary, when the objectified fact type comes first.
+    - **(a)** Recommended. A flagged entity-value binary outranks a
+      flagged spanning uniqueness, then document order breaks the rest.
+      No key moves, as decision 8 intends, and an objectified type with
+      a reference scheme keeps it.
+    - **(b)** Document order alone, as decision 8 reads literally. Simple
+      to state, and the acceptance list in 4a shows each key that moves.
 
 ## Risks and testing
 
