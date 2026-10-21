@@ -601,6 +601,12 @@
       "caught_by": "reasoning",
       "note": "Grounding the reader sites showed one PR would touch 43 source files, tens of test files and every host-naming output; the split keeps the compile-time check in 3c."
     },
+    "orm-format-3::d1002d78ea4d": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- 3c lands as two prs. the same probe, run with each package's tests included, found 273 test reads of the getter in 45 files (core 88 in 21, formats 148 in 14,",
+      "caught_by": "execution",
+      "note": "The draft relied on removing the getter to make the compiler name every reader; tsconfig excludes tests, and a probe that renamed the getter and type-checked with tests included found 273 test reads in 45 files, so 3c split into a test-reader PR and the storage move."
+    },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",
       "excerpt": "- production extraction derives a budget too. processtranscript had the same exposure -- a user importing a long transcript got a silently truncated model with ",

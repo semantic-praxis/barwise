@@ -726,6 +726,7 @@ model:
       expect(ft.internalConstraints).toHaveLength(2);
       expect(ft.internalConstraints[0]!.type).toBe("internal_uniqueness");
       expect(ft.internalConstraints[1]!.type).toBe("mandatory");
+      expect(model.constraints).toEqual([]);
     });
 
     it("deserializes external_uniqueness constraints", () => {
@@ -976,9 +977,6 @@ model:
           expect(rest!.internalConstraints[j]).toEqual(orig.internalConstraints[j]);
         }
       }
-
-      // Constraints across fact types, which no fact type above compares.
-      expect(restored.constraints).toEqual(original.constraints);
 
       // Definitions
       expect(restored.definitions).toHaveLength(

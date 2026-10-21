@@ -44,7 +44,10 @@ function composite(model: OrmModel) {
     })),
     externalUniques: sorted(
       model.constraints.filter((c) =>
-        c.type === "external_uniqueness" && c.roleIds.some((id) => playerOf.has(id))
+        c.type === "external_uniqueness"
+        // Over a composite fact type, or over roles that resolve nowhere,
+        // which shows as "?" rather than dropping out of the comparison.
+        && (c.roleIds.some((id) => playerOf.has(id)) || model.constraintsTouchingNone().includes(c))
       )
         .map((c) => c.roleIds.map((id) => playerOf.get(id) ?? "?").sort()),
     ),

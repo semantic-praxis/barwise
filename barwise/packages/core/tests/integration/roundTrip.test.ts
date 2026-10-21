@@ -73,9 +73,6 @@ describe("Round-trip serialization integration", () => {
       serializer.serialize(original),
     );
 
-    // Constraints across fact types, which no fact type below compares.
-    expect(roundTripped.constraints).toEqual(original.constraints);
-
     for (const origFt of original.factTypes) {
       const rtFt = roundTripped.getFactType(origFt.id);
       expect(rtFt).toBeDefined();
@@ -167,6 +164,11 @@ describe("Round-trip serialization integration", () => {
 
     expect(roundTripped.objectTypes).toHaveLength(model.objectTypes.length);
     expect(roundTripped.factTypes).toHaveLength(model.factTypes.length);
+
+    // The constraints across fact types (the exclusive-or and the subset
+    // among them) survive whole; no fact type's own list holds them.
+    expect(model.constraints.length).toBeGreaterThan(0);
+    expect(roundTripped.constraints).toEqual(model.constraints);
 
     // Verify the ring constraints survived.
     const rtParent = roundTripped.getFactTypeByName(

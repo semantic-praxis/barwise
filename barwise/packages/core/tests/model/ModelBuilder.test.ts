@@ -101,6 +101,7 @@ describe("ModelBuilder", () => {
 
     // Verify constraints on Customer places Order.
     expect(placesOrder!.internalConstraints).toHaveLength(2);
+    expect(model.constraints).toEqual([]);
     const uniquenessConstraint = placesOrder!.internalConstraints.find(
       isInternalUniqueness,
     );

@@ -1249,9 +1249,9 @@ Implementation notes (2026-10-21, WS3c):
 - **3c lands as two PRs.** The same probe, run with each
   package's tests included, found 273 test reads of the getter in 45
   files (core 88 in 21, formats 148 in 14, llm 21 in 3, dbt 12 in 5,
-  cli 4 in 2), beside 9 source reads in 5 core files. The plan that
-  removing the getter makes the compiler name every reader holds for
-  source only: the packages' `tsconfig` files exclude `tests/` and
+  cli 4 in 2), beside 9 source reads in 5 core files. The draft said
+  removing the getter makes the compiler name every reader; that holds
+  for source only: the packages' `tsconfig` files exclude `tests/` and
   vitest strips types, so a test read would surface as a runtime
   failure at best. **3c-i** moves the test readers to the APIs that
   survive the move (`internalConstraints`, `model.constraints`,
