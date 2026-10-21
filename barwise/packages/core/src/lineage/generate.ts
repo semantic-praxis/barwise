@@ -3,7 +3,7 @@
  */
 
 import type { RelationalSchema } from "../mapping/RelationalSchema.js";
-import type { Constraint } from "../model/Constraint.js";
+import { type Constraint, subtypeFactIdsOf } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
@@ -230,6 +230,24 @@ export function generateModelLineage(
         elementId: sf.id,
         elementType: "SubtypeFact",
         elementName: subtypeFactName(model, sf),
+      });
+    }
+
+    // The constraints over those subtype facts (orm-format-3 WS4b): the
+    // NORMA writer and the DDL annotation emit them, so impact on one must
+    // find this artifact too.
+    for (const c of model.constraints) {
+      const facts = subtypeFactIdsOf(c).flatMap((id) => model.getSubtypeFact(id) ?? []);
+      if (
+        !c.id || !facts.some((sf) => sf.subtypeId === entity.id || sf.supertypeId === entity.id)
+      ) {
+        continue;
+      }
+      const supertype = model.getObjectType(facts[0]!.supertypeId)?.name ?? facts[0]!.supertypeId;
+      sources.push({
+        elementId: c.id,
+        elementType: "Constraint",
+        elementName: getConstraintName(c, [{ name: `subtypes of ${supertype}` }]),
       });
     }
 

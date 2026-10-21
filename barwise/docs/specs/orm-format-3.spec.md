@@ -1649,14 +1649,31 @@ Implementation notes (2026-10-21, WS4b-i, subtype constraints in memory):
   lossy only where 2.0 cannot hold a constraint: two of one kind over one
   supertype merge, and an exclusion over a single subtype fact, which
   validation reports, is dropped on reload.
-- **`removeSubtypeFact` narrows rather than mirroring `removeFactType`.**
-  The draft said it should drop a constraint "whose operand it was", as
-  `removeFactType` drops one every role of which was in it. It removes the
-  subtype fact's id from every constraint naming it instead, and drops a
-  constraint left naming none. An exclusive-or over Male and Female with
-  Male removed is a rule about Female alone, which validation reports as
-  too few subtypes, and a model holding it still loads; a dangling id
-  would not.
+- **`removeSubtypeFact` keeps what still holds, rather than mirroring
+  `removeFactType`.** The draft said it should drop a constraint "whose
+  operand it was", as `removeFactType` drops one every role of which was
+  in it, leaving a constraint that names others dangling. A dangling
+  subtype fact id would make a model fail to load after its next save, so
+  the removed id leaves every constraint naming it, and each keeps only
+  what is still true without it: an exclusion narrows; an exclusive-or
+  keeps its exclusion half over the rest; a disjunctive mandatory goes,
+  because "each Person is at least one of Male, Female" without Male is
+  not "each Person is a Female". An exclusion left over one subtype goes
+  too. A first version narrowed every kind, which made a disjunctive
+  mandatory or exclusive-or stronger than the modeller stated; code review
+  caught it.
+- **NORMA export writes a partition over the subtypes it names.** The
+  flag-based writer wrote the exclusion and mandatory over every subtype
+  meta-role of a supertype whenever any of them was flagged, so a
+  supertype with an unflagged subtype gained a rule nobody stated. It now
+  writes each constraint over its own subtype facts, keeping the old ids.
+  No tracked model has a partial group, so no export moves. A group of one
+  is still not written, which the one-to-one mapping in a later PR settles.
+- **The 2.0 writer is lossy beyond the draft's two cases**, for models
+  built in code or by a merge mixing two sides: modality, a stated id, and
+  an exclusive-or beside a disjunctive mandatory over other subtypes,
+  which reloads weaker. `subtypeFlagsFromConstraints` lists every case;
+  the 3.0 serializer ends them.
 - **Validation** adds three rules: too few subtypes (one for a
   disjunctive mandatory, two for the other kinds), subtype facts of more
   than one supertype, and a subtype fact id the model does not have. The
@@ -1667,11 +1684,13 @@ Implementation notes (2026-10-21, WS4b-i, subtype constraints in memory):
   change is a constraint delta now. Merge adds subtype constraints after
   subtype facts, mapping each id to the merged subtype fact with the same
   subtype and supertype, and drops one whose subtype facts were not
-  accepted. `constraintsTouchingNone` leaves them out, so the VS Code tree
-  does not list them as unattached; its subtype rows still say
+  accepted. `constraintsTouchingNone` leaves them out unless none of their
+  subtype facts resolve, so the VS Code tree lists only a dangling one as
+  unattached; its subtype rows still say
   "exclusive" and "exhaustive", read from the constraints. DDL routing
   leaves them to the annotation, as it left the flags. The diagram does
-  not draw them, as it never drew the flags (barwise-yeq).
+  not draw them, as it never drew the flags (barwise-yeq). Lineage lists
+  each as a source of its supertype and the subtypes it names.
 - **The llm parser writes no flags.** The draft listed
   `llm/src/parse/subtypes.ts` among the flags' writers; it never set them.
   Its constraint dedupe now compares subtype operands as well as roles.

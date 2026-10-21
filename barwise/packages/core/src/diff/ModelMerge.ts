@@ -244,25 +244,28 @@ export function mergeModels(
     const lost = roleIdsOf(remapped).some((id) => !mergedRoles.has(id) && sourceRoles.has(id));
     return lost ? undefined : remapped;
   };
-  // Each subtype fact maps to the merged one with the same two ends. One the
-  // merge left out (a rejected addition, an accepted removal) takes the
-  // constraint with it, as a role does above; one neither model held is
-  // carried through for validation to report.
+  // Each subtype fact maps to the merged one with the same two ends, read in
+  // the constraint's own model first and then the other, as a role's
+  // source spans both. One the merge left out (a rejected addition, an
+  // accepted removal) takes the constraint with it, as a role does above;
+  // one neither model held is carried through for validation to report.
   const overMergedSubtypeFacts = (
     chosen: ExternalConstraint,
     fromIncoming: boolean,
   ): ExternalConstraint | undefined => {
     const ids: string[] = [];
     for (const id of subtypeFactIdsOf(chosen)) {
-      const source = (fromIncoming ? incoming : existing).getSubtypeFact(id);
+      const own = (fromIncoming ? incoming : existing).getSubtypeFact(id);
+      const inIncoming = own ? fromIncoming : !fromIncoming;
+      const source = own ?? (fromIncoming ? existing : incoming).getSubtypeFact(id);
       if (!source) {
         ids.push(id);
         continue;
       }
-      const subtypeId = fromIncoming
+      const subtypeId = inIncoming
         ? resolveObjectTypeId(merged, source.subtypeId, incomingIdToMergedId)
         : source.subtypeId;
-      const supertypeId = fromIncoming
+      const supertypeId = inIncoming
         ? resolveObjectTypeId(merged, source.supertypeId, incomingIdToMergedId)
         : source.supertypeId;
       const kept = merged.subtypeFacts.find((sf) =>

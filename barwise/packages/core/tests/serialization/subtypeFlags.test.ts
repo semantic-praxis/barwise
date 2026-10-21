@@ -156,12 +156,48 @@ model:
     ]);
   });
 
-  it("narrows the constraint as its subtype facts are removed, then drops it", () => {
+  it("drops the constraint when removing a subtype leaves an exclusive-or over one", () => {
     const model = serializer.deserialize(yaml);
-    const [xor] = model.constraints;
     model.removeSubtypeFact("sf-m");
-    expect(model.constraints).toEqual([{ ...xor, subtypeFactIds: ["sf-f"] }]);
-    model.removeSubtypeFact("sf-f");
     expect(model.constraints).toEqual([]);
+  });
+});
+
+describe("removing a subtype fact keeps only what still holds", () => {
+  /** Person with subtypes a, b and c, and one constraint over all three. */
+  function three(type: "exclusion" | "exclusive_or" | "disjunctive_mandatory") {
+    const model = new OrmModel({ name: "People" });
+    model.addObjectType({ id: "p", name: "Person", kind: "entity", referenceMode: "id" });
+    for (const s of ["a", "b", "c"]) {
+      model.addObjectType({ id: s, name: s.toUpperCase(), kind: "entity", referenceMode: "id" });
+      model.addSubtypeFact({ id: `sf-${s}`, subtypeId: s, supertypeId: "p" });
+    }
+    model.addConstraint({
+      id: "c",
+      type,
+      modality: "deontic",
+      subtypeFactIds: ["sf-a", "sf-b", "sf-c"],
+    });
+    model.removeSubtypeFact("sf-a");
+    return model.constraints;
+  }
+
+  it("narrows an exclusion: no Person is two of the rest still holds", () => {
+    expect(three("exclusion")).toEqual([
+      { id: "c", modality: "deontic", type: "exclusion", subtypeFactIds: ["sf-b", "sf-c"] },
+    ]);
+  });
+
+  it("keeps an exclusive-or's exclusion half and drops its exhaustive one", () => {
+    // "Exactly one of A, B, C" without A is not "exactly one of B, C",
+    // which would forbid a Person who was only an A.
+    expect(three("exclusive_or")).toEqual([
+      { id: "c", modality: "deontic", type: "exclusion", subtypeFactIds: ["sf-b", "sf-c"] },
+    ]);
+  });
+
+  it("drops a disjunctive mandatory, which would otherwise grow stronger", () => {
+    // "At least one of A, B, C" without A is not "at least one of B, C".
+    expect(three("disjunctive_mandatory")).toEqual([]);
   });
 });

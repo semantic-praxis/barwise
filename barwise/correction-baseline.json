@@ -625,17 +625,17 @@
       "caught_by": "reasoning",
       "note": "Grounding the reader sites showed one PR would touch 43 source files, tens of test files and every host-naming output; the split keeps the compile-time check in 3c."
     },
+    "orm-format-3::b398ee0f2240": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- the operand. roleorsubtypeoperand makes exclusion, disjunctivemandatory and exclusiveor take roleids or subtypefactids, exactly one. roleidsof returns no role",
+      "caught_by": "execution",
+      "note": "Corrections to the WS4b draft. The compiler, once the flags were removed, showed the llm parser never wrote them, though the draft listed it among their writers. Writing the removeSubtypeFact cascade showed a dangling subtype fact id would make a model unloadable, so the operand is pruned instead; code review then caught that pruning every kind made a disjunctive mandatory or exclusive-or stronger, and the NORMA writer writing partitions over every subtype of a supertype."
+    },
     "orm-format-3::c99682fde87a": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "- 3c-iii, writers. - facttype.addconstraint and facttypeconfig.constraints take the internal kinds only, and the forward from 3c-ii is gone. a fact type still r",
       "caught_by": "execution",
       "note": "The draft listed ModelMerge among the writers to move; it had moved in 3c-ii. Running the migrated suite showed that tests varying the nesting host built identical models, so they were reworked to vary it through a 2.0 file."
-    },
-    "orm-format-3::d0d1a19cf80a": {
-      "spec": "orm-format-3.spec.md",
-      "excerpt": "- the operand. roleorsubtypeoperand makes exclusion, disjunctivemandatory and exclusiveor take roleids or subtypefactids, exactly one. roleidsof returns no role",
-      "caught_by": "execution",
-      "note": "Two corrections to the WS4b draft. The compiler, once the flags were removed, showed the llm parser never wrote them, though the draft listed it among their writers. And writing the removeSubtypeFact cascade showed that dropping a constraint only when its last operand goes, as removeFactType does, leaves a dangling subtype fact id the 3.0 loader would refuse; it narrows the operand instead."
     },
     "orm-format-3::d1002d78ea4d": {
       "spec": "orm-format-3.spec.md",

@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { mergeModels } from "../../src/diff/ModelMerge.js";
+import { generateModelLineage } from "../../src/lineage/generate.js";
 import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
@@ -102,10 +103,22 @@ describe("a constraint over subtypes", () => {
     expect(diagnostics[0]!.message).toContain("sf-gone");
   });
 
-  it("is not listed among the constraints that touch no fact type", () => {
+  it("is listed among the constraints touching nothing only when none of its subtype facts resolve", () => {
     const { model, sf } = people();
     model.addConstraint(over("exclusion", [sf["Male"]!, sf["Female"]!]));
     expect(model.constraintsTouchingNone()).toEqual([]);
+    const dangling = over("exclusion", ["sf-gone", "sf-also-gone"], "c-dangling");
+    model.addConstraint(dangling);
+    expect(model.constraintsTouchingNone()).toEqual([dangling]);
+  });
+
+  it("is a lineage source of the supertype and each subtype it names", () => {
+    const { model, sf } = people();
+    model.addConstraint(over("exclusive_or", [sf["Male"]!, sf["Female"]!]));
+    const sourced = generateModelLineage(model)
+      .filter((e) => e.sources.some((s) => s.elementId === "c-exclusive_or"))
+      .map((e) => e.artifact);
+    expect(sourced.sort()).toEqual(["Female", "Male", "Person"]);
   });
 
   it("diffs as a constraint, labelled by the subtype relationships it names", () => {

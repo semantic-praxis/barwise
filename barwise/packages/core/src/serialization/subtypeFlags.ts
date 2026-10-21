@@ -71,10 +71,23 @@ export function subtypeConstraintsFromFlags(
  * subtypes names: exclusive under an `exclusion` or `exclusive_or`,
  * exhaustive under a `disjunctive_mandatory` or `exclusive_or`.
  *
- * Lossy only where 2.0 cannot say it: two constraints of one kind over one
- * supertype's subtypes merge into one flagged group, and an exclusion over
- * a single subtype fact, which validation reports, is dropped on reload.
- * Every 2.0 file loads to constraints this writes back unchanged.
+ * Every 2.0 file loads to constraints this writes back unchanged. A model
+ * built otherwise -- in code, or by a merge that keeps one side's
+ * constraint and the other's -- can hold what flags cannot say, and a 2.0
+ * save loses it:
+ *
+ * - two constraints of one kind over one supertype's subtypes merge into
+ *   one flagged group, and an exclusive-or beside a disjunctive mandatory
+ *   over other subtypes reloads as an exclusion and one wider disjunctive
+ *   mandatory, which is weaker;
+ * - a deontic modality, and a stated id, which reloads derived;
+ * - an exclusion over a single subtype fact, which validation reports,
+ *   is dropped, and an exclusive-or over one reloads as the disjunctive
+ *   mandatory it is equivalent to;
+ * - a subtype fact id that names nothing writes no flag.
+ *
+ * Format 3.0 stores the constraints themselves (orm-format-3 WS4b, after
+ * 4b-i), which ends every case above.
  */
 export function subtypeFlagsFromConstraints(
   constraints: readonly ExternalConstraint[],

@@ -295,13 +295,17 @@ export class OrmModel {
    * constraint left dangling by a renamed or deleted role disappears.
    * Both read the one `holdsAny` test, so a constraint is in exactly one
    * of this and some fact type's view. A constraint over subtypes names no
-   * role, so it is in neither: it belongs with the subtype facts it names
-   * (orm-format-3 WS4b), not among the dangling.
+   * role; it is here only when none of its subtype facts resolve either,
+   * since otherwise it belongs with the subtype facts it names
+   * (orm-format-3 WS4b).
    */
   constraintsTouchingNone(): readonly ExternalConstraint[] {
     const factTypes = this.factTypes;
     return this.constraints.filter((c) => {
-      if (subtypeFactIdsOf(c).length > 0) return false;
+      const subtypeFactIds = subtypeFactIdsOf(c);
+      if (subtypeFactIds.length > 0) {
+        return !subtypeFactIds.some((id) => this._subtypeFacts.has(id));
+      }
       const roleIds = roleIdsOf(c);
       return !factTypes.some((ft) => holdsAny(ft, roleIds));
     });
@@ -525,13 +529,19 @@ export class OrmModel {
   }
 
   /**
-   * Remove a subtype fact from the model, and from every constraint over
-   * subtypes that names it. A constraint left naming none goes with it.
+   * Remove a subtype fact from the model, and keep of each constraint over
+   * subtypes naming it only what still holds without it.
    *
-   * Narrowed, not left dangling as `removeFactType` leaves a constraint's
-   * roles: an exclusive-or over Male and Female with Male removed is a rule
-   * about Female alone, which validation reports as too few subtypes, and a
-   * model holding it still loads. An id naming nothing would not.
+   * An exclusion loses the one subtype: no Person is two of the rest still
+   * holds. A disjunctive mandatory goes: "each Person is at least one of
+   * Male, Female" with Male removed is not "each Person is a Female", a
+   * rule nobody stated. An exclusive-or keeps its exclusion half over the
+   * rest and loses the exhaustive one, for the same reason. An exclusion
+   * left over one subtype states nothing and goes too.
+   *
+   * Not left dangling, as `removeFactType` leaves a constraint's roles: a
+   * model holding an id that names nothing does not load after its next
+   * save.
    */
   removeSubtypeFact(id: string): void {
     if (!this._subtypeFacts.has(id)) {
@@ -543,8 +553,16 @@ export class OrmModel {
       const ids = subtypeFactIdsOf(c);
       if (!ids.includes(id)) continue;
       const rest = ids.filter((sf) => sf !== id);
-      if (rest.length === 0) this._constraints.splice(i, 1);
-      else this._constraints[i] = { ...c, subtypeFactIds: rest } as ExternalConstraint;
+      if (c.type === "disjunctive_mandatory" || rest.length < 2) {
+        this._constraints.splice(i, 1);
+      } else {
+        this._constraints[i] = {
+          ...(c.id !== undefined ? { id: c.id } : {}),
+          ...(c.modality !== undefined ? { modality: c.modality } : {}),
+          type: "exclusion",
+          subtypeFactIds: rest,
+        };
+      }
     }
   }
 

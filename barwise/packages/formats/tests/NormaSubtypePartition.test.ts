@@ -46,6 +46,18 @@ describe("a constraint over subtypes through NORMA", () => {
     expect(partitions(roundTrip(model))).toEqual([{ type, subtypes: ["Male", "Female"] }]);
   });
 
+  it("is written over the meta-roles of the subtypes it names, and no others", () => {
+    // Employee is a third subtype the exclusion does not name; writing it
+    // over every subtype of Person would invent "no Employee is a Male".
+    const model = people("exclusion");
+    const person = model.getObjectTypeByName("Person")!;
+    const employee = model.addObjectType({ name: "Employee", kind: "entity", referenceMode: "id" });
+    model.addSubtypeFact({ subtypeId: employee.id, supertypeId: person.id });
+    expect(partitions(roundTrip(model))).toEqual([
+      { type: "exclusion", subtypes: ["Male", "Female"] },
+    ]);
+  });
+
   it("is written over the supertype meta-roles, not as a constraint over no roles", () => {
     const doc = writeOrmToNorma(people("exclusion"));
     const exclusions = doc.constraints.filter((c) => c.type === "exclusion");

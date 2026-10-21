@@ -22,6 +22,7 @@ import {
   type ConstraintSpec,
   type FactType,
   type OrmModel,
+  roleIdsOf,
   subtypeFactIdsOf,
 } from "@barwise/core";
 import { generateCounterexampleInView } from "@barwise/core/counterexample";
@@ -103,7 +104,8 @@ export function routeConstraints(
     const [c] = inView;
     // A constraint over subtypes travels in the barwise annotation, as the
     // 2.0 subtype flags it replaces did (orm-format-3 WS4b); it names no
-    // role, so it has no column or table here.
+    // role, so it has no column or table here, and nothing below it reads
+    // one.
     if (subtypeFactIdsOf(c).length > 0) return;
     if (c.type === "external_uniqueness") {
       const cols = c.roleIds.map((r) => columnForJoinedRole(r, model, schema));
@@ -336,11 +338,11 @@ function constraintPseudocode(c: Constraint, ft: FactType | undefined, model: Or
         + `is between ${c.min ?? 0} and ${max}`;
     }
     case "exclusion":
-      return `no instance plays more than one of: ${operandLabels(c, ft, model)}`;
+      return `no instance plays more than one of: ${roleLabels(roleIdsOf(c), ft, model)}`;
     case "exclusive_or":
-      return `each instance plays exactly one of: ${operandLabels(c, ft, model)}`;
+      return `each instance plays exactly one of: ${roleLabels(roleIdsOf(c), ft, model)}`;
     case "disjunctive_mandatory":
-      return `each instance plays at least one of: ${operandLabels(c, ft, model)}`;
+      return `each instance plays at least one of: ${roleLabels(roleIdsOf(c), ft, model)}`;
     case "subset":
       return `population(${roleLabels(c.subsetRoleIds, ft, model)}) is a subset of `
         + `population(${roleLabels(c.supersetRoleIds, ft, model)})`;
@@ -391,20 +393,6 @@ function rangeText(
 }
 
 /** Human-readable labels for a role sequence: "Player.roleName" each. */
-/** Its roles, or for a constraint over subtypes, the subtypes it names. */
-function operandLabels(
-  c: Extract<Constraint, { type: "exclusion" | "exclusive_or" | "disjunctive_mandatory"; }>,
-  ft: FactType | undefined,
-  model: OrmModel,
-): string {
-  if (c.roleIds) return roleLabels(c.roleIds, ft, model);
-  return c.subtypeFactIds.map((id) => {
-    const sf = model.getSubtypeFact(id);
-    const sub = sf && model.getObjectType(sf.subtypeId);
-    return sub ? `is a ${sub.name}` : id;
-  }).join(", ");
-}
-
 function roleLabels(
   roleIds: readonly string[],
   ft: FactType | undefined,
