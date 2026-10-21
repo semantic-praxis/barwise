@@ -107,9 +107,9 @@ describe("NORMA construct round-trip (WS3)", () => {
 
   it("round-trips deontic modality; alethic stays implicit", () => {
     const ft = back.getFactTypeByName("Customer places Order")!;
-    const uc = ft.constraints.find((c) => c.type === "internal_uniqueness")!;
+    const uc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness")!;
     expect(uc.modality).toBe("deontic");
-    const mand = ft.constraints.find((c) => c.type === "mandatory")!;
+    const mand = ft.internalConstraints.find((c) => c.type === "mandatory")!;
     expect(mand.modality).toBeUndefined();
   });
 
@@ -130,7 +130,7 @@ describe("NORMA construct round-trip (WS3)", () => {
 
   it("round-trips unary-role cardinality, bounded and deontic-unbounded", () => {
     const pref = back.getFactTypeByName("Customer is preferred")!;
-    const prefCard = pref.constraints.find((c) => c.type === "cardinality")!;
+    const prefCard = pref.internalConstraints.find((c) => c.type === "cardinality")!;
     expect(prefCard).toMatchObject({
       roleId: pref.roles[0]!.id,
       min: 0,
@@ -139,7 +139,7 @@ describe("NORMA construct round-trip (WS3)", () => {
     expect(prefCard.modality).toBeUndefined();
 
     const active = back.getFactTypeByName("Customer is active")!;
-    const activeCard = active.constraints.find((c) => c.type === "cardinality")!;
+    const activeCard = active.internalConstraints.find((c) => c.type === "cardinality")!;
     expect(activeCard).toMatchObject({
       roleId: active.roles[0]!.id,
       min: 2,
@@ -218,7 +218,7 @@ describe("exclusive-or round-trip (norma-round-trip-completion WS1)", () => {
     expect(xml).toContain("orm:ExclusiveOrExclusionConstraint");
     expect(xml).toMatch(/MandatoryConstraint[^>]*IsSimple="false"/);
 
-    const all = back.factTypes.flatMap((f) => f.constraints);
+    const all = back.everyConstraint().map(([c]) => c);
     const xors = all.filter((c) => c.type === "exclusive_or");
     expect(xors).toHaveLength(1);
     const expectedRoleIds = [
@@ -239,7 +239,7 @@ describe("exclusive-or round-trip (norma-round-trip-completion WS1)", () => {
     expect(oneSided).toContain("ExclusiveOrExclusionConstraint");
 
     const back = mapNormaToOrm(parseNormaXml(oneSided));
-    const all = back.factTypes.flatMap((f) => f.constraints);
+    const all = back.everyConstraint().map(([c]) => c);
     expect(all.filter((c) => c.type === "exclusive_or")).toHaveLength(1);
     expect(all.some((c) => c.type === "exclusion")).toBe(false);
     expect(all.some((c) => c.type === "disjunctive_mandatory")).toBe(false);
@@ -291,7 +291,7 @@ describe("value-comparison round-trip (norma-round-trip-completion WS2)", () => 
     expect(xml).toContain('Operator="LessThanOrEqual"');
 
     const ft = back.getFactTypeByName("ReviewPeriod runs from and to")!;
-    const cmp = ft.constraints.find((c) => c.type === "value_comparison")!;
+    const cmp = ft.internalConstraints.find((c) => c.type === "value_comparison")!;
     expect(cmp).toMatchObject({
       roleId1: ft.roles[1]!.id,
       roleId2: ft.roles[2]!.id,

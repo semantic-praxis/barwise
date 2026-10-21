@@ -29,6 +29,7 @@ function composite(model: OrmModel) {
     || f.roles.some((r) => objectifiers.has(r.playerId))
   );
   const playerOf = new Map(facts.flatMap((f) => f.roles.map((r) => [r.id, name(r.playerId)])));
+  const anyRole = new Set(model.factTypes.flatMap((f) => f.roles.map((r) => r.id)));
   const sorted = <T>(xs: T[]) =>
     xs.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   return {
@@ -36,15 +37,23 @@ function composite(model: OrmModel) {
       const index = new Map(f.roles.map((r, i) => [r.id, i]));
       return {
         players: f.roles.map((r) => name(r.playerId)),
-        uniques: f.constraints.filter((c) => c.type === "internal_uniqueness")
+        uniques: f.internalConstraints.filter((c) => c.type === "internal_uniqueness")
           .map((c) => c.roleIds.map((id) => index.get(id)).sort()),
-        mandatory: f.constraints.filter((c) => c.type === "mandatory")
+        mandatory: f.internalConstraints.filter((c) => c.type === "mandatory")
           .map((c) => index.get(c.roleId)).sort(),
       };
     })),
     externalUniques: sorted(
-      facts.flatMap((f) => f.constraints).filter((c) => c.type === "external_uniqueness")
-        .map((c) => c.roleIds.map((id) => playerOf.get(id) ?? "?").sort()),
+      model.constraints.filter((c) =>
+        c.type === "external_uniqueness"
+        // Over a role of the fact types compared above, or over a role that
+        // resolves nowhere, which shows as "?" rather than dropping out.
+        && c.roleIds.some((id) => playerOf.has(id) || !anyRole.has(id))
+      )
+        // A role elsewhere in the model and one that resolves nowhere differ.
+        .map((c) =>
+          c.roleIds.map((id) => playerOf.get(id) ?? (anyRole.has(id) ? "(other)" : "?")).sort()
+        ),
     ),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
   };

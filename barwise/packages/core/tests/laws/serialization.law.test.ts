@@ -162,9 +162,7 @@ describe("coverage: the generator reaches the shapes the recorded defects lived 
   it("produces every constraint kind the metamodel admits", () => {
     const seen = new Set<string>();
     for (const model of models) {
-      for (const ft of model.factTypes) {
-        for (const constraint of ft.constraints) seen.add(constraint.type);
-      }
+      for (const [constraint] of model.everyConstraint()) seen.add(constraint.type);
     }
     // Compared against the union's own runtime list rather than a
     // literal, so a constraint kind added to the metamodel fails here

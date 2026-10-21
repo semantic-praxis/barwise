@@ -55,7 +55,7 @@ function setup() {
 function constraintsOf(model: ReturnType<typeof setup>["model"], factName: string) {
   const ft = model.factTypes.find((f) => f.name === factName);
   expect(ft).toBeDefined();
-  return ft!.constraints;
+  return model.constraintsTouching(ft!.id);
 }
 
 describe("mergeSqlPatterns", () => {

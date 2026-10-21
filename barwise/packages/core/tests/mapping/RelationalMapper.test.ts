@@ -1483,7 +1483,7 @@ describe("RelationalMapper", () => {
 
       // Find the uniqueness constraint ID
       const ft = model.getFactTypeByName("Customer places Order")!;
-      const uniquenessConstraint = ft.constraints.find(
+      const uniquenessConstraint = ft.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       )!;
       expect(uniquenessConstraint).toBeDefined();
@@ -1513,7 +1513,7 @@ describe("RelationalMapper", () => {
         .build();
 
       const ft = model.getFactTypeByName("Customer places Order")!;
-      const uniquenessConstraint = ft.constraints.find(
+      const uniquenessConstraint = ft.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       )!;
 
@@ -1548,7 +1548,7 @@ describe("RelationalMapper", () => {
       // addConstraint fills a missing id, as the fact type constructor
       // does (barwise-nkq).
       ft.addConstraint({ type: "internal_uniqueness", roleIds: ["r2"] });
-      const filled = ft.constraints[0]!.id;
+      const filled = ft.internalConstraints[0]!.id;
       expect(filled).toEqual(expect.any(String));
 
       const schema = mapper.map(model);

@@ -911,7 +911,7 @@ describe("mergeModels", () => {
     const merged = mergeModels(existing, incoming, diff.deltas, accepted);
 
     const bornIn = merged.getFactTypeByName("Person was born in Country")!;
-    const join = bornIn.constraints.find((c) => c.type === "join_equality");
+    const join = merged.constraintsTouching(bornIn.id).find((c) => c.type === "join_equality");
     expect(join).toBeDefined();
     if (join?.type !== "join_equality") throw new Error("unreachable");
 

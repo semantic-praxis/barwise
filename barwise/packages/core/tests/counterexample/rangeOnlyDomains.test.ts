@@ -86,7 +86,7 @@ function makeModel(options: Options): OrmModel {
   });
   // Point the uniqueness at the Person role now that its id exists.
   const [personRole, scoreRole] = ft.roles;
-  (ft.constraints[0] as { roleIds: string[]; }).roleIds = [personRole!.id];
+  (ft.internalConstraints[0] as { roleIds: string[]; }).roleIds = [personRole!.id];
   const ranges = options.roleRanges ?? options.roleRangesWithIntegerPlayer;
   if (ranges || options.roleValues) {
     ft.addConstraint({

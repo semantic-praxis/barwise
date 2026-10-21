@@ -80,7 +80,7 @@ describe("Round-trip serialization integration", () => {
       expect(rtFt!.definition).toBe(origFt.definition);
       expect(rtFt!.arity).toBe(origFt.arity);
       expect(rtFt!.readings).toHaveLength(origFt.readings.length);
-      expect(rtFt!.constraints).toHaveLength(origFt.constraints.length);
+      expect(rtFt!.internalConstraints).toHaveLength(origFt.internalConstraints.length);
 
       // Verify each role.
       for (let i = 0; i < origFt.roles.length; i++) {
@@ -92,8 +92,8 @@ describe("Round-trip serialization integration", () => {
       }
 
       // Verify constraint types match.
-      for (let i = 0; i < origFt.constraints.length; i++) {
-        expect(rtFt!.constraints[i]!.type).toBe(origFt.constraints[i]!.type);
+      for (let i = 0; i < origFt.internalConstraints.length; i++) {
+        expect(rtFt!.internalConstraints[i]!.type).toBe(origFt.internalConstraints[i]!.type);
       }
     }
   });
@@ -139,21 +139,21 @@ describe("Round-trip serialization integration", () => {
     // Verify specific Phase 2 constraints loaded correctly.
     const drivesFt = model.getFactTypeByName("Person drives Car");
     expect(drivesFt).toBeDefined();
-    const xorConstraint = drivesFt!.constraints.find(
+    const xorConstraint = model.constraintsTouching(drivesFt!.id).find(
       (c) => c.type === "exclusive_or",
     );
     expect(xorConstraint).toBeDefined();
 
     const purchaseFt = model.getFactTypeByName("Person purchases Ticket");
     expect(purchaseFt).toBeDefined();
-    const subsetConstraint = purchaseFt!.constraints.find(
+    const subsetConstraint = model.constraintsTouching(purchaseFt!.id).find(
       (c) => c.type === "subset",
     );
     expect(subsetConstraint).toBeDefined();
 
     const parentFt = model.getFactTypeByName("Person is parent of Person");
     expect(parentFt).toBeDefined();
-    const ringConstraints = parentFt!.constraints.filter(
+    const ringConstraints = parentFt!.internalConstraints.filter(
       (c) => c.type === "ring",
     );
     expect(ringConstraints).toHaveLength(2);
@@ -165,12 +165,17 @@ describe("Round-trip serialization integration", () => {
     expect(roundTripped.objectTypes).toHaveLength(model.objectTypes.length);
     expect(roundTripped.factTypes).toHaveLength(model.factTypes.length);
 
+    // The constraints across fact types (the exclusive-or and the subset
+    // among them) survive whole; no fact type's own list holds them.
+    expect(model.constraints.length).toBeGreaterThan(0);
+    expect(roundTripped.constraints).toEqual(model.constraints);
+
     // Verify the ring constraints survived.
     const rtParent = roundTripped.getFactTypeByName(
       "Person is parent of Person",
     );
     expect(rtParent).toBeDefined();
-    const rtRings = rtParent!.constraints.filter((c) => c.type === "ring");
+    const rtRings = rtParent!.internalConstraints.filter((c) => c.type === "ring");
     expect(rtRings).toHaveLength(2);
   });
 

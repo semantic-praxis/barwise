@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split in two 2026-10-21, 3c-i (test readers) implemented; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1243,6 +1243,24 @@ Implementation notes (2026-10-19):
     probe that renamed the getter in core's emitted declarations and
     type-checked the other eleven packages found no read (2026-10-21).
     Core's own readers are 3c's.
+
+Implementation notes (2026-10-21, WS3c):
+
+- **3c lands as two PRs.** The same probe, run with each
+  package's tests included, found 273 test reads of the getter in 45
+  files (core 88 in 21, formats 148 in 14, llm 21 in 3, dbt 12 in 5,
+  cli 4 in 2), beside 9 source reads in 5 core files. The draft said
+  removing the getter makes the compiler name every reader; that holds
+  for source only: the packages' `tsconfig` files exclude `tests/` and
+  vitest strips types, so a test read would surface as a runtime
+  failure at best. **3c-i** moves the test readers to the APIs that
+  survive the move (`internalConstraints`, `model.constraints`,
+  `constraintsTouching`, `everyConstraint`) with no source change,
+  keeping only the tests whose subject is the getter or 2.0 nesting.
+  **3c-ii** is the storage move as listed above, with the serializer,
+  the writers, diff's constraint delta and merge, which cannot be
+  separated: once a fact type no longer holds its external
+  constraints, diff's per-fact-type deltas no longer see them.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 

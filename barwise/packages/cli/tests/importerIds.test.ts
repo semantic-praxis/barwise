@@ -204,7 +204,9 @@ function allIds(model: OrmModel): string[] {
   for (const ft of model.factTypes) {
     ids.push(`fact type ${ft.name}: ${ft.id}`);
     for (const r of ft.roles) ids.push(`role ${ft.name}/${r.name}: ${r.id}`);
-    for (const c of ft.constraints) ids.push(`constraint ${ft.name}/${c.type}: ${c.id}`);
+  }
+  for (const [c, ft] of model.everyConstraint()) {
+    ids.push(`constraint ${ft?.name ?? "(across fact types)"}/${c.type}: ${c.id}`);
   }
   return ids;
 }

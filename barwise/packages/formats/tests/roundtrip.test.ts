@@ -139,9 +139,7 @@ describe("Round-trip tests", () => {
       const importedModel = importResult.model;
 
       // Should have mandatory constraint
-      const allConstraints = importedModel.factTypes.flatMap(
-        (ft) => ft.constraints,
-      );
+      const allConstraints = importedModel.everyConstraint().map(([c]) => c);
       const mandatoryConstraints = allConstraints.filter(
         (c) => c.type === "mandatory",
       );

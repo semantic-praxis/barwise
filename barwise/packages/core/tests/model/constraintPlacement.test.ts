@@ -216,7 +216,7 @@ describe("FactType.addConstraint", () => {
     });
     inBuilding.addConstraint({ id: "c-stated", type: "mandatory", roleId: "r-2" });
 
-    const [filled, stated] = inBuilding.constraints.slice(-2);
+    const [filled, stated] = inBuilding.internalConstraints.slice(-2);
     expect(filled!.id).toEqual(expect.any(String));
     expect(filled!.id).not.toBe("");
     expect(stated!.id).toBe("c-stated");

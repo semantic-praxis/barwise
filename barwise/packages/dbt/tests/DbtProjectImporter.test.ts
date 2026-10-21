@@ -221,7 +221,7 @@ describe("DbtProjectImporter", () => {
 
       const ft = result.model.getFactTypeByName("Orders has OrderTotal");
       expect(ft).toBeDefined();
-      const mandatory = ft!.constraints.filter(
+      const mandatory = ft!.internalConstraints.filter(
         (c) => c.type === "mandatory",
       );
       expect(mandatory.length).toBeGreaterThan(0);
@@ -232,7 +232,7 @@ describe("DbtProjectImporter", () => {
 
       const ft = result.model.getFactTypeByName("Orders has Status");
       expect(ft).toBeDefined();
-      const vc = ft!.constraints.find((c) => c.type === "value_constraint");
+      const vc = ft!.internalConstraints.find((c) => c.type === "value_constraint");
       expect(vc).toBeDefined();
       expect(
         vc!.type === "value_constraint" && vc!.values,
@@ -256,7 +256,7 @@ models:
       const result = importDbtProject([yaml]);
       const ft = result.model.getFactTypeByName("Sites has Status");
       expect(ft).toBeDefined();
-      const vc = ft!.constraints.find((c) => c.type === "value_constraint");
+      const vc = ft!.internalConstraints.find((c) => c.type === "value_constraint");
       expect(vc).toBeUndefined();
 
       // Should warn the user about the empty accepted_values list.
@@ -293,7 +293,7 @@ models:
       // Should have uniqueness on both roles:
       // role1 (entity has value) for functional dependency
       // role2 (value unique across entities) from unique test
-      const ucs = ft!.constraints.filter(
+      const ucs = ft!.internalConstraints.filter(
         (c) => c.type === "internal_uniqueness",
       );
       expect(ucs).toHaveLength(2);

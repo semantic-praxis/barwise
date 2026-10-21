@@ -26,7 +26,7 @@ function constraintsByPlayer(model: OrmModel, ft: FactType): string[] {
     const role = ft.roles.find((r) => r.id === roleId)!;
     return model.getObjectType(role.playerId)!.name;
   };
-  return ft.constraints.map((c: Constraint) => {
+  return model.constraintsTouching(ft.id).map((c: Constraint) => {
     if (c.type === "mandatory") return `mandatory:${player(c.roleId)}`;
     if (c.type === "internal_uniqueness") {
       return `unique:${c.roleIds.map(player).join(",")}${c.isPreferred ? ":preferred" : ""}`;
@@ -132,11 +132,16 @@ describe("a single-column key becomes a typed identifier (R4)", () => {
       "mandatory:Enrollment",
       "unique:Enrollment",
     ]);
+    // The external uniqueness spans both fact types, so it touches both; it
+    // is one constraint in the model, not one per fact type.
     expect(constraintsByPlayer(model, factType(model, "Enrollment has CourseId"))).toEqual([
+      "external_uniqueness",
       "mandatory:Enrollment",
       "unique:Enrollment",
     ]);
-    const external = student.constraints.find((c) => c.type === "external_uniqueness");
+    const external = model.constraintsTouching(student.id).find((c) =>
+      c.type === "external_uniqueness"
+    );
     expect(
       external && "roleIds" in external
         ? external.roleIds.map((id) =>
@@ -243,8 +248,10 @@ describe("column types: several words, length and scale, trailing clauses (R2, R
       "unique:V",
     ]);
     expect(constraintsByPlayer(result.model, factType(result.model, "V has B"))).toEqual([
+      "external_uniqueness",
       "unique:V",
     ]);
+    expect(result.model.constraints.map((c) => c.type)).toEqual(["external_uniqueness"]);
     expect(result.warnings).toEqual([]);
   });
 

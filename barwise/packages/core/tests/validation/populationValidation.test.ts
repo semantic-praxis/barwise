@@ -1563,7 +1563,7 @@ describe("deontic modality", () => {
         (d) => d.ruleId === "population/unary-role-cardinality-violation",
       );
       expect(diags).toHaveLength(2);
-      const filled = [underMin.constraints[0]!.id, overMax.constraints[0]!.id];
+      const filled = [underMin.internalConstraints[0]!.id, overMax.internalConstraints[0]!.id];
       expect(filled).toEqual([expect.any(String), expect.any(String)]);
       expect(diags.map((d) => d.elementId)).toEqual(filled);
     });

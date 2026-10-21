@@ -220,7 +220,11 @@ model:
       ["sees first", "Patient"],
     ]);
     // The uniqueness the DDL states sits on the patient's role, as before.
-    expect(primary?.constraints.map(({ type, ...c }) => [type, "roleIds" in c ? c.roleIds : []]))
+    expect(
+      (primary ? model.constraintsTouching(primary.id) : undefined)?.map((
+        { type, ...c },
+      ) => [type, "roleIds" in c ? c.roleIds : []]),
+    )
       .toEqual([["internal_uniqueness", [primary!.roles[1]!.id]]]);
     expect(model.getFactTypeByName("Patient reports AllergyNote")?.roles.map((r) => r.name))
       .toEqual(["reports", "is reported by"]);
@@ -465,7 +469,7 @@ describe("over the trial kernels and the examples", () => {
       const where = new Map(
         m.factTypes.flatMap((f) => f.roles.map((r, i) => [r.id, `${players(f)}#${i}`] as const)),
       );
-      return m.factTypes.flatMap((f) => f.constraints)
+      return m.everyConstraint().map(([c]) => c)
         .flatMap((c) => c.type === "external_uniqueness" ? [c.roleIds] : [])
         .map((ids) => ids.map((id) => where.get(id) ?? id).sort().join(" + "))
         .sort();

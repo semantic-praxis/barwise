@@ -35,7 +35,7 @@ function roundTrip(constraint: Constraint): Constraint {
   const yaml = serializer.serialize(model);
   const deserialized = serializer.deserialize(yaml);
   const ft = deserialized.factTypes[0]!;
-  return ft.constraints[0]!;
+  return deserialized.constraintsTouching(ft.id)[0]!;
 }
 
 describe("Phase 2 constraint serialization round-trip", () => {
@@ -108,7 +108,7 @@ describe("Phase 2 constraint serialization round-trip", () => {
     // The multi-role form uses a `roles:` list, not the legacy `role:` key.
     expect(yaml).not.toContain("role: r1");
 
-    const c = serializer.deserialize(yaml).factTypes[0]!.constraints[0]!;
+    const c = serializer.deserialize(yaml).factTypes[0]!.internalConstraints[0]!;
     expect(c.type).toBe("frequency");
     expect((c as { roleIds: string[]; }).roleIds).toEqual(["r1", "r2"]);
   });

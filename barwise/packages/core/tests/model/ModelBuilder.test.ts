@@ -100,13 +100,14 @@ describe("ModelBuilder", () => {
     ).toBe("Order is placed by Customer");
 
     // Verify constraints on Customer places Order.
-    expect(placesOrder!.constraints).toHaveLength(2);
-    const uniquenessConstraint = placesOrder!.constraints.find(
+    expect(placesOrder!.internalConstraints).toHaveLength(2);
+    expect(model.constraints).toEqual([]);
+    const uniquenessConstraint = placesOrder!.internalConstraints.find(
       isInternalUniqueness,
     );
     expect(uniquenessConstraint).toBeDefined();
 
-    const mandatoryConstraint = placesOrder!.constraints.find(isMandatoryRole);
+    const mandatoryConstraint = placesOrder!.internalConstraints.find(isMandatoryRole);
     expect(mandatoryConstraint).toBeDefined();
 
     // Verify spanning uniqueness on Order contains Product.
@@ -114,7 +115,7 @@ describe("ModelBuilder", () => {
       "Order contains Product",
     );
     expect(containsProduct).toBeDefined();
-    const spanningUniqueness = containsProduct!.constraints.find(isInternalUniqueness);
+    const spanningUniqueness = containsProduct!.internalConstraints.find(isInternalUniqueness);
     expect(spanningUniqueness).toBeDefined();
     expect(spanningUniqueness!.roleIds).toHaveLength(2);
 

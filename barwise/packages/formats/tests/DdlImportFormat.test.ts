@@ -49,7 +49,7 @@ describe("DdlImportFormat", () => {
       expect(hasNameFact?.roles).toHaveLength(2);
 
       // Should have mandatory constraint on name (NOT NULL)
-      const allConstraints = result.model.factTypes.flatMap((ft) => ft.constraints);
+      const allConstraints = result.model.everyConstraint().map(([c]) => c);
       const mandatoryConstraints = allConstraints.filter((c) => c.type === "mandatory");
       expect(mandatoryConstraints.length).toBeGreaterThan(0);
 
@@ -92,7 +92,7 @@ describe("DdlImportFormat", () => {
       expect(fkFact).toBeDefined();
 
       // FK relationship should have uniqueness constraint (many-to-one)
-      const uniquenessConstraints = fkFact?.constraints.filter(
+      const uniquenessConstraints = fkFact?.internalConstraints.filter(
         (c) => c.type === "internal_uniqueness",
       );
       expect(uniquenessConstraints).toHaveLength(1);
@@ -117,7 +117,7 @@ describe("DdlImportFormat", () => {
       expect(emailFact).toBeDefined();
 
       // Should have uniqueness on the entity side (unique email per user)
-      const constraints = emailFact?.constraints.filter(
+      const constraints = emailFact?.internalConstraints.filter(
         (c) => c.type === "internal_uniqueness",
       );
       // At least one uniqueness constraint
@@ -252,7 +252,7 @@ describe("DdlImportFormat", () => {
       const requiredFact = result.model.factTypes.find((ft) => ft.name.includes("RequiredCol"));
       expect(requiredFact).toBeDefined();
 
-      const mandatoryOnRequired = requiredFact?.constraints.filter(
+      const mandatoryOnRequired = requiredFact?.internalConstraints.filter(
         (c) => c.type === "mandatory",
       );
       expect(mandatoryOnRequired?.length).toBeGreaterThan(0);
@@ -261,7 +261,7 @@ describe("DdlImportFormat", () => {
       const optionalFact = result.model.factTypes.find((ft) => ft.name.includes("OptionalCol"));
       expect(optionalFact).toBeDefined();
 
-      const mandatoryOnOptional = optionalFact?.constraints.filter(
+      const mandatoryOnOptional = optionalFact?.internalConstraints.filter(
         (c) => c.type === "mandatory",
       );
       expect(mandatoryOnOptional?.length).toBe(0);

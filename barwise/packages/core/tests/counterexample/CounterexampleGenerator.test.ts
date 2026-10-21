@@ -50,7 +50,7 @@ describe("counterexample generation", () => {
       })
       .build();
     const ft = model.getFactTypeByName("Customer places Order")!;
-    const uc = ft.constraints.find((c) => c.type === "internal_uniqueness")!;
+    const uc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness")!;
 
     const ce = generateCounterexampleForConstraint(uc, ft, model);
     expect(ce).toBeDefined();
@@ -70,7 +70,7 @@ describe("counterexample generation", () => {
       })
       .build();
     const ft = model.getFactTypeByName("Customer places Order")!;
-    const uc = ft.constraints.find((c) => c.type === "internal_uniqueness")!;
+    const uc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness")!;
 
     const ce = generateCounterexampleForConstraint(uc, ft, model);
     expect(forbids(model, ce!, "population/uniqueness-violation")).toBe(true);
@@ -91,7 +91,7 @@ describe("counterexample generation", () => {
       roleId: "Order has Rating::role2",
       values: ["A", "B", "C"],
     });
-    const vc = ft.constraints.find((c) => c.type === "value_constraint")!;
+    const vc = ft.internalConstraints.find((c) => c.type === "value_constraint")!;
 
     const ce = generateCounterexampleForConstraint(vc, ft, model);
     expect(ce).toBeDefined();
@@ -102,7 +102,7 @@ describe("counterexample generation", () => {
     const model = placesModel();
     const ft = model.getFactTypeByName("Customer places Order")!;
     ft.addConstraint({ type: "value_constraint", values: ["A", "B"] });
-    const vc = ft.constraints.find((c) => c.type === "value_constraint")!;
+    const vc = ft.internalConstraints.find((c) => c.type === "value_constraint")!;
 
     expect(generateCounterexampleForConstraint(vc, ft, model)).toBeUndefined();
   });
@@ -116,7 +116,7 @@ describe("counterexample generation", () => {
       min: 1,
       max: 3,
     });
-    const fc = ft.constraints.find((c) => c.type === "frequency")!;
+    const fc = ft.internalConstraints.find((c) => c.type === "frequency")!;
 
     const ce = generateCounterexampleForConstraint(fc, ft, model);
     expect(ce!.forbidden[0]!.instances).toHaveLength(4);
@@ -132,7 +132,7 @@ describe("counterexample generation", () => {
       min: 2,
       max: "unbounded",
     });
-    const fc = ft.constraints.find((c) => c.type === "frequency")!;
+    const fc = ft.internalConstraints.find((c) => c.type === "frequency")!;
 
     const ce = generateCounterexampleForConstraint(fc, ft, model);
     expect(ce!.forbidden[0]!.instances).toHaveLength(1);
@@ -148,7 +148,7 @@ describe("counterexample generation", () => {
       min: 1,
       max: "unbounded",
     });
-    const fc = ft.constraints.find((c) => c.type === "frequency")!;
+    const fc = ft.internalConstraints.find((c) => c.type === "frequency")!;
 
     expect(generateCounterexampleForConstraint(fc, ft, model)).toBeUndefined();
   });
@@ -179,7 +179,7 @@ describe("counterexample generation", () => {
         roleId2: "Person reports to Person::role2",
         ringType,
       });
-      const rc = ft.constraints.find((c) => c.type === "ring")!;
+      const rc = ft.internalConstraints.find((c) => c.type === "ring")!;
 
       const ce = generateCounterexampleForConstraint(rc, ft, model);
       expect(ce).toBeDefined();
@@ -219,7 +219,7 @@ describe("counterexample generation", () => {
         roleId2: "Person reports to Person::role2",
         ringType,
       });
-      const rc = ft.constraints.find((c) => c.type === "ring")!;
+      const rc = ft.internalConstraints.find((c) => c.type === "ring")!;
       const ce = generateCounterexampleForConstraint(rc, ft, model)!;
 
       const forbidden = ce.forbidden[0]!;
@@ -293,7 +293,7 @@ describe("cross-fact-type counterexamples", () => {
       })
       .build();
     const ft = model.getFactTypeByName("Customer places Order")!;
-    const mc = ft.constraints.find((c) => c.type === "mandatory")!;
+    const mc = ft.internalConstraints.find((c) => c.type === "mandatory")!;
 
     const ce = generateCounterexampleForConstraint(mc, ft, model);
     expect(ce).toBeDefined();
@@ -305,7 +305,7 @@ describe("cross-fact-type counterexamples", () => {
     const model = placesModel();
     const ft = model.getFactTypeByName("Customer places Order")!;
     ft.addConstraint({ type: "mandatory", roleId: "Customer places Order::role1" });
-    const mc = ft.constraints.find((c) => c.type === "mandatory")!;
+    const mc = ft.internalConstraints.find((c) => c.type === "mandatory")!;
 
     expect(generateCounterexampleForConstraint(mc, ft, model)).toBeUndefined();
   });
@@ -333,7 +333,7 @@ describe("cross-fact-type counterexamples", () => {
       type: "disjunctive_mandatory",
       roleIds: ["Person has HomePhone::role1", "Person has MobilePhone::role1"],
     });
-    const dc = home.constraints.find((c) => c.type === "disjunctive_mandatory")!;
+    const dc = model.constraintsTouching(home.id).find((c) => c.type === "disjunctive_mandatory")!;
 
     const ce = generateCounterexampleForConstraint(dc, home, model);
     expect(ce).toBeDefined();
@@ -363,7 +363,7 @@ describe("cross-fact-type counterexamples", () => {
       type: "exclusion",
       roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
     });
-    const ec = drives.constraints.find((c) => c.type === "exclusion")!;
+    const ec = model.constraintsTouching(drives.id).find((c) => c.type === "exclusion")!;
 
     const ce = generateCounterexampleForConstraint(ec, drives, model);
     expect(ce).toBeDefined();
@@ -377,7 +377,7 @@ describe("cross-fact-type counterexamples", () => {
       type: "exclusive_or",
       roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
     });
-    const xor = drives.constraints.find((c) => c.type === "exclusive_or")!;
+    const xor = model.constraintsTouching(drives.id).find((c) => c.type === "exclusive_or")!;
 
     const ce = generateCounterexampleForConstraint(xor, drives, model);
     expect(ce).toBeDefined();
@@ -406,7 +406,7 @@ describe("cross-fact-type counterexamples", () => {
         "Person enrolled in Course::role2",
       ],
     });
-    const sc = teaches.constraints.find((c) => c.type === "subset")!;
+    const sc = model.constraintsTouching(teaches.id).find((c) => c.type === "subset")!;
 
     const ce = generateCounterexampleForConstraint(sc, teaches, model);
     expect(ce).toBeDefined();
@@ -436,7 +436,9 @@ describe("cross-fact-type counterexamples", () => {
       type: "external_uniqueness",
       roleIds: ["Room is in Building::role2", "Room has RoomNumber::role2"],
     });
-    const euc = inBuilding.constraints.find((c) => c.type === "external_uniqueness")!;
+    const euc = model.constraintsTouching(inBuilding.id).find((c) =>
+      c.type === "external_uniqueness"
+    )!;
 
     const ce = generateCounterexampleForConstraint(euc, inBuilding, model);
     expect(ce).toBeDefined();
@@ -453,7 +455,9 @@ describe("cross-fact-type counterexamples", () => {
       type: "external_uniqueness",
       roleIds: ["Room is in Building::role1", "Room is in Building::role2"],
     });
-    const euc = inBuilding.constraints.find((c) => c.type === "external_uniqueness")!;
+    const euc = model.constraintsTouching(inBuilding.id).find((c) =>
+      c.type === "external_uniqueness"
+    )!;
 
     expect(generateCounterexampleForConstraint(euc, inBuilding, model)).toBeUndefined();
   });
@@ -477,7 +481,7 @@ describe("cross-fact-type counterexamples", () => {
       roleIds1: ["Person manages Dept::role1", "Person manages Dept::role2"],
       roleIds2: ["Person works in Dept::role1", "Person works in Dept::role2"],
     });
-    const eq = manages.constraints.find((c) => c.type === "equality")!;
+    const eq = model.constraintsTouching(manages.id).find((c) => c.type === "equality")!;
 
     const ce = generateCounterexampleForConstraint(eq, manages, model);
     expect(ce).toBeDefined();
@@ -756,7 +760,7 @@ describe("descendant anchors for mandatory counterexamples", () => {
 
   function mandatoryCe(model: OrmModel): Counterexample | undefined {
     const ft = model.getFactTypeByName("Employee works in Department")!;
-    const mc = ft.constraints.find((c) => c.type === "mandatory")!;
+    const mc = ft.internalConstraints.find((c) => c.type === "mandatory")!;
     return generateCounterexampleForConstraint(mc, ft, model);
   }
 

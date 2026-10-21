@@ -37,7 +37,7 @@ const FIXTURES = [
 ];
 
 function constraintIds(model: OrmModel): (string | undefined)[] {
-  return model.factTypes.flatMap((ft) => ft.constraints.map((c) => c.id));
+  return model.everyConstraint().map(([c]) => c.id);
 }
 
 function normaIdsOf(doc: { constraints: readonly { id: string; }[]; }): Set<string> {
@@ -206,7 +206,9 @@ describe("NORMA import keeps constraint ids", () => {
     // importer skips a mandatory a role already has.
     const base = mapNormaToOrm(doc);
     const free = base.factTypes.map((ft) =>
-      ft.roles.find((r) => !ft.constraints.some((c) => c.type === "mandatory" && c.roleId === r.id))
+      ft.roles.find((r) =>
+        !ft.internalConstraints.some((c) => c.type === "mandatory" && c.roleId === r.id)
+      )
         ?.id
     ).filter((id): id is string => id !== undefined);
     const [first, second] = free.map(asNormaId);
@@ -267,7 +269,9 @@ describe("NORMA import keeps constraint ids", () => {
     );
     const base = mapNormaToOrm(doc);
     const free = base.factTypes.map((ft) =>
-      ft.roles.find((r) => !ft.constraints.some((c) => c.type === "mandatory" && c.roleId === r.id))
+      ft.roles.find((r) =>
+        !ft.internalConstraints.some((c) => c.type === "mandatory" && c.roleId === r.id)
+      )
         ?.id
     ).filter((id): id is string => id !== undefined).map(asNormaId);
     const twice: NormaMandatoryConstraint = {
@@ -311,7 +315,7 @@ describe("NORMA import keeps constraint ids", () => {
       ],
     };
     const cardinalityOf = (m: OrmModel) =>
-      m.factTypes.flatMap((f) => f.constraints).find((c) => c.type === "cardinality")?.id;
+      m.everyConstraint().map(([c]) => c).find((c) => c.type === "cardinality")?.id;
     // The importer's derived id for a cardinality NORMA wrote without one.
     expect(cardinalityOf(mapNormaToOrm(withCard))).toBe(cardinalityId(role!.id));
 
@@ -347,7 +351,7 @@ describe("NORMA import keeps constraint ids", () => {
           ...doc.factTypes.slice(2),
         ],
       };
-      const xors = mapNormaToOrm(listed).factTypes.flatMap((f) => f.constraints).filter((c) =>
+      const xors = mapNormaToOrm(listed).everyConstraint().map(([c]) => c).filter((c) =>
         c.type === "exclusive_or"
       );
       expect(xors.map((c) => c.id)).toEqual(["_c-xor"]);
@@ -365,8 +369,8 @@ describe("NORMA import keeps constraint ids", () => {
     const rival = { ...exclusion, id: asNormaId("_rival"), exclusiveOrMandatoryRef: mandatory.id };
     const others = doc.constraints.filter((c) => c !== exclusion && c !== mandatory);
     for (const order of [[mandatory, exclusion, rival], [rival, exclusion, mandatory]]) {
-      const xors = mapNormaToOrm({ ...doc, constraints: [...others, ...order] }).factTypes
-        .flatMap((f) => f.constraints).filter((c) => c.type === "exclusive_or");
+      const xors = mapNormaToOrm({ ...doc, constraints: [...others, ...order] })
+        .everyConstraint().map(([c]) => c).filter((c) => c.type === "exclusive_or");
       expect(xors.map((c) => c.id)).toEqual(["_c-xor"]);
     }
   });
@@ -383,7 +387,7 @@ describe("NORMA import keeps constraint ids", () => {
     )! as NormaMandatoryConstraint;
     const others = doc.constraints.filter((c) => c !== exclusion && c !== mandatory);
     const xorIds = (constraints: NormaConstraint[]) =>
-      mapNormaToOrm({ ...doc, constraints }).factTypes.flatMap((f) => f.constraints)
+      mapNormaToOrm({ ...doc, constraints }).everyConstraint().map(([c]) => c)
         .filter((c) => c.type === "exclusive_or").map((c) => c.id);
 
     // The mandatory is gone.
@@ -408,7 +412,7 @@ describe("NORMA import keeps constraint ids", () => {
       ...doc,
       constraints: [...others, mandatory, exclusion, rival],
     })
-      .factTypes.flatMap((f) => f.constraints);
+      .everyConstraint().map(([c]) => c);
     expect(withRival.filter((c) => c.type === "exclusive_or").map((c) => c.id)).toEqual([
       exclusion.id,
     ]);
@@ -430,8 +434,8 @@ describe("NORMA import keeps constraint ids", () => {
       roleRefs: [role],
       exclusiveOrExclusionRef: exclusion.id,
     };
-    const all = mapNormaToOrm({ ...doc, constraints: [...doc.constraints, simple] }).factTypes
-      .flatMap((f) => f.constraints);
+    const all = mapNormaToOrm({ ...doc, constraints: [...doc.constraints, simple] })
+      .everyConstraint().map(([c]) => c);
     expect(all.find((c) => c.type === "mandatory")?.id).toBe("_mc_simple");
   });
 
@@ -471,8 +475,8 @@ describe("NORMA import keeps constraint ids", () => {
       ],
     ];
     for (const factTypes of listed) {
-      const all = mapNormaToOrm({ ...doc, constraints, factTypes }).factTypes
-        .flatMap((f) => f.constraints);
+      const all = mapNormaToOrm({ ...doc, constraints, factTypes })
+        .everyConstraint().map(([c]) => c);
       expect(all.filter((c) => c.type === "exclusion" || c.type === "join_exclusion")).toEqual([]);
       expect(all.filter((c) => c.type === "exclusive_or").map((c) => c.id)).toEqual(["_c-xor"]);
     }
@@ -500,8 +504,8 @@ describe("NORMA import keeps constraint ids", () => {
       { ...first!, internalConstraintRefs: [...first!.internalConstraintRefs, exclusion.id] },
       ...rest,
     ];
-    const xors = mapNormaToOrm({ ...doc, constraints, factTypes }).factTypes
-      .flatMap((f) => f.constraints).filter((c) => c.type === "exclusive_or");
+    const xors = mapNormaToOrm({ ...doc, constraints, factTypes })
+      .everyConstraint().map(([c]) => c).filter((c) => c.type === "exclusive_or");
     expect(xors).toHaveLength(1);
     expect(xors[0]).toMatchObject({ id: "_c-xor", roleIds: mandatory.roleRefs });
     expect(xors[0]!.modality).toBeUndefined();
@@ -558,8 +562,8 @@ describe("NORMA import keeps constraint ids", () => {
       id: asNormaId("_m_second"),
       modality: "deontic",
     };
-    const xors = mapNormaToOrm({ ...doc, constraints: [...doc.constraints, second] }).factTypes
-      .flatMap((f) => f.constraints).filter((c) => c.type === "exclusive_or");
+    const xors = mapNormaToOrm({ ...doc, constraints: [...doc.constraints, second] })
+      .everyConstraint().map(([c]) => c).filter((c) => c.type === "exclusive_or");
     expect(xors.map((c) => c.id)).toEqual(expect.arrayContaining(["_c-xor", "_m_second"]));
   });
 
@@ -600,7 +604,7 @@ describe("NORMA import keeps constraint ids", () => {
         ...doc.factTypes.slice(2),
       ],
     };
-    const xors = mapNormaToOrm(listed).factTypes.flatMap((f) => f.constraints).filter((c) =>
+    const xors = mapNormaToOrm(listed).everyConstraint().map(([c]) => c).filter((c) =>
       c.type === "exclusive_or"
     );
     expect(xors).toHaveLength(1);
@@ -705,7 +709,7 @@ describe("NORMA import keeps constraint ids", () => {
             ...rest,
           ],
         };
-        const all = mapNormaToOrm(listed).factTypes.flatMap((f) => f.constraints);
+        const all = mapNormaToOrm(listed).everyConstraint().map(([c]) => c);
         expect(all.filter((c) => c.type === "exclusion" || c.type === "disjunctive_mandatory"))
           .toEqual([]);
         expect(all.filter((c) => c.type === "exclusive_or").map((c) => c.id)).toEqual(["_c-xor"]);
@@ -734,7 +738,9 @@ describe("NORMA import keeps constraint ids", () => {
     );
     const base = mapNormaToOrm(doc);
     const free = base.factTypes.map((ft) =>
-      ft.roles.find((r) => !ft.constraints.some((c) => c.type === "mandatory" && c.roleId === r.id))
+      ft.roles.find((r) =>
+        !ft.internalConstraints.some((c) => c.type === "mandatory" && c.roleId === r.id)
+      )
         ?.id
     ).filter((id): id is string => id !== undefined).map(asNormaId);
     const anonymous = (roleId: NormaId): NormaMandatoryConstraint => ({
@@ -807,7 +813,7 @@ describe("NORMA import keeps constraint ids", () => {
         ...rest,
       ],
     };
-    const xors = mapNormaToOrm(listed).factTypes.flatMap((f) => f.constraints).filter((c) =>
+    const xors = mapNormaToOrm(listed).everyConstraint().map(([c]) => c).filter((c) =>
       c.type === "exclusive_or"
     );
     expect(xors.map((c) => c.id)).toEqual(["_c-xor"]);
@@ -824,7 +830,7 @@ describe("NORMA import keeps constraint ids", () => {
         { ...mandatory2, modality: "deontic" as const },
       ],
     };
-    const xors = mapNormaToOrm(deontic).factTypes.flatMap((f) => f.constraints).filter((c) =>
+    const xors = mapNormaToOrm(deontic).everyConstraint().map(([c]) => c).filter((c) =>
       c.type === "exclusive_or"
     );
     expect(xors.map((c) => [c.id, c.modality ?? "alethic"])).toEqual([
@@ -848,7 +854,7 @@ describe("NORMA import keeps constraint ids", () => {
         ...rest,
       ],
     };
-    const xors = mapNormaToOrm(listed).factTypes.flatMap((f) => f.constraints).filter((c) =>
+    const xors = mapNormaToOrm(listed).everyConstraint().map(([c]) => c).filter((c) =>
       c.type === "exclusive_or"
     );
     expect(xors.map((c) => c.id)).toEqual(["_c-xor"]);
@@ -879,7 +885,7 @@ describe("NORMA import keeps constraint ids", () => {
     });
     const xml = exportXml(model);
     const back = mapNormaToOrm(parseNormaXml(xml));
-    const xor = back.factTypes.flatMap((f) => f.constraints).find((c) => c.type === "exclusive_or");
+    const xor = back.everyConstraint().map(([c]) => c).find((c) => c.type === "exclusive_or");
     expect(xor?.id).toBe("_c-xor");
     expect(xml).toContain('id="_c-xor"');
 
@@ -887,18 +893,14 @@ describe("NORMA import keeps constraint ids", () => {
     const mandatoryOnly = xml.replace(/<orm:ExclusiveOrMandatoryConstraint[^>]*\/>/g, "");
     expect(mandatoryOnly).not.toBe(xml);
     const back2 = mapNormaToOrm(parseNormaXml(mandatoryOnly));
-    const xor2 = back2.factTypes.flatMap((f) => f.constraints).find((c) =>
-      c.type === "exclusive_or"
-    );
+    const xor2 = back2.everyConstraint().map(([c]) => c).find((c) => c.type === "exclusive_or");
     expect(xor2?.id).toBe("_c-xor");
 
     // ... or only the exclusion side's.
     const exclusionOnly = xml.replace(/<orm:ExclusiveOrExclusionConstraint[^>]*\/>/g, "");
     expect(exclusionOnly).not.toBe(xml);
     const back3 = mapNormaToOrm(parseNormaXml(exclusionOnly));
-    const xor3 = back3.factTypes.flatMap((f) => f.constraints).find((c) =>
-      c.type === "exclusive_or"
-    );
+    const xor3 = back3.everyConstraint().map(([c]) => c).find((c) => c.type === "exclusive_or");
     expect(xor3?.id).toBe("_c-xor");
   });
 });
@@ -926,8 +928,8 @@ describe("NORMA import keeps modality in every phase", () => {
     const deontic = constraints.map((c) =>
       c.type === "exclusion" ? { ...c, modality: "deontic" as const } : c
     );
-    const exclusion = mapNormaToOrm({ ...doc, constraints: deontic }).factTypes
-      .flatMap((f) => f.constraints).find((c) => c.type === "exclusion");
+    const exclusion = mapNormaToOrm({ ...doc, constraints: deontic })
+      .everyConstraint().map(([c]) => c).find((c) => c.type === "exclusion");
     expect(exclusion?.modality).toBe("deontic");
   });
 
@@ -946,7 +948,7 @@ describe("NORMA import keeps modality in every phase", () => {
     const all = mapNormaToOrm({
       ...doc,
       constraints: [...constraints, external("_eu_a"), external("_eu_d", "deontic")],
-    }).factTypes.flatMap((f) => f.constraints).filter((c) => c.type === "external_uniqueness");
+    }).everyConstraint().map(([c]) => c).filter((c) => c.type === "external_uniqueness");
     expect(all.map((c) => [c.id, c.modality ?? "alethic"])).toEqual([
       ["_eu_a", "alethic"],
       ["_eu_d", "deontic"],
@@ -957,8 +959,8 @@ describe("NORMA import keeps modality in every phase", () => {
     const { doc, constraints } = uncoupled();
     const plain = constraints.find((c) => c.type === "mandatory" && !c.isSimple)!;
     const deontic = { ...plain, id: asNormaId("_dm_deontic"), modality: "deontic" as const };
-    const disjunctive = mapNormaToOrm({ ...doc, constraints: [...constraints, deontic] }).factTypes
-      .flatMap((f) => f.constraints).filter((c) => c.type === "disjunctive_mandatory");
+    const disjunctive = mapNormaToOrm({ ...doc, constraints: [...constraints, deontic] })
+      .everyConstraint().map(([c]) => c).filter((c) => c.type === "disjunctive_mandatory");
     expect(disjunctive.map((c) => c.modality ?? "alethic").sort()).toEqual(["alethic", "deontic"]);
   });
 });
@@ -994,8 +996,8 @@ describe("NORMA import keeps every distinct constraint", () => {
   }
 
   const ids = (doc: ReturnType<typeof people>, extra: NormaConstraint[]) =>
-    mapNormaToOrm({ ...doc, constraints: [...doc.constraints, ...extra] }).factTypes
-      .flatMap((f) => f.constraints).map((c) => c.id);
+    mapNormaToOrm({ ...doc, constraints: [...doc.constraints, ...extra] })
+      .everyConstraint().map(([c]) => c).map((c) => c.id);
 
   it("keeps two subsets from one role into different roles", () => {
     // NORMA writes this whenever one role is a subset of two others.
@@ -1060,7 +1062,7 @@ describe("NORMA import keeps every distinct constraint", () => {
             }
             : f
         ),
-      }).factTypes.flatMap((f) => f.constraints).map((c) => c.id);
+      }).everyConstraint().map(([c]) => c).map((c) => c.id);
       expect(all.filter((id) => id === "_u1" || id === "_u2")).toHaveLength(1);
     }
   });
@@ -1137,7 +1139,7 @@ describe("NORMA export of a file that omits constraint ids", () => {
     const model = xorModel();
     const ft = model.getFactType("ft-employed")!;
     ft.addConstraint({ type: "mandatory", roleId: "r-employed" });
-    const filled = ft.constraints.at(-1)!.id!;
+    const filled = ft.internalConstraints.at(-1)!.id!;
     expect(filled).toEqual(expect.any(String));
 
     const doc = writeOrmToNorma(model);

@@ -119,7 +119,7 @@ describe("OrmYamlSerializer", () => {
       });
 
       const restored = serializer.deserialize(serializer.serialize(model));
-      const c = restored.getFactTypeByName("Person has Age")!.constraints
+      const c = restored.getFactTypeByName("Person has Age")!.internalConstraints
         .find((x) => x.type === "value_constraint");
       expect(c).toMatchObject({
         type: "value_constraint",
@@ -152,7 +152,7 @@ describe("OrmYamlSerializer", () => {
       });
 
       const restored = serializer.deserialize(serializer.serialize(model));
-      const c = restored.getFactTypeByName("Trip runs")!.constraints
+      const c = restored.getFactTypeByName("Trip runs")!.internalConstraints
         .find((x) => x.type === "value_comparison");
       expect(c).toMatchObject({
         type: "value_comparison",
@@ -248,7 +248,7 @@ describe("OrmYamlSerializer", () => {
       expect((yaml.match(/modality:/g) ?? []).length).toBe(1);
 
       const restored = serializer.deserialize(yaml);
-      const constraints = restored.getFactTypeByName("Person has Name")!.constraints;
+      const constraints = restored.getFactTypeByName("Person has Name")!.internalConstraints;
       expect(constraints.find((c) => c.type === "mandatory")!.modality).toBe("deontic");
       expect(constraints.find((c) => c.type === "internal_uniqueness")!.modality).toBeUndefined();
     });
@@ -287,7 +287,7 @@ describe("OrmYamlSerializer", () => {
         min: 2,
         max: "unbounded",
       });
-      const card = restored.getFactTypeByName("Promotion is active")!.constraints
+      const card = restored.getFactTypeByName("Promotion is active")!.internalConstraints
         .find((c) => c.type === "cardinality");
       expect(card).toMatchObject({ type: "cardinality", roleId: "r1", min: 0, max: 10 });
     });
@@ -633,7 +633,7 @@ model:
       const model = serializer.deserialize(yaml);
 
       const ft = model.factTypes[0]!;
-      const uc = ft.constraints.find(
+      const uc = ft.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       );
       expect(uc).toBeDefined();
@@ -668,7 +668,7 @@ model:
       const model = serializer.deserialize(yaml);
 
       const ft = model.factTypes[0]!;
-      const uc = ft.constraints.find(
+      const uc = ft.internalConstraints.find(
         (c) => c.type === "internal_uniqueness",
       );
       expect(uc).toBeDefined();
@@ -723,9 +723,10 @@ model:
       expect(ft.roles[1]!.playerId).toBe("ot-002");
       expect(ft.readings).toHaveLength(2);
       expect(ft.readings[0]!.template).toBe("{0} places {1}");
-      expect(ft.constraints).toHaveLength(2);
-      expect(ft.constraints[0]!.type).toBe("internal_uniqueness");
-      expect(ft.constraints[1]!.type).toBe("mandatory");
+      expect(ft.internalConstraints).toHaveLength(2);
+      expect(ft.internalConstraints[0]!.type).toBe("internal_uniqueness");
+      expect(ft.internalConstraints[1]!.type).toBe("mandatory");
+      expect(model.constraints).toEqual([]);
     });
 
     it("deserializes external_uniqueness constraints", () => {
@@ -752,7 +753,7 @@ model:
           roles: ["r-001", "r-999"]
 `;
       const model = serializer.deserialize(yaml);
-      const c = model.factTypes[0]!.constraints[0]!;
+      const c = model.constraints[0]!;
       expect(c.type).toBe("external_uniqueness");
       if (c.type === "external_uniqueness") {
         expect(c.roleIds).toEqual(["r-001", "r-999"]);
@@ -784,7 +785,7 @@ model:
           values: ["X", "Y"]
 `;
       const model = serializer.deserialize(yaml);
-      const c = model.factTypes[0]!.constraints[0]!;
+      const c = model.factTypes[0]!.internalConstraints[0]!;
       expect(c.type).toBe("value_constraint");
       if (c.type === "value_constraint") {
         expect(c.roleId).toBe("r-001");
@@ -971,9 +972,9 @@ model:
             orig.readings[j]!.template,
           );
         }
-        expect(rest!.constraints.length).toBe(orig.constraints.length);
-        for (let j = 0; j < orig.constraints.length; j++) {
-          expect(rest!.constraints[j]).toEqual(orig.constraints[j]);
+        expect(rest!.internalConstraints.length).toBe(orig.internalConstraints.length);
+        for (let j = 0; j < orig.internalConstraints.length; j++) {
+          expect(rest!.internalConstraints[j]).toEqual(orig.internalConstraints[j]);
         }
       }
 
@@ -1013,11 +1014,14 @@ model:
       const restored = serializer.deserialize(yaml);
 
       const ft = restored.factTypes[0]!;
-      expect(ft.constraints).toHaveLength(4);
-      expect(ft.constraints[0]!.type).toBe("internal_uniqueness");
-      expect(ft.constraints[1]!.type).toBe("mandatory");
-      expect(ft.constraints[2]!.type).toBe("external_uniqueness");
-      expect(ft.constraints[3]!.type).toBe("value_constraint");
+      // The fact type keeps its own three; the constraint across fact types
+      // belongs to the model.
+      expect(ft.internalConstraints).toHaveLength(3);
+      expect(ft.internalConstraints[0]!.type).toBe("internal_uniqueness");
+      expect(ft.internalConstraints[1]!.type).toBe("mandatory");
+      expect(ft.internalConstraints[2]!.type).toBe("value_constraint");
+      expect(restored.constraints).toHaveLength(1);
+      expect(restored.constraints[0]!.type).toBe("external_uniqueness");
     });
 
     it("produces YAML that matches the architecture doc format", () => {

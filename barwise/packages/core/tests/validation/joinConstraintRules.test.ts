@@ -156,7 +156,7 @@ describe("joinConstraintRules", () => {
     // (barwise-nkq), so the diagnostic names the constraint, not its host.
     const bad: JoinOperand = { path: { root: "ot-missing", steps: [] }, projection: [0] };
     ft.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
-    const filled = ft.constraints.at(-1)!.id;
+    const filled = model.constraints.at(-1)!.id;
     expect(filled).toEqual(expect.any(String));
 
     const diags = unresolvedDiagnostics(model);
