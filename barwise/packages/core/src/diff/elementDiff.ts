@@ -448,6 +448,32 @@ function resolveRole(id: string, keys: RoleKeys): string {
 }
 
 /**
+ * The operand of an exclusion, a disjunctive mandatory or an exclusive-or:
+ * its roles or its subtype facts, which `withSubtypeFacts` keys by name.
+ */
+function operandOf(
+  c: { readonly roleIds?: readonly string[]; readonly subtypeFactIds?: readonly string[]; },
+) {
+  return c.roleIds ?? c.subtypeFactIds ?? [];
+}
+
+/**
+ * Keys a subtype fact by its subtype's and supertype's names, as
+ * `roleKeys` keys a role by its fact type's name and position, so a
+ * subtype constraint pairs by content across models whose subtype fact
+ * ids are unrelated (an import, independent LLM samples). Only constraints
+ * across fact types can name one, so only `pairModelConstraints` wraps
+ * its keys with this (orm-format-3 WS4b).
+ */
+function withSubtypeFacts(keys: RoleKeys, model: OrmModel, other: OrmModel): RoleKeys {
+  const nameOf = (id: string) => (model.getObjectType(id) ?? other.getObjectType(id))?.name ?? id;
+  return (id) => {
+    const sf = model.getSubtypeFact(id) ?? other.getSubtypeFact(id);
+    return sf ? `s${JSON.stringify([nameOf(sf.subtypeId), nameOf(sf.supertypeId)])}` : keys(id);
+  };
+}
+
+/**
  * Produce a stable, comparable string key for a constraint, normalized
  * so that role IDs are replaced with positions, or for a pair joined by
  * id with shared role ids (see `roleKeys` and `pairRoleKeys`). This
@@ -487,15 +513,15 @@ function constraintTypeKey(
       return `VC:${role}:${valueConstraintKey(c)}`;
     }
     case "disjunctive_mandatory": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
+      const indices = operandOf(c).map((id) => resolveRole(id, idxMap)).sort();
       return `DM:${indices.join(",")}`;
     }
     case "exclusion": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
+      const indices = operandOf(c).map((id) => resolveRole(id, idxMap)).sort();
       return `EX:${indices.join(",")}`;
     }
     case "exclusive_or": {
-      const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
+      const indices = operandOf(c).map((id) => resolveRole(id, idxMap)).sort();
       return `XO:${indices.join(",")}`;
     }
     case "subset": {
@@ -659,8 +685,16 @@ export function pairModelConstraints(
 ): ConstraintPair[] {
   const a = existing.constraints;
   const b = incoming.constraints;
-  const keysA = roleKeys([], holders.existing, holders.incoming);
-  const keysB = roleKeys([], holders.incoming, holders.existing);
+  const keysA = withSubtypeFacts(
+    roleKeys([], holders.existing, holders.incoming),
+    existing,
+    incoming,
+  );
+  const keysB = withSubtypeFacts(
+    roleKeys([], holders.incoming, holders.existing),
+    incoming,
+    existing,
+  );
   const pairOf = new Map<ExternalConstraint, ConstraintPair>();
   const taken = new Set<ExternalConstraint>();
   const byId = pairById(a, b, keysA, keysB, holders.existing, holders.incoming, pairing);
@@ -708,12 +742,6 @@ export function diffSubtypeFact(a: SubtypeFact, b: SubtypeFact): ChangeDescripti
       from: a.providesIdentification,
       to: b.providesIdentification,
     });
-  }
-  if (a.isExclusive !== b.isExclusive) {
-    changes.push({ change: "subtypeExclusive", from: a.isExclusive, to: b.isExclusive });
-  }
-  if (a.isExhaustive !== b.isExhaustive) {
-    changes.push({ change: "subtypeExhaustive", from: a.isExhaustive, to: b.isExhaustive });
   }
   if (derivationKey(a.definingRule) !== derivationKey(b.definingRule)) {
     changes.push({

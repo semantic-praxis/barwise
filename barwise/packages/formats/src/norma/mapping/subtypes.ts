@@ -6,6 +6,7 @@
  * supertype meta-roles; objectified types are linked to their nested
  * fact types once both exist.
  */
+import { type FlaggedSubtypeFact, subtypeConstraintsFromFlags } from "@barwise/core";
 import { derivedNormaElementId, NORMA_ID_TAGS } from "../normaId.js";
 import type { NormaDocument } from "../NormaXmlTypes.js";
 import { type NormaMappingContext, NormaMappingError } from "./context.js";
@@ -19,6 +20,9 @@ export function mapSubtypeFacts(ctx: NormaMappingContext): void {
   // SupertypeMetaRoles. These must be resolved before creating SubtypeFacts
   // because the properties are immutable.
   const subtypePartition = resolveSubtypePartitions(doc);
+  // The partitions as flags, converted to constraints over the subtype
+  // facts once every subtype fact exists (orm-format-3 WS4b).
+  const flagged: FlaggedSubtypeFact[] = [];
 
   for (const sf of doc.subtypeFacts) {
     const subtypeId = objectTypeIdMap.get(sf.subtypePlayerRef);
@@ -36,16 +40,21 @@ export function mapSubtypeFacts(ctx: NormaMappingContext): void {
     }
 
     const partition = subtypePartition.get(sf.supertypeRoleId);
-    model.addSubtypeFact({
+    const added = model.addSubtypeFact({
       // NORMA's own id, as for every other element the importer maps.
       ...(sf.id ? { id: sf.id } : {}),
       subtypeId,
       supertypeId,
       providesIdentification: sf.providesIdentification,
-      isExclusive: partition?.isExclusive,
-      isExhaustive: partition?.isExhaustive,
+    });
+    flagged.push({
+      id: added.id,
+      supertype: supertypeId,
+      ...(partition?.isExclusive ? { is_exclusive: true } : {}),
+      ...(partition?.isExhaustive ? { is_exhaustive: true } : {}),
     });
   }
+  for (const c of subtypeConstraintsFromFlags(flagged)) model.addConstraint(c);
 }
 
 /** Link objectified types to their nested fact types (phase 5). */

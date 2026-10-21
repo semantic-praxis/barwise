@@ -20,25 +20,6 @@ export interface SubtypeFactConfig {
    */
   readonly providesIdentification?: boolean;
   /**
-   * Whether the subtypes of this supertype are mutually exclusive.
-   * When true, no supertype instance can simultaneously be an instance
-   * of more than one subtype in the same partition group (all
-   * SubtypeFacts sharing the same supertype with isExclusive=true).
-   *
-   * In ORM 2 notation this corresponds to an exclusion constraint
-   * across the supertype meta-roles of the subtype partition.
-   */
-  readonly isExclusive?: boolean;
-  /**
-   * Whether the subtypes of this supertype are exhaustive (cover
-   * all instances). When true, every supertype instance must be an
-   * instance of at least one subtype in the same partition group.
-   *
-   * In ORM 2 notation this corresponds to a disjunctive mandatory
-   * constraint across the supertype meta-roles of the subtype partition.
-   */
-  readonly isExhaustive?: boolean;
-  /**
    * Defining rule when this subtype's membership is determined by a
    * derivation rule (Halpin's subtype-defining rules) rather than asserted.
    * Absent for an asserted subtype.
@@ -65,8 +46,6 @@ export class SubtypeFact extends ModelElement {
   readonly subtypeId: string;
   readonly supertypeId: string;
   readonly providesIdentification: boolean;
-  readonly isExclusive: boolean;
-  readonly isExhaustive: boolean;
   readonly definingRule: DerivationRule | undefined;
 
   constructor(config: SubtypeFactConfig) {
@@ -79,8 +58,6 @@ export class SubtypeFact extends ModelElement {
     this.subtypeId = config.subtypeId;
     this.supertypeId = config.supertypeId;
     this.providesIdentification = config.providesIdentification ?? true;
-    this.isExclusive = config.isExclusive ?? false;
-    this.isExhaustive = config.isExhaustive ?? false;
     this.definingRule = config.definingRule;
 
     if (config.subtypeId === config.supertypeId) {
@@ -106,8 +83,6 @@ export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
     subtypeId: sf.subtypeId,
     supertypeId: sf.supertypeId,
     providesIdentification: sf.providesIdentification,
-    isExclusive: sf.isExclusive,
-    isExhaustive: sf.isExhaustive,
     definingRule: sf.definingRule,
   };
   return config;

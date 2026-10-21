@@ -148,6 +148,16 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
           u.missing,
         );
       }
+      if (u.field === "subtypeFactIds") {
+        return report(
+          RULE_ID.subtypeConstraintUnknownSubtypeFact,
+          "default",
+          constraintElementId(constraint),
+          // Only the three kinds with a subtype operand reach here.
+          EXTERNAL_KIND_LABEL[constraint.type as keyof typeof EXTERNAL_KIND_LABEL],
+          u.missing,
+        );
+      }
       if (factType === undefined) {
         const kind = EXTERNAL_KIND_LABEL[constraint.type];
         const held = model.factTypesOf(constraint);

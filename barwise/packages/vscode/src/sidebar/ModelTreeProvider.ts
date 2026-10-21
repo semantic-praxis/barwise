@@ -22,6 +22,7 @@ import {
   preferredIdentifiers,
   roleIdsOf,
   type SubtypeFact,
+  subtypeFlagsFromConstraints,
   type ValueType,
 } from "@barwise/core";
 import * as vscode from "vscode";
@@ -351,8 +352,10 @@ function subtypeItem(sf: SubtypeFact, model: OrmModel): ModelTreeItem {
   const supName = sup?.name ?? sf.supertypeId;
   const flags: string[] = [];
   if (sf.providesIdentification) flags.push("identifies");
-  if (sf.isExclusive) flags.push("exclusive");
-  if (sf.isExhaustive) flags.push("exhaustive");
+  // What the constraints over this supertype's subtypes say of this one.
+  const partition = subtypeFlagsFromConstraints(model.constraints).get(sf.id);
+  if (partition?.exclusive) flags.push("exclusive");
+  if (partition?.exhaustive) flags.push("exhaustive");
   return {
     kind: "subtype_fact",
     label: `${subName} is a ${supName}`,

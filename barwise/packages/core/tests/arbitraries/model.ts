@@ -71,6 +71,10 @@ import type {
 import { OrmModel, type OrmModelConfig } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig, PopulationConfig } from "../../src/model/Population.js";
 import type { SubtypeFactConfig } from "../../src/model/SubtypeFact.js";
+import {
+  type FlaggedSubtypeFact,
+  subtypeConstraintsFromFlags,
+} from "../../src/serialization/subtypeFlags.js";
 
 /**
  * The seed every law runs at, and the number of models each generates.
@@ -722,14 +726,21 @@ function firstHop(
   return null;
 }
 
+/**
+ * The subtype facts, and the constraints over them their raw flags state.
+ * The flags are drawn as a 2.0 file states them and converted by step 3
+ * (orm-format-3 WS4b), so every generated subtype constraint is one a 2.0
+ * file can hold, and the 2.0 round trip is lossless over them.
+ */
 function toSubtypeFacts(
   raws: readonly RawSubtypeFact[],
   objectTypes: readonly ObjectTypeConfig[],
-): SubtypeFactConfig[] {
+): { configs: SubtypeFactConfig[]; constraints: ExternalConstraint[]; } {
   const entities = objectTypes.filter((ot) => ot.kind === "entity");
-  if (entities.length < 2) return [];
+  if (entities.length < 2) return { configs: [], constraints: [] };
 
   const out: SubtypeFactConfig[] = [];
+  const flagged: FlaggedSubtypeFact[] = [];
   const seen = new Set<string>();
   for (const [i, raw] of raws.entries()) {
     const a = raw.pickA % entities.length;
@@ -749,12 +760,16 @@ function toSubtypeFacts(
       subtypeId: sub.id!,
       supertypeId: sup.id!,
       providesIdentification: raw.providesIdentification,
-      isExclusive: raw.isExclusive,
-      isExhaustive: raw.isExhaustive,
       ...(definingRule !== undefined ? { definingRule } : {}),
     });
+    flagged.push({
+      id: `sf${i}`,
+      supertype: sup.id!,
+      is_exclusive: raw.isExclusive,
+      is_exhaustive: raw.isExhaustive,
+    });
   }
-  return out;
+  return { configs: out, constraints: subtypeConstraintsFromFlags(flagged) };
 }
 
 function toObjectified(
@@ -969,7 +984,10 @@ function toPlan(raw: RawModel): ModelPlan {
     (constraintsByOwner.get(j) ?? []).filter(isExternalConstraint)
   );
 
-  const subtypeFacts = toSubtypeFacts(raw.subtypeFacts, objectTypes);
+  const { configs: subtypeFacts, constraints: overSubtypes } = toSubtypeFacts(
+    raw.subtypeFacts,
+    objectTypes,
+  );
 
   return {
     model: {
@@ -979,7 +997,8 @@ function toPlan(raw: RawModel): ModelPlan {
     },
     objectTypes,
     factTypes,
-    constraints,
+    // After the constraints across fact types, as a 2.0 load orders them.
+    constraints: [...constraints, ...overSubtypes],
     subtypeFacts,
     objectifiedFactTypes: toObjectified(raw.objectified, objectTypes, skeletons, subtypeFacts),
     populations: toPopulations(raw.populations, skeletons),

@@ -159,14 +159,6 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
     text: "provides identification: true -> false",
   },
   {
-    sample: { change: "subtypeExclusive", from: false, to: true },
-    text: "exclusive: false -> true",
-  },
-  {
-    sample: { change: "subtypeExhaustive", from: false, to: true },
-    text: "exhaustive: false -> true",
-  },
-  {
     sample: { change: "populationDescription", from: "Audited placements.", to: undefined },
     text: `population description: "Audited placements." -> "(none)"`,
   },

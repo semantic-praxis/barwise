@@ -53,6 +53,9 @@ export const RULE_ID = {
   disjunctiveMandatoryTooFewRoles: "constraint/disjunctive-mandatory-too-few-roles",
   equalityArityMismatch: "constraint/equality-arity-mismatch",
   exclusionTooFewRoles: "constraint/exclusion-too-few-roles",
+  subtypeConstraintTooFewSubtypes: "constraint/subtype-constraint-too-few-subtypes",
+  subtypeConstraintMixedSupertypes: "constraint/subtype-constraint-mixed-supertypes",
+  subtypeConstraintUnknownSubtypeFact: "constraint/subtype-constraint-unknown-subtype-fact",
   exclusiveOrTooFewRoles: "constraint/exclusive-or-too-few-roles",
   externalUniquenessAllLocal: "constraint/external-uniqueness-all-local",
   frequencyEmptyRoles: "constraint/frequency-empty-roles",
@@ -277,6 +280,33 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (span: string): string =>
         `Exclusion constraint over ${span} must reference at least 2 roles.`,
+    },
+  },
+  [RULE_ID.subtypeConstraintTooFewSubtypes]: {
+    severity: "error",
+    description:
+      "An exclusion or exclusive-or over subtypes names fewer than two subtype facts, or a disjunctive mandatory names none.",
+    messages: {
+      default: (kind: string, supertype: string, count: number, min: number): string =>
+        `${kind} constraint over the subtypes of ${supertype} names ${count} subtype fact${
+          count === 1 ? "" : "s"
+        }; it needs at least ${min}.`,
+    },
+  },
+  [RULE_ID.subtypeConstraintMixedSupertypes]: {
+    severity: "error",
+    description: "A constraint over subtypes names subtype facts of more than one supertype.",
+    messages: {
+      default: (kind: string, supertypes: string): string =>
+        `${kind} constraint names subtype facts of more than one supertype (${supertypes}); the subtypes it constrains must share one.`,
+    },
+  },
+  [RULE_ID.subtypeConstraintUnknownSubtypeFact]: {
+    severity: "error",
+    description: "A constraint over subtypes names a subtype fact the model does not have.",
+    messages: {
+      default: (kind: string, subtypeFactId: string): string =>
+        `${kind} constraint references subtype fact id "${subtypeFactId}", which the model does not have.`,
     },
   },
   [RULE_ID.exclusiveOrTooFewRoles]: {

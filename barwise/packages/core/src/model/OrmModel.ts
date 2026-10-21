@@ -3,6 +3,7 @@ import {
   type ExternalConstraint,
   type InternalConstraint,
   roleIdsOf,
+  subtypeFactIdsOf,
 } from "./Constraint.js";
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
@@ -293,11 +294,14 @@ export class OrmModel {
    * reader that shows constraints by fact type reads these too, or a
    * constraint left dangling by a renamed or deleted role disappears.
    * Both read the one `holdsAny` test, so a constraint is in exactly one
-   * of this and some fact type's view.
+   * of this and some fact type's view. A constraint over subtypes names no
+   * role, so it is in neither: it belongs with the subtype facts it names
+   * (orm-format-3 WS4b), not among the dangling.
    */
   constraintsTouchingNone(): readonly ExternalConstraint[] {
     const factTypes = this.factTypes;
     return this.constraints.filter((c) => {
+      if (subtypeFactIdsOf(c).length > 0) return false;
       const roleIds = roleIdsOf(c);
       return !factTypes.some((ft) => holdsAny(ft, roleIds));
     });
@@ -520,12 +524,28 @@ export class OrmModel {
     return sf;
   }
 
-  /** Remove a subtype fact from the model. */
+  /**
+   * Remove a subtype fact from the model, and from every constraint over
+   * subtypes that names it. A constraint left naming none goes with it.
+   *
+   * Narrowed, not left dangling as `removeFactType` leaves a constraint's
+   * roles: an exclusive-or over Male and Female with Male removed is a rule
+   * about Female alone, which validation reports as too few subtypes, and a
+   * model holding it still loads. An id naming nothing would not.
+   */
   removeSubtypeFact(id: string): void {
     if (!this._subtypeFacts.has(id)) {
       throw new Error(`Subtype fact with id "${id}" not found.`);
     }
     this._subtypeFacts.delete(id);
+    for (let i = this._constraints.length - 1; i >= 0; i--) {
+      const c = this._constraints[i]!;
+      const ids = subtypeFactIdsOf(c);
+      if (!ids.includes(id)) continue;
+      const rest = ids.filter((sf) => sf !== id);
+      if (rest.length === 0) this._constraints.splice(i, 1);
+      else this._constraints[i] = { ...c, subtypeFactIds: rest } as ExternalConstraint;
+    }
   }
 
   /**

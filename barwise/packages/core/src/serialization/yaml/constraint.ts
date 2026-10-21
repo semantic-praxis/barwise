@@ -20,9 +20,9 @@ type OrmYamlConstraintBody =
   | { type: "mandatory"; role: string; }
   | { type: "external_uniqueness"; roles: string[]; }
   | ({ type: "value_constraint"; role?: string; } & OrmYamlValueConstraintBody)
-  | { type: "disjunctive_mandatory"; roles: string[]; }
-  | { type: "exclusion"; roles: string[]; }
-  | { type: "exclusive_or"; roles: string[]; }
+  | ({ type: "disjunctive_mandatory"; } & OrmYamlRolesOrSubtypeFacts)
+  | ({ type: "exclusion"; } & OrmYamlRolesOrSubtypeFacts)
+  | ({ type: "exclusive_or"; } & OrmYamlRolesOrSubtypeFacts)
   | { type: "subset"; subset_roles: string[]; superset_roles: string[]; }
   | { type: "equality"; roles_1: string[]; roles_2: string[]; }
   | { type: "ring"; role_1: string; role_2: string; ring_type: RingType; }
@@ -37,6 +37,15 @@ type OrmYamlConstraintBody =
   | { type: "join_subset"; subset: OrmYamlJoinOperand; superset: OrmYamlJoinOperand; }
   | { type: "join_equality"; operands: OrmYamlJoinOperand[]; }
   | { type: "join_exclusion"; operands: OrmYamlJoinOperand[]; };
+
+/**
+ * The operand of an exclusion, a disjunctive mandatory or an exclusive-or
+ * as a file states it: roles, or a supertype's subtype facts
+ * (orm-format-3, Open decision 2).
+ */
+type OrmYamlRolesOrSubtypeFacts =
+  | { roles: string[]; subtype_facts?: never; }
+  | { subtype_facts: string[]; roles?: never; };
 
 /** A serialized constraint carries the shared optional `modality`. */
 export type OrmYamlConstraint = OrmYamlConstraintBody & { modality?: ConstraintModality; };
@@ -71,13 +80,19 @@ export function serializeConstraint(c: Constraint): OrmYamlConstraint {
       break;
     }
     case "disjunctive_mandatory":
-      result = { type: "disjunctive_mandatory", roles: [...c.roleIds] };
+      result = c.subtypeFactIds
+        ? { type: "disjunctive_mandatory", subtype_facts: [...c.subtypeFactIds] }
+        : { type: "disjunctive_mandatory", roles: [...c.roleIds] };
       break;
     case "exclusion":
-      result = { type: "exclusion", roles: [...c.roleIds] };
+      result = c.subtypeFactIds
+        ? { type: "exclusion", subtype_facts: [...c.subtypeFactIds] }
+        : { type: "exclusion", roles: [...c.roleIds] };
       break;
     case "exclusive_or":
-      result = { type: "exclusive_or", roles: [...c.roleIds] };
+      result = c.subtypeFactIds
+        ? { type: "exclusive_or", subtype_facts: [...c.subtypeFactIds] }
+        : { type: "exclusive_or", roles: [...c.roleIds] };
       break;
     case "subset":
       result = {
@@ -159,13 +174,19 @@ export function deserializeConstraint(c: OrmYamlConstraint): Constraint {
       break;
     }
     case "disjunctive_mandatory":
-      result = { type: "disjunctive_mandatory", roleIds: c.roles };
+      result = c.subtype_facts
+        ? { type: "disjunctive_mandatory", subtypeFactIds: c.subtype_facts }
+        : { type: "disjunctive_mandatory", roleIds: c.roles };
       break;
     case "exclusion":
-      result = { type: "exclusion", roleIds: c.roles };
+      result = c.subtype_facts
+        ? { type: "exclusion", subtypeFactIds: c.subtype_facts }
+        : { type: "exclusion", roleIds: c.roles };
       break;
     case "exclusive_or":
-      result = { type: "exclusive_or", roleIds: c.roles };
+      result = c.subtype_facts
+        ? { type: "exclusive_or", subtypeFactIds: c.subtype_facts }
+        : { type: "exclusive_or", roleIds: c.roles };
       break;
     case "subset":
       result = {

@@ -14,7 +14,7 @@
  * Returns a freshly constructed OrmModel (no mutation of inputs).
  */
 
-import { type ExternalConstraint, roleIdsOf } from "../model/Constraint.js";
+import { type ExternalConstraint, roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
@@ -202,38 +202,87 @@ export function mergeModels(
   const roleIds = (m: OrmModel) => m.factTypes.flatMap((ft) => ft.roles.map((r) => r.id));
   const mergedRoles = new Set(roleIds(merged));
   const sourceRoles = new Set([...roleIds(existing), ...roleIds(incoming)]);
-  for (const [delta, idx] of constraintDeltas) {
-    const isAccepted = accepted.has(idx);
-    // In order of preference: an accepted modification whose incoming
-    // version names a role the merge took falls back to the existing one,
-    // which the reviewer did not ask to remove.
-    const candidates = delta.kind === "unchanged"
+  // In order of preference: an accepted modification whose incoming
+  // version names a role the merge took falls back to the existing one,
+  // which the reviewer did not ask to remove.
+  const candidatesOf = (delta: ConstraintDelta, isAccepted: boolean) =>
+    delta.kind === "unchanged"
       ? [delta.existing]
       : delta.kind === "added"
       ? (isAccepted ? [delta.incoming] : [])
       : delta.kind === "removed"
       ? (isAccepted ? [] : [delta.existing])
       : (isAccepted ? [delta.incoming, delta.existing] : [delta.existing]);
-    for (const chosen of candidates) {
+  // The first candidate the merge can place, or none.
+  const placeConstraint = (delta: ConstraintDelta, isAccepted: boolean): void => {
+    for (const chosen of candidatesOf(delta, isAccepted)) {
       if (!chosen) continue;
-      const fromIncoming = chosen === delta.incoming;
-      const remapped = remapConstraintIds(
-        [mapRoleIds(chosen, fromIncoming ? incomingRoleIdToMergedId : roleIdMap)],
-        merged,
-        incomingIdToMergedId,
-      )[0] as ExternalConstraint;
-      // A role the merged model does not hold, where one of the two models
-      // did, was taken by the merge itself: a rejected fact type addition
-      // or an accepted removal. The constraint goes with it, as a
-      // population does, rather than surviving with a dangling role. A
-      // role neither model ever held is the file's own dangling reference
-      // and is carried through, so validation reports it.
-      const lost = roleIdsOf(remapped).some((id) => !mergedRoles.has(id) && sourceRoles.has(id));
-      if (lost) continue;
+      const placed = subtypeFactIdsOf(chosen).length > 0
+        ? overMergedSubtypeFacts(chosen, chosen === delta.incoming)
+        : overMergedRoles(chosen, chosen === delta.incoming);
+      if (!placed) continue;
       // A modification is paired by id, so either side carries the existing id.
-      merged.addConstraint(remapped);
-      break;
+      merged.addConstraint(placed);
+      return;
     }
+  };
+  const overMergedRoles = (
+    chosen: ExternalConstraint,
+    fromIncoming: boolean,
+  ): ExternalConstraint | undefined => {
+    const remapped = remapConstraintIds(
+      [mapRoleIds(chosen, fromIncoming ? incomingRoleIdToMergedId : roleIdMap)],
+      merged,
+      incomingIdToMergedId,
+    )[0] as ExternalConstraint;
+    // A role the merged model does not hold, where one of the two models
+    // did, was taken by the merge itself: a rejected fact type addition
+    // or an accepted removal. The constraint goes with it, as a
+    // population does, rather than surviving with a dangling role. A
+    // role neither model ever held is the file's own dangling reference
+    // and is carried through, so validation reports it.
+    const lost = roleIdsOf(remapped).some((id) => !mergedRoles.has(id) && sourceRoles.has(id));
+    return lost ? undefined : remapped;
+  };
+  // Each subtype fact maps to the merged one with the same two ends. One the
+  // merge left out (a rejected addition, an accepted removal) takes the
+  // constraint with it, as a role does above; one neither model held is
+  // carried through for validation to report.
+  const overMergedSubtypeFacts = (
+    chosen: ExternalConstraint,
+    fromIncoming: boolean,
+  ): ExternalConstraint | undefined => {
+    const ids: string[] = [];
+    for (const id of subtypeFactIdsOf(chosen)) {
+      const source = (fromIncoming ? incoming : existing).getSubtypeFact(id);
+      if (!source) {
+        ids.push(id);
+        continue;
+      }
+      const subtypeId = fromIncoming
+        ? resolveObjectTypeId(merged, source.subtypeId, incomingIdToMergedId)
+        : source.subtypeId;
+      const supertypeId = fromIncoming
+        ? resolveObjectTypeId(merged, source.supertypeId, incomingIdToMergedId)
+        : source.supertypeId;
+      const kept = merged.subtypeFacts.find((sf) =>
+        sf.subtypeId === subtypeId && sf.supertypeId === supertypeId
+      );
+      if (!kept) return undefined;
+      ids.push(kept.id);
+    }
+    return { ...chosen, subtypeFactIds: ids } as ExternalConstraint;
+  };
+  // A delta with a constraint over subtype facts on either side waits for
+  // phase 4, which settles the merged subtype facts and their ids
+  // (orm-format-3 WS4b); either side may be the one placed.
+  const overSubtypes: [ConstraintDelta, number][] = [];
+  for (const [delta, idx] of constraintDeltas) {
+    if ([delta.existing, delta.incoming].some((c) => c && subtypeFactIdsOf(c).length > 0)) {
+      overSubtypes.push([delta, idx]);
+      continue;
+    }
+    placeConstraint(delta, accepted.has(idx));
   }
 
   // Phase 3: definitions.
@@ -303,6 +352,10 @@ export function mergeModels(
     const id = merged.subtypeFacts.some((sf) => sf.id === preferredId) ? undefined : preferredId;
     merged.addSubtypeFact({ ...toSubtypeFactConfig(chosen), id, subtypeId, supertypeId });
   }
+
+  // Phase 4b: constraints over subtype facts, now that the merged model
+  // holds its subtype facts.
+  for (const [delta, idx] of overSubtypes) placeConstraint(delta, accepted.has(idx));
 
   // Phase 5: objectified fact types. After fact types AND object types,
   // since it references one of each. Its delta type forbids "modified",

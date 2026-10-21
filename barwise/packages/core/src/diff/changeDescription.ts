@@ -140,8 +140,6 @@ export type ChangeDescription =
     readonly from: boolean;
     readonly to: boolean;
   }
-  | { readonly change: "subtypeExclusive"; readonly from: boolean; readonly to: boolean; }
-  | { readonly change: "subtypeExhaustive"; readonly from: boolean; readonly to: boolean; }
   | {
     readonly change: "definingRule";
     readonly from?: DerivationRule;
@@ -263,10 +261,6 @@ export function describeChange(change: ChangeDescription): string {
       return `context: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
     case "providesIdentification":
       return `provides identification: ${change.from} -> ${change.to}`;
-    case "subtypeExclusive":
-      return `exclusive: ${change.from} -> ${change.to}`;
-    case "subtypeExhaustive":
-      return `exhaustive: ${change.from} -> ${change.to}`;
     case "definingRule":
       return "defining rule changed";
     case "populationDescription":

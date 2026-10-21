@@ -577,6 +577,12 @@
       "caught_by": "reasoning",
       "note": "Code review on PR #684 found the unheld-fact-type path in constraintsTouching wrong three ways across two rounds; it was dropped rather than patched again."
     },
+    "orm-format-3::388f0ed7bf2e": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- 4b lands as more than one pr. the draft planned one pr in commits that each keep the suite green. the first commit alone touches 45 files across five packages",
+      "caught_by": "reasoning",
+      "note": "A scope call made at implementation: the first commit was green and reviewable alone, and 45 files is already a full review, so the draft's one PR became several."
+    },
     "orm-format-3::4b8c3c16bdc4": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "10. land 4a ahead of the format -- open; recommended: yes. raised by ws4's grounding (2026-10-21). the draft planned ws4 as one pr. - (a) recommended. 4a, the n",
@@ -624,6 +630,12 @@
       "excerpt": "- 3c-iii, writers. - facttype.addconstraint and facttypeconfig.constraints take the internal kinds only, and the forward from 3c-ii is gone. a fact type still r",
       "caught_by": "execution",
       "note": "The draft listed ModelMerge among the writers to move; it had moved in 3c-ii. Running the migrated suite showed that tests varying the nesting host built identical models, so they were reworked to vary it through a 2.0 file."
+    },
+    "orm-format-3::d0d1a19cf80a": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- the operand. roleorsubtypeoperand makes exclusion, disjunctivemandatory and exclusiveor take roleids or subtypefactids, exactly one. roleidsof returns no role",
+      "caught_by": "execution",
+      "note": "Two corrections to the WS4b draft. The compiler, once the flags were removed, showed the llm parser never wrote them, though the draft listed it among their writers. And writing the removeSubtypeFact cascade showed that dropping a constraint only when its last operand goes, as removeFactType does, leaves a dangling subtype fact id the 3.0 loader would refuse; it narrows the operand instead."
     },
     "orm-format-3::d1002d78ea4d": {
       "spec": "orm-format-3.spec.md",

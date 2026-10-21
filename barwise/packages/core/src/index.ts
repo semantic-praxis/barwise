@@ -43,9 +43,11 @@ export {
   type RingConstraint,
   type RingType,
   roleIdsOf,
+  type RoleOrSubtypeOperand,
   type RolePath,
   type RolePathStep,
   type SubsetConstraint,
+  subtypeFactIdsOf,
   type ValueComparisonConstraint,
   type ValueComparisonOperator,
   type ValueConstraint,
@@ -181,6 +183,11 @@ export {
   SchemaValidator,
 } from "./serialization/SchemaValidator.js";
 export { CURRENT_ORM_VERSION, type OrmVersionMigration } from "./serialization/schemaVersion.js";
+export {
+  type FlaggedSubtypeFact,
+  subtypeConstraintsFromFlags,
+  subtypeFlagsFromConstraints,
+} from "./serialization/subtypeFlags.js";
 
 // Validation
 export {

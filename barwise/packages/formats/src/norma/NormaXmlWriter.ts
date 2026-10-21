@@ -33,6 +33,9 @@ import {
   preferredIdentifiers,
   pureObjectifyingEntityIds,
   type Role,
+  type RoleOrSubtypeOperand,
+  subtypeFactIdsOf,
+  subtypeFlagsFromConstraints,
   type ValueComparisonOperator,
   type ValueRange,
   type ValueType,
@@ -155,6 +158,9 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   // after every fact type's own, whichever fact type a 2.0 file nested
   // them under (orm-format-3, Open decision 9).
   for (const c of model.constraints) {
+    // A constraint over subtypes is written with the subtype facts, over
+    // their supertype meta-roles (`writeSubtypeFacts`).
+    if (subtypeFactIdsOf(c).length > 0) continue;
     writeTopLevel(
       c,
       toNormaId(constraintId(c, "across fact types")),
@@ -371,7 +377,7 @@ function writeTopLevel(
       id: ownId,
       name: "",
       ...modality,
-      roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
+      roleSequences: operandRoles(c).map((r) => [toNormaId(r)]),
       exclusiveOrMandatoryRef: mandatoryId,
     });
     constraints.push({
@@ -381,7 +387,7 @@ function writeTopLevel(
       ...modality,
       isSimple: false,
       isImplied: false,
-      roleRefs: c.roleIds.map(toNormaId),
+      roleRefs: operandRoles(c).map(toNormaId),
       exclusiveOrExclusionRef: ownId,
     });
     return ownId;
@@ -511,7 +517,7 @@ function writeConstraint(
         ...modality,
         isSimple: false,
         isImplied: false,
-        roleRefs: c.roleIds.map(toNormaId),
+        roleRefs: operandRoles(c).map(toNormaId),
       };
     case "frequency":
       return {
@@ -556,7 +562,7 @@ function writeConstraint(
         id,
         name: "",
         ...modality,
-        roleSequences: c.roleIds.map((r) => [toNormaId(r)]),
+        roleSequences: operandRoles(c).map((r) => [toNormaId(r)]),
       };
     case "exclusive_or":
       // Emitted by writeFactType as NORMA's coupled exclusion +
@@ -713,11 +719,23 @@ function writeJoinPath(o: JoinOperand, id: NormaId): NormaJoinPath | undefined {
 // Subtype facts
 // ---------------------------------------------------------------------------
 
+/**
+ * The roles of a constraint that can instead constrain subtypes. One over
+ * subtypes never reaches the role writers -- `writeSubtypeFacts` writes it
+ * -- so reaching here with one is a defect, reported rather than written as
+ * a constraint over no roles.
+ */
+function operandRoles(c: RoleOrSubtypeOperand): readonly string[] {
+  if (c.roleIds) return c.roleIds;
+  throw new Error("A constraint over subtypes is written with its subtype facts.");
+}
+
 function writeSubtypeFacts(
   model: OrmModel,
   out: NormaSubtypeFact[],
   constraints: NormaConstraint[],
 ): void {
+  const flags = subtypeFlagsFromConstraints(model.constraints);
   // Group subtype facts by supertype so exclusive/exhaustive partitions can
   // be re-expressed as exclusion / disjunctive-mandatory constraints over the
   // supertype meta-roles.
@@ -745,8 +763,8 @@ function writeSubtypeFacts(
       isExhaustive: false,
     };
     group.supertypeRoleIds.push(supertypeRoleId);
-    group.isExclusive = group.isExclusive || sf.isExclusive;
-    group.isExhaustive = group.isExhaustive || sf.isExhaustive;
+    group.isExclusive = group.isExclusive || (flags.get(sf.id)?.exclusive ?? false);
+    group.isExhaustive = group.isExhaustive || (flags.get(sf.id)?.exhaustive ?? false);
     bySupertype.set(sf.supertypeId, group);
   }
 

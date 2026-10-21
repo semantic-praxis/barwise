@@ -12,7 +12,13 @@
  * plus explicit checks of the structures the conceptual diff does not cover
  * (subtype facts and objectification), so the guard is complete.
  */
-import { clearFormats, getExporter, type OrmModel, registerFormat } from "@barwise/core";
+import {
+  clearFormats,
+  getExporter,
+  type OrmModel,
+  registerFormat,
+  subtypeFlagsFromConstraints,
+} from "@barwise/core";
 import { diffModels } from "@barwise/core/diff";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -64,13 +70,17 @@ function expectModelsEqual(a: OrmModel, b: OrmModel, fixture: string): void {
 }
 
 function expectSubtypesEqual(a: OrmModel, b: OrmModel, fixture: string): void {
-  const key = (m: OrmModel) =>
-    m.subtypeFacts
+  const key = (m: OrmModel) => {
+    // What the constraints over subtypes say of each (orm-format-3 WS4b).
+    const flags = subtypeFlagsFromConstraints(m.constraints);
+    return m.subtypeFacts
       .map((sf) =>
         `${m.getObjectType(sf.subtypeId)?.name}<:${m.getObjectType(sf.supertypeId)?.name}`
-        + `:excl=${sf.isExclusive}:exh=${sf.isExhaustive}:pid=${sf.providesIdentification}`
+        + `:excl=${flags.get(sf.id)?.exclusive ?? false}`
+        + `:exh=${flags.get(sf.id)?.exhaustive ?? false}:pid=${sf.providesIdentification}`
       )
       .sort();
+  };
   expect(key(b), `subtype facts mismatch for ${fixture}`).toEqual(key(a));
 }
 

@@ -13,7 +13,7 @@
  * test over the trial kernels and the examples pins it.
  */
 
-import { type OrmModel, validateReadingTemplate } from "@barwise/core";
+import { type OrmModel, subtypeFlagsFromConstraints, validateReadingTemplate } from "@barwise/core";
 import type { DerivationKind, DerivationRule, DerivationStorage, FactType } from "@barwise/core";
 import type { RelationalSchema, Table } from "@barwise/core/mapping";
 
@@ -153,6 +153,8 @@ export function annotateTable(
   const objectifies = objectifiedFt ? relationshipOf(model, objectifiedFt, table) : undefined;
   // The mapper tags each subtype's foreign key with its subtype fact's id.
   const supertypes: SupertypeLink[] = [];
+  // v1 states the constraints over subtypes as flags on each link.
+  const flags = subtypeFlagsFromConstraints(model.constraints);
   for (const sf of model.subtypeFacts) {
     if (sf.subtypeId !== entity.id) continue;
     const supertype = model.getObjectType(sf.supertypeId);
@@ -162,8 +164,8 @@ export function annotateTable(
       entity: supertype.name,
       columns: [...fk.columnNames],
       providesIdentification: sf.providesIdentification,
-      isExclusive: sf.isExclusive,
-      isExhaustive: sf.isExhaustive,
+      isExclusive: flags.get(sf.id)?.exclusive ?? false,
+      isExhaustive: flags.get(sf.id)?.exhaustive ?? false,
       ...(sf.definingRule ? { definingRule: sf.definingRule } : {}),
     });
   }

@@ -107,7 +107,11 @@ function disjunctiveMandatoryViolationsIn(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   if (!isDisjunctiveMandatory(c)) return diagnostics;
-  const playerId = c.roleIds
+  // Totality over subtypes has no population to check: a model does not
+  // populate subtype membership (orm-format-3 WS4b).
+  if (!c.roleIds) return diagnostics;
+  const roleIds = c.roleIds;
+  const playerId = roleIds
     .map((rid) => rolePlayer.get(rid))
     .find((p) => p !== undefined);
   if (playerId === undefined) return diagnostics;
@@ -115,7 +119,7 @@ function disjunctiveMandatoryViolationsIn(
   if (!required || required.size === 0) return diagnostics;
 
   const playedSomewhere = new Set<string>();
-  for (const rid of c.roleIds) {
+  for (const rid of roleIds) {
     for (const value of valuesPlayedInRole(model, rid)) {
       playedSomewhere.add(value);
     }
@@ -129,7 +133,7 @@ function disjunctiveMandatoryViolationsIn(
           RULE_ID.disjunctiveMandatoryViolation,
           "default",
           constraintElementId(c),
-          c.roleIds.join(", "),
+          roleIds.join(", "),
           value,
         ),
       );
