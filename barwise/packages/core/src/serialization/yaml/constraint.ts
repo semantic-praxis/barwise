@@ -54,12 +54,7 @@ export function serializeConstraint(c: Constraint): OrmYamlConstraint {
   let result: OrmYamlConstraint;
   switch (c.type) {
     case "internal_uniqueness": {
-      const iuc: OrmYamlConstraint = { type: "internal_uniqueness", roles: [...c.roleIds] };
-      if (c.isPreferred) {
-        (iuc as { type: "internal_uniqueness"; roles: string[]; is_preferred?: boolean; })
-          .is_preferred = true;
-      }
-      result = iuc;
+      result = { type: "internal_uniqueness", roles: [...c.roleIds] };
       break;
     }
     case "mandatory":
@@ -154,10 +149,9 @@ export function deserializeConstraint(c: OrmYamlConstraint): Constraint {
 
   switch (c.type) {
     case "internal_uniqueness": {
+      // A 2.0 file's `is_preferred` is the 2.0 reader's to place on an
+      // entity (`storePreferredFlags`); the constraint does not carry it.
       result = { type: "internal_uniqueness", roleIds: c.roles };
-      if (c.is_preferred) {
-        result = { ...result, isPreferred: true } as Constraint;
-      }
       break;
     }
     case "mandatory":

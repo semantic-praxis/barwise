@@ -271,8 +271,9 @@ function withRefMode(layout: DiagramLayout): OrmModel {
       { id: "r-h2", name: "is of", playerId: "vt-customer-id" },
     ],
     readings: ["{0} has {1}"],
-    constraints: [{ type: "internal_uniqueness", roleIds: ["r-h2"], isPreferred: true }],
+    constraints: [{ id: "c-has-id", type: "internal_uniqueness", roleIds: ["r-h2"] }],
   });
+  model.setPreferredIdentifier("ot-customer", "c-has-id");
   model.addFactType({
     id: "ft-places",
     name: "Customer places Order",

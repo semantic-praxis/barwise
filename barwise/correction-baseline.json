@@ -589,6 +589,12 @@
       "caught_by": "reasoning",
       "note": "Open decision raised by WS4 grounding: the draft planned one PR; 4a ahead stores nothing new, so the draft guarantee holds. Left open for the owner, with the rejected storage split recorded as option (c)."
     },
+    "orm-format-3::4e31a1731572": {
+      "spec": "orm-format-3.spec.md",
+      "excerpt": "- the reference and the format ship together. ws4b-i's note planned the stored reference and schema 3.0 as separate prs. they cannot be: a stored reference save",
+      "caught_by": "reasoning",
+      "note": "Found while implementing: a stored reference saved to 2.0 must become a flag, which cannot say which of a binary's two uniquenesses it means, so the 286 entity-role flags would move on the first save. The two PRs became one."
+    },
     "orm-format-3::5bb2cdde76e1": {
       "spec": "orm-format-3.spec.md",
       "excerpt": "ws4 is two prs: 4a changes only how the preferred identifier is read, and 4b changes what is stored and the file format (open decision 10). the draft kept ws4 i",

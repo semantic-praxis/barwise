@@ -326,7 +326,7 @@ describe("NormaToOrmMapper", () => {
       }
     });
 
-    it("maps isPreferred from uniqueness constraint", () => {
+    it("stores a preferred uniqueness as the entity's identifier", () => {
       const uc: NormaConstraint = {
         type: "uniqueness",
         id: "_uc1",
@@ -351,12 +351,10 @@ describe("NormaToOrmMapper", () => {
       const ft = model.factTypes[0]!;
       const iuc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(iuc).toBeDefined();
-      if (iuc?.type === "internal_uniqueness") {
-        expect(iuc.isPreferred).toBe(true);
-      }
+      expect(model.preferredIdentifierOf(model.getObjectTypeByName("Customer")!.id)).toBe(iuc!.id);
     });
 
-    it("does not set isPreferred when constraint is not preferred", () => {
+    it("stores no identifier when the uniqueness is not preferred", () => {
       const uc: NormaConstraint = {
         type: "uniqueness",
         id: "_uc1",
@@ -381,9 +379,7 @@ describe("NormaToOrmMapper", () => {
       const ft = model.factTypes[0]!;
       const iuc = ft.internalConstraints.find((c) => c.type === "internal_uniqueness");
       expect(iuc).toBeDefined();
-      if (iuc?.type === "internal_uniqueness") {
-        expect(iuc.isPreferred).toBeUndefined();
-      }
+      expect(model.preferredIdentifierRefs).toEqual([]);
     });
 
     it("maps simple mandatory constraint from internalConstraintRefs", () => {

@@ -187,7 +187,9 @@ export function annotateOrmYaml(
       continue;
     }
     if (
-      line.match(/^\s{2}(?:subtype_facts|definitions|objectified_fact_types|populations):/)
+      line.match(
+        /^\s{2}(?:constraints|subtype_facts|definitions|objectified_fact_types|populations|diagrams):/,
+      )
     ) {
       currentSection = "other";
       continue;

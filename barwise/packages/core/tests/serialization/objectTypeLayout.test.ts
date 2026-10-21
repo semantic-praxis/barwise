@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
-const EXPECTED = `orm_version: "2.0"
+const EXPECTED = `orm_version: "3.0"
 model:
   name: Layout
   object_types:
@@ -27,6 +27,7 @@ model:
       name: Customer
       kind: entity
       reference_mode: customer_id
+      preferred_identifier: c-customer-key
       definition: A party that buys.
       source_context: sales
       aliases:
@@ -78,6 +79,9 @@ function fullyPopulatedModel(): OrmModel {
     note: "Imported from CRM.",
     cardinality: { min: 1, max: "unbounded" },
   });
+  // The reference alone: its position is what is pinned, and a reference to
+  // a constraint the model lacks is validation's to report, not the writer's.
+  model.setPreferredIdentifier("ot-entity", "c-customer-key");
   model.addObjectType({
     id: "ot-value",
     name: "Rating",

@@ -6,6 +6,8 @@ import {
   type Constraint,
   type ExternalConstraint,
   type FactType,
+  generateId,
+  type InternalConstraint,
   isExternalConstraint,
   type OrmModel,
   type RingType,
@@ -18,11 +20,16 @@ import { resolveRolesByPlayerName, VALID_RING_TYPES } from "./helpers.js";
 /**
  * Apply inferred constraints to fact types in the model.
  * Mutates `model` and `warnings`; returns the constraint provenance.
+ *
+ * The extraction keeps 2.0's `is_preferred` flag (orm-format-3, Scope);
+ * the id of each uniqueness it flags is added to `preferred`, for the
+ * caller to place once objectifications exist (`storePreferredFlags`).
  */
 export function parseConstraints(
   section: readonly InferredConstraint[],
   model: OrmModel,
   warnings: string[],
+  preferred: Set<string> = new Set(),
 ): ConstraintProvenance[] {
   const constraintProvenance: ConstraintProvenance[] = [];
 
@@ -43,14 +50,21 @@ export function parseConstraints(
       // Find the role(s) by player name or role name.
       const roleIds = resolveRolesByPlayerName(ft, ic.roles, model, warnings, ic.description);
       if (roleIds.length > 0) {
-        const constraint: Constraint = ic.is_preferred
-          ? { type: "internal_uniqueness", roleIds, isPreferred: true }
-          : { type: "internal_uniqueness", roleIds };
+        const constraint: InternalConstraint = {
+          id: generateId(),
+          type: "internal_uniqueness",
+          roleIds,
+        };
 
         // Skip duplicate constraints (LLMs often emit the same constraint
         // in multiple phrasings, e.g. "each X has at most one Y" and
         // "each Y identifies at most one X" both targeting the same role).
-        if (isDuplicateConstraint(model, ft, constraint)) {
+        // A flagged duplicate flags the uniqueness already present: the
+        // identifier it names is that one, and dropping the flag with the
+        // duplicate lost it.
+        const held = heldUniqueness(ft, roleIds);
+        if (held) {
+          if (ic.is_preferred && held.id !== undefined) preferred.add(held.id);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -60,6 +74,7 @@ export function parseConstraints(
           });
         } else {
           ft.addConstraint(constraint);
+          if (ic.is_preferred) preferred.add(constraint.id!);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -411,8 +426,8 @@ export function parseConstraints(
  * fact type for one of its own, anywhere in the model for one across fact
  * types (orm-format-3, Open decision 9), whichever fact type holds it.
  * Two internal_uniqueness constraints are duplicates if they cover the same set
- * of role IDs. The isPreferred flag is promoted (if either is preferred, the
- * existing one wins).
+ * of role IDs. A uniqueness is checked by `heldUniqueness` instead, so a
+ * flagged duplicate can flag the one already present.
  */
 function isDuplicateConstraint(
   model: OrmModel,
@@ -518,4 +533,12 @@ function arraysEqual(
 ): boolean {
   if (a.length !== b.length) return false;
   return a.every((v, i) => v === b[i]);
+}
+
+/** The fact type's uniqueness over exactly these roles, in any order. */
+function heldUniqueness(ft: FactType, roleIds: readonly string[]): InternalConstraint | undefined {
+  const want = [...roleIds].sort().join("\u0000");
+  return ft.internalConstraints.find((c) =>
+    c.type === "internal_uniqueness" && [...c.roleIds].sort().join("\u0000") === want
+  );
 }

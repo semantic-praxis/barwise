@@ -97,9 +97,14 @@ export {
 export {
   type IdentifyingUniqueness,
   isIdentified,
+  type PlacedFlags,
+  placePreferredFlags,
+  type PreferredIdentifierResolution,
   type PreferredIdentifiers,
   preferredIdentifiers,
   preferredIdentifyingBinary,
+  resolvePreferredIdentifier,
+  storePreferredFlags,
 } from "./model/identification.js";
 export { ModelElement } from "./model/ModelElement.js";
 export {
@@ -166,7 +171,12 @@ export {
   MappingDeserializationError,
   MappingSerializer,
 } from "./serialization/MappingSerializer.js";
-export { DeserializationError, OrmYamlSerializer } from "./serialization/OrmYamlSerializer.js";
+export {
+  DeserializationError,
+  OrmYamlSerializer,
+  readDocument20,
+  writeDocument,
+} from "./serialization/OrmYamlSerializer.js";
 export {
   assembleProject,
   type LoadedProject,

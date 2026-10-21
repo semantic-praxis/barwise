@@ -125,15 +125,25 @@ it, so knip sees an unused file where there is a live edge.
   constraint spanning two of them once, and `everyConstraint` for the whole
   model) and
   `OrmModel.getConstraint`. Since WS3c the model stores the external kinds
-  (`OrmModel.addConstraint`); a fact type holds only its own, and a 2.0
-  save writes each external one under the first fact type holding one of
-  its roles (`docs/specs/orm-format-3.spec.md`, WS3). `FactType.addConstraint`
+  (`OrmModel.addConstraint`); a fact type holds only its own, and a
+  save writes format 3.0, which lists the external ones in
+  `model.constraints` (`docs/specs/orm-format-3.spec.md`, WS3 and WS4). `FactType.addConstraint`
   and `FactTypeConfig.constraints` take the internal kinds only, pinned by
   `tests/types/constraintPlacement.test-d.ts`, and refuse an external one at
   run time as well, for a value whose type was asserted: one stored there
   would be invisible to every reader of the model's constraints. The 2.0
   loader is the one place that still sees both kinds under a fact type,
   and it splits them after deriving ids.
+- **An entity names its preferred identifier; nothing infers it.** The
+  model stores a constraint id per entity (`OrmModel.preferredIdentifierOf`,
+  written as `preferred_identifier` in 3.0), and every reader asks
+  `preferredIdentifiers(model)`, which keeps a reference only when
+  `resolvePreferredIdentifier` says the constraint identifies that entity.
+  The 2.0 `is_preferred` flag is read once, by `readDocument20` and the
+  llm parser through `storePreferredFlags`; do not add a reader that
+  looks for a flag, because no constraint carries one any more. A file
+  below 3.0 is read by the 2.0 reader against the frozen
+  `schemas/orm-model-2.0.schema.json`, and saved as 3.0.
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class
   hierarchies.

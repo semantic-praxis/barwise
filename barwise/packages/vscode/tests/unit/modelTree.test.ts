@@ -15,7 +15,8 @@ const { buildTree } = await import("../../src/sidebar/ModelTreeProvider.js");
 /**
  * Room is in Building, Room has RoomNumber, Room has Area, read back from a
  * 2.0 file that nests the key in `host`: in memory the key belongs to the
- * model (WS3c), so only a file can nest it.
+ * model (WS3c), so only a file can nest it. A save writes 3.0, which lists
+ * the key in the model, so the document is restated as 2.0.
  */
 function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
   const model = new OrmModel({ name: "Facilities" });
@@ -43,11 +44,15 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
   });
   const yaml = new OrmYamlSerializer();
   type NestedFactType = { id: string; constraints?: { id: string; }[]; };
-  const doc = parse(yaml.serialize(model)) as { model: { fact_types: NestedFactType[]; }; };
+  const doc = parse(yaml.serialize(model)) as {
+    orm_version: string;
+    model: { fact_types: NestedFactType[]; constraints?: { id: string; }[]; };
+  };
+  doc.orm_version = "2.0";
   const fts = doc.model.fact_types;
-  const key = fts.flatMap((ft) => ft.constraints ?? []).find((c) => c.id === "c-key")!;
   // No fact type here has a constraint of its own, so the key is all there is.
-  for (const ft of fts) delete ft.constraints;
+  const key = doc.model.constraints!.find((c) => c.id === "c-key")!;
+  delete doc.model.constraints;
   fts.find((ft) => ft.id === host)!.constraints = [key];
   return yaml.deserialize(stringify(doc));
 }

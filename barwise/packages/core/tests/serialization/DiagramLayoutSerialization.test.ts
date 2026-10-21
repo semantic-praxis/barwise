@@ -252,10 +252,10 @@ ${diagram}
     expect(layout.elements).toBeUndefined();
   });
 
-  it("chains a 1.0 document through 1.1 to 2.0", () => {
+  it("chains a 1.0 document through 1.1 and 2.0 to 3.0", () => {
     const model = serializer.deserialize(v1Doc("1.0", byName));
     expect(model.getDiagramLayout("Sales")!.elements).toEqual(["ot-customer", "ot-order"]);
-    expect(serializer.serialize(model)).toContain('orm_version: "2.0"');
+    expect(serializer.serialize(model)).toContain('orm_version: "3.0"');
   });
 
   it("keeps a name that matches no element, so validation can report it", () => {

@@ -62,8 +62,11 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
     const entityRoleId = generateId();
     const valueRoleId = generateId();
     ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, entityRoleId);
+    // The value role's uniqueness is the entity's preferred identifier,
+    // named on the entity (orm-format-3 WS4b).
+    const identifyingId = generateId();
     const constraints: InternalConstraint[] = [
-      { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
+      { id: identifyingId, type: "internal_uniqueness", roleIds: [valueRoleId] },
       { type: "internal_uniqueness", roleIds: [entityRoleId] },
       { type: "mandatory", roleId: entityRoleId },
     ];
@@ -76,6 +79,7 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
       readings: ["{0} has {1}", "{1} is of {0}"],
       constraints,
     });
+    ctx.model.setPreferredIdentifier(entityId, identifyingId);
   }
 }
 

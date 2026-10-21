@@ -533,7 +533,7 @@ export class RelationalMapper {
       // uniqueness constraint (PR #580 review).
       primaryKey: {
         columnNames: ft.arity > 2
-          ? associativeKey(ft, roleColumns, columns)
+          ? associativeKey(ft, model, roleColumns, columns)
           : columns.map((c) => c.name),
       },
       foreignKeys,
@@ -669,6 +669,7 @@ export class RelationalMapper {
       entityTable.primaryKey = {
         columnNames: associativeKey(
           factType,
+          model,
           roleColumns,
           entityTable.columns.filter((c) => absorbed.includes(c.name)),
         ),
@@ -798,8 +799,9 @@ function pushColumn(columns: Column[], column: Column, alternative?: string): st
 
 /**
  * An associative table's primary key: the columns of the fact type's
- * preferred internal uniqueness constraint, else of its first one, else
- * of every role (a fact type with no uniqueness at all is a set of rows).
+ * uniqueness that is some entity's preferred identifier (an objectified
+ * fact type's, in practice), else of its first one, else of every role (a
+ * fact type with no uniqueness at all is a set of rows).
  * It used to be every entity role's columns, whatever the constraints
  * said, so "Encounter has Diagnosis at DiagnosisRank" -- unique on
  * (encounter, diagnosis) and on (encounter, rank) -- was keyed on
@@ -808,11 +810,14 @@ function pushColumn(columns: Column[], column: Column, alternative?: string): st
  */
 function associativeKey(
   ft: FactType,
+  model: OrmModel,
   roleColumns: ReadonlyMap<string, readonly string[]>,
   columns: readonly Column[],
 ): string[] {
   const uniqueness = ft.internalConstraints.filter((c) => c.type === "internal_uniqueness");
-  const chosen = uniqueness.find((c) => c.isPreferred) ?? uniqueness[0];
+  const { byConstraint } = preferredIdentifiers(model);
+  const chosen = uniqueness.find((c) => c.id !== undefined && byConstraint.has(c.id))
+    ?? uniqueness[0];
   if (!chosen) return columns.map((c) => c.name);
   return chosen.roleIds.flatMap((id) => roleColumns.get(id) ?? []);
 }

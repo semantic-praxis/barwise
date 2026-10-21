@@ -1,4 +1,4 @@
-import type { Constraint, ExternalConstraint } from "../../model/Constraint.js";
+import type { Constraint } from "../../model/Constraint.js";
 import type { FactType, FactTypeConfig } from "../../model/FactType.js";
 import type { Role } from "../../model/Role.js";
 import {
@@ -42,10 +42,7 @@ function serializeRole(role: Role): OrmYamlRole {
  *   a 2.0 file, written after its own: the model holds them, and 2.0 nests
  *   each under one fact type (`lowerConstraints`).
  */
-export function serializeFactType(
-  ft: FactType,
-  across: readonly ExternalConstraint[] = [],
-): OrmYamlFactType {
+export function serializeFactType(ft: FactType): OrmYamlFactType {
   const result: OrmYamlFactType = {
     id: ft.id,
     name: ft.name,
@@ -60,9 +57,8 @@ export function serializeFactType(
     result.note = ft.note;
   }
 
-  const constraints = [...ft.internalConstraints, ...across];
-  if (constraints.length > 0) {
-    result.constraints = constraints.map((c) => serializeConstraint(c));
+  if (ft.internalConstraints.length > 0) {
+    result.constraints = ft.internalConstraints.map((c) => serializeConstraint(c));
   }
   if (ft.derivation) {
     result.derivation = serializeDerivation(ft.derivation);

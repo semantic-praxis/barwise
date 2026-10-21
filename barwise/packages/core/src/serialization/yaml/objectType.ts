@@ -16,6 +16,8 @@ export interface OrmYamlObjectType {
   name: string;
   kind: "entity" | "value";
   reference_mode?: string;
+  /** An entity's preferred identifier: a uniqueness constraint's id (3.0). */
+  preferred_identifier?: string;
   definition?: string;
   source_context?: string;
   value_constraint?: OrmYamlValueConstraintBody;
@@ -27,7 +29,15 @@ export interface OrmYamlObjectType {
   cardinality?: { min: number; max: number | "unbounded"; };
 }
 
-export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
+/**
+ * An object type as the file states it. `preferredIdentifierId` is the
+ * model's (`OrmModel.preferredIdentifierOf`): the model holds the
+ * reference, the file states it on the entity.
+ */
+export function serializeObjectType(
+  ot: ObjectType,
+  preferredIdentifierId?: string,
+): OrmYamlObjectType {
   const result: OrmYamlObjectType = {
     id: ot.id,
     name: ot.name,
@@ -43,6 +53,7 @@ export function serializeObjectType(ot: ObjectType): OrmYamlObjectType {
 
   if (isEntityType(ot)) {
     result.reference_mode = ot.referenceMode;
+    if (preferredIdentifierId !== undefined) result.preferred_identifier = preferredIdentifierId;
   }
   if (ot.definition) {
     result.definition = ot.definition;

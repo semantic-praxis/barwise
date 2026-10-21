@@ -15,7 +15,15 @@ import { migrateDiagramReferencesToIds } from "./migrations/diagramReferencesToI
  * this onto every document it produces, and the JSON Schema pins its
  * `orm_version` `const` to the same value.
  */
-export const CURRENT_ORM_VERSION = "2.0";
+export const CURRENT_ORM_VERSION = "3.0";
+
+/**
+ * The version before the current one, which this build still reads: a 2.0
+ * file is read by the 2.0 reader (`readDocument20`) straight into the
+ * model, against the 2.0 schema frozen when 3.0 landed, and is written as
+ * 3.0 when saved (orm-format-3 WS4b). Older versions migrate to it first.
+ */
+export const LEGACY_ORM_VERSION = "2.0";
 
 /**
  * Upgrades a parsed `.orm.yaml` document from one version to the next.
@@ -31,10 +39,12 @@ export interface OrmVersionMigration {
 }
 
 /**
- * Registered migrations, applied in chain order on load. When a new
- * version lands, bump
- * {@link CURRENT_ORM_VERSION} and the schema `const`, and add the
- * version-to-version migration here.
+ * Registered migrations on the raw document, applied in chain order on
+ * load, up to {@link LEGACY_ORM_VERSION}. 2.0 to 3.0 is not one of them:
+ * placing a 2.0 preferred-identifier flag needs the model (Open decision
+ * 8 reads object type kinds, objectifications and roles), so a 2.0 file is
+ * read into the model and the model is what 3.0 states. A raw document
+ * that needs 3.0 is `writeDocument(readDocument20(doc))`.
  */
 export const ORM_VERSION_MIGRATIONS: readonly OrmVersionMigration[] = [
   // 1.0 -> 1.1 added optional constructs (value ranges were de-facto part of

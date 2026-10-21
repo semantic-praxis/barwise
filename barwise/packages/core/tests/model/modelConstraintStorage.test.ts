@@ -118,20 +118,27 @@ describe("constraints across fact types on the model", () => {
   });
 });
 
-describe("a 2.0 save of constraints across fact types", () => {
+describe("a 3.0 save of constraints across fact types", () => {
   const yaml = new OrmYamlSerializer();
-  const nestedIn = (text: string) =>
-    Object.fromEntries(
-      (parse(text).model.fact_types as { id: string; constraints?: { id: string; }[]; }[]).map((
-        ft,
-      ) => [ft.id, (ft.constraints ?? []).map((c) => c.id)]),
-    );
+  const listed = (text: string) => {
+    const model = parse(text).model;
+    return {
+      factTypes: Object.fromEntries(
+        ((model.fact_types ?? []) as { id: string; constraints?: { id: string; }[]; }[]).map((
+          ft,
+        ) => [
+          ft.id,
+          (ft.constraints ?? []).map((c) => c.id),
+        ]),
+      ),
+      model: ((model.constraints ?? []) as { id: string; }[]).map((c) => c.id),
+    };
+  };
 
-  it("writes one under its first holder, after that fact type's own", () => {
-    // ft-in is the first fact type holding one of its roles.
-    expect(nestedIn(yaml.serialize(rooms([key])))).toEqual({
-      "ft-in": ["c-in", "c-key"],
-      "ft-nr": ["c-nr"],
+  it("writes one in the model's own list, and each fact type's own under it", () => {
+    expect(listed(yaml.serialize(rooms([key])))).toEqual({
+      factTypes: { "ft-in": ["c-in"], "ft-nr": ["c-nr"] },
+      model: ["c-key"],
     });
   });
 
@@ -142,21 +149,21 @@ describe("a 2.0 save of constraints across fact types", () => {
     expect(yaml.serialize(back)).toBe(yaml.serialize(model));
   });
 
-  it("keeps one none of whose roles is in a fact type, under the first fact type", () => {
+  it("keeps one none of whose roles is in a fact type", () => {
     // A lenient load reads one and merge carries one through; validation
     // reports it, and the file must not lose it.
     const model = rooms();
     model.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] });
     const text = yaml.serialize(model);
-    expect(nestedIn(text)["ft-in"]).toEqual(["c-in", "c-gone"]);
+    expect(listed(text).model).toEqual(["c-gone"]);
     expect(yaml.deserialize(text, { lenient: true }).constraints.map((c) => c.id)).toEqual([
       "c-gone",
     ]);
   });
 
-  it("refuses one in a model with no fact type, by id", () => {
+  it("saves one in a model with no fact type, which 2.0 had nowhere to put", () => {
     const model = new OrmModel({ name: "Empty" });
     model.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] });
-    expect(() => yaml.serialize(model)).toThrow(/"c-gone"/);
+    expect(listed(yaml.serialize(model)).model).toEqual(["c-gone"]);
   });
 });

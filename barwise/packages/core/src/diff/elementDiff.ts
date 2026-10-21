@@ -12,6 +12,7 @@
 import type { Constraint, ExternalConstraint, JoinOperand } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
+import { resolvePreferredIdentifier } from "../model/identification.js";
 import {
   isEntityType,
   isValueType,
@@ -28,8 +29,8 @@ import type { ChangeDescription, RoleSummary } from "./changeDescription.js";
 export function diffObjectType(
   a: ObjectType,
   b: ObjectType,
-  _existingModel: OrmModel,
-  _incomingModel: OrmModel,
+  existingModel: OrmModel,
+  incomingModel: OrmModel,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 
@@ -54,6 +55,14 @@ export function diffObjectType(
       from: referenceModeOf(a),
       to: referenceModeOf(b),
     });
+  }
+  // Compared by what the identifier is, not by its constraint's id: two
+  // models built apart (an import, independent LLM samples) give the same
+  // uniqueness different ids.
+  const fromId = preferredIdentifierLabel(existingModel, a.id);
+  const toId = preferredIdentifierLabel(incomingModel, b.id);
+  if (fromId !== toId) {
+    changes.push({ change: "preferredIdentifier", from: fromId, to: toId });
   }
   if ((a.definition ?? "") !== (b.definition ?? "")) {
     changes.push({ change: "definition", from: a.definition, to: b.definition });
@@ -502,7 +511,7 @@ function constraintTypeKey(
   switch (c.type) {
     case "internal_uniqueness": {
       const indices = c.roleIds.map((id) => resolveRole(id, idxMap)).sort();
-      return `IU:${indices.join(",")}:${c.isPreferred ? "P" : ""}`;
+      return `IU:${indices.join(",")}`;
     }
     case "mandatory":
       return `M:${resolveRole(c.roleId, idxMap)}`;
@@ -845,4 +854,20 @@ export function diffDefinition(a: Definition, b: Definition): ChangeDescription[
     changes.push({ change: "context", from: a.context, to: b.context });
   }
   return changes;
+}
+
+/**
+ * An entity's preferred identifier, named by content: the identifying
+ * fact type and the roles its uniqueness covers, or the stored id when the
+ * reference identifies nothing (validation reports that).
+ */
+function preferredIdentifierLabel(model: OrmModel, entityId: string): string | undefined {
+  const resolved = resolvePreferredIdentifier(model, entityId);
+  if (resolved.ok) {
+    const { factType, constraint } = resolved.at;
+    const roles = constraint.roleIds.map((id) => factType.getRoleById(id)?.name ?? id);
+    return `"${factType.name}" (${roles.join(", ")})`;
+  }
+  const stored = model.preferredIdentifierOf(entityId);
+  return stored === undefined ? undefined : `constraint "${stored}"`;
 }

@@ -4,6 +4,7 @@ import {
   identificationSources,
   isIdentified,
   preferredIdentifiers,
+  resolvePreferredIdentifier,
 } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
@@ -162,12 +163,32 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
 
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity") continue;
-    const preferredCount = identificationSources(model, ot, identifiers)
-      .filter((s) => s.kind === "preferred-uniqueness").length;
-
-    if (preferredCount > 1) {
+    // A stored reference that identifies nothing is an error, reported
+    // once, and the entity is not also called unidentified for it: the
+    // fix is to the reference.
+    const resolved = resolvePreferredIdentifier(model, ot.id);
+    if (!resolved.ok && resolved.reason !== "none") {
+      const constraintId = model.preferredIdentifierOf(ot.id)!;
+      const named = model.getConstraint(constraintId);
       diagnostics.push(
-        report(RULE_ID.multiplePreferredIdentifiers, "default", ot.id, ot.name, preferredCount),
+        resolved.reason === "dangling"
+          ? report(RULE_ID.preferredIdentifierInvalid, "dangling", ot.id, ot.name, constraintId)
+          : resolved.reason === "not-uniqueness"
+          ? report(
+            RULE_ID.preferredIdentifierInvalid,
+            "notUniqueness",
+            ot.id,
+            ot.name,
+            constraintId,
+            named?.type ?? "",
+          )
+          : report(
+            RULE_ID.preferredIdentifierInvalid,
+            "notThisEntity",
+            ot.id,
+            ot.name,
+            constraintId,
+          ),
       );
     } else if (!isIdentified(model, ot.id, identifiers)) {
       diagnostics.push(report(RULE_ID.missingPreferredIdentifier, "default", ot.id, ot.name));

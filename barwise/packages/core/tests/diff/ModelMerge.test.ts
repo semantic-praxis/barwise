@@ -1283,3 +1283,77 @@ describe("mergeModels: a KEPT population follows its fact type's roles", () => {
     });
   });
 });
+
+describe("mergeModels carries preferred identifiers (orm-format-3 WS4b-ii)", () => {
+  /** Customer and CustomerId, with the identifying binary; `ref` names its identifier. */
+  function customers(ref: string | undefined, withOrder = false): OrmModel {
+    const model = new OrmModel({ name: "Shop" });
+    model.addObjectType({ id: "ot-c", name: "Customer", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "ot-cid", name: "CustomerId", kind: "value" });
+    model.addFactType({
+      id: "ft-id",
+      name: "Customer has CustomerId",
+      roles: [
+        { id: "r-c", name: "has", playerId: "ot-c" },
+        { id: "r-cid", name: "is of", playerId: "ot-cid" },
+      ],
+      readings: ["{0} has {1}"],
+      constraints: [
+        { id: "u-c", type: "internal_uniqueness", roleIds: ["r-c"] },
+        { id: "u-cid", type: "internal_uniqueness", roleIds: ["r-cid"] },
+      ],
+    });
+    if (ref) model.setPreferredIdentifier("ot-c", ref);
+    if (withOrder) {
+      model.addObjectType({ id: "ot-o", name: "Order", kind: "entity", referenceMode: "nr" });
+      model.addObjectType({ id: "ot-onr", name: "OrderNr", kind: "value" });
+      model.addFactType({
+        id: "ft-onr",
+        name: "Order has OrderNr",
+        roles: [
+          { id: "r-o", name: "has", playerId: "ot-o" },
+          { id: "r-onr", name: "is of", playerId: "ot-onr" },
+        ],
+        readings: ["{0} has {1}"],
+        constraints: [{ id: "u-onr", type: "internal_uniqueness", roleIds: ["r-onr"] }],
+      });
+      model.setPreferredIdentifier("ot-o", "u-onr");
+    }
+    return model;
+  }
+
+  it("takes an entity's new identifier with its accepted modification, and keeps the old one without it", () => {
+    const existing = customers(undefined);
+    const incoming = customers("u-cid");
+    const { deltas } = diffModels(existing, incoming);
+    const i = deltas.findIndex((d) => d.elementType === "object_type" && d.kind === "modified");
+    expect(i).toBeGreaterThanOrEqual(0);
+
+    expect(mergeModels(existing, incoming, deltas, new Set([i])).preferredIdentifierRefs)
+      .toEqual([["ot-c", "u-cid"]]);
+    expect(mergeModels(existing, incoming, deltas, new Set()).preferredIdentifierRefs).toEqual([]);
+  });
+
+  it("keeps an unchanged entity's identifier", () => {
+    const existing = customers("u-cid");
+    const incoming = customers("u-cid");
+    const { deltas } = diffModels(existing, incoming);
+    expect(mergeModels(existing, incoming, deltas, new Set()).preferredIdentifierRefs)
+      .toEqual([["ot-c", "u-cid"]]);
+  });
+
+  it("drops an added entity's identifier when its constraint's fact type is rejected", () => {
+    const existing = customers("u-cid");
+    const incoming = customers("u-cid", true);
+    const { deltas } = diffModels(existing, incoming);
+    const objectTypes = deltas.flatMap((d, i) =>
+      d.elementType === "object_type" && d.kind === "added" ? [i] : []
+    );
+    const all = new Set(deltas.map((_, i) => i));
+
+    expect(mergeModels(existing, incoming, deltas, all).preferredIdentifierRefs)
+      .toEqual([["ot-c", "u-cid"], ["ot-o", "u-onr"]]);
+    expect(mergeModels(existing, incoming, deltas, new Set(objectTypes)).preferredIdentifierRefs)
+      .toEqual([["ot-c", "u-cid"]]);
+  });
+});

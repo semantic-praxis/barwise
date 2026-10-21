@@ -8,7 +8,7 @@
  * into nullable and adding `UNIQUE` to every column on re-export. These
  * assert the role, by its player.
  */
-import type { Constraint, FactType, OrmModel } from "@barwise/core";
+import { type Constraint, type FactType, type OrmModel, preferredIdentifiers } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
 
@@ -26,10 +26,11 @@ function constraintsByPlayer(model: OrmModel, ft: FactType): string[] {
     const role = ft.roles.find((r) => r.id === roleId)!;
     return model.getObjectType(role.playerId)!.name;
   };
+  const preferred = new Set(preferredIdentifiers(model).byConstraint.keys());
   return model.constraintsTouching(ft.id).map((c: Constraint) => {
     if (c.type === "mandatory") return `mandatory:${player(c.roleId)}`;
     if (c.type === "internal_uniqueness") {
-      return `unique:${c.roleIds.map(player).join(",")}${c.isPreferred ? ":preferred" : ""}`;
+      return `unique:${c.roleIds.map(player).join(",")}${preferred.has(c.id!) ? ":preferred" : ""}`;
     }
     return c.type;
   }).sort();

@@ -487,6 +487,26 @@ export function mergeModels(
     });
   }
 
+  // Phase 6b: preferred identifiers, now that every constraint is placed.
+  // Each entity takes its reference from the side the reviewer kept: a
+  // changed identifier is part of the entity's modification, accepted or
+  // rejected with it, not a second reference. One whose constraint the
+  // merge left out goes too, so the merged model names nothing it lacks.
+  for (const [delta, idx] of otDeltas) {
+    const takeIncoming = (delta.kind === "added" || delta.kind === "modified")
+      && accepted.has(idx);
+    const source = takeIncoming ? delta.incoming : delta.existing;
+    if (!source) continue;
+    const mergedId = takeIncoming && delta.kind === "added"
+      ? incomingIdToMergedId.get(source.id) ?? source.id
+      : (delta.existing ?? source).id;
+    const ref = (takeIncoming ? incoming : existing).preferredIdentifierOf(source.id);
+    const ot = merged.getObjectType(mergedId);
+    if (ref !== undefined && ot?.kind === "entity" && merged.getConstraint(ref)) {
+      merged.setPreferredIdentifier(mergedId, ref);
+    }
+  }
+
   // Phase 7: the one kind the diff deliberately does not model.
   carryUnmodelledElements(merged, existing);
 

@@ -1,4 +1,5 @@
 import type { Constraint } from "../../src/model/Constraint.js";
+import { storePreferredFlags } from "../../src/model/identification.js";
 import type {
   DataTypeDef,
   ObjectTypeKind,
@@ -40,7 +41,11 @@ interface BinaryFactTypeOptions {
   uniqueness?: "role1" | "role2" | "both" | "spanning";
   /** Shorthand: "role1" or "role2" for mandatory role constraint. */
   mandatory?: "role1" | "role2" | "both";
-  /** Mark the uniqueness constraint as preferred identifier. */
+  /**
+   * Mark the uniqueness constraint as a preferred identifier, as a 2.0
+   * file's `is_preferred` flag would: `build` places it on the entity it
+   * identifies with the 2.0 loader's rule (`storePreferredFlags`).
+   */
   isPreferred?: boolean;
   definition?: string;
 }
@@ -225,6 +230,13 @@ export class ModelBuilder {
    * @throws If any referenced object types don't exist.
    */
   build(): OrmModel {
+    // The flagged uniqueness of each fact type, by the id it is given.
+    const flagged = new Set<string>();
+    const flag = (factTypeName: string) => {
+      const id = `${factTypeName}::preferred`;
+      flagged.add(id);
+      return id;
+    };
     const model = new OrmModel({
       name: this.modelName,
       domainContext: this.domainContext,
@@ -284,14 +296,14 @@ export class ModelBuilder {
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role1Id],
-              ...(preferred ? { isPreferred: true } : {}),
+              ...(preferred ? { id: flag(name) } : {}),
             });
             break;
           case "role2":
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role2Id],
-              ...(preferred ? { isPreferred: true } : {}),
+              ...(preferred ? { id: flag(name) } : {}),
             });
             break;
           case "both":
@@ -300,7 +312,7 @@ export class ModelBuilder {
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role1Id],
-              ...(preferred ? { isPreferred: true } : {}),
+              ...(preferred ? { id: flag(name) } : {}),
             });
             constraints.push({
               type: "internal_uniqueness",
@@ -311,7 +323,7 @@ export class ModelBuilder {
             constraints.push({
               type: "internal_uniqueness",
               roleIds: [role1Id, role2Id],
-              ...(preferred ? { isPreferred: true } : {}),
+              ...(preferred ? { id: flag(name) } : {}),
             });
             break;
         }
@@ -413,6 +425,9 @@ export class ModelBuilder {
       model.addDefinition(def);
     }
 
+    // After the objectifications: an objectified fact type's flag names
+    // the objectifying type.
+    storePreferredFlags(model, (c) => c.id !== undefined && flagged.has(c.id));
     return model;
   }
 }

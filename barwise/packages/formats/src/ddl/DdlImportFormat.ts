@@ -1034,8 +1034,11 @@ export class DdlImportFormat implements ImportFormat {
     // Minted, never built from names (importer-role-ids.spec.md).
     const entityRoleId = generateId();
     const valueRoleId = generateId();
+    // The value role's uniqueness is the entity's preferred identifier,
+    // named on the entity once the fact type exists (orm-format-3 WS4b).
+    const identifyingId = generateId();
     const constraints: InternalConstraint[] = [
-      { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
+      { id: identifyingId, type: "internal_uniqueness", roleIds: [valueRoleId] },
       { type: "internal_uniqueness", roleIds: [entityRoleId] },
       { type: "mandatory", roleId: entityRoleId },
     ];
@@ -1050,6 +1053,7 @@ export class DdlImportFormat implements ImportFormat {
           constraints,
         ),
       );
+      model.setPreferredIdentifier(entity.id, identifyingId);
       return { factType, farRoleId: valueRoleId };
     }
     const factType = model.addFactType({
@@ -1061,6 +1065,7 @@ export class DdlImportFormat implements ImportFormat {
       readings: ["{0} has {1}", "{1} is of {0}"],
       constraints,
     });
+    model.setPreferredIdentifier(entity.id, identifyingId);
     return { factType, farRoleId: valueRoleId };
   }
 
@@ -1190,7 +1195,6 @@ export class DdlImportFormat implements ImportFormat {
       constraints.push({
         type: "internal_uniqueness",
         roleIds: [role2Id],
-        isPreferred: false,
       });
 
       // Add mandatory constraint if NOT NULL
