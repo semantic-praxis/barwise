@@ -7,7 +7,7 @@
  * inline paths and deserialize back to an equal structure.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint, JoinOperand } from "../../src/model/Constraint.js";
+import type { Constraint, ExternalConstraint, JoinOperand } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
@@ -22,7 +22,7 @@ const citizenOf: JoinOperand = {
   projection: [0, 1],
 };
 
-function buildModel(constraint: Constraint): OrmModel {
+function buildModel(constraint: ExternalConstraint): OrmModel {
   const model = new OrmModel({ name: "Test" });
   const person = model.addObjectType({
     id: "ot-person",
@@ -50,12 +50,12 @@ function buildModel(constraint: Constraint): OrmModel {
       { name: "has citizen", playerId: country.id, id: "pc-country" },
     ],
     readings: ["{0} is citizen of {1}"],
-    constraints: [constraint],
   });
+  model.addConstraint(constraint);
   return model;
 }
 
-function roundTrip(constraint: Constraint): Constraint {
+function roundTrip(constraint: ExternalConstraint): Constraint {
   const yaml = serializer.serialize(buildModel(constraint));
   const restored = serializer.deserialize(yaml);
   const citizenFt = restored.getFactTypeByName("Person is citizen of Country")!;

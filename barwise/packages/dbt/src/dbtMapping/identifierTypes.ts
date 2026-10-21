@@ -16,7 +16,7 @@
  * gets its plain name ahead of a non-key column that happens to share it.
  */
 
-import { type Constraint, generateId, type ObjectType } from "@barwise/core";
+import { generateId, type InternalConstraint, type ObjectType } from "@barwise/core";
 import type { DbtColumn } from "../DbtSchemaTypes.js";
 import {
   claimValueType,
@@ -62,7 +62,7 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
     const entityRoleId = generateId();
     const valueRoleId = generateId();
     ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, entityRoleId);
-    const constraints: Constraint[] = [
+    const constraints: InternalConstraint[] = [
       { type: "internal_uniqueness", roleIds: [valueRoleId], isPreferred: true },
       { type: "internal_uniqueness", roleIds: [entityRoleId] },
       { type: "mandatory", roleId: entityRoleId },

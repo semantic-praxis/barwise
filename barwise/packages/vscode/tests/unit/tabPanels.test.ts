@@ -54,7 +54,7 @@ describe("buildTabPanels", () => {
       ],
       readings: ["{0} ships {1}"],
     });
-    places!.addConstraint({
+    spanning.addConstraint({
       type: "exclusion",
       roleIds: [places!.roles[0]!.id, ships.roles[0]!.id],
     });

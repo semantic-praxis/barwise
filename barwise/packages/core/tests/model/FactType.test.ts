@@ -143,7 +143,7 @@ describe("FactType", () => {
     expect(ft.internalConstraints.map((c) => c.type)).toEqual(["internal_uniqueness", "mandatory"]);
   });
 
-  it("refuses a constraint across fact types when it has no model to hold it", () => {
+  it("refuses a constraint across fact types, naming where it goes", () => {
     const ft = new FactType({
       name: "Test",
       roles: [
@@ -152,8 +152,12 @@ describe("FactType", () => {
       ],
       readings: ["{0} test {1}"],
     });
-    expect(() => ft.addConstraint({ type: "exclusion", roleIds: ["role-1", "role-2"] })).toThrow(
-      /lives in a model/,
+    const across = { type: "exclusion", roleIds: ["role-1", "role-2"] } as never;
+    expect(() => ft.addConstraint(across)).toThrow(
+      /lives in the model, not in fact type "Test": add it with OrmModel\.addConstraint/,
+    );
+    expect(() => ft.addConstraint({ type: "nonsense" } as never)).toThrow(
+      /Fact type "Test" has no constraint kind "nonsense"/,
     );
     expect(ft.internalConstraints).toEqual([]);
   });

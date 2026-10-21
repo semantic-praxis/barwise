@@ -61,7 +61,7 @@ function exclusionModel(violate: boolean): OrmModel {
     { player: person, name: "rides", id: "r1" },
     { player: bus, name: "ridden by", id: "r2" },
   );
-  drives.addConstraint({ type: "exclusion", roleIds: ["d1", "r1"] });
+  m.addConstraint({ type: "exclusion", roleIds: ["d1", "r1"] });
   pop(m, drives.id, { d1: "P1", d2: "CAR1" });
   pop(m, rides.id, { r1: violate ? "P1" : "P2", r2: "BUS1" });
   return m;
@@ -92,7 +92,7 @@ function xorModel(violate: boolean): OrmModel {
     { player: person, name: "rides", id: "r1" },
     { player: bus, name: "ridden by", id: "r2" },
   );
-  drives.addConstraint({ type: "exclusive_or", roleIds: ["d1", "r1"] });
+  m.addConstraint({ type: "exclusive_or", roleIds: ["d1", "r1"] });
   pop(m, idFt.id, { pid1: "P1", pid2: "PID1" });
   pop(m, drives.id, { d1: "P1", d2: "CAR1" });
   if (violate) {
@@ -118,7 +118,7 @@ function subsetModel(violate: boolean): OrmModel {
     { player: person, name: "enrolled in", id: "e1" },
     { player: course, name: "enrolls", id: "e2" },
   );
-  teaches.addConstraint({
+  m.addConstraint({
     type: "subset",
     subsetRoleIds: ["t1", "t2"],
     supersetRoleIds: ["e1", "e2"],
@@ -147,7 +147,7 @@ function equalityModel(violate: boolean): OrmModel {
     { player: person, name: "works in", id: "wk1" },
     { player: dept, name: "employs", id: "wk2" },
   );
-  manages.addConstraint({
+  m.addConstraint({
     type: "equality",
     roleIds1: ["mg1", "mg2"],
     roleIds2: ["wk1", "wk2"],

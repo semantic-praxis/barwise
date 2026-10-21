@@ -68,10 +68,8 @@ function xorModel(): OrmModel {
     id: "ft-retired",
     roles: [{ id: "r-retired", name: "is retired", playerId: person.id }],
     readings: ["{0} is retired"],
-    constraints: [
-      { type: "exclusive_or", id: "c-xor", roleIds: ["r-employed", "r-retired"] },
-    ],
   });
+  model.addConstraint({ type: "exclusive_or", id: "c-xor", roleIds: ["r-employed", "r-retired"] });
   return model;
 }
 
@@ -589,9 +587,11 @@ describe("NORMA import keeps constraint ids", () => {
       id: "ft-retired",
       roles: [{ id: "r-retired", name: "is retired", playerId: person.id }],
       readings: ["{0} is retired"],
-      constraints: [
-        { type: "exclusive_or", id: "c-xor", roleIds: ["r-employed", "r-retired"] },
-      ],
+    });
+    model.addConstraint({
+      type: "exclusive_or",
+      id: "c-xor",
+      roleIds: ["r-employed", "r-retired"],
     });
     const doc = parseNormaXml(exportXml(model));
     const exclusion = doc.constraints.find((c) => c.type === "exclusion")!;
@@ -879,9 +879,11 @@ describe("NORMA import keeps constraint ids", () => {
       id: "ft-retired",
       roles: [{ id: "r-retired", name: "is retired", playerId: person.id }],
       readings: ["{0} is retired"],
-      constraints: [
-        { type: "exclusive_or", id: "c-xor", roleIds: ["r-employed", "r-retired"] },
-      ],
+    });
+    model.addConstraint({
+      type: "exclusive_or",
+      id: "c-xor",
+      roleIds: ["r-employed", "r-retired"],
     });
     const xml = exportXml(model);
     const back = mapNormaToOrm(parseNormaXml(xml));
@@ -1098,7 +1100,7 @@ describe("NORMA export of a file that omits constraint ids", () => {
     // `<exclusion-id>_xormand`; a constraint already holding that id makes
     // the exclusive-or a repeat, never a second element with one id.
     const model = xorModel();
-    model.getFactType("ft-employed")!.addConstraint({
+    model.addConstraint({
       type: "disjunctive_mandatory",
       id: "c-xor_xormand",
       roleIds: ["r-employed", "r-retired"],

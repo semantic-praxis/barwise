@@ -4,6 +4,7 @@
 
 import {
   type Constraint,
+  type ExternalConstraint,
   type FactType,
   isExternalConstraint,
   type OrmModel,
@@ -166,7 +167,10 @@ export function parseConstraints(
       || ic.type === "exclusion"
       || ic.type === "exclusive_or"
     ) {
-      // Multi-role constraints within a single fact type.
+      // Multi-role constraints, stored on the model as every constraint
+      // across fact types is (orm-format-3 WS3c). The roles still resolve
+      // within the one fact type the draft names, so one spanning two is
+      // not yet reachable from a draft.
       // All four share the same structure: { type, roleIds }.
       const roleIds = resolveRolesByPlayerName(ft, ic.roles, model, warnings, ic.description);
       if (roleIds.length === 0) {
@@ -180,7 +184,7 @@ export function parseConstraints(
           }] in fact type "${ic.fact_type}".`,
         });
       } else {
-        const constraint: Constraint = {
+        const constraint: ExternalConstraint = {
           type: ic.type,
           roleIds,
         };
@@ -193,7 +197,7 @@ export function parseConstraints(
             skipReason: `Duplicate constraint (identical ${ic.type} already present).`,
           });
         } else {
-          ft.addConstraint(constraint);
+          model.addConstraint(constraint);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,
@@ -372,7 +376,7 @@ export function parseConstraints(
             `${ic.type} constraint requires matching arity: got ${subsetRoleIds.length} vs ${supersetRoleIds.length}.`,
         });
       } else {
-        const constraint: Constraint = ic.type === "subset"
+        const constraint: ExternalConstraint = ic.type === "subset"
           ? { type: "subset", subsetRoleIds, supersetRoleIds }
           : { type: "equality", roleIds1: subsetRoleIds, roleIds2: supersetRoleIds };
 
@@ -385,7 +389,7 @@ export function parseConstraints(
             skipReason: `Duplicate constraint (identical ${ic.type} already present).`,
           });
         } else {
-          ft.addConstraint(constraint);
+          model.addConstraint(constraint);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,

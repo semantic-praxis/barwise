@@ -4,7 +4,7 @@
  * constraint type, and CHECK predicate rendering. All pure -- no python,
  * no filesystem.
  */
-import type { Constraint, OrmModel } from "@barwise/core";
+import { type Constraint, isInternalConstraint, type OrmModel } from "@barwise/core";
 import { RelationalMapper } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
 import { routeConstraints } from "../src/ddl/constraintRouting.js";
@@ -37,8 +37,11 @@ function baseModel(): OrmModel {
     .build();
 }
 
+/** Add `constraint` to `factName`, or to the model when it spans fact types. */
 function routeWith(model: OrmModel, factName: string, constraint: Constraint) {
-  model.getFactTypeByName(factName)!.addConstraint(constraint);
+  if (isInternalConstraint(constraint)) {
+    model.getFactTypeByName(factName)!.addConstraint(constraint);
+  } else model.addConstraint(constraint);
   const schema = new RelationalMapper().map(model);
   return routeConstraints(model, schema, postgres, "postgres");
 }

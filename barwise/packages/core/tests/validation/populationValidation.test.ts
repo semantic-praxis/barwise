@@ -1116,7 +1116,12 @@ describe("populationValidationRules", () => {
 // Helpers for Phase 2 constraint tests
 // ---------------------------------------------------------------------------
 
-import type { Constraint, RingType } from "../../src/model/Constraint.js";
+import {
+  type Constraint,
+  isExternalConstraint,
+  isInternalConstraint,
+  type RingType,
+} from "../../src/model/Constraint.js";
 
 /**
  * Build a model with a self-referencing "Person is parent of Person" fact type.
@@ -1185,8 +1190,9 @@ function makeSelfRefModel(options?: {
       { name: "is child of", playerId: person.id, id: "r2" },
     ],
     readings: ["{0} is parent of {1}"],
-    constraints,
+    constraints: constraints.filter(isInternalConstraint),
   });
+  for (const c of constraints.filter(isExternalConstraint)) model.addConstraint(c);
 
   return model;
 }

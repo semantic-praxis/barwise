@@ -204,10 +204,12 @@ describe("exclusive-or round-trip (norma-round-trip-completion WS1)", () => {
       id: "ft-retired",
       roles: [{ id: "r-retired", name: "is retired", playerId: person.id }],
       readings: ["{0} is retired"],
-      constraints: [
-        { type: "internal_uniqueness", roleIds: ["r-retired"] },
-        { type: "exclusive_or", id: "c-xor", roleIds: ["r-employed", "r-retired"] },
-      ],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r-retired"] }],
+    });
+    model.addConstraint({
+      type: "exclusive_or",
+      id: "c-xor",
+      roleIds: ["r-employed", "r-retired"],
     });
     return model;
   }

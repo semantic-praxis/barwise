@@ -8,7 +8,7 @@
  * richer constraint semantics added in Phase 2.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint } from "../../src/model/Constraint.js";
+import { type Constraint, isInternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
@@ -25,8 +25,9 @@ function buildModelWithConstraint(constraint: Constraint): OrmModel {
       { id: "r2", name: "is driven by", playerId: ot2.id },
     ],
     readings: ["{0} drives {1}"],
-    constraints: [constraint],
+    constraints: isInternalConstraint(constraint) ? [constraint] : [],
   });
+  if (!isInternalConstraint(constraint)) model.addConstraint(constraint);
   return model;
 }
 

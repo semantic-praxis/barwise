@@ -280,7 +280,7 @@ describe("referenceDiagnostics for join constraint paths", () => {
     subsetPath: (m: OrmModel) => { root: string; steps: { entry: string; exit: string; }[]; },
   ): OrmModel {
     const model = base();
-    model.factTypes[0]!.addConstraint({
+    model.addConstraint({
       type: "join_subset",
       id: "jc1",
       subset: { path: subsetPath(model), projection: [0] },

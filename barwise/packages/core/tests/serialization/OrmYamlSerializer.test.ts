@@ -1005,10 +1005,10 @@ model:
         constraints: [
           { type: "internal_uniqueness", roleIds: ["r1"] },
           { type: "mandatory", roleId: "r2" },
-          { type: "external_uniqueness", roleIds: ["r1", "r2"] },
           { type: "value_constraint", roleId: "r1", values: ["Red", "Blue"] },
         ],
       });
+      model.addConstraint({ type: "external_uniqueness", roleIds: ["r1", "r2"] });
 
       const yaml = serializer.serialize(model);
       const restored = serializer.deserialize(yaml);

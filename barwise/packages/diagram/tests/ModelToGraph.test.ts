@@ -235,7 +235,7 @@ describe("ModelToGraph", () => {
     const ft2 = model.getFactTypeByName("Employee has LastName")!;
     const fnameRoleId = ft1.roles[1]!.id; // FirstName role
     const lnameRoleId = ft2.roles[1]!.id; // LastName role
-    ft1.addConstraint({
+    model.addConstraint({
       type: "external_uniqueness",
       roleIds: [fnameRoleId, lnameRoleId],
     });
@@ -298,7 +298,7 @@ describe("ModelToGraph", () => {
     // Add an external uniqueness referencing a non-existent role.
     const ft = model.getFactTypeByName("A has B")!;
     const realRoleId = ft.roles[0]!.id;
-    ft.addConstraint({
+    model.addConstraint({
       type: "external_uniqueness",
       roleIds: [realRoleId, "non-existent-role"],
     });
@@ -331,7 +331,7 @@ describe("ModelToGraph", () => {
 
     const ft1 = model.getFactTypeByName("Person has DriverLicNr")!;
     const ft2 = model.getFactTypeByName("Person has PassportNr")!;
-    ft1.addConstraint({
+    model.addConstraint({
       type: "exclusion",
       roleIds: [ft1.roles[1]!.id, ft2.roles[1]!.id],
     });
@@ -364,7 +364,7 @@ describe("ModelToGraph", () => {
 
     const ft1 = model.getFactTypeByName("Person is Male")!;
     const ft2 = model.getFactTypeByName("Person is Female")!;
-    ft1.addConstraint({
+    model.addConstraint({
       type: "exclusive_or",
       roleIds: [ft1.roles[0]!.id, ft2.roles[0]!.id],
     });
@@ -395,7 +395,7 @@ describe("ModelToGraph", () => {
 
     const ft1 = model.getFactTypeByName("Person has Phone")!;
     const ft2 = model.getFactTypeByName("Person has Email")!;
-    ft1.addConstraint({
+    model.addConstraint({
       type: "disjunctive_mandatory",
       roleIds: [ft1.roles[0]!.id, ft2.roles[0]!.id],
     });
@@ -425,7 +425,7 @@ describe("ModelToGraph", () => {
 
     const ft1 = model.getFactTypeByName("Person leads Team")!;
     const ft2 = model.getFactTypeByName("Person belongs to Team")!;
-    ft1.addConstraint({
+    model.addConstraint({
       type: "subset",
       subsetRoleIds: [ft1.roles[0]!.id],
       supersetRoleIds: [ft2.roles[0]!.id],
@@ -459,7 +459,7 @@ describe("ModelToGraph", () => {
 
     const ft1 = model.getFactTypeByName("Person is married to Spouse")!;
     const ft2 = model.getFactTypeByName("Spouse is married to Person")!;
-    ft1.addConstraint({
+    model.addConstraint({
       type: "equality",
       roleIds1: [ft1.roles[0]!.id],
       roleIds2: [ft2.roles[0]!.id],

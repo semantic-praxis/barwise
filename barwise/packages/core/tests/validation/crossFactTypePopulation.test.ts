@@ -89,7 +89,7 @@ function disjunctiveModel(hasPhone: boolean): OrmModel {
     readings: ["{0} has mobile {1}"],
   });
   // Attach the spanning constraint after both phone fact types exist.
-  homeFt.addConstraint({ type: "disjunctive_mandatory", roleIds: ["h1", "m1"] });
+  model.addConstraint({ type: "disjunctive_mandatory", roleIds: ["h1", "m1"] });
 
   model.addPopulation({ factTypeId: idFt.id }).addInstance({
     roleValues: { pid1: "P1", pid2: "PID1" },

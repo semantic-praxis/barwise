@@ -10,28 +10,30 @@
  *   - Subset/equality role-set matching
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint } from "../../src/model/Constraint.js";
+import { type Constraint, isInternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { constraintConsistencyRules } from "../../src/validation/rules/constraintConsistency.js";
 
 /**
- * Builds a binary "Person drives Car" model with one attached constraint.
- * Roles are "r1" (Person) and "r2" (Car), so constraints can reference
- * either by ID.
+ * Builds a binary "Person drives Car" model with one attached constraint:
+ * on the fact type for an internal kind, on the model for one that may
+ * span fact types. Roles are "r1" (Person) and "r2" (Car), so constraints
+ * can reference either by ID.
  */
 function buildModelWithConstraint(constraint: Constraint): OrmModel {
   const model = new OrmModel({ name: "Test" });
   const ot1 = model.addObjectType({ name: "Person", kind: "entity", referenceMode: "person_id" });
   const ot2 = model.addObjectType({ name: "Car", kind: "entity", referenceMode: "car_id" });
-  model.addFactType({
+  const ft = model.addFactType({
     name: "Person drives Car",
     roles: [
       { id: "r1", name: "drives", playerId: ot1.id },
       { id: "r2", name: "is driven by", playerId: ot2.id },
     ],
     readings: ["{0} drives {1}"],
-    constraints: [constraint],
   });
+  if (isInternalConstraint(constraint)) ft.addConstraint(constraint);
+  else model.addConstraint(constraint);
   return model;
 }
 

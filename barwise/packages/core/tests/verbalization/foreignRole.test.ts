@@ -105,7 +105,7 @@ describe("verbalizing a constraint that names a role of another fact type", () =
     // that kind -- validation reports the ALL-local one as the anomaly.
     // A guard that flagged this would be a false finding on a correct
     // model.
-    model.factTypes[0]!.addConstraint({
+    model.addConstraint({
       type: "external_uniqueness",
       roleIds: [localRoleId, foreignRoleId],
       id: "c6",

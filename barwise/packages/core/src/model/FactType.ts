@@ -1,8 +1,8 @@
 import type { Complete } from "../util/complete.js";
 import {
   type Constraint,
-  type ExternalConstraint,
   type InternalConstraint,
+  isExternalConstraint,
   isInternalConstraint,
 } from "./Constraint.js";
 import { generateId } from "./id.js";
@@ -50,7 +50,11 @@ export interface FactTypeConfig {
   readonly id?: string;
   readonly roles: readonly RoleConfig[];
   readonly readings: readonly string[];
-  readonly constraints?: readonly Constraint[];
+  /**
+   * The fact type's own constraints. One across fact types lives in the
+   * model: add it with `OrmModel.addConstraint` (orm-format-3 WS3c).
+   */
+  readonly constraints?: readonly InternalConstraint[];
   /** Natural-language definition. */
   readonly definition?: string;
   /** Free-text note: informal commentary distinct from `definition`. */
@@ -75,20 +79,12 @@ export class FactType extends ModelElement {
   private readonly _roles: Role[];
   private readonly _readings: ReadingOrder[];
   private readonly _constraints: InternalConstraint[];
-  private readonly _toModel: ((c: ExternalConstraint) => void) | undefined;
   private _definition: string | undefined;
   private _note: string | undefined;
   private _derivation: DerivationRule | undefined;
 
-  /**
-   * @param toModel Where a constraint across fact types goes: the model
-   *   that owns this fact type stores them (orm-format-3 WS3c), and
-   *   `OrmModel.addFactType` passes its own `addConstraint`. A fact type
-   *   built on its own has no model to hold one, so it refuses one.
-   */
-  constructor(config: FactTypeConfig, toModel?: (c: ExternalConstraint) => void) {
+  constructor(config: FactTypeConfig) {
     super(config.name, config.id);
-    this._toModel = toModel;
 
     if (config.roles.length === 0) {
       throw new Error(
@@ -188,23 +184,27 @@ export class FactType extends ModelElement {
    * output that names a constraint by id would have nothing to name it by
    * until the model was saved and reloaded.
    *
-   * A constraint across fact types is handed to the owning model, which
-   * stores it; a 2.0 file and the writers not yet moved to
-   * `OrmModel.addConstraint` still nest one here, and this is what keeps
-   * them working until WS3c-iii narrows the parameter.
+   * A constraint across fact types lives in the model
+   * (`OrmModel.addConstraint`). The type says so; the check is for a
+   * value whose type was asserted, such as a parsed file, which would
+   * otherwise be stored where no reader of the model's constraints looks.
    */
-  addConstraint(constraint: Constraint): void {
-    if (isInternalConstraint(constraint)) {
-      this._constraints.push(withId(constraint));
-      return;
-    }
-    if (!this._toModel) {
+  addConstraint(constraint: InternalConstraint): void {
+    const c = constraint as Constraint;
+    if (isExternalConstraint(c)) {
       throw new Error(
-        `A ${constraint.type} constraint spans fact types and lives in a model; `
-          + `fact type "${this.name}" has none. Add it with OrmModel.addConstraint.`,
+        `A ${c.type} constraint spans fact types, so it lives in the model, `
+          + `not in fact type "${this.name}": add it with OrmModel.addConstraint.`,
       );
     }
-    this._toModel(constraint);
+    if (!isInternalConstraint(c)) {
+      throw new Error(
+        `Fact type "${this.name}" has no constraint kind "${
+          String((constraint as { type?: unknown; }).type)
+        }".`,
+      );
+    }
+    this._constraints.push(withId(c));
   }
 
   /** Get all role ids that reference a given object type (by player id). */

@@ -1524,19 +1524,19 @@ describe("diffModels", () => {
           { name: "has citizen", playerId: country.id, id: citizenExit },
         ],
         readings: ["{0} is citizen of {1}"],
-        constraints: [{
-          type: "join_equality",
-          operands: [
-            {
-              path: { root: person.id, steps: [{ entry: "pb-person", exit: "pb-country" }] },
-              projection: [0, 1],
-            },
-            {
-              path: { root: person.id, steps: [{ entry: "pc-person", exit: citizenExit }] },
-              projection: [0, 1],
-            },
-          ],
-        }],
+      });
+      m.addConstraint({
+        type: "join_equality",
+        operands: [
+          {
+            path: { root: person.id, steps: [{ entry: "pb-person", exit: "pb-country" }] },
+            projection: [0, 1],
+          },
+          {
+            path: { root: person.id, steps: [{ entry: "pc-person", exit: citizenExit }] },
+            projection: [0, 1],
+          },
+        ],
       });
       return m;
     };
@@ -1584,7 +1584,7 @@ describe("a constraint over roles of other fact types", () => {
       unique === "number" ? "Room has RoomNumber" : "Room has RoomName",
     )!;
     const building = m.getFactTypeByName(other)!;
-    host.addConstraint({
+    m.addConstraint({
       type: "external_uniqueness",
       roleIds: [host.roles[1]!.id, dangling ?? building.roles[buildingRole]!.id],
     });
@@ -1678,8 +1678,8 @@ describe("a constraint over roles of other fact types", () => {
         { id: "r-num", name: "is of", playerId: "ot-num" },
       ],
       readings: ["{0} has {1}"],
-      constraints: [{ type: "external_uniqueness" as const, roleIds: ["r-num", "r-bld"] }],
     };
+    const key = { type: "external_uniqueness" as const, roleIds: ["r-num", "r-bld"] };
     full.addFactType(hostConfig);
     full.addFactType({
       id: "ft-bld",
@@ -1690,8 +1690,10 @@ describe("a constraint over roles of other fact types", () => {
       ],
       readings: ["{0} is in {1}"],
     });
+    full.addConstraint(key);
     const fragment = new OrmModel({ name: "M" });
     fragment.addFactType(hostConfig, { skipPlayerValidation: true });
+    fragment.addConstraint(key);
     expect(constraintChanges(full, fragment)).toEqual([]);
     expect(constraintChanges(fragment, full)).toEqual([]);
   });

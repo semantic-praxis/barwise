@@ -295,7 +295,7 @@ describe("a probe that puts one value in several roles asks all of them", () => 
       readings: ["{0} is counted"],
     });
 
-    flagged.addConstraint({
+    model.addConstraint({
       type: "exclusion",
       roleIds: [flagged.roles[0]!.id, counted.roles[0]!.id],
     });

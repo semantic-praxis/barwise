@@ -196,8 +196,8 @@ export class OrmModel {
   /**
    * The constraints that live in the model: the external kinds, whose roles
    * may span fact types (orm-format-3, placement by kind), in the order they
-   * were added. A 2.0 file's are added as its fact types load, so they keep
-   * file order: by the fact type nesting each, then by position.
+   * were added. The 2.0 loader adds a file's after every fact type, in file
+   * order: by the fact type nesting each, then by position.
    */
   get constraints(): readonly ExternalConstraint[] {
     return this._constraints;
@@ -411,20 +411,7 @@ export class OrmModel {
       }
     }
 
-    const owner: { built?: FactType; } = {};
-    const ft = new FactType(config, (c) => {
-      // Built and since removed: the model no longer owns it, so it has no
-      // model to give a constraint to.
-      const built = owner.built;
-      if (built && this._factTypes.get(built.id) !== built) {
-        throw new Error(
-          `Fact type "${built.name}" is no longer in model "${this._name}"; `
-            + `its ${c.type} constraint has nowhere to go.`,
-        );
-      }
-      this.addConstraint(c);
-    });
-    owner.built = ft;
+    const ft = new FactType(config);
     this._factTypes.set(ft.id, ft);
     return ft;
   }

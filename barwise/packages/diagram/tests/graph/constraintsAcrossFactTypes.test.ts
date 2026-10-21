@@ -5,10 +5,10 @@
  * node's id, not its edges, and not whether it is drawn, which it used to
  * when that fact type was a reference mode absorbed into its entity.
  */
-import type { Constraint, OrmModel } from "@barwise/core";
+import type { ExternalConstraint, OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { modelToGraph } from "../../src/graph/ModelToGraph.js";
-import { rooms } from "../fixtures/rooms.js";
+import { rooms, roomsFile } from "../fixtures/rooms.js";
 
 /** The constraint nodes and their edges, which is all a constraint draws. */
 function constraintPart(model: OrmModel, options?: Parameters<typeof modelToGraph>[1]) {
@@ -21,7 +21,7 @@ function constraintPart(model: OrmModel, options?: Parameters<typeof modelToGrap
 
 describe("constraint nodes across fact types", () => {
   it("draws the key by its own id, with an edge to each fact type it spans", () => {
-    expect(constraintPart(rooms("ft-in"))).toEqual({
+    expect(constraintPart(rooms())).toEqual({
       nodes: [{
         kind: "constraint",
         id: "c-key",
@@ -37,29 +37,29 @@ describe("constraint nodes across fact types", () => {
   });
 
   it("draws the same thing whichever fact type nests it, an absorbed one included", () => {
-    const expected = constraintPart(rooms("ft-in"));
-    for (const host of ["ft-nr", "ft-id"] as const) {
-      expect(constraintPart(rooms(host)), host).toEqual(expected);
+    const expected = constraintPart(rooms());
+    for (const host of ["ft-in", "ft-nr", "ft-id"] as const) {
+      expect(constraintPart(roomsFile(host)), host).toEqual(expected);
     }
   });
 
   it("does not draw a constraint every fact type of which is absorbed", () => {
-    const onlyAbsorbed: Constraint = {
+    const onlyAbsorbed: ExternalConstraint = {
       id: "c-absorbed",
       type: "exclusion",
       roleIds: ["r-room-id", "r-rid"],
     };
-    const ids = constraintPart(rooms("ft-in", [onlyAbsorbed])).nodes.map((n) => n.id);
+    const ids = constraintPart(rooms([onlyAbsorbed])).nodes.map((n) => n.id);
     expect(ids).toEqual(["c-key"]);
   });
 
   it("draws one that touches an absorbed fact type and a drawn one", () => {
-    const halfAbsorbed: Constraint = {
+    const halfAbsorbed: ExternalConstraint = {
       id: "c-half",
       type: "exclusion",
       roleIds: ["r-room-id", "r-room-in"],
     };
-    const part = constraintPart(rooms("ft-in", [halfAbsorbed]));
+    const part = constraintPart(rooms([halfAbsorbed]));
     // Order-free: node order is file order, which 3c makes model order.
     expect(part.nodes.map((n) => n.id).sort()).toEqual(["c-half", "c-key"]);
     // Its edges go to drawn fact types only: none to the absorbed one.
@@ -69,8 +69,12 @@ describe("constraint nodes across fact types", () => {
   });
 
   it("does not draw one whose roles resolve to nothing", () => {
-    const dangling: Constraint = { id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] };
-    expect(constraintPart(rooms("ft-in", [dangling])).nodes.map((n) => n.id)).toEqual(["c-key"]);
+    const dangling: ExternalConstraint = {
+      id: "c-gone",
+      type: "exclusion",
+      roleIds: ["r-x", "r-y"],
+    };
+    expect(constraintPart(rooms([dangling])).nodes.map((n) => n.id)).toEqual(["c-key"]);
   });
 
   it("does not draw one whose fact types a neighbourhood view leaves out", () => {
@@ -79,43 +83,55 @@ describe("constraint nodes across fact types", () => {
       factTypeIds: new Set(["ft-id"]),
       subtypeFactIds: new Set<string>(),
     };
-    expect(constraintPart(rooms("ft-in"), { includeFilter: filter })).toEqual({
+    expect(constraintPart(rooms(), { includeFilter: filter })).toEqual({
       nodes: [],
       edges: [],
     });
     // With one of its two fact types in view, it is drawn with that edge.
     const partial = { ...filter, factTypeIds: new Set(["ft-in"]) };
-    expect(constraintPart(rooms("ft-in"), { includeFilter: partial }).edges).toEqual([
+    expect(constraintPart(rooms(), { includeFilter: partial }).edges).toEqual([
       { constraintNodeId: "c-key", factTypeNodeId: "ft-in", roleId: "r-b" },
     ]);
   });
 
   it("keeps two constraints that share an id apart (barwise-b2s)", () => {
-    const twin: Constraint = { id: "c-key", type: "exclusion", roleIds: ["r-b", "r-n"] };
-    const ids = constraintPart(rooms("ft-in", [twin])).nodes.map((n) => n.id).sort();
+    const twin: ExternalConstraint = { id: "c-key", type: "exclusion", roleIds: ["r-b", "r-n"] };
+    const ids = constraintPart(rooms([twin])).nodes.map((n) => n.id).sort();
     expect(ids).toEqual(["c-key", "c-key#2"]);
   });
 
   it("keeps an id an internal constraint shares, since a badge has no node id", () => {
-    const samePref: Constraint = { id: "c-pref", type: "exclusion", roleIds: ["r-b", "r-n"] };
-    const ids = constraintPart(rooms("ft-in", [samePref])).nodes.map((n) => n.id).sort();
+    const samePref: ExternalConstraint = {
+      id: "c-pref",
+      type: "exclusion",
+      roleIds: ["r-b", "r-n"],
+    };
+    const ids = constraintPart(rooms([samePref])).nodes.map((n) => n.id).sort();
     expect(ids).toEqual(["c-key", "c-pref"]);
   });
 
   it("leaves an id to the drawn constraint when one never drawn shares it", () => {
     // Walked first, under "Room has RoomId"; join constraints have no glyph.
-    const undrawn: Constraint = { id: "c-key", type: "join_exclusion", operands: [] };
-    expect(constraintPart(rooms("ft-in", [undrawn])).nodes.map((n) => n.id)).toEqual(["c-key"]);
+    const undrawn: ExternalConstraint = { id: "c-key", type: "join_exclusion", operands: [] };
+    expect(constraintPart(rooms([undrawn])).nodes.map((n) => n.id)).toEqual(["c-key"]);
   });
 
   it("never issues a node id another node holds, and leaves a unique stated id to its owner", () => {
     // Under "Room has RoomId", walked first: an id equal to a fact type's,
     // a twin of the key, and an exclusive-or whose own unique id is what a
     // suffix for the twins would otherwise be.
-    const sameAsFactType: Constraint = { id: "ft-nr", type: "exclusion", roleIds: ["r-b", "r-n"] };
-    const twin: Constraint = { id: "c-key", type: "exclusion", roleIds: ["r-b", "r-n"] };
-    const stated: Constraint = { id: "c-key#2", type: "exclusive_or", roleIds: ["r-b", "r-n"] };
-    const graph = modelToGraph(rooms("ft-in", [sameAsFactType, twin, stated]));
+    const sameAsFactType: ExternalConstraint = {
+      id: "ft-nr",
+      type: "exclusion",
+      roleIds: ["r-b", "r-n"],
+    };
+    const twin: ExternalConstraint = { id: "c-key", type: "exclusion", roleIds: ["r-b", "r-n"] };
+    const stated: ExternalConstraint = {
+      id: "c-key#2",
+      type: "exclusive_or",
+      roleIds: ["r-b", "r-n"],
+    };
+    const graph = modelToGraph(rooms([sameAsFactType, twin, stated]));
     const ids = graph.nodes.map((n) => n.id);
     expect(new Set(ids).size).toBe(ids.length);
     const byKind = graph.nodes.flatMap((n) =>
@@ -133,8 +149,12 @@ describe("constraint nodes across fact types", () => {
     // Two constraints share c-key. The twin, walked first, spans only
     // "Room has RoomNumber"; a view of "Room is in Building" draws only the
     // key, which keeps the suffixed id it has in the full view.
-    const twin: Constraint = { id: "c-key", type: "exclusion", roleIds: ["r-room-nr", "r-n"] };
-    const model = rooms("ft-in", [twin]);
+    const twin: ExternalConstraint = {
+      id: "c-key",
+      type: "exclusion",
+      roleIds: ["r-room-nr", "r-n"],
+    };
+    const model = rooms([twin]);
     const full = constraintPart(model).nodes.map((n) => n.id);
     const view = constraintPart(model, {
       includeFilter: {

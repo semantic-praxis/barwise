@@ -6,7 +6,7 @@
  * under -- the property the host fallacy broke.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint } from "../../src/model/Constraint.js";
+import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import type { Diagnostic } from "../../src/validation/Diagnostic.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
@@ -15,11 +15,14 @@ import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 
 /**
  * Room is in Building, Room has RoomNumber, Room has Area. The constraints
- * across fact types are malformed or violated on purpose, and `host` picks
- * the fact type that nests them, as a 2.0 file might.
+ * across fact types are malformed or violated on purpose. The model holds
+ * them; `host` picks the fact type after which they are added, which varies
+ * their order among the model's elements. It cannot vary the 2.0 nesting,
+ * as the other readers' tests do through a file: the file schema refuses
+ * these constraints, which is the point of them.
  */
 function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
-  const across: Constraint[] = [
+  const across: ExternalConstraint[] = [
     // Too few roles: spans only "Room is in Building".
     { id: "c-excl-one", type: "exclusion", roleIds: ["r-1"] },
     // Arity mismatch across two fact types.
@@ -57,7 +60,9 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
     kind: "value",
     dataType: { name: "integer" },
   });
-  const nested = (ftId: string) => (host === ftId ? across : []);
+  const addAcrossAfter = (ftId: string) => {
+    if (host === ftId) { for (const c of across) model.addConstraint(c); }
+  };
   model.addFactType({
     id: "ft-in",
     name: "Room is in Building",
@@ -66,11 +71,9 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
       { id: "r-2", name: "houses", playerId: "ot-building" },
     ],
     readings: ["{0} is in {1}"],
-    constraints: [
-      { id: "c-one-building", type: "internal_uniqueness", roleIds: ["r-1"] },
-      ...nested("ft-in"),
-    ],
+    constraints: [{ id: "c-one-building", type: "internal_uniqueness", roleIds: ["r-1"] }],
   });
+  addAcrossAfter("ft-in");
   model.addFactType({
     id: "ft-nr",
     name: "Room has RoomNumber",
@@ -79,11 +82,9 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
       { id: "r-4", name: "is of", playerId: "ot-nr" },
     ],
     readings: ["{0} has {1}"],
-    constraints: [
-      { id: "c-one-nr", type: "internal_uniqueness", roleIds: ["r-3"] },
-      ...nested("ft-nr"),
-    ],
+    constraints: [{ id: "c-one-nr", type: "internal_uniqueness", roleIds: ["r-3"] }],
   });
+  addAcrossAfter("ft-nr");
   model.addFactType({
     id: "ft-area",
     name: "Room has Area",
@@ -92,8 +93,8 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
       { id: "r-6", name: "is of", playerId: "ot-area" },
     ],
     readings: ["{0} has {1}"],
-    constraints: nested("ft-area"),
   });
+  addAcrossAfter("ft-area");
   const pop = model.addPopulation({ id: "pop-nr", factTypeId: "ft-nr" });
   pop.addInstance({ id: "i-1", roleValues: { "r-3": "X", "r-4": "X" } });
   return model;
@@ -170,7 +171,7 @@ describe("a constraint across fact types with no roles", () => {
   it("draws no population violation from every fact type's population", () => {
     // Only a model built in code can hold one: the schema refuses it on load.
     const model = rooms("ft-in");
-    model.getFactType("ft-in")!.addConstraint({
+    model.addConstraint({
       id: "c-xor-empty",
       type: "exclusive_or",
       roleIds: [],
@@ -184,7 +185,7 @@ describe("a constraint across fact types naming a role no fact type has", () => 
   it("is reported against its own id and span, whichever fact type nests it", () => {
     for (const host of ["ft-in", "ft-nr", "ft-area"] as const) {
       const model = rooms(host);
-      model.getFactType(host)!.addConstraint({
+      model.addConstraint({
         id: "c-excl-gone",
         type: "exclusion",
         roleIds: ["r-1", "r-gone"],
@@ -204,7 +205,7 @@ describe("a constraint across fact types naming a role no fact type has", () => 
   });
 
   it("names each kind by its own label, wherever in the constraint the dangling id sits", () => {
-    const cases: [string, Constraint][] = [
+    const cases: [string, ExternalConstraint][] = [
       ["External uniqueness", {
         id: "c",
         type: "external_uniqueness",
@@ -222,7 +223,7 @@ describe("a constraint across fact types naming a role no fact type has", () => 
     ];
     for (const [label, constraint] of cases) {
       const model = rooms("ft-nr");
-      model.getFactType("ft-nr")!.addConstraint(constraint);
+      model.addConstraint(constraint);
       const ds = validate(model).filter((d) => d.ruleId === RULE_ID.acrossFactTypesUnknownRole);
       expect(ds.map((d) => d.message), label).toEqual([
         `${label} constraint over fact type "Room is in Building" references role id "r-gone", which no fact type in the model has.`,
@@ -232,7 +233,7 @@ describe("a constraint across fact types naming a role no fact type has", () => 
 
   it("names no span when none of its roles resolve", () => {
     const model = rooms("ft-in");
-    model.getFactType("ft-in")!.addConstraint({
+    model.addConstraint({
       id: "c-excl-lost",
       type: "exclusion",
       roleIds: ["r-gone", "r-lost"],

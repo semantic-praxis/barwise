@@ -10,7 +10,7 @@
  * skipped and named on stderr (barwise-nkn, three trial imports).
  */
 
-import { type Constraint, generateId } from "@barwise/core";
+import { generateId, type InternalConstraint } from "@barwise/core";
 import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
 import {
   claimValueType,
@@ -216,7 +216,7 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     const roles: { id: string; name: string; playerId: string; }[] = [];
     // An accepted_values test on a value role is its value constraint, as
     // buildConstraints reads it on any other column (PR #621 review).
-    const valueConstraints: Constraint[] = [];
+    const valueConstraints: InternalConstraint[] = [];
     for (const [colName] of info.roles) {
       const col = m.columns.find((c) => c.name === colName)!;
       const rel = rels.find((r) => r.columnName === colName);
@@ -284,7 +284,7 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       [c],
       i,
     ) => (info.key.includes(c!) ? [roles[i]!.id] : []));
-    const constraints: Constraint[] = [
+    const constraints: InternalConstraint[] = [
       { type: "internal_uniqueness", roleIds: keyRoleIds },
       ...valueConstraints,
     ];

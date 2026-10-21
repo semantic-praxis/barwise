@@ -5,12 +5,18 @@
  * table, not where NORMA's document lists it, and not whether NORMA's
  * importer keeps a second copy of it.
  */
-import { type Constraint, type OrmModel, setIdGenerator } from "@barwise/core";
+import {
+  type ExternalConstraint,
+  type OrmModel,
+  OrmYamlSerializer,
+  setIdGenerator,
+} from "@barwise/core";
 import { RelationalMapper } from "@barwise/core/mapping";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parse, stringify } from "yaml";
 import { routeConstraints } from "../src/ddl/constraintRouting.js";
 import { resolveDialectProfile } from "../src/ddl/dialectCapabilities.js";
 import { asNormaId } from "../src/norma/normaId.js";
@@ -64,19 +70,42 @@ function build(host: Host): OrmModel {
     .build();
   const roleOf = (factName: string, name: string) =>
     model.getFactTypeByName(factName)!.roles.find((r) => r.name === name)!.id;
-  const exclusion: Constraint = {
+  const exclusion: ExternalConstraint = {
     id: "c-lead-or-sponsor",
     type: "exclusion",
     roleIds: [roleOf(leads, "leads"), roleOf(sponsors, "sponsors")],
   };
-  const key: Constraint = {
+  const key: ExternalConstraint = {
     id: "c-led-and-sponsored",
     type: "external_uniqueness",
     roleIds: [roleOf(leads, "is led by"), roleOf(sponsors, "is sponsored by")],
   };
-  model.getFactTypeByName(host)!.addConstraint(exclusion);
-  model.getFactTypeByName(host)!.addConstraint(key);
-  return model;
+  model.addConstraint(exclusion);
+  model.addConstraint(key);
+  return nestedUnder(model, host, [exclusion.id!, key.id!]);
+}
+
+/**
+ * `model` read back from a 2.0 file that nests the constraints `ids`
+ * under `host`, after its own: in memory such a constraint belongs to the
+ * model (WS3c), so the nesting is only a 2.0 file's to vary.
+ */
+function nestedUnder(model: OrmModel, host: Host, ids: readonly string[]): OrmModel {
+  const yaml = new OrmYamlSerializer();
+  type NestedFactType = { name: string; constraints?: { id: string; }[]; };
+  const doc = parse(yaml.serialize(model)) as { model: { fact_types: NestedFactType[]; }; };
+  const fts = doc.model.fact_types;
+  const moved = ids.map((id) =>
+    fts.flatMap((ft) => ft.constraints ?? []).find((c) => c.id === id)!
+  );
+  for (const ft of fts) {
+    const own = (ft.constraints ?? []).filter((c) => !ids.includes(c.id));
+    if (own.length > 0) ft.constraints = own;
+    else delete ft.constraints;
+  }
+  const target = fts.find((ft) => ft.name === host)!;
+  target.constraints = [...(target.constraints ?? []), ...moved];
+  return yaml.deserialize(stringify(doc));
 }
 
 describe("constraints across fact types in DDL routing", () => {
@@ -104,9 +133,12 @@ describe("constraints across fact types in DDL routing", () => {
   it("notes a key missing a column beside the columns it has, and one with none nearest", () => {
     const model = projects(leads);
     const real = model.getFactTypeByName(leads)!.roles.find((r) => r.name === "is led by")!.id;
-    const ft = model.getFactTypeByName(sponsors)!;
-    ft.addConstraint({ id: "c-half", type: "external_uniqueness", roleIds: ["r-ghost", real] });
-    ft.addConstraint({ id: "c-none", type: "external_uniqueness", roleIds: ["r-ghost", "r-gone"] });
+    model.addConstraint({ id: "c-half", type: "external_uniqueness", roleIds: ["r-ghost", real] });
+    model.addConstraint({
+      id: "c-none",
+      type: "external_uniqueness",
+      roleIds: ["r-ghost", "r-gone"],
+    });
     const spills = route(model).spilled.map((s) => [s.reason, s.tableName]);
     // Its one real role's column is project.person_id.
     expect(spills).toContainEqual(["a role maps to no column", "project"]);

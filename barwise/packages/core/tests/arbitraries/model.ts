@@ -45,6 +45,9 @@ import fc from "fast-check";
 import {
   type Constraint,
   CONSTRAINT_TYPES,
+  type ExternalConstraint,
+  isExternalConstraint,
+  isInternalConstraint,
   type RingType,
   type ValueComparisonOperator,
 } from "../../src/model/Constraint.js";
@@ -375,6 +378,8 @@ export interface ModelPlan {
   readonly model: OrmModelConfig;
   readonly objectTypes: readonly ObjectTypeConfig[];
   readonly factTypes: readonly FactTypeConfig[];
+  /** Constraints across fact types, which the model holds (orm-format-3 WS3c). */
+  readonly constraints: readonly ExternalConstraint[];
   readonly subtypeFacts: readonly SubtypeFactConfig[];
   readonly objectifiedFactTypes: readonly ObjectifiedFactTypeConfig[];
   readonly populations: readonly PopulationConfig[];
@@ -946,9 +951,14 @@ function toPlan(raw: RawModel): ModelPlan {
     raw,
     skeletons.map((skeleton, j) => ({
       ...skeleton,
-      constraints: constraintsByOwner.get(j) ?? [],
+      constraints: (constraintsByOwner.get(j) ?? []).filter(isInternalConstraint),
     })),
     objectTypes,
+  );
+  // Owner by owner, as each fact type once handed its own to the model, so
+  // a seed draws the same model it did.
+  const constraints = skeletons.flatMap((_, j) =>
+    (constraintsByOwner.get(j) ?? []).filter(isExternalConstraint)
   );
 
   const subtypeFacts = toSubtypeFacts(raw.subtypeFacts, objectTypes);
@@ -961,6 +971,7 @@ function toPlan(raw: RawModel): ModelPlan {
     },
     objectTypes,
     factTypes,
+    constraints,
     subtypeFacts,
     objectifiedFactTypes: toObjectified(raw.objectified, objectTypes, skeletons, subtypeFacts),
     populations: toPopulations(raw.populations, skeletons),
@@ -991,6 +1002,7 @@ export function buildModel(plan: ModelPlan): OrmModel {
   const model = new OrmModel(plan.model);
   for (const config of plan.objectTypes) model.addObjectType(config);
   for (const config of plan.factTypes) model.addFactType(config);
+  for (const constraint of plan.constraints) model.addConstraint(constraint);
   for (const config of plan.subtypeFacts) model.addSubtypeFact(config);
   for (const config of plan.objectifiedFactTypes) model.addObjectifiedFactType(config);
   for (const config of plan.populations) model.addPopulation(config);

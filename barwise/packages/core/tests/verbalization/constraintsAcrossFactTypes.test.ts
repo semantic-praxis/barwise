@@ -9,16 +9,18 @@
  * broke.
  */
 import { describe, expect, it } from "vitest";
-import type { Constraint } from "../../src/model/Constraint.js";
+import { parse, stringify } from "yaml";
+import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { Verbalizer } from "../../src/verbalization/Verbalizer.js";
 
 /**
  * Room is identified by (Building, RoomNumber): the composite key is an
- * external uniqueness over a role of each fact type. `hostKeyUnder` picks
- * the fact type that nests it, as a 2.0 file might.
+ * external uniqueness over a role of each fact type, held by the model
+ * with `extra` after it; `"none"` leaves them out.
  */
-function rooms(hostKeyUnder: "ft-in" | "ft-nr" | "none", extra: Constraint[] = []): OrmModel {
+function rooms(keyed: "key" | "none", extra: ExternalConstraint[] = []): OrmModel {
   const model = new OrmModel({ name: "Facilities" });
   model.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
   model.addObjectType({
@@ -28,7 +30,7 @@ function rooms(hostKeyUnder: "ft-in" | "ft-nr" | "none", extra: Constraint[] = [
     referenceMode: "code",
   });
   model.addObjectType({ id: "ot-nr", name: "RoomNumber", kind: "value" });
-  const key: Constraint = {
+  const key: ExternalConstraint = {
     id: "c-room-key",
     type: "external_uniqueness",
     roleIds: ["r-2", "r-4"],
@@ -41,10 +43,7 @@ function rooms(hostKeyUnder: "ft-in" | "ft-nr" | "none", extra: Constraint[] = [
       { id: "r-2", name: "houses", playerId: "ot-building" },
     ],
     readings: ["{0} is in {1}"],
-    constraints: [
-      { id: "c-one-building", type: "internal_uniqueness", roleIds: ["r-1"] },
-      ...(hostKeyUnder === "ft-in" ? [key, ...extra] : []),
-    ],
+    constraints: [{ id: "c-one-building", type: "internal_uniqueness", roleIds: ["r-1"] }],
   });
   model.addFactType({
     id: "ft-nr",
@@ -54,11 +53,9 @@ function rooms(hostKeyUnder: "ft-in" | "ft-nr" | "none", extra: Constraint[] = [
       { id: "r-4", name: "is of", playerId: "ot-nr" },
     ],
     readings: ["{0} has {1}"],
-    constraints: [
-      { id: "c-one-nr", type: "internal_uniqueness", roleIds: ["r-3"] },
-      ...(hostKeyUnder === "ft-nr" ? [key, ...extra] : []),
-    ],
+    constraints: [{ id: "c-one-nr", type: "internal_uniqueness", roleIds: ["r-3"] }],
   });
+  if (keyed === "key") { for (const c of [key, ...extra]) model.addConstraint(c); }
   return model;
 }
 
@@ -66,7 +63,7 @@ const KEY_TEXT = "The combination of Building and RoomNumber is unique across fa
 
 describe("verbalizeModel", () => {
   it("says a constraint across fact types once, after a section heading", () => {
-    const rows = new Verbalizer().verbalizeModel(rooms("ft-nr"));
+    const rows = new Verbalizer().verbalizeModel(rooms("key"));
     const texts = rows.map((v) => v.text);
 
     expect(texts.filter((t) => t === KEY_TEXT)).toHaveLength(1);
@@ -80,9 +77,17 @@ describe("verbalizeModel", () => {
     expect(heading).toBeGreaterThan(texts.indexOf("Each Room has at most one RoomNumber."));
   });
 
-  it("is the same whichever fact type nests the constraint", () => {
+  it("is the same whichever fact type a 2.0 file nests the constraint under", () => {
+    // A save nests the key under ft-in, its first holder; move it to ft-nr.
+    const yaml = new OrmYamlSerializer();
+    const doc = parse(yaml.serialize(rooms("key")));
+    const [ftIn, ftNr] = doc.model.fact_types;
+    const at = ftIn.constraints.findIndex((c: { id: string; }) => c.id === "c-room-key");
+    ftNr.constraints.push(...ftIn.constraints.splice(at, 1));
+    const moved = yaml.deserialize(stringify(doc));
+    expect(moved.factTypes.map((ft) => ft.id)).toEqual(["ft-in", "ft-nr"]);
     const strip = (m: OrmModel) => new Verbalizer().verbalizeModel(m);
-    expect(strip(rooms("ft-in"))).toEqual(strip(rooms("ft-nr")));
+    expect(strip(moved)).toEqual(strip(rooms("key")));
   });
 
   it("emits no heading for a model with no constraint across fact types", () => {
@@ -92,7 +97,7 @@ describe("verbalizeModel", () => {
   });
 
   it("gives every constraint row its own id and the fact types it applies to", () => {
-    const rows = new Verbalizer().verbalizeModel(rooms("ft-nr")).filter((v) =>
+    const rows = new Verbalizer().verbalizeModel(rooms("key")).filter((v) =>
       v.category === "constraint"
     );
     expect(rows.map((v) => [v.sourceElementId, v.factTypeIds])).toEqual([
@@ -103,7 +108,7 @@ describe("verbalizeModel", () => {
   });
 
   it("keeps the row fields on a deontic constraint across fact types", () => {
-    const model = rooms("ft-in", [
+    const model = rooms("key", [
       { id: "c-pref", type: "exclusion", roleIds: ["r-1", "r-3"], modality: "deontic" },
     ]);
     const row = new Verbalizer().verbalizeModel(model).find((v) => v.sourceElementId === "c-pref")!;
@@ -115,7 +120,7 @@ describe("verbalizeModel", () => {
 describe("verbalizeFactType", () => {
   it("says a constraint across fact types under each fact type it touches", () => {
     const verbalizer = new Verbalizer();
-    const model = rooms("ft-nr");
+    const model = rooms("key");
     for (const ftId of ["ft-in", "ft-nr"]) {
       const texts = verbalizer.verbalizeFactType(ftId, model).map((v) => v.text);
       expect(texts, ftId).toContain(KEY_TEXT);
@@ -126,7 +131,7 @@ describe("verbalizeFactType", () => {
 
 describe("ConstraintVerbalizer.verbalizeAll", () => {
   it("answers by id from the model, list and text alike", () => {
-    const rows = new Verbalizer().constraints.verbalizeAll("ft-nr", rooms("ft-nr"));
+    const rows = new Verbalizer().constraints.verbalizeAll("ft-nr", rooms("key"));
     expect(rows.map((v) => [v.sourceElementId, v.text])).toEqual([
       ["c-one-nr", "Each Room has at most one RoomNumber."],
       ["c-room-key", KEY_TEXT],
@@ -134,6 +139,6 @@ describe("ConstraintVerbalizer.verbalizeAll", () => {
   });
 
   it("yields nothing for a fact type the model does not have", () => {
-    expect(new Verbalizer().constraints.verbalizeAll("ft-missing", rooms("ft-nr"))).toEqual([]);
+    expect(new Verbalizer().constraints.verbalizeAll("ft-missing", rooms("key"))).toEqual([]);
   });
 });

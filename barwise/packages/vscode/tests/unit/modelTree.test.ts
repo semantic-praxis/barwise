@@ -4,14 +4,19 @@
  * spanning two fact types shows under both, and under neither of the
  * others, whichever fact type a 2.0 file nests it in.
  */
-import { OrmModel } from "@barwise/core";
+import { OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { describe, expect, it, vi } from "vitest";
+import { parse, stringify } from "yaml";
 
 vi.mock("vscode", async () => (await import("./helpers/inertModule.js")).inertModule());
 
 const { buildTree } = await import("../../src/sidebar/ModelTreeProvider.js");
 
-/** Room is in Building, Room has RoomNumber, Room has Area; the key nests in `host`. */
+/**
+ * Room is in Building, Room has RoomNumber, Room has Area, read back from a
+ * 2.0 file that nests the key in `host`: in memory the key belongs to the
+ * model (WS3c), so only a file can nest it.
+ */
 function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
   const model = new OrmModel({ name: "Facilities" });
   model.addObjectType({ id: "ot-room", name: "Room", kind: "entity", referenceMode: "id" });
@@ -27,14 +32,24 @@ function rooms(host: "ft-in" | "ft-nr" | "ft-area"): OrmModel {
         { id: `${id}-other`, name: "s", playerId: other },
       ],
       readings: ["{0} r {1}"],
-      constraints: host === id
-        ? [{ id: "c-key", type: "external_uniqueness", roleIds: ["ft-in-other", "ft-nr-other"] }]
-        : [],
     });
   fact("ft-in", "Room is in Building", "ot-b");
   fact("ft-nr", "Room has RoomNumber", "ot-nr");
   fact("ft-area", "Room has Area", "ot-a");
-  return model;
+  model.addConstraint({
+    id: "c-key",
+    type: "external_uniqueness",
+    roleIds: ["ft-in-other", "ft-nr-other"],
+  });
+  const yaml = new OrmYamlSerializer();
+  type NestedFactType = { id: string; constraints?: { id: string; }[]; };
+  const doc = parse(yaml.serialize(model)) as { model: { fact_types: NestedFactType[]; }; };
+  const fts = doc.model.fact_types;
+  const key = fts.flatMap((ft) => ft.constraints ?? []).find((c) => c.id === "c-key")!;
+  // No fact type here has a constraint of its own, so the key is all there is.
+  for (const ft of fts) delete ft.constraints;
+  fts.find((ft) => ft.id === host)!.constraints = [key];
+  return yaml.deserialize(stringify(doc));
 }
 
 /** Fact type name to the labels of its constraint children. */
@@ -48,7 +63,7 @@ function constraintsByFactType(model: OrmModel): Record<string, string[]> {
 describe("model tree constraints", () => {
   it("lists a constraint touching no fact type under Unattached Constraints", () => {
     const model = rooms("ft-area");
-    model.getFactType("ft-area")!.addConstraint({
+    model.addConstraint({
       id: "c-gone",
       type: "exclusion",
       roleIds: ["r-gone", "r-lost"],
