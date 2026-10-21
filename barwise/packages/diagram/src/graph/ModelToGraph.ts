@@ -22,8 +22,10 @@ import type {
  * Constraint kinds deliberately not drawn as dedicated constraint
  * nodes, each with the reason. A new Constraint member must be added
  * either to the drawn cases in the constraint-node switch or here --
- * the switch's default indexes this record over the exact complement
- * of the drawn kinds, so leaving it out of both is a compile error.
+ * the switch's default indexes this record over the external kinds it
+ * does not draw, so leaving one out of both is a compile error. The
+ * internal kinds never reach the switch, which walks `model.constraints`;
+ * they stay listed to say where each is drawn instead.
  */
 const NOT_DRAWN: Record<
   | "internal_uniqueness"
@@ -147,7 +149,7 @@ export function modelToGraph(
     const singleRoleUniqueIds = new Set<string>();
     let hasSpanning = false;
 
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type === "internal_uniqueness") {
         if (c.roleIds.length === 1 && c.roleIds[0]) {
           singleRoleUniqueIds.add(c.roleIds[0]);
@@ -159,7 +161,7 @@ export function modelToGraph(
 
     // Determine which roles are mandatory.
     const mandatoryRoleIds = new Set<string>();
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type === "mandatory") {
         mandatoryRoleIds.add(c.roleId);
       }
@@ -167,7 +169,7 @@ export function modelToGraph(
 
     // Collect frequency constraints per role.
     const frequencyByRole = new Map<string, { min: number; max: number | "unbounded"; }>();
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       // Single-role frequency renders as a per-role badge; a multi-role
       // (role-sequence) frequency has no single-role anchor and is skipped.
       if (c.type === "frequency" && c.roleIds.length === 1) {
@@ -177,7 +179,7 @@ export function modelToGraph(
 
     // Detect ring constraint (at most one per fact type).
     let ringConstraint: FactTypeNode["ringConstraint"];
-    for (const c of ft.constraints) {
+    for (const c of ft.internalConstraints) {
       if (c.type === "ring") {
         ringConstraint = {
           label: RING_TYPE_LABELS[c.ringType],
@@ -239,16 +241,18 @@ export function modelToGraph(
 
   // Extract constraints that are rendered as circled symbol nodes.
   // This covers external uniqueness, exclusion, exclusive-or,
-  // disjunctive mandatory, subset, and equality constraints.
-  let constraintIndex = 0;
+  // disjunctive mandatory, subset, and equality constraints. Each node
+  // takes its constraint's own id, so a selection, a view or a diff names
+  // the same node whatever order the file lists constraints in
+  // (orm-format-3, Open decision 9); a counter used to number them.
 
   /** Helper: create a constraint node and edges for a set of role ids. */
   function addConstraintNode(
+    constraintId: string,
     kind: ConstraintKind,
     roleIds: readonly string[],
     supersetRoleIds?: readonly string[],
   ): void {
-    const constraintId = `constraint-${constraintIndex++}`;
     const node: ConstraintNode = {
       kind: "constraint",
       id: constraintId,
@@ -274,38 +278,45 @@ export function modelToGraph(
     }
   }
 
-  for (const ft of model.factTypes) {
-    if (absorbedFactTypeIds.has(ft.id)) continue;
-    for (const c of ft.constraints) {
-      switch (c.type) {
-        case "external_uniqueness":
-          addConstraintNode("external_uniqueness", c.roleIds);
-          break;
-        case "exclusion":
-          addConstraintNode("exclusion", c.roleIds);
-          break;
-        case "exclusive_or":
-          addConstraintNode("exclusive_or", c.roleIds);
-          break;
-        case "disjunctive_mandatory":
-          addConstraintNode("disjunctive_mandatory", c.roleIds);
-          break;
-        case "subset":
-          addConstraintNode("subset", c.subsetRoleIds, c.supersetRoleIds);
-          break;
-        case "equality":
-          addConstraintNode("equality", c.roleIds1, c.roleIds2);
-          break;
-        default: {
-          // Narrowed to exactly the kinds declared not-drawn below; a
-          // new Constraint member missing from both the cases above
-          // and NOT_DRAWN fails to compile instead of silently not
-          // rendering (barwise-869: the join/comparison/cardinality
-          // kinds were undrawn with nothing recording the intent).
-          const reason: string = NOT_DRAWN[c.type];
-          void reason;
-          break;
-        }
+  // Every constraint across fact types, once, unless every fact type it
+  // touches is absorbed into a reference mode and so has no node to attach
+  // to. The fact type a 2.0 file nests it under decides nothing: it used to
+  // decide whether the constraint was drawn at all.
+  for (const c of model.constraints) {
+    const touched = model.factTypesOf(c);
+    if (touched.length > 0 && touched.every((ft) => absorbedFactTypeIds.has(ft.id))) continue;
+    // Every constraint in a model has an id (barwise-nkq); the type stays
+    // optional until WS3c, and a node without one could not be named.
+    if (c.id === undefined) throw new Error(`A ${c.type} constraint in the model has no id.`);
+    const id = c.id;
+    switch (c.type) {
+      case "external_uniqueness":
+        addConstraintNode(id, "external_uniqueness", c.roleIds);
+        break;
+      case "exclusion":
+        addConstraintNode(id, "exclusion", c.roleIds);
+        break;
+      case "exclusive_or":
+        addConstraintNode(id, "exclusive_or", c.roleIds);
+        break;
+      case "disjunctive_mandatory":
+        addConstraintNode(id, "disjunctive_mandatory", c.roleIds);
+        break;
+      case "subset":
+        addConstraintNode(id, "subset", c.subsetRoleIds, c.supersetRoleIds);
+        break;
+      case "equality":
+        addConstraintNode(id, "equality", c.roleIds1, c.roleIds2);
+        break;
+      default: {
+        // Narrowed to exactly the kinds declared not-drawn below; a
+        // new Constraint member missing from both the cases above
+        // and NOT_DRAWN fails to compile instead of silently not
+        // rendering (barwise-869: the join/comparison/cardinality
+        // kinds were undrawn with nothing recording the intent).
+        const reason: string = NOT_DRAWN[c.type];
+        void reason;
+        break;
       }
     }
   }

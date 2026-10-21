@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, and 3b-i (vscode, learn and dbt readers) 2026-10-21; WS4 and WS5 not started; every open decision
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, and 3b-ii (diagram) 2026-10-21; WS4 and WS5 not started; every open decision
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1146,6 +1146,21 @@ Implementation notes (2026-10-19):
     is `getConstraint`, by id alone.
   - dbt's three SQL-pattern checks read `internalConstraints`: each asks
     about an internal kind only.
+
+- **Diagram (3b-ii, 2026-10-21).**
+  - A constraint node takes its constraint's own id, where a counter
+    numbered them `constraint-0`, `constraint-1` in walk order, so a
+    selection, a view or a diff names the same node however the file
+    orders its constraints.
+  - `modelToGraph` walks `model.constraints` and skips a constraint only
+    when every fact type it touches is absorbed into a reference mode.
+    It used to skip any constraint nested under an absorbed fact type,
+    whatever it spanned, and draw one nested elsewhere that touched only
+    absorbed ones.
+  - The four per-fact-type badge reads (uniqueness, mandatory, frequency,
+    ring) read `internalConstraints`.
+  - The webview's model summary lists `constraintsTouching` per fact
+    type, so its tree badge and inspector agree with the sidebar.
 
 ### 4. Format 3.0 (provisional: not yet grounded)
 
