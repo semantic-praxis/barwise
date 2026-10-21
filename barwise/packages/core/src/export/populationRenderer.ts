@@ -6,6 +6,7 @@
  */
 
 import type { RelationalSchema, Table } from "../mapping/RelationalSchema.js";
+import { preferredIdentifiers } from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance } from "../model/Population.js";
 
@@ -113,6 +114,7 @@ export function renderPopulationAsOpenApiExamples(
   model: OrmModel,
 ): ReadonlyMap<string, Record<string, unknown>> {
   const examples = new Map<string, Record<string, unknown>>();
+  const identifiers = preferredIdentifiers(model);
 
   // For each entity type, look for populations of identifier fact types
   for (const objectType of model.objectTypes) {
@@ -120,19 +122,12 @@ export function renderPopulationAsOpenApiExamples(
       continue;
     }
 
-    // Find identifier fact type
-    const idFactTypes = model.factTypes.filter((ft) => {
-      return (
-        ft.roles.length === 2
-        && ft.roles.some((r) => r.playerId === objectType.id)
-        && ft.internalConstraints.some(
-          (c) =>
-            c.type === "internal_uniqueness"
-            && c.isPreferred === true,
-        )
-      );
-    });
-
+    // The binary that identifies the entity, when its identifier is one.
+    const identifying = identifiers.byEntity.get(objectType.id)?.factType;
+    const idFactTypes = identifying && identifying.roles.length === 2
+        && identifying.roles.some((r) => r.playerId === objectType.id)
+      ? [identifying]
+      : [];
     if (idFactTypes.length === 0) {
       continue;
     }

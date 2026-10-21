@@ -921,11 +921,19 @@ function withPreferredIdentifier(
     );
     if (alreadyPreferred) return unchanged;
 
+    // The value's role needs its own uniqueness: without one a value
+    // could belong to two entities and identify neither, and
+    // `preferredIdentifiers` reads the flag as naming nothing.
+    const valueRole = entityRole === r1 ? r2 : r1;
+    const onValue = (ft.constraints ?? []).some((c) =>
+      c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === valueRole.id
+    );
     unchanged[j] = {
       ...ft,
       constraints: [
         ...(ft.constraints ?? []),
         { type: "internal_uniqueness", roleIds: [entityRole.id!], isPreferred: true },
+        ...(onValue ? [] : [{ type: "internal_uniqueness" as const, roleIds: [valueRole.id!] }]),
       ],
     };
     return unchanged;

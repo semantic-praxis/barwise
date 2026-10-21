@@ -2,7 +2,7 @@
 
 Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
-grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), not implemented; WS5 not started; open decisions 1 to 9
+grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), 4a implemented 2026-10-21; WS5 not started; open decisions 1 to 9
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
@@ -1553,6 +1553,52 @@ that each keep the suite green). Closes barwise-loo and barwise-alg.
 - `barwise migrate` (Open decision 5) with its capability-matrix row.
 - **Acceptance:** the risks below, with the corpus rewritten in WS5.
 
+Implementation notes (2026-10-21, WS4a):
+
+- **The rule.** `preferredIdentifiers(model)` in `model/identification.ts`
+  returns the map from each entity to its identifying uniqueness and the
+  inverse, computed once. Every reader listed above uses it, and
+  `preferredIdentifyingBinary` is its answer when that is an entity-value
+  binary. `identificationSources` still lists every flag, so
+  `completeness/multiple-preferred-identifiers` still fires; a test pins
+  it.
+- **Decision 8, refined.** A flagged uniqueness on an objectified fact type
+  identifies the objectifying type whether or not it spans every role.
+  Decision 8 named only the spanning case. The auction models' four
+  objectified ternaries, each in two copies, are identified by a two-role
+  uniqueness, as NORMA allows. Read literally, decision 8 handed those
+  eight flags to the third role's player, an entity that has its own
+  reference binary, and `preferredIdentifiers` then dropped them. Decision
+  11 is implemented as recommended (the reference binary wins a tie).
+- **The corpus.** Of the 376 flags in tracked models, 374 identify an
+  entity. The two dropped are `order-management`'s "Customer has Name", in
+  both copies: the flag is on Customer's role, and no uniqueness covers the
+  name's.
+- **What changed**, over the 88 tracked models that load, before and after,
+  capturing each reader's output:
+  - validation: no model changed;
+  - DDL: 2 models, the two `order-management` copies, where Customer's
+    key moves from `name` to its reference mode's `customer_id`;
+  - query anchors: 8 models. Entities gain an identifier the importers'
+    convention used to hide (`shop`, the payments domain), and the
+    auction models' entities lose one the old rule borrowed from a
+    neighbouring ternary;
+  - annotator TODOs: 6 models, mostly objectified types that now have an
+    identifier;
+  - diagram folding and `ModelContext`: the two `order-management` copies;
+  - NORMA export: 31 models. 310 more `PreferredIdentifier` links, 30
+    fewer synthesized reference-scheme expansions, because the real
+    identifying binary is now found, and `IsPreferred` on the linked
+    uniqueness;
+  - population examples: no model changed.
+- **Test fixtures.** `ModelBuilder`'s `uniqueness: "both"` now honours
+  `isPreferred`, and the fixtures that flagged role1 of an entity-value
+  binary with no uniqueness on the value's role use it: that shape
+  identifies nothing. The model arbitrary adds the value role's
+  uniqueness when it draws a preferred identifier, which moves the
+  counterexample stray ratchet from 135 to 141 (six new internal
+  uniqueness counterexamples, all tripping rules already listed).
+
 ### 5. Corpus, docs, release notes (provisional: not yet grounded)
 
 The tracked 115 files (113 when drafted) rewritten by the migration (a script under `scripts/`,
@@ -1755,6 +1801,9 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
       a reference scheme keeps it.
     - **(b)** Document order alone, as decision 8 reads literally. Simple
       to state, and the acceptance list in 4a shows each key that moves.
+
+    Implemented as (a) in 4a, with the objectification refinement its
+    implementation notes record.
 
 ## Risks and testing
 

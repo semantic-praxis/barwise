@@ -14,7 +14,12 @@
  * attribute. The identifying fact's own instances stay implicit, exactly
  * as NORMA writes them.
  */
-import { type ObjectType, type OrmModel, referenceModeOf } from "@barwise/core";
+import {
+  type ObjectType,
+  type OrmModel,
+  preferredIdentifiers,
+  referenceModeOf,
+} from "@barwise/core";
 import { derivedNormaId, type NormaId, toNormaId } from "./normaId.js";
 import type {
   NormaConstraint,
@@ -53,7 +58,10 @@ interface IdentifyingSeat {
   readonly valueTypeId: NormaId;
 }
 
-export function buildPopulationGraph(model: OrmModel): PopulationGraph {
+export function buildPopulationGraph(
+  model: OrmModel,
+  identifiers: ReturnType<typeof preferredIdentifiers> = preferredIdentifiers(model),
+): PopulationGraph {
   const graph: PopulationGraph = {
     valueInstancesByOwner: new Map(),
     entityInstancesByOwner: new Map(),
@@ -126,7 +134,8 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
     if (existing) return existing;
     let seat = seatByEntity.get(entity.id);
     if (!seat) {
-      seat = findIdentifyingSeat(model, entity.id) ?? synthesizeExpansion(graph, entity);
+      seat = findIdentifyingSeat(model, entity.id, identifiers)
+        ?? synthesizeExpansion(graph, entity);
       seatByEntity.set(entity.id, seat);
     }
     const valueInstanceId = internValueInstance(seat.valueTypeId, value);
@@ -189,32 +198,29 @@ export function buildPopulationGraph(model: OrmModel): PopulationGraph {
 }
 
 /**
- * The model's explicit identifying seat for an entity: a binary fact where
- * a preferred single-role internal uniqueness covers a value-typed role and
- * the entity plays the other role.
+ * The model's explicit identifying seat for an entity: the binary that
+ * identifies it (`preferredIdentifiers`), when that is a single-role
+ * uniqueness on a value-typed role with the entity on the other role.
  */
 function findIdentifyingSeat(
   model: OrmModel,
   entityId: string,
+  identifiers: ReturnType<typeof preferredIdentifiers>,
 ): IdentifyingSeat | undefined {
-  for (const ft of model.factTypes) {
-    if (ft.roles.length !== 2) continue;
-    for (const c of ft.internalConstraints) {
-      if (c.type !== "internal_uniqueness" || !c.isPreferred || c.roleIds.length !== 1) {
-        continue;
-      }
-      const valueRole = ft.roles.find((r) => r.id === c.roleIds[0]);
-      const entityRole = ft.roles.find((r) => r.id !== c.roleIds[0]);
-      if (!valueRole || !entityRole || entityRole.playerId !== entityId) continue;
-      const player = model.getObjectType(valueRole.playerId);
-      if (player?.kind !== "value") continue;
-      return {
-        valueRoleId: toNormaId(valueRole.id),
-        valueTypeId: toNormaId(player.id),
-      };
-    }
+  const at = identifiers.byEntity.get(entityId);
+  if (!at || at.factType.roles.length !== 2 || at.constraint.roleIds.length !== 1) {
+    return undefined;
   }
-  return undefined;
+  const ft = at.factType;
+  const valueRole = ft.roles.find((r) => r.id === at.constraint.roleIds[0]);
+  const entityRole = ft.roles.find((r) => r.id !== at.constraint.roleIds[0]);
+  if (!valueRole || !entityRole || entityRole.playerId !== entityId) return undefined;
+  const player = model.getObjectType(valueRole.playerId);
+  if (player?.kind !== "value") return undefined;
+  return {
+    valueRoleId: toNormaId(valueRole.id),
+    valueTypeId: toNormaId(player.id),
+  };
 }
 
 /**

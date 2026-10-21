@@ -5,7 +5,7 @@
  * redefining them.
  */
 
-import type { OrmModel } from "@barwise/core";
+import { type OrmModel, preferredIdentifiers } from "@barwise/core";
 
 /**
  * Produce a text summary of the entity types, value types, and fact
@@ -38,13 +38,12 @@ export function buildExistingModelContext(model: OrmModel): string {
   }
 
   // Fact types (non-identifier only, to keep the context concise).
-  const factTypes = model.factTypes.filter((ft) => {
-    // Skip identifier fact types (they're implied by reference_mode).
-    const hasPreferred = ft.internalConstraints.some(
-      (c) => c.type === "internal_uniqueness" && c.isPreferred,
-    );
-    return !hasPreferred || ft.arity > 2;
-  });
+  // Skip identifier fact types (they're implied by reference_mode): the
+  // ones core's one rule says identify an entity.
+  const identifying = new Set(
+    [...preferredIdentifiers(model).byEntity.values()].map((at) => at.factType.id),
+  );
+  const factTypes = model.factTypes.filter((ft) => !identifying.has(ft.id) || ft.arity > 2);
   if (factTypes.length > 0) {
     lines.push("Fact Types:");
     for (const ft of factTypes) {

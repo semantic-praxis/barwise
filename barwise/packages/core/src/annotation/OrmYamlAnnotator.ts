@@ -22,7 +22,7 @@
  * idempotent via stripBarwiseComments().
  */
 
-import { isInternalUniqueness } from "../model/Constraint.js";
+import { preferredIdentifiers } from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import {
   type AnnotationSeverity,
@@ -349,9 +349,10 @@ function collectStructuralGaps(
   model: OrmModel,
   annotations: OrmAnnotation[],
 ): void {
+  const identifiers = preferredIdentifiers(model);
   for (const ot of model.objectTypes) {
     // Entity types missing a preferred identifier.
-    if (ot.kind === "entity" && !hasPreferredIdentifier(ot, model)) {
+    if (ot.kind === "entity" && !hasPreferredIdentifier(ot, identifiers)) {
       annotations.push({
         elementType: "object_type",
         elementName: ot.name,
@@ -375,25 +376,14 @@ function collectStructuralGaps(
 /**
  * Check if an entity type has a formally declared preferred identifier.
  * A reference mode is just a naming hint; the real formalization is a
- * uniqueness constraint marked `isPreferred` on a binary fact type
- * where this entity plays one of the roles.
+ * preferred uniqueness constraint that identifies this entity
+ * (`preferredIdentifiers`).
  */
 function hasPreferredIdentifier(
   entity: import("../model/ObjectType.js").ObjectType,
-  model: OrmModel,
+  identifiers: ReturnType<typeof preferredIdentifiers>,
 ): boolean {
-  for (const ft of model.factTypes) {
-    const playsRole = ft.roles.some((r) => r.playerId === entity.id);
-    if (!playsRole) continue;
-
-    for (const c of ft.internalConstraints) {
-      if (isInternalUniqueness(c) && c.isPreferred) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return identifiers.byEntity.has(entity.id);
 }
 
 // ---------------------------------------------------------------------------

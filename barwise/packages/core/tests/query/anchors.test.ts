@@ -19,8 +19,26 @@ function identifiedModel(): OrmModel {
     .withBinaryFactType("Customer has CustomerId", {
       role1: { player: "Customer", name: "has" },
       role2: { player: "CustomerId", name: "identifies" },
-      uniqueness: "role1",
+      uniqueness: "both",
       mandatory: "role1",
+      isPreferred: true,
+    })
+    .build();
+}
+
+/**
+ * The importers' convention: the preferred flag on the value's role. The
+ * anchor used to require the flag on a role the entity plays, so an
+ * imported model reported every entity as having no identifier.
+ */
+function importedModel(): OrmModel {
+  return new ModelBuilder("M")
+    .withEntityType("Customer", { referenceMode: "customer_id" })
+    .withValueType("CustomerId")
+    .withBinaryFactType("CustomerId identifies Customer", {
+      role1: { player: "CustomerId", name: "identifies" },
+      role2: { player: "Customer", name: "has" },
+      uniqueness: "both",
       isPreferred: true,
     })
     .build();
@@ -51,6 +69,15 @@ describe("queryModel: anchors", () => {
     });
     expect(a.mandatoryRoles).toEqual(["Customer has CustomerId"]);
     expect(a.missingIdentifier).toBe(false);
+  });
+
+  it("finds the identifier when the flag is on the value's role, as importers put it", () => {
+    const [a] = anchorsOf(runQuery(importedModel(), "anchors Customer"));
+    expect(a!.preferredIdentifier).toEqual({
+      factType: "CustomerId identifies Customer",
+      identifierTypes: ["CustomerId"],
+    });
+    expect(a!.missingIdentifier).toBe(false);
   });
 
   it("lists every entity type (and only entity types) for the bare query", () => {

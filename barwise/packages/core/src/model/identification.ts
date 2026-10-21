@@ -1,3 +1,4 @@
+import { type InternalUniquenessConstraint, isInternalUniqueness } from "./Constraint.js";
 import type { FactType } from "./FactType.js";
 import type { ObjectType, ValueType } from "./ObjectType.js";
 import type { OrmModel } from "./OrmModel.js";
@@ -114,6 +115,120 @@ export function identificationOrder(
   return { order };
 }
 
+/** The uniqueness constraint that identifies an entity type, and where it is. */
+export interface IdentifyingUniqueness {
+  readonly entityId: string;
+  readonly constraint: InternalUniquenessConstraint;
+  readonly factType: FactType;
+}
+
+/**
+ * Which uniqueness identifies which entity type: one answer for every
+ * reader (orm-format-3, Open decision 8 and WS4a; barwise-971).
+ *
+ * Nine modules used to answer "which constraint is this entity's
+ * preferred identifier" with nine rules, and the two conventions for
+ * where the `isPreferred` flag sits meant each one found nothing on some
+ * models: the importers flag the uniqueness on the value's role, the
+ * extraction prompt flags the entity's role. This reads each flag the way
+ * ORM and NORMA's `PreferredIdentifier` mean it, as naming the entity the
+ * roles opposite the uniqueness identify:
+ *
+ * - a flagged uniqueness on an objectified fact type identifies the
+ *   objectifying type, whether it spans every role or, as NORMA allows, all
+ *   but one (Open decision 8 named only the spanning case; the auction
+ *   models' objectified ternaries are identified by a two-role uniqueness,
+ *   and reading those flags as naming the third role's player made an
+ *   entity with its own reference scheme the claimant);
+ * - a flagged uniqueness on either role of a binary between one entity
+ *   and one value type identifies the entity, by the uniqueness on the
+ *   value's role (and is dropped when there is none);
+ * - otherwise, a flagged uniqueness whose uncovered roles are all played
+ *   by one entity type identifies that entity;
+ * - anything else is dropped.
+ *
+ * Two flags naming one entity is a modelling error
+ * (`completeness/multiple-preferred-identifiers`, which counts the flags
+ * themselves through `identificationSources`, so this resolution cannot
+ * hide it). The entity-value binary wins, so an objectified type with its
+ * own reference scheme keeps the key the mapper gives it today (Open
+ * decision 11); then the first in model order.
+ *
+ * `byConstraint` is the inverse, for readers that ask about a fact type
+ * or a constraint rather than an entity: calling a per-entity lookup
+ * inside a loop over fact types would make each of them quadratic.
+ */
+export function preferredIdentifiers(model: OrmModel): {
+  readonly byEntity: ReadonlyMap<string, IdentifyingUniqueness>;
+  readonly byConstraint: ReadonlyMap<string, IdentifyingUniqueness>;
+} {
+  const objectifying = new Map(
+    model.objectifiedFactTypes.map((oft) => [oft.factTypeId, oft.objectTypeId]),
+  );
+  const chosen = new Map<string, { readonly at: IdentifyingUniqueness; readonly rank: number; }>();
+  const offer = (at: IdentifyingUniqueness, rank: number): void => {
+    const held = chosen.get(at.entityId);
+    if (!held || rank < held.rank) chosen.set(at.entityId, { at, rank });
+  };
+  const isEntity = (id: string) => model.getObjectType(id)?.kind === "entity";
+
+  for (const factType of model.factTypes) {
+    for (const c of factType.internalConstraints) {
+      if (!isInternalUniqueness(c) || !c.isPreferred) continue;
+      const covered = new Set(c.roleIds);
+
+      const objectType = objectifying.get(factType.id);
+      if (objectType) {
+        if (isEntity(objectType)) offer({ entityId: objectType, constraint: c, factType }, 1);
+        continue;
+      }
+
+      const binary = entityValueRoles(model, factType);
+      if (binary) {
+        const onValue = factType.internalConstraints.find(
+          (u): u is InternalUniquenessConstraint =>
+            isInternalUniqueness(u) && u.roleIds.length === 1
+            && u.roleIds[0] === binary.valueRole.id,
+        );
+        if (onValue) {
+          offer({ entityId: binary.entityRole.playerId, constraint: onValue, factType }, 0);
+        }
+        continue;
+      }
+
+      const players = new Set(
+        factType.roles.filter((r) => !covered.has(r.id)).map((r) => r.playerId),
+      );
+      const [only] = players;
+      if (players.size === 1 && only !== undefined && isEntity(only)) {
+        offer({ entityId: only, constraint: c, factType }, 1);
+      }
+    }
+  }
+
+  const byEntity = new Map([...chosen].map(([id, { at }]) => [id, at]));
+  const byConstraint = new Map<string, IdentifyingUniqueness>();
+  for (const at of byEntity.values()) {
+    if (at.constraint.id !== undefined) byConstraint.set(at.constraint.id, at);
+  }
+  return { byEntity, byConstraint };
+}
+
+/** The entity's and the value's roles of a binary between one of each. */
+function entityValueRoles(
+  model: OrmModel,
+  factType: FactType,
+): { readonly entityRole: Role; readonly valueRole: Role; } | undefined {
+  if (factType.arity !== 2) return undefined;
+  const [r1, r2] = factType.roles;
+  if (!r1 || !r2) return undefined;
+  const k1 = model.getObjectType(r1.playerId)?.kind;
+  const k2 = model.getObjectType(r2.playerId)?.kind;
+  if (k1 === "entity" && k2 === "value") return { entityRole: r1, valueRole: r2 };
+  if (k1 === "value" && k2 === "entity") return { entityRole: r2, valueRole: r1 };
+  return undefined;
+}
+
 /**
  * The binary fact type that identifies an entity type, when it has one.
  *
@@ -131,42 +246,22 @@ export function identificationOrder(
  * value column: one identification, two columns, on 109 entities across
  * 15 shipped models (barwise-967).
  *
- * The rule is the mapper's existing pass 1, unchanged, so no model's
- * primary-key type moves: a binary carrying any preferred internal
- * uniqueness constraint, in which this entity plays a role and the
- * other player is a value type, first in model order. Four other
- * modules compute "the preferred identifier" with four subtly different
- * rules; converging them changes diagnostics on shipped models and is
- * tracked separately.
+ * It is `preferredIdentifiers`' answer when that answer is such a
+ * binary. Pass the result of `preferredIdentifiers` when calling this for
+ * many entities, so the model is read once.
  */
 export function preferredIdentifyingBinary(
   model: OrmModel,
   entity: ObjectType,
+  identifiers = preferredIdentifiers(model),
 ): PreferredIdentifyingBinary | undefined {
-  for (const factType of model.factTypes) {
-    if (factType.arity !== 2) continue;
-    const preferred = factType.internalConstraints.some(
-      (c) => c.type === "internal_uniqueness" && c.isPreferred,
-    );
-    if (!preferred) continue;
-
-    const [role1, role2] = factType.roles;
-    if (!role1 || !role2) continue;
-
-    const entityRole = role1.playerId === entity.id
-      ? role1
-      : role2.playerId === entity.id
-      ? role2
-      : undefined;
-    if (!entityRole) continue;
-
-    const otherRole = entityRole === role1 ? role2 : role1;
-    const valuePlayer = model.getObjectType(otherRole.playerId);
-    if (valuePlayer?.kind !== "value") continue;
-
-    return { factType, entityRole, valuePlayer };
-  }
-  return undefined;
+  const at = identifiers.byEntity.get(entity.id);
+  if (!at) return undefined;
+  const binary = entityValueRoles(model, at.factType);
+  if (!binary || binary.entityRole.playerId !== entity.id) return undefined;
+  const valuePlayer = model.getObjectType(binary.valueRole.playerId);
+  if (valuePlayer?.kind !== "value") return undefined;
+  return { factType: at.factType, entityRole: binary.entityRole, valuePlayer };
 }
 
 /**

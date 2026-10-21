@@ -7,10 +7,11 @@
  * returns a `not-found` result rather than throwing.
  */
 
-import { type Constraint, isInternalUniqueness, isMandatoryRole } from "../model/Constraint.js";
+import { type Constraint, isMandatoryRole } from "../model/Constraint.js";
 import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import { type ModelGraph, requireGraph } from "../model/graph.js";
+import { preferredIdentifiers } from "../model/identification.js";
 import { type ObjectType, referenceModeOf } from "../model/ObjectType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { expandReading } from "../model/ReadingOrder.js";
@@ -76,6 +77,7 @@ export function queryModel(model: OrmModel, query: ModelQuery): QueryResult {
  */
 class QueryContext {
   private readonly verbalizer = new Verbalizer();
+  private identifiers: ReturnType<typeof preferredIdentifiers> | undefined;
 
   constructor(
     private readonly model: OrmModel,
@@ -415,22 +417,18 @@ class QueryContext {
 
   /** Compute the identification anchors of a single entity type. */
   private entityAnchors(entity: ObjectType): EntityAnchors {
-    let preferredIdentifier: EntityAnchors["preferredIdentifier"];
+    this.identifiers ??= preferredIdentifiers(this.model);
+    const identifying = this.identifiers.byEntity.get(entity.id);
+    const preferredIdentifier: EntityAnchors["preferredIdentifier"] = identifying && {
+      factType: identifying.factType.name,
+      identifierTypes: identifying.factType.roles
+        .filter((r) => r.playerId !== entity.id)
+        .map((r) => this.graph.player(r).name),
+    };
     const mandatoryFactTypes = new Set<string>();
 
     for (const ft of this.model.factTypesForObjectType(entity.id)) {
       for (const c of ft.internalConstraints) {
-        if (
-          preferredIdentifier === undefined
-          && isInternalUniqueness(c)
-          && c.isPreferred
-          && c.roleIds.some((rid) => ft.getRoleById(rid)?.playerId === entity.id)
-        ) {
-          const identifierTypes = ft.roles
-            .filter((r) => r.playerId !== entity.id)
-            .map((r) => this.graph.player(r).name);
-          preferredIdentifier = { factType: ft.name, identifierTypes };
-        }
         if (isMandatoryRole(c) && ft.getRoleById(c.roleId)?.playerId === entity.id) {
           mandatoryFactTypes.add(ft.name);
         }

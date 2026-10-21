@@ -29,6 +29,7 @@ import {
   type JoinOperand,
   type ObjectType,
   type OrmModel,
+  preferredIdentifiers,
   pureObjectifyingEntityIds,
   type Role,
   type ValueComparisonOperator,
@@ -84,7 +85,8 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
 
   // Sample populations: the NORMA instance graph, including any
   // reference-scheme expansions synthesized for populated entities.
-  const popGraph = buildPopulationGraph(model);
+  const identifiers = preferredIdentifiers(model);
+  const popGraph = buildPopulationGraph(model, identifiers);
 
   const entityTypes: NormaEntityType[] = [];
   const valueTypes: NormaValueType[] = [];
@@ -92,7 +94,10 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
 
   // Map a uniqueness constraint to the entity it preferentially identifies,
   // so the entity can carry a PreferredIdentifier link.
-  const preferredIdByEntity = collectPreferredIdentifiers(model);
+  const preferredIdByEntity = collectPreferredIdentifiers(identifiers);
+  // Each uniqueness written IsPreferred is the one an entity's
+  // PreferredIdentifier names, so the two cannot disagree.
+  const preferred = new Set(identifiers.byConstraint.keys());
 
   for (const ot of model.objectTypes) {
     const refs = playedRoles.get(ot.id) ?? [];
@@ -142,7 +147,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   const seenConstraintIds = new Set<string>();
 
   for (const ft of model.factTypes) {
-    const { norma } = writeFactType(ft, constraints, seenConstraintIds, popGraph);
+    const { norma } = writeFactType(ft, constraints, seenConstraintIds, popGraph, preferred);
     factTypes.push(norma);
   }
   // Constraints across fact types are top-level only, written once each
@@ -154,6 +159,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
       toNormaId(constraintId(c, "across fact types")),
       constraints,
       seenConstraintIds,
+      preferred,
     );
   }
 
@@ -234,29 +240,18 @@ function collectPlayedRoles(model: OrmModel): Map<string, NormaId[]> {
 
 /**
  * Map each entity (or objectified entity) id to the NORMA id of the
- * uniqueness constraint that is its preferred identifier, if any.
- *
- * The preferred internal uniqueness constraint sits on the role played by
- * the injected reference value type; the entity is the player of the OTHER
- * role in that same fact type.
+ * uniqueness constraint that is its preferred identifier, if any: core's
+ * `preferredIdentifiers`, the one rule every reader uses (orm-format-3
+ * WS4a), which is NORMA's own reading of a reference scheme.
  */
-function collectPreferredIdentifiers(model: OrmModel): Map<string, string> {
-  const result = new Map<string, string>();
-  for (const ft of model.factTypes) {
-    for (const c of ft.internalConstraints) {
-      if (c.type !== "internal_uniqueness" || !c.isPreferred) continue;
-      const constrainedRoleIds = new Set(c.roleIds);
-      // The identified entity plays the role(s) NOT in the uniqueness set.
-      for (const role of ft.roles) {
-        if (constrainedRoleIds.has(role.id)) continue;
-        const player = model.getObjectType(role.playerId);
-        if (player && player.kind === "entity") {
-          result.set(player.id, toNormaId(constraintId(c, onFactType(ft))));
-        }
-      }
-    }
-  }
-  return result;
+function collectPreferredIdentifiers(
+  identifiers: ReturnType<typeof preferredIdentifiers>,
+): Map<string, string> {
+  return new Map(
+    [...identifiers.byEntity].map((
+      [entityId, at],
+    ) => [entityId, toNormaId(constraintId(at.constraint, onFactType(at.factType)))]),
+  );
 }
 
 // `ValueType`, not `ObjectType`: the one call site is inside a
@@ -301,6 +296,7 @@ function writeFactType(
   constraints: NormaConstraint[],
   seen: Set<string>,
   popGraph: PopulationGraph,
+  preferred: ReadonlySet<string>,
 ): { norma: NormaFactType; internalRefs: string[]; } {
   const roles: NormaRole[] = ft.roles.map((role) => writeRole(ft, role, popGraph));
   const factInstances = popGraph.factInstancesByFact.get(toNormaId(ft.id));
@@ -320,6 +316,7 @@ function writeFactType(
       toNormaId(constraintId(c, onFactType(ft))),
       constraints,
       seen,
+      preferred,
     );
     // Internal (single-fact) constraints are referenced from the fact's
     // InternalConstraints; the rest of its kinds are top-level only.
@@ -356,6 +353,7 @@ function writeTopLevel(
   ownId: NormaId,
   constraints: NormaConstraint[],
   seen: Set<string>,
+  preferred: ReadonlySet<string>,
 ): NormaId | undefined {
   if (c.type === "exclusive_or") {
     // NORMA has no single xor element: the native encoding is an
@@ -387,7 +385,7 @@ function writeTopLevel(
     });
     return ownId;
   }
-  const written = writeConstraint(c, ownId);
+  const written = writeConstraint(c, ownId, preferred);
   if (!written || seen.has(written.id)) return undefined;
   seen.add(written.id);
   constraints.push(written);
@@ -467,7 +465,11 @@ function constraintId(c: Constraint, where: string): string {
   return c.id;
 }
 
-function writeConstraint(c: Constraint, id: NormaId): NormaConstraint | undefined {
+function writeConstraint(
+  c: Constraint,
+  id: NormaId,
+  preferred: ReadonlySet<string>,
+): NormaConstraint | undefined {
   const modality = c.modality === "deontic" ? ({ modality: "deontic" } as const) : {};
   switch (c.type) {
     case "internal_uniqueness":
@@ -477,7 +479,7 @@ function writeConstraint(c: Constraint, id: NormaId): NormaConstraint | undefine
         name: "",
         ...modality,
         isInternal: true,
-        isPreferred: c.isPreferred ?? false,
+        isPreferred: c.id !== undefined && preferred.has(c.id),
         roleRefs: c.roleIds.map(toNormaId),
       };
     case "external_uniqueness":
