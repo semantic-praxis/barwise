@@ -6,7 +6,7 @@ grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii im
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
-Last-updated: 2026-10-21
+Last-updated: 2026-10-22
 Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
@@ -1848,7 +1848,7 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 - **Verbalization output** moves external constraints into their own section;
   golden files change in WS3.
 
-## Open decisions (1 to 9 resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18; 10 and 11 open)
+## Open decisions (1 to 9 resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18; 10 to 12 open)
 
 1. **ADR 0003 amends ADR 0001's "inline and local" -- resolved 2026-10-17 by the owner: yes,
    as recommended.** Recommend: yes, as
@@ -2031,6 +2031,26 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 
     Implemented as (a) in 4a, with the objectification refinement its
     implementation notes record.
+
+12. **Which additions ship in 3.0 -- open; recommended: the three below, as
+    a gate on releasing 3.0.** Raised by the corpus comment audit
+    (2026-10-22). Format 3.0 is merged (semantic-praxis/barwise#708) and in no
+    release: `v1.7.0` and `edge` both predate it. Three specs add optional
+    fields to the format: `constraint-notes.spec.md` (a `note` on every
+    constraint), `model-open-questions.spec.md` (`model.open_questions`) and
+    `subject-areas.spec.md` (`model.subject_areas` and a `subject_area` on
+    object types and fact types).
+    - **(a)** Recommended. Each addition whose first workstream lands before
+      3.0 is released is part of 3.0; the release waits for none of them. A
+      file written by any 3.0 build is then readable by every later 3.0
+      build, and no 3.0-to-3.1 step exists for fields that never shipped
+      without them.
+    - **(b)** Release 3.0 as merged, and add all three in 3.1, which the
+      loader reads with no migration step (each field is optional).
+    - **(c)** Hold the 3.0 release until all three land.
+
+    Whichever is chosen, an addition that misses the 3.0 release is 3.1, and
+    that spec says so in its Status line.
 
 ## Risks and testing
 
