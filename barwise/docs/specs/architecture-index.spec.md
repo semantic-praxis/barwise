@@ -6,7 +6,8 @@ Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
-barwise/scripts/arch-triage.mjs, barwise/packages/core/CLAUDE.md,
++barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
+barwise/packages/cli/CLAUDE.md, barwise/packages/core/CLAUDE.md,
 barwise/packages/mcp/CLAUDE.md, barwise/docs/adr/metamodel-evolution-policy.md,
 -barwise/docs/adr/0002-constraint-coverage-policy.md,
 +barwise/docs/adr/constraint-coverage-policy.md,
@@ -75,14 +76,17 @@ line says this PR changed it.
    root `CLAUDE.md` "Dependency Graph" block and `INTENDED` in
    `barwise/.dependency-cruiser.cjs` agree edge for edge for all 12
    packages. `barwise/scripts/arch-triage.mjs` keeps its own `INTENDED`,
-   which has drifted: it has no `promptlab` key, and its `cli` and `mcp`
-   lists lack `diagram-ui` and `promptlab`. The `package.json` lists agree
+   which has drifted: it has no `promptlab` key, its `cli` list lacks
+   `diagram-ui` and `promptlab`, and its `mcp` list lacks `diagram-ui`. The `package.json` lists agree
    in runtime `dependencies` but not `devDependencies` (`@barwise/llm`
    lists `@barwise/diagram` for `tests/Pipeline.integration.test.ts`).
    Only `INTENDED` against real imports is checked (`npm run depcruise`).
    Both `INTENDED` copies say the root CLAUDE.md graph is the source of
-   truth, and `packages/core/CLAUDE.md` and `packages/mcp/CLAUDE.md` call
+   truth, and the `cli`, `core` and `mcp` package `CLAUDE.md` files call
    it "the authoritative list": the reverse of what CI enforces.
+   `.dependency-cruiser.cjs` exports only `forbidden` and `options`, and
+   dependency-cruiser's config schema rejects any other top-level key, so
+   no script can import `INTENDED` from it as it stands.
 
 Set aside: ARCHITECTURE.md's section numbers cannot change.
 `docs/ORM_PROJECT_GUIDE.md`, the two Halpin-Morgan reading documents and
@@ -101,8 +105,8 @@ Decided by the owner on 2026-10-23.
   specs follow.
 - **Edited in place.** The ADR on `main` is the current decision. There
   is no superseded state and no dead decision for an agent to find and
-  follow. Retiring a concern deletes its file; `check:instruction-refs`
-  already fails on any instruction file still linking to it.
+  follow. Retiring a concern deletes its file, and every reference to it
+  must go in the same PR (see Open decision 5 for what checks that).
 - **History lives in git and the PR.** The PR that changes an ADR states
   what changed and why; `git log -p` on the file leads to those PRs.
 - **No status field.** The two existing ADRs read `Status: Accepted`. On
@@ -163,7 +167,7 @@ decision.
 
 In scope:
 
-- When a file under `barwise/docs/adr/` lacks `Scope:`, `Date:`, or a
+- When a file under `barwise/docs/adr/` other than a `README.md` lacks `Scope:`, `Date:`, or a
   `## Decision` section, or carries a `Scope:` value outside
   `architecture` and `process`, `npm run check:architecture` shall fail
   (exit 1) naming the file and the field.
@@ -173,8 +177,9 @@ In scope:
 - When the edges in the root `CLAUDE.md` "Dependency Graph" block differ
   from `INTENDED` in either direction, the check shall fail (exit 1)
   naming each edge.
-- `arch-triage.mjs` shall import `INTENDED` from
-  `.dependency-cruiser.cjs` rather than keep a copy.
+- `INTENDED` shall move to its own module, `scripts/lib/intended.cjs`,
+  which `.dependency-cruiser.cjs`, `arch-triage.mjs` and
+  `check-architecture.mjs` all require; no script keeps a copy.
 - When the check cannot read the ADR directory, `INTENDED`, or either
   target document, it shall exit 2 and say what it could not read
   (`docs/specs/gate-refusal-contract.spec.md`).
@@ -184,7 +189,8 @@ In scope:
   reason.
 - When a PR changes a file under `barwise/docs/adr/`, `pr-risk` shall
   route it to the "When an ADR changed" checklist group through a
-  `review-tiers.json` row, so `check:review-tiers` accounts for the new
+  `review-tiers.json` row (tier `high-risk`: a changed decision is rework
+  for everything that follows it), so `check:review-tiers` accounts for the new
   heading.
 
 Out of scope: ADRs for the local choices in specs; a history section or
@@ -194,37 +200,37 @@ status field inside ADRs; a check that a Decision edit moves `Date:`
 
 ## Inventory
 
-| Path                                                | Current state                                                         | Change                                                                                          |
-| --------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `barwise/docs/adr/`                                 | `metamodel-evolution-policy.md` (renamed in this PR) and ADR 0002     | 0002 renamed (WS2); `Status:` lines dropped and `Scope:` added; new ADRs (WS2, WS4)             |
-| `barwise/docs/ARCHITECTURE.md`                      | Historical record; 8.1 and the section 6 tree cite a nonexistent file | Generated first section; header sentence; the two dead-link lines removed                       |
-| `barwise/.dependency-cruiser.cjs`                   | `INTENDED` says CLAUDE.md is its source of truth                      | Comment corrected: `INTENDED` is the authority                                                  |
-| `barwise/scripts/arch-triage.mjs`                   | Its own drifted `INTENDED` copy                                       | Imports `INTENDED` from the dependency rules file                                               |
-| `packages/core/CLAUDE.md`, `packages/mcp/CLAUDE.md` | Call the root CLAUDE.md graph authoritative                           | Name `INTENDED` as the authority                                                                |
-| `barwise/scripts/check-architecture.mjs`            | Does not exist                                                        | New: graph edges, ADR shape, generated-section checks                                           |
-| `barwise/scripts/regen-architecture.mjs`            | Does not exist                                                        | New: renders the generated section                                                              |
-| `barwise/review-tiers.json`                         | No row for ADRs                                                       | A row for "When an ADR changed", globs `barwise/docs/adr/`                                      |
-| `.claude/skills/pr-review/checklist.md`             | No ADR group                                                          | "When an ADR changed": PR body says what changed and why; no spec restates the decision         |
-| `.claude/skills/spec-writer/template.adr.md`        | Does not exist                                                        | New: the ADR template                                                                           |
-| `CLAUDE.md` (root)                                  | Holds the graph and 16 conventions inline                             | Graph drift-checked (WS1); conventions become rule plus ADR link (WS5)                          |
-| `ci.yml`, both `package.json` files                 | No such step or scripts                                               | `check:architecture` unguarded; both scripts with root forwarders from `regen-root-package.mjs` |
+| Path                                           | Current state                                                        | Change                                                                                          |
+| ---------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `barwise/docs/adr/`                            | `metamodel-evolution-policy.md` (renamed in this PR) and ADR 0002    | 0002 renamed (WS2); `Status:` lines dropped and `Scope:` added; new ADRs (WS2, WS4)             |
+| `barwise/docs/ARCHITECTURE.md`                 | Historical record; 8.1 and the section 6 tree cite nonexistent files | Generated first section; header sentence; the dead `decisions/` lines removed                   |
+| `barwise/.dependency-cruiser.cjs`              | Holds `INTENDED`, which says CLAUDE.md is its source of truth        | Requires `lib/intended.cjs`; the comment names it the authority                                 |
+| `barwise/scripts/lib/intended.cjs`             | Does not exist                                                       | New: `INTENDED`, moved out of `.dependency-cruiser.cjs`, which requires it                      |
+| `barwise/scripts/arch-triage.mjs`              | Its own drifted `INTENDED` copy                                      | Requires `lib/intended.cjs`                                                                     |
+| `cli`, `core`, `mcp` package `CLAUDE.md` files | Call the root CLAUDE.md graph authoritative                          | Name `INTENDED` as the authority                                                                |
+| `barwise/scripts/check-architecture.mjs`       | Does not exist                                                       | New: graph edges, ADR shape, generated-section checks                                           |
+| `barwise/scripts/regen-architecture.mjs`       | Does not exist                                                       | New: renders the generated section                                                              |
+| `barwise/review-tiers.json`                    | No row for ADRs                                                      | A `high-risk` row for "When an ADR changed", globs `barwise/docs/adr/`                          |
+| `.claude/skills/pr-review/checklist.md`        | No ADR group                                                         | "When an ADR changed": PR body says what changed and why; no spec restates the decision         |
+| `.claude/skills/spec-writer/template.adr.md`   | Does not exist                                                       | New: the ADR template                                                                           |
+| `CLAUDE.md` (root)                             | Holds the graph and 16 conventions inline                            | Graph drift-checked (WS1); conventions become rule plus ADR link (WS5)                          |
+| `ci.yml`, both `package.json` files            | No such step or scripts                                              | `check:architecture` unguarded; both scripts with root forwarders from `regen-root-package.mjs` |
 
-The `spec-writer` and `steward` skills are edited by WS2 and WS3 for one
-line each; they are shared files many PRs touch, so they are listed here
-and left out of `Touches:`, which `plan-scope-check.spec.md` reads as what
-this spec owns. (`plan-scope-check.spec.md` treats `.claude/skills/` as
-wiring for the same reason.) No shared spec reader is needed: ADRs are
-their own files with three header fields.
+The `spec-writer` and `steward` skills each gain one line (WS2, WS3).
+Whether shared files like these belong in `Touches:` is Open decision 6.
+No shared spec reader is needed: ADRs are their own files with three
+header fields.
 
 ## Target architecture
 
 ```
 barwise/docs/adr/<concern>.md ──┐
                                 ├── regen-architecture.mjs ──> ARCHITECTURE.md
-.dependency-cruiser.cjs ────────┤     (INTENDED)               (generated first section:
-        │                       │                               ADRs by scope, then the graph)
-        │                       └── arch-triage.mjs (imports INTENDED)
-        └── check-architecture.mjs ── compares ──> root CLAUDE.md graph block (edges only;
+scripts/lib/intended.cjs ───────┤                              (generated first section:
+   (INTENDED)   │               │                               ADRs by scope, then the graph)
+                │               ├── .dependency-cruiser.cjs (requires it)
+                │               └── arch-triage.mjs (requires it)
+                └── check-architecture.mjs ── compares ──> root CLAUDE.md graph block (edges only;
                                                     the hand-written annotations stay)
 ```
 
@@ -236,9 +242,11 @@ loads is a larger change than a drift test.
 
 ## Which copy of the package graph is the authority? (resolved: `INTENDED`, the owner's decision of 2026-10-23)
 
-`INTENDED` in `barwise/.dependency-cruiser.cjs` is the package graph. The
-root `CLAUDE.md` block renders it and is checked against it, and
-`arch-triage.mjs` imports it (WS1). It states a policy ("may import") and
+`INTENDED`, the map the dependency rules file enforces, is the package
+graph. WS1 moves it to `scripts/lib/intended.cjs` so the rules file and
+the scripts require one copy; the owner's decision names the map, and
+the move only gives it a home others can import (Open decision 7). The
+root `CLAUDE.md` block renders it and is checked against it. It states a policy ("may import") and
 is the one copy CI enforces through `npm run depcruise`. Runtime
 `dependencies` must stay within it; `devDependencies` may reach further
 for tests (anchor 4). WS2 records this decision as
@@ -265,11 +273,13 @@ for tests (anchor 4). WS2 records this decision as
 
 ### 1. One package graph
 
-`check-architecture.mjs` compares the `CLAUDE.md` graph edges with
-`INTENDED` (exit 1 on a missing or extra edge, exit 2 if either side
-cannot be parsed). `arch-triage.mjs` imports `INTENDED` instead of its
-copy, which fixes its drift. The comments in both files and the two
-package `CLAUDE.md` lines name `INTENDED` as the authority. The step runs
+Move `INTENDED` to `scripts/lib/intended.cjs`; `.dependency-cruiser.cjs`
+and `arch-triage.mjs` require it, which fixes arch-triage's drift, and
+`npm run depcruise` must still pass with the config's exports unchanged.
+`check-architecture.mjs` compares the `CLAUDE.md` graph edges with it
+(exit 1 on a missing or extra edge, exit 2 if either side cannot be
+parsed). The three package `CLAUDE.md` lines and the comments name
+`INTENDED` as the authority. The step runs
 in `ci.yml` without a docs-only guard, and a gates test plants an extra
 edge and sees red through `mutate.mjs`.
 
@@ -280,9 +290,10 @@ edge and sees red through `mutate.mjs`.
   path citations and "ADR 0002" mentions in live documents (the two
   package `CLAUDE.md` files, `suite.yaml` and two specs), and leave
   archived specs and dated records such as
-  `reference-rubric-audit-2026-08-27.md` as they are. Acceptance: no
-  live document outside `docs/specs/archive/` and the dated records
-  names an ADR by number.
+  `reference-rubric-audit-2026-08-27.md` as they are. Acceptance: the
+  files listed here no longer name ADR 0002 by number. This spec keeps
+  its historical mentions, and `orm-format-3.spec.md`'s "ADR 0003" is
+  barwise-l5z's to resolve.
 - Drop `Status:` from both ADRs and add `Scope:`; add the ADR shape
   check with a sandbox test seen red first.
 - Add `template.adr.md`, the `spec-writer` step, the `pr-review`
@@ -297,10 +308,11 @@ edge and sees red through `mutate.mjs`.
 fails when they differ. The header gains a sentence saying the first
 section is current and generated; the root `CLAUDE.md` "Essential
 Context" pointer names it; `regen:architecture` joins the steward
-skill's regenerator list; and the two lines citing the nonexistent
-`docs/decisions/001-yaml-over-xml.md` (8.1 and the section 6 tree) are
-removed. Below the markers, `git diff` must show those two lines and
-nothing else. `plan-scope-check.spec.md` WS4 exempts this partial writer
+skill's regenerator list; and the lines citing the nonexistent `docs/decisions/` directory are
+removed: 8.1's pointer to `001-yaml-over-xml.md`, and the section 6
+tree's `decisions/` entry with its three files (`001`, `002` and `003`,
+none of which has ever existed). Below the markers, `git diff` must show
+those lines and nothing else. `plan-scope-check.spec.md` WS4 exempts this partial writer
 from marking ARCHITECTURE.md generated.
 
 Not grounded: what becomes of section 8's six historical decisions. 8.4
@@ -370,6 +382,29 @@ link. Keep inline what an agent needs before it knows which ADR to open
 3. **The scope values.** Recommend `architecture` and `process`.
 4. **How far `CLAUDE.md` shrinks (WS5).** Recommend rule-plus-link for
    every convention with an ADR.
+
+5. **What checks references to an ADR by name.** References now read
+   ADR `metamodel-evolution-policy` in specs and code comments, and
+   `check:instruction-refs` scans only instruction files, so deleting or
+   renaming an ADR breaks those references silently. Recommend
+   `check:architecture` resolve every ADR `<name>` token and
+   `docs/adr/<name>.md` path in tracked text to an existing ADR,
+   excluding archived specs and dated records; the alternative is
+   leaving it to review.
+6. **Shared files in `Touches:`.** This spec lists files other work also
+   edits (`review-tiers.json`, package `CLAUDE.md` files, an eval suite).
+   Whether that trips other PRs depends on `plan-scope-check.spec.md`'s
+   Open decision 5; under its recommended option it does not.
+7. **Moving `INTENDED` out of the dependency rules file.** The owner
+   decided the rules file's `INTENDED` is the authority. The map cannot be
+   imported from that file (anchor 4), so WS1 moves it to
+   `scripts/lib/intended.cjs`, which the rules file requires. Recommend
+   reading the decision as naming the map, not the file it sits in.
+8. **A check that runtime `dependencies` stay within `INTENDED`.** The
+   resolved heading states the rule and nothing enforces it, which is a
+   must-agree copy guarded by prose. Recommend adding it to WS1: read
+   each `package.json`, compare internal runtime dependencies with the
+   map, exit 1 on an extra edge.
 
 ## Risks and testing
 

@@ -232,8 +232,8 @@ Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
   `ci.yml` would trip both gates for every Draft spec that lists it. So
   `lib/spec-reader.mjs` keeps one `WIRING` list (`.github/workflows/`,
   `package.json`, `barwise/package.json`, `CLAUDE.md`,
-  `barwise/scripts/tests/`, `barwise/docs/specs/`, `.claude/skills/`,
-  `.beads/`), and both gates ignore `Touches:` entries under it. `audit-spec-status` already
+  `barwise/scripts/tests/`, `barwise/docs/specs/`, `.beads/`), and both
+  gates ignore `Touches:` entries under it. `audit-spec-status` already
   makes the same move for barrels (`HUB`); this is the declared form of
   it. `audit:specs` also keeps its code-extension filter, so a Markdown
   entry such as a skill counts for the report and for plan review, and not
@@ -241,10 +241,7 @@ Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
   workstream that updates Status or a pointer in other specs is
   documenting decisions already made, not implementing one; the plan
   review still fires for that workstream through the owned entries it
-  changes in the same PR. `.claude/skills/` is wiring for the same reason
-  as `CLAUDE.md`: most workstreams add a line to a skill, and a steward or
-  spec-writer fix must not need a plan review on every Draft spec that
-  lists the skill.
+  changes in the same PR.
 - **Only the header block is read.** The reader takes header fields from
   the lines between the title and the first `##` heading, never from the
   body, so an example inside a code block (like the one above) is never
@@ -491,6 +488,27 @@ implementation in flight is the first thing to measure.
    Status. **Recommended: report it, not refuse it.** WS3 lists an added
    `plan.md` or `PLAN.md` outside `barwise/docs/specs/` at the top of its
    report.
+
+5. **Which PRs does `check:plan-review` cover?** As written, any PR that
+   changes a file a Draft spec owns in `Touches:`. Six review findings
+   across three rounds on PR #714 were one recurring failure of that
+   rule: an unrelated PR edits a shared file (`ci.yml`, a skill,
+   `review-tiers.json`, an eval suite) that some Draft spec lists, and
+   fails for want of that spec's plan review. The `WIRING` list patches
+   it one file at a time, and widening it to skills weakened the rule
+   for skill-only workstreams. Options:
+   - (a) Keep the rule and keep growing `WIRING`.
+   - (b) Cover only PRs that name the spec: its file is in the diff, or
+     its file name is in a commit message on the branch. That is the
+     rule this spec already uses to find a PR's plan, and `pr-creation`
+     already requires a PR to name the workstream it implements. An
+     unrelated PR names no Draft spec, so it is never covered; `WIRING`
+     then matters only to `audit:specs`.
+
+   **Recommended: (b).** It fixes the cause rather than the instances.
+   Its risk is a PR that implements a spec without naming it; the scope
+   report prints "no plan found" for a substantive PR, and `pr-review`
+   already checks that a PR names its workstream.
 
 ## Risks and testing
 
