@@ -20,18 +20,6 @@
       ],
       "note": "Genuinely unimplemented, and the header is right. Both workstreams are property-based testing (an extraction-response arbitrary, then parser totality over generated responses) and nothing of the sort exists: fast-check is not a dependency of any package, and the only 'arbitrary' in llm or promptlab is a comment in an unrelated test. The four commits below are unrelated work on files it names -- a dependabot bump, suite 2.5.0, the assertNever sweep, and the npm-audit gate. Remove this row when workstream 1 ships and the Status says so. Caught only after the gate's pattern was fixed to see the claim mid-line; it had escaped on position alone (barwise-912 class-C pass)."
     },
-    "eval-difficulty-calibration.spec.md": {
-      "status": "Draft for review (design only -- no transcript authored in this\nPR)",
-      "commits": [
-        "398eb4b9",
-        "29df7f65",
-        "e6e56ab0",
-        "4e9a1b05",
-        "a11271bd",
-        "39092b19"
-      ],
-      "note": "Genuinely still a draft, and the header is right: this spec's deliverable is authored transcripts for the eval suite, and none exists (promptlab's cases are unchanged since it was written). The commit below is barwise-935 refactoring CounterexampleGenerator.ts, which this spec only CITES as a place ring constraints surface; it authors nothing this spec plans. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when the first transcript lands and the Status says so."
-    },
     "functional-design-quality.spec.md": {
       "status": "Draft -- the five open decisions resolved in review 2026-09-09\n(see Decisions); no workstream implemented",
       "commits": [

@@ -1,6 +1,6 @@
 # Constraint-type coverage: the living inventory and the closing workstreams
 
-Status: Accepted (companion to ADR 0002, which holds the policy; this
+Status: Accepted (companion to ADR `constraint-coverage-policy`, which holds the policy; this
 file holds the state that changes as coverage closes)
 Workstream map: WS1 done at suite 2.5.0 (barwise-845 closed; the
 irreflexive check carries a real answer key in
@@ -14,7 +14,7 @@ live at suite 2.5.0)
 Tracking: barwise-878 (the reference audit; the inventory below is its
 first pass); barwise-845 (the irreflexive instance arrives with the
 dev references); barwise-846 (the authoring budget rides split-spec
-workstream 3). Policy: `docs/adr/0002-constraint-coverage-policy.md`
+workstream 3). Policy: `docs/adr/constraint-coverage-policy.md`
 -- the trust statement, the comparative-not-certifying resolution, the
 two-instances-per-common-type threshold, and the common/rare tiering
 all live there and are not restated here.
@@ -23,7 +23,7 @@ all live there and are not restated here.
 
 Explicit over implicit, applied to a claim readers were left to
 assume: the extraction chain's capability envelope exceeds the eval
-suite's evidence envelope, and nothing said so. ADR 0002 records the
+suite's evidence envelope, and nothing said so. ADR `constraint-coverage-policy` records the
 policy that closes the gap on purpose rather than by authoring
 program; this spec records where coverage stands and which tracked
 work closes each gap. **Update the inventory in the same commit that
@@ -100,7 +100,8 @@ eval suite.
 ## Non-goals
 
 - No restatement of the policy: trust statement, thresholds, and
-  tiering are ADR 0002's alone. A change to those is a new ADR, not an
+  tiering are ADR `constraint-coverage-policy`'s alone. A change to those is
+  an edit to that ADR, in a PR that says what changed and why, not an
   edit here.
 - No transcript rewritten or authored to shoehorn a rare type in.
 - No change to scoring, weights, or splits here; rubric additions land

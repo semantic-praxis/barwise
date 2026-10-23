@@ -7,7 +7,7 @@ import { report, RULE_ID } from "../ruleId.js";
  * Derivation consistency rules.
  *
  * These check the _declaration_ of a derivation, never its meaning -- core
- * stores derivation rules as data and never evaluates them (ADR-0001 filter
+ * stores derivation rules as data and never evaluates them (ADR `metamodel-evolution-policy` filter
  * 3). Two structural checks:
  *
  * - A derived or semiderived element (fact type or subtype) whose rule text

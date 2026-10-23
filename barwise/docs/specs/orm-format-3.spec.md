@@ -71,7 +71,7 @@ role outside its fact type except one deliberate validation-error fixture
 ## Should every constraint be model-level, as in NORMA? (resolved: no, owner 2026-10-16)
 
 The owner first chose NORMA's approach outright, then asked for placement by
-kind once ADR 0001's "inline and local" filter was on the table. Internal
+kind once ADR `metamodel-evolution-policy`'s "inline and local" filter was on the table. Internal
 constraints have exactly one element to sit beside, so nesting them keeps the
 filter for 3,011 of the 3,085 constraints in the corpus (73 are
 external; the last is an unknown kind in a fixture, refused as it is today) and keeps a fact type readable with its
@@ -272,26 +272,26 @@ every time until then.
 
 ## Inventory
 
-| Area                                                      | Today                                             | Verdict                                                                     |
-| --------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------- |
-| `core/schemas/orm-model.schema.json`                      | `orm_version` const `2.0`; one constraint `oneOf` | 3.0; internal and external `oneOf`s; ids required; flags removed            |
-| `core/src/serialization/schemaVersion.ts`                 | migrations 1.0 to 1.1 to 2.0                      | adds 2.0 to 3.0                                                             |
-| `core/src/serialization/migrations/`                      | `diagramReferencesToIds.ts`                       | adds the 3.0 migration                                                      |
-| `core/src/serialization/yaml/constraint.ts`, `subtype.ts` | nested constraints; subtype flags                 | model-level constraints; subtype flags gone                                 |
-| `core/src/model/FactType.ts`                              | mints missing constraint ids (line 108)           | fills missing ids (3a); `constraints` removed; `internalConstraints`        |
-| `core/src/model/OrmModel.ts`                              | no constraint list                                | `constraints`, `constraintsTouching`, `getConstraint`; `addConstraint` (3c) |
-| `core/src/model/Constraint.ts`                            | one 16-kind union                                 | `InternalConstraint` / `ExternalConstraint`; subtype operands               |
-| `core/src/model/SubtypeFact.ts`                           | `isExclusive`, `isExhaustive`                     | removed                                                                     |
-| `core/src/model/identification.ts`                        | preferred = internal uniqueness flag              | preferred = the entity's referenced constraint                              |
-| `core/src/validation/`, `verbalization/`, `mapping/`      | read external kinds from `ft.constraints`         | read `model.constraints`; compiler-guided                                   |
-| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                  | by id first, then content; content-only mode for LLM samples (WS3)          |
-| `core/src/project/splitModel.ts`                          | detects cross-domain constraints under hosts      | migrates the raw document to 3.0 before splitting; reads the model list     |
-| `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags    | keeps ids; places by kind; partition constraints 1:1; preferred both ways   |
-| `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`             | node id = constraint id                                                     |
-| `llm/src/parse/`                                          | attaches constraints to fact types                | places by kind through the model API                                        |
-| tracked `.orm.yaml` files (115)                           | 2.0                                               | rewritten as 3.0 by the migration, in WS5                                   |
-| `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)          | corrected in WS5                                                            |
-| `docs/adr/`                                               | ADR 0001 "inline and local"                       | ADR 0003 amends it for external constraints                                 |
+| Area                                                      | Today                                               | Verdict                                                                     |
+| --------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------- |
+| `core/schemas/orm-model.schema.json`                      | `orm_version` const `2.0`; one constraint `oneOf`   | 3.0; internal and external `oneOf`s; ids required; flags removed            |
+| `core/src/serialization/schemaVersion.ts`                 | migrations 1.0 to 1.1 to 2.0                        | adds 2.0 to 3.0                                                             |
+| `core/src/serialization/migrations/`                      | `diagramReferencesToIds.ts`                         | adds the 3.0 migration                                                      |
+| `core/src/serialization/yaml/constraint.ts`, `subtype.ts` | nested constraints; subtype flags                   | model-level constraints; subtype flags gone                                 |
+| `core/src/model/FactType.ts`                              | mints missing constraint ids (line 108)             | fills missing ids (3a); `constraints` removed; `internalConstraints`        |
+| `core/src/model/OrmModel.ts`                              | no constraint list                                  | `constraints`, `constraintsTouching`, `getConstraint`; `addConstraint` (3c) |
+| `core/src/model/Constraint.ts`                            | one 16-kind union                                   | `InternalConstraint` / `ExternalConstraint`; subtype operands               |
+| `core/src/model/SubtypeFact.ts`                           | `isExclusive`, `isExhaustive`                       | removed                                                                     |
+| `core/src/model/identification.ts`                        | preferred = internal uniqueness flag                | preferred = the entity's referenced constraint                              |
+| `core/src/validation/`, `verbalization/`, `mapping/`      | read external kinds from `ft.constraints`           | read `model.constraints`; compiler-guided                                   |
+| `core/src/diff/`, `ModelMerge.ts`                         | match constraints by content key                    | by id first, then content; content-only mode for LLM samples (WS3)          |
+| `core/src/project/splitModel.ts`                          | detects cross-domain constraints under hosts        | migrates the raw document to 3.0 before splitting; reads the model list     |
+| `formats/src/norma/`                                      | drops constraint ids; first-holder host; flags      | keeps ids; places by kind; partition constraints 1:1; preferred both ways   |
+| `diagram/src/graph/ModelToGraph.ts`                       | constraint nodes `constraint-<index>`               | node id = constraint id                                                     |
+| `llm/src/parse/`                                          | attaches constraints to fact types                  | places by kind through the model API                                        |
+| tracked `.orm.yaml` files (115)                           | 2.0                                                 | rewritten as 3.0 by the migration, in WS5                                   |
+| `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)            | corrected in WS5                                                            |
+| `docs/adr/`                                               | ADR `metamodel-evolution-policy` "inline and local" | ADR 0003 amends it for external constraints                                 |
 
 Not in the table because they need no design decision, but in WS3 and WS4's
 scope: the programmatic builders that create constraints without ids or set
@@ -318,7 +318,7 @@ still imports.
 - **Every constraint at model level, as NORMA does.** One rule, closest to
   NORMA. Rejected by the owner once placement by kind was on the table: it
   moves 3,011 internal constraints away from the fact type they describe,
-  breaks ADR 0001's "inline and local" for every kind, and makes a hand author
+  breaks ADR `metamodel-evolution-policy`'s "inline and local" for every kind, and makes a hand author
   or an LLM editing through MCP keep 3,085 cross-references consistent instead
   of 73.
 - **Placement by each constraint's span.** Rejected above: location would
@@ -334,7 +334,7 @@ still imports.
 ## Workstreams (each independently shippable)
 
 **The format changes in one workstream, WS4; everything before it keeps
-reading and writing 2.0 without loss.** ADR 0001 allows a shared version
+reading and writing 2.0 without loss.** ADR `metamodel-evolution-policy` allows a shared version
 bump across several PRs only for additive minor changes; a breaking change
 bumps the major version "with a real migration". Bumping to 3.0 in an early
 workstream and adding to it later would let any build in between save a file
@@ -349,7 +349,7 @@ hold, so a 2.0 save between workstreams would silently lose data.
 
 ### 1. ADR 0003 and this spec
 
-ADR 0003 amends ADR 0001's "inline and local" filter: an internal constraint
+ADR 0003 amends ADR `metamodel-evolution-policy`'s "inline and local" filter: an internal constraint
 lives inline on its fact type; an external constraint, which has no single
 element to be local to, lives in the model's constraint list and refers to
 roles and subtype facts by id. Records the owner's two decisions above.
@@ -1850,7 +1850,7 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 
 ## Open decisions (1 to 9 resolved: 1 to 8 on 2026-10-17; 9, and a revision of 4, on 2026-10-18; 10 to 12 open)
 
-1. **ADR 0003 amends ADR 0001's "inline and local" -- resolved 2026-10-17 by the owner: yes,
+1. **ADR 0003 amends ADR `metamodel-evolution-policy`'s "inline and local" -- resolved 2026-10-17 by the owner: yes,
    as recommended.** Recommend: yes, as
    WS1 states it -- internal inline, external model-level by reference.
 2. **Shape of subtype constraints -- resolved 2026-10-17 by the owner: option (a), reuse
