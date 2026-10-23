@@ -3188,8 +3188,13 @@ test("run-script-tests refuses an absent tests directory rather than failing", (
  */
 const VALID_TRIVIAL = { globs: [".beads/issues.jsonl"], why: "fixture" };
 
-/** A minimal pair of inputs the gate accepts, written into a temp dir. */
-function tierFixture(dir, headings, rows) {
+/**
+ * A minimal set of inputs the gate accepts, written into a temp dir. The
+ * tracked-file list makes the fixture globs live (the gate fails a glob
+ * that matches nothing), and `tracked` replaces it for the dead-glob cases.
+ */
+function tierFixture(dir, headings, rows, tracked = ["x/a.ts", ".beads/issues.jsonl"]) {
+  writeFileSync(join(dir, "tracked.txt"), tracked.join("\n"));
   const md = ["# Checklist", "", ...headings.flatMap((h) => [`## ${h}`, "", "- item", ""])];
   writeFileSync(join(dir, "checklist.md"), md.join("\n"));
   writeFileSync(
@@ -3208,8 +3213,39 @@ function tierFixture(dir, headings, rows) {
     join(dir, "checklist.md"),
     "--table",
     join(dir, "review-tiers.json"),
+    "--tracked",
+    join(dir, "tracked.txt"),
   ];
 }
+
+test("check-review-tiers fails on a row glob that matches no tracked file", () => {
+  // barwise-fs0: a row named a path that did not exist and routed nothing
+  // for five weeks while every other check passed.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], [".beads/issues.jsonl"]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, `a dead glob must fail: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /glob matches no tracked file: A: x\//);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on a trivial glob that matches no tracked file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], ["x/a.ts"]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, `a dead trivial glob must fail: ${run.stdout}${run.stderr}`);
+    assert.match(
+      `${run.stdout}${run.stderr}`,
+      /glob matches no tracked file: trivial: \.beads\/issues\.jsonl/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("check-review-tiers passes when every heading has exactly one row", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
