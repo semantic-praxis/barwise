@@ -49,8 +49,9 @@ const ROOTED = /^(barwise|\.claude|\.github|\.beads)\//;
 const EXT = /\.(mjs|cjs|ts|tsx|js|json|md|yaml|yml|sh|py|toml|txt)$/;
 
 function isInstructionFile(f) {
-  // REVIEW.md is read by the Claude Code Review service, at the root and in
-  // any directory a diff touches, so it cites paths the same way.
+  // REVIEW.md is read by the Claude Code Review service -- the root file,
+  // and a nested one once the default branch is protected -- and cites
+  // paths the same way.
   return /(^|\/)(CLAUDE|AGENTS|REVIEW)\.md$/.test(f)
     || (f.startsWith(".claude/") && f.endsWith(".md"));
 }
