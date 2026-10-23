@@ -8,7 +8,37 @@ Barwise is an [ORM 2](https://en.wikipedia.org/wiki/Object-role_modeling) modeli
 
 ## Learning ORM
 
-Barwise assumes familiarity with Object-Role Modeling. The definitive reference is Terry Halpin and Tony Morgan's _Information Modeling and Relational Databases_ (3rd ed., Morgan Kaufmann / Elsevier, 2024; ISBN 9780443237904) -- the text this project's metamodel is designed against. If you work with ORM, buy Dr. Halpin's book; it is the standard reference for the method, and no tool is a substitute for it. A spaced-repetition Anki deck that drills the concepts, with per-card pointers into the book, lives in [`barwise/docs/anki`](barwise/docs/anki); a transcript of the book's table of contents is in [`barwise/docs/halpin-morgan-3e-contents.md`](barwise/docs/halpin-morgan-3e-contents.md); and a reading guide that says which chapters to read in what order, and what each grounds in the tool, is [`barwise/docs/halpin-morgan-3e-reading-guide.md`](barwise/docs/halpin-morgan-3e-reading-guide.md).
+Barwise assumes you know, or are willing to learn, some Object-Role Modeling. If you have modeled in ER or relational schemas, start with [the order-fulfillment tutorial](barwise/docs/tutorial/order-fulfillment.md). It builds one model step by step, and each step starts from bad data the model so far still allows. It is written for readers whose ER habits will mislead them in the early steps. The modeling gym (`barwise gym list`, from a source build) has short exercises with deterministic feedback.
+
+### Why it is worth learning
+
+Take one rule from a shop: every order is either shipped to an address or collected at a store. Never both, and never neither.
+
+**In SQL DDL** the rule takes two nullable columns plus a `CHECK` that someone has to remember to write:
+
+```sql
+CREATE TABLE sales_order (
+  order_number INTEGER     NOT NULL PRIMARY KEY,
+  address      VARCHAR(200),
+  store_code   VARCHAR(10) REFERENCES store (store_code),
+  CHECK ((address IS NOT NULL AND store_code IS NULL)
+      OR (address IS NULL AND store_code IS NOT NULL))
+);
+```
+
+Leave out the `CHECK` and the table still builds, and it now accepts an order with neither a delivery address nor a store. Nothing in the columns themselves says they are related.
+
+**In an ER diagram** the rule is two optional relationships from Order. The crow's-foot notation most tools draw has no mark for "exactly one of these," so the rule ends up in a note. Barker notation's exclusive arc is the exception.
+
+**In ORM** the rule is a constraint across the two fact types, an exclusive-or, and barwise reads it back as a sentence the shop manager can check:
+
+> Each SalesOrder either is shipped to some Address or is collected from some Store but not both.
+
+The model is [`barwise/examples/models/order-handover.orm.yaml`](barwise/examples/models/order-handover.orm.yaml). Run `barwise verbalize examples/models/order-handover.orm.yaml` from `barwise/` to get that sentence. The rule is written once, in the model, in a form the business can confirm, rather than depending on whoever writes the DDL to remember a `CHECK`. One current limitation: barwise's DDL export does not yet generate that `CHECK`. It writes the sentence as a comment above `CREATE TABLE sales_order` instead (barwise-qly).
+
+### References
+
+The definitive reference is Terry Halpin and Tony Morgan's _Information Modeling and Relational Databases_ (3rd ed., Morgan Kaufmann / Elsevier, 2024; ISBN 9780443237904) -- the text this project's metamodel is designed against. If you work with ORM, buy Dr. Halpin's book; it is the standard reference for the method, and no tool is a substitute for it. A spaced-repetition Anki deck that drills the concepts, with per-card pointers into the book, lives in [`barwise/docs/anki`](barwise/docs/anki); a transcript of the book's table of contents is in [`barwise/docs/halpin-morgan-3e-contents.md`](barwise/docs/halpin-morgan-3e-contents.md); and a reading guide that says which chapters to read in what order, and what each grounds in the tool, is [`barwise/docs/halpin-morgan-3e-reading-guide.md`](barwise/docs/halpin-morgan-3e-reading-guide.md).
 
 ## Prerequisites
 
@@ -155,14 +185,43 @@ With `anthropic`, run **Barwise: Set Anthropic API Key** to store the key in the
 
 ## Quick start
 
-1. **Create a project:** run the command **Barwise: New Project** from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`).
-2. **Import a transcript:** run **Barwise: Import...** and choose **From Transcript**, pick a `.md` or `.txt` file containing a business conversation, and name the model. The LLM extracts object types, fact types, and constraints into a `.orm.yaml` file. Try one of the example transcripts in `barwise/examples/transcripts/` to get started. The same picker also imports from dbt projects and TypeScript/Java/Kotlin code.
-3. **Review changes:** if the `.orm.yaml` already exists, the import shows a fact-by-fact review dialog. Each added, modified, or removed element gets its own checkbox -- additions and modifications are pre-selected, removals require explicit opt-in.
-4. **Validate:** run **Barwise: Validate Model** to check structural rules and constraint consistency.
-5. **Visualize:** run **Barwise: Show Diagram** to see the ORM diagram.
-6. **Verbalize:** run **Barwise: Verbalize Model** to generate natural-language readings of all fact types and constraints.
+The main path needs no API key and no language model: start from a model or an existing schema, read its rules back as sentences, then generate what you build. The commands below use the CLI and the sample files in `barwise/examples/getting-started/`, with paths relative to `barwise/`; [the CLI guide](barwise/docs/getting-started/cli.md) shows how to put `barwise` on your path. [GETTING_STARTED.md](GETTING_STARTED.md) has the same steps for VS Code and MCP.
 
-Most of the same capabilities are available from the terminal via the `barwise` CLI (see [`barwise/docs/CLI.md`](barwise/docs/CLI.md)) and to MCP clients via the MCP server (see [`barwise/docs/MCP.md`](barwise/docs/MCP.md)). [GETTING_STARTED.md](GETTING_STARTED.md) maps each step across the three and lists where they differ.
+1. **Start from a model.** Copy the hand-written sample, a small model of customers and sales orders, or import the DDL of a database you already have. Either way you end up with `shop.orm.yaml`, which the rest of the steps use:
+
+   ```sh
+   cp examples/getting-started/shop.orm.yaml .
+   # or
+   barwise import model examples/getting-started/shop.sql --format ddl --output shop.orm.yaml
+   ```
+
+   The import is mechanical. It turns keys, `NOT NULL` and foreign keys into fact types and constraints, and its readings are only as good as the column names. Step 3 shows the ones that read badly; fix them by editing their `readings` in the file.
+
+2. **Check the structure.** `barwise validate shop.orm.yaml` reports structural errors and constraints that contradict each other.
+
+3. **Read the rules back.** `barwise verbalize shop.orm.yaml --counterexamples` prints every rule as a sentence a business expert can confirm or reject ("Each SalesOrder is placed by at least one Customer"), followed by small example sets of facts the rules forbid. This is the review that matters. A model can pass validation and still state the wrong rule; the sentences are how you catch that.
+
+4. **Draw it.** `barwise diagram shop.orm.yaml --output shop.svg` writes the ORM diagram. It prints a deprecation notice that points at an `svg` export format which does not exist yet; `diagram` is still the way to draw a model from the CLI (barwise-zir).
+
+5. **Generate artifacts.** `barwise export shop.orm.yaml --format ddl --dialect snowflake` writes the tables. Other formats include `dbt`, `openapi` and `avro`.
+
+### Drafting a model from a transcript
+
+Barwise can also draft a model from a business conversation using a language model: `barwise import transcript`, the `import_transcript` MCP tool, or **Barwise: Import...** > **From Transcript** in VS Code. Use it to get a first draft quickly, then review it. A language model can misread a business rule, and the result will still validate: validation checks that the model is well formed, not that it says what the business means. The import helps you find what to review:
+
+- **Annotations in the file.** Questions the transcript left open, constraints the model was unsure of, and constraints it could not apply are written into the `.orm.yaml` as `TODO` and `NOTE` comments. Search the file for `TODO` first.
+- **Run-to-run disagreement.** `--samples <n>` (CLI and MCP) extracts the model two to five times and reports every element the runs disagree on as an ambiguity, which is where the transcript leaves the answer open. It writes the run that agrees most with the others. It costs n times as much.
+- **The reasoning behind the draft.** `--trail` writes a `.trail.json` file beside the model with the ambiguities found and the low-confidence assumptions the draft still depends on. Add `--alternatives` to include the framing it set aside at the biggest structural choice.
+- **Reviewing changes to an existing model.** Importing into a model that already exists merges into it: the CLI accepts additions and changes and skips removals, and VS Code shows a dialog listing each added, changed or removed element, with removals unchecked by default. Commit the model first anyway: the merge rewrites the file, so comments in it, earlier `TODO` and `NOTE` lines included, do not survive, and if the existing file cannot be read as a model, or the merge fails, the CLI writes the new draft over it (barwise-ihc). A first import into a new file has no review step, so read the result with `barwise verbalize` before relying on it.
+
+```sh
+barwise import transcript examples/transcripts/order-management.md --output orders.orm.yaml --samples 3 --trail
+barwise verbalize orders.orm.yaml
+```
+
+The sample transcripts are in `barwise/examples/transcripts/`. The same **Barwise: Import...** picker in VS Code also imports dbt projects and TypeScript, Java and Kotlin code.
+
+Every CLI command is documented in [`barwise/docs/CLI.md`](barwise/docs/CLI.md), and every MCP tool in [`barwise/docs/MCP.md`](barwise/docs/MCP.md).
 
 ## Project structure
 
