@@ -17,6 +17,10 @@ Take one rule from a shop: every order is either shipped to an address or collec
 **In SQL DDL** the rule takes two nullable columns plus a `CHECK` that someone has to remember to write:
 
 ```sql
+CREATE TABLE store (
+  store_code   VARCHAR(10) NOT NULL PRIMARY KEY
+);
+
 CREATE TABLE sales_order (
   order_number INTEGER     NOT NULL PRIMARY KEY,
   address      VARCHAR(200),
@@ -185,14 +189,12 @@ With `anthropic`, run **Barwise: Set Anthropic API Key** to store the key in the
 
 ## Quick start
 
-The main path needs no API key and no language model: start from a model or an existing schema, read its rules back as sentences, then generate what you build. The commands below use the CLI and the sample files in `barwise/examples/getting-started/`, with paths relative to `barwise/`; [the CLI guide](barwise/docs/getting-started/cli.md) shows how to put `barwise` on your path. [GETTING_STARTED.md](GETTING_STARTED.md) has the same steps for VS Code and MCP.
+The main path needs no API key and no language model: start from a model or an existing schema, read its rules back as sentences, then generate what you build. Work in an empty directory, not in a clone of this repository, so the files the steps write do not land in the checkout. Copy into it the two sample files in [`barwise/examples/getting-started/`](barwise/examples/getting-started/), `shop.orm.yaml` and `shop.sql`. [The CLI guide](barwise/docs/getting-started/cli.md) shows how to put `barwise` on your path, including from the downloaded `.cjs` file. [GETTING_STARTED.md](GETTING_STARTED.md) has the same steps for VS Code and MCP.
 
-1. **Start from a model.** Copy the hand-written sample, a small model of customers and sales orders, or import the DDL of a database you already have. Either way you end up with `shop.orm.yaml`, which the rest of the steps use:
+1. **Start from a model.** `shop.orm.yaml` is a small hand-written model of customers and sales orders, ready to use. To start from a database you already have instead, import its DDL, which replaces that file:
 
    ```sh
-   cp examples/getting-started/shop.orm.yaml .
-   # or
-   barwise import model examples/getting-started/shop.sql --format ddl --output shop.orm.yaml
+   barwise import model shop.sql --format ddl --output shop.orm.yaml
    ```
 
    The import is mechanical. It turns keys, `NOT NULL` and foreign keys into fact types and constraints, and its readings are only as good as the column names. Step 3 shows the ones that read badly; fix them by editing their `readings` in the file.
@@ -207,7 +209,7 @@ The main path needs no API key and no language model: start from a model or an e
 
 ### Drafting a model from a transcript
 
-Barwise can also draft a model from a business conversation using a language model: `barwise import transcript`, the `import_transcript` MCP tool, or **Barwise: Import...** > **From Transcript** in VS Code. Use it to get a first draft quickly, then review it. A language model can misread a business rule, and the result will still validate: validation checks that the model is well formed, not that it says what the business means. The import helps you find what to review:
+Barwise can also draft a model from a business conversation using a language model: `barwise import transcript`, the `import_transcript` MCP tool, or **Barwise: Import...** > **From Transcript** in VS Code. The CLI needs a model provider for this: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in the environment, or an Ollama server on `localhost:11434` (section 2 of [the CLI guide](barwise/docs/getting-started/cli.md)); without one the command fails with `fetch failed`. VS Code uses the settings under Configuration above. Use it to get a first draft quickly, then review it. A language model can misread a business rule, and the result will still validate: validation checks that the model is well formed, not that it says what the business means. The import helps you find what to review:
 
 - **Annotations in the file.** Questions the transcript left open, constraints the model was unsure of, and constraints it could not apply are written into the `.orm.yaml` as `TODO` and `NOTE` comments. Search the file for `TODO` first.
 - **Run-to-run disagreement.** `--samples <n>` (CLI and MCP) extracts the model two to five times and reports every element the runs disagree on as an ambiguity, which is where the transcript leaves the answer open. It writes the run that agrees most with the others. It costs n times as much.
@@ -215,11 +217,11 @@ Barwise can also draft a model from a business conversation using a language mod
 - **Reviewing changes to an existing model.** Importing into a model that already exists merges into it: the CLI accepts additions and changes and skips removals, and VS Code shows a dialog listing each added, changed or removed element, with removals unchecked by default. Commit the model first anyway: the merge rewrites the file, so comments in it, earlier `TODO` and `NOTE` lines included, do not survive, and if the existing file cannot be read as a model, or the merge fails, the CLI writes the new draft over it (barwise-ihc). A first import into a new file has no review step, so read the result with `barwise verbalize` before relying on it.
 
 ```sh
-barwise import transcript examples/transcripts/order-management.md --output orders.orm.yaml --samples 3 --trail
+barwise import transcript order-management.md --output orders.orm.yaml --samples 3 --trail
 barwise verbalize orders.orm.yaml
 ```
 
-The sample transcripts are in `barwise/examples/transcripts/`. The same **Barwise: Import...** picker in VS Code also imports dbt projects and TypeScript, Java and Kotlin code.
+Copy `order-management.md`, or another sample transcript, from [`barwise/examples/transcripts/`](barwise/examples/transcripts/) into the same directory first. The same **Barwise: Import...** picker in VS Code also imports dbt projects and TypeScript, Java and Kotlin code.
 
 Every CLI command is documented in [`barwise/docs/CLI.md`](barwise/docs/CLI.md), and every MCP tool in [`barwise/docs/MCP.md`](barwise/docs/MCP.md).
 

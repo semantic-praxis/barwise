@@ -21,6 +21,7 @@ import { DdlExportFormat } from "@barwise/formats";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { runCli } from "../workspace/run.js";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 const README = "README.md";
@@ -37,6 +38,17 @@ describe("README: Why it is worth learning", () => {
   it("quotes the verbalizer's sentence for the example's exclusive-or", () => {
     expect(sentence).toMatch(/either .* or .* but not both/);
     expect(readme).toContain(`> ${sentence}\n`);
+  });
+
+  // The README tells the reader to run this command to see the sentence, so
+  // the command has to print it, not just the Verbalizer underneath it.
+  it("prints that sentence from the command the README gives", async () => {
+    expect(readme).toContain(
+      "Run `barwise verbalize examples/models/order-handover.orm.yaml` from `barwise/`",
+    );
+    const result = await runCli(["verbalize", `${REPO_ROOT}${EXAMPLE}`]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.split("\n").map((line) => line.trim())).toContain(sentence);
   });
 
   it("states the DDL export's limitation (barwise-qly)", () => {
