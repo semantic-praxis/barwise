@@ -1,12 +1,12 @@
 # `.orm.yaml` format 3.0: constraint identity and placement by kind
 
-Status: WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
+Status: WS1 implemented 2026-10-23 (the amendment written into the metamodel ADR in place, not as an ADR 0003); WS2 implemented 2026-10-17 (stable constraint ids under 2.0; NORMA
 import keeps constraint, fact type, subtype fact and fact instance ids); WS3
 grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii implemented 2026-10-19, and 3a-ii-c (query, describe, counterexamples, graph references and lineage) 2026-10-20, 3a-iii (id-first diff) 2026-10-21, 3b-i (vscode, learn and dbt readers) 2026-10-21, 3b-ii (diagram) 2026-10-21, 3b-iii (formats) 2026-10-21, and 3b-iv (llm) 2026-10-21, which completes 3b; 3c split 2026-10-21, 3c-i (test readers), 3c-ii (storage, diff and merge) and 3c-iii (writers) implemented 2026-10-21, which completes WS3; WS4 grounded 2026-10-21 (4a and 4b; Open decisions 10 and 11 open), 4a implemented 2026-10-21, 4b split into PRs and 4b-i (constraints over subtypes in memory) implemented 2026-10-21, 4b-ii (the stored identifier and format 3.0) 2026-10-21, and 4b-iii (`barwise migrate`) 2026-10-21; WS5 not started; open decisions 1 to 9
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
-Last-updated: 2026-10-22
+Last-updated: 2026-10-23
 Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
@@ -291,7 +291,7 @@ every time until then.
 | `llm/src/parse/`                                          | attaches constraints to fact types                  | places by kind through the model API                                        |
 | tracked `.orm.yaml` files (115)                           | 2.0                                                 | rewritten as 3.0 by the migration, in WS5                                   |
 | `docs/NORMA_VS_ORM_YAML.md`                               | matrix overstates two rows (barwise-hnb)            | corrected in WS5                                                            |
-| `docs/adr/`                                               | ADR `metamodel-evolution-policy` "inline and local" | ADR 0003 amends it for external constraints                                 |
+| `docs/adr/`                                               | ADR `metamodel-evolution-policy` "inline and local" | Amended in place for external constraints (barwise-l5z)                     |
 
 Not in the table because they need no design decision, but in WS3 and WS4's
 scope: the programmatic builders that create constraints without ids or set
@@ -347,9 +347,11 @@ reference are in WS4 for that reason: a 2.0 serializer would have to convert
 them back to flags on save, and steps 3 and 4 drop what the flags cannot
 hold, so a 2.0 save between workstreams would silently lose data.
 
-### 1. ADR 0003 and this spec
+### 1. The metamodel ADR and this spec (implemented 2026-10-23)
 
-ADR 0003 amends ADR `metamodel-evolution-policy`'s "inline and local" filter: an internal constraint
+The owner's 2026-10-17 decision amends ADR `metamodel-evolution-policy`'s
+"inline and local" filter, in place rather than as a new "ADR 0003" (the
+living-ADR convention, `architecture-index.spec.md`; barwise-l5z): an internal constraint
 lives inline on its fact type; an external constraint, which has no single
 element to be local to, lives in the model's constraint list and refers to
 roles and subtype facts by id. Records the owner's two decisions above.
@@ -1853,6 +1855,8 @@ listing what step 4 drops. It can share WS4's PR if the radius allows.
 1. **ADR 0003 amends ADR `metamodel-evolution-policy`'s "inline and local" -- resolved 2026-10-17 by the owner: yes,
    as recommended.** Recommend: yes, as
    WS1 states it -- internal inline, external model-level by reference.
+   Recorded 2026-10-23 as an in-place edit of that ADR, not a new ADR 0003
+   (barwise-l5z).
 2. **Shape of subtype constraints -- resolved 2026-10-17 by the owner: option (a), reuse
    the three kinds with a `subtype_facts` operand.**
    - **(a)** Reuse `exclusion`, `disjunctive_mandatory` and `exclusive_or`

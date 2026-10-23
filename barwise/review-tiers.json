@@ -47,7 +47,7 @@
     {
       "heading": "When generated output changed",
       "tier": "routine",
-      "globs": ["barwise/examples/output/", "barwise/packages/llm/src/prompts/builtins.generated.ts"],
+      "globs": ["barwise/examples/output/", "barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts"],
       "why": "drift tests already fail when output disagrees with its regenerator"
     },
     {
@@ -78,8 +78,9 @@
       "heading": "When a skill, agent brief, CLAUDE.md, AGENTS.md, or prompt artifact changed",
       "tier": "high-risk",
       "globs": [
-        "barwise/.claude/",
         ".claude/skills/",
+        ".claude/agents/",
+        "barwise/packages/llm/prompts/",
         "CLAUDE.md",
         "AGENTS.md",
         "barwise/packages/*/CLAUDE.md",
