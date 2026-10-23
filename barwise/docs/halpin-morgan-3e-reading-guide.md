@@ -18,7 +18,7 @@ disagree, and the book is the authority over the transcript.
 ## Why this book, and why this order
 
 Barwise's metamodel is designed against this edition rather than against NORMA's
-tooling (`docs/adr/0001-metamodel-evolution-policy.md`, filter 4), and
+tooling (`docs/adr/metamodel-evolution-policy.md`, filter 4), and
 `docs/book-verification-checklist.md` verifies barwise's constructs against it.
 So the book is not background reading for the tool. It is the specification the
 tool's validation rules and verbalization forms are trying to be faithful to,
@@ -46,7 +46,7 @@ assumes you bring from the book:
 - **The relational schema is derived.** Tables, keys and foreign keys
   fall out of the conceptual model by the Rmap procedure (section 11.3).
   Barwise recomputes them and never stores them
-  (`docs/adr/0001-metamodel-evolution-policy.md`, decision 5).
+  (`docs/adr/metamodel-evolution-policy.md`, decision 5).
 
 Three things the book covers that barwise deliberately does not model, so you do
 not look for them: dynamic rules and process models (chapter 15), conceptual
@@ -249,7 +249,7 @@ The section teaches the ORM side.
 | 10 (Advanced), remaining sections | 10.2 (deontic rules) when you meet a constraint with deontic modality; 10.3 (temporality) before modeling history; 10.4 (collection types) and 10.7 (higher-order types) rarely. |
 | 12 (SQL), 13 (Other features)     | Skip: you write SQL. 12.1 (relational algebra) if you never studied it; 13.2 (defining tables) to compare with a barwise DDL export.                                             |
 | 14 (Schema Transformations)       | 14.3 (nesting, coreferencing, flattening) with stop 6; 14.6 (normalization) to see it fall out of elementary facts; 14.8 (reengineering) before importing a legacy schema.       |
-| 15 (Process and State)            | Skip. Barwise does not model dynamic rules, by decision (`docs/adr/0001-metamodel-evolution-policy.md`, tier 4).                                                                 |
+| 15 (Process and State)            | Skip. Barwise does not model dynamic rules, by decision (`docs/adr/metamodel-evolution-policy.md`, tier 4).                                                                      |
 | 16 (Data File Formats)            | 16.5 (XML, JSON, and ORM) only; it is the section closest to what a `.orm.yaml` file is doing (`docs/book-verification-cc5-serialization.md`).                                   |
 | 17 (NoSQL)                        | 17.4 (document databases) and 17.5 (graph databases) if you target either; the mapping ideas transfer.                                                                           |
 | 18 (Other aspects)                | 18.2 (data warehousing and OLAP) is written for this reader. 18.7 (metamodeling) if you want to know how barwise's metamodel could be an ORM model itself.                       |

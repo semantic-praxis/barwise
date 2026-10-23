@@ -157,7 +157,7 @@ Book references cite chapter and section numbers verified against the
 - **Halpin & Morgan, _Information Modeling and Relational Databases_,
   3rd ed. (2024).** ISBN 9780443237904. The canonical ORM reference, and
   the edition the barwise metamodel is designed against (see
-  `docs/adr/0001-metamodel-evolution-policy.md`). Key chapters: 3
+  `docs/adr/metamodel-evolution-policy.md`). Key chapters: 3
   (conceptual modeling and the CSDP), 4 (uniqueness), 5 (mandatory roles
   and reference schemes), 6 (value, set-comparison, and subtype
   constraints), 7 (ring, frequency, and final checks), 10.5

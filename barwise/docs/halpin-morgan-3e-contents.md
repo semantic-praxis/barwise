@@ -9,7 +9,7 @@ grounding book citations without needing the physical book in hand.
 - **Companion:**
   `https://www.elsevier.com/books-and-journals/book-companion/9780443237904`
 
-This is the edition `docs/adr/0001-metamodel-evolution-policy.md` pins
+This is the edition `docs/adr/metamodel-evolution-policy.md` pins
 the metamodel to (filter 4: design against the book, not against NORMA's
 tooling), and the source `docs/book-verification-checklist.md` verifies
 constructs against. It is also the target of the `docs/anki` deck's
