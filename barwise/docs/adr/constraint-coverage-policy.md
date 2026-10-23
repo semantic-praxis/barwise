@@ -1,4 +1,4 @@
-# ADR 0002: Constraint-extraction coverage policy
+# Constraint-extraction coverage policy
 
 Status: Accepted
 Date: 2026-08-27

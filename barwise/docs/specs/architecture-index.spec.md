@@ -9,8 +9,7 @@ Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
 +barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
 barwise/packages/cli/CLAUDE.md, barwise/packages/core/CLAUDE.md,
 barwise/packages/mcp/CLAUDE.md, barwise/docs/adr/metamodel-evolution-policy.md,
--barwise/docs/adr/0002-constraint-coverage-policy.md,
-+barwise/docs/adr/constraint-coverage-policy.md,
+barwise/docs/adr/constraint-coverage-policy.md,
 +barwise/docs/adr/package-graph-authority.md, barwise/packages/llm/CLAUDE.md,
 barwise/packages/promptlab/CLAUDE.md, barwise/packages/promptlab/evals/suite.yaml,
 +barwise/scripts/regen-architecture.mjs, +barwise/scripts/check-architecture.mjs,
@@ -59,8 +58,9 @@ line says this PR changed it.
    Consequences sections. ADR 0001 was edited in place the day after it
    was written (`d2d677ea`), and ADR 0002 was split from its spec so
    that "the spec keeps the living half" (`7e67e04e`): the ADR-and-spec
-   division this spec adopts. This PR renamed ADR 0001 to
-   `metamodel-evolution-policy.md` at the owner's request.
+   division this spec adopts. At the owner's request this PR renamed both
+   by concern, to `metamodel-evolution-policy.md` and
+   `constraint-coverage-policy.md`.
 2. **References to an ADR number spread.** At `1a32f9c7`, 16 tracked
    files cited the two ADR paths and the text named "ADR 0001" or "ADR
    0002" 60 times (`git grep -nE "ADR[ -]?000[12]" 1a32f9c7 -- .
@@ -106,7 +106,8 @@ Decided by the owner on 2026-10-23.
 - **Edited in place.** The ADR on `main` is the current decision. There
   is no superseded state and no dead decision for an agent to find and
   follow. Retiring a concern deletes its file, and every reference to it
-  must go in the same PR (see Open decision 5 for what checks that).
+  must go in the same PR; `check:architecture` fails on any reference
+  left (WS2).
 - **History lives in git and the PR.** The PR that changes an ADR states
   what changed and why; `git log -p` on the file leads to those PRs.
 - **No status field.** The two existing ADRs read `Status: Accepted`. On
@@ -180,6 +181,11 @@ In scope:
 - `INTENDED` shall move to its own module, `scripts/lib/intended.cjs`,
   which `.dependency-cruiser.cjs`, `arch-triage.mjs` and
   `check-architecture.mjs` all require; no script keeps a copy.
+- When tracked text outside archived specs and dated records names an
+  ADR as ADR `<name>` or `docs/adr/<name>.md` and no such ADR exists, the
+  check shall fail (exit 1) naming the file and line.
+- When a package's internal runtime `dependencies` include a package
+  `INTENDED` does not allow it, the check shall fail (exit 1).
 - When the check cannot read the ADR directory, `INTENDED`, or either
   target document, it shall exit 2 and say what it could not read
   (`docs/specs/gate-refusal-contract.spec.md`).
@@ -202,7 +208,7 @@ status field inside ADRs; a check that a Decision edit moves `Date:`
 
 | Path                                           | Current state                                                        | Change                                                                                          |
 | ---------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `barwise/docs/adr/`                            | `metamodel-evolution-policy.md` (renamed in this PR) and ADR 0002    | 0002 renamed (WS2); `Status:` lines dropped and `Scope:` added; new ADRs (WS2, WS4)             |
+| `barwise/docs/adr/`                            | Two ADRs, both renamed by concern in this PR                         | `Status:` lines dropped and `Scope:` added; new ADRs (WS2, WS4)                                 |
 | `barwise/docs/ARCHITECTURE.md`                 | Historical record; 8.1 and the section 6 tree cite nonexistent files | Generated first section; header sentence; the dead `decisions/` lines removed                   |
 | `barwise/.dependency-cruiser.cjs`              | Holds `INTENDED`, which says CLAUDE.md is its source of truth        | Requires `lib/intended.cjs`; the comment names it the authority                                 |
 | `barwise/scripts/lib/intended.cjs`             | Does not exist                                                       | New: `INTENDED`, moved out of `.dependency-cruiser.cjs`, which requires it                      |
@@ -245,11 +251,12 @@ loads is a larger change than a drift test.
 `INTENDED`, the map the dependency rules file enforces, is the package
 graph. WS1 moves it to `scripts/lib/intended.cjs` so the rules file and
 the scripts require one copy; the owner's decision names the map, and
-the move only gives it a home others can import (Open decision 7). The
+the move only gives it a home others can import (Open decision 7,
+resolved). The
 root `CLAUDE.md` block renders it and is checked against it. It states a policy ("may import") and
 is the one copy CI enforces through `npm run depcruise`. Runtime
-`dependencies` must stay within it; `devDependencies` may reach further
-for tests (anchor 4). WS2 records this decision as
+`dependencies` must stay within it, and WS1 checks that they do;
+`devDependencies` may reach further for tests (anchor 4). WS2 records this decision as
 `package-graph-authority.md`, and this heading then points to it.
 
 ## Alternatives considered
@@ -278,22 +285,25 @@ and `arch-triage.mjs` require it, which fixes arch-triage's drift, and
 `npm run depcruise` must still pass with the config's exports unchanged.
 `check-architecture.mjs` compares the `CLAUDE.md` graph edges with it
 (exit 1 on a missing or extra edge, exit 2 if either side cannot be
-parsed). The three package `CLAUDE.md` lines and the comments name
-`INTENDED` as the authority. The step runs
+parsed), and compares each package's internal runtime `dependencies` in
+`package.json` with it (exit 1 on a dependency the map does not allow;
+`devDependencies` are not compared). The three package `CLAUDE.md` lines
+and the comments name `INTENDED` as the authority. The step runs
 in `ci.yml` without a docs-only guard, and a gates test plants an extra
 edge and sees red through `mutate.mjs`.
 
-### 2. The ADR convention, the second rename, and the first new ADR
+### 2. The ADR convention, the reference check, and the first new ADR
 
-- Rename `0002-constraint-coverage-policy.md` to
-  `constraint-coverage-policy.md` as this PR renamed ADR 0001: rewrite
-  path citations and "ADR 0002" mentions in live documents (the two
-  package `CLAUDE.md` files, `suite.yaml` and two specs), and leave
-  archived specs and dated records such as
-  `reference-rubric-audit-2026-08-27.md` as they are. Acceptance: the
-  files listed here no longer name ADR 0002 by number. This spec keeps
-  its historical mentions, and `orm-format-3.spec.md`'s "ADR 0003" is
-  barwise-l5z's to resolve.
+- Both renames landed in this PR, at the owner's request: live documents
+  were rewritten, and archived specs and dated records (such as
+  `reference-rubric-audit-2026-08-27.md`) were left as they are.
+- Add the reference check to `check-architecture.mjs`: every ADR
+  `<name>` token and `docs/adr/<name>.md` path in tracked text resolves
+  to an existing ADR, excluding `docs/specs/archive/`, the dated records
+  (a date in the file name), and this spec's own historical mentions of
+  the old numbers. `orm-format-3.spec.md`'s "ADR 0003" is resolved by
+  barwise-l5z before this lands. Sandbox tests: a dead name, a dead path,
+  and an archived mention that is ignored, each seen red first.
 - Drop `Status:` from both ADRs and add `Scope:`; add the ADR shape
   check with a sandbox test seen red first.
 - Add `template.adr.md`, the `spec-writer` step, the `pr-review`
@@ -383,28 +393,17 @@ link. Keep inline what an agent needs before it knows which ADR to open
 4. **How far `CLAUDE.md` shrinks (WS5).** Recommend rule-plus-link for
    every convention with an ADR.
 
-5. **What checks references to an ADR by name.** References now read
-   ADR `metamodel-evolution-policy` in specs and code comments, and
-   `check:instruction-refs` scans only instruction files, so deleting or
-   renaming an ADR breaks those references silently. Recommend
-   `check:architecture` resolve every ADR `<name>` token and
-   `docs/adr/<name>.md` path in tracked text to an existing ADR,
-   excluding archived specs and dated records; the alternative is
-   leaving it to review.
-6. **Shared files in `Touches:`.** This spec lists files other work also
-   edits (`review-tiers.json`, package `CLAUDE.md` files, an eval suite).
-   Whether that trips other PRs depends on `plan-scope-check.spec.md`'s
-   Open decision 5; under its recommended option it does not.
-7. **Moving `INTENDED` out of the dependency rules file.** The owner
-   decided the rules file's `INTENDED` is the authority. The map cannot be
-   imported from that file (anchor 4), so WS1 moves it to
-   `scripts/lib/intended.cjs`, which the rules file requires. Recommend
-   reading the decision as naming the map, not the file it sits in.
-8. **A check that runtime `dependencies` stay within `INTENDED`.** The
-   resolved heading states the rule and nothing enforces it, which is a
-   must-agree copy guarded by prose. Recommend adding it to WS1: read
-   each `package.json`, compare internal runtime dependencies with the
-   map, exit 1 on an extra edge.
+5. **What checks references to an ADR by name.** **Resolved 2026-10-23
+   by the owner:** `check:architecture` resolves them (WS2).
+6. **Shared files in `Touches:`.** **Resolved** by
+   `plan-scope-check.spec.md` Open decision 5: plan review covers only
+   PRs that name the spec, so listing a shared file trips no other PR.
+7. **Moving `INTENDED` out of the dependency rules file.** **Resolved
+   2026-10-23 by the owner:** the decision names the map, which moves to
+   `scripts/lib/intended.cjs` because the rules file cannot export it
+   (anchor 4).
+8. **A check that runtime `dependencies` stay within `INTENDED`.**
+   **Resolved 2026-10-23 by the owner: yes**, in WS1.
 
 ## Risks and testing
 

@@ -93,8 +93,10 @@ In scope:
 - When a `Touches:` entry is neither a tracked path, a path the branch
   adds, nor a pattern matching a tracked path, `check:spec-touches` shall
   exit 1 naming the spec and the entry.
-- When a diff changes a path in a spec's `Touches:` while that spec's
-  Status claims nothing is built, and the spec has no `Plan-reviewed:`
+- When a PR names a spec (the spec file is in its diff, or its file name
+  is in a commit message on the branch) and changes a path in that spec's
+  `Touches:` while the spec's Status at the merge base claims nothing is
+  built, and the spec has no `Plan-reviewed:`
   line naming an ancestor of the first such change that contains the
   spec, `check:plan-review` shall exit 1 naming the spec.
 - When either check cannot read git or a spec, it shall exit 2.
@@ -227,13 +229,14 @@ Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
 - **Shared wiring files are planned but not owned.** Nearly every
   workstream adds a step to `ci.yml`, a script to the two `package.json`
   files, a test to `scripts/tests/`, or a line to the root `CLAUDE.md`.
-  Listing them is right for the scope report, but if `audit:specs` and
-  `check:plan-review` treated them as a spec's subject, every PR touching
-  `ci.yml` would trip both gates for every Draft spec that lists it. So
+  Listing them is right for the scope report, but if `audit:specs`
+  treated them as a spec's subject, every commit touching `ci.yml` would
+  make every Draft spec that lists it look stale. So
   `lib/spec-reader.mjs` keeps one `WIRING` list (`.github/workflows/`,
   `package.json`, `barwise/package.json`, `CLAUDE.md`,
-  `barwise/scripts/tests/`, `barwise/docs/specs/`, `.beads/`), and both
-  gates ignore `Touches:` entries under it. `audit-spec-status` already
+  `barwise/scripts/tests/`, `barwise/docs/specs/`, `.beads/`), and the
+  audit ignores `Touches:` entries under it. `check:plan-review` does not
+  need it: it covers only PRs that name the spec (next section). `audit-spec-status` already
   makes the same move for barrels (`HUB`); this is the declared form of
   it. `audit:specs` also keeps its code-extension filter, so a Markdown
   entry such as a skill counts for the report and for plan review, and not
@@ -273,10 +276,13 @@ Plan-reviewed: <commit> (code-review, pr-review)
 
 `check:plan-review` (WS6) applies the rule to a diff:
 
-- **Which specs it covers.** A spec is covered when the diff changes one
-  of its owned `Touches:` entries (wiring excluded, as above) and either
-  the spec is new in the diff or its Status at the merge base claims
-  nothing is built. Reading Status at the base, not the head, matters:
+- **Which specs it covers.** A spec is covered when the PR names it --
+  the spec file is in the diff, or its file name is in a commit message on
+  the branch, the same rule the scope report uses to find a PR's plan --
+  and the diff changes one of its `Touches:` entries, and either the spec
+  is new in the diff or its Status at the merge base claims nothing is
+  built. An unrelated PR names no Draft spec, so editing a shared file
+  never makes it answer for one (Open decision 5, resolved). Reading Status at the base, not the head, matters:
   `template.spec.md` tells authors to update Status in the commit that
   lands a workstream, so a head-side reading would exempt every compliant
   first-workstream PR.
@@ -489,8 +495,9 @@ implementation in flight is the first thing to measure.
    `plan.md` or `PLAN.md` outside `barwise/docs/specs/` at the top of its
    report.
 
-5. **Which PRs does `check:plan-review` cover?** As written, any PR that
-   changes a file a Draft spec owns in `Touches:`. Six review findings
+5. **Which PRs does `check:plan-review` cover?** **Resolved 2026-10-23 by
+   the owner: (b), only PRs that name the spec.** As first written, any PR
+   that changed a file a Draft spec owns in `Touches:`. Six review findings
    across three rounds on PR #714 were one recurring failure of that
    rule: an unrelated PR edits a shared file (`ci.yml`, a skill,
    `review-tiers.json`, an eval suite) that some Draft spec lists, and
@@ -505,8 +512,7 @@ implementation in flight is the first thing to measure.
      unrelated PR names no Draft spec, so it is never covered; `WIRING`
      then matters only to `audit:specs`.
 
-   **Recommended: (b).** It fixes the cause rather than the instances.
-   Its risk is a PR that implements a spec without naming it; the scope
+   It fixes the cause rather than the instances. Its risk is a PR that implements a spec without naming it; the scope
    report prints "no plan found" for a substantive PR, and `pr-review`
    already checks that a PR names its workstream.
 
