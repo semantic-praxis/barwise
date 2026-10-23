@@ -68,7 +68,8 @@ line says this PR changed it.
 3. **Decisions that were made did not reach their ADR.** `orm-format-3`
    planned an "ADR 0003" amending ADR 0001's "inline and local" filter,
    resolved by the owner on 2026-10-17; no such file has ever existed,
-   and the metamodel ADR still states the unamended filter (barwise-l5z).
+   and the metamodel ADR stated the unamended filter until it was amended
+   in place on 2026-10-23 (barwise-l5z).
    One living file per concern removes the question of which file an
    amendment goes in.
 4. **The package graph has four copies and one checked direction.** The
