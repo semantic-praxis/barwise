@@ -93,10 +93,10 @@ fact, which would defeat the comparison.
 | `barwise/scripts/audit-spec-status.mjs` | Holds `namedPaths`, the one reader of "which repo paths a spec names": backticked tokens with a code extension, tried at three roots, kept if git knows them; barrels excluded | Moves to a shared lib; behaviour unchanged for the audit                |
 | `barwise/scripts/lib/spec-paths.mjs`    | Does not exist                                                                                                                                                                 | New: `namedPaths`, plus a directory-prefix mode the scope check needs   |
 | `barwise/scripts/plan-scope.mjs`        | Does not exist                                                                                                                                                                 | New: the report                                                         |
-| `barwise/scripts/lib/changed-class.mjs` | `committedPaths(base)` lists a branch's changed files; CI's change classifier uses it                                                                                          | Reused for the file list                                                |
+| `changed-class.mjs`                     | `committedPaths(base)` runs a two-dot `git diff base HEAD`, right for CI's merge commit and wrong locally once `main` has moved                                                | Not reused; the file list is a three-dot diff, as `pr-risk` reads it    |
 | `.gitattributes`                        | One line: the beads merge driver                                                                                                                                               | Gains `linguist-generated` marks, if Open decision 2 takes its default  |
-| `barwise/review-tiers.json`             | `trivial.globs` is one exact path, chosen for "skip the Copilot review", a different question                                                                                  | Untouched: not the exclusion list (OD 2)                                |
-| `barwise/scripts/check-file-size.mjs`   | Warn-only report of large source files, exit 0 always                                                                                                                          | Untouched; the precedent for a report that never gates                  |
+| `review-tiers.json`                     | `trivial.globs` answers a different question; its "generated output" row names a path that does not exist                                                                      | Its generated row is checked against the marks (WS4)                    |
+| `check-file-size.mjs`                   | Warn-only report of large source files, exit 0 always                                                                                                                          | Untouched; the precedent for a report that never gates                  |
 | `.claude/skills/pr-creation/SKILL.md`   | Split rule keyed on spine files (more than five), fallout patterns, and reading time                                                                                           | Gains one readiness line: run the report, explain anything outside plan |
 | `.claude/skills/pr-review/SKILL.md`     | Section 1 reads the spec and issue before the diff                                                                                                                             | Gains the report as an input to the scope-drift check in section 3      |
 | `plan.md` (repo root)                   | A Phase 6 implementation plan; the work it describes is complete                                                                                                               | Deleted (OD 3)                                                          |
@@ -126,13 +126,27 @@ Three findings settle it:
   plan" more lenient, since a path cited only as context counts as
   planned; that errs toward fewer false reports.
 
-Two gaps in the existing reader matter here and not to the audit, which
-looks only at code files a spec names:
+Four gaps in the existing reader matter here and not to the audit, which
+looks only at code files a spec names. The 800-of-905 figure above counts
+tokens that resolve; it does not apply `namedPaths`' filters, so the
+reader keeps fewer than that:
 
 - **Directories.** `namedPaths` keeps only tokens with a code extension, so
   a spec saying `barwise/packages/cli/` plans nothing. The scope check
-  needs "a named directory covers the files under it". WS2 adds this as an
-  option, leaving the audit's default unchanged.
+  needs "a named directory covers the files under it".
+- **Markdown and other non-code files.** `.md` is not in its extension
+  list, so a skill, a CLAUDE.md, a doc or `.gitattributes` named in a spec
+  is never planned. A process spec whose Inventory is all Markdown would
+  report every changed file as outside its plan; this spec's own Inventory
+  would flag three of its rows.
+- **Bare names.** A token with no `/` is skipped, so a root file such as
+  `plan.md` is never matched.
+- **Barrels.** `index.ts` and `registration.ts` are dropped on purpose for
+  the audit, and should count as planned for this check.
+
+WS2 adds each as an option (`{ dirs, anyExtension, bare, barrels }`),
+leaving the audit's default behaviour unchanged.
+
 - **Planned new files.** A path that does not exist yet is dropped by the
   "git knows it" filter. When the branch creates it, the check must count
   the spec as having named it. WS3 resolves names against the branch's
@@ -159,14 +173,17 @@ to name its workstream.
 
 ```
 barwise/scripts/lib/spec-paths.mjs
-  namedPaths(text, { directories = false, exists }) -> string[]
+  namedPaths(text, { dirs, anyExtension, bare, barrels, exists }) -> string[]
       the one reader of "paths a spec names" (moved from audit-spec-status)
 
 barwise/scripts/audit-spec-status.mjs   imports namedPaths; output unchanged
 barwise/scripts/plan-scope.mjs          npm run plan-scope [-- --base <ref>]
-  changed  = committedPaths(base) minus files git check-attr marks generated
+  changed  = git diff --name-status -z --no-renames base...HEAD (three dots,
+             as pr-risk reads it: a two-dot diff counts main's own new
+             commits as this branch's changes) minus files git check-attr
+             marks generated
   specs    = specs in the diff + spec names in `git log base..HEAD` messages
-  planned  = union of namedPaths(spec, { directories: true }) at HEAD
+  planned  = union of namedPaths(spec, all four options on) at HEAD
   outside  = changed files under no planned path
   size     = numstat over `changed`; rank among the last 100 first-parent
              merges on base, measured the same way
@@ -221,8 +238,12 @@ a changed file.
 
 ### 3. `plan-scope.mjs` and its npm script (provisional: not yet grounded)
 
-The report above, with sandbox tests in `scripts/tests/` for:
+The report above. The npm script lands with its root `package.json`
+forwarder, regenerated by `regen-root-package.mjs`, or
+`check:root-scripts` fails. Sandbox tests in `scripts/tests/` cover:
 
+- a branch behind a `main` that has moved since it was cut, whose
+  changes must not include `main`'s new commits;
 - a spec found through the diff;
 - a spec found through a commit message;
 - no spec found;
@@ -239,7 +260,18 @@ the first thing to check when grounding this workstream.
 Depends on Open decision 2. Add `linguist-generated=true` for each path in
 the agreed list, read through `git check-attr`. Add a drift test that
 every `regen:*` script's output path carries the mark, so a new
-regenerator cannot ship unmarked. WS3 can land first with an empty
+regenerator cannot ship unmarked. A regenerator that writes only a section
+of a hand-written file (as `architecture-index.spec.md` proposes for
+ARCHITECTURE.md) is exempt by name in that test: marking the whole file
+would hide its hand-written body from diffs and from this report.
+
+The same test makes `.gitattributes` the one owner of the generated list:
+it asserts that the "When generated output changed" row's globs in
+`review-tiers.json` match the marked paths. Today that row has already
+drifted: it names `llm/src/prompts/builtins.generated.ts`, and the file is
+`builtins.generated.ts`, so the glob has matched
+nothing since it was written on 2026-09-18 and no check said so
+(barwise-fs0). WS3 can land first with an empty
 exclusion list, and then reports inflated sizes until this lands.
 
 ### 5. Wire the report into `pr-creation` and `pr-review` (provisional)

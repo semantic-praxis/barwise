@@ -31,14 +31,14 @@ decided this" can only do so from memory.
 The architecture facts that stay current here are the ones a check
 reads: the package graph (`.dependency-cruiser.cjs`), core's purity
 (`check-core-purity.mjs`), the tool lists (pinned by
-`mcp/tests/serverSpawn.test.ts` and
-`vscode/tests/unit/toolRegistration.test.ts`), and the paths instruction
+`serverSpawn.test.ts` and
+`toolRegistration.test.ts`), and the paths instruction
 files cite (`check-instruction-refs.mjs`). The ones that decayed are the
 ones nothing reads. ARCHITECTURE.md section 8.1 cites
 `docs/decisions/001-yaml-over-xml.md`, a file that has never existed in
 this repository's history, and section 8.4's "read-only diagrams" was
 overtaken when the canvas began saving layouts and views into the model
-(`vscode/src/diagram/protocol.ts`, `saveLayout` and `saveView`). This
+(`protocol.ts`, `saveLayout` and `saveView`). This
 spec applies the pattern that works to the facts that did not.
 
 ## Anchors
@@ -64,7 +64,10 @@ Verified 2026-10-23 against `origin/main` at `1a32f9c7`.
    superseded, withdrawn or replaced decisions, in forms such as
    "**WS4 WITHDRAWN** by the owner's decision of 2026-09-23" and
    "Superseded by `diagram-empty-view`". Spec `Status:` lines are free
-   text too (35 read exactly "Status: Implemented", and the rest vary).
+   text too: at `1a32f9c7`, 14 read exactly "Status: Implemented" and 91
+   begin with it (`git grep -hE '^Status: Implemented$' 1a32f9c7 --
+   'barwise/docs/specs/*.spec.md' ':(exclude)barwise/docs/specs/archive/*'
+   | wc -l`, and `-lE '^Status: Implemented'` for the second).
    Nothing a script can trust says a decision no longer holds.
 4. **The package graph has three copies and one checked direction.** The
    root `CLAUDE.md` "Dependency Graph" block, the `INTENDED` map in
@@ -102,10 +105,10 @@ system design" and points at the generated section for decisions. This
 adds no second owner: the decisions are owned by the specs, the graph by
 `INTENDED`, and both documents only render them.
 
-## What is a decision, mechanically? (resolved: a resolved heading with a marker line)
+## What is a decision, mechanically? (resolved: a heading with a marker line)
 
-A decision is a `##` or `###` heading carrying `(resolved: ...)` with,
-as the first non-blank line under it:
+A decision is a `##` or `###` heading with, as the first non-blank line
+under it:
 
 ```
 Decision: architecture
@@ -120,8 +123,17 @@ Superseded-by: <spec file>.spec.md#<heading slug>
 ```
 
 The target is a spec file and the GitHub-style slug of a heading in it,
-and that heading must itself be a decision. A bulleted open decision is
-not indexable; to index one, promote it to a heading. Marking is
+and that heading must itself be a decision.
+
+The marker, not the heading text, is what makes a decision. Headings
+say "resolved" four ways today -- `(resolved: yes)`, `(resolved
+2026-09-25)`, a `Decisions (resolved ...)` section, and dated headings
+such as tiered-pr-review's `## The decision of 2026-09-23: review
+everything non-trivial, block nothing` -- and requiring one spelling
+would leave that last one, a process decision Open decision 3 wants
+indexed, unindexable. What the check refuses is a marker on something
+still open: under a heading containing `(open`, or inside an `Open
+decisions` section. A bulleted open decision is not indexable; to index one, promote it to a heading. Marking is
 explicit because the sample in anchor 2 shows that most resolved
 headings record a local choice, and an index of all 141 would bury the
 ones that matter.
@@ -130,8 +142,7 @@ ones that matter.
 
 In scope:
 
-- When a spec heading carries `(resolved: ...)` and a `Decision:` line,
-  the generator shall list it in ARCHITECTURE.md's generated section
+- When a spec heading is followed by a `Decision:` line, the generator shall list it in ARCHITECTURE.md's generated section
   under its scope, with the spec, the heading text and a link.
 - When a decision carries `Superseded-by:`, the generator shall list it
   under "Superseded" with a link to its replacement, never among the
@@ -139,8 +150,9 @@ In scope:
 - When a `Superseded-by:` target does not exist, or names a heading that
   is not itself a decision, `npm run check:architecture` shall fail
   (exit 1) naming the spec and line.
-- When a `Decision:` line sits under a heading without `(resolved`, or
-  carries a value outside the closed set, the check shall fail (exit 1).
+- When a `Decision:` line sits under a heading containing `(open` or
+  inside an `Open decisions` section, or carries a value outside the
+  closed set, the check shall fail (exit 1).
 - When the generated section differs from what the generator produces,
   the check shall fail (exit 1) and name `npm run regen:architecture`.
 - When the edges in the root `CLAUDE.md` "Dependency Graph" block differ
@@ -159,17 +171,18 @@ outside specs.
 
 ## Inventory
 
-| Path                                          | Current state                                     | Change                                                      |
-| --------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------- |
-| `barwise/docs/ARCHITECTURE.md`                | Historical record; 8.1 cites a nonexistent file   | Gains a generated first section; header sentence; 8.1 fixed |
-| `CLAUDE.md` (root)                            | Holds the graph; calls ARCHITECTURE.md historical | Graph drift-checked; pointer names the generated section    |
-| `barwise/.dependency-cruiser.cjs`             | `INTENDED` says CLAUDE.md is its source of truth  | Comment corrected: `INTENDED` is the authority              |
-| `barwise/scripts/audit-spec-status.mjs`       | Owns reading a spec header                        | Its reader moves to a shared lib (provisional)              |
-| `barwise/scripts/lib/spec-headers.mjs`        | Does not exist                                    | New: one reader for Status, headings and decision markers   |
-| `barwise/scripts/regen-architecture.mjs`      | Does not exist                                    | New: renders the generated section                          |
-| `barwise/scripts/check-architecture.mjs`      | Does not exist                                    | New: the drift and marker checks above                      |
-| `.claude/skills/spec-writer/template.spec.md` | No decision marker                                | Documents `Decision:` and `Superseded-by:`                  |
-| `.github/workflows/ci.yml`                    | No such step                                      | Runs `check:architecture`                                   |
+| Path                                               | Current state                                     | Change                                                                                                                                     |
+| -------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `barwise/docs/ARCHITECTURE.md`                     | Historical record; 8.1 cites a nonexistent file   | Gains a generated first section; header sentence; 8.1 fixed                                                                                |
+| `CLAUDE.md` (root)                                 | Holds the graph; calls ARCHITECTURE.md historical | Graph drift-checked; pointer names the generated section                                                                                   |
+| `barwise/.dependency-cruiser.cjs`                  | `INTENDED` says CLAUDE.md is its source of truth  | Comment corrected: `INTENDED` is the authority                                                                                             |
+| `barwise/scripts/audit-spec-status.mjs`            | Owns reading a spec header                        | Its reader moves to a shared lib (provisional)                                                                                             |
+| `barwise/scripts/lib/spec-headers.mjs`             | Does not exist                                    | New: one reader for Status, headings and decision markers                                                                                  |
+| `barwise/scripts/regen-architecture.mjs`           | Does not exist                                    | New: renders the generated section                                                                                                         |
+| `barwise/scripts/check-architecture.mjs`           | Does not exist                                    | New: the drift and marker checks above                                                                                                     |
+| `.claude/skills/spec-writer/template.spec.md`      | No decision marker                                | Documents `Decision:` and `Superseded-by:`                                                                                                 |
+| `ci.yml`                                           | No such step                                      | Runs `check:architecture`                                                                                                                  |
+| `barwise/package.json` and the root `package.json` | No such scripts                                   | `check:architecture` and `regen:architecture`, with root forwarders regenerated by `regen-root-package.mjs` so `check:root-scripts` passes |
 
 `check-instruction-refs.mjs` is untouched: ARCHITECTURE.md is not an
 instruction file, and the links the generator writes are checked by
@@ -237,7 +250,9 @@ spec) and a rendering of `INTENDED` between markers at the top of
 ARCHITECTURE.md; `check-architecture.mjs` fails when they differ. Add
 the header sentence and the root `CLAUDE.md` pointer, add
 `regen:architecture` to the steward skill's regenerator list, and
-remove 8.1's dead link. Index each of section 8's six historical
+remove 8.1's dead link. `regen:architecture` writes a section of a
+hand-written file, not a whole file, so `plan-scope-check.spec.md`'s
+WS4 exempts it by name from marking ARCHITECTURE.md generated. Index each of section 8's six historical
 decisions that still holds, pointing at its 8.x section, with 8.4
 listed as superseded by whichever spec decided saved layouts (not yet
 identified).

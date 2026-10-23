@@ -77,6 +77,9 @@ In scope:
 - When a checklist group or failure mode has no path trigger, the system
   shall print it on every run under its own heading, and shall never
   omit it.
+- When `pr-risk` prints REVIEW.md's failure modes, it shall print every
+  one of them, path-triggered ones first, because REVIEW.md tells every
+  reviewer to run all of them.
 - When REVIEW.md's "Always check" items and the table's failure-mode
   rows disagree in either direction, `check:review-tiers` shall exit 1
   and name the disagreement.
@@ -108,8 +111,8 @@ Out of scope:
 | `barwise/scripts/check-review-tiers.mjs` | Bidirectional heading check, exit 0/1/2                 | Also compares failure-mode titles both ways (WS2)          |
 | `.claude/skills/pr-review/SKILL.md`      | "Say which groups applied", decided by hand             | Starts from `pr-risk` output (WS1)                         |
 | `.claude/skills/pr-creation/SKILL.md`    | Author runs the checklist against own diff              | Same instruction, author side (WS1)                        |
-| `barwise/scripts/tests/gates.test.mjs`   | Covers `pr-risk` and `check-review-tiers` branches      | New cases for each WS2 branch, seen red first              |
-| `.github/workflows/ci.yml`               | Runs `check:review-tiers`                               | Possibly prints routing (WS3, provisional)                 |
+| `gates.test.mjs`                         | Covers `pr-risk` and `check-review-tiers` branches      | New cases for each WS2 branch, seen red first              |
+| `ci.yml`                                 | Runs `check:review-tiers`                               | Possibly prints routing (WS3, provisional)                 |
 
 `copilot-review.yml` reads only `.tier` and `.trivial` from the JSON, so
 adding fields to it does not change the workflow's behaviour.
@@ -150,9 +153,12 @@ or `not-path-derivable` (failure mode 5, restated facts, which can live
 in any file). Globs use the table's existing four-shape pattern language,
 validated by `patternFault`; no new matcher.
 
-The REVIEW.md parser reads the numbered items under the `## Always
-check` heading and takes each item's bold lead (`1. **Input dropped at a
-boundary.**`) as its title. It throws on a missing heading or zero items,
+The REVIEW.md parser reads the numbered items under the first `##`
+heading that starts with `Always check`, so the heading's date range
+(`## Always check: the failure modes of 2026-09-23 to 2026-10-23` on
+#712's branch) can change without breaking it. It takes each item's bold
+lead (`1. **Input dropped at a boundary.**`) as its title. It throws on a
+missing heading or zero items,
 as `checklistHeadings` does, so the gate refuses rather than reporting
 eight stale rows from a file it never opened.
 
@@ -203,6 +209,13 @@ text and JSON output. Each new branch gets a sandbox test seen red via
 `mutate.mjs`: a title in REVIEW.md with no row, a row with no title,
 REVIEW.md missing, an empty "Always check" list.
 
+Routing orders the failure modes; it never removes one. REVIEW.md says
+to run all eight on every PR, and the service reads that instruction
+directly, so `pr-risk` prints every failure mode: the path-triggered ones
+first with the paths that triggered them, then the rest under "not
+triggered by path -- still run". A skill or reviewer that reads only the
+first group is reading the report wrong, and the heading says so.
+
 Acceptance: re-running the measurement above through `pr-risk` reports
 the per-failure-mode counts; any failure mode that fires on more than
 half of the last 40 PRs has its globs narrowed or is moved to `always`,
@@ -244,10 +257,11 @@ depth and whether `origin/main` resolves there are unverified, and
 
 ## Risks and testing
 
-- A failure mode routed by path reads as "does not apply" whenever the
-  path list misses where the defect lives. The beyond-reach list exists
-  for this, and the `why` field records what each glob list was measured
-  against so a later reader can re-measure.
+- A failure mode routed by path could read as "does not apply" whenever
+  the path list misses where the defect lives. That is why routing orders
+  rather than filters (WS2), why the beyond-reach list exists, and why the
+  `why` field records what each glob list was measured against so a later
+  reader can re-measure.
 - REVIEW.md wording edits break the title match and fail
   `check:review-tiers`. That is the gate working, and the failure message
   must name the title on both sides so the fix is one edit.
