@@ -5,7 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-2jy
-Touches: -plan.md, .gitattributes, barwise/review-tiers.json, REVIEW.md,
+Touches: -plan.md, .gitattributes, barwise/review-tiers.json,
 barwise/scripts/audit-spec-status.mjs, +barwise/scripts/lib/spec-reader.mjs,
 +barwise/scripts/plan-scope.mjs, +barwise/scripts/check-spec-touches.mjs,
 +barwise/scripts/check-plan-review.mjs, barwise/scripts/tests/,
@@ -237,7 +237,12 @@ Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
   makes the same move for barrels (`HUB`); this is the declared form of
   it. `audit:specs` also keeps its code-extension filter, so a Markdown
   entry such as a skill counts for the report and for plan review, and not
-  for the audit, as today.
+  for the audit, as today. `barwise/docs/specs/` is wiring because a
+  workstream that records decisions or Status in other specs is
+  documenting decisions already made, not implementing one; the plan
+  review still fires for that workstream through the owned entries it
+  changes in the same PR (for `architecture-index.spec.md` WS2,
+  `lib/spec-decisions.mjs`).
 - **Only the header block is read.** The reader takes header fields from
   the lines between the title and the first `##` heading, never from the
   body, so an example inside a code block (like the one above) is never
@@ -470,7 +475,10 @@ implementation in flight is the first thing to measure.
      `lib/review-tiers.mjs`.
    - (c) Hard-code the list in the script.
 
-   **Recommended: (a).** It is one owner for three readers: this script,
+   **Recommended: (a).** If chosen, `REVIEW.md` joins this spec's
+   `Touches:` once #712 has merged it; until then it is not a tracked
+   path and `check:spec-touches` would refuse it. It is one owner for
+   three readers: this script,
    the review service, and GitHub's diff view. Whether `barwise/trial/`
    fixtures belong on it is part of the decision; marking them collapses
    them in review, which is wrong if a reviewer should read them.

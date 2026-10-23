@@ -142,11 +142,12 @@ such as tiered-pr-review's `## The decision of 2026-09-23: review
 everything non-trivial, block nothing` -- and requiring one spelling
 would leave that last one, a process decision Open decision 3 wants
 indexed, unindexable. What the check refuses is a marker on something
-still open: under a heading containing `(open`, or a `###` heading
-inside a `## Open decisions` section whose heading does not say it is
-resolved (16 such sections already read `Decisions (resolved ...)` or
-`Open decisions (resolved ...)`, and a marked `###` under them is
-indexable). A bulleted open decision is not indexable; to index one, promote it to a heading. Marking is
+still open: under a heading containing `(open`, or anywhere inside a
+`## Open decisions` section whose heading does not say it is resolved --
+under one of its `###` headings or directly in its body beside the
+numbered items. (16 sections already read `Decisions (resolved ...)` or
+`Open decisions (resolved ...)`; a marked `###` under one of those is
+indexable.) A bulleted open decision is not indexable; to index one, promote it to a heading. Marking is
 explicit because the sample in anchor 2 shows that most resolved
 headings record a local choice, and an index of all 141 would bury the
 ones that matter.
@@ -164,9 +165,8 @@ In scope:
   is not itself a decision, `npm run check:architecture` shall fail
   (exit 1) naming the spec and line.
 - When a `Decision:` line sits under a heading containing `(open`, or
-  under a `###` heading inside a `## Open decisions` section whose heading
-  does not say it is resolved, or carries a value outside the
-  closed set, the check shall fail (exit 1).
+  anywhere inside a `## Open decisions` section whose heading does not
+  say it is resolved, or carries a value outside the closed set, the check shall fail (exit 1).
 - When the generated section differs from what the generator produces,
   the check shall fail (exit 1) and name `npm run regen:architecture`.
 - When the edges in the root `CLAUDE.md` "Dependency Graph" block differ
