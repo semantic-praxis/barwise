@@ -4,7 +4,7 @@ Status: Implemented -- workstream 1 (see Implementation notes); workstream 2
 not started
 
 Created: 2026-10-08
-Last-updated: 2026-10-08
+Last-updated: 2026-10-23
 Tracking: barwise-52b
 
 ## Principle
@@ -61,7 +61,7 @@ known zero rather than a backlog.
 
 In scope:
 
-- When an instruction file (`CLAUDE.md` or `AGENTS.md` at any depth, or
+- When an instruction file (`CLAUDE.md`, `AGENTS.md` or `REVIEW.md` at any depth, or
   any `.md` under `.claude/`) contains a backticked token that the rules
   below classify as a path, and the token resolves under none of them,
   the gate shall exit 1 and name the file, line and token.
@@ -166,7 +166,7 @@ it locally as CI does.
 
 ```
 check-instruction-refs.mjs
-  files    = trackedFiles() filtered to CLAUDE.md | AGENTS.md | .claude/**/*.md
+  files    = trackedFiles() filtered to CLAUDE.md | AGENTS.md | REVIEW.md | .claude/**/*.md
   index    = tracked files + their parent directories (one Set)
   for each file, each line:
     path tokens    -> rules above; dead or ambiguous      (WS1)
@@ -310,6 +310,12 @@ and the canonical `node "$(git rev-parse --show-toplevel)/<path>"` form
 from the root `CLAUDE.md`, which resolves from the repo root only. The
 ignored-file test now creates the exact path it cites, so it shows an
 existing ignored file failing, not only a missing one.
+
+2026-10-23: `REVIEW.md` joined the set (`review-md.spec.md`, barwise-f4v).
+The Claude Code Review service reads it as instructions and it cites
+paths the same way, so the filter grew by one name rather than the
+spec waiting for a general definition. `.github/copilot-instructions.md`
+is the remaining instruction file the gate does not read (barwise-yi6).
 
 ## Risks and testing
 

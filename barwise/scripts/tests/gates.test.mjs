@@ -4609,6 +4609,7 @@ function refsRepo({ allow = [], files = {} } = {}) {
       "Run `node build.mjs`; the entry is `unique.ts`; ours is `src/twin.ts`.\n",
     // `CLAUDE.md` exists at the root and in barwise/pkg/: the root one wins.
     ".claude/skills/s/SKILL.md": "Read `./notes.md`, then `CLAUDE.md`.\n",
+    "REVIEW.md": "Also apply `barwise/docs/guide.md`.\n",
   };
   for (const [f, body] of Object.entries({ ...base, ...files })) {
     if (body === null) continue;
@@ -4629,7 +4630,8 @@ test("check-instruction-refs passes every live branch, from the root and from a 
   try {
     const top = r.run();
     assert.equal(top.status, 0, top.stdout + top.stderr);
-    assert.match(top.stdout, /4 instruction file\(s\)/); // notes.md is under .claude/ too
+    // notes.md is under .claude/ too, and the root REVIEW.md counts.
+    assert.match(top.stdout, /5 instruction file\(s\)/);
     const sub = r.run(join(r.dir, "barwise", "pkg"));
     assert.equal(sub.status, 0, sub.stderr);
     assert.equal(sub.stdout, top.stdout);
@@ -4674,6 +4676,18 @@ for (
       "a dead canonical node command",
       { "CLAUDE.md": 'Run `node "$(git rev-parse --show-toplevel)/barwise/scripts/gone.mjs"`.\n' },
       /show-toplevel\)\/barwise\/scripts\/gone\.mjs` -- resolves neither from the repo root/,
+    ],
+    [
+      // A nested REVIEW.md is read once the default branch is protected.
+      "a dead path in a nested REVIEW.md",
+      { "barwise/pkg/REVIEW.md": "Apply `barwise/docs/gone.md`.\n" },
+      /barwise\/pkg\/REVIEW\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
+    [
+      // The root REVIEW.md is the one the service reads today (barwise-f4v).
+      "a dead path in the root REVIEW.md",
+      { "REVIEW.md": "Apply `barwise/docs/gone.md`.\n" },
+      /\sREVIEW\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
     ],
   ]
 ) {
@@ -4730,6 +4744,7 @@ test("check-instruction-refs refuses a listing with no instruction file rather t
       "barwise/pkg/CLAUDE.md": null,
       ".claude/skills/s/SKILL.md": null,
       ".claude/skills/s/notes.md": null,
+      "REVIEW.md": null,
     },
   });
   try {
