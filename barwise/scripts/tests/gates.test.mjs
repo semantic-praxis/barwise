@@ -4599,6 +4599,12 @@ for (
       { "CLAUDE.md": 'Run `node "$(git rev-parse --show-toplevel)/barwise/scripts/gone.mjs"`.\n' },
       /show-toplevel\)\/barwise\/scripts\/gone\.mjs` -- resolves neither from the repo root/,
     ],
+    [
+      // The Claude Code Review service reads REVIEW.md at any depth.
+      "a dead path in a REVIEW.md",
+      { "barwise/pkg/REVIEW.md": "Apply `barwise/docs/gone.md`.\n" },
+      /barwise\/pkg\/REVIEW\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
   ]
 ) {
   test(`check-instruction-refs fails ${name}`, () => {
