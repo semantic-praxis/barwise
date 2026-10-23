@@ -27,7 +27,7 @@ export type DerivationStorage = "derive_on_request" | "derived_and_stored";
 /**
  * A derivation rule: how a derived fact type's (or subtype's) population is
  * defined. In v1 the rule is informal -- opaque text carried verbatim and
- * verbalized, never parsed or executed by core (ADR-0001 filter 3). The
+ * verbalized, never parsed or executed by core (ADR `metamodel-evolution-policy` filter 3). The
  * `isFormal` flag is reserved for a future formal grammar; it is absent or
  * false in v1.
  */

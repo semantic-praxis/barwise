@@ -24,12 +24,12 @@ of the file uses, and ids are stable across renames by construction. The
 cost is legibility: `positions: { ot-asset: ... }` reads worse than
 `positions: { Asset: ... }`, and a model whose ids are UUIDs reads worse
 still. That cost is accepted. The diagram section is written by tools
-(the VS Code panel, the NORMA importer), not by hand, and ADR-0001's
+(the VS Code panel, the NORMA importer), not by hand, and ADR `metamodel-evolution-policy`'s
 legibility argument is about the constructs a human or an LLM authors.
 
 The version bump is not optional. A barwise that reads 1.1 would load a
 2.0 file, look each id up as a name, find nothing and render the whole
-model. That is the same silent failure this spec removes. ADR-0001 says
+model. That is the same silent failure this spec removes. ADR `metamodel-evolution-policy` says
 a structural change bumps the major version with a real migration, and
 the bump is what turns an older reader's silent misread into the
 serializer's existing "written by a newer barwise" error.
@@ -119,7 +119,7 @@ kinds. This spec relies on that and does not add a check for it.
   a key's meaning would depend on what else is in the file, and a name
   that happens to equal another element's id resolves to the wrong
   element without any sign.
-- **Minor bump (1.2).** ADR-0001 reserves minor bumps for additive
+- **Minor bump (1.2).** ADR `metamodel-evolution-policy` reserves minor bumps for additive
   changes that an older reader can ignore. An older reader cannot ignore
   this one; it misreads it.
 
@@ -164,7 +164,7 @@ Everything in Scope, with tests:
 
 ## Open decisions (for review)
 
-- **D1: major or minor bump.** Recommended: 2.0, per ADR-0001 (see
+- **D1: major or minor bump.** Recommended: 2.0, per ADR `metamodel-evolution-policy` (see
   Alternatives). The trade-off is a release note saying files written
   from now on need barwise 1.8 or later.
 - **D2: an unknown name during migration.** Keep it verbatim so the new
