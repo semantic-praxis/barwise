@@ -1,7 +1,7 @@
 # Model invariants: what the store refuses, what validation reports, and what operations promise
 
-Status: Draft -- no workstream implemented; open decisions 1 to 3 resolved
-by the owner 2026-10-23, each as recommended
+Status: Draft -- no workstream implemented; decisions resolved by the owner
+2026-10-23 (decision 1 revised the same day after review)
 
 Created: 2026-10-23
 Last-updated: 2026-10-23
@@ -22,15 +22,22 @@ rule runs. A defect the storage _can_ represent, such as a dangling role
 reference, is the opposite case: barwise loads it on purpose so the editor
 can show it, and it belongs to validation.
 
+The same question, asked of an operation, gives the second half: **a shared
+id means the same element.** Diff matches object types and fact types by
+name, so a rename that keeps its id reads as one element removed and
+another added, and the merge that follows can lose the one the user kept.
+Pairing by id first, as constraints already are (barwise-18n), makes a
+rename one modification, and the collision never forms.
+
 That split is design by contract, applied to a model that must be able to
 hold mistakes. Of its three parts, barwise already has two in its own
 idiom, and this spec adds what is missing rather than a second mechanism:
 
-| Contract part                              | Barwise today                                                                                                                                    | This spec                                                                                     |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Precondition (what a caller supplies)      | JSON Schema on load; 33 refusals in `OrmModel`; Effect Schema decoders planned (`effect-adoption.spec.md`), whose errors appear in the type      | unchanged                                                                                     |
-| Invariant (always true of a model)         | Decided 2026-09-06: "can the value exist with this defect" picks build refusals over validation rules (`core-branching-load.spec.md`, Decisions) | applies that test to element ids, which it missed (workstreams 1, 3, 4)                       |
-| Postcondition (what an operation promises) | Property laws over generated models (`tests/laws/`)                                                                                              | a merge law for partial acceptance over renamed pairs, the case that lost data (workstream 2) |
+| Contract part                              | Barwise today                                                                                                                                    | This spec                                                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Precondition (what a caller supplies)      | JSON Schema on load; 33 refusals in `OrmModel`; Effect Schema decoders planned (`effect-adoption.spec.md`), whose errors appear in the type      | unchanged                                                                                                             |
+| Invariant (always true of a model)         | Decided 2026-09-06: "can the value exist with this defect" picks build refusals over validation rules (`core-branching-load.spec.md`, Decisions) | applies that test to element ids, which it missed (workstreams 1, 3, 4)                                               |
+| Postcondition (what an operation promises) | Property laws over generated models (`tests/laws/`)                                                                                              | diff pairs a shared id; a merge law over renamed pairs and partial acceptance, the case that lost data (workstream 2) |
 
 ## Should barwise adopt a design-by-contract library or runtime assertions? (resolved: no)
 
@@ -56,14 +63,14 @@ when the value cannot exist with the defect, and a validation rule
 otherwise. It applied the test to 12 reference and name rules. It did not
 list element ids, and today's code shows why that is the sharpest case:
 
-| Defect                                                                                     | Can the model hold it?                                     | Today                                                                 | Owner                                                                             |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Two object types (or fact types, subtype facts, objectifications, populations) with one id | No: an id-keyed map keeps the last one                     | Silently replaced, from a file and from code; no diagnostic           | The store refuses it (workstream 3)                                               |
-| Two roles with one id                                                                      | Yes: roles are an array per fact type                      | `structural/duplicate-role-id`                                        | Validation, unchanged                                                             |
-| Two constraints with one id                                                                | Yes: constraints are arrays                                | Refused by the 3.0 loader only; a 2.0 file and code pass              | Validation reports it (workstream 1); the builder refuses it later (workstream 4) |
-| Two subtype facts over one subtype/supertype pair, different ids                           | Yes: the ids differ                                        | `addSubtypeFact` refuses it, but only outside a lenient load; no rule | Validation reports it (workstream 1)                                              |
-| Two object types with one name                                                             | No, at `addObjectType`, which refuses; yes, after a rename | `structural/duplicate-object-type-name`                               | Unchanged                                                                         |
-| A role naming an absent object type                                                        | Yes, under a lenient load                                  | `structural/dangling-role-reference`                                  | Unchanged until the builder (barwise-973)                                         |
+| Defect                                                                                     | Can the model hold it?                                     | Today                                                                                                       | Owner                                                                             |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Two object types (or fact types, subtype facts, objectifications, populations) with one id | No: an id-keyed map keeps the last one                     | Silently replaced, from a file and from code; no diagnostic                                                 | The store refuses it (workstream 3)                                               |
+| Two roles with one id                                                                      | Yes: roles are an array per fact type                      | `structural/duplicate-role-id`, reported from `graphOf` (`graph.ts:205-216`, `referenceDiagnostics.ts:114`) | Validation, unchanged                                                             |
+| Two constraints with one id                                                                | Yes: constraints are arrays                                | Refused by the 3.0 loader only; a 2.0 file and code pass                                                    | Validation reports it (workstream 1); the builder refuses it later (workstream 4) |
+| Two subtype facts over one subtype/supertype pair, different ids                           | Yes: the ids differ                                        | `addSubtypeFact` refuses it, but only outside a lenient load; no rule                                       | Validation reports it (workstream 1)                                              |
+| Two object types with one name                                                             | No, at `addObjectType`, which refuses; yes, after a rename | `structural/duplicate-object-type-name`                                                                     | Unchanged                                                                         |
+| A role naming an absent object type                                                        | Yes, under a lenient load                                  | `structural/dangling-role-reference`                                                                        | Unchanged until the builder (barwise-973)                                         |
 
 The rule this table states, and which workstream 3 writes into
 `core/CLAUDE.md`: **a defect the model cannot hold is refused when it is
@@ -71,6 +78,27 @@ stored; a defect it can hold is reported by validation.** A lenient load
 skips the checks for what the model can hold, which today include the
 subtype-pair check, so each of those needs a rule that reports it; it never
 skips an id the store already holds, because that cannot be reported later.
+
+## When two models share an id, are they the same element? (resolved: yes)
+
+The first draft of this spec answered no, by omission: it kept the diff's
+name matching and made merge keep both elements, the added one under a new
+id. Review found four ways that design still cross-wired references
+(rejected additions, constraints across fact types, re-merging a saved
+derived id, the entity's preferred identifier), and the owner named the
+deeper defect: keeping both puts one concept in the model twice. Customer
+renamed to Client under one id, kept as two entity types, splits its facts
+between the copies, and a uniqueness or mandatory rule stated once holds on
+one copy only. Each copy is consistent alone, so validation cannot see it.
+
+A shared id is the strongest evidence of identity the format carries, since
+3.0 makes every id required and stable. The diff's name matching predates
+that: its stated reason is that "re-extraction mints fresh ids and only
+names survive" (`ModelDiff.ts:289-291`), which still holds for an LLM
+draft and is kept as the fallback. The owner decided constraints the same
+way on 2026-10-18 (barwise-18n). Accepting a renamed object type then needs
+no merge mechanism at all: an accepted modification already takes the
+incoming content under the existing id (`ModelMerge.ts:134-145`).
 
 ## Scope
 
@@ -81,18 +109,28 @@ In scope:
   files and models built in code).
 - When a model holds two subtype facts over one subtype/supertype pair,
   validation shall report it, naming both ids.
-- When a merge accepts an added element whose id an element kept from the
-  existing model holds, the merged model shall hold both, the added one
-  under an id derived from its inputs, with every reference the incoming
-  model made to it translated; the same inputs shall give the same merged
-  model. This holds for object types, fact types, their roles and their
-  own constraints, subtype facts, objectifications and populations.
-- When the merge laws run, they shall include partial acceptance over pairs
-  in which the incoming model renames an element and keeps its id.
+- When both models hold an object type, or a fact type, with one id,
+  `diffModels` shall pair them whatever their names, and report a changed
+  name as a `name` change on that one delta. Elements whose id only one
+  side holds pair by name, as today.
+- When the caller says the two models' ids are unrelated
+  (`matching: "content"`), `diffModels` shall pair object types, fact types
+  and constraints by name and content only, as `constraintMatching:
+  "content"` does for constraints today.
+- When a merge would add an object type or fact type whose name or id the
+  merged model already holds, it shall refuse with `MergeConflictError`,
+  naming both elements, instead of evicting one or failing with a bare
+  error.
+- When a merge would add an objectification whose id the merged model
+  already holds, it shall give it a fresh id, as it already does for subtype
+  facts and populations.
+- When the merge laws run, they shall include pairs in which the incoming
+  model renames object types and fact types under kept ids, and any subset
+  of deltas accepted.
 - When an object type, fact type, subtype fact, objectified fact type or
   population is added with an id an element of the same kind already holds,
-  `OrmModel` shall refuse it, naming the id and both elements, whether or
-  not `skipPlayerValidation` is set.
+  `OrmModel` shall refuse it with `DuplicateIdError`, naming the id and both
+  elements, whether or not `skipPlayerValidation` is set.
 - When a file, 2.0 or 3.0, lenient or not, states two elements of one of
   those kinds with one id, `deserialize` shall throw `DeserializationError`,
   naming the id and both elements.
@@ -104,29 +142,36 @@ Out of scope:
 - Whether an object type and a fact type may share an id. Different kinds
   live in different maps, so the store can hold it, and the owner decided it
   stays allowed (decision 2).
-- Collisions between constraints across fact types in a merge. Diff pairs
-  the model's own constraints by id first (orm-format-3 WS3a-iii), so two
-  sharing an id are one modified constraint, never a kept one and an added
-  one. A fact type's own constraints are different: an added fact type
-  brings them whole, and they are in scope above.
+- Id-first matching for subtype facts, objectifications and populations.
+  They have no name, and diff identifies them by what they relate
+  (`ModelDiff.ts:289`, `:378`, populations by fact type and tuples), so a
+  rename cannot split them; the merge's fresh id covers their collisions.
+- The fresh ids merge mints for those three kinds come from the installed
+  generator, so such a merge is not reproducible. Filed separately
+  (barwise-yg5), since no lost element depends on it.
 - Design-by-contract tooling of any kind (resolved above).
 
 ## Inventory
 
-Verified on main `1a32f9c7`, 2026-10-23.
+Verified on main `09adf160`, 2026-10-23.
 
-| Area                                                  | Current state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Verdict                                                                                                                                                                                                                       |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/src/model/OrmModel.ts`                          | Five `Map<string, ...>` stores (:63-67); `addObjectType` and `addFactType` check the name (:132, :450), never the id; `addSubtypeFact` checks the subtype/supertype pair inside `if (!skipPlayerValidation)` (:542-578); `addPopulation` checks only its fact type; every refusal is a plain `Error`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | each `add*` refuses an id already held, as `DuplicateIdError` (workstream 3)                                                                                                                                                  |
-| `core/src/model/Population.ts`                        | No name; a population is described by its fact type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | the refusal and the derived id name it by id and fact type                                                                                                                                                                    |
-| `core/src/serialization/OrmYamlSerializer.ts`         | `fromDocument` refuses two constraints sharing an id with `DeserializationError` (`claim`, :268-278); `readDocument20` does not; both call `add*` unwrapped, so a refusal from `OrmModel` surfaces as a plain `Error`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | both readers turn a `DuplicateIdError` into `DeserializationError` (workstream 3); the constraint check stays                                                                                                                 |
-| `core/src/validation/rules/structural.ts`             | `duplicate-role-id`, `duplicate-object-type-name`, `duplicate-fact-type-name`, two objectification duplicates; nothing for constraint ids or subtype pairs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | gains `structural/duplicate-constraint-id` and `structural/duplicate-subtype-fact` (workstream 1)                                                                                                                             |
-| `core/src/diff/ModelMerge.ts`                         | `incomingIdToMergedId` (:82) and `incomingFtIdToMergedId` (:87) translate object type and fact type ids for elements matched by name; `incomingRoleIdToMergedId` (:95) and `roleIdMap` (:103) do the same for roles of matched fact types. Subtype facts and populations already avoid a collision: when the merged model holds the id, the merge passes `id: undefined` (:362-369, :471, :480), so `OrmModel` mints a random one. Object types, fact types and objectifications keep their incoming id and evict. An added fact type's own constraints keep their source ids (`addFactTypeToMerged`, :773), and phase 6b resolves a preferred identifier with `getConstraint`, the first match (:511). `resolveObjectTypeId` and `resolveFactTypeId` (:807-834) try a direct hit in the merged model before the map | resolvers become side-aware; the eviction closed for the three kinds that still have it, and for an added fact type's roles and constraints; every collision, the two random mints included, gets a derived id (workstream 2) |
-| Id references in the model                            | Roles name object types; constraints name roles and, over subtypes, subtype facts (`subtypeFactIds`); objectifications name a fact type and an object type; populations name a fact type and roles. Nothing names an objectification's or a population's own id                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | maps needed for object types, fact types, roles and subtype facts; objectifications and populations need only a derived id                                                                                                    |
-| `core/tests/laws/merge.law.test.ts`                   | Laws for "accept nothing" (:31) and "accept everything" (:102)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | gains partial acceptance (workstream 2)                                                                                                                                                                                       |
-| `core/tests/arbitraries/model.ts`                     | Object type and fact type ids and names come from one index (`ot${i}`/`T${i}`, :461-462; `ft${j}`/`F${j}`, :524-525), so two draws never rename an element under a kept id; subtype facts and populations (`sf${i}`, `pop${i}`) do collide across draws                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | gains a renamed-pair arbitrary (workstream 2)                                                                                                                                                                                 |
-| Importers in `code-analysis`, `dbt`, `formats`, `llm` | 14 source files call `addObjectType` or `addFactType`, several with ids they compute themselves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | each a site that could now throw; measured by the full monorepo suite in workstream 3 (provisional: not yet grounded per importer)                                                                                            |
-| `docs/specs/core-branching-load.spec.md`              | WS1's `build()` takes `structural/dangling-*`, `structural/duplicate-*`, the `*-not-entity` rules and the subtype cycle                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | amended to name element-id and constraint-id uniqueness (workstream 4)                                                                                                                                                        |
+| Area                                                                                    | Current state                                                                                                                                                                                                                                                                           | Verdict                                                                                                       |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `core/src/model/OrmModel.ts`                                                            | Five `Map<string, ...>` stores (:63-67); `addObjectType` and `addFactType` check the name (:132, :450), never the id; `addSubtypeFact` checks the pair inside `if (!skipPlayerValidation)` (:542-578); `addPopulation` checks only its fact type; every refusal is a plain `Error`      | each `add*` refuses an id already held, as `DuplicateIdError` (workstream 3)                                  |
+| `core/src/model/Population.ts`, `SubtypeFact.ts`, `ObjectifiedFactType.ts`              | None of the three has a name                                                                                                                                                                                                                                                            | the refusal names them by what they relate (Target architecture)                                              |
+| `core/src/serialization/OrmYamlSerializer.ts`                                           | `fromDocument` refuses two constraints sharing an id (`claim`, :268-278); `readDocument20` does not; both call `add*` unwrapped                                                                                                                                                         | both readers turn a `DuplicateIdError` into `DeserializationError` (workstream 3)                             |
+| `core/src/validation/rules/structural.ts`                                               | `structuralRules(model, graph)` (:37), skipped when `graphOf` cannot resolve a reference, and `structuralWellFormedness(model)` (:51), which always runs                                                                                                                                | both new rules go in `structuralWellFormedness`: neither reads a reference (workstream 1)                     |
+| `core/src/diff/ModelDiff.ts`                                                            | Object types and fact types keyed by name (:90-91, :137-138); subtype facts, objectifications and populations by what they relate; constraints id-first through `constraintMatching` (:40, :85)                                                                                         | object types and fact types id-first; one `matching` option for all three (workstream 2)                      |
+| `core/src/diff/elementDiff.ts`                                                          | `diffObjectType` and `diffFactType` compare no name, since names matched; the comment at :436 says "one renamed is a different one". A constraint across fact types is keyed by the other fact type's name (`roleKeys`)                                                                 | a `name` change; the comment goes; keys checked against renames (workstream 2, provisional)                   |
+| `core/src/diff/changeDescription.ts`, `breakingLevel.ts`                                | No `name` change kind. Changes that alter what the relational mapping binds to are `breaking` (`breakingLevel.ts` header)                                                                                                                                                               | `name` added, rated `breaking`: a renamed object type renames its table and its columns elsewhere             |
+| `core/src/diff/deltas.ts`                                                               | `SynonymCandidate`: a removed and an added element that may be a rename, "never auto-linked"                                                                                                                                                                                            | unchanged; it still flags renames between models whose ids differ                                             |
+| `core/src/diff/ModelMerge.ts`                                                           | Subtype facts and populations get `id: undefined` when the merged model holds theirs (:362-369, :471, :480), so `OrmModel` mints one; objectifications keep their id and evict; an accepted modification keeps the existing id (:134-145); a throw nulls the merge (`mergeAndValidate`) | objectifications follow the same pattern; `MergeConflictError` for an object type or fact type (workstream 2) |
+| `core/src/diff/ModelMerge.ts` `addableSubtypeFact`, `addableObjectification` (:557-583) | Mirror `OrmModel`'s guards so a throw does not null the whole merge; guarded by a comment                                                                                                                                                                                               | replaced by predicates `OrmModel` exports and its own `add*` calls (workstream 3)                             |
+| `llm/src/diffOptions.ts`                                                                | `UNRELATED_IDS_DIFF = { constraintMatching: "content" }` (:11), the one caller of the option outside core                                                                                                                                                                               | `{ matching: "content" }`                                                                                     |
+| `core/tests/laws/merge.law.test.ts`                                                     | Laws for "accept nothing" (:31) and "accept everything" (:102)                                                                                                                                                                                                                          | gains partial acceptance (workstream 2)                                                                       |
+| `core/tests/arbitraries/model.ts`                                                       | Object type and fact type ids and names come from one index (`ot${i}`/`T${i}`, :461-462; `ft${j}`/`F${j}`, :524-525), so two draws never rename an element under a kept id                                                                                                              | gains a renamed-pair arbitrary (workstream 2)                                                                 |
+| Importers in `code-analysis`, `dbt`, `formats`, `llm`                                   | 14 source files call `addObjectType` or `addFactType`, several with ids they compute themselves                                                                                                                                                                                         | each could now throw; measured in workstream 3 (provisional: not yet grounded per importer)                   |
+| `docs/specs/core-branching-load.spec.md`                                                | WS1's `build()` takes `structural/dangling-*`, `structural/duplicate-*`, the `*-not-entity` rules and the subtype cycle                                                                                                                                                                 | amended to name element-id and constraint-id uniqueness (workstream 4)                                        |
 
 The merge law suite is a shadow of the property it was meant to check. It
 covers the two ends of acceptance, nothing and everything, and its
@@ -136,9 +181,29 @@ rename case that loses data is never drawn.
 ## Target architecture
 
 ```ts
-// OrmModel: one private check before each of the five id-keyed stores.
-// Runs whatever skipPlayerValidation says: the store cannot hold a second
-// element under one id, so lenience cannot defer it to a rule.
+// diff: one question, asked once -- are the two models' ids related?
+interface DiffOptions {
+  /** "id-first" (default): a shared id pairs, whatever the name; the rest
+   *  pair by name (object types, fact types) or content (constraints).
+   *  "content": ids say nothing (independent LLM samples); never pair by id. */
+  readonly matching?: "id-first" | "content";
+}
+// ChangeDescription gains { change: "name"; from: string; to: string },
+// on object type and fact type deltas only, rated "breaking".
+
+// merge: under id-first an added object type or fact type cannot share an
+// id with an existing one (it would have paired), so what is left is a
+// NAME clash -- a rename accepted onto a name another element keeps -- and
+// content-mode ids. Both refuse, rather than evict or null the merge.
+export class MergeConflictError extends Error {
+  readonly kept: { readonly id: string; readonly name: string; };
+  readonly added: { readonly id: string; readonly name: string; };
+}
+// Objectifications: id: undefined when held, as subtype facts and
+// populations already are; nothing references an objectification's id.
+
+// OrmModel: one check before each of the five id-keyed stores, whatever
+// skipPlayerValidation says.
 export class DuplicateIdError extends Error {
   readonly id: string;
   readonly kind:
@@ -148,125 +213,116 @@ export class DuplicateIdError extends Error {
     | "objectification"
     | "population";
 }
-// message: `Object type id "x" is already held by "A"; "B" cannot reuse it.`
-// A population, which has no name, reads "population of fact type F".
+// Elements are named by name where they have one, otherwise by what they
+// relate: "subtype fact Manager -> Employee", "objectification of
+// Enrollment", "population of fact type Person has Name".
+// canAddSubtypeFact / canAddObjectifiedFactType: the guards, exported, and
+// called by add* itself, so merge's pre-checks read the same predicate.
 
 // Both readers: catch DuplicateIdError around add*, rethrow as
 // DeserializationError naming the id. Nothing else they call is wrapped.
 
-// structural.ts: representable, so reported, not refused.
+// structuralWellFormedness: representable, so reported, not refused.
 //   structural/duplicate-constraint-id, over model.everyConstraint().
 //   structural/duplicate-subtype-fact, over model.subtypeFacts.
-
-// ModelMerge: an accepted addition never displaces a kept element.
-//   An incoming element's references are in the incoming id space, so a
-//   resolver given one consults the incoming map first and the merged model
-//   only for an id the map does not hold. An existing element's references
-//   resolve directly, as today.
-//   On a collision: derivedId("merge-collision", [kind, incomingId, label]),
-//   where label is the name, or a population's fact type id; recorded in the
-//   kind's map (object type, fact type, role, subtype fact), so roles,
-//   constraints over subtypes, objectifications and populations that the
-//   incoming model wrote against the old id are rewritten.
-//   An added fact type's roles and own constraints get derived ids too when
-//   any is held, recorded in the role map and a constraint-id map that
-//   phase 6b reads, so an incoming entity's preferred identifier names the
-//   added fact type's uniqueness, not the kept one's.
-//   Derived, not minted: the merge already mints a random id for a
-//   colliding subtype fact or population (:362-369, :480), so one merge can
-//   give two results; those two sites move to the derived id as well.
 ```
 
 ## Alternatives considered
 
+- **Keep name matching, and have merge keep both elements** under a derived
+  id. The first two drafts of this spec. Rejected by the owner after
+  review: it puts one concept in the model twice, and four cases still
+  cross-wired references (the section above).
+- **Keep name matching, and refuse the merge on any id collision.** Small,
+  and it closes the loss, but it refuses the common case (a rename under a
+  kept id) that id-first pairing handles as an ordinary modification.
 - **A validation rule for duplicate element ids.** It cannot see the
-  defect: by the time a rule runs, the map holds one element. Detecting it
-  would mean the store keeping a list of collisions, which is a refusal
-  postponed.
+  defect: by the time a rule runs, the map holds one element.
 - **Make the stores arrays, so the defect is representable and reportable.**
   It turns every id lookup linear or adds an index that must be kept in
   step, for a state no correct model has. The builder (barwise-973) will
   hold arrays and refuse at `build()`, which is the same answer one layer
   later.
 - **The loader checks element ids itself, as `claim` does for constraints.**
-  It gives the right error type without a new class, but states the rule in
-  two places, the store and the loader, and the store's copy still covers
-  only code. One refusal in the store, converted at the loader, keeps one
-  owner.
+  It states the rule in two places, the store and the loader. One refusal
+  in the store, converted at the loader, keeps one owner.
 - **A model-wide `modelInvariants(model)` check run after every operation.**
-  Proposed in conversation before grounding. It cannot see what workstreams
-  2 and 3 fix, because a lost element leaves no trace in the output; the
-  merge defect is a relation between input and output, which a law states
-  and an invariant over the output cannot. And the representable rules
-  already have one home, the validation engine.
+  It cannot see a lost element, which leaves no trace in the output; that
+  is a relation between input and output, which a law states.
 
 ## Workstreams (each independently shippable)
 
 The order is forced: workstream 3 makes the store throw on a held id, and
-until workstream 2 lands, a merge that hits the rename case would then
-throw instead of finishing. Workstream 2 therefore lands first among the
-two.
+until workstream 2 lands, a merge that hits the rename case would then fail
+instead of finishing. The tracker records it: barwise-1l0 depends on
+barwise-ue5.
 
 ### 1. Validation reports what the store can hold (barwise-b2s)
 
 `structural/duplicate-constraint-id` over `everyConstraint`, an error naming
 the id and the fact types each constraint applies to, and
-`structural/duplicate-subtype-fact`, an error naming both ids and the pair.
-The 3.0 loader's `claim` stays: a 3.0 file is refused at load, a 2.0 file
-and a model built in code are reported.
+`structural/duplicate-subtype-fact`, an error naming both ids and the pair,
+both in `structuralWellFormedness`. The 3.0 loader's `claim` stays: a 3.0
+file is refused at load, a 2.0 file and a model built in code are reported.
 
-Acceptance: tests plant each duplicate in a 2.0 file, in a lenient load,
-and in code, and see one diagnostic each; both ids are registered in
-`ruleId.ts`. Independent of the other workstreams.
+Acceptance: tests plant each duplicate in a 2.0 file, in a lenient load with
+a dangling role beside it, and in code, and see one diagnostic each; both
+ids are registered in `ruleId.ts`. Independent of the other workstreams.
 
-### 2. Merge keeps both elements, and the laws draw renames (barwise-ue5)
+### 2. Diff pairs a shared id; merge refuses what is left (barwise-ue5)
 
-The side-aware resolvers, and derived ids on collision, as in Target
-architecture: new for object types, fact types, objectifications and an
-added fact type's roles and own constraints, and replacing the random ids
-the merge already mints for subtype facts and populations.
+Id-first pairing for object types and fact types with the name fallback,
+the `name` change, the one `matching` option (and `UNRELATED_IDS_DIFF`
+moved to it), `MergeConflictError`, the objectification fresh id, and the
+renamed-pair arbitrary: the incoming model is the existing one with some
+object types and fact types renamed under the same ids.
 
-A new arbitrary draws a pair in which the incoming model is the existing
-one with some object types and fact types renamed under the same ids (and,
-independently, some roles added), so diff reports a removal and an addition
-sharing an id.
+Whether a renamed fact type makes every constraint across it read as
+modified, because `roleKeys` names the other fact type, is checked here
+first (provisional: not yet grounded). If it does, the key names the other
+fact type by its pairing, not its spelling.
 
 Acceptance:
 
-- The probe from barwise-ue5, as a test: existing `x`/A, incoming `x`/B
-  with an added fact type whose role plays B, only the additions accepted.
-  The result holds A under `x`, B under the derived id, and the role plays
-  B; merging twice gives byte-identical YAML.
+- The probe from barwise-ue5, as a test: existing `x`/A, incoming `x`/B.
+  `diffModels` reports one modified object type with a `name` change,
+  rated breaking. Accepting it yields B under `x`; rejecting it yields A
+  under `x`; every role that played `x` plays the one element either way.
 - The same for a fact type renamed under a kept id with the same role and
-  constraint ids, its entity's preferred identifier on that uniqueness: no
-  two roles and no two constraints in the result share an id, and the
-  incoming entity's preferred identifier names the added fact type's
-  constraint.
-- A subtype fact and a population that collide: merging twice gives the
-  same ids, where today each merge mints a new one.
-- A law over renamed pairs and a drawn subset of deltas: every existing
-  element whose removal was not accepted is in the result, every accepted
-  addition is in the result, and every reference resolves to the element
-  the side it came from meant.
-- The law fails on main before the fix; main is the mutant.
+  constraint ids: one modified fact type, and the merged model holds one
+  fact type, one set of roles and one set of constraints whichever way the
+  rename is decided.
+- A swap (A and B exchange names under kept ids) with one rename accepted
+  and the other rejected: the merge refuses with `MergeConflictError`
+  naming both, and returns no partial model.
+- Two models whose ids are unrelated but coincide (positional `ot0`), under
+  `matching: "content"`: pairing by name, as today.
+- A law over renamed pairs and a drawn subset of deltas: the merge either
+  refuses with `MergeConflictError` or returns a model in which every
+  existing element whose removal was not accepted is present, every
+  accepted addition is present, and no element was replaced. It fails on
+  main first; main is the mutant.
 
 ### 3. The store refuses an id it already holds (barwise-1l0)
 
-`DuplicateIdError` and the check before each of the five stores, both
-readers converting it, and the `core/CLAUDE.md` rule stated above.
+`DuplicateIdError` and the check before each of the five stores, the
+exported guard predicates that merge's `addable*` pre-checks call instead of
+restating, both readers converting the error, and the `core/CLAUDE.md` rule
+stated above.
 
 Acceptance:
 
 - When each of the five `add*` methods receives an id its store holds, it
   shall throw `DuplicateIdError`, naming the id and both elements; one test
-  per kind, the population case naming its fact type.
+  per kind, each kind named as in Target architecture.
 - When a 2.0 file and a 3.0 file each state two object types with one id,
   `deserialize` shall throw `DeserializationError` naming the id, with and
   without `lenient`.
-- When the tracked corpus and the full monorepo suite run before and after,
-  everything that passed before shall pass after. An importer test that now
-  throws is an importer that was already losing an element: it is filed as
-  its own bug with the input that triggers it, not worked around here.
+- When the full monorepo suite and the tracked corpus run, they shall pass.
+  An importer whose test now throws was already losing an element: it is
+  fixed in its own PR, with the input that triggers it, and this workstream
+  lands after that PR. A duplicate id is never caught and dropped to get
+  green.
 
 ### 4. The builder's list names the id rules (provisional: not yet grounded)
 
@@ -277,63 +333,67 @@ only; it lands whenever barwise-973 is next grounded.
 
 ## API and migration impact
 
-- New export: `DuplicateIdError` from core's root.
+- New exports: `DuplicateIdError`, `MergeConflictError`, and the two guard
+  predicates, from core.
+- `DiffOptions.constraintMatching` becomes `matching` and covers object
+  types and fact types too. One caller outside core (`llm/src/diffOptions.ts`).
+- Diff output changes for a rename under a kept id: one `modified` delta
+  with a `name` change, where it was a `removed` and an `added`. The CLI,
+  MCP and VS Code diff and merge surfaces print deltas as they come, so each
+  shows the rename as one change; any test that pins the old pair changes
+  with it, in the same PR.
 - `OrmModel.add*` throws in a case it accepted. Any caller that relied on
-  replacement by id was already losing data; workstream 3's measurement
-  says whether one exists among the importers.
-- Two new validation rule ids, both errors. A 2.0 file with duplicate
-  constraint ids now shows a diagnostic in the editor.
-- Merge: the result can contain an id neither input used, derived from the
-  inputs, so a merge is still reproducible. The MCP and VS Code merge
-  write-back writes it like any other id.
+  replacement by id was already losing data; workstream 3 measures whether
+  one exists among the importers.
+- Two new validation rule ids, both errors.
 - No surface gains or loses a capability; the capability matrix is
   unchanged.
 
 ## Decisions (resolved by the owner, 2026-10-23)
 
-Each was decided as recommended: (a) in all three. The options are kept so
-a later workstream does not reopen them without the trade-off in view.
+The options are kept so a later workstream does not reopen them without the
+trade-off in view.
 
-1. **Merge on a collision: keep both, or refuse.** (a) Chosen: keep
-   both, the added element under a derived id. The user accepted an
-   addition and rejected a removal, and both choices are honoured. (b)
-   Refuse the merge, naming the collision. Far smaller (no resolver or map
-   changes, no arbitrary), but it blocks the common rename case (an id like
-   `ot-customer` kept while the name changes) until the user edits a file
-   by hand. Under (b), workstream 2 shrinks to the refusal and the law, and
-   still lands before workstream 3.
-2. **May two elements of different kinds share an id?** (a) Chosen:
-   leave it allowed and out of this spec. The stores hold it, and every
-   `OrmModel` lookup is per kind (`getObjectType`, `getFactType`, ...),
-   and NORMA ids are already a separate branded space
-   (`model-graph-and-id-spaces.spec.md`). (b) Make ids model-wide, as
-   constraint ids are, with a validation rule. Worth doing only when a
-   reader looks an id up without knowing its kind; none does today.
+1. **Merge on a collision.** First decided as (a) keep both, the added
+   element under a derived id; revised the same day, after review, to (c).
+   (a) puts one concept in the model twice and still cross-wired references
+   in four cases. (b) Refuse the merge on any id collision: small, but it
+   refuses the ordinary rename. (c) Chosen: a shared id is the same
+   element, so diff pairs object types and fact types by id first and a
+   rename is one modification; merge refuses only the name clash that is
+   left.
+2. **May two elements of different kinds share an id?** (a) Chosen: leave
+   it allowed and out of this spec. The stores hold it, every `OrmModel`
+   lookup is per kind (`getObjectType`, `getFactType`, ...), and NORMA ids
+   are already a separate branded space (`model-graph-and-id-spaces.spec.md`).
+   (b) Make ids model-wide, as constraint ids are, with a validation rule.
+   Worth doing only when a reader looks an id up without knowing its kind.
 3. **Where the rule in Principle is written down.** (a) Chosen:
    `core/CLAUDE.md`, beside the placement and preferred-identifier rules,
    since it governs how core stores elements. (b) The root `CLAUDE.md`,
-   under Design Principles, which would make it a project-wide rule; no
-   other package stores model elements.
+   which would make it a project-wide rule; no other package stores model
+   elements.
 
 ## Risks and testing
 
-- **An importer depends on replacement.** Fourteen importer files call
-  `add*`, some with computed ids. Workstream 3 runs the whole monorepo
-  suite before and after and reports any importer that starts throwing,
-  rather than adjusting it in the same PR.
-- **A merge that is not reproducible.** Minting the new id from the
-  installed generator makes one merge give two results, against the
-  determinism rule for core, and the merge already does this for subtype
-  facts and populations. Every collision id is derived instead, and
-  workstream 2's tests merge twice and compare bytes.
-- **A derived id that collides again.** The hash input includes the
-  incoming id and a label; a second collision means a model already holding
-  that hash, which the generator cannot produce. The merge refuses that
-  case rather than looping.
-- **A law that cannot fail.** Workstream 2's law is verified by running it
-  against main first. The existing generator could not have failed it,
-  which is why the renamed-pair arbitrary is part of the workstream rather
-  than an option.
+- **Accidental shared ids pair unrelated elements.** Two models built apart
+  can share positional ids (`ot0`, promptlab's deterministic ids). Every
+  comparison of independent LLM samples already passes the content mode
+  through `UNRELATED_IDS_DIFF`, which now covers object types and fact
+  types; `barwise diff` and MCP `diff_models` cannot yet ask for it, which
+  is barwise-uy7, raised in priority by this spec.
+- **Transcript imports keep pairing by name.** `barwise import transcript`
+  and the VS Code import diff the base model against an LLM draft with the
+  default mode. The draft's object types are built without an id
+  (`llm/src/parse/objectTypes.ts:50`), so each gets a fresh UUID that no
+  base element holds, and every one falls through to the name fallback.
+  `barwise history`, which diffs one file across commits, is the surface
+  that gains: a rename there becomes one change.
+- **An importer depends on replacement.** Workstream 3 runs the whole
+  monorepo suite and lands only after any importer it exposes is fixed.
+- **A law that cannot fail.** Workstream 2's law is run against main
+  first; the existing generator could not have failed it, which is why the
+  renamed-pair arbitrary is part of the workstream.
 
 ## Non-goals
 
