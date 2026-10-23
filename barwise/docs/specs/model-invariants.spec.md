@@ -1,6 +1,7 @@
 # Model invariants: what the store refuses, what validation reports, and what operations promise
 
-Status: Draft -- no workstream implemented
+Status: Draft -- no workstream implemented; open decisions 1 to 3 resolved
+by the owner 2026-10-23, each as recommended
 
 Created: 2026-10-23
 Last-updated: 2026-10-23
@@ -101,8 +102,8 @@ Out of scope:
 - Moving the referential rules into the builder. That is barwise-973;
   workstream 4 only amends its list.
 - Whether an object type and a fact type may share an id. Different kinds
-  live in different maps, so the store can hold it; whether it should is
-  Open decision 2.
+  live in different maps, so the store can hold it, and the owner decided it
+  stays allowed (decision 2).
 - Constraint id collisions in a merge. Diff pairs constraints by id first
   (orm-format-3 WS3a-iii), so two constraints sharing an id are one
   modified constraint, never a kept one and an added one.
@@ -276,9 +277,12 @@ only; it lands whenever barwise-973 is next grounded.
 - No surface gains or loses a capability; the capability matrix is
   unchanged.
 
-## Open decisions (for review)
+## Decisions (resolved by the owner, 2026-10-23)
 
-1. **Merge on a collision: keep both, or refuse.** (a) Recommended: keep
+Each was decided as recommended: (a) in all three. The options are kept so
+a later workstream does not reopen them without the trade-off in view.
+
+1. **Merge on a collision: keep both, or refuse.** (a) Chosen: keep
    both, the added element under a derived id. The user accepted an
    addition and rejected a removal, and both choices are honoured. (b)
    Refuse the merge, naming the collision. Far smaller (no resolver or map
@@ -286,14 +290,14 @@ only; it lands whenever barwise-973 is next grounded.
    `ot-customer` kept while the name changes) until the user edits a file
    by hand. Under (b), workstream 2 shrinks to the refusal and the law, and
    still lands before workstream 3.
-2. **May two elements of different kinds share an id?** (a) Recommended:
+2. **May two elements of different kinds share an id?** (a) Chosen:
    leave it allowed and out of this spec. The stores hold it, and every
    `OrmModel` lookup is per kind (`getObjectType`, `getFactType`, ...),
    and NORMA ids are already a separate branded space
    (`model-graph-and-id-spaces.spec.md`). (b) Make ids model-wide, as
    constraint ids are, with a validation rule. Worth doing only when a
    reader looks an id up without knowing its kind; none does today.
-3. **Where the rule in Principle is written down.** (a) Recommended:
+3. **Where the rule in Principle is written down.** (a) Chosen:
    `core/CLAUDE.md`, beside the placement and preferred-identifier rules,
    since it governs how core stores elements. (b) The root `CLAUDE.md`,
    under Design Principles, which would make it a project-wide rule; no
