@@ -242,9 +242,7 @@ Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
   entry such as a skill counts for the report and for plan review, and not
   for the audit, as today. `barwise/docs/specs/` is wiring because a
   workstream that updates Status or a pointer in other specs is
-  documenting decisions already made, not implementing one; the plan
-  review still fires for that workstream through the owned entries it
-  changes in the same PR.
+  documenting decisions already made, not implementing one.
 - **Only the header block is read.** The reader takes header fields from
   the lines between the title and the first `##` heading, never from the
   body, so an example inside a code block (like the one above) is never
@@ -287,7 +285,8 @@ Plan-reviewed: <commit> (code-review, pr-review)
   lands a workstream, so a head-side reading would exempt every compliant
   first-workstream PR.
 - **What it requires.** A `Plan-reviewed:` line naming a commit that is an
-  ancestor of the diff's first change to an owned entry, and at which the
+  ancestor of the diff's first change to a `Touches:` entry, and at which
+  the
   spec's body -- everything but the header block -- is identical to the
   body at that first change. A review of an earlier draft does not cover
   a plan rewritten afterwards; this PR is the example, where the owner's

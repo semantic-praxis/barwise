@@ -15,8 +15,7 @@ barwise/packages/promptlab/CLAUDE.md, barwise/packages/promptlab/evals/suite.yam
 +barwise/scripts/regen-architecture.mjs, +barwise/scripts/check-architecture.mjs,
 barwise/review-tiers.json, +.claude/skills/spec-writer/template.adr.md,
 .claude/skills/pr-review/checklist.md, barwise/scripts/tests/,
-barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md,
-barwise/docs/specs/
+barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md
 
 In one sentence: each architecture or process decision lives in one ADR
 named for its concern and edited in place; the PR that changes an ADR
@@ -146,7 +145,8 @@ headings stay in their specs and are not indexed. That answers the
 owner's objection to both earlier designs (index every resolved heading,
 or tag the important ones inside specs).
 
-**An ADR and its spec divide the work, as ADR 0002 and its spec do.**
+**An ADR and its spec divide the work, as `constraint-coverage-policy` and
+its spec do.**
 The spec holds the reasoning, alternatives and workstreams; the ADR holds
 the decision and its consequences and links the spec. When a spec
 settles an ADR-level question, the spec's resolved heading points to the
@@ -181,8 +181,9 @@ In scope:
 - `INTENDED` shall move to its own module, `scripts/lib/intended.cjs`,
   which `.dependency-cruiser.cjs`, `arch-triage.mjs` and
   `check-architecture.mjs` all require; no script keeps a copy.
-- When tracked text outside archived specs and dated records names an
-  ADR as ADR `<name>` or `docs/adr/<name>.md` and no such ADR exists, the
+- When an instruction file, a live spec, an ADR or package source names
+  an ADR as ADR `<name>` or `docs/adr/<name>.md`, and no such ADR exists
+  and none is planned as a `+` entry in the citing spec's `Touches:`, the
   check shall fail (exit 1) naming the file and line.
 - When a package's internal runtime `dependencies` include a package
   `INTENDED` does not allow it, the check shall fail (exit 1).
@@ -297,13 +298,17 @@ edge and sees red through `mutate.mjs`.
 - Both renames landed in this PR, at the owner's request: live documents
   were rewritten, and archived specs and dated records (such as
   `reference-rubric-audit-2026-08-27.md`) were left as they are.
-- Add the reference check to `check-architecture.mjs`: every ADR
-  `<name>` token and `docs/adr/<name>.md` path in tracked text resolves
-  to an existing ADR, excluding `docs/specs/archive/`, the dated records
-  (a date in the file name), and this spec's own historical mentions of
-  the old numbers. `orm-format-3.spec.md`'s "ADR 0003" is resolved by
-  barwise-l5z before this lands. Sandbox tests: a dead name, a dead path,
-  and an archived mention that is ignored, each seen red first.
+- Add the reference check to `check-architecture.mjs`. It reads a named
+  set, not "everything except": instruction files, specs outside
+  `docs/specs/archive/`, `docs/adr/`, and `barwise/packages/*/src/`. That
+  leaves out the tracker, eval runs and payloads, dated records and
+  archives, all of which are history. It resolves the two current forms,
+  ADR `<name>` and `docs/adr/<name>.md`, to an existing ADR or to a `+`
+  entry in the citing spec's `Touches:` (an ADR a Draft spec plans). A
+  number such as "ADR 0001" is not a form it reads, so historical
+  mentions need no exemption. Sandbox tests: a dead name, a dead path,
+  a planned `+` ADR that passes, and a tracker mention that is not read,
+  each seen red first where red applies.
 - Drop `Status:` from both ADRs and add `Scope:`; add the ADR shape
   check with a sandbox test seen red first.
 - Add `template.adr.md`, the `spec-writer` step, the `pr-review`
@@ -397,7 +402,10 @@ link. Keep inline what an agent needs before it knows which ADR to open
    by the owner:** `check:architecture` resolves them (WS2).
 6. **Shared files in `Touches:`.** **Resolved** by
    `plan-scope-check.spec.md` Open decision 5: plan review covers only
-   PRs that name the spec, so listing a shared file trips no other PR.
+   PRs that name the spec, so listing a shared file puts no other PR
+   through this spec's plan review. `audit:specs` can still ask for a
+   baseline row when unrelated work edits a listed code file, as it does
+   today for any Draft spec's named files.
 7. **Moving `INTENDED` out of the dependency rules file.** **Resolved
    2026-10-23 by the owner:** the decision names the map, which moves to
    `scripts/lib/intended.cjs` because the rules file cannot export it

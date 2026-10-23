@@ -4,6 +4,8 @@
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams\nopen -- design only, no implementation in this PR)",
       "commits": [
+        "4a38f022",
+        "eb7522cf",
         "545fc8d1",
         "788b02d5",
         "6657985f",
@@ -20,18 +22,6 @@
       ],
       "note": "Genuinely unimplemented, and the header is right. Both workstreams are property-based testing (an extraction-response arbitrary, then parser totality over generated responses) and nothing of the sort exists: fast-check is not a dependency of any package, and the only 'arbitrary' in llm or promptlab is a comment in an unrelated test. The four commits below are unrelated work on files it names -- a dependabot bump, suite 2.5.0, the assertNever sweep, and the npm-audit gate. Remove this row when workstream 1 ships and the Status says so. Caught only after the gate's pattern was fixed to see the claim mid-line; it had escaped on position alone (barwise-912 class-C pass)."
     },
-    "eval-difficulty-calibration.spec.md": {
-      "status": "Draft for review (design only -- no transcript authored in this\nPR)",
-      "commits": [
-        "398eb4b9",
-        "29df7f65",
-        "e6e56ab0",
-        "4e9a1b05",
-        "a11271bd",
-        "39092b19"
-      ],
-      "note": "Genuinely still a draft, and the header is right: this spec's deliverable is authored transcripts for the eval suite, and none exists (promptlab's cases are unchanged since it was written). The commit below is barwise-935 refactoring CounterexampleGenerator.ts, which this spec only CITES as a place ring constraints surface; it authors nothing this spec plans. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when the first transcript lands and the Status says so."
-    },
     "functional-design-quality.spec.md": {
       "status": "Draft -- the five open decisions resolved in review 2026-09-09\n(see Decisions); no workstream implemented",
       "commits": [
@@ -42,6 +32,10 @@
     "implicit-sensemaking.spec.md": {
       "status": "draft",
       "commits": [
+        "2275dcf4",
+        "609ab336",
+        "8ba42920",
+        "ed1e0f33",
         "6657985f",
         "42b11436",
         "af4076f8",
@@ -55,6 +49,9 @@
     "model-issues-tab.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
+        "2ee84147",
+        "43dfe061",
+        "5ea121ef",
         "592dac69"
       ],
       "note": "Genuinely unimplemented, and the header is right: no part of the Issues tab exists yet. The commit is dbt-key-type-fidelity WS3 (barwise-1057), which changed ExportAnnotationCollector -- one of the finding sources this spec names -- so that a data-type TODO fires only on a real fallback and a description TODO only on a missing definition. The tab will read those findings; it has not been built. Remove this row when a workstream ships and the Status says so."
@@ -62,6 +59,15 @@
     "mutation-ratchet.spec.md": {
       "status": "Draft -- no workstream implemented. All five open decisions\nresolved 2026-09-10; the workstreams below reflect them.",
       "commits": [
+        "4a38f022",
+        "13ed02fb",
+        "77935e65",
+        "bd883874",
+        "755fb56d",
+        "93e88611",
+        "76f1fc73",
+        "206b0c84",
+        "b9c960a2",
         "39394af3",
         "87eac42e",
         "e735c9e4",
