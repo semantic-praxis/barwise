@@ -6,11 +6,11 @@ Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, CLAUDE.md, barwise/.dependency-cruiser.cjs,
-barwise/scripts/audit-spec-status.mjs, barwise/scripts/lib/spec-reader.mjs,
-barwise/scripts/regen-architecture.mjs, barwise/scripts/check-architecture.mjs,
-barwise/scripts/tests/, barwise/package.json, package.json,
-.github/workflows/ci.yml, .claude/skills/spec-writer/template.spec.md,
-.claude/skills/steward/SKILL.md
++barwise/scripts/lib/spec-decisions.mjs, +barwise/scripts/regen-architecture.mjs,
++barwise/scripts/check-architecture.mjs, barwise/scripts/tests/,
+barwise/package.json, package.json, .github/workflows/ci.yml,
+barwise/docs/specs/, .claude/skills/spec-writer/SKILL.md,
+.claude/skills/spec-writer/template.spec.md, .claude/skills/steward/SKILL.md
 
 In one sentence: specs mark the decisions that set architecture or
 process with a one-line `Decision:` marker, a script renders those
@@ -78,7 +78,11 @@ Verified 2026-10-23 against `origin/main` at `1a32f9c7`.
 4. **The package graph has three copies and one checked direction.** The
    root `CLAUDE.md` "Dependency Graph" block, the `INTENDED` map in
    `barwise/.dependency-cruiser.cjs`, and the twelve `package.json`
-   dependency lists agree today. Only `INTENDED` against real imports is
+   dependency lists. The first two agree; the `package.json` lists agree
+   in their runtime `dependencies` but not their `devDependencies`:
+   `@barwise/llm` lists `@barwise/diagram` as a dev dependency for
+   `tests/Pipeline.integration.test.ts`, while `INTENDED` gives `llm`
+   only `core`. Only `INTENDED` against real imports is
    checked (`npm run depcruise`, guarded by `check:depcruise-gate`).
    `INTENDED`'s own comment reads "Source of truth is the root CLAUDE.md
    dependency graph", which is the reverse of what CI enforces.
@@ -138,8 +142,11 @@ such as tiered-pr-review's `## The decision of 2026-09-23: review
 everything non-trivial, block nothing` -- and requiring one spelling
 would leave that last one, a process decision Open decision 3 wants
 indexed, unindexable. What the check refuses is a marker on something
-still open: under a heading containing `(open`, or inside an `Open
-decisions` section. A bulleted open decision is not indexable; to index one, promote it to a heading. Marking is
+still open: under a heading containing `(open`, or a `###` heading
+inside a `## Open decisions` section whose heading does not say it is
+resolved (16 such sections already read `Decisions (resolved ...)` or
+`Open decisions (resolved ...)`, and a marked `###` under them is
+indexable). A bulleted open decision is not indexable; to index one, promote it to a heading. Marking is
 explicit because the sample in anchor 2 shows that most resolved
 headings record a local choice, and an index of all 141 would bury the
 ones that matter.
@@ -156,8 +163,9 @@ In scope:
 - When a `Superseded-by:` target does not exist, or names a heading that
   is not itself a decision, `npm run check:architecture` shall fail
   (exit 1) naming the spec and line.
-- When a `Decision:` line sits under a heading containing `(open` or
-  inside an `Open decisions` section, or carries a value outside the
+- When a `Decision:` line sits under a heading containing `(open`, or
+  under a `###` heading inside a `## Open decisions` section whose heading
+  does not say it is resolved, or carries a value outside the
   closed set, the check shall fail (exit 1).
 - When the generated section differs from what the generator produces,
   the check shall fail (exit 1) and name `npm run regen:architecture`.
@@ -177,18 +185,18 @@ outside specs.
 
 ## Inventory
 
-| Path                                               | Current state                                     | Change                                                                                                                                     |
-| -------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `barwise/docs/ARCHITECTURE.md`                     | Historical record; 8.1 cites a nonexistent file   | Gains a generated first section; header sentence; 8.1 fixed                                                                                |
-| `CLAUDE.md` (root)                                 | Holds the graph; calls ARCHITECTURE.md historical | Graph drift-checked; pointer names the generated section                                                                                   |
-| `barwise/.dependency-cruiser.cjs`                  | `INTENDED` says CLAUDE.md is its source of truth  | Comment corrected: `INTENDED` is the authority                                                                                             |
-| `barwise/scripts/audit-spec-status.mjs`            | Owns reading a spec header                        | Its reader moves to a shared lib (provisional)                                                                                             |
-| `barwise/scripts/lib/spec-reader.mjs`              | Does not exist                                    | Shared with plan-scope-check WS2; adds the heading and marker readers                                                                      |
-| `barwise/scripts/regen-architecture.mjs`           | Does not exist                                    | New: renders the generated section                                                                                                         |
-| `barwise/scripts/check-architecture.mjs`           | Does not exist                                    | New: the drift and marker checks above                                                                                                     |
-| `.claude/skills/spec-writer/template.spec.md`      | No decision marker                                | Documents `Decision:` and `Superseded-by:`                                                                                                 |
-| `ci.yml`                                           | No such step                                      | Runs `check:architecture`                                                                                                                  |
-| `barwise/package.json` and the root `package.json` | No such scripts                                   | `check:architecture` and `regen:architecture`, with root forwarders regenerated by `regen-root-package.mjs` so `check:root-scripts` passes |
+| Path                                               | Current state                                                                               | Change                                                                                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `barwise/docs/ARCHITECTURE.md`                     | Historical record; 8.1 cites a nonexistent file                                             | Gains a generated first section; header sentence; 8.1 fixed                                                                                |
+| `CLAUDE.md` (root)                                 | Holds the graph; calls ARCHITECTURE.md historical                                           | Graph drift-checked; pointer names the generated section                                                                                   |
+| `barwise/.dependency-cruiser.cjs`                  | `INTENDED` says CLAUDE.md is its source of truth                                            | Comment corrected: `INTENDED` is the authority                                                                                             |
+| `barwise/scripts/lib/spec-reader.mjs`              | Does not exist; `plan-scope-check.spec.md` WS2 creates it from `audit-spec-status`'s reader | Imported, not edited                                                                                                                       |
+| `barwise/scripts/lib/spec-decisions.mjs`           | Does not exist                                                                              | New: heading and decision-marker readers over `spec-reader`                                                                                |
+| `barwise/scripts/regen-architecture.mjs`           | Does not exist                                                                              | New: renders the generated section                                                                                                         |
+| `barwise/scripts/check-architecture.mjs`           | Does not exist                                                                              | New: the drift and marker checks above                                                                                                     |
+| `.claude/skills/spec-writer/template.spec.md`      | No decision marker                                                                          | Documents `Decision:` and `Superseded-by:`                                                                                                 |
+| `ci.yml`                                           | No such step                                                                                | Runs `check:architecture`                                                                                                                  |
+| `barwise/package.json` and the root `package.json` | No such scripts                                                                             | `check:architecture` and `regen:architecture`, with root forwarders regenerated by `regen-root-package.mjs` so `check:root-scripts` passes |
 
 `check-instruction-refs.mjs` is untouched: ARCHITECTURE.md is not an
 instruction file, and the links the generator writes are checked by
@@ -198,7 +206,7 @@ instruction file, and the links the generator writes are checked by
 
 ```
 specs/*.spec.md ──(Decision:, Superseded-by:)──┐
-                                               ├─ lib/spec-reader.mjs ─── regen-architecture.mjs ──> ARCHITECTURE.md
+                                               ├─ lib/spec-decisions.mjs ─ regen-architecture.mjs ──> ARCHITECTURE.md
 .dependency-cruiser.cjs (INTENDED) ────────────┘                              (generated first section)
         │
         └── check-architecture.mjs ── compares ──> root CLAUDE.md graph block (edges only;
@@ -209,6 +217,24 @@ The `CLAUDE.md` graph is checked, not generated, because its
 annotations ("connector package: registers ...") are prose worth
 keeping, and `CLAUDE.md` is loaded into every session, so a generator
 writing into it is a larger change than a drift test.
+
+## Which copy of the package graph is the authority? (resolved: `INTENDED`, the owner's decision of 2026-10-23)
+
+Decision: architecture
+
+`INTENDED` in `barwise/.dependency-cruiser.cjs` is the package graph;
+the root `CLAUDE.md` block renders it and is checked against it (WS1).
+It states a policy ("may import") and is the one copy CI enforces through
+`npm run depcruise`. `package.json` lists what is installed, and its
+runtime `dependencies` must stay within `INTENDED`; `devDependencies` may
+legitimately reach further for tests, as `@barwise/llm`'s dev dependency
+on `@barwise/diagram` does (anchor 4). A check that runtime dependencies
+stay within `INTENDED` is a separate, smaller question this spec does not
+take on.
+
+This is the first heading to carry a `Decision:` marker, and it is a
+heading rather than an Open-decisions bullet because bullets are not
+indexable.
 
 ## Alternatives considered
 
@@ -238,16 +264,18 @@ either side cannot be parsed), fix `INTENDED`'s inverted comment, wire
 it into `ci.yml` (which `ci:local` reads), and add a gates test that plants an
 extra edge and sees red. No spec changes and no ARCHITECTURE.md change.
 
-### 2. Decision markers and one spec-header reader (provisional: not yet grounded)
+### 2. Decision markers (provisional: not yet grounded)
 
-Move `audit-spec-status.mjs`'s header reading into
-`scripts/lib/spec-reader.mjs` and add the heading and marker reader.
+Depends on `plan-scope-check.spec.md` WS2, which owns moving
+`audit-spec-status.mjs`'s header reading into `scripts/lib/spec-reader.mjs`.
+This workstream adds `scripts/lib/spec-decisions.mjs`, which imports that
+reader and adds the heading and marker readers.
 Extend `check-architecture.mjs` with the marker rules in Scope. Document
 the two lines in `template.spec.md` and the `spec-writer` skill. Mark
 the first decisions: the candidates are the 124 `(resolved: ...)`
 headings, listed by a `--candidates` flag; which to mark is Open
-decision 4. Whether `audit-spec-status.mjs`'s reader extracts cleanly
-is the ungrounded part.
+decision 4. What is ungrounded is the marker reader's handling of the four
+ways headings say "resolved" today.
 
 ### 3. The generated section in ARCHITECTURE.md (provisional: not yet grounded)
 
@@ -297,12 +325,8 @@ The same three parts carry over to a data-engineering team.
    in workstream 2's PR, rather than an agent guessing which decisions
    matter. The alternative is marking only new decisions, which leaves
    the index nearly empty for months.
-5. **Which copy of the package graph is the authority.** **Resolved
-   2026-10-23 by the owner: `INTENDED` in the dependency rules file**
-   (`barwise/.dependency-cruiser.cjs`), as recommended: it is a policy ("may import"), and the one CI enforces.
-   `package.json` states what is installed, which can legitimately be
-   narrower, and a check that internal `package.json` dependencies stay
-   within `INTENDED` is a separate, smaller question.
+5. **Which copy of the package graph is the authority.** Resolved by the
+   owner; see "Which copy of the package graph is the authority?" above.
 
 ## Risks and testing
 

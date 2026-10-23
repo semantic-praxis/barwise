@@ -136,13 +136,14 @@ checklist.md "## " headings --- names -->    rows[]          (exists)
                                      pr-review / pr-creation start here
 ```
 
-A failure-mode row has a title (matched against REVIEW.md), a trigger,
-and a reason:
+A failure-mode row has the same shape as a checklist row -- `heading`,
+`tier`, `globs`, `why` -- with `heading` holding the REVIEW.md title, so
+one row validator serves both arrays:
 
 ```json
 {
-  "title": "Input dropped at a boundary",
-  "trigger": "paths",
+  "heading": "Input dropped at a boundary",
+  "tier": "high-risk",
   "globs": [
     "barwise/packages/formats/src/",
     "barwise/packages/dbt/src/",
@@ -152,16 +153,22 @@ and a reason:
 }
 ```
 
-`trigger` is `paths`, `always` (failure mode 8, PR description claims),
-or `not-path-derivable` (failure mode 5, restated facts, which can live
-in any file). Globs use the table's existing four-shape pattern language,
-validated by `patternFault`; no new matcher.
+`tier` takes the table's existing values: `always` with `globs: ["**"]`
+(failure mode 8, PR description claims), `not-path-derivable` with no
+globs (failure mode 5, restated facts, which can live in any file), and
+`high-risk` or `routine` for a path-routed mode, by the same test the
+checklist rows use. WS2 extracts the per-row validation inside `tierRows`
+into one function that both the `rows` and `failureModes` arrays call,
+so there is no second validator and no new matcher; globs use the
+existing four-shape pattern language through `patternFault`.
 
 The REVIEW.md parser reads the numbered items under the first `##`
 heading that starts with `Always check`, so the heading's date range
 (`## Always check: the failure modes of 2026-09-23 to 2026-10-23` on
 #712's branch) can change without breaking it. It takes each item's bold
-lead (`1. **Input dropped at a boundary.**`) as its title. It throws on a
+lead (`1. **Input dropped at a boundary.**`) as its title, with the
+trailing period REVIEW.md writes stripped, so the row reads
+`Input dropped at a boundary`. It throws on a
 missing heading or zero items,
 as `checklistHeadings` does, so the gate refuses rather than reporting
 eight stale rows from a file it never opened.
@@ -185,7 +192,8 @@ eight stale rows from a file it never opened.
   paths cannot see (types chosen, interfaces widened, copies added),
   which is where most review judgment lives. It is non-deterministic,
   needs a key in CI, and its misses look like clean runs. It stays a
-  candidate for a later spec once barwise-nm8 gives a way to score it.
+  candidate for a later spec once there is a way to score it (barwise-nm8,
+  filed with #712, proposes an eval set of the month's real defects).
 
 ## Workstreams (each independently shippable)
 

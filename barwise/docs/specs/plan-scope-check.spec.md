@@ -5,13 +5,13 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-2jy
-Touches: plan.md, .gitattributes, barwise/scripts/audit-spec-status.mjs,
-barwise/scripts/lib/spec-reader.mjs, barwise/scripts/plan-scope.mjs,
-barwise/scripts/check-spec-touches.mjs, barwise/scripts/check-plan-review.mjs,
-barwise/scripts/tests/, barwise/package.json, package.json,
-.github/workflows/ci.yml, .claude/skills/pr-creation/SKILL.md,
-.claude/skills/pr-review/SKILL.md, .claude/skills/spec-writer/SKILL.md,
-.claude/skills/spec-writer/template.spec.md
+Touches: -plan.md, .gitattributes, barwise/review-tiers.json, REVIEW.md,
+barwise/scripts/audit-spec-status.mjs, +barwise/scripts/lib/spec-reader.mjs,
++barwise/scripts/plan-scope.mjs, +barwise/scripts/check-spec-touches.mjs,
++barwise/scripts/check-plan-review.mjs, barwise/scripts/tests/,
+barwise/package.json, package.json, .github/workflows/ci.yml,
+.claude/skills/pr-creation/SKILL.md, .claude/skills/pr-review/SKILL.md,
+.claude/skills/spec-writer/SKILL.md, .claude/skills/spec-writer/template.spec.md
 
 In one sentence: a report-only script reads the spec a pull request names,
 lists every changed file the spec did not name, and states the PR's size
@@ -125,9 +125,10 @@ fact, which would defeat the comparison.
 | `ci.yml`                                      | Runs neither check                                                                                                                                                             | Runs both, each with its root `package.json` forwarder                                           |
 | `plan.md` (repo root)                         | A Phase 6 implementation plan; the work it describes is complete                                                                                                               | Deleted (OD 3)                                                                                   |
 
-Looks affected and is not: the spec template. Its Inventory already
-carries the plan; this spec reads what is there rather than adding a
-second list.
+The spec template gains two header fields, `Touches:` and `Plan-reviewed:`,
+by the owner's decisions below. The Inventory stays as the reader's
+explanation of each planned change; `Touches:` is its machine-checked
+summary, and specs without one fall back to the Inventory's paths.
 
 ## Where the plan's file list lives (resolved: a `Touches:` header, with the spec's text as the fallback)
 
@@ -207,25 +208,50 @@ The three specs in PR #714 had to name such files bare to stay clear of
 the audit, which is a writing convention, not a mechanism.
 
 So a spec declares its plan in its header, beside `Status:` and
-`Tracking:`, which `audit-spec-status` already parses with `header()`:
+`Tracking:`:
 
-```
-Touches: barwise/scripts/plan-scope.mjs, barwise/scripts/lib/spec-reader.mjs,
-  barwise/scripts/audit-spec-status.mjs, barwise/package.json, package.json
+```text
+Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
+  -plan.md, .github/workflows/ci.yml
 ```
 
-- Comma-separated repo-rooted paths, a trailing `/` for a directory and
-  the review-tiers pattern shapes for globs; it may wrap, as `Tracking:`
-  does.
-- A path that does not exist yet is allowed; the check resolves it against
-  the branch's tree, as for planned new files above.
-- `audit:specs` and this report read `Touches:` when it is present and
-  fall back to `namedPaths` when it is not, so no existing spec changes.
-- `check:spec-touches` (WS2) fails, exit 1, on a `Touches:` entry that is
-  neither a tracked path, a path the branch adds, nor a pattern matching a
-  tracked path, so the declaration cannot rot the way a `review-tiers.json`
-  glob did (barwise-fs0).
-- The spec template documents the field; `spec-writer` asks for it.
+- **Entries.** Comma-separated repo-rooted paths, a trailing `/` for a
+  directory, and the review-tiers pattern shapes for globs. The field may
+  wrap, as `Tracking:` does.
+- **Planned changes are marked.** `+path` is a file the plan creates and
+  `-path` one it deletes. An unmarked entry must be tracked (or, for a
+  pattern, match a tracked path); a `+` entry may be absent and a `-`
+  entry may already be gone. Without the marks, `check:spec-touches` would
+  fail on `main` for every Draft spec that plans a new file, because on
+  `main` there is no branch to add it.
+- **Shared wiring files are planned but not owned.** Nearly every
+  workstream adds a step to `ci.yml`, a script to the two `package.json`
+  files, a test to `scripts/tests/`, or a line to the root `CLAUDE.md`.
+  Listing them is right for the scope report, but if `audit:specs` and
+  `check:plan-review` treated them as a spec's subject, every PR touching
+  `ci.yml` would trip both gates for every Draft spec that lists it. So
+  `lib/spec-reader.mjs` keeps one `WIRING` list (`.github/workflows/`,
+  `package.json`, `barwise/package.json`, `CLAUDE.md`,
+  `barwise/scripts/tests/`, `barwise/docs/specs/`, `.beads/`), and both
+  gates ignore `Touches:` entries under it. `audit-spec-status` already
+  makes the same move for barrels (`HUB`); this is the declared form of
+  it. `audit:specs` also keeps its code-extension filter, so a Markdown
+  entry such as a skill counts for the report and for plan review, and not
+  for the audit, as today.
+- **Only the header block is read.** The reader takes header fields from
+  the lines between the title and the first `##` heading, never from the
+  body, so an example inside a code block (like the one above) is never
+  read as the spec's own field. `audit-spec-status`'s `header()` matches
+  the first such line anywhere in the file, which is safe today only
+  because no spec quotes a header field at column 0; WS2 narrows it.
+- **Fallback.** `audit:specs` and this report read `Touches:` when it is
+  present and fall back to `namedPaths` when it is not, so no existing
+  spec changes.
+- **Kept live.** `check:spec-touches` (WS2) fails, exit 1, on an unmarked
+  entry that matches nothing tracked, so the declaration cannot rot the
+  way a `review-tiers.json` glob did (barwise-fs0); exit 2 when it cannot
+  list tracked files.
+- The spec template documents the field and `spec-writer` asks for it.
 
 ## Is a plan reviewed before its code? (resolved: yes, with `/code-review` and `/pr-review`)
 
@@ -235,26 +261,40 @@ committed. It replaces Open decision 1's options. Measured: 90 of 120
 spec-adding PRs since 2026-07-01 shipped code in the same PR, so today the
 spec is reviewed, if at all, beside the code it was meant to shape.
 
-The review is recorded where a script can find it, in the spec's header:
+The review is recorded in the spec's header block:
 
-```
-Plan-reviewed: 7395e5e0 (code-review, pr-review)
+```text
+Plan-reviewed: <commit> (code-review, pr-review)
 ```
 
-The commit named is the head both reviews ran on, and it must contain the
-spec. A spec may still land in the same PR as its first workstream; what
-the rule fixes is the order. `check:plan-review` (WS6) applies it: when a
-diff changes a path in a spec's `Touches:` while that spec's Status
-claims nothing is built, and the spec carries no `Plan-reviewed:` line
-naming a commit that is an ancestor of the first such change, it fails,
-exit 1, naming the spec.
+`check:plan-review` (WS6) applies the rule to a diff:
+
+- **Which specs it covers.** A spec is covered when the diff changes one
+  of its owned `Touches:` entries (wiring excluded, as above) and either
+  the spec is new in the diff or its Status at the merge base claims
+  nothing is built. Reading Status at the base, not the head, matters:
+  `template.spec.md` tells authors to update Status in the commit that
+  lands a workstream, so a head-side reading would exempt every compliant
+  first-workstream PR.
+- **What it requires.** A `Plan-reviewed:` line naming a commit that is an
+  ancestor of the diff's first change to an owned entry, and at which the
+  spec's body -- everything but the header block -- is identical to the
+  body at that first change. A review of an earlier draft does not cover
+  a plan rewritten afterwards; this PR is the example, where the owner's
+  decisions were written after the first `/code-review` round, so only a
+  review of the head that carries them counts.
+- **Its answers.** Exit 1 naming the spec when the line is missing, names
+  a non-ancestor, or names a commit whose body differs. Exit 2 when it
+  cannot read git, when a spec cannot be read, or when the clone is
+  shallow, since ancestry in a truncated history is not an answer
+  (`audit-spec-status` refuses a shallow clone through
+  `requireFullHistory` for the same reason).
 
 Unlike size and scope, this is a gate. Size is a shadow of review cost;
 whether the plan was reviewed is the property itself, and the owner made
 it a rule. What the line cannot prove is that the reviews ran well, any
-more than `steward` 4b's merge comment does. It records the claim on a
-named commit so the claim can be checked against that commit, and a
-review that never ran leaves no session output to point at.
+more than `steward` 4b's merge comment does. It ties the claim to a named
+commit and a body that can be compared, so a later reader can check it.
 
 ## Target architecture
 
@@ -270,7 +310,8 @@ barwise/scripts/plan-scope.mjs          npm run plan-scope [-- --base <ref>]
              commits as this branch's changes) minus files git check-attr
              marks generated
   specs    = specs in the diff + spec names in `git log base..HEAD` messages
-  planned  = union of namedPaths(spec, all four options on) at HEAD
+  planned  = union over specs of touches(spec) when it has a Touches:
+             header, else namedPaths(spec, all four options on), at HEAD
   outside  = changed files under no planned path
   size     = numstat over `changed`; rank among the last 100 first-parent
              merges on base, measured the same way
@@ -287,11 +328,12 @@ Report (plain text):
 
 ## Alternatives considered
 
-- **A declared file list in the PR body or a new spec header field.**
-  Exact and cheap to parse. Lost because it is a third list beside the
-  Inventory and the reading guide, written by the same author at the same
-  moment. It would match the diff by construction, since the author writes
-  it after the code exists, so it would measure nothing.
+- **A declared file list in the PR body.** Exact and cheap to parse. Lost
+  because the author writes it after the code exists, so it matches the
+  diff by construction and measures nothing. The first draft of this spec
+  rejected a spec header field on the same ground; the owner chose one
+  (`Touches:`), and the objection is answered by the plan-review rule,
+  which fixes the header before any implementation is committed.
 - **A size gate.** Fail above a fixed line count, as many teams do. Lost on
   the evidence above: the median PR is 160 lines and the 90th percentile
   1,010. A threshold low enough to matter fails legitimate test-heavy PRs
@@ -359,8 +401,8 @@ would hide its hand-written body from diffs and from this report.
 The same test makes `.gitattributes` the one owner of the generated list:
 it asserts that the "When generated output changed" row's globs in
 `review-tiers.json` match the marked paths. Today that row has already
-drifted: it names `llm/src/prompts/builtins.generated.ts`, and the file is
-`builtins.generated.ts`, so the glob has matched
+drifted: it names a `prompts/` directory in `@barwise/llm`, and the file
+lives under `prompt/artifacts/` there, so the glob has matched
 nothing since it was written on 2026-09-18 and no check said so
 (barwise-fs0). WS3 can land first with an empty
 exclusion list, and then reports inflated sizes until this lands.
@@ -482,5 +524,6 @@ Snapshot of 2026-10-23 on `1a32f9c7` (origin/main).
 ## Non-goals
 
 - No change to `pr-creation`'s split rule or to who decides a split.
-- No gate on size, scope, or the presence of a spec.
-- No change to the spec template.
+- No gate on size, scope, or the presence of a spec. The two gates this
+  spec adds check the `Touches:` declaration and the plan-review order,
+  not size or scope.
