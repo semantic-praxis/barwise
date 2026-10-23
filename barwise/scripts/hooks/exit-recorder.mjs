@@ -21,6 +21,14 @@ import { basename, join } from "node:path";
 const base = process.env.BARWISE_EXIT_DIR;
 const session = process.env.CLAUDE_CODE_SESSION_ID;
 delete process.env.BARWISE_EXIT_DIR;
+// No descendant can record, so none needs to load this either: drop our
+// own token and keep every other option byte for byte. That saves a
+// module load in every test fork and turbo task, and keeps the preload
+// out of tools that reject it (vscode-test's Electron).
+if (process.env.NODE_OPTIONS) {
+  process.env.NODE_OPTIONS = process.env.NODE_OPTIONS.split(" ")
+    .filter((t) => !t.startsWith("--import=data:text/javascript;base64,")).join(" ").trim();
+}
 
 /**
  * A word safe to keep. argv is where a credential typed on a command line

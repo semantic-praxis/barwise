@@ -25,14 +25,14 @@
  * so with exit 2 too: exit 1 reaches only a verbose transcript, where
  * "could not answer" would read as "nothing failed".
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   acceptsImport,
+  envFileChange,
   envLines,
   exitBase,
-  mergeEnvFile,
   namesNode,
   NOT_ARMED_AFTER,
   readState,
@@ -42,11 +42,16 @@ import {
 } from "../lib/exit-log.mjs";
 
 const mode = process.argv[2];
+// Read only by the modes that use it. session never reads stdin:
+// session-start.sh records that a SessionStart pipe left open hangs an
+// unbounded read, and this mode has no use for its input.
 let input;
-try {
-  input = JSON.parse(readFileSync(0, "utf8"));
-} catch {
-  // Judged per mode below.
+function readInput() {
+  try {
+    input = JSON.parse(readFileSync(0, "utf8"));
+  } catch {
+    input = undefined;
+  }
 }
 
 function session() {
@@ -67,10 +72,17 @@ function session() {
   } catch {
     // A new file.
   }
-  writeFileSync(file, mergeEnvFile(existing, envLines(base, source)));
+  const change = envFileChange(existing, envLines(base, source));
+  if (change?.append) appendFileSync(file, change.append);
+  else if (change?.replace) writeFileSync(file, change.replace);
 }
 
 function read(kind) {
+  readInput();
+  // A Stop that already held the turn open does not read again: a
+  // background loop that keeps failing would otherwise hold it forever.
+  // What it would have read stays unread for the next call.
+  if (kind === "stop" && input?.stop_hook_active) process.exit(0);
   const sid = input?.session_id;
   if (typeof sid !== "string" || sid === "") throw new Error("no session_id in the hook input");
   const base = exitBase();

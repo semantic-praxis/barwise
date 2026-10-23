@@ -80,7 +80,12 @@ export function readUnread(base, session, position) {
     if (line === "") continue;
     try {
       const e = JSON.parse(line);
-      if (typeof e.code !== "number" || typeof e.t !== "number") throw new Error("shape");
+      // The whole shape, not just the code: an entry report() cannot
+      // print would throw there, before the read position is saved, and
+      // wedge every later read on the same line.
+      const ok = Number.isInteger(e?.code) && Number.isFinite(e?.t)
+        && !Number.isNaN(new Date(e.t).getTime()) && typeof e?.label === "string";
+      if (!ok) throw new Error("shape");
       entries.push(e);
     } catch {
       unreadable += 1;
@@ -99,6 +104,16 @@ export function namesNode(command) {
     command ?? "",
   );
 }
+
+/**
+ * The first line of each report, exported so the CLAUDE.md sentence that
+ * quotes the post one is held to it by a drift test.
+ */
+export const HEADINGS = {
+  post: "These processes exited non-zero, and the command still reported 0:",
+  stop: "Before this turn ends: processes exited non-zero and no command's status showed it:",
+  failure: (status) => `Non-zero exits read with this call (its status: ${status ?? "unknown"}):`,
+};
 
 /** The calls with node in command position before the silence counts as not armed. */
 export const NOT_ARMED_AFTER = 3;
@@ -120,13 +135,7 @@ export function report(kind, entries, unreadable, status) {
   const width = Math.max(0, ...failed.map((e) => e.label.length));
   const lines = [];
   if (failed.length > 0) {
-    lines.push(
-      kind === "failure"
-        ? `Non-zero exits read with this call (its status: ${status ?? "unknown"}):`
-        : kind === "stop"
-        ? "Before this turn ends: processes exited non-zero and no command's status showed it:"
-        : "These processes exited non-zero, and the command still reported 0:",
-    );
+    lines.push(kind === "failure" ? HEADINGS.failure(status) : HEADINGS[kind]);
     for (const e of failed) {
       lines.push(`  ${e.label.padEnd(width)}   exit ${e.code}   ${clock(e.t)}`);
     }
@@ -171,11 +180,23 @@ const KINDS = [
 ];
 
 /**
- * The env file with each line of ours replacing any earlier line of its
- * kind, so a resume across a recorder change leaves one recorder, not
- * two, and a repeated start writes nothing new (barwise-1035's rule).
+ * What the env file needs: null when it already holds exactly our lines;
+ * `{ append }` when it holds no line of our kinds, so the common path is
+ * an append that cannot race another hook's append (session-start.sh's
+ * `persist_env` writes with `>>`); `{ replace }` only when an older line
+ * of ours is there (a resume across a recorder change), so one recorder
+ * is left, not two. Every other line, blank ones included, is kept as it
+ * was: the file is shared, and only our two kinds of line are ours.
  */
-export function mergeEnvFile(existing, lines) {
-  const kept = existing.split("\n").filter((l) => l !== "" && !KINDS.some((k) => k.test(l)));
-  return `${[...kept, ...lines].join("\n")}\n`;
+export function envFileChange(existing, lines) {
+  const rows = existing === "" ? [] : existing.replace(/\n$/, "").split("\n");
+  const ours = rows.filter((l) => KINDS.some((k) => k.test(l)));
+  if (ours.length === lines.length && ours.every((l, i) => l === lines[i])) return null;
+  if (ours.length === 0) {
+    return {
+      append: `${existing !== "" && !existing.endsWith("\n") ? "\n" : ""}${lines.join("\n")}\n`,
+    };
+  }
+  const kept = rows.filter((l) => !KINDS.some((k) => k.test(l)));
+  return { replace: `${[...kept, ...lines].join("\n")}\n` };
 }

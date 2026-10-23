@@ -21,12 +21,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { acceptsImport, envLines, exitLogPath, mergeEnvFile } from "../lib/exit-log.mjs";
+import { acceptsImport, envFileChange, envLines, exitLogPath, HEADINGS } from "../lib/exit-log.mjs";
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "..");
 const HOOK = join(SCRIPTS, "hooks", "masked-exit.mjs");
 const RECORDER = join(SCRIPTS, "hooks", "exit-recorder.mjs");
-const SETTINGS = join(SCRIPTS, "..", "..", ".claude", "settings.json");
+const REPO = join(SCRIPTS, "..", "..");
+const SETTINGS = join(REPO, ".claude", "settings.json");
 const SID = "fixture-session";
 
 /** A fresh fixture: a temp dir standing in for TMPDIR, and the paths in it. */
@@ -117,6 +118,15 @@ test("the failure mode lists every non-zero exit it reads, never silent", () => 
     r = f.hook("failure", { error: "Exit code 1" });
     assert.equal(r.status, 2);
     assert.match(r.stderr, /exit 2[\s\S]*exit 1/);
+    // A background entry already in the log when a failing call ends.
+    mkdirSync(dirname(f.log), { recursive: true });
+    writeFileSync(
+      f.log,
+      readFileSync(f.log, "utf8") + `${JSON.stringify({ t: Date.now(), code: 7, label: "bg" })}\n`,
+    );
+    r = f.hook("failure", { error: "Exit code 1" });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /bg\s+exit 7/);
     // An unparsable error still lists what it read.
     f.sh("node -e 'process.exit(5)'");
     r = f.hook("failure", { error: "something else" });
@@ -171,6 +181,29 @@ test("only the first node process records, and opted-out commands record nothing
     f.sh("unset BARWISE_EXIT_DIR; node -e 'process.exit(1)' | tail");
     f.sh("env -u BARWISE_EXIT_DIR node -e 'process.exit(1)'");
     assert.equal(f.entries().length, 1, "unset and env -u (how every hook runs) record nothing");
+    // The post hook run exactly as its settings entry runs it, armed.
+    const { hooks } = JSON.parse(readFileSync(SETTINGS, "utf8"));
+    const cmd = hooks.PostToolUse[0].hooks[0].command;
+    const ran = spawnSync("bash", ["-c", cmd], {
+      input: JSON.stringify({ session_id: SID, tool_input: { command: "ls" } }),
+      env: { ...f.armed, CLAUDE_PROJECT_DIR: REPO, TMPDIR: f.dir },
+      encoding: "utf8",
+    });
+    assert.equal(ran.status, 0, ran.stderr);
+    assert.equal(f.entries().length, 1, "a hook never records its own exit");
+  } finally {
+    f.done();
+  }
+});
+
+test("the recorder takes its own --import out of NODE_OPTIONS for descendants", () => {
+  const f = fixture();
+  try {
+    const run = f.sh("node -e 'process.stdout.write(String(process.env.NODE_OPTIONS))'", {
+      ...f.armed,
+      NODE_OPTIONS: `${f.armed.NODE_OPTIONS} --max-old-space-size=512`,
+    });
+    assert.equal(run.stdout, "--max-old-space-size=512");
   } finally {
     f.done();
   }
@@ -185,6 +218,16 @@ test("the read survives a bad line, waits for a torn one, and restarts on a shor
     assert.equal(r.status, 2);
     assert.match(r.stderr, /1 unreadable exit-log entry/);
     assert.match(r.stderr, /x\s+exit 1/, "the entry after the bad line is still read");
+    // Parseable but not an entry (no label, a bad time): unreadable, not a
+    // crash that wedges every later read on the same line.
+    writeFileSync(
+      f.log,
+      readFileSync(f.log, "utf8") + '{"t":1,"code":1}\n{"t":"x","code":2,"label":"q"}\n',
+    );
+    r = post(f);
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /2 unreadable exit-log entries/);
+    assert.doesNotMatch(r.stderr, /could not answer/);
     // A torn line is left for the next read.
     writeFileSync(
       f.log,
@@ -258,8 +301,13 @@ test("the Stop mode holds the turn open once over an unread failure", () => {
     let r = f.hook("stop", { stop_hook_active: false });
     assert.equal(r.status, 2);
     assert.match(r.stderr, /Before this turn ends/);
+    // A new failure while the turn is held open does not hold it again;
+    // it waits, unread, for the next call.
+    f.sh("node -e 'process.exit(4)'");
     r = f.hook("stop", { stop_hook_active: true });
     assert.equal(r.status, 0, r.stderr);
+    r = post(f);
+    assert.match(r.stderr, /node -e\s+exit 4/);
   } finally {
     f.done();
   }
@@ -389,15 +437,24 @@ test("only node 20.6 and later get the --import line", () => {
   for (const v of ["18.19.0", "20.5.1", "16.20.2"]) assert.equal(acceptsImport(v), false, v);
 });
 
-test("the env merge keeps unrelated lines and replaces only ours", () => {
-  const merged = mergeEnvFile(
-    'export A=1\nexport BARWISE_EXIT_DIR="/old"\n',
-    envLines("/new", "x"),
-  );
-  assert.match(merged, /^export A=1\nexport BARWISE_EXIT_DIR="\/new"\nexport NODE_OPTIONS=/);
-  assert.equal(merged.split("\n").filter(Boolean).length, 3);
+test("the env file is appended to, and rewritten only to replace a stale line of ours", () => {
+  const lines = envLines("/new", "x");
+  const other = 'export A=1\n\nexport B="two\n\nlines"\n';
+  assert.deepEqual(envFileChange(other, lines), { append: `${lines.join("\n")}\n` });
+  assert.equal(envFileChange(`${other}${lines.join("\n")}\n`, lines), null);
+  const stale = envFileChange(`${other}export BARWISE_EXIT_DIR="/old"\n`, lines);
+  assert.ok(stale.replace.startsWith(other), "every other line, blank ones included, kept");
+  assert.ok(stale.replace.endsWith(`${lines.join("\n")}\n`));
+  assert.doesNotMatch(stale.replace, /\/old/);
 });
 
+test("CLAUDE.md quotes the report the hook actually prints", () => {
+  const text = readFileSync(join(REPO, "CLAUDE.md"), "utf8").replace(/\s+/g, " ");
+  assert.ok(
+    text.includes(HEADINGS.post.replace(/:$/, "")),
+    "CLAUDE.md's quote and HEADINGS.post have drifted",
+  );
+});
 test("the wiring: four entries, right matchers, every hook command without the switch", () => {
   const { hooks } = JSON.parse(readFileSync(SETTINGS, "utf8"));
   const find = (event, mode) =>

@@ -99,8 +99,10 @@ directory (0700) on its first write; an absent log is an empty log,
 never an error.
 
 **The recorder is inlined, not a file.** `NODE_OPTIONS` names it as
-`--import=data:text/javascript;base64,<source>`. A `--require` of a file
-is fatal when the file is missing (measured: every node command exits 1
+`--import=data:text/javascript;base64,<source>`. Once loaded, the recorder removes its own token from `NODE_OPTIONS`
+(every other option kept byte for byte), so no descendant loads it: none
+could record, and it stays out of tools that reject the preload. A
+`--require` of a file is fatal when the file is missing (measured: every node command exits 1
 with MODULE_NOT_FOUND), and a path with a space splits `NODE_OPTIONS`; an
 inline module has neither failure. Base64's alphabet (`A-Z a-z 0-9 + / =`)
 has nothing a shell treats specially, so the export line cannot be broken
@@ -194,7 +196,11 @@ which matters most. When the next step is not a Bash call (the agent
 reads the background output with Read and ends the turn), a **Stop**
 hook does the same read before the turn ends: on an unread non-zero or
 unreadable entry it exits 2, which keeps the turn open with the report
-in front of the model, so a turn cannot end over an unread failure. A complete line that does not parse (an older recorder's format, a
+in front of the model, so a turn cannot end over an unread failure. A
+Stop that runs while the turn is already held open (`stop_hook_active`)
+does not read at all, so a background loop that keeps failing cannot
+hold the turn open forever; what it would have read waits for the next
+call. A complete line that does not parse (an older recorder's format, a
 corrupted write) is listed as "1 unreadable entry", with exit 2 like a
 failure, because it may have been one, and skipped, so one bad line
 cannot stop every later read; a last line without its newline (a write in progress) is left for the
@@ -284,6 +290,10 @@ Out of scope, each named so the gap is visible:
 - **A gate killed by a signal** (no `exit` event), and **a code changed
   by a later `exit` listener** (recorded as first seen; above).
 - **Two Bash calls running at the same time** (the attribution gap).
+- **Hooks configured outside `.claude/settings.json`** (user-level
+  settings, plugins). The `env -u` prefix and its wiring test cover this
+  file only; such a hook could record its own exit if Claude Code applies
+  the env file to hook commands, which is unconfirmed.
 - **A command that replaces `NODE_OPTIONS` for one process**
   (`NODE_OPTIONS=--max-old-space-size=8192 npm test | tail`, `env -i
   ...`): that process loads no recorder and records nothing, and because
@@ -429,9 +439,9 @@ None. The owner chose a mechanism on 2026-10-23.
 
 ## Risks and testing
 
-- **`NODE_OPTIONS` reaches every node process in the session.** A tool
-  that rejects `--import` in `NODE_OPTIONS` (Electron, under
-  `vscode-test`) would fail to start; if the integration suite does, it
+- **`NODE_OPTIONS` reaches every directly started node process in the
+  session** (descendants lose it, above). A tool started directly that
+  rejects `--import` in `NODE_OPTIONS` would fail to start; if the integration suite does, it
   gets a declared opt-out in the PR that finds it.
 - **The premise rests on the harness**: PostToolUse on success and
   PostToolUseFailure on a non-zero exit, `CLAUDE_CODE_SESSION_ID` in the
