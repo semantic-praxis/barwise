@@ -15,7 +15,7 @@ output specification for the PR body (spec:
 - The failure modes in the root `REVIEW.md` ("Always check") were run.
   That file owns them because the Claude Code Review service reads it
   and not this one; they are the defect classes reviews here found most
-  often between 2026-09-23 and 2026-10-23; three of the eight appear
+  often between 2026-09-23 and 2026-10-23; four of the eight appear
   nowhere below and the rest only in part. Authority: `docs/specs/review-md.spec.md`.
 - The spec workstream is named, and the spec's `Status` header says
   what this PR ships. `audit:specs --check` guards only the claim of

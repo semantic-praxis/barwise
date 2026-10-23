@@ -4679,9 +4679,15 @@ for (
     ],
     [
       // A nested REVIEW.md is read once the default branch is protected.
-      "a dead path in a REVIEW.md",
+      "a dead path in a nested REVIEW.md",
       { "barwise/pkg/REVIEW.md": "Apply `barwise/docs/gone.md`.\n" },
       /barwise\/pkg\/REVIEW\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
+    [
+      // The root REVIEW.md is the one the service reads today (barwise-f4v).
+      "a dead path in the root REVIEW.md",
+      { "REVIEW.md": "Apply `barwise/docs/gone.md`.\n" },
+      /\sREVIEW\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
     ],
   ]
 ) {

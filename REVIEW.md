@@ -14,13 +14,13 @@ Evidence for every rule: `barwise/docs/specs/review-md.spec.md`.
 
 ## Which review runs when
 
-| Lane               | Run by                          | When                                                      | Reads this file        |
-| ------------------ | ------------------------------- | --------------------------------------------------------- | ---------------------- |
-| CI (`ci.yml`)      | GitHub and the pre-push hook    | Every push                                                | no                     |
-| `/code-review`     | The author                      | Before opening: `high` on the spine, `low` on the fallout | no; reads `CLAUDE.md`  |
-| `/security-review` | The author                      | Before opening, when a trigger below is in the diff       | no                     |
-| Claude Code Review | GitHub                          | Every PR, once an Owner enables the service               | yes                    |
-| `/pr-review`       | The PR's agent, or anyone asked | Before merging, on the head being merged (`steward` 4b)   | yes, via its checklist |
+| Lane               | Run by                          | When                                                     | Reads this file        |
+| ------------------ | ------------------------------- | -------------------------------------------------------- | ---------------------- |
+| CI (`ci.yml`)      | GitHub and the pre-push hook    | Every push                                               | no                     |
+| `/code-review`     | The author                      | Before opening, at the effort the `pr-review` skill sets | no; reads `CLAUDE.md`  |
+| `/security-review` | The author                      | Before opening, when a trigger below is in the diff      | no                     |
+| Claude Code Review | GitHub                          | Every PR, once an Owner enables the service              | yes                    |
+| `/pr-review`       | The PR's agent, or anyone asked | Before merging, on the head being merged (`steward` 4b)  | yes, via its checklist |
 
 `/pr-review` runs `/code-review` itself; the author's earlier run does
 not replace it.
@@ -29,8 +29,8 @@ Run `/security-review` when the diff makes a network call (the LLM
 providers, any `fetch`); starts a subprocess or builds a command line
 (`dbt compile`, the LSP sessions in `@barwise/code-analysis`,
 `execFileSync` or `spawnSync` in `barwise/scripts/`); reads or writes a
-file whose path comes from input (MCP tools, exporters, `project
-split`); touches a workflow (above all a `pull_request_target` job such as
+file whose path or content comes from input (MCP tools, exporters,
+`project split`, parsing an uploaded model); touches a workflow (above all a `pull_request_target` job such as
 `.github/workflows/copilot-review.yml`), a token, an API key or
 `ExtensionContext.secrets`; or puts transcript, model or schema text
 into an LLM prompt whose output is written or executed.
@@ -150,7 +150,8 @@ checklist groups whose trigger the diff meets.
    `barwise/packages/vscode/src/mcp/ToolRegistration.ts` counterparts;
    the capability matrix checks reach, not behaviour (barwise-1fr). A fix to one importer is checked in the DDL, dbt and
    OpenAPI siblings (74a71ad3). A new export has a non-test caller; a
-   new `package.json` script has a CI step (da360d7e).
+   new `package.json` gate has a CI step, or the PR says why it runs on
+   demand, as `mutate` and `fault-matrix` do (da360d7e).
 5. **A restated fact went stale.** A message naming a format, command or
    flag names a registered one; docs name published packages
    (941cc09b); an MCP or language-model tool description matches what

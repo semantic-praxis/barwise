@@ -85,9 +85,11 @@ closed in the window), `git log` (548 commits; 106 post-merge fixes and
 32 in-review fixes read in full), and 30 PRs' review threads (144
 threads). The WS6 seed pass in `tiered-pr-review.spec.md` (25 Copilot
 findings) was the prior taxonomy. Classes are ranked by occurrences
-times cost; each REVIEW.md rule cites its instances. The commit count
-reproduces with `git log --since=2026-09-23 --oneline 1a32f9c7 | wc -l`
-(548); the PR and thread counts are a one-time read through
+times cost; each REVIEW.md rule cites its instances. The read used a
+time-less `--since`, which git takes as that time of day, and covered
+548 commits; the reproducible bound is
+`git rev-list --count --since=2026-09-23T00:00:00Z 1a32f9c7`, which
+gives 552. The PR and thread counts are a one-time read through
 the GitHub API on 2026-10-23 and have no command behind them, so treat
 them as a snapshot of that date.
 
