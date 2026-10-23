@@ -3,12 +3,16 @@
   "specs": {
     "architecture-index.spec.md": {
       "status": "Draft -- no workstream implemented",
-      "commits": [],
+      "commits": [
+        "ef46a883"
+      ],
       "note": "Genuinely unimplemented, and the header is right. The commit that put this row here is the barwise-fs0 fix to review-tiers.json (two dead globs corrected, a dead-glob check added); this spec plans a new review-tiers row for ADR changes, which that commit does not add. Remove this row when WS1 ships and the Status says so."
     },
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams\nopen -- design only, no implementation in this PR)",
       "commits": [
+        "4a38f022",
+        "eb7522cf",
         "545fc8d1",
         "788b02d5",
         "6657985f",
@@ -23,7 +27,7 @@
         "369f0415",
         "1c524f68"
       ],
-      "note": "Genuinely unimplemented, and the header is right. Both workstreams are property-based testing (an extraction-response arbitrary, then parser totality over generated responses) and nothing of the sort exists: fast-check is not a dependency of any package, and the only 'arbitrary' in llm or promptlab is a comment in an unrelated test. The four commits below are unrelated work on files it names -- a dependabot bump, suite 2.5.0, the assertNever sweep, and the npm-audit gate. Remove this row when workstream 1 ships and the Status says so. Caught only after the gate's pattern was fixed to see the claim mid-line; it had escaped on position alone (barwise-912 class-C pass)."
+      "note": "Genuinely unimplemented, and the header is right. Both workstreams are property-based testing (an extraction-response arbitrary, then parser totality over generated responses) and nothing of the sort exists: fast-check is a dev dependency of core and diagram (05f0b50d, 2026-09-07), for laws over a generated OrmModel, which is not the extraction-response arbitrary this spec plans; nothing in llm or promptlab generates extraction responses. The four commits below are unrelated work on files it names -- a dependabot bump, suite 2.5.0, the assertNever sweep, and the npm-audit gate. Remove this row when workstream 1 ships and the Status says so. Caught only after the gate's pattern was fixed to see the claim mid-line; it had escaped on position alone (barwise-912 class-C pass). Re-read 2026-10-23 (barwise-qs8): 4a38f022 and eb7522cf are orm-format-3 core and test changes to files this spec names, not either workstream; the verdict holds."
     },
     "functional-design-quality.spec.md": {
       "status": "Draft -- the five open decisions resolved in review 2026-09-09\n(see Decisions); no workstream implemented",
@@ -32,29 +36,28 @@
       ],
       "note": "Genuinely unimplemented, and the header is right. This spec's deliverables are five detectors -- invariant, escaping mutation, throw, law, api -- each with a baseline that ratchets. None exists: there is no detector script, no baseline file, and check-core-purity.mjs still checks exactly the four things it checked before (no I/O, clock, randomness, or LLM SDK). The commit below changed how that script RESOLVES THE REPOSITORY ROOT -- it now imports the guarded REPO_ROOT from lib/tracked.mjs instead of running its own git rev-parse, so it refuses rather than crashing when git answers emptily (barwise-989 WS2, docs/specs/gate-refusal-contract.spec.md). That is the gate-refusal contract reaching a file this spec happens to name; it measures nothing this spec plans. Same proxy false positive the gate's own header describes. Remove this row when the first detector ships and the Status says so."
     },
-    "implicit-sensemaking.spec.md": {
-      "status": "draft",
-      "commits": [
-        "6657985f",
-        "42b11436",
-        "af4076f8",
-        "d79977fe",
-        "0a23bb42",
-        "8a62161a",
-        "8175c7c5"
-      ],
-      "note": "Genuinely still a draft; the commits below are unrelated work on modules the spec happens to name. 8a62161 is model-lint's four workstreams touching populationValidation.ts; 8175c7c moved mcp output-size guidance, touching verbalize.ts. Neither implements anything here -- no rival-frame or premortem code exists in any package's src. The spec's own Tracking line says it files bd issues per workstream WHEN IT LANDS, so nothing has landed to report. Remove this row when the first workstream ships and the Status says so."
-    },
     "model-issues-tab.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
+        "2ee84147",
+        "43dfe061",
+        "5ea121ef",
         "592dac69"
       ],
-      "note": "Genuinely unimplemented, and the header is right: no part of the Issues tab exists yet. The commit is dbt-key-type-fidelity WS3 (barwise-1057), which changed ExportAnnotationCollector -- one of the finding sources this spec names -- so that a data-type TODO fires only on a real fallback and a description TODO only on a missing definition. The tab will read those findings; it has not been built. Remove this row when a workstream ships and the Status says so."
+      "note": "Genuinely unimplemented, and the header is right: no part of the Issues tab exists yet. The commit is dbt-key-type-fidelity WS3 (barwise-1057), which changed ExportAnnotationCollector -- one of the finding sources this spec names -- so that a data-type TODO fires only on a real fallback and a description TODO only on a missing definition. The tab will read those findings; it has not been built. Remove this row when a workstream ships and the Status says so. Re-read 2026-10-23 (barwise-qs8): 2ee84147 (orm-format-3 moves the llm constraint readers), 43dfe061 (the merge_models description fix) and 5ea121ef (barwise_split_model for the chat participant) touch files this spec names; core has no fix-proposal or span-edit planner and the extension no Issues view, so the verdict holds."
     },
     "mutation-ratchet.spec.md": {
       "status": "Draft -- no workstream implemented. All five open decisions\nresolved 2026-09-10; the workstreams below reflect them.",
       "commits": [
+        "4a38f022",
+        "13ed02fb",
+        "77935e65",
+        "bd883874",
+        "755fb56d",
+        "93e88611",
+        "76f1fc73",
+        "206b0c84",
+        "b9c960a2",
         "39394af3",
         "87eac42e",
         "e735c9e4",
@@ -80,11 +83,18 @@
         "b6324fd1",
         "ec9ae742"
       ],
-      "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is `scripts/mutation-baseline.mjs --classify`, a classifier that splits surviving mutants by whether the suite is the thing that should have caught them, plus a scheduled run. That file does not exist, no package.json script or workflow mentions a ratchet, and no Stryker checker is installed -- verified, not assumed. The commit below is barwise-998 fixing four defects in `scripts/mutate.mjs`, which this spec NAMES as an input the ratchet will drive rather than as something it implements: a signal-killed child that read as CAUGHT, a throw in the restore that read as UNCAUGHT, an unpinned restore-hash branch, and a spec sentence claiming a gate that does not exist. If anything, it makes this spec's own restore discipline cheaper to meet, since a killed run now refuses instead of reporting a result. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when WS1 ships and the Status says so."
+      "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is `scripts/mutation-baseline.mjs --classify`, a classifier that splits surviving mutants by whether the suite is the thing that should have caught them, plus a scheduled run. That file does not exist, no package.json script or workflow mentions a ratchet, and no Stryker checker is installed -- verified, not assumed. The commit below is barwise-998 fixing four defects in `scripts/mutate.mjs`, which this spec NAMES as an input the ratchet will drive rather than as something it implements: a signal-killed child that read as CAUGHT, a throw in the restore that read as UNCAUGHT, an unpinned restore-hash branch, and a spec sentence claiming a gate that does not exist. If anything, it makes this spec's own restore discipline cheaper to meet, since a killed run now refuses instead of reporting a result. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when WS1 ships and the Status says so. Re-read 2026-10-23 (barwise-qs8): the nine newer commits are orm-format-3 core work (4a38f022, 13ed02fb, 77935e65, bd883874) and script and audit fixes (755fb56d, 93e88611, 76f1fc73, 206b0c84, b9c960a2); scripts/mutation-baseline.mjs does not exist, so the verdict holds."
+    },
+    "plan-scope-check.spec.md": {
+      "status": "Draft -- no workstream implemented",
+      "commits": [],
+      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here is the barwise-qs8 fix to audit-spec-status.mjs (--write reopens a verdict it would credit with new commits, and --check reports commits a verdict never recorded), which this spec names because its WS2 moves the audit's spec reader into a shared lib; that move, Touches: and the scope report are not built. Remove this row when WS1 ships and the Status says so."
     },
     "review-routing.spec.md": {
       "status": "Draft -- no workstream implemented",
-      "commits": [],
+      "commits": [
+        "ef46a883"
+      ],
       "note": "Genuinely unimplemented, and the header is right. The commit that put this row here is the barwise-fs0 fix: check-review-tiers.mjs gained a dead-glob check and review-tiers.json two corrected globs. This spec plans pr-risk routing output and a failureModes block, neither of which that commit builds. Remove this row when WS1 ships and the Status says so."
     }
   }

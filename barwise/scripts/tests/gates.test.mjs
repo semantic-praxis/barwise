@@ -2731,6 +2731,12 @@ const BASELINE_WRITERS = [
     key: "specs",
     human: ["note"],
     placeholder: "TODO: classify",
+    // The one change a rewrite may make to a verdict: reopening it, with the
+    // old note kept whole, when commits it never covered have landed
+    // (barwise-qs8). Anything else is the barwise-1026 loss.
+    reopened: (before, after) =>
+      typeof after === "string" && /^TODO: re-read -- /.test(after)
+      && after.endsWith(`Previous note: ${before}`),
   },
 ];
 
@@ -2761,6 +2767,7 @@ for (const w of BASELINE_WRITERS) {
       for (const [id, row] of Object.entries(oldRows)) {
         assert.ok(id in newRows, `${w.file}: row ${id} was dropped by a rewrite`);
         for (const field of w.human) {
+          if (w.reopened?.(row[field], newRows[id][field])) continue;
           assert.deepEqual(
             newRows[id][field],
             row[field],
@@ -4717,6 +4724,84 @@ test("check-instruction-refs refuses an empty listing rather than reporting OK",
     });
     assert.equal(out.status, 2, out.stdout + out.stderr);
     assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * audit-spec-status: a verdict covers the commits it was written against
+ * (barwise-qs8). A refresh once added nine commits to a row under a note
+ * describing older ones, and --check passed. --check now reports commits a
+ * verdict never recorded, without failing on them, and --write reopens the
+ * note so the refresh cannot stand in for a re-read.
+ */
+test("audit-spec-status reports commits a verdict never covered, and --write reopens the note", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-specaudit-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  const run = (...args) =>
+    spawnSync(process.execPath, [join(SCRIPTS, "audit-spec-status.mjs"), ...args], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+  const baselineFile = join(dir, "barwise", "spec-status-baseline.json");
+  try {
+    g("init", "-q");
+    g("config", "user.email", "test@example.com");
+    g("config", "user.name", "test");
+    mkdirSync(join(dir, "barwise", "src"), { recursive: true });
+    mkdirSync(join(dir, "barwise", "docs", "specs"), { recursive: true });
+    mkdirSync(join(dir, ".beads"), { recursive: true });
+    writeFileSync(join(dir, ".beads", "issues.jsonl"), "");
+    writeFileSync(join(dir, "barwise", "src", "a.ts"), "0\n");
+    g("add", "-A");
+    g("commit", "-qm", "source");
+    writeFileSync(
+      join(dir, "barwise", "docs", "specs", "s.spec.md"),
+      "# S\n\nStatus: Draft -- no workstream implemented\n\nBuilds `barwise/src/a.ts`.\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "spec");
+    const touch = (n) => {
+      writeFileSync(join(dir, "barwise", "src", "a.ts"), `${n}\n`);
+      g("commit", "-qam", `touch ${n}`);
+      return g("rev-parse", "HEAD");
+    };
+
+    const first = touch(1);
+    // Six characters, shorter than the seven git abbreviates to here: the
+    // match must be by prefix, as a growing repository lengthens them.
+    writeFileSync(
+      baselineFile,
+      JSON.stringify({
+        specs: {
+          "s.spec.md": {
+            status: "Draft -- no workstream implemented",
+            commits: [first.slice(0, 6)],
+            note: "Reviewed: the commit is unrelated to this spec.",
+          },
+        },
+      }),
+    );
+    let r = run("--check");
+    assert.equal(r.status, 0, `a covered verdict passes: ${r.stdout}${r.stderr}`);
+    assert.doesNotMatch(r.stdout, /predate commits/, "a recorded commit is not reported");
+
+    const second = touch(2);
+    r = run("--check");
+    assert.equal(r.status, 0, `an unrecorded commit is reported, not failed: ${r.stderr}`);
+    assert.match(r.stdout, new RegExp(`s\\.spec\\.md: ${second.slice(0, 7)}`));
+
+    r = run("--write");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const note = JSON.parse(readFileSync(baselineFile, "utf8")).specs["s.spec.md"].note;
+    assert.match(note, /^TODO: re-read -- /, "the write must reopen the verdict, not keep it");
+    assert.match(note, /Previous note: Reviewed: the commit is unrelated/);
+    r = run("--check");
+    assert.equal(r.status, 1, "a reopened verdict stays red until a person re-reads it");
+    assert.match(r.stderr, /UNCLASSIFIED: s\.spec\.md/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
