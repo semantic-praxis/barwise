@@ -175,7 +175,7 @@ npx tsc --noEmit            # type-check only
   suggestion: schema-valid, population-checked for consistency, and
   unmeasured for whether it reflects the transcript. The policy (the
   trust statement and coverage thresholds) is
-  `docs/adr/0002-constraint-coverage-policy.md`; which types are
+  `docs/adr/constraint-coverage-policy.md`; which types are
   covered today is
   `docs/specs/constraint-extraction-coverage.spec.md`. Consult both
   before building anything that relies on ring or subset extraction.

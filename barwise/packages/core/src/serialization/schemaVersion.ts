@@ -56,7 +56,7 @@ export const ORM_VERSION_MIGRATIONS: readonly OrmVersionMigration[] = [
     to: "1.1",
     migrate: (doc) => ({ ...doc, orm_version: "1.1" }),
   },
-  // 1.1 -> 2.0 is structural, so it is a major bump (ADR-0001): diagram
+  // 1.1 -> 2.0 is structural, so it is a major bump (ADR `metamodel-evolution-policy`): diagram
   // references change from element names to element ids. A 1.x reader
   // would look each id up as a name and silently render the whole model;
   // the version is what makes it refuse instead.

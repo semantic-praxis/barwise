@@ -86,7 +86,7 @@
 #   incident-response's requires_ambiguity and budget, so dev rubrics
 #   now guard settled constraints instead of only element presence.
 #   incident-response's ring check is the suite's first irreflexive
-#   instance (docs/adr/0002-constraint-coverage-policy.md).
+#   instance (docs/adr/constraint-coverage-policy.md).
 # - university-enrollment licenses LetterGrade/Grade: the 2.4.0 grade
 #   check failed all five sweep runs over the player's name while every
 #   run carried the correct ternary and spanning uniqueness. The check
