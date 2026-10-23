@@ -66,6 +66,9 @@ try {
   tracked = list
     ? readFileSync(list, "utf8").split("\n").filter(Boolean)
     : (await import("./lib/tracked.mjs")).trackedFiles();
+  // An empty listing would make every glob read as dead: a confident
+  // failure about every row, from a list that answered nothing.
+  if (tracked.length === 0) throw new Error("the tracked-file list is empty");
 } catch (err) {
   console.error(`check:review-tiers: cannot answer -- ${err.message}`);
   if (err.cause) console.error(`  cause: ${err.cause.message}`);

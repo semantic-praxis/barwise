@@ -3239,6 +3239,25 @@ test("check-review-tiers fails on a row glob that matches no tracked file", () =
   }
 });
 
+test("check-review-tiers REFUSES an empty tracked-file list rather than calling every glob dead", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], []);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, `an empty listing answers nothing: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /tracked-file list is empty/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers passes on the real table and tracked files, with no overrides", () => {
+  // The default path: lib/tracked.mjs and repo-rooted globs, which every
+  // fixture test above bypasses with --tracked.
+  const run = gate("check-review-tiers.mjs", REPO);
+  assert.equal(run.status, 0, `the live table must agree: ${run.stdout}${run.stderr}`);
+});
+
 test("check-review-tiers fails on a trivial glob that matches no tracked file", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
   try {
