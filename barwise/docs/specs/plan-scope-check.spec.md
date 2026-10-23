@@ -232,8 +232,8 @@ Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
   `ci.yml` would trip both gates for every Draft spec that lists it. So
   `lib/spec-reader.mjs` keeps one `WIRING` list (`.github/workflows/`,
   `package.json`, `barwise/package.json`, `CLAUDE.md`,
-  `barwise/scripts/tests/`, `barwise/docs/specs/`, `.beads/`), and both
-  gates ignore `Touches:` entries under it. `audit-spec-status` already
+  `barwise/scripts/tests/`, `barwise/docs/specs/`, `.claude/skills/`,
+  `.beads/`), and both gates ignore `Touches:` entries under it. `audit-spec-status` already
   makes the same move for barrels (`HUB`); this is the declared form of
   it. `audit:specs` also keeps its code-extension filter, so a Markdown
   entry such as a skill counts for the report and for plan review, and not
@@ -241,7 +241,10 @@ Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
   workstream that updates Status or a pointer in other specs is
   documenting decisions already made, not implementing one; the plan
   review still fires for that workstream through the owned entries it
-  changes in the same PR.
+  changes in the same PR. `.claude/skills/` is wiring for the same reason
+  as `CLAUDE.md`: most workstreams add a line to a skill, and a steward or
+  spec-writer fix must not need a plan review on every Draft spec that
+  lists the skill.
 - **Only the header block is read.** The reader takes header fields from
   the lines between the title and the first `##` heading, never from the
   body, so an example inside a code block (like the one above) is never
