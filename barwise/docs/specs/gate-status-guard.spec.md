@@ -10,10 +10,10 @@ Touches: +barwise/scripts/hooks/gate-status-guard.mjs,
 +barwise/scripts/tests/gate-status-guard.test.mjs,
 barwise/scripts/tests/expected-counts.json, .claude/settings.json, CLAUDE.md
 
-In one sentence: a PreToolUse hook refuses an agent's Bash command in
-which a gate's exit status is overwritten before anyone reads it -- by a
-pipe, or by a later command -- because the reader then sees green from a
-gate that was red.
+In one sentence: a PreToolUse hook lets an agent's Bash command run a
+gate only in a shape that keeps the gate's exit status visible, and
+refuses every other shape, because a status overwritten by a pipe or a
+later command reads green from a gate that was red.
 
 ## Principle
 
@@ -23,180 +23,204 @@ passed. The repo's contract says so for the gates themselves (exit 2 for
 failure one layer out, at the call site. A Bash command reports the
 status of its last command, so in `npm run test:scripts | tail -2` the
 status is `tail`'s, and in `npm run test:scripts > log; tail log` it is
-also `tail`'s.
+`tail`'s too.
 
 It is not hypothetical. barwise-906 names it as trap (b), from its
-instance (2): the pre-push hook's status read through `echo | sh hook |
-tail`. On 2026-10-23 it happened twice more in one session
-(barwise-40a): `mutate.mjs ... | tail -1; echo $?` printed 0 while mutate
-had refused with exit 2, and `npm run test:scripts | tail -2; echo $?`
-printed 0 with a test failing. Both were caught only because the printed
-text disagreed with the status. Writing the trap down did not stop it,
-so the call site refuses the command rather than the next reader being
-told to remember it. That is "define errors out of existence" applied to
-the caller, as `python-uv-guard.mjs` already does for bare interpreters
-(barwise-1060).
+instance (2): the pre-push hook's status read as `PIPESTATUS[0]` of
+`echo | sh hook | tail`, which is `echo`'s. On 2026-10-23 it happened
+twice more in one session (barwise-40a): `mutate.mjs ... | tail -1; echo
+$?` printed 0 while mutate had refused with exit 2, and `npm run
+test:scripts | tail -2; echo $?` printed 0 with a test failing. Both were
+caught only because the printed text disagreed with the status. Writing
+the trap down did not stop it, so the call site refuses the command
+rather than the next reader being told to remember it. That is "define
+errors out of existence" applied to the caller, as `python-uv-guard.mjs`
+already does for bare interpreters (barwise-1060).
 
-## What does "the status reaches the reader" mean? (resolved: one of three shapes)
+## Allow known shapes, or refuse known masks? (resolved: allow known shapes)
 
-The property is not "no pipes". Piping is how an agent reads long
-output, and a pipe from `git log` has no status anyone acts on. Nor is
-it "a gate is the last command": `gate > log 2>&1; echo "exit=$?"; tail
-log` keeps the status, in text, and is the form this repo's sessions
-already use. The property is that a gate's status is either the
-command's own status or captured before anything overwrites it. A gate's
-status reaches the reader when:
+Two rounds of plan review (`/code-review`, 2026-10-23) settled this.
+The first draft refused a gate on the left of a pipe, and moved the
+failure: an agent refused there writes `gate > log; tail log`, which
+masks the status the same way. The second listed the ways a status is
+masked, and each list had holes: a backgrounded gate, `|&`, a `pipefail`
+pipeline followed by another command, `s=$?` never printed, a
+`PIPESTATUS` index naming the wrong stage, `if`/`for` bodies. Bash has
+more ways to lose a status than a hook can enumerate.
 
-1. **it is the command's status**: the gate is in the last stage of the
-   last pipeline, or followed only by `&&` (a failure stops the chain
-   and the command exits with the gate's status), or the pipeline sets
-   `pipefail` (`set -o pipefail`, `set -euo pipefail`) before it;
-2. **it is captured at once**: the next command reads `$?`, or, for a
-   gate inside a pipeline, `PIPESTATUS` (`echo "exit=$?"`, `s=$?`,
-   `echo ${PIPESTATUS[0]}`). "Next" is literal: `PIPESTATUS` describes
-   the most recent pipeline only, so a read two commands later reads
-   someone else's status;
-3. **it is handled**: the gate is followed by `||`, which is a written
-   decision about failure (`gate || echo FAILED`, `gate || true`).
+So the hook inverts it. It recognises a few shapes that provably keep
+the status, and refuses any command that runs a gate in any other shape,
+including shapes it cannot parse. A parse it does not understand then
+fails closed for gates rather than open, and a gap in the hook costs a
+rewrite, not a wrong reading.
 
-Anything else is a masked status: a gate in a non-final pipeline stage
-with neither `pipefail` nor an immediate `PIPESTATUS`, or a gate followed
-by `;`, `&` or a newline and then a command that does not read `$?`.
+## The shapes that keep the status
 
-The form the refusal suggests is `<gate> > <log> 2>&1; s=$?; tail -20
-<log>; exit $s`, which keeps the full log and makes the command's own
-status the gate's, so the Bash tool reports it with no text to read.
+A Bash command is a list of pipelines joined by `;`, newline, `&&`,
+`||` or `&`. A gate's pipeline keeps its status when it has one of these
+shapes, and the hook allows nothing else around a gate:
 
-## Which commands are gates? (resolved: derived from the scripts that define them)
+1. **Last.** The gate's pipeline is the last in the list, and the gate is
+   its last stage or `pipefail` is in force (an earlier top-level `set`
+   whose options include `-o pipefail`, with no later `set +o
+   pipefail`). The command's status is then the gate's.
+2. **An `&&` chain to the end.** The gate's pipeline is followed by `&&`
+   and every separator after it is `&&`, with the same stage condition as
+   shape 1. A failure stops the chain, so the command exits with the
+   gate's status.
+3. **Printed at once.** The gate is the pipeline's only stage, it is
+   followed by `;` or a newline, and the next command is `echo` or
+   `printf` whose text contains `$?` outside single quotes. Or the gate
+   is stage `i` of a longer pipeline and the next command is `echo` or
+   `printf` naming `${PIPESTATUS[i]}` with that exact `i`. The status is
+   then in the output, named.
+4. **Captured and re-raised.** As shape 3, but the next command is
+   `NAME=$?` and the last command of the list is `exit $NAME` (quoted or
+   not). This is the form the refusal suggests:
+   `<gate> > <log> 2>&1; s=$?; tail -20 <log>; exit $s`. It keeps the
+   full log and makes the command's own status the gate's, so the Bash
+   tool reports it with nothing to read.
+5. **Handled.** The gate is the pipeline's only stage and is followed by
+   `||`: a written decision about failure (`gate || echo FAILED`).
 
-A gate is a command whose exit status is its answer. The set is read
-from the files that define those commands, on each check, so a new gate
-is covered the day it lands:
+A gate inside a subshell or brace group, `( ... )` or `{ ...; }`, keeps
+its status into the group when it has shape 1 or 2 within the group's
+own list; the group is then judged as the gate at the outer level. So
+`(cd packages/core && npx vitest run) > log 2>&1; echo "exit=$?"` is
+allowed and `(cd packages/core && npx vitest run) | tail` is not.
 
-- **Gate names**: every npm script `ci.yml` runs (from
-  `scripts/lib/ci-gates.mjs`, the parser `ci-local.mjs` and
-  `fault-matrix.mjs` already share), plus every script in
-  `barwise/package.json` and each workspace `package.json` whose name
-  matches one declared rule, `^(test|check|audit|lint|build|typecheck|validate|ci:|mutate|fault-matrix)`.
-  The rule is declared rather than derived because on-demand gates
-  (`mutate`, `fault-matrix`, `trial:gate`) appear in no workflow; it is
-  the one hand-written part, and it names kinds, not scripts.
-- **Gate commands**: the commands those scripts run, taken from their
-  bodies. A body is split into commands; each contributes its head and,
-  where the head is a launcher (`node`, `bash`, `sh`, `uv run`, `npx`),
-  the script or tool it launches; otherwise its head and first
-  subcommand. So `turbo run`, `dprint check`, `knip`, `vitest run`, `tsc`,
-  `node scripts/check-review-tiers.mjs` and `uv run ... pytest` are
-  gates because a gate script runs them, and `dprint fmt` is not.
-- **Fixed additions**, each a launcher form the bodies cannot show:
-  `node --test`; `node <path>/at-root.mjs <name>` with `<name>` a gate
-  name (root CLAUDE.md's prescribed spelling); `sh` or `bash` on a file
-  under `.husky/` (barwise-906's own instance).
+Refused whatever else is true: a gate in a compound command (`if`,
+`while`, `until`, `for`, `case`, `!`, `[[ ]]`, a function body); a gate
+followed by `&`; a gate in a pipeline joined with `|&` unless shape 1
+or 3 applies; a gate inside `$( ... )` or backticks; and any command that
+contains a gate and that the tokenizer cannot parse (an unclosed quote,
+paren or heredoc).
 
-A command is matched after its wrappers are removed: leading `VAR=value`
-assignments, `env`, `timeout`, `nice`, `time`, `command`, `npx`, and the
-flags of `uv run`. `npm` is matched on its subcommand after its options
-(`--prefix`, `-w`, `--workspace=`, `--silent`, `-s`): `npm test` and `npm
-run <gate name>`. A group, `( ... )` or `{ ...; }`, is a gate stage when
-it contains a gate, so `(cd packages/core && npx vitest run) | tail` is
-caught.
+## Which commands are gates? (resolved: every script, minus declared data scripts)
+
+Deciding what is a gate by name failed the same way listing masks did:
+any rule over names missed one (`trial:gate`) or caught a writer
+(`fmt-root.mjs`). Under an allowlist of shapes, a false "gate" costs only
+a rewrite into a shape that is better anyway, so the definition is
+conservative: a gate is any command whose exit status a script in this
+repo defines.
+
+- `npm` running a script: `npm test`, `npm t`, `npm run <name>`, `npm
+  run-script <name>`, with any options before the subcommand. Every npm
+  script counts, except those declared in the rules module as returning
+  data, not a verdict. The list starts with one: `bd` (the tracker
+  CLI). It is declared rather than inferred because nothing in a script
+  body says whether its status is a verdict.
+- `node` running `--test`, or a file whose basename a `package.json`
+  script body names (root and workspaces, read on each check), except
+  the files of declared data scripts. So `node
+  "$(git rev-parse --show-toplevel)/barwise/scripts/at-root.mjs"
+  test:scripts` and `node barwise/scripts/mutate.mjs` are both gates,
+  whatever the path prefix.
+- A tool a `package.json` script body runs, matched by name: a body's
+  command head that is an executable in `barwise/node_modules/.bin`
+  (today: depcruise, dprint, eslint, husky, jscpd, knip, oxlint, publint,
+  tsc, turbo, vitest, vscode-test), and `pytest`, which a body runs
+  through `uv run`. Read from the bodies and `.bin` on each check, so a
+  new tool used by a script is covered when the script lands.
+- `git commit` and `git push`, which run the husky hooks, and any path
+  under `.husky/` run directly or through `sh`/`bash`.
+
+A command is matched at its head, or after any of the commands that run
+another (`env`, `timeout`, `nice`, `nohup`, `time`, `exec`, `command`,
+`stdbuf`, `sudo`, `npx`, `uv run`, `xargs`), by scanning its remaining
+words for a gate head rather than parsing each launcher's options.
+Scanning means `timeout -s KILL 600 npm run test:scripts` matches
+without knowing that `-s` takes a value, which is the hole PR #575 found
+in a name-only match. The list differs from `python-uv-rules.mjs`'s
+`WRAPPER` on purpose: `WRAPPER` must parse each wrapper's options to
+find where the interpreter sits, while this list only names commands
+that run another, and nothing here depends on the two agreeing. A
+command that is not at a head or after a launcher is not a gate: `grep
+vitest log | head` is allowed.
 
 ## Scope
 
 In scope:
 
-- When an agent's Bash command runs a gate whose status does not reach
-  the reader in one of the three shapes above, the hook shall exit 2 and
-  print the line, the gate, why its status is lost, and the suggested
-  form.
-- When every gate in a command is in one of the three shapes, the hook
-  shall exit 0.
-- When the command has no pipeline stage before another and no command
-  followed by `;`, `&` or a newline and then another, the hook shall
-  exit 0 without reading any file: such a command cannot mask a status.
-- When the hook cannot read its input, or a command it must judge needs
-  the gate set and `ci.yml` or a `package.json` cannot be read, it shall
-  exit 1: shown to the user, not blocking, the "could not answer"
+- When an agent's Bash command runs a gate in a shape outside the five
+  above, the hook shall exit 2 and print the line, the gate, the reason,
+  and the suggested form.
+- When every gate in a command has one of the five shapes, or the
+  command runs no gate, the hook shall exit 0.
+- When the command is a single simple command (one pipeline of one
+  stage, no group), the hook shall exit 0 without reading any file: a
+  lone command's status is the command's status.
+- When the hook cannot read its input or a `package.json`, it shall exit
+  1: shown to the user, not blocking, the "could not answer"
   `python-uv-guard.mjs` uses under Claude Code's hook contract.
 - Quoted text is not a command, but a quoted word keeps its content for
-  matching: `node "$CLAUDE_PROJECT_DIR/barwise/scripts/mutate.mjs"` is
-  `mutate.mjs`. A heredoc body and a comment are not commands.
-- A redirection is part of the command it follows: `2>&1`, `>&2`, `&>`
-  and `<&` are not separators.
+  matching, and a redirection (`2>&1`, `>&2`, `&>`, `<&`, `>>`) is part
+  of the command it follows. A heredoc body and a comment are not
+  commands.
 
-Out of scope: the inside of a command substitution `$( ... )` (its
-status is not the command's in most uses); tracked scripts and
-workflows, whose pipes are reviewed with them and linted by
-`check:shell`; shells other than bash (the Bash tool here runs bash; zsh
-spells the array `pipestatus`, which the capture rule also accepts, but
-nothing tests zsh).
+Out of scope: shells other than bash (the Bash tool here runs bash);
+tracked scripts and workflows, whose pipes are reviewed with them and
+linted by `check:shell`.
 
 ## Inventory
 
-| Path                                          | Today                                                | After                                                                          |
-| --------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `barwise/scripts/lib/shell-tokens.mjs`        | Does not exist                                       | A small bash tokenizer: words with quotes removed, operators, groups, lines    |
-| `barwise/scripts/lib/gate-status-rules.mjs`   | Does not exist                                       | The gate set from the defining files, and the masked-status finding, both pure |
-| `barwise/scripts/hooks/gate-status-guard.mjs` | Does not exist                                       | Reads hook input, calls the rules, applies the hook exit contract              |
-| `barwise/scripts/lib/python-uv-rules.mjs`     | Splits commands with a regex over quote-blanked text | Unchanged                                                                      |
-| `.claude/settings.json`                       | One PreToolUse Bash hook                             | Two, each its own entry                                                        |
-| `CLAUDE.md`                                   | Monorepo Commands names the pgrep self-match trap    | One sentence beside it naming this hook and the suggested form                 |
+| Path                                          | Today                                                | After                                                                                    |
+| --------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `barwise/scripts/lib/shell-tokens.mjs`        | Does not exist                                       | A bash tokenizer: words with quotes removed, raw text kept, operators, groups, compounds |
+| `barwise/scripts/lib/gate-status-rules.mjs`   | Does not exist                                       | The gate matcher read from the defining files, and the shape check, both pure            |
+| `barwise/scripts/hooks/gate-status-guard.mjs` | Does not exist                                       | Reads hook input, calls the rules, applies the hook exit contract                        |
+| `barwise/scripts/lib/python-uv-rules.mjs`     | Splits commands with a regex over quote-blanked text | Unchanged                                                                                |
+| `.claude/settings.json`                       | One PreToolUse Bash hook                             | Two, each its own entry                                                                  |
+| `CLAUDE.md`                                   | Monorepo Commands names the pgrep self-match trap    | One sentence beside it naming this hook and the suggested form                           |
 
-Why a tokenizer, not `commandSegments`: that function splits on a regex
-`/&&|\|\||[;|&]/` over text with quotes blanked. Both properties defeat
-this check, measured: `commandSegments("npx vitest run 2>&1 | tail -30")`
-returns `["npx vitest run 2>", "1 ", " tail -30"]`, so the gate's segment
-ends in `&` and the pipe belongs to `1`; and blanking turns
-`node "$CLAUDE_PROJECT_DIR/barwise/scripts/check-review-tiers.mjs"` into
-a run of quote characters no gate can match. The uv rules tolerate both
-because they look for an interpreter word, not at what joins commands.
-
-`python-uv-rules.mjs` keeps its splitter. Moving it onto the tokenizer
-would be a behaviour change to a working gate (`check:python-uv` and
-its hook both import it) for no failure anyone has seen; it is filed as
-a follow-up rather than done here, and the two splitters are not a
-must-agree copy -- they answer different questions and neither is
-derived from the other.
+Why a tokenizer, not `commandSegments`: it splits on `/&&|\|\||[;|&]/`
+over text with quotes blanked. Measured, `commandSegments("npx vitest
+run 2>&1 | tail -30")` returns `["npx vitest run 2>", "1 ", " tail
+-30"]`, so the gate's segment ends in `&` and the pipe belongs to `1`;
+and blanking turns a quoted script path into quote characters no gate
+can match. The uv rules tolerate both because they look for an
+interpreter word, not at what joins commands. `python-uv-rules.mjs`
+keeps its splitter: moving a working gate onto the tokenizer is a
+behaviour change no failure has asked for, filed as a follow-up.
 
 ## Target architecture
 
 ```
 scripts/lib/shell-tokens.mjs
-  parse(command) -> List
-    List  = [{ pipeline: Stage[], sep: "&&" | "||" | ";" | "&" | "\n" | "", line, raw }]
-    Stage = { words: string[], line } | { group: List, line }
-  (quotes removed inside words, $( ) kept verbatim, heredoc bodies and comments dropped,
-   redirections attached to their command)
+  parse(command) -> { ok: true, list } | { ok: false, why }
+    list  = [{ pipeline: Stage[], pipes: ("|" | "|&")[], sep, line, raw }]
+    Stage = { kind: "simple", words, raw } | { kind: "group", list }
+          | { kind: "compound", raw }          // if / for / while / case / ! / [[ / function
 
 scripts/lib/gate-status-rules.mjs
-  mayMask(list) -> boolean                              no file reads
-  gateSet({ workflow, packages }) -> { isGate(words) }  reads ci.yml, package.json files
-  maskedGates(list, gateSet) -> [{ line, gate, why }]
+  gateMatcher({ root }) -> (words) => gate name | null    reads package.json files, .bin
+  unkeptGates(list, isGate) -> [{ line, gate, why }]     the five shapes, nothing else
 
 scripts/hooks/gate-status-guard.mjs
-  stdin JSON -> parse -> mayMask? -> gateSet -> maskedGates -> exit 0 / 2 / 1
+  stdin JSON -> parse -> single simple command? exit 0
+             -> gateMatcher -> unkeptGates -> exit 0 / 2 / 1
 ```
 
 ## Alternatives considered
 
-- **Refuse only a gate on the left of a pipe** (the first draft). The
-  review of this spec showed it moves the failure rather than removing
-  it: an agent refused on `gate | tail` writes `gate > log; tail log`,
-  which loses the status the same way and would be allowed.
-- **Require a gate to be the last command.** Simpler to state, and it
-  refuses `gate > log 2>&1; echo "exit=$?"; tail log`, a form that does
-  keep the status and that every recent session uses.
-- **A hand-written list of gate names.** Stale the day a gate is added;
-  the defining files already list them.
-- **A bash parser from npm.** A real parser for a 150-line need, a new
-  dependency in a hook that starts on every Bash call, and the
-  maintained candidates do not model the operators this needs any better
-  than a tokenizer written for it.
-- **Fold this into `python-uv-guard.mjs`.** Saves one node start per
-  Bash call. Rejected: the two rules share no concern, and one file
-  would make a change to either re-test both.
+- **Refuse a gate on the left of a pipe** (first draft). Moves the
+  failure to `gate > log; tail log`.
+- **Refuse a list of masking shapes** (second draft). Each list missed
+  shapes bash allows; see the resolved question.
+- **Require a gate to be the last command.** Refuses `gate > log 2>&1;
+  echo "exit=$?"; tail log`, which keeps the status and is the form
+  recent sessions use.
+- **Name gates with a pattern over script names.** Missed `trial:gate`
+  and caught writers; the conservative definition makes a false match
+  cost a rewrite instead.
+- **A bash parser from npm.** A new dependency in a hook that starts on
+  every Bash call, for a grammar subset a tokenizer covers, and the
+  shapes check would still be ours.
+- **Fold this into `python-uv-guard.mjs`.** Saves one node start per Bash
+  call; the rules share no concern.
 - **Accept the risk and close barwise-40a.** It recurred after being
-  written down. The owner chose the hook on 2026-10-23.
+  written down; the owner chose the hook on 2026-10-23.
 
 ## Workstreams (each independently shippable)
 
@@ -204,41 +228,47 @@ scripts/hooks/gate-status-guard.mjs
 
 The tokenizer, the rules, the hook, its test, the `.claude/settings.json`
 entry and the CLAUDE.md sentence, in one PR. The test drives the hook as
-Claude Code does (JSON on stdin) and covers, each refusal asserting its
-message and each watched failing with its rule removed:
+Claude Code does (JSON on stdin). Each refusal asserts its message, and
+each rule is watched failing with it removed:
 
-- refused: the two commands recorded in barwise-40a, barwise-906's
-  `echo | sh .husky/pre-push | tail`, `gate 2>&1 | tail`, `gate > log;
-  tail log`, `timeout 600 npm run test:scripts | tail`, the `at-root.mjs`
-  spelling, a quoted script path, `(cd pkg && npx vitest run) | tail`,
-  and `gate | tail; grep x; echo ${PIPESTATUS[0]}` (a late read);
-- allowed: the suggested form, `echo "exit=$?"` after a redirect,
-  `pipefail`, an immediate `PIPESTATUS`, `gate && next`, `gate || echo
-  FAILED`, a gate as the last command, `dprint fmt | tail`, `git log |
-  head`, and a gate named only in a quoted string or a heredoc body;
-- derivation: a gate added to a fixture `ci.yml`, and a command a
-  fixture gate script runs, are both caught with no change to the hook;
-- refusal to answer: an unreadable `ci.yml` exits 1 for a command that
-  needs it, and a pipe-free command exits 0 with `ci.yml` unreadable.
+- refused: both commands recorded in barwise-40a; barwise-906's `echo |
+  sh .husky/pre-push | tail; echo ${PIPESTATUS[0]}` (wrong index);
+  `gate 2>&1 | tail`; `gate |& tail`; `gate > log; tail log`; `gate >
+  log; s=$?; tail log` (captured, never raised); `set -o pipefail; gate |
+  tail; grep x log`; `gate &`; `gate && echo ok; tail log`; `gate | tail
+  && echo ok`; `timeout -s KILL 600 npm run test:scripts | tail`; the
+  `at-root.mjs` spelling; a quoted script path; `(cd pkg && npx vitest
+  run) | tail`; `if npm test; then echo ok; fi`; `git push 2>&1 | tail`;
+  an unclosed quote around a gate;
+- allowed: each of the five shapes, including the suggested form and
+  ``${PIPESTATUS[1]}`` naming the right stage; `(cd pkg && npx vitest run)
+  > log 2>&1; echo "exit=$?"``; a lone gate; ``git log | head``; ``grep
+  > vitest log | head``; ``node barwise/scripts/beads-crud.mjs list | head`
+  > (a declared data script); a gate named only inside quotes or a heredoc
+  > body;
+- derivation: a script added to a fixture `package.json`, and a tool its
+  body runs, are both gates with no change to the hook;
+- could not answer: an unreadable `package.json` exits 1 for a command
+  that needs it, and a lone command exits 0 with it unreadable.
 
 ## Open decisions (for review)
 
-None. The owner chose the hook on 2026-10-23, and the design questions
-the plan review raised are resolved above.
+None. The owner chose the hook on 2026-10-23; the two plan-review
+rounds' questions are resolved above.
 
 ## Risks and testing
 
-- **False refusals.** `npm run audit:specs | head`, for viewing, is
-  refused even when nobody reads its status. The cost is one rewrite to
-  the suggested form, which also keeps the full log.
-- **False passes.** A gate the defining files do not reveal (a tool run
-  directly that no script runs) is not seen. The derivation narrows that
-  to tools nobody uses as a gate here.
+- **False refusals.** `npm run audit:specs | head`, for viewing, and
+  `npm run fmt | tail` are refused. The cost is a rewrite to the
+  suggested form, which keeps the full log; the refusal prints it.
+- **False passes.** A gate no script in the repo defines (a tool run
+  directly that no `package.json` body names) is not seen.
 - **Harness contract.** Exit 2 blocks and hands stderr to the agent; any
   other non-zero status is shown without blocking, so a crash fails open,
-  as its sibling does.
-- **Cost per command.** Most commands exit before any file read. The
-  rest read `ci.yml` and the `package.json` files; measured in the PR.
+  as its sibling does. A parse failure around a gate is a refusal, not a
+  crash.
+- **Cost per command.** A lone command reads no file. The rest read the
+  `package.json` files and list `.bin`; measured in the PR.
 
 ## Non-goals
 
