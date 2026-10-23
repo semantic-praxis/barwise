@@ -18,6 +18,7 @@ import { isExclusiveOr, OrmYamlSerializer } from "@barwise/core";
 import { SQL_DIALECTS } from "@barwise/core/sql";
 import { Verbalizer } from "@barwise/core/verbalization";
 import { DdlExportFormat } from "@barwise/formats";
+import { MAX_SAMPLES, MIN_SAMPLES } from "@barwise/llm";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -26,6 +27,7 @@ import { runCli } from "../workspace/run.js";
 const REPO_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
 const README = "README.md";
 const EXAMPLE = "barwise/examples/models/order-handover.orm.yaml";
+const SHOP_DIR = "barwise/examples/getting-started/";
 const readme = readFileSync(`${REPO_ROOT}${README}`, "utf8");
 const model = new OrmYamlSerializer().deserialize(readFileSync(`${REPO_ROOT}${EXAMPLE}`, "utf8"));
 
@@ -43,9 +45,11 @@ describe("README: Why it is worth learning", () => {
   // The README tells the reader to run this command to see the sentence, so
   // the command has to print it, not just the Verbalizer underneath it.
   it("prints that sentence from the command the README gives", async () => {
-    expect(readme).toContain(
-      "Run `barwise verbalize examples/models/order-handover.orm.yaml` from `barwise/`",
-    );
+    // Derived from EXAMPLE, so moving the file cannot leave the README's
+    // command pointing at the old path while this test loads the new one.
+    expect(EXAMPLE.startsWith("barwise/")).toBe(true);
+    const fromBarwise = EXAMPLE.slice("barwise/".length);
+    expect(readme).toContain(`Run \`barwise verbalize ${fromBarwise}\` from \`barwise/\``);
     const result = await runCli(["verbalize", `${REPO_ROOT}${EXAMPLE}`]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout.split("\n").map((line) => line.trim())).toContain(sentence);
@@ -76,4 +80,29 @@ describe("README: Why it is worth learning", () => {
       expect(text.slice(comment, table)).not.toMatch(/CREATE TABLE|\);/);
     },
   );
+});
+
+// The Quick start quotes barwise output and a CLI limit too; the same rule
+// holds there: what the README says barwise prints, barwise prints.
+describe("README: Quick start", () => {
+  it("quotes a sentence step 3's command really prints for the sample model", async () => {
+    const quoted = "Each SalesOrder is placed by at least one Customer";
+    expect(readme).toContain(`(${SHOP_DIR})`);
+    expect(readme).toContain("`barwise verbalize shop.orm.yaml --counterexamples`");
+    expect(readme).toContain(`("${quoted}")`);
+    const result = await runCli([
+      "verbalize",
+      `${REPO_ROOT}${SHOP_DIR}shop.orm.yaml`,
+      "--counterexamples",
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.split("\n").map((line) => line.trim())).toContain(`${quoted}.`);
+  });
+
+  // MIN_SAMPLES and MAX_SAMPLES bound the sampling path the bullet
+  // describes; --samples 1 is accepted too, as the plain single extraction.
+  it("states the range of the multi-sample path (MIN_SAMPLES to MAX_SAMPLES)", () => {
+    const words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+    expect(readme).toContain(`${words[MIN_SAMPLES]} to ${words[MAX_SAMPLES]} times`);
+  });
 });
