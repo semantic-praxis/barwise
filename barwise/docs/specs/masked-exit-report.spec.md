@@ -12,10 +12,9 @@ barwise/scripts/tests/expected-counts.json, barwise/test-plan/cli-checks.sh,
 .claude/settings.json, CLAUDE.md
 
 In one sentence: each node process an agent's Bash command starts
-directly records its own exit code against that tool call, and when the
-call exits 0 while one of those processes failed, a PostToolUse hook
-tells the agent which one -- so a red gate behind a pipe or a later
-command no longer reads green.
+directly records its own exit code, and when the call exits 0 while one
+of those processes failed, a PostToolUse hook tells the agent which one
+-- so a red gate behind a pipe or a later command no longer reads green.
 
 ## Principle
 
@@ -62,58 +61,58 @@ descendant of a node process does not. So:
   however the command is spelled. Nothing parses the command.
 - `git push` runs `.husky/pre-push`, which runs `npm run ci:local`: npm
   records. `echo | sh .husky/pre-push | tail` likewise.
-- `turbo run test` starts node processes, but turbo is reached through
-  `npm` (which consumed the variable) or `npx` (likewise), and turbo's
-  strict environment mode drops unknown variables anyway. Measured with
-  turbo 2.11.3: it passes `NODE_OPTIONS` and drops `BARWISE_*`, so its
-  tasks load the recorder and record nothing.
+- `turbo run test` is reached through `npm` or `npx`, which consumed the
+  variable, and turbo's strict environment mode drops unknown variables
+  anyway (measured with turbo 2.11.3: it passes `NODE_OPTIONS` and drops
+  `BARWISE_*`), so its tasks load the recorder and record nothing.
 - A test suite that spawns gates on purpose (`gates.test.mjs` runs
   hundreds expecting exit 1 and 2) is itself a node process: its
   children see no variable.
-
-A first draft used a depth counter in the environment instead. Turbo
-strips such a counter while passing `NODE_OPTIONS`, which would make
-every task "depth 0" the day someone added the log to turbo's
-pass-through list; consuming the one variable has no state to strip.
 
 A prototype on 2026-10-23 confirmed the mechanism: `npm run bad | tail
 -1` recorded npm with code 1 and nothing for its child; `timeout`, a
 subshell and an uncaught throw each recorded their real code.
 
 The recorder never writes to stdout or stderr and never changes an exit
-code; if it cannot append, it does nothing. What it records is the exit
-code, the time, and a short label: the basename of the script or tool
-(`argv[1]`), and for npm and npx the subcommand and script name. Never
-the full argv: argv is where a credential typed on a command line sits
-(root CLAUDE.md, "A key has nowhere to be written down"). Files are
-created 0600 in a 0700 directory.
+code; if it cannot append, it does nothing. It records the exit code,
+the time, and a short label: the basename of the script or tool
+(`argv[1]`), `-e` for an inline script, and for npm and npx the
+subcommand and script name. Never the full argv: argv is where a
+credential typed on a command line sits (root CLAUDE.md, "A key has
+nowhere to be written down"). Files are created 0600 in a 0700
+directory.
 
-## Which call does a process belong to? (resolved: an id written before the shell runs)
+## Which call does a process belong to? (resolved: entries since the call began, each reported once)
 
-Wall-clock windows misattribute: `duration_ms` excludes hook latency,
-so a fast-exiting process (mutate refusing in 40 ms) falls outside the
-window, and background commands and subagents in the same session write
-during other calls. So each call gets its own file:
+The environment cannot carry a per-call id. Measured in this session on
+2026-10-23: the SessionStart env file is read once, when the session
+starts, and its text is inlined into every command's shell line, so a
+line appended later never runs, and a dynamic line would make every Bash
+call depend on that line not failing. So the environment carries only
+static values, `NODE_OPTIONS` and one session log path in
+`BARWISE_EXIT_LOG`, written as plain `export NAME="value"` lines, the
+form `.claude/hooks/session-start.sh` already uses for `PATH`.
 
-1. A PreToolUse hook on Bash writes the call's `tool_use_id` to the
-   session's `current-call` file.
-2. The session environment file (`$CLAUDE_ENV_FILE`, which Bash applies
-   before every command) reads it and exports `BARWISE_EXIT_LOG=
-   <session dir>/calls/<tool_use_id>.jsonl`, and touches
-   `<tool_use_id>.armed` to show the environment was applied.
-3. The PostToolUse hook reads `calls/<its tool_use_id>.jsonl`.
+Attribution lives in the hooks, which do know the call:
 
-Two Bash calls started at the same instant can race on `current-call`;
-the result is a report against the sibling call that names the process,
-so a misattribution is visible, not silent. That is the one remaining
-attribution gap, and it is declared.
+1. **PreToolUse** on Bash records the call's start: `tool_use_id` and the
+   time, in the session directory.
+2. **PostToolUse** (the call exited 0) reads the log from the offset where
+   the last read stopped, keeps the entries at or after its call's start,
+   reports the non-zero ones, and advances the offset past everything it
+   read.
+3. **PostToolUseFailure** (the call exited non-zero, so its status was
+   visible) advances the offset the same way and reports nothing, so a
+   failure the agent already saw is never reported later.
 
-A process that outlives its call (a backgrounded `npm run ci:local |
-tail &`) writes to its own call's file after that call's PostToolUse ran.
-So each PostToolUse also reads the files of earlier calls that are
-marked ended and have grown since, and reports their new failures as
-"from an earlier command". The masked background case is the one that
-matters most, and this is how it is caught.
+Each entry is reported at most once, and each read costs only what was
+appended since the last. A process that outlives its call (a
+backgrounded `npm run ci:local | tail &`) is reported by the first call
+that ends after it exits, with its own time on the line: the masked
+background case, which matters most. Two Bash calls running at the same
+time can claim each other's entries; the report names the process and
+its time, so a misattribution is visible, not silent. That is the one
+remaining attribution gap, and it is declared.
 
 ## When does the hook speak? (resolved: only when the call exited 0)
 
@@ -126,8 +125,8 @@ stderr, the documented way to put a warning in front of the model:
 
 ```
 This command exited 0, but processes it started exited non-zero:
-  npm run test:scripts   exit 1
-  mutate.mjs             exit 2
+  npm run test:scripts   exit 1   22:41:07
+  mutate.mjs             exit 2   22:41:09
 If you printed or handled that status, ignore this; otherwise the
 command's status was hidden (a pipe, or a later command).
 ```
@@ -139,32 +138,36 @@ tool calls beside it, which a reader may not want.
 log; echo "exit=$?"` with lint failing prints `exit=1` and still gets
 the report. The cost is one redundant notice, only when something
 failed, which is when attention is warranted; telling "printed" from
-"hidden" would mean reading the output, which is the text-matching this
-design replaced. Probes that fail by design (`beads-crud show X || create
-...`) are reported too, and the same reasoning applies; a script that
-runs expected failures as its job declares the opt-out below.
+"hidden" would mean reading the output, the text-matching this design
+replaced. Probes that fail by design (`beads-crud show X || create ...`)
+are reported too, for the same reason; a script that runs expected
+failures as its job declares the opt-out below.
 
 ## Scope
 
 In scope:
 
-- When a session starts, the SessionStart hook shall copy the recorder
-  to the session directory outside the repository (so checking out a
-  commit without it, or stashing it, cannot break every node command),
-  and write to `$CLAUDE_ENV_FILE`, once per distinct line, the lines that
-  export `NODE_OPTIONS` (only if the copied recorder exists, and only if
-  not already present) and `BARWISE_EXIT_LOG` as above.
+- When a session starts, the SessionStart hook shall copy the recorder to
+  the session directory outside the repository (so checking out a commit
+  without it, or stashing it, cannot break every node command), and
+  append to `$CLAUDE_ENV_FILE`, each only if not already present, two
+  static lines: `export NODE_OPTIONS="--require=<copy>"`, keeping any
+  value `NODE_OPTIONS` had when the hook ran, and `export
+  BARWISE_EXIT_LOG="<session dir>/exits.jsonl"`. If the copy fails, it
+  writes neither line.
 - When a node process starts with `BARWISE_EXIT_LOG` set, the recorder
   shall delete it from its environment and append its exit code, time
   and label to that file on exit.
-- When a Bash call exits 0 and its file, or a grown file of an ended
-  earlier call, holds a non-zero entry, the PostToolUse hook shall exit 2
-  and name each such process and its code.
+- When a Bash call exits 0 and the log holds an unreported non-zero entry
+  from at or after the call's start, the PostToolUse hook shall exit 2
+  and name each such process, its code and its time.
 - When it finds none, it shall exit 0 silently.
-- When the call's `.armed` marker is absent, the recorder was not set up
-  for it, and the hook shall say so once per session (exit 1, shown to
-  the user, not the model), so "not armed" never reads as "nothing
-  failed".
+- When a Bash call exits non-zero, the PostToolUseFailure hook shall mark
+  the entries up to now as read, and say nothing.
+- When the session directory or the recorder copy is absent, the recorder
+  was not set up, and the PostToolUse hook shall say so once per session
+  (exit 1, shown to the user, not the model), so "not armed" never reads
+  as "nothing failed".
 - When a script runs node processes that fail by design and checks them
   itself, it shall `unset BARWISE_EXIT_LOG` at its top: a declared
   opt-out. Today that is `test-plan/cli-checks.sh`, which asserts the
@@ -178,28 +181,28 @@ Out of scope, each named so the gap is visible:
   way; it is a follow-up, because the Bash tool's own shell is bash too
   and telling the two apart is its own design.
 - **A gate killed by a signal** (no `exit` event).
-- **Two Bash calls started at the same instant** (the race above).
+- **Two Bash calls running at the same time** (the attribution gap above).
 
 ## Inventory
 
-| Path                                      | Today                                  | After                                                                        |
-| ----------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------- |
-| `barwise/scripts/hooks/exit-recorder.cjs` | Does not exist                         | The `--require` preload: consume the variable, append on exit, never throw   |
-| `barwise/scripts/lib/exit-log.mjs`        | Does not exist                         | Session directory, call file, armed marker, ended-call bookkeeping: one home |
-| `barwise/scripts/hooks/masked-exit.mjs`   | Does not exist                         | `session`, `pre` and `post` modes for the three hook events                  |
-| `barwise/test-plan/cli-checks.sh`         | Asserts the CLI's exit codes           | Also `unset BARWISE_EXIT_LOG` (the declared opt-out)                         |
-| `.claude/settings.json`                   | SessionStart and PreToolUse hooks      | Plus one entry each for SessionStart, PreToolUse Bash and PostToolUse Bash   |
-| `CLAUDE.md`                               | Monorepo Commands names the pgrep trap | One sentence beside it: what the report means                                |
+| Path                                      | Today                                  | After                                                                      |
+| ----------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------- |
+| `barwise/scripts/hooks/exit-recorder.cjs` | Does not exist                         | The `--require` preload: consume the variable, append on exit, never throw |
+| `barwise/scripts/lib/exit-log.mjs`        | Does not exist                         | Session directory, call starts, the read offset: one home                  |
+| `barwise/scripts/hooks/masked-exit.mjs`   | Does not exist                         | `session`, `pre`, `post` and `failure` modes for the four hook events      |
+| `barwise/test-plan/cli-checks.sh`         | Asserts the CLI's exit codes           | Also `unset BARWISE_EXIT_LOG` (the declared opt-out)                       |
+| `.claude/settings.json`                   | SessionStart and PreToolUse hooks      | Plus SessionStart, PreToolUse, PostToolUse and PostToolUseFailure entries  |
+| `CLAUDE.md`                               | Monorepo Commands names the pgrep trap | One sentence beside it: what the report means                              |
 
-One script with three modes rather than three scripts: the modes share
-every path rule, and a single `exit-log.mjs` behind one entry point keeps
-the layout in one place. The recorder is separate because `--require`
-loads CommonJS and it must stay one `fs` call per node start; it reads
-its path from the variable rather than computing it, so the path rule is
-not written twice.
+One script with four modes rather than four scripts: the modes share
+every path rule, and one `exit-log.mjs` behind one entry point keeps the
+layout in one place. The recorder is separate because `--require` loads
+CommonJS and it must stay one `fs` call per node start; it reads its path
+from the variable rather than computing it, so the path rule is not
+written twice.
 
 The session directory is `os.tmpdir()/barwise-exit/<session_id>/`:
-outside the repository, never committed, and removed with the container.
+outside the repository, never committed, removed with the container.
 The existing `.claude/hooks/session-start.sh` is not used because it
 runs only in remote sessions; this applies locally too. Its
 `persist_env` helper's rule (append a line only if not already present,
@@ -213,8 +216,11 @@ barwise-1035) is the rule the new SessionStart mode follows.
 - **A depth counter** for "started directly" (the fourth draft). Turbo
   strips it and passes `NODE_OPTIONS`; consuming one variable has no
   counter to strip.
-- **Wall-clock windows** for attribution (the fourth draft). Clipped fast
-  processes and cross-reported background ones.
+- **Windows from `duration_ms`** (the fourth draft). Clipped fast
+  processes, because `duration_ms` excludes hook latency.
+- **A per-call id exported from the env file** (the fifth draft). The
+  file is read once at session start, so the id would never change;
+  measured.
 - **Make every gate print its status on its last line.** Edits every
   gate, the line is cut by `tail` or `grep`, and it moves the reading
   back into text.
@@ -241,16 +247,19 @@ failing with it removed:
 - `gate > log; tail log` and `gate || true` produce a report too;
 - a node process started by a node process records nothing;
 - `unset BARWISE_EXIT_LOG` records nothing;
-- a process exiting after its call ended is reported by the next call,
-  once;
-- another call's file is not read;
+- a process exiting after its call ended is reported by the next call
+  that ends, once, with its time;
+- an entry before the call's start is not reported;
+- after a PostToolUseFailure, the failure it saw is never reported;
 - no non-zero entry: exit 0, no output;
-- no `.armed` marker: exit 1 once per session;
+- no session directory: exit 1 once per session;
 - the recorder with an unwritable or absent log leaves the observed
   process's output and exit code unchanged, and records no argv beyond
   the label;
-- the SessionStart mode keeps an existing `NODE_OPTIONS`, writes each line
-  once across repeated starts, and works with a space in the path;
+- the SessionStart mode keeps an existing `NODE_OPTIONS`, writes each
+  line once across repeated starts (resume, clear and compact all fire
+  SessionStart), writes nothing when the copy fails, and works with a
+  space in the path;
 - the PR body measures the recorder's cost per node start.
 
 ## Open decisions (for review)
@@ -267,7 +276,7 @@ None. The owner chose a mechanism on 2026-10-23.
   PostToolUse for non-zero Bash exits, the report would repeat what the
   status already showed: redundant, not wrong.
 - **Settings take effect at the next session start**, because
-  `$CLAUDE_ENV_FILE` is written by SessionStart.
+  `$CLAUDE_ENV_FILE` is written by SessionStart and read once.
 - **Harness contract.** PostToolUse exit 2 shows stderr to the model; any
   other non-zero status is shown to the user only, so a crash in the hook
   fails quiet.
