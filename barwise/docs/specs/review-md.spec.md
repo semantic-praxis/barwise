@@ -114,6 +114,29 @@ rather than measured (#672). Copilot's non-convergence -- new findings on
 unchanged lines in round after round, 10 to 13 rounds on #621 and #662 --
 sets the re-review rule.
 
+## Does the Claude Code team's own practice change this? (resolved: four additions; approval policy is the owner's)
+
+"How the Claude Code team does code review" (Osmani, Lunt, Wang;
+read 2026-10-23) describes a REVIEW.md written by code owners and
+measured for whether the reviewer follows it. Compared item by item:
+
+| Their practice                                                             | Here                                                                                             |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| REVIEW.md is short and says what failure looks like in the repo            | Added: the opening line; 189 lines to 170 while adding three sections                            |
+| Summary starts with a count, says plainly when nothing to fix              | Added: "The summary"                                                                             |
+| Cap nits; skip paths; `file:line` evidence, not a guess from a name        | Already in the first version                                                                     |
+| Converge: round cap, diff-only re-review, flag the class, no repeats       | Added: "Re-reviews must converge". 59% of their re-flags were old code; ours ran 10 to 28 rounds |
+| Verify before a PR exists; fresh-context review; fix repeats at the source | Already: `/code-review` in the lane map, `session-review` ledger                                 |
+| An approval covers one commit                                              | Already: `steward` 4b pins the reviewed SHA                                                      |
+| Every thread answered; open findings block merge                           | Answered by convention; blocking needs branch protection (owner)                                 |
+| Risk tiers set from the change; CI workflows always need a person          | Not here: `steward` 4b lets the agent merge any tier (owner)                                     |
+| Incidents and reverts become the reviewer's eval set                       | Not yet: barwise-nm8                                                                             |
+| Measure noise by what people do with each comment                          | Partly: `pr-review` section 4 records outcomes on the thread                                     |
+
+The rows marked owner are approval policy, which this repository
+delegates by the owner's decision (`steward`, section 4b), so this spec
+names them and does not change them.
+
 ## Alternatives considered
 
 - **Put the new rules in `checklist.md` and keep REVIEW.md to service
