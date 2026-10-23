@@ -217,6 +217,15 @@ function header(text, field) {
   return m ? m[1].trim() : undefined;
 }
 
+/**
+ * Commits in `found` that `recorded` does not contain. By prefix, because
+ * both are abbreviations and git lengthens them as a repository grows, so
+ * the same commit can be recorded in 8 characters and found in 9.
+ */
+function unseenCommits(found, recorded = []) {
+  return found.filter((c) => !recorded.some((r) => c.startsWith(r) || r.startsWith(c)));
+}
+
 /** Specs claiming nothing is built, with the commits that say otherwise. */
 function findings() {
   const found = [];
@@ -370,11 +379,33 @@ if (!check) {
   // Merged, not regenerated: the `note` is why a stale-looking header is
   // actually right, and rebuilding from the detector alone stamped the
   // placeholder over all six of them (barwise-1026).
+  const existing = readExistingRows(BASELINE, "specs");
   const { rows: specs, ...counts } = mergeBaselineRows({
     fresh,
-    existing: readExistingRows(BASELINE, "specs"),
+    existing,
     preserve: { note: "TODO: classify" },
   });
+  // A verdict covers the commits it was written against, not ones that
+  // landed since. Refreshing the list under the old note made four verdicts
+  // read as covering commits nobody had looked at (barwise-qs8), so a row
+  // that gains commits gets its note reopened, and --check stays red until
+  // a person re-reads them and removes the TODO.
+  // A row already reopened gains any newer commits in its TODO, so the
+  // person who clears it re-reads everything the row will then claim.
+  const REOPENED = /^TODO: re-read -- (.*?) landed since this verdict\. Previous note: ([\s\S]*)$/;
+  const reopened = [];
+  for (const [id, row] of Object.entries(specs)) {
+    const prior = existing[id];
+    if (!prior?.note || prior.note.startsWith("TODO: classify")) continue;
+    const added = unseenCommits(row.commits, prior.commits);
+    if (added.length === 0) continue;
+    const open = REOPENED.exec(prior.note);
+    const listed = open ? open[1].split(", ") : [];
+    const verdict = open ? open[2] : prior.note;
+    row.note = `TODO: re-read -- ${[...listed, ...added].join(", ")} landed since this verdict. `
+      + `Previous note: ${verdict}`;
+    reopened.push(`${id}: ${added.join(", ")}`);
+  }
 
   const baseline = {
     $comment: "Specs whose Status claims no implementation while commits have landed on "
@@ -389,6 +420,8 @@ if (!check) {
       + ` -- ${mergeSummary(counts)}`,
   );
   for (const id of counts.dropped) console.log(`  dropped (no longer stale): ${id}`);
+  // Said here, not left for --check to find: a reopen rewrites a note.
+  for (const r of reopened) console.log(`  reopened (re-read before --check passes): ${r}`);
   process.exit(0);
 }
 
@@ -404,6 +437,13 @@ noteUntrackedInput({
 const baseline = JSON.parse(readFileSync(BASELINE, "utf8")).specs;
 const failures = [];
 const seen = new Set();
+// Reported, never failed on. A commit that touches a file a Draft spec
+// names is a shadow of implementation, not the thing: failing on it made
+// every change to a named file red (merge commits included, which no
+// baseline can record) until a note was rewritten. The hole barwise-qs8
+// found -- a refresh crediting a verdict with commits nobody read -- is
+// closed on the write side instead: --write reopens the note.
+const unreviewed = [];
 
 for (const f of found) {
   seen.add(f.id);
@@ -417,7 +457,14 @@ for (const f of found) {
         + `spec-status-baseline.json saying why it is still right.`,
     );
   } else if (!row.note || row.note.startsWith("TODO")) {
-    failures.push(`UNCLASSIFIED: ${f.id} -- its baseline row has no note.`);
+    failures.push(
+      row.note?.startsWith("TODO: re-read")
+        ? `UNCLASSIFIED: ${f.id} -- reopened: ${row.note.split(" Previous note:")[0]}`
+        : `UNCLASSIFIED: ${f.id} -- its baseline row has no note.`,
+    );
+  } else {
+    const added = unseenCommits(f.commits, row.commits);
+    if (added.length > 0) unreviewed.push(`${f.id}: ${added.join(", ")}`);
   }
 }
 for (const id of Object.keys(baseline)) {
@@ -438,3 +485,10 @@ if (failures.length > 0) {
 console.log(
   `audit-spec-status --check: ${found.length} spec(s) claiming no implementation, all classified. OK`,
 );
+if (unreviewed.length > 0) {
+  console.log(
+    `  ${unreviewed.length} verdict(s) predate commits that touched what their spec names; `
+      + "`--write` records them and reopens the note for a re-read:",
+  );
+  for (const u of unreviewed) console.log(`    ${u}`);
+}

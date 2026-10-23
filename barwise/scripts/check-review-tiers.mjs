@@ -20,29 +20,44 @@
  * is stale -- a confident wrong answer about thirteen rows, from a file
  * it never opened.
  *
- * `--checklist` and `--table` override the inputs. They exist for this
+ * A glob that matches no tracked file fails too. It passes every other
+ * check here and routes nothing, forever: the "When generated output
+ * changed" row named `llm/src/prompts/builtins.generated.ts` from
+ * 2026-09-18 while the file lived under `prompt/artifacts/`, and nothing
+ * said so (barwise-fs0).
+ *
+ * `--checklist`, `--table` and `--tracked` override the inputs. They exist for this
  * gate's own tests in scripts/tests/gates.test.mjs, which have to watch
  * each exit code on a planted defect and must not perturb the real
  * checklist to do it. Nothing else passes them.
  *
  * Spec: docs/specs/tiered-pr-review.spec.md (WS2, barwise-1037).
  */
+import { readFileSync } from "node:fs";
 import {
   CHECKLIST,
   checklistHeadings,
   compareTable,
+  matchesPattern,
   TABLE,
   tierRows,
   trivialGlobs,
 } from "./lib/review-tiers.mjs";
 
-/** `--flag value`, or the default. No dependency, and no partial matching. */
+/**
+ * `--flag value`, or the default. No dependency, and no partial matching.
+ * A flag given without a value refuses: falling back would answer about
+ * the live repository when a fixture was asked about.
+ */
 function opt(flag, fallback) {
   const i = process.argv.indexOf(flag);
-  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+  if (i === -1) return fallback;
+  const value = process.argv[i + 1];
+  if (!value || value.startsWith("--")) throw new Error(`${flag} needs a value`);
+  return value;
 }
 
-let headings, rows, trivial;
+let headings, rows, trivial, tracked;
 try {
   headings = checklistHeadings(opt("--checklist", CHECKLIST));
   rows = tierRows(opt("--table", TABLE));
@@ -51,6 +66,16 @@ try {
   // every later workflow run into a refusal, which requests a review
   // (safe) but hides the cause in a job log nobody opens.
   trivial = trivialGlobs(opt("--table", TABLE));
+  // Imported only when no list is given: lib/tracked.mjs resolves the
+  // repository root at import, and refuses (exit 2) outside one, which is
+  // where this gate's own fixtures run.
+  const list = opt("--tracked", null);
+  tracked = list
+    ? readFileSync(list, "utf8").split("\n").filter(Boolean)
+    : (await import("./lib/tracked.mjs")).trackedFiles();
+  // An empty listing would make every glob read as dead: a confident
+  // failure about every row, from a list that answered nothing.
+  if (tracked.length === 0) throw new Error("the tracked-file list is empty");
 } catch (err) {
   console.error(`check:review-tiers: cannot answer -- ${err.message}`);
   if (err.cause) console.error(`  cause: ${err.cause.message}`);
@@ -58,13 +83,20 @@ try {
 }
 
 const { missing, stale, duplicated } = compareTable(headings, rows);
+const live = (g) => tracked.some((f) => matchesPattern(f, g));
+const dead = [
+  ...rows.flatMap((r) => (r.globs ?? []).filter((g) => !live(g)).map((g) => `${r.heading}: ${g}`)),
+  ...trivial.filter((g) => !live(g)).map((g) => `trivial: ${g}`),
+];
 
-if (missing.length > 0 || stale.length > 0 || duplicated.length > 0) {
+if (missing.length > 0 || stale.length > 0 || duplicated.length > 0 || dead.length > 0) {
   for (const h of missing) console.error(`  no row for checklist heading: ${h}`);
   for (const h of stale) console.error(`  row names a heading the checklist no longer has: ${h}`);
   for (const h of duplicated) console.error(`  heading declared by more than one row: ${h}`);
+  for (const d of dead) console.error(`  glob matches no tracked file: ${d}`);
   console.error(
-    "\ncheck:review-tiers: barwise/review-tiers.json and the checklist disagree.\n"
+    "\ncheck:review-tiers: barwise/review-tiers.json and the checklist disagree,\n"
+      + "  or a glob in the table matches no tracked file.\n"
       + "  Every '## ' heading in .claude/skills/pr-review/checklist.md needs exactly\n"
       + "  one row. A trigger that is not path-shaped gets tier 'not-path-derivable'\n"
       + "  rather than a glob that cannot express it.",

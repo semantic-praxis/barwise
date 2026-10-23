@@ -1,7 +1,7 @@
 # Metamodel evolution policy
 
 Status: Accepted
-Date: 2026-06-17
+Date: 2026-10-17
 Tracking: barwise-5t9 (+ children), docs/NORMA_VS_ORM_YAML.md,
 docs/specs/norma-export.spec.md
 
@@ -34,7 +34,12 @@ decide what comes off the menu.
      construct we cannot verbalize cleanly does not serve the mission.
    - _Inline and local._ It lives on the element it constrains, as a
      discriminated-union value -- not in a separate referenced graph the
-     author (human or LLM) must keep consistent.
+     author (human or LLM) must keep consistent. An internal constraint
+     lives inline on its fact type. An external constraint, which spans
+     fact types or subtype facts and so has no single element to be local
+     to, lives in the model's constraint list and refers to the roles and
+     subtype facts it constrains by id (decided 2026-10-17;
+     `docs/specs/orm-format-3.spec.md`).
    - _Deterministic._ Rules are stored as _data_, never executed by core.
      This admits derivation rules as structure; it argues against
      constructs that are inherently about state change over time.

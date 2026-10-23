@@ -2731,6 +2731,14 @@ const BASELINE_WRITERS = [
     key: "specs",
     human: ["note"],
     placeholder: "TODO: classify",
+    // The one change a rewrite may make to a verdict: reopening it, with the
+    // old note kept whole, when commits it never covered have landed
+    // (barwise-qs8). Anything else is the barwise-1026 loss.
+    reopened: (before, after) => {
+      const inner = /Previous note: ([\s\S]*)$/.exec(before)?.[1] ?? before;
+      return typeof after === "string" && /^TODO: re-read -- /.test(after)
+        && after.endsWith(`Previous note: ${/^TODO: re-read -- /.test(before) ? inner : before}`);
+    },
   },
 ];
 
@@ -2761,6 +2769,7 @@ for (const w of BASELINE_WRITERS) {
       for (const [id, row] of Object.entries(oldRows)) {
         assert.ok(id in newRows, `${w.file}: row ${id} was dropped by a rewrite`);
         for (const field of w.human) {
+          if (w.reopened?.(row[field], newRows[id][field])) continue;
           assert.deepEqual(
             newRows[id][field],
             row[field],
@@ -3188,8 +3197,13 @@ test("run-script-tests refuses an absent tests directory rather than failing", (
  */
 const VALID_TRIVIAL = { globs: [".beads/issues.jsonl"], why: "fixture" };
 
-/** A minimal pair of inputs the gate accepts, written into a temp dir. */
-function tierFixture(dir, headings, rows) {
+/**
+ * A minimal set of inputs the gate accepts, written into a temp dir. The
+ * tracked-file list makes the fixture globs live (the gate fails a glob
+ * that matches nothing), and `tracked` replaces it for the dead-glob cases.
+ */
+function tierFixture(dir, headings, rows, tracked = ["x/a.ts", ".beads/issues.jsonl"]) {
+  writeFileSync(join(dir, "tracked.txt"), tracked.join("\n"));
   const md = ["# Checklist", "", ...headings.flatMap((h) => [`## ${h}`, "", "- item", ""])];
   writeFileSync(join(dir, "checklist.md"), md.join("\n"));
   writeFileSync(
@@ -3208,8 +3222,70 @@ function tierFixture(dir, headings, rows) {
     join(dir, "checklist.md"),
     "--table",
     join(dir, "review-tiers.json"),
+    "--tracked",
+    join(dir, "tracked.txt"),
   ];
 }
+
+test("check-review-tiers fails on a row glob that matches no tracked file", () => {
+  // barwise-fs0: a row named a path that did not exist and routed nothing
+  // for five weeks while every other check passed.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], [".beads/issues.jsonl"]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, `a dead glob must fail: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /glob matches no tracked file: A: x\//);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES an empty tracked-file list rather than calling every glob dead", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], []);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, `an empty listing answers nothing: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /tracked-file list is empty/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a --tracked flag with no value rather than reading the live repository", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], ["x/a"]).slice(0, -1);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, `a flag with no value answers nothing: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /--tracked needs a value/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers passes on the real table and tracked files, with no overrides", () => {
+  // The default path: lib/tracked.mjs and repo-rooted globs, which every
+  // fixture test above bypasses with --tracked.
+  const run = gate("check-review-tiers.mjs", REPO);
+  assert.equal(run.status, 0, `the live table must agree: ${run.stdout}${run.stderr}`);
+});
+
+test("check-review-tiers fails on a trivial glob that matches no tracked file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], ["x/a.ts"]);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, `a dead trivial glob must fail: ${run.stdout}${run.stderr}`);
+    assert.match(
+      `${run.stdout}${run.stderr}`,
+      /glob matches no tracked file: trivial: \.beads\/issues\.jsonl/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("check-review-tiers passes when every heading has exactly one row", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
@@ -4690,6 +4766,104 @@ test("check-instruction-refs refuses an empty listing rather than reporting OK",
     });
     assert.equal(out.status, 2, out.stdout + out.stderr);
     assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * audit-spec-status: a verdict covers the commits it was written against
+ * (barwise-qs8). A refresh once added nine commits to a row under a note
+ * describing older ones, and --check passed. --check now reports commits a
+ * verdict never recorded, without failing on them, and --write reopens the
+ * note so the refresh cannot stand in for a re-read.
+ */
+test("audit-spec-status reports commits a verdict never covered, and --write reopens the note", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-specaudit-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  const run = (...args) =>
+    spawnSync(process.execPath, [join(SCRIPTS, "audit-spec-status.mjs"), ...args], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+  const baselineFile = join(dir, "barwise", "spec-status-baseline.json");
+  try {
+    g("init", "-q");
+    g("config", "user.email", "test@example.com");
+    g("config", "user.name", "test");
+    mkdirSync(join(dir, "barwise", "src"), { recursive: true });
+    mkdirSync(join(dir, "barwise", "docs", "specs"), { recursive: true });
+    mkdirSync(join(dir, ".beads"), { recursive: true });
+    writeFileSync(join(dir, ".beads", "issues.jsonl"), "");
+    writeFileSync(join(dir, "barwise", "src", "a.ts"), "0\n");
+    g("add", "-A");
+    g("commit", "-qm", "source");
+    writeFileSync(
+      join(dir, "barwise", "docs", "specs", "s.spec.md"),
+      "# S\n\nStatus: Draft -- no workstream implemented\n\nBuilds `barwise/src/a.ts`.\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "spec");
+    const touch = (n) => {
+      writeFileSync(join(dir, "barwise", "src", "a.ts"), `${n}\n`);
+      g("commit", "-qam", `touch ${n}`);
+      return g("rev-parse", "HEAD");
+    };
+
+    const first = touch(1);
+    // Six characters, shorter than the seven git abbreviates to here: the
+    // match must be by prefix, as a growing repository lengthens them.
+    writeFileSync(
+      baselineFile,
+      JSON.stringify({
+        specs: {
+          "s.spec.md": {
+            status: "Draft -- no workstream implemented",
+            commits: [first.slice(0, 6)],
+            note: "Reviewed: the commit is unrelated to this spec.",
+          },
+        },
+      }),
+    );
+    let r = run("--check");
+    assert.equal(r.status, 0, `a covered verdict passes: ${r.stdout}${r.stderr}`);
+    assert.doesNotMatch(r.stdout, /predate commits/, "a recorded commit is not reported");
+
+    const second = touch(2);
+    r = run("--check");
+    assert.equal(r.status, 0, `an unrecorded commit is reported, not failed: ${r.stderr}`);
+    assert.match(r.stdout, new RegExp(`s\\.spec\\.md: ${second.slice(0, 7)}`));
+
+    r = run("--write");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      new RegExp(
+        `reopened \\(re-read before --check passes\\): s\\.spec\\.md: ${second.slice(0, 7)}`,
+      ),
+      "a write that rewrites a note must say so",
+    );
+    const note = JSON.parse(readFileSync(baselineFile, "utf8")).specs["s.spec.md"].note;
+    assert.match(note, /^TODO: re-read -- /, "the write must reopen the verdict, not keep it");
+    assert.match(note, /Previous note: Reviewed: the commit is unrelated/);
+    r = run("--check");
+    assert.equal(r.status, 1, "a reopened verdict stays red until a person re-reads it");
+    assert.match(r.stderr, /UNCLASSIFIED: s\.spec\.md -- reopened: TODO: re-read -- /);
+    assert.doesNotMatch(r.stderr, /has no note/, "a reopened row has a note; say what it asks");
+
+    // A commit that lands while the row is reopened joins its TODO, so the
+    // re-read covers everything the row will then record.
+    const third = touch(3);
+    r = run("--write");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const again = JSON.parse(readFileSync(baselineFile, "utf8")).specs["s.spec.md"].note;
+    assert.match(
+      again,
+      new RegExp(`^TODO: re-read -- ${second.slice(0, 7)}\\w*, ${third.slice(0, 7)}`),
+    );
+    assert.match(again, /Previous note: Reviewed: the commit is unrelated to this spec\.$/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
