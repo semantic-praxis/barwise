@@ -110,7 +110,7 @@ fact, which would defeat the comparison.
 | Area                                          | Current state                                                                                                                                                                  | Verdict                                                                                          |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | `barwise/scripts/audit-spec-status.mjs`       | Holds `namedPaths`, the one reader of "which repo paths a spec names": backticked tokens with a code extension, tried at three roots, kept if git knows them; barrels excluded | Moves to a shared lib; behaviour unchanged for the audit                                         |
-| `barwise/scripts/lib/spec-reader.mjs`         | Does not exist                                                                                                                                                                 | New, shared with architecture-index: `namedPaths` with its four options, `header()`, `touches()` |
+| `barwise/scripts/lib/spec-reader.mjs`         | Does not exist                                                                                                                                                                 | New: `namedPaths` with its four options, `header()`, `touches()`                                 |
 | `barwise/scripts/plan-scope.mjs`              | Does not exist                                                                                                                                                                 | New: the report                                                                                  |
 | `changed-class.mjs`                           | `committedPaths(base)` runs a two-dot `git diff base HEAD`, right for CI's merge commit and wrong locally once `main` has moved                                                | Not reused; the file list is a three-dot diff, as `pr-risk` reads it                             |
 | `.gitattributes`                              | One line: the beads merge driver                                                                                                                                               | Gains `linguist-generated` marks, if Open decision 2 takes its default                           |
@@ -238,11 +238,10 @@ Touches: barwise/scripts/audit-spec-status.mjs, +barwise/scripts/plan-scope.mjs,
   it. `audit:specs` also keeps its code-extension filter, so a Markdown
   entry such as a skill counts for the report and for plan review, and not
   for the audit, as today. `barwise/docs/specs/` is wiring because a
-  workstream that records decisions or Status in other specs is
+  workstream that updates Status or a pointer in other specs is
   documenting decisions already made, not implementing one; the plan
   review still fires for that workstream through the owned entries it
-  changes in the same PR (for `architecture-index.spec.md` WS2,
-  `lib/spec-decisions.mjs`).
+  changes in the same PR.
 - **Only the header block is read.** The reader takes header fields from
   the lines between the title and the first `##` heading, never from the
   body, so an example inside a code block (like the one above) is never
@@ -371,8 +370,7 @@ root forwarder. `audit-spec-status` reads `Touches:` when present. Tests:
 each option on and off; a `Touches:` entry that resolves, one the branch
 adds, and a dead one seen failing; and a Draft spec citing `ci.yml` as
 context with a `Touches:` that omits it, which an edit to `ci.yml` no
-longer trips. `architecture-index.spec.md` adds its heading and marker
-readers to the same lib.
+longer trips.
 
 ### 3. `plan-scope.mjs` and its npm script (provisional: not yet grounded)
 

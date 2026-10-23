@@ -1,350 +1,373 @@
-# A current architecture index generated from the decisions specs record
+# Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
 Status: Draft -- no workstream implemented
 
 Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-ubc
-Touches: barwise/docs/ARCHITECTURE.md, CLAUDE.md, barwise/.dependency-cruiser.cjs,
-+barwise/scripts/lib/spec-decisions.mjs, +barwise/scripts/regen-architecture.mjs,
+Touches: barwise/docs/adr/, barwise/docs/ARCHITECTURE.md, CLAUDE.md,
+barwise/.dependency-cruiser.cjs, +barwise/scripts/regen-architecture.mjs,
 +barwise/scripts/check-architecture.mjs, barwise/scripts/tests/,
 barwise/package.json, package.json, .github/workflows/ci.yml,
-barwise/docs/specs/, .claude/skills/spec-writer/SKILL.md,
-.claude/skills/spec-writer/template.spec.md, .claude/skills/steward/SKILL.md
++.claude/skills/spec-writer/template.adr.md, .claude/skills/spec-writer/SKILL.md,
+.claude/skills/pr-review/checklist.md, .claude/skills/steward/SKILL.md
 
-In one sentence: specs mark the decisions that set architecture or
-process with a one-line `Decision:` marker, a script renders those
-decisions and the package graph into a generated section at the top of
-`barwise/docs/ARCHITECTURE.md`, and CI fails when that section, the
-root `CLAUDE.md` package graph, or a supersession link disagrees with
-its source.
+In one sentence: each architecture or process decision lives in one ADR
+named for its concern and edited in place, the PR that changes an ADR
+says what changed and why, a generated first section of
+`barwise/docs/ARCHITECTURE.md` lists the current ADRs and the package
+graph, and CI fails when that section, an ADR's shape, or the root
+`CLAUDE.md` package graph drifts from its source.
 
 ## Principle
 
 Explicit over implicit, and a copy that must agree is derived or
 checked, never guarded by a comment (root `CLAUDE.md`, Conventions).
 
-Barwise already keeps its decisions where tools can read them: 87 of the
-141 specs carry at least one heading marked `(resolved`, 141 such
-headings in all, most of the form `## <question>? (resolved: <answer>)`. What it lacks is a current place that lists them.
-`barwise/docs/ARCHITECTURE.md` says of itself "Historical design record
-(February 2026)" (barwise-873), and the current structure is spread
-across the root and per-package `CLAUDE.md` files. A reader who wants
-"what has this project decided about ids, or about review" has to know
-which of 141 specs to open. A reviewer who wants to say "#662 already
-decided this" can only do so from memory.
+A decision a reviewer or agent must follow needs a home that holds only
+the current answer. Today barwise has three partial homes. Two ADRs live
+in `barwise/docs/adr/`. About 141 "(resolved ...)" headings are spread
+across 87 specs, most of them local choices. And the root `CLAUDE.md`
+states 16 conventions with their reasons inline, in a file of 621 lines
+that every session loads. `barwise/docs/ARCHITECTURE.md` calls itself a
+"historical design record (February 2026)" (barwise-873), and its
+section 8.1 cites `docs/decisions/001-yaml-over-xml.md`, a file that has
+never existed in this repository's history.
 
-The architecture facts that stay current here are the ones a check
-reads: the package graph (`.dependency-cruiser.cjs`), core's purity
-(`check-core-purity.mjs`), the tool lists (pinned by
-`serverSpawn.test.ts` and
-`toolRegistration.test.ts`), and the paths instruction
-files cite (`check-instruction-refs.mjs`). The ones that decayed are the
-ones nothing reads. ARCHITECTURE.md section 8.1 cites
-`docs/decisions/001-yaml-over-xml.md`, a file that has never existed in
-this repository's history, and section 8.4's "read-only diagrams" was
-overtaken when the canvas began saving layouts and views into the model
-(`protocol.ts`, `saveLayout` and `saveView`). This
-spec applies the pattern that works to the facts that did not.
+The owner's decisions of 2026-10-23 set the shape: decisions get ADRs;
+an ADR covers one concern, is named for it, and is edited in place when
+the decision changes; and the history lives in git and in the PR that
+made the change, not in the ADR.
 
 ## Anchors
 
 Verified 2026-10-23 against `origin/main` at `1a32f9c7`.
 
-1. **Decision headings are regular enough to parse.** All 141 resolved
-   headings are on one line; 140 are `##`, one is `###`. 124 use
-   `(resolved: ...)`; the other 17 are section headings of the form
-   `## Decisions (resolved 2026-09-25)` that hold bullets. Separately,
-   25 bulleted open decisions in 9 specs carry `(resolved: ...)`, and
-   some wrap across lines. Command:
-   `grep -hE "^#+ .*\(resolved" barwise/docs/specs/*.spec.md`.
-2. **Most resolved headings are local, not architectural.** A sample of
-   18 included "Should history read git directly or take file pairs?
-   (resolved: git in the CLI, pure pairs in core)" next to "What went
-   wrong (resolved: the reload rule could not tell new from old)". By my
-   reading about a third of the sample is a decision a new contributor
-   would need. That is judgment, not measurement, and it is why the
-   design asks authors to mark decisions rather than indexing every
-   heading.
-3. **Supersession is recorded only as prose.** 21 specs mention
-   superseded, withdrawn or replaced decisions, in forms such as
-   "**WS4 WITHDRAWN** by the owner's decision of 2026-09-23" and
-   "Superseded by `diagram-empty-view`". Spec `Status:` lines are free
-   text too: at `1a32f9c7`, 14 read exactly "Status: Implemented" and 91
-   begin with it (`git grep -hE '^Status: Implemented$' 1a32f9c7 --
-   'barwise/docs/specs/*.spec.md' ':(exclude)barwise/docs/specs/archive/*'
-   | wc -l`, and `-lE '^Status: Implemented'` for the second).
-   Nothing a script can trust says a decision no longer holds.
+1. **The ADR directory exists, and it already works this way.**
+   `barwise/docs/adr/` holds `0001-metamodel-evolution-policy.md`
+   (2026-06-17) and `0002-constraint-coverage-policy.md` (2026-08-27),
+   each with `Status:`, `Date:` and `Tracking:` headers and Context,
+   Decision and Consequences sections. ADR 0001 was edited in place the
+   day after it was written, to settle schema versioning (`d2d677ea`),
+   which is the living-ADR practice this spec writes down. ADR 0002 was
+   split from its spec so that "the spec keeps the living half"
+   (`7e67e04e`): the ADR holds the policy, and the spec holds the
+   inventory and workstreams. That is the ADR-and-spec division this
+   spec adopts.
+2. **The numbers are cited widely.** 16 tracked files cite the two ADR
+   paths, including two package `CLAUDE.md` files, five archived specs
+   and the promptlab eval suite definition, and the text names "ADR 0001" or
+   "ADR 0002" 60 times (`git grep -nE "ADR[ -]?000[12]" -- . ':!.beads'
+   | wc -l`). Renaming to concern names is a mechanical rewrite of all
+   of them, not an edit to two files.
+3. **Supersession is prose today.** 23 specs mention a superseded,
+   withdrawn or replaced decision (`git grep -liE 'supersed|withdrawn|
+   replaced by' 1a32f9c7 -- 'barwise/docs/specs/*.spec.md'
+   ':(exclude)barwise/docs/specs/archive/*' | wc -l`), and nothing a
+   script can read says which decisions still hold. In-place ADRs make
+   that question disappear: the ADR on `main` is the decision.
 4. **The package graph has three copies and one checked direction.** The
-   root `CLAUDE.md` "Dependency Graph" block, the `INTENDED` map in
-   `barwise/.dependency-cruiser.cjs`, and the twelve `package.json`
-   dependency lists. The first two agree; the `package.json` lists agree
-   in their runtime `dependencies` but not their `devDependencies`:
-   `@barwise/llm` lists `@barwise/diagram` as a dev dependency for
-   `tests/Pipeline.integration.test.ts`, while `INTENDED` gives `llm`
-   only `core`. Only `INTENDED` against real imports is
-   checked (`npm run depcruise`, guarded by `check:depcruise-gate`).
-   `INTENDED`'s own comment reads "Source of truth is the root CLAUDE.md
-   dependency graph", which is the reverse of what CI enforces.
+   root `CLAUDE.md` "Dependency Graph" block and the `INTENDED` map in
+   `barwise/.dependency-cruiser.cjs` agree edge for edge for all 12
+   packages. The `package.json` lists agree in runtime `dependencies`
+   but not `devDependencies`: `@barwise/llm` lists `@barwise/diagram` as
+   a dev dependency for `tests/Pipeline.integration.test.ts`, while
+   `INTENDED` gives `llm` only `core`. Only `INTENDED` against real
+   imports is checked (`npm run depcruise`). `INTENDED`'s own comment
+   reads "Source of truth is the root CLAUDE.md dependency graph", the
+   reverse of what CI enforces.
 
-Set aside: that ARCHITECTURE.md's section numbers could be renumbered
-freely. They cannot. `docs/ORM_PROJECT_GUIDE.md`,
-`docs/halpin-morgan-3e-reading-guide.md`,
-`docs/halpin-morgan-3e-contents.md` and
-`specs/prompt-optimization-harness.spec.md` cite sections such as
-3.1.4, 3.4-3.5 and 7.5, and
-`check-book-citations.mjs` treats "ARCHITECTURE.md" as a citation
-boundary.
+Set aside: ARCHITECTURE.md's section numbers cannot change.
+`docs/ORM_PROJECT_GUIDE.md`, the two Halpin-Morgan reading documents and
+`specs/prompt-optimization-harness.spec.md` cite sections such as 3.1.4
+and 7.5, and `check-book-citations.mjs` treats "ARCHITECTURE.md" as a
+citation boundary.
 
-## Should ARCHITECTURE.md become current again? (resolved: its first section, generated)
+## What is an ADR here? (resolved: one living file per concern)
 
-Yes. A hand rewrite failed before, so the new section is generated. The
-historical body stays where it is, because its numbered sections
-(metamodel, mapping) are cited from four documents and are still the
-best description of the metamodel's rationale.
+Decided by the owner on 2026-10-23.
 
-The file gains one unnumbered section at the top, between generated
-markers, holding the current decision index and the package graph. The
-existing header already says the body is a February 2026 record; it
-gains one sentence saying the first section is current and generated.
-Nothing in the body moves, so no citation breaks.
+- **One ADR per concern, not per decision.** "Where non-deterministic
+  code may live" is one ADR even if its answer changes twice.
+- **Named by concern, not by number:**
+  `barwise/docs/adr/package-graph-authority.md`, the same stable-kebab
+  rule specs follow. A number suits an append-only log; a living
+  document wants a stable name.
+- **Edited in place.** The ADR on `main` is the current decision, so
+  there is no superseded state, no `Superseded-by:` link to keep valid,
+  and no dead decision for an agent to find and follow. Retiring a
+  concern deletes its file; git keeps it, and
+  `check:instruction-refs` already fails on any instruction file still
+  linking to it.
+- **History lives in git and the PR, not in the ADR.** The PR that
+  changes an ADR's Decision states what changed and why. A reader who
+  needs the past runs `git log -p` on the file and reads those PRs.
+- **The format is the one the two existing ADRs use,** with one field
+  added and one redefined:
 
-Root `CLAUDE.md` keeps the current structure an agent loads every
-session. It stops pointing at ARCHITECTURE.md only for "the original
-system design" and points at the generated section for decisions. This
-adds no second owner: the decisions are owned by the specs, the graph by
-`INTENDED`, and both documents only render them.
+  ```text
+  # <Concern>
 
-## What is a decision, mechanically? (resolved: a heading with a marker line)
+  Status: Accepted
+  Scope: architecture
+  Date: 2026-10-23
+  Tracking: barwise-ubc, docs/specs/<spec>.spec.md
 
-A decision is a `##` or `###` heading with, as the first non-blank line
-under it:
+  ## Context
+  ## Decision
+  ## Consequences
+  ```
 
-```
-Decision: architecture
-```
+  `Scope:` is `architecture` or `process`. `Date:` is the date the
+  Decision section last changed. `Status:` is `Accepted` on `main`; an
+  ADR proposed in an open PR may read `Proposed`, and merging it means
+  setting `Accepted`. The `# ADR 0001:` title prefix goes.
 
-The value is a closed set (`architecture` or `process`; Open decision
-3). A decision that no longer holds gains a second line:
+## Which decisions get an ADR? (resolved: the ones others must follow)
 
-```
-Decision: architecture
-Superseded-by: <spec file>.spec.md#<heading slug>
-```
+A decision gets an ADR when it sets a rule other work must follow, or
+would be expensive to reverse. The local choices in specs' resolved
+headings stay in their specs; nothing indexes them. This answers the
+owner's objection to both earlier designs (index every resolved heading,
+or tag the important ones inside specs): decisions that matter get their
+own file, and the rest stay where they were made.
 
-The target is a spec file and the GitHub-style slug of a heading in it,
-and that heading must itself be a decision.
+**An ADR and its spec divide the work, as ADR 0002 and its spec do.**
+The spec holds the reasoning, the alternatives and the workstreams. The
+ADR holds the decision and its consequences, and links the spec. When a
+spec settles an ADR-level question, the same PR writes or edits the ADR,
+and the spec's resolved heading points to the ADR rather than restating
+it. Under the owner's plan-review rule (`plan-scope-check.spec.md`), the
+ADR is reviewed with the spec before any implementation.
 
-The marker, not the heading text, is what makes a decision. Headings
-say "resolved" four ways today -- `(resolved: yes)`, `(resolved
-2026-09-25)`, a `Decisions (resolved ...)` section, and dated headings
-such as tiered-pr-review's `## The decision of 2026-09-23: review
-everything non-trivial, block nothing` -- and requiring one spelling
-would leave that last one, a process decision Open decision 3 wants
-indexed, unindexable. What the check refuses is a marker on something
-still open: under a heading containing `(open`, or anywhere inside a
-`## Open decisions` section whose heading does not say it is resolved --
-under one of its `###` headings or directly in its body beside the
-numbered items. (16 sections already read `Decisions (resolved ...)` or
-`Open decisions (resolved ...)`; a marked `###` under one of those is
-indexable.) A bulleted open decision is not indexable; to index one, promote it to a heading. Marking is
-explicit because the sample in anchor 2 shows that most resolved
-headings record a local choice, and an index of all 141 would bury the
-ones that matter.
+**`CLAUDE.md` links to ADRs rather than restating them** (WS5). Its 16
+conventions mostly carry their reasons inline. Each can become a one-line
+rule plus a link, so the file every session loads gets shorter, and the
+reason is one file away when an agent needs it.
 
 ## Scope
 
 In scope:
 
-- When a spec heading is followed by a `Decision:` line, the generator shall list it in ARCHITECTURE.md's generated section
-  under its scope, with the spec, the heading text and a link.
-- When a decision carries `Superseded-by:`, the generator shall list it
-  under "Superseded" with a link to its replacement, never among the
-  current decisions.
-- When a `Superseded-by:` target does not exist, or names a heading that
-  is not itself a decision, `npm run check:architecture` shall fail
-  (exit 1) naming the spec and line.
-- When a `Decision:` line sits under a heading containing `(open`, or
-  anywhere inside a `## Open decisions` section whose heading does not
-  say it is resolved, or carries a value outside the closed set, the check shall fail (exit 1).
-- When the generated section differs from what the generator produces,
-  the check shall fail (exit 1) and name `npm run regen:architecture`.
+- When a file under `barwise/docs/adr/` lacks `Status:`, `Scope:`,
+  `Date:`, or a `## Decision` section, or carries a `Status:` or `Scope:`
+  value outside its closed set, `npm run check:architecture` shall fail
+  (exit 1) naming the file and the field.
+- When a diff changes an ADR's `## Decision` section and leaves its
+  `Date:` unchanged, the check shall fail (exit 1), so a reversal cannot
+  pass as a wording fix.
+- When an ADR on the base branch reads `Status: Proposed`, the check
+  shall fail (exit 1): merging is acceptance.
+- When the generated section of ARCHITECTURE.md differs from what
+  `npm run regen:architecture` produces, the check shall fail (exit 1)
+  and name the command.
 - When the edges in the root `CLAUDE.md` "Dependency Graph" block differ
   from `INTENDED` in either direction, the check shall fail (exit 1)
   naming each edge.
-- When the check cannot read the specs directory, `INTENDED`, or either
-  target document, it shall exit 2 and say what it could not read
+- When the check cannot read the ADR directory, `INTENDED`, either
+  target document, or the merge base (a shallow clone included), it
+  shall exit 2 and say what it could not read
   (`docs/specs/gate-refusal-contract.spec.md`).
+- When a PR changes an ADR's Decision, the `pr-review` checklist shall
+  ask that the PR body say what changed and why.
 
-Out of scope: backfilling every existing decision in one change (Open
-decision 4); changing how spec `Status:` lines are written (anchor 3
-says they are free text, and `audit-spec-status.mjs` already owns
-reading them); generating the per-package `CLAUDE.md` dependency
-tables (barwise-873 named them; separate work); a decision record format
-outside specs.
+Out of scope: ADRs for the local choices in specs; a history section
+inside ADRs (the owner's decision); generating the per-package
+`CLAUDE.md` dependency tables (barwise-873 names them; separate work).
 
 ## Inventory
 
-| Path                                               | Current state                                                                               | Change                                                                                                                                     |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `barwise/docs/ARCHITECTURE.md`                     | Historical record; 8.1 cites a nonexistent file                                             | Gains a generated first section; header sentence; 8.1 fixed                                                                                |
-| `CLAUDE.md` (root)                                 | Holds the graph; calls ARCHITECTURE.md historical                                           | Graph drift-checked; pointer names the generated section                                                                                   |
-| `barwise/.dependency-cruiser.cjs`                  | `INTENDED` says CLAUDE.md is its source of truth                                            | Comment corrected: `INTENDED` is the authority                                                                                             |
-| `barwise/scripts/lib/spec-reader.mjs`              | Does not exist; `plan-scope-check.spec.md` WS2 creates it from `audit-spec-status`'s reader | Imported, not edited                                                                                                                       |
-| `barwise/scripts/lib/spec-decisions.mjs`           | Does not exist                                                                              | New: heading and decision-marker readers over `spec-reader`                                                                                |
-| `barwise/scripts/regen-architecture.mjs`           | Does not exist                                                                              | New: renders the generated section                                                                                                         |
-| `barwise/scripts/check-architecture.mjs`           | Does not exist                                                                              | New: the drift and marker checks above                                                                                                     |
-| `.claude/skills/spec-writer/template.spec.md`      | No decision marker                                                                          | Documents `Decision:` and `Superseded-by:`                                                                                                 |
-| `ci.yml`                                           | No such step                                                                                | Runs `check:architecture`                                                                                                                  |
-| `barwise/package.json` and the root `package.json` | No such scripts                                                                             | `check:architecture` and `regen:architecture`, with root forwarders regenerated by `regen-root-package.mjs` so `check:root-scripts` passes |
+| Path                                               | Current state                                          | Change                                                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `barwise/docs/adr/`                                | Two numbered ADRs                                      | Renamed by concern (WS2); new ADRs added (WS2, WS4)                                                        |
+| `barwise/docs/ARCHITECTURE.md`                     | Historical record; 8.1 cites a nonexistent file        | Gains a generated first section and a header sentence; 8.1's dead link removed                             |
+| `CLAUDE.md` (root)                                 | Holds the graph and 16 conventions with reasons inline | Graph drift-checked (WS1); conventions become rule plus ADR link (WS5)                                     |
+| `barwise/.dependency-cruiser.cjs`                  | `INTENDED` says CLAUDE.md is its source of truth       | Comment corrected: `INTENDED` is the authority                                                             |
+| `barwise/scripts/check-architecture.mjs`           | Does not exist                                         | New: graph, ADR shape, Decision-date and index checks                                                      |
+| `barwise/scripts/regen-architecture.mjs`           | Does not exist                                         | New: renders the generated section                                                                         |
+| `.claude/skills/spec-writer/template.adr.md`       | Does not exist                                         | New: the ADR template                                                                                      |
+| `.claude/skills/spec-writer/SKILL.md`              | No ADR step                                            | When a spec settles a rule others must follow, write or edit its ADR in the same PR                        |
+| `.claude/skills/pr-review/checklist.md`            | No ADR item                                            | "When an ADR's Decision changed": the PR body says what changed and why; the spec does not restate the ADR |
+| `.claude/skills/steward/SKILL.md`                  | Regenerator list                                       | Gains `regen:architecture`                                                                                 |
+| `ci.yml`                                           | No such step                                           | Runs `check:architecture`                                                                                  |
+| `barwise/package.json` and the root `package.json` | No such scripts                                        | `check:architecture` and `regen:architecture`, with root forwarders from `regen-root-package.mjs`          |
 
-`check-instruction-refs.mjs` is untouched: ARCHITECTURE.md is not an
-instruction file, and the links the generator writes are checked by
-`check:architecture` itself.
+No shared spec reader is needed: ADRs are their own files with four
+header fields, so this spec does not depend on `plan-scope-check.spec.md`
+WS2.
 
 ## Target architecture
 
 ```
-specs/*.spec.md ──(Decision:, Superseded-by:)──┐
-                                               ├─ lib/spec-decisions.mjs ─ regen-architecture.mjs ──> ARCHITECTURE.md
-.dependency-cruiser.cjs (INTENDED) ────────────┘                              (generated first section)
-        │
+barwise/docs/adr/<concern>.md ──┐
+                                ├── regen-architecture.mjs ──> ARCHITECTURE.md
+.dependency-cruiser.cjs ────────┘     (INTENDED)               (generated first section:
+        │                                                       ADRs by scope, then the graph)
         └── check-architecture.mjs ── compares ──> root CLAUDE.md graph block (edges only;
                                                     the hand-written annotations stay)
 ```
 
-The `CLAUDE.md` graph is checked, not generated, because its
-annotations ("connector package: registers ...") are prose worth
-keeping, and `CLAUDE.md` is loaded into every session, so a generator
-writing into it is a larger change than a drift test.
+The generated section lists each ADR under its scope with its title, its
+`Date:`, the first sentence of its Decision, and a link. The `CLAUDE.md`
+graph is checked rather than generated, because its annotations
+("connector package: registers ...") are prose worth keeping, and a
+generator writing into the file every session loads is a larger change
+than a drift test.
 
 ## Which copy of the package graph is the authority? (resolved: `INTENDED`, the owner's decision of 2026-10-23)
 
-Decision: architecture
-
-`INTENDED` in `barwise/.dependency-cruiser.cjs` is the package graph;
-the root `CLAUDE.md` block renders it and is checked against it (WS1).
-It states a policy ("may import") and is the one copy CI enforces through
-`npm run depcruise`. `package.json` lists what is installed, and its
-runtime `dependencies` must stay within `INTENDED`; `devDependencies` may
-legitimately reach further for tests, as `@barwise/llm`'s dev dependency
-on `@barwise/diagram` does (anchor 4). A check that runtime dependencies
-stay within `INTENDED` is a separate, smaller question this spec does not
-take on.
-
-This is the first heading to carry a `Decision:` marker, and it is a
-heading rather than an Open-decisions bullet because bullets are not
-indexable.
+`INTENDED` in `barwise/.dependency-cruiser.cjs` is the package graph; the
+root `CLAUDE.md` block renders it and is checked against it (WS1). It
+states a policy ("may import") and is the one copy CI enforces through
+`npm run depcruise`. Runtime `dependencies` must stay within `INTENDED`;
+`devDependencies` may reach further for tests, as `@barwise/llm`'s does
+(anchor 4). A check on runtime dependencies is a separate, smaller
+question this spec does not take on. WS2 records this decision as the
+ADR `package-graph-authority.md`, and this heading then points to it.
 
 ## Alternatives considered
 
-- **A new `barwise/docs/DECISIONS.md`, leaving ARCHITECTURE.md
-  historical.** Same generator, separate file. Cheaper to explain and
-  touches no cited document. It lost narrowly, because it leaves the
-  document named "architecture" permanently out of date, which is the
-  trap the owner named; it stays Open decision 1.
-- **A classic ADR directory (`docs/decisions/NNNN-title.md`).** The
-  common industry form, and what ARCHITECTURE.md planned in February.
-  It lost because the specs already carry the reasoning, so each ADR
-  would restate a spec section, two owners of one decision. The
-  directory was planned and never created (anchor: the dead 8.1 link),
-  which is the outcome a hand-kept parallel record tends to have.
-- **Rewrite ARCHITECTURE.md by hand as a current document, with a
-  review checklist item to keep it current.** It lost because that is
-  the state barwise-873 found decayed, and because renumbering would
-  break four documents' citations.
+- **Numbered, immutable ADRs with supersession.** The classic form, and
+  how `0001` and `0002` are named. Lost on the owner's decision: dead
+  decisions accumulate beside live ones, look just as authoritative to an
+  agent searching the directory, and need a supersession chain and a
+  check to keep it valid. ADR 0001's own history shows the repo already
+  edits in place.
+- **Mark decisions inside specs with a `Decision:` line, or index every
+  resolved heading.** This spec's first design. The owner rejected both:
+  indexing every heading buries the few decisions that matter among 141
+  local ones, and tagging leaves decisions inside long planning
+  documents.
+- **A history section inside each ADR.** Keeps the reason for each change
+  next to the decision. Lost on the owner's decision: git and the PR
+  already hold it, and a growing history section is the context
+  pollution in-place editing avoids.
+- **Rewrite ARCHITECTURE.md by hand.** That is the state barwise-873
+  found decayed, and renumbering would break four documents' citations.
 
 ## Workstreams (each independently shippable)
 
 ### 1. Check the package graph against `INTENDED`
 
-Smallest and independent of the rest. Add the edge comparison to a new
-`check-architecture.mjs` (exit 1 on a missing or extra edge, exit 2 if
-either side cannot be parsed), fix `INTENDED`'s inverted comment, wire
-it into `ci.yml` (which `ci:local` reads), and add a gates test that plants an
-extra edge and sees red. No spec changes and no ARCHITECTURE.md change.
+Smallest and independent of the rest. `check-architecture.mjs` compares
+the `CLAUDE.md` graph edges with `INTENDED` (exit 1 on a missing or extra
+edge, exit 2 if either side cannot be parsed), `INTENDED`'s inverted
+comment is fixed, the step runs in `ci.yml`, and a gates test plants an
+extra edge and sees red through `mutate.mjs`.
 
-### 2. Decision markers (provisional: not yet grounded)
+### 2. The ADR convention, the two renames, and the first new ADR
 
-Depends on `plan-scope-check.spec.md` WS2, which owns moving
-`audit-spec-status.mjs`'s header reading into `scripts/lib/spec-reader.mjs`.
-This workstream adds `scripts/lib/spec-decisions.mjs`, which imports that
-reader and adds the heading and marker readers.
-Extend `check-architecture.mjs` with the marker rules in Scope. Document
-the two lines in `template.spec.md` and the `spec-writer` skill. Mark
-the first decisions: the candidates are the 124 `(resolved: ...)`
-headings, listed by a `--candidates` flag; which to mark is Open
-decision 4. What is ungrounded is the marker reader's handling of the four
-ways headings say "resolved" today.
+- `git mv` `0001-metamodel-evolution-policy.md` to
+  `metamodel-evolution-policy.md` and `0002-constraint-coverage-policy.md`
+  to `constraint-coverage-policy.md`. Rewrite every path citation (anchor
+  2) in the same commit, and drop the `# ADR 0001:` title prefixes. Prose
+  that says "ADR 0001" becomes the concern name. A grep for `adr/000`
+  that finds nothing is the acceptance test; `check:instruction-refs`
+  covers the two package `CLAUDE.md` files.
+- Add `Scope:` to both, and the ADR shape and Decision-date checks to
+  `check-architecture.mjs`, with a sandbox test for each, seen red
+  first.
+- Add `template.adr.md`, the `spec-writer` step and the `pr-review`
+  checklist item.
+- Write `package-graph-authority.md` from the resolved heading above,
+  and point that heading at it.
 
 ### 3. The generated section in ARCHITECTURE.md (provisional: not yet grounded)
 
-`regen-architecture.mjs` writes the decision index (by scope, then
-spec) and a rendering of `INTENDED` between markers at the top of
-ARCHITECTURE.md; `check-architecture.mjs` fails when they differ. Add
-the header sentence and the root `CLAUDE.md` pointer, add
-`regen:architecture` to the steward skill's regenerator list, and
-remove 8.1's dead link. `regen:architecture` writes a section of a
-hand-written file, not a whole file, so `plan-scope-check.spec.md`'s
-WS4 exempts it by name from marking ARCHITECTURE.md generated. Index each of section 8's six historical
-decisions that still holds, pointing at its 8.x section, with 8.4
-listed as superseded by whichever spec decided saved layouts (not yet
-identified).
+`regen-architecture.mjs` writes the ADR index and a rendering of
+`INTENDED` between markers at the top of ARCHITECTURE.md, and
+`check-architecture.mjs` fails when they differ. The header gains a
+sentence saying the first section is current and generated; the root
+`CLAUDE.md` "Essential Context" pointer names it; 8.1's dead link goes;
+`regen:architecture` joins the steward skill's regenerator list.
+`regen:architecture` writes part of a hand-written file, so
+`plan-scope-check.spec.md` WS4 exempts it by name from marking
+ARCHITECTURE.md generated. Not grounded: whether the six section-8
+historical decisions that still hold become ADRs or are left as history.
+
+### 4. Backfill the first batch of ADRs (provisional: the owner picks the list)
+
+One PR per few ADRs, each reviewed under the plan-review rule, since
+writing a decision down is a plan. Candidates, drawn from the root
+`CLAUDE.md` and the specs it cites:
+
+| Proposed ADR                      | Scope        | Today stated in                                           |
+| --------------------------------- | ------------ | --------------------------------------------------------- |
+| `determinism-in-core.md`          | architecture | CLAUDE.md design principles; `check-core-purity.mjs`      |
+| `connector-packages.md`           | architecture | CLAUDE.md "Dependency Graph" prose (core ships no format) |
+| `schema-versioning.md`            | architecture | ADR 0001's schema-versioning section; `migrate` row       |
+| `surface-capability-parity.md`    | architecture | CLAUDE.md capability matrix ("an unmarked gap is a bug")  |
+| `production-prompt-resolution.md` | architecture | CLAUDE.md `--artifacts` paragraph                         |
+| `keyless-model-access.md`         | architecture | CLAUDE.md conventions; `keyless-model-access.spec.md`     |
+| `python-from-the-lockfile.md`     | process      | CLAUDE.md conventions                                     |
+| `gate-refusal-contract.md`        | process      | CLAUDE.md conventions; `gate-refusal-contract.spec.md`    |
+| `must-agree-copies.md`            | process      | CLAUDE.md conventions; `duplication-drift-guards.spec.md` |
+| `baselines-merge-on-write.md`     | process      | CLAUDE.md conventions                                     |
+| `credential-handling.md`          | process      | CLAUDE.md conventions; `credential-scanning.spec.md`      |
+| `pinned-runtimes.md`              | process      | CLAUDE.md "Monorepo Commands" (Node and Python pins)      |
+| `plan-before-code.md`             | process      | `plan-scope-check.spec.md` (the owner's rule)             |
+| `merge-delegation.md`             | process      | `steward` skill, section 4b                               |
+| `review-policy.md`                | process      | `tiered-pr-review.spec.md` "The decision of 2026-09-23"   |
+
+`schema-versioning.md` is the question this list exists to raise: today
+it is a section of the metamodel ADR, and one concern per ADR says it
+splits out.
+
+### 5. Shorten the root `CLAUDE.md` (provisional: after WS4)
+
+Each convention that has an ADR becomes its rule in a line or two plus a
+link. Measure the file before and after; the session-start context is
+what this buys. Keep in `CLAUDE.md` anything an agent needs before it
+knows which ADR to open.
 
 ## How this transfers to a team with ADRs in Confluence
 
-The same three parts carry over to a data-engineering team.
-
-- Write ADRs as markdown in the repository they affect (`docs/adr/`),
-  with `Status:` and `Superseded-by:` lines, so a reviewer and an agent
-  can read them from the checkout. Cross-cutting ones live in the repo
-  that owns the decision, and other repos link to them.
-- Make the architecture page an index the CI regenerates and checks,
-  never a page someone remembers to update. A Confluence copy, if the
-  team wants one, is published from the repository, not edited there.
-- Check the facts a tool can read against their source: dbt model
+- ADRs live as markdown in the repository they govern, one per concern,
+  named for it and edited in place; cross-cutting ones live in the repo
+  that owns the decision, and others link to it.
+- The PR that changes an ADR carries the why, and the repository's
+  history is the audit trail -- which is also the answer for a team that
+  needs one for compliance.
+- The architecture page is an index CI regenerates and checks; a
+  Confluence copy, if wanted, is published from the repository, never
+  edited there.
+- Facts a tool can read are checked against their source: dbt model
   contracts and `dbt ls --select` against the documented layers, a
   Terraform module graph against the declared boundaries, Airflow DAG
   dependencies against the documented data flow.
 
 ## Open decisions (for review)
 
-1. **Generated section in ARCHITECTURE.md, or a new DECISIONS.md.**
-   Recommend the section: it makes the document named "architecture"
-   current, and the body's citations survive. Choose DECISIONS.md if a
-   half-generated, half-historical file reads as more confusing than
-   two files.
-2. **Mark decisions, or index every resolved heading.** Recommend
-   marking (anchor 2). Indexing all 141 needs no format change and no
-   backfill, at the cost of an index mostly made of local choices.
-3. **The scope values.** Recommend `architecture` and `process`. This
-   month's largest decisions were process ones ("The decision of
-   2026-09-23" on tiered review), and leaving them out would index half
-   of what a reviewer cites.
-4. **Backfill.** Recommend the owner marks from the `--candidates` list
-   in workstream 2's PR, rather than an agent guessing which decisions
-   matter. The alternative is marking only new decisions, which leaves
-   the index nearly empty for months.
-5. **Which copy of the package graph is the authority.** Resolved by the
-   owner; see "Which copy of the package graph is the authority?" above.
+1. **Index in ARCHITECTURE.md, or in a generated `adr/README.md`.**
+   Recommend ARCHITECTURE.md, which is the owner's corollary (keep
+   ARCHITECTURE.md current with the ADRs) and leaves the body's
+   citations intact. Choose the README if a half-generated,
+   half-historical file reads as more confusing than two files.
+2. **The backfill list.** Recommend the owner strikes or adds rows in the
+   WS4 table; the default is all fifteen, in about four PRs.
+3. **The scope values.** Recommend `architecture` and `process`; this
+   month's largest decisions were process ones.
+4. **How far `CLAUDE.md` shrinks (WS5).** Recommend rule-plus-link for
+   every convention with an ADR, keeping the commands and traps an agent
+   needs on its first command (the cwd and `dist` warnings) inline.
 
 ## Risks and testing
 
-- **Tripwire: the index grows past about 40 current decisions.** At
-  that size it stops being a summary and becomes a second table of
-  contents for the specs; tighten what `architecture` means before
-  adding more.
-- **Tripwire: a parse failure reads as an empty index.** The generator
-  must exit 2 when it finds zero specs or zero headings, never write an
-  empty section (the gate-refusal contract). Each check gets a gates
-  test that sees it red on a planted defect via `mutate.mjs` before
-  green.
-- Workstream 3 changes a file four documents cite by section number;
-  the test is that `git diff` shows no change below the generated
-  markers.
+- **Tripwire: the index passes about 40 ADRs.** Past that it is a second
+  table of contents; tighten what "others must follow" means.
+- **Tripwire: an ADR's Decision keeps changing.** Three Decision edits in
+  a quarter says the concern is not settled and belongs in a spec until
+  it is.
+- **A parse failure must not read as an empty index.** The generator
+  exits 2 on zero ADRs or an unreadable graph, never writes an empty
+  section. Each check gets a gates test seen red via `mutate.mjs`.
+- WS3 changes a file four documents cite by section number; `git diff`
+  must show no change below the generated markers.
+- WS2's rename touches 16 files; the acceptance grep and
+  `check:instruction-refs` are what make it safe.
 
 ## Non-goals
 
-- No new decision content. The index renders what specs already say.
-- No change to how specs are written beyond the two marker lines.
+- No ADRs for the local choices recorded in specs.
+- No history section inside ADRs.
 - No retirement of ARCHITECTURE.md's historical body.
