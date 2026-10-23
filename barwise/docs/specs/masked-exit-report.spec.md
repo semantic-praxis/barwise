@@ -127,9 +127,12 @@ flag:
   `npm --//registry.npmjs.org/:_authToken=X whoami`, `npm run --otp 123456
   build` and `npx --registry https://u:T@h vitest` record `npm`, `npm` and
   `npx`.
-- **`epipe`** is set when the process died on a write to a closed pipe,
-  seen through `process.on("uncaughtExceptionMonitor")`, which observes
-  without changing behaviour. Measured on Node 26: `process.stdout.write`
+- **`epipe`** is set when the process died of a write to a closed pipe:
+  `process.on("uncaughtExceptionMonitor")`, which observes without
+  changing behaviour, saw an error with `code === "EPIPE"` and `syscall === "write"` while no `uncaughtException` listener was registered (so
+  the error was fatal), and the process then exited 1. An EPIPE a
+  handler caught and survived, or an exit code other than the crash's,
+  is recorded as an ordinary exit. Measured on Node 26: `process.stdout.write`
   or `fs.writeSync(1, ...)` into `| head -1` exits 1 with EPIPE, while
   `console.log` exits 0. Such an exit is the reader leaving early, not the
   gate failing, and its own result is unknown; the report says exactly
@@ -186,10 +189,16 @@ only the wording differs:
 
 A process that outlives its call is read by the first call that ends
 after it exits, with its time on the line: the masked background case,
-which matters most. A complete line that does not parse (an older
-recorder's format, a corrupted write) is listed as "1 unreadable entry"
-and skipped, so one bad line cannot stop every later read; a last line
-without its newline (a write in progress) is left for the next read. Two
+which matters most. When the next step is not a Bash call (the agent
+reads the background output with Read and ends the turn), a **Stop**
+hook does the same read before the turn ends: on an unread non-zero or
+unreadable entry it exits 2, which keeps the turn open with the report
+in front of the model, so a turn cannot end over an unread failure. A complete line that does not parse (an older recorder's format, a
+corrupted write) is listed as "1 unreadable entry", with exit 2 like a
+failure, because it may have been one, and skipped, so one bad line
+cannot stop every later read; a last line without its newline (a write in progress) is left for the
+next read. If the log is shorter than the read position (it was removed
+and recreated), the read starts again from the beginning. Two
 Bash calls running at the same time can read each other's entries; the
 report names the process and its time, so a misattribution is visible,
 not silent. That is the one remaining attribution gap, and it is
@@ -230,7 +239,11 @@ below.
 In scope:
 
 - When a session starts, the SessionStart mode shall append to
-  `$CLAUDE_ENV_FILE`, each only if not already present, two static lines
+  `$CLAUDE_ENV_FILE` two static lines, each replacing any earlier line of
+  its kind (an earlier `BARWISE_EXIT_DIR` export, or a `NODE_OPTIONS`
+  export carrying an older recorder, so a resume across a recorder change
+  leaves one recorder, not two) and otherwise appended only if not
+  already present,
   written literally so the shell expands them: `export
   BARWISE_EXIT_DIR="<base>"` and `export
   NODE_OPTIONS="--import=data:text/javascript;base64,<b64>${NODE_OPTIONS:+
@@ -239,10 +252,11 @@ In scope:
   `CLAUDE_CODE_SESSION_ID` set, the recorder shall delete
   `BARWISE_EXIT_DIR` from its environment and append its exit code, time,
   label and `epipe` flag to the session log on exit.
-- When a Bash call ends, the PostToolUse or PostToolUseFailure mode shall
-  read the unread complete lines, and if any holds a non-zero code, exit 2
-  naming each such process, its code and its time, in the wording for
-  that event; otherwise it shall exit 0 silently.
+- When a Bash call ends, the PostToolUse or PostToolUseFailure mode, and
+  when a turn ends, the Stop mode, shall read the unread complete lines,
+  and if any holds a non-zero code or does not parse, exit 2 naming each
+  such process, its code and its time (or the unreadable line), in the
+  wording for that event; otherwise it shall exit 0 silently.
 - When three calls with node, npm or npx in command position have ended
   and the log has never received an entry, the mode that sees the third
   shall exit 2, once per session, saying the recorder is not recording.
@@ -267,6 +281,12 @@ Out of scope, each named so the gap is visible:
 - **A gate killed by a signal** (no `exit` event), and **a code changed
   by a later `exit` listener** (recorded as first seen; above).
 - **Two Bash calls running at the same time** (the attribution gap).
+- **A command that replaces `NODE_OPTIONS` for one process**
+  (`NODE_OPTIONS=--max-old-space-size=8192 npm test | tail`, `env -i
+  ...`): that process loads no recorder and records nothing, and because
+  other commands do record, the not-armed notice cannot catch it.
+  Appending instead (`NODE_OPTIONS="$NODE_OPTIONS --max-old-space-size=..."`)
+  keeps the recorder; the CLAUDE.md sentence says so.
 - **A Bash `node` older than 20.6**, the first to accept `--import` in
   `NODE_OPTIONS`. Every node command would exit 9. The repo already
   requires Node 26 (`engines`, `.nvmrc`, and `session-start.sh` installs
@@ -278,19 +298,19 @@ Out of scope, each named so the gap is visible:
 
 ## Inventory
 
-| Path                                                                                     | Today                                  | After                                                                                                                                     |
-| ---------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `barwise/scripts/hooks/exit-recorder.mjs`                                                | Does not exist                         | The recorder's source: consume the switch, label, flag EPIPE, append on exit, never throw                                                 |
-| `barwise/scripts/lib/exit-log.mjs`                                                       | Does not exist                         | The base and log path, the read position, reading complete lines, the not-armed count, the two wordings                                   |
-| `barwise/scripts/hooks/masked-exit.mjs`                                                  | Does not exist                         | `session`, `post` and `failure` modes for the three hook events                                                                           |
-| `barwise/scripts/tests/masked-exit.test.mjs`                                             | Does not exist                         | The tests below                                                                                                                           |
-| `barwise/scripts/tests/expected-counts.json`                                             | The test-count manifest                | Records the new file in the same commit (`npm run test:scripts -- --write`); run-script-tests refuses without                             |
-| `barwise/test-plan/cli-checks.sh`, `barwise/eval-runner.sh`, `barwise/compile-runner.sh` | Start the CLI expecting failures       | Also `unset BARWISE_EXIT_DIR` (the declared opt-out)                                                                                      |
-| `barwise/optimizer/barwise_optimizer/barwise_cli.py`                                     | Starts the CLI for the optimizer lane  | Drops `BARWISE_EXIT_DIR` from the environment it passes (the same opt-out)                                                                |
-| `.claude/settings.json`                                                                  | SessionStart and PreToolUse hooks      | Plus SessionStart (matcher `""`), PostToolUse and PostToolUseFailure (matcher `Bash`); every hook command under `env -u BARWISE_EXIT_DIR` |
-| `CLAUDE.md`                                                                              | Monorepo Commands names the pgrep trap | One sentence beside it: what the report means                                                                                             |
+| Path                                                                                     | Today                                  | After                                                                                                                                              |
+| ---------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `barwise/scripts/hooks/exit-recorder.mjs`                                                | Does not exist                         | The recorder's source: consume the switch, label, flag EPIPE, append on exit, never throw                                                          |
+| `barwise/scripts/lib/exit-log.mjs`                                                       | Does not exist                         | The base and log path, the read position, reading complete lines, the not-armed count, the two wordings                                            |
+| `barwise/scripts/hooks/masked-exit.mjs`                                                  | Does not exist                         | `session`, `post`, `failure` and `stop` modes for the four hook events                                                                             |
+| `barwise/scripts/tests/masked-exit.test.mjs`                                             | Does not exist                         | The tests below                                                                                                                                    |
+| `barwise/scripts/tests/expected-counts.json`                                             | The test-count manifest                | Records the new file in the same commit (`npm run test:scripts -- --write`); run-script-tests refuses without                                      |
+| `barwise/test-plan/cli-checks.sh`, `barwise/eval-runner.sh`, `barwise/compile-runner.sh` | Start the CLI expecting failures       | Also `unset BARWISE_EXIT_DIR` (the declared opt-out)                                                                                               |
+| `barwise/optimizer/barwise_optimizer/barwise_cli.py`                                     | Starts the CLI for the optimizer lane  | Drops `BARWISE_EXIT_DIR` from the environment it passes (the same opt-out)                                                                         |
+| `.claude/settings.json`                                                                  | SessionStart and PreToolUse hooks      | Plus SessionStart and Stop (matcher `""`), PostToolUse and PostToolUseFailure (matcher `Bash`); every hook command under `env -u BARWISE_EXIT_DIR` |
+| `CLAUDE.md`                                                                              | Monorepo Commands names the pgrep trap | One sentence beside it: what the report means                                                                                                      |
 
-One script with three modes rather than three scripts: the modes share
+One script with four modes rather than four scripts: the modes share
 every rule in `exit-log.mjs`, and one entry point keeps the layout in
 one place. The recorder is separate because it is inlined into
 `NODE_OPTIONS` and must stand alone.
@@ -359,13 +379,19 @@ failing with it removed:
   silent while a non-zero entry is unread;
 - a background failure read by the next call that ends, once, with its
   time;
-- `node -e 'for(;;)process.stdout.write("x\n")' | head -1`: listed as
-  stopped by a closed pipe, not as a failure;
+- `node -e 'for(let i=0;i<1e5;i++)process.stdout.write("x\n")' | head
+  -1` (bounded: an endless synchronous loop never yields to the EPIPE
+  error and does not exit, measured): listed as stopped by a closed
+  pipe; the same process with an `uncaughtException` handler that
+  survives and then exits 1: listed as a failure;
 - a node process started by a node process: not recorded; `unset
   BARWISE_EXIT_DIR`: not recorded; a hook command run as its settings
   entry runs it: not recorded;
-- an unparsable complete line: listed as unreadable, and the next entry
-  still read; a line without its newline: left for the next read;
+- an unparsable complete line: listed as unreadable with exit 2, and the
+  next entry still read; a line without its newline: left for the next
+  read; a log shorter than the read position: read from the start;
+- the Stop mode: an unread failure exits 2; a second Stop with nothing
+  new exits 0, so the turn is held open once, not forever;
 - no non-zero entry, and an absent log: exit 0, no output;
 - three calls with `npm` in command position and an empty log, succeeded
   or failed: exit 2, once per session; three with `grep npm x`: silent;
@@ -376,7 +402,8 @@ failing with it removed:
 - the recorder with an unwritable base leaves the observed process's
   output and exit code unchanged;
 - the SessionStart mode writes each line once across repeated starts
-  (resume, clear and compact all fire SessionStart), keeps an existing
+  (resume, clear and compact all fire SessionStart), replaces a
+  `NODE_OPTIONS` line carrying a different recorder, keeps an existing
   `NODE_OPTIONS` through the literal `${NODE_OPTIONS:+ ...}`, and writes
   nothing when the recorder cannot be read;
 - **end to end**: the SessionStart mode writes an env file, its text is
@@ -387,8 +414,8 @@ failing with it removed:
   `NODE_OPTIONS` are tested together;
 - the drift test: the recorder and `exit-log.mjs` compute the same path;
 - **the wiring**: a test parses `.claude/settings.json` and asserts the
-  three new entries, their matchers (`""` for SessionStart, `Bash` for the
-  others) and mode arguments, and that every hook command in the file
+  four new entries, their matchers (`""` for SessionStart and Stop,
+  `Bash` for the others) and mode arguments, and that every hook command in the file
   carries the `env -u BARWISE_EXIT_DIR` prefix, so a misspelled event or a
   new unprefixed hook cannot pass behind a green suite;
 - the PR body measures the recorder's cost per node start.
