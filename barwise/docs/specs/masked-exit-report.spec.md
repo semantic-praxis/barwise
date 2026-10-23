@@ -1,16 +1,17 @@
 # A failure the command's status hid is reported anyway
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-23 -- workstream 1 (the recorder and the report)
 
 Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-40a
+Plan-reviewed: 9b6f45d2 (code-review, pr-review)
 Touches: +barwise/scripts/hooks/exit-recorder.mjs,
 +barwise/scripts/hooks/masked-exit.mjs, +barwise/scripts/lib/exit-log.mjs,
 +barwise/scripts/tests/masked-exit.test.mjs,
 barwise/scripts/tests/expected-counts.json, barwise/test-plan/cli-checks.sh,
-barwise/eval-runner.sh, barwise/compile-runner.sh,
-barwise/optimizer/barwise_optimizer/barwise_cli.py, .claude/settings.json,
+barwise/eval-runner.sh, barwise/optimizer/barwise_optimizer/barwise_cli.py,
++barwise/optimizer/tests/conftest.py, .claude/settings.json,
 CLAUDE.md
 
 In one sentence: each node process an agent's Bash command starts
@@ -265,10 +266,12 @@ In scope:
 - When a script runs node processes that fail by design and checks them
   itself, it shall unset `BARWISE_EXIT_DIR` for them: a declared opt-out.
   Today that is `test-plan/cli-checks.sh` (asserts the CLI's exit codes),
-  `eval-runner.sh` and `compile-runner.sh` (probe the CLI with `if !`), and
+  `eval-runner.sh` (probes the CLI with `if !`),
   `optimizer/barwise_optimizer/barwise_cli.py`, the one place the
-  optimizer lane starts the CLI, which drops it from the environment it
-  passes. A launcher this list misses shows up in the report by name, and
+  optimizer lane starts the CLI (`compile-runner.sh` reaches it only
+  through there), which drops it from the environment it passes, and a
+  new `optimizer/tests/conftest.py`, because the smoke tests start the CLI
+  themselves and let some calls fail by design. A launcher this list misses shows up in the report by name, and
   is added here in the PR that finds it.
 
 Out of scope, each named so the gap is visible:
@@ -298,17 +301,17 @@ Out of scope, each named so the gap is visible:
 
 ## Inventory
 
-| Path                                                                                     | Today                                  | After                                                                                                                                              |
-| ---------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `barwise/scripts/hooks/exit-recorder.mjs`                                                | Does not exist                         | The recorder's source: consume the switch, label, flag EPIPE, append on exit, never throw                                                          |
-| `barwise/scripts/lib/exit-log.mjs`                                                       | Does not exist                         | The base and log path, the read position, reading complete lines, the not-armed count, the two wordings                                            |
-| `barwise/scripts/hooks/masked-exit.mjs`                                                  | Does not exist                         | `session`, `post`, `failure` and `stop` modes for the four hook events                                                                             |
-| `barwise/scripts/tests/masked-exit.test.mjs`                                             | Does not exist                         | The tests below                                                                                                                                    |
-| `barwise/scripts/tests/expected-counts.json`                                             | The test-count manifest                | Records the new file in the same commit (`npm run test:scripts -- --write`); run-script-tests refuses without                                      |
-| `barwise/test-plan/cli-checks.sh`, `barwise/eval-runner.sh`, `barwise/compile-runner.sh` | Start the CLI expecting failures       | Also `unset BARWISE_EXIT_DIR` (the declared opt-out)                                                                                               |
-| `barwise/optimizer/barwise_optimizer/barwise_cli.py`                                     | Starts the CLI for the optimizer lane  | Drops `BARWISE_EXIT_DIR` from the environment it passes (the same opt-out)                                                                         |
-| `.claude/settings.json`                                                                  | SessionStart and PreToolUse hooks      | Plus SessionStart and Stop (matcher `""`), PostToolUse and PostToolUseFailure (matcher `Bash`); every hook command under `env -u BARWISE_EXIT_DIR` |
-| `CLAUDE.md`                                                                              | Monorepo Commands names the pgrep trap | One sentence beside it: what the report means                                                                                                      |
+| Path                                                        | Today                                  | After                                                                                                                                              |
+| ----------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `barwise/scripts/hooks/exit-recorder.mjs`                   | Does not exist                         | The recorder's source: consume the switch, label, flag EPIPE, append on exit, never throw                                                          |
+| `barwise/scripts/lib/exit-log.mjs`                          | Does not exist                         | The base and log path, the read position, reading complete lines, the not-armed count, the two wordings                                            |
+| `barwise/scripts/hooks/masked-exit.mjs`                     | Does not exist                         | `session`, `post`, `failure` and `stop` modes for the four hook events                                                                             |
+| `barwise/scripts/tests/masked-exit.test.mjs`                | Does not exist                         | The tests below                                                                                                                                    |
+| `barwise/scripts/tests/expected-counts.json`                | The test-count manifest                | Records the new file in the same commit (`npm run test:scripts -- --write`); run-script-tests refuses without                                      |
+| `barwise/test-plan/cli-checks.sh`, `barwise/eval-runner.sh` | Start the CLI expecting failures       | Also `unset BARWISE_EXIT_DIR` (the declared opt-out)                                                                                               |
+| `barwise/optimizer/barwise_optimizer/barwise_cli.py`        | Starts the CLI for the optimizer lane  | Drops `BARWISE_EXIT_DIR` from the environment it passes; a new `optimizer/tests/conftest.py` removes it for the suite (the same opt-out)           |
+| `.claude/settings.json`                                     | SessionStart and PreToolUse hooks      | Plus SessionStart and Stop (matcher `""`), PostToolUse and PostToolUseFailure (matcher `Bash`); every hook command under `env -u BARWISE_EXIT_DIR` |
+| `CLAUDE.md`                                                 | Monorepo Commands names the pgrep trap | One sentence beside it: what the report means                                                                                                      |
 
 One script with four modes rather than four scripts: the modes share
 every rule in `exit-log.mjs`, and one entry point keeps the layout in
