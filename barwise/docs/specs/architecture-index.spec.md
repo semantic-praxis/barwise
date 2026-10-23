@@ -336,10 +336,10 @@ and views; 8.2's enforcement moved from tsconfig to dependency-cruiser.
 Which of the rest still hold, and whether any deserve an ADR, is for the
 grounding of this workstream.
 
-### 4. Backfill the first batch of ADRs (provisional: the owner picks the list)
+### 4. Backfill ADRs one at a time (provisional: the owner takes each in turn)
 
-One PR per few ADRs, each reviewed with `/code-review` and `/pr-review`
-before merge. Each PR adds its files to this spec's `Touches:`.
+One PR per ADR, each reviewed with `/code-review` and `/pr-review`
+before merge (Open decision 2). Each PR adds its files to this spec's `Touches:`.
 Candidates, with every place each is stated today, so WS5 can replace
 all of them with a link:
 
@@ -390,10 +390,10 @@ link. Keep inline what an agent needs before it knows which ADR to open
 ## Open decisions (for review)
 
 1. **Index in ARCHITECTURE.md, or in a generated `adr/README.md`.**
-   Recommend ARCHITECTURE.md, the owner's corollary (keep it current
-   with the ADRs).
-2. **The backfill list.** Recommend the owner strikes or adds rows in the
-   WS4 table; the default is all sixteen, in about four PRs.
+   **Resolved 2026-10-23 by the owner: ARCHITECTURE.md.**
+2. **The backfill list.** **Resolved 2026-10-23 by the owner: one ADR
+   at a time.** The WS4 table is the candidate list, not a commitment;
+   each candidate is decided, written and reviewed in its own PR.
 3. **The scope values.** Recommend `architecture` and `process`.
 4. **How far `CLAUDE.md` shrinks (WS5).** Recommend rule-plus-link for
    every convention with an ADR.
