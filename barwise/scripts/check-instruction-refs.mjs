@@ -3,8 +3,8 @@
  * Every path and `node <path>` command an instruction file cites must
  * resolve (docs/specs/instruction-reference-check.spec.md, WS1).
  *
- * An instruction file -- CLAUDE.md or AGENTS.md at any depth, any .md
- * under .claude/ -- is code that runs in an agent's head, and a path it
+ * An instruction file -- CLAUDE.md, AGENTS.md or REVIEW.md at any depth,
+ * any .md under .claude/ -- is code that runs in an agent's head, and a path it
  * cites is a copy of a fact the repository owns. The 2026-10-04 prompt
  * audit found 26 such copies stale by hand, among them
  * `node scripts/beads-crud.mjs` at five sites where it does not resolve
@@ -49,7 +49,11 @@ const ROOTED = /^(barwise|\.claude|\.github|\.beads)\//;
 const EXT = /\.(mjs|cjs|ts|tsx|js|json|md|yaml|yml|sh|py|toml|txt)$/;
 
 function isInstructionFile(f) {
-  return /(^|\/)(CLAUDE|AGENTS)\.md$/.test(f) || (f.startsWith(".claude/") && f.endsWith(".md"));
+  // REVIEW.md is read by the Claude Code Review service -- the root file,
+  // and a nested one once the default branch is protected -- and cites
+  // paths the same way.
+  return /(^|\/)(CLAUDE|AGENTS|REVIEW)\.md$/.test(f)
+    || (f.startsWith(".claude/") && f.endsWith(".md"));
 }
 
 /** The candidate path a backticked token names, or null. Spec: Resolution rules. */
