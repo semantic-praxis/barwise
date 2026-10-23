@@ -1,4 +1,4 @@
-# ADR 0001: Metamodel evolution policy
+# Metamodel evolution policy
 
 Status: Accepted
 Date: 2026-06-17
