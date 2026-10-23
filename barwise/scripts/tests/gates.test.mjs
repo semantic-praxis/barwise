@@ -2734,9 +2734,11 @@ const BASELINE_WRITERS = [
     // The one change a rewrite may make to a verdict: reopening it, with the
     // old note kept whole, when commits it never covered have landed
     // (barwise-qs8). Anything else is the barwise-1026 loss.
-    reopened: (before, after) =>
-      typeof after === "string" && /^TODO: re-read -- /.test(after)
-      && after.endsWith(`Previous note: ${before}`),
+    reopened: (before, after) => {
+      const inner = /Previous note: ([\s\S]*)$/.exec(before)?.[1] ?? before;
+      return typeof after === "string" && /^TODO: re-read -- /.test(after)
+        && after.endsWith(`Previous note: ${/^TODO: re-read -- /.test(before) ? inner : before}`);
+    },
   },
 ];
 
@@ -4821,6 +4823,18 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
     r = run("--check");
     assert.equal(r.status, 1, "a reopened verdict stays red until a person re-reads it");
     assert.match(r.stderr, /UNCLASSIFIED: s\.spec\.md/);
+
+    // A commit that lands while the row is reopened joins its TODO, so the
+    // re-read covers everything the row will then record.
+    const third = touch(3);
+    r = run("--write");
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const again = JSON.parse(readFileSync(baselineFile, "utf8")).specs["s.spec.md"].note;
+    assert.match(
+      again,
+      new RegExp(`^TODO: re-read -- ${second.slice(0, 7)}\\w*, ${third.slice(0, 7)}`),
+    );
+    assert.match(again, /Previous note: Reviewed: the commit is unrelated to this spec\.$/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

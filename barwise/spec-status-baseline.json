@@ -87,7 +87,9 @@
     },
     "plan-scope-check.spec.md": {
       "status": "Draft -- no workstream implemented",
-      "commits": [],
+      "commits": [
+        "6953b5f9"
+      ],
       "note": "Genuinely unimplemented, and the header is right. The commit that put this row here is the barwise-qs8 fix to audit-spec-status.mjs (--write reopens a verdict it would credit with new commits, and --check reports commits a verdict never recorded), which this spec names because its WS2 moves the audit's spec reader into a shared lib; that move, Touches: and the scope report are not built. Remove this row when WS1 ships and the Status says so."
     },
     "review-routing.spec.md": {

@@ -390,14 +390,19 @@ if (!check) {
   // read as covering commits nobody had looked at (barwise-qs8), so a row
   // that gains commits gets its note reopened, and --check stays red until
   // a person re-reads them and removes the TODO.
+  // A row already reopened gains any newer commits in its TODO, so the
+  // person who clears it re-reads everything the row will then claim.
+  const REOPENED = /^TODO: re-read -- (.*?) landed since this verdict\. Previous note: ([\s\S]*)$/;
   for (const [id, row] of Object.entries(specs)) {
     const prior = existing[id];
-    if (!prior?.note || prior.note.startsWith("TODO")) continue;
+    if (!prior?.note || prior.note.startsWith("TODO: classify")) continue;
     const added = unseenCommits(row.commits, prior.commits);
-    if (added.length > 0) {
-      row.note = `TODO: re-read -- ${added.join(", ")} landed since this verdict. `
-        + `Previous note: ${prior.note}`;
-    }
+    if (added.length === 0) continue;
+    const open = REOPENED.exec(prior.note);
+    const listed = open ? open[1].split(", ") : [];
+    const verdict = open ? open[2] : prior.note;
+    row.note = `TODO: re-read -- ${[...listed, ...added].join(", ")} landed since this verdict. `
+      + `Previous note: ${verdict}`;
   }
 
   const baseline = {
