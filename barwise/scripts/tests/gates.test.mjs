@@ -3253,6 +3253,18 @@ test("check-review-tiers REFUSES an empty tracked-file list rather than calling 
   }
 });
 
+test("check-review-tiers REFUSES a --tracked flag with no value rather than reading the live repository", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], ["x/a"]).slice(0, -1);
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, `a flag with no value answers nothing: ${run.stdout}${run.stderr}`);
+    assert.match(`${run.stdout}${run.stderr}`, /--tracked needs a value/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check-review-tiers passes on the real table and tracked files, with no overrides", () => {
   // The default path: lib/tracked.mjs and repo-rooted globs, which every
   // fixture test above bypasses with --tracked.
@@ -4817,12 +4829,20 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
 
     r = run("--write");
     assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      new RegExp(
+        `reopened \\(re-read before --check passes\\): s\\.spec\\.md: ${second.slice(0, 7)}`,
+      ),
+      "a write that rewrites a note must say so",
+    );
     const note = JSON.parse(readFileSync(baselineFile, "utf8")).specs["s.spec.md"].note;
     assert.match(note, /^TODO: re-read -- /, "the write must reopen the verdict, not keep it");
     assert.match(note, /Previous note: Reviewed: the commit is unrelated/);
     r = run("--check");
     assert.equal(r.status, 1, "a reopened verdict stays red until a person re-reads it");
-    assert.match(r.stderr, /UNCLASSIFIED: s\.spec\.md/);
+    assert.match(r.stderr, /UNCLASSIFIED: s\.spec\.md -- reopened: TODO: re-read -- /);
+    assert.doesNotMatch(r.stderr, /has no note/, "a reopened row has a note; say what it asks");
 
     // A commit that lands while the row is reopened joins its TODO, so the
     // re-read covers everything the row will then record.

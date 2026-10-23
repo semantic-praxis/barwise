@@ -393,6 +393,7 @@ if (!check) {
   // A row already reopened gains any newer commits in its TODO, so the
   // person who clears it re-reads everything the row will then claim.
   const REOPENED = /^TODO: re-read -- (.*?) landed since this verdict\. Previous note: ([\s\S]*)$/;
+  const reopened = [];
   for (const [id, row] of Object.entries(specs)) {
     const prior = existing[id];
     if (!prior?.note || prior.note.startsWith("TODO: classify")) continue;
@@ -403,6 +404,7 @@ if (!check) {
     const verdict = open ? open[2] : prior.note;
     row.note = `TODO: re-read -- ${[...listed, ...added].join(", ")} landed since this verdict. `
       + `Previous note: ${verdict}`;
+    reopened.push(`${id}: ${added.join(", ")}`);
   }
 
   const baseline = {
@@ -418,6 +420,8 @@ if (!check) {
       + ` -- ${mergeSummary(counts)}`,
   );
   for (const id of counts.dropped) console.log(`  dropped (no longer stale): ${id}`);
+  // Said here, not left for --check to find: a reopen rewrites a note.
+  for (const r of reopened) console.log(`  reopened (re-read before --check passes): ${r}`);
   process.exit(0);
 }
 
@@ -453,7 +457,11 @@ for (const f of found) {
         + `spec-status-baseline.json saying why it is still right.`,
     );
   } else if (!row.note || row.note.startsWith("TODO")) {
-    failures.push(`UNCLASSIFIED: ${f.id} -- its baseline row has no note.`);
+    failures.push(
+      row.note?.startsWith("TODO: re-read")
+        ? `UNCLASSIFIED: ${f.id} -- reopened: ${row.note.split(" Previous note:")[0]}`
+        : `UNCLASSIFIED: ${f.id} -- its baseline row has no note.`,
+    );
   } else {
     const added = unseenCommits(f.commits, row.commits);
     if (added.length > 0) unreviewed.push(`${f.id}: ${added.join(", ")}`);

@@ -79,6 +79,8 @@
       "tier": "high-risk",
       "globs": [
         ".claude/skills/",
+        ".claude/agents/",
+        "barwise/packages/llm/prompts/",
         "CLAUDE.md",
         "AGENTS.md",
         "barwise/packages/*/CLAUDE.md",
