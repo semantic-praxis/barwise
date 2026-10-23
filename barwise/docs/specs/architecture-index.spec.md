@@ -5,6 +5,12 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-ubc
+Touches: barwise/docs/ARCHITECTURE.md, CLAUDE.md, barwise/.dependency-cruiser.cjs,
+barwise/scripts/audit-spec-status.mjs, barwise/scripts/lib/spec-reader.mjs,
+barwise/scripts/regen-architecture.mjs, barwise/scripts/check-architecture.mjs,
+barwise/scripts/tests/, barwise/package.json, package.json,
+.github/workflows/ci.yml, .claude/skills/spec-writer/template.spec.md,
+.claude/skills/steward/SKILL.md
 
 In one sentence: specs mark the decisions that set architecture or
 process with a one-line `Decision:` marker, a script renders those
@@ -177,7 +183,7 @@ outside specs.
 | `CLAUDE.md` (root)                                 | Holds the graph; calls ARCHITECTURE.md historical | Graph drift-checked; pointer names the generated section                                                                                   |
 | `barwise/.dependency-cruiser.cjs`                  | `INTENDED` says CLAUDE.md is its source of truth  | Comment corrected: `INTENDED` is the authority                                                                                             |
 | `barwise/scripts/audit-spec-status.mjs`            | Owns reading a spec header                        | Its reader moves to a shared lib (provisional)                                                                                             |
-| `barwise/scripts/lib/spec-headers.mjs`             | Does not exist                                    | New: one reader for Status, headings and decision markers                                                                                  |
+| `barwise/scripts/lib/spec-reader.mjs`              | Does not exist                                    | Shared with plan-scope-check WS2; adds the heading and marker readers                                                                      |
 | `barwise/scripts/regen-architecture.mjs`           | Does not exist                                    | New: renders the generated section                                                                                                         |
 | `barwise/scripts/check-architecture.mjs`           | Does not exist                                    | New: the drift and marker checks above                                                                                                     |
 | `.claude/skills/spec-writer/template.spec.md`      | No decision marker                                | Documents `Decision:` and `Superseded-by:`                                                                                                 |
@@ -192,7 +198,7 @@ instruction file, and the links the generator writes are checked by
 
 ```
 specs/*.spec.md ──(Decision:, Superseded-by:)──┐
-                                               ├─ lib/spec-headers.mjs ── regen-architecture.mjs ──> ARCHITECTURE.md
+                                               ├─ lib/spec-reader.mjs ─── regen-architecture.mjs ──> ARCHITECTURE.md
 .dependency-cruiser.cjs (INTENDED) ────────────┘                              (generated first section)
         │
         └── check-architecture.mjs ── compares ──> root CLAUDE.md graph block (edges only;
@@ -235,7 +241,7 @@ extra edge and sees red. No spec changes and no ARCHITECTURE.md change.
 ### 2. Decision markers and one spec-header reader (provisional: not yet grounded)
 
 Move `audit-spec-status.mjs`'s header reading into
-`scripts/lib/spec-headers.mjs` and add the heading and marker reader.
+`scripts/lib/spec-reader.mjs` and add the heading and marker reader.
 Extend `check-architecture.mjs` with the marker rules in Scope. Document
 the two lines in `template.spec.md` and the `spec-writer` skill. Mark
 the first decisions: the candidates are the 124 `(resolved: ...)`
@@ -291,8 +297,9 @@ The same three parts carry over to a data-engineering team.
    in workstream 2's PR, rather than an agent guessing which decisions
    matter. The alternative is marking only new decisions, which leaves
    the index nearly empty for months.
-5. **Which copy of the package graph is the authority.** Recommend
-   `INTENDED`: it is a policy ("may import"), and the one CI enforces.
+5. **Which copy of the package graph is the authority.** **Resolved
+   2026-10-23 by the owner: `INTENDED` in the dependency rules file**
+   (`barwise/.dependency-cruiser.cjs`), as recommended: it is a policy ("may import"), and the one CI enforces.
    `package.json` states what is installed, which can legitimately be
    narrower, and a check that internal `package.json` dependencies stay
    within `INTENDED` is a separate, smaller question.

@@ -5,6 +5,13 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-2jy
+Touches: plan.md, .gitattributes, barwise/scripts/audit-spec-status.mjs,
+barwise/scripts/lib/spec-reader.mjs, barwise/scripts/plan-scope.mjs,
+barwise/scripts/check-spec-touches.mjs, barwise/scripts/check-plan-review.mjs,
+barwise/scripts/tests/, barwise/package.json, package.json,
+.github/workflows/ci.yml, .claude/skills/pr-creation/SKILL.md,
+.claude/skills/pr-review/SKILL.md, .claude/skills/spec-writer/SKILL.md,
+.claude/skills/spec-writer/template.spec.md
 
 In one sentence: a report-only script reads the spec a pull request names,
 lists every changed file the spec did not name, and states the PR's size
@@ -80,35 +87,55 @@ In scope:
   see its input must not print PASS").
 - The system shall exit 0 whenever it produces a report, whatever the
   report says.
+- When a spec carries a `Touches:` header, the system and `audit:specs`
+  shall read its plan from that header alone; when it does not, from the
+  paths its text names.
+- When a `Touches:` entry is neither a tracked path, a path the branch
+  adds, nor a pattern matching a tracked path, `check:spec-touches` shall
+  exit 1 naming the spec and the entry.
+- When a diff changes a path in a spec's `Touches:` while that spec's
+  Status claims nothing is built, and the spec has no `Plan-reviewed:`
+  line naming an ancestor of the first such change that contains the
+  spec, `check:plan-review` shall exit 1 naming the spec.
+- When either check cannot read git or a spec, it shall exit 2.
 
 Out of scope: blocking a merge on size or scope (see the resolved question
-above); judging whether an unplanned file was a good addition, which stays
+above; the plan-review rule is a gate because it checks the property, not
+a proxy); judging whether an unplanned file was a good addition, which stays
 with the reviewer; generating a spec's file list from a diff after the
 fact, which would defeat the comparison.
 
 ## Inventory
 
-| Area                                    | Current state                                                                                                                                                                  | Verdict                                                                 |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| `barwise/scripts/audit-spec-status.mjs` | Holds `namedPaths`, the one reader of "which repo paths a spec names": backticked tokens with a code extension, tried at three roots, kept if git knows them; barrels excluded | Moves to a shared lib; behaviour unchanged for the audit                |
-| `barwise/scripts/lib/spec-paths.mjs`    | Does not exist                                                                                                                                                                 | New: `namedPaths`, plus a directory-prefix mode the scope check needs   |
-| `barwise/scripts/plan-scope.mjs`        | Does not exist                                                                                                                                                                 | New: the report                                                         |
-| `changed-class.mjs`                     | `committedPaths(base)` runs a two-dot `git diff base HEAD`, right for CI's merge commit and wrong locally once `main` has moved                                                | Not reused; the file list is a three-dot diff, as `pr-risk` reads it    |
-| `.gitattributes`                        | One line: the beads merge driver                                                                                                                                               | Gains `linguist-generated` marks, if Open decision 2 takes its default  |
-| `review-tiers.json`                     | `trivial.globs` answers a different question; its "generated output" row names a path that does not exist                                                                      | Its generated row is checked against the marks (WS4)                    |
-| `check-file-size.mjs`                   | Warn-only report of large source files, exit 0 always                                                                                                                          | Untouched; the precedent for a report that never gates                  |
-| `.claude/skills/pr-creation/SKILL.md`   | Split rule keyed on spine files (more than five), fallout patterns, and reading time                                                                                           | Gains one readiness line: run the report, explain anything outside plan |
-| `.claude/skills/pr-review/SKILL.md`     | Section 1 reads the spec and issue before the diff                                                                                                                             | Gains the report as an input to the scope-drift check in section 3      |
-| `plan.md` (repo root)                   | A Phase 6 implementation plan; the work it describes is complete                                                                                                               | Deleted (OD 3)                                                          |
+| Area                                          | Current state                                                                                                                                                                  | Verdict                                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `barwise/scripts/audit-spec-status.mjs`       | Holds `namedPaths`, the one reader of "which repo paths a spec names": backticked tokens with a code extension, tried at three roots, kept if git knows them; barrels excluded | Moves to a shared lib; behaviour unchanged for the audit                                         |
+| `barwise/scripts/lib/spec-reader.mjs`         | Does not exist                                                                                                                                                                 | New, shared with architecture-index: `namedPaths` with its four options, `header()`, `touches()` |
+| `barwise/scripts/plan-scope.mjs`              | Does not exist                                                                                                                                                                 | New: the report                                                                                  |
+| `changed-class.mjs`                           | `committedPaths(base)` runs a two-dot `git diff base HEAD`, right for CI's merge commit and wrong locally once `main` has moved                                                | Not reused; the file list is a three-dot diff, as `pr-risk` reads it                             |
+| `.gitattributes`                              | One line: the beads merge driver                                                                                                                                               | Gains `linguist-generated` marks, if Open decision 2 takes its default                           |
+| `review-tiers.json`                           | `trivial.globs` answers a different question; its "generated output" row names a path that does not exist                                                                      | Its generated row is checked against the marks (WS4)                                             |
+| `check-file-size.mjs`                         | Warn-only report of large source files, exit 0 always                                                                                                                          | Untouched; the precedent for a report that never gates                                           |
+| `.claude/skills/pr-creation/SKILL.md`         | Split rule keyed on spine files (more than five), fallout patterns, and reading time                                                                                           | Gains one readiness line: run the report, explain anything outside plan                          |
+| `.claude/skills/pr-review/SKILL.md`           | Section 1 reads the spec and issue before the diff                                                                                                                             | Gains the report as an input to the scope-drift check in section 3                               |
+| `.claude/skills/spec-writer/SKILL.md`         | Step 8 says to land the spec for review first; nothing records that it was                                                                                                     | Step 8 requires `/code-review` and `/pr-review` on the spec, and the `Plan-reviewed:` line (WS6) |
+| `.claude/skills/spec-writer/template.spec.md` | Header has Status, Created, Last-updated, Tracking                                                                                                                             | Documents `Touches:` (WS2) and `Plan-reviewed:` (WS6)                                            |
+| `barwise/scripts/check-spec-touches.mjs`      | Does not exist                                                                                                                                                                 | New: every `Touches:` entry resolves (WS2)                                                       |
+| `barwise/scripts/check-plan-review.mjs`       | Does not exist                                                                                                                                                                 | New: implementation follows a recorded plan review (WS6)                                         |
+| `ci.yml`                                      | Runs neither check                                                                                                                                                             | Runs both, each with its root `package.json` forwarder                                           |
+| `plan.md` (repo root)                         | A Phase 6 implementation plan; the work it describes is complete                                                                                                               | Deleted (OD 3)                                                                                   |
 
 Looks affected and is not: the spec template. Its Inventory already
 carries the plan; this spec reads what is there rather than adding a
 second list.
 
-## Where the plan's file list lives (resolved: the spec as it stands)
+## Where the plan's file list lives (resolved: a `Touches:` header, with the spec's text as the fallback)
 
-A spec's named paths, read by the existing `namedPaths`, are the plan.
-Three findings settle it:
+The owner's decision of 2026-10-23: a spec declares the paths it plans to
+change, explicitly, so the answer is the same every time it is asked
+(next section). For a spec without that declaration -- every spec written
+before it -- the plan is the spec's named paths, read by the existing
+`namedPaths`. Three findings settle the fallback:
 
 - **The data exists.** 108 of the 112 Inventory sections name at least one
   path; 800 of the 905 path tokens in Inventory first columns resolve to a
@@ -169,10 +196,70 @@ skill prescribes it). When neither finds a spec, the report says so. That is its
 the useful answer for a substantive PR, since `pr-creation` requires a PR
 to name its workstream.
 
+## Which paths does a spec plan to change? (resolved: a `Touches:` header line)
+
+The owner's decision of 2026-10-23, asked for consistency and
+repeatability. Inferring a spec's subject from every backticked path
+fails both ways: `audit:specs` reads a path cited as context (`ci.yml`,
+a gate test) as the spec's subject, so an unrelated PR that edits it trips
+the audit; and this check would read the same context path as planned.
+The three specs in PR #714 had to name such files bare to stay clear of
+the audit, which is a writing convention, not a mechanism.
+
+So a spec declares its plan in its header, beside `Status:` and
+`Tracking:`, which `audit-spec-status` already parses with `header()`:
+
+```
+Touches: barwise/scripts/plan-scope.mjs, barwise/scripts/lib/spec-reader.mjs,
+  barwise/scripts/audit-spec-status.mjs, barwise/package.json, package.json
+```
+
+- Comma-separated repo-rooted paths, a trailing `/` for a directory and
+  the review-tiers pattern shapes for globs; it may wrap, as `Tracking:`
+  does.
+- A path that does not exist yet is allowed; the check resolves it against
+  the branch's tree, as for planned new files above.
+- `audit:specs` and this report read `Touches:` when it is present and
+  fall back to `namedPaths` when it is not, so no existing spec changes.
+- `check:spec-touches` (WS2) fails, exit 1, on a `Touches:` entry that is
+  neither a tracked path, a path the branch adds, nor a pattern matching a
+  tracked path, so the declaration cannot rot the way a `review-tiers.json`
+  glob did (barwise-fs0).
+- The spec template documents the field; `spec-writer` asks for it.
+
+## Is a plan reviewed before its code? (resolved: yes, with `/code-review` and `/pr-review`)
+
+The owner's decision of 2026-10-23: a plan must be reviewed with both the
+`/code-review` and `/pr-review` skills before its implementation is
+committed. It replaces Open decision 1's options. Measured: 90 of 120
+spec-adding PRs since 2026-07-01 shipped code in the same PR, so today the
+spec is reviewed, if at all, beside the code it was meant to shape.
+
+The review is recorded where a script can find it, in the spec's header:
+
+```
+Plan-reviewed: 7395e5e0 (code-review, pr-review)
+```
+
+The commit named is the head both reviews ran on, and it must contain the
+spec. A spec may still land in the same PR as its first workstream; what
+the rule fixes is the order. `check:plan-review` (WS6) applies it: when a
+diff changes a path in a spec's `Touches:` while that spec's Status
+claims nothing is built, and the spec carries no `Plan-reviewed:` line
+naming a commit that is an ancestor of the first such change, it fails,
+exit 1, naming the spec.
+
+Unlike size and scope, this is a gate. Size is a shadow of review cost;
+whether the plan was reviewed is the property itself, and the owner made
+it a rule. What the line cannot prove is that the reviews ran well, any
+more than `steward` 4b's merge comment does. It records the claim on a
+named commit so the claim can be checked against that commit, and a
+review that never ran leaves no session output to point at.
+
 ## Target architecture
 
 ```
-barwise/scripts/lib/spec-paths.mjs
+barwise/scripts/lib/spec-reader.mjs
   namedPaths(text, { dirs, anyExtension, bare, barrels, exists }) -> string[]
       the one reader of "paths a spec names" (moved from audit-spec-status)
 
@@ -224,17 +311,21 @@ Report (plain text):
 
 The smallest change and independent of the rest. The work it plans is
 complete (CLAUDE.md, "All development phases are complete") and git keeps
-it. If Open decision 3 goes the other way, it moves to
-`barwise/docs/specs/archive/` with a Status line instead.
+it.
 
-### 2. Move `namedPaths` to `barwise/scripts/lib/spec-paths.mjs`
+### 2. Move `namedPaths` to `barwise/scripts/lib/spec-reader.mjs`
 
-A refactor with one new option. `audit-spec-status` imports it and its
-`--check` output over the current tree is byte-identical before and after;
-the existing script tests pin that. Add `directories: true`, which keeps a
-backticked token ending in `/` when git knows the directory. Tests: the
-directory mode on and off, and a planted spec whose named directory covers
-a changed file.
+A refactor plus the `Touches:` reader. `audit-spec-status` imports
+`namedPaths` and `header()` from the lib, and its `--check` output over
+the current tree is byte-identical before and after; the existing script
+tests pin that. Add the four reader options (`dirs`, `anyExtension`,
+`bare`, `barrels`), `touches(text)`, and `check:spec-touches` with its
+root forwarder. `audit-spec-status` reads `Touches:` when present. Tests:
+each option on and off; a `Touches:` entry that resolves, one the branch
+adds, and a dead one seen failing; and a Draft spec citing `ci.yml` as
+context with a `Touches:` that omits it, which an edit to `ci.yml` no
+longer trips. `architecture-index.spec.md` adds its heading and marker
+readers to the same lib.
 
 ### 3. `plan-scope.mjs` and its npm script (provisional: not yet grounded)
 
@@ -284,9 +375,34 @@ exclusion list, and then reports inflated sizes until this lands.
 A non-blocking CI step that prints the report to the job summary is
 deferred until the report has been used on real PRs.
 
+### 6. The plan-review rule and `check:plan-review` (provisional: not yet grounded)
+
+The owner's rule, written where authors and agents read it, and checked:
+
+- `spec-writer` step 8: run `/code-review` and `/pr-review` on the spec
+  before committing any implementation, then add the `Plan-reviewed:`
+  line naming the reviewed head.
+- `pr-creation` readiness: a PR that adds a spec and implements it shows
+  the plan-review commit before the first implementation commit.
+- The spec template documents `Touches:` and `Plan-reviewed:`.
+- `check:plan-review` in `ci.yml`, with its root forwarder, applying the
+  requirement in Scope. It reads `Touches:` through `lib/spec-reader.mjs`,
+  so it needs WS2. Sandbox tests: implementation with no review line,
+  with a line naming a later commit, with a line naming a commit that
+  lacks the spec, the passing order, and git failing (exit 2), each seen
+  red first through `mutate.mjs`.
+
+Not grounded: how many open specs would fail on day one. The rule applies
+to implementation after it lands, so a spec whose Status already claims
+work is built is out of its reach; the count of Draft specs with
+implementation in flight is the first thing to measure.
+
 ## Open decisions (for review)
 
-1. **Must a plan be reviewed before code?** Since 2026-07-01, 90 of the 120
+1. **Must a plan be reviewed before code?** **Resolved 2026-10-23 by the
+   owner: yes, with `/code-review` and `/pr-review`** ("Is a plan reviewed
+   before its code?" above). The options as they were weighed: since
+   2026-07-01, 90 of the 120
    merged PRs that added a spec also changed code in the same PR, so
    `spec-writer` step 8 ("land the spec for review, then implement") is
    the exception in practice. Options:
@@ -299,8 +415,6 @@ deferred until the report has been used on real PRs.
      specs to land with their first workstream, reviewed spec-first
      (`pr-review` section 1 already orders it so).
 
-   **Recommended: (c).** This spec does not implement it; it belongs in
-   `spec-writer`, and the decision is the owner's.
 2. **What counts as generated or recorded, and where the list lives.**
    REVIEW.md (PR #712) lists regenerated outputs and recorded data in
    prose. `review-tiers.json`'s `trivial` block answers a different
@@ -318,8 +432,9 @@ deferred until the report has been used on real PRs.
    the review service, and GitHub's diff view. Whether `barwise/trial/`
    fixtures belong on it is part of the decision; marking them collapses
    them in review, which is wrong if a reviewer should read them.
-3. **The root `plan.md`: delete, or archive.** **Recommended: delete**
-   (WS1). It is not in spec format and its work is done.
+3. **The root `plan.md`: delete, or archive.** **Resolved 2026-10-23 by
+   the owner: delete** (WS1). It is not in spec format and its work is
+   done.
 4. **Should an ad hoc `PLAN.md` be refused?** Agents in plan mode write plan
    files, and one that lands outside `docs/specs/` gets no review and no
    Status. **Recommended: report it, not refuse it.** WS3 lists an added
@@ -359,7 +474,7 @@ Snapshot of 2026-10-23 on `1a32f9c7` (origin/main).
 
 - If most "outside the plan" entries on real PRs are files the spec
   plainly meant (brace shorthand, renames), revisit the model-judged
-  alternative or brace expansion in `spec-paths`.
+  alternative or brace expansion in `spec-reader`.
 - If authors start naming every file in the spec to empty the list, the
   report has become a target. Stop showing the count and show only the
   list.

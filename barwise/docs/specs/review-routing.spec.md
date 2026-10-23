@@ -5,6 +5,10 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-6mf
+Touches: barwise/scripts/pr-risk.mjs, barwise/scripts/lib/review-tiers.mjs,
+barwise/review-tiers.json, barwise/scripts/check-review-tiers.mjs,
+barwise/scripts/tests/gates.test.mjs, .github/workflows/ci.yml,
+.claude/skills/pr-review/SKILL.md, .claude/skills/pr-creation/SKILL.md
 
 In one sentence: `pr-risk` already computes which `pr-review` checklist
 groups a diff triggers, and nobody reads it; this spec puts its output
