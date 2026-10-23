@@ -51,6 +51,9 @@ least once:
 - **`pr-review/checklist.md` has been run against your own diff**, as
   a reviewer would run it, and what it found is fixed rather than
   promised.
+- **The author-side review lanes have run**: `/code-review` on your own
+  diff, and `/security-review` when the diff meets a trigger listed in the
+  root `REVIEW.md`, which owns that list and which lane runs when.
 - **Each fact is written once; everything else points to it.** A
   count, a status, a list of entries, or a claim about what the code
   does has one home: wherever it is produced or decided -- the spec's

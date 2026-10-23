@@ -1,6 +1,6 @@
 # Implicit Sensemaking in Barwise
 
-Status: draft
+Status: Workstreams 1-4 and 6 implemented (WS1 sensemaking guidance, WS2 and WS4 counterexample generators, WS3 `--counterexamples` and `verbalize_model`, WS6 anchors view); WS5 (multi-candidate framing) has alternative framings in the extraction response (`ExtractionTypes.ts`), and whether that is all of WS5 is not confirmed. Corrected 2026-10-23: the header read "draft" while these shipped (barwise-qs8).
 Owner: design conversation (sensemaking initiative)
 Tracking: no REPO_REVIEW finding; originates from the sensemaking
 design thread. File bd issues per workstream when this lands.
@@ -152,7 +152,7 @@ mcp/src/prompts/guidance/guidance.ts
 Ordered smallest-blast-radius first; each keeps the full suite green as
 its own PR.
 
-- [ ] **WS1 -- Sensemaking guidance (#1).** Add `SENSEMAKING_GUIDANCE`
+- [x] **WS1 -- Sensemaking guidance (#1).** Add `SENSEMAKING_GUIDANCE`
       to `guidance.ts`; compose it into `analyze-domain` and
       `review-model`; update the two agent definitions
       (`barwise-model-reviewer` gains a premortem/expectancy step;
@@ -161,7 +161,7 @@ its own PR.
       framings to resolve). No core change. Expectancy guidance uses
       `verbalize_model`, which exists today; the counterexample mention
       is added in WS3 once the flag lands.
-- [ ] **WS2 -- Counterexample generator, intra-fact-type (#2 core).**
+- [x] **WS2 -- Counterexample generator, intra-fact-type (#2 core).**
       New `core/src/counterexample/` module generating the minimal
       forbidden `Population` for internal uniqueness, value, frequency,
       and ring constraints. Extract `makeCompositeKey` from
@@ -170,7 +170,7 @@ its own PR.
       `index.ts`. Unit tests via `ModelBuilder`, including the
       round-trip: every generated `forbidden` population must fail
       `populationValidation` on exactly its constraint.
-- [ ] **WS3 -- Surface counterexamples (#2 surfacing).** Add
+- [x] **WS3 -- Surface counterexamples (#2 surfacing).** Add
       `counterexamples` to `verbalize_model`, `--counterexamples` to the
       CLI, and a "Rules out" hover subsection; all opt-in, default off.
       Append the counterexample reference to `SENSEMAKING_GUIDANCE`.

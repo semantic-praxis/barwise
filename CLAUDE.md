@@ -400,7 +400,10 @@ skill (`.claude/skills/release/`).
   section 4b (the owner's condition: the review has recommended
   `merge` on the head being merged); the barwise invariants CI cannot check live once,
   in `pr-review/checklist.md`, which the author runs before a reviewer
-  has to (`docs/specs/pr-skills.spec.md`).
+  has to (`docs/specs/pr-skills.spec.md`). Which review runs when
+  (`/code-review`, `/security-review`, `/pr-review`, the Claude Code
+  Review service) and the failure modes reviews here keep finding live
+  in the root `REVIEW.md` (`docs/specs/review-md.spec.md`).
 - TypeScript strict mode. Base config in `barwise/tsconfig.base.json`
   uses NodeNext module resolution; the vscode package overrides to
   Bundler resolution for esbuild.

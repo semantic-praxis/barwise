@@ -27,7 +27,8 @@ afterwards confirm `/code-review` posted no review or comment (a
 steward's trace comment from its section 4b is not that); take
 its CONFIRMED findings and treat its PLAUSIBLE ones under section 4's
 rule. `security-review`
-applies when the diff touches subprocess, network, or file I/O;
+applies when the diff meets a trigger in the root `REVIEW.md`, which
+owns that list;
 `duplication-audit` when it adds a copy; `assertion-audit` when it
 adds a test for a refusal or error; `articulation` in critique mode
 for the body and any doc; and `sensemaking` -- the repo's own copy is
