@@ -58,7 +58,7 @@ comparison is exact. The first matching row wins:
 Row 2 checks `created_at`, not the title, because that is the test
 `check-beads.sh` already applies to a reused id (barwise-984), and
 titles are edited legitimately. If row 7's timestamps are equal, the
-driver reports a conflict rather than picking a side (open decision 3).
+driver reports a conflict rather than picking a side (decision 3).
 
 The table is per id, so one case it cannot see is a dependency: one
 side deletes an issue that the other side added a dependency on. Each
@@ -107,9 +107,10 @@ Out of scope:
 - Resolving the conflict GitHub shows on a pull request. GitHub runs no
   custom merge driver, so a PR stays marked conflicted until someone
   merges the base into it locally. With this spec that merge needs no
-  hand resolution; noticing it is still needed is open decision 1.
+  hand resolution; noticing it is still needed is decision 1, a comment
+  workflow tracked as barwise-ojo.
 - One file per issue, which would remove the conflict class altogether
-  (open decision 2).
+  (decision 2: deferred).
 - Any change to `beads-crud.mjs`'s write path or to `check-beads.sh`.
 
 ## Inventory
@@ -206,10 +207,13 @@ that does not exist breaks every merge of the file. Acceptance:
   rule is the steward rule, and CLAUDE.md says `bd` is not part of the
   interface.
 
-## Open decisions (for review)
+## Decisions (owner, 2026-10-23)
+
+All three were answered on PR #718; each records the options it chose
+among, so a later reader can see what was set aside.
 
 1. **Who merges the base into a pull request that conflicts only on
-   the tracker?** No event wakes an agent when a change to main makes a
+   the tracker? Decided: (c), a comment, as its own spec (barwise-ojo).** No event wakes an agent when a change to main makes a
    PR conflict, and GitHub does not run the driver. Options:
    - (a) Leave it to the PR's agent and to the steward skill's
      check-ins. Cost: hours of latency, as on PR #704.
@@ -221,19 +225,18 @@ that does not exist breaks every merge of the file. Acceptance:
    - (c) The same workflow, but it only comments on the PR. This fixes
      the noticing and leaves the push to whoever owns the branch.
 
-   Recommend (c) as the next spec. It closes the detection gap with no
-   write access, and (b) can follow if the comments turn out to be
-   ignored.
-2. **One file per issue?** Storing each issue as
+   (c) closes the detection gap with no write access, and (b) can
+   follow if the comments turn out to be ignored.
+2. **One file per issue? Decided: deferred.** Storing each issue as
    `.beads/issues/<id>.json` would make concurrent additions touch
    different files, so they could never conflict. Ids are already
    random (`beads-random-ids.spec.md`). Cost: `bd` compatibility,
    rewrites of `beads-crud.mjs` and `check-beads.sh`, and a 598-file
-   directory. Recommend deferring it: with the driver in place, the
+   directory. Deferred because, with the driver in place, the
    remaining conflicts are real disagreements, which a per-file layout
    would surface in the same way.
-3. **Equal `updated_at` with different lines.** The options are to
-   report a conflict, or to prefer one side. Recommend the conflict.
+3. **Equal `updated_at` with different lines? Decided: report a
+   conflict.** The other option was to prefer one side.
    The timestamps have one-second resolution, so a tie means two edits
    in the same second on two branches, which is rare and better shown
    to a person than guessed.
