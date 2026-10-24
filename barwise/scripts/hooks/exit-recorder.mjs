@@ -25,9 +25,12 @@ delete process.env.BARWISE_EXIT_DIR;
 // own token and keep every other option byte for byte. That saves a
 // module load in every test fork and turbo task, and keeps the preload
 // out of tools that reject it (vscode-test's Electron).
+// Must agree with IMPORT_PREFIX in scripts/lib/exit-log.mjs; a drift
+// test holds the two together, since this file cannot import it.
+const IMPORT_PREFIX = "--import=data:text/javascript;base64,";
 if (process.env.NODE_OPTIONS) {
   process.env.NODE_OPTIONS = process.env.NODE_OPTIONS.split(" ")
-    .filter((t) => !t.startsWith("--import=data:text/javascript;base64,")).join(" ").trim();
+    .filter((t) => !t.startsWith(IMPORT_PREFIX)).join(" ").trim();
 }
 
 /**
@@ -42,7 +45,11 @@ const WORD = /^[A-Za-z0-9][A-Za-z0-9_:.-]*$/;
  * the value after a flag can be a token (`npm run --otp 123456 build`).
  */
 function label() {
-  const inline = process.execArgv.some((a) => /^(-e|-p|--eval|--print)(=|$)/.test(a));
+  // Short flags combine (`node -pe '...' arg`), so any cluster holding
+  // e or p is inline code, and argv[1] is then the user's first argument.
+  const inline = process.execArgv.some((a) =>
+    /^(-[a-zA-Z]*[ep][a-zA-Z]*|--eval|--print)(=|$)/.test(a)
+  );
   if (inline) return "node -e";
   const script = process.argv[1];
   if (!script) return "node";

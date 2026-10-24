@@ -15,13 +15,24 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 
-/** The base directory, as the hooks see it. SessionStart hands it to the recorder. */
+/**
+ * The base directory, as the hooks see it; SessionStart hands it to the
+ * recorder. Per user: it is created 0700, so a shared name would lock out
+ * every user after the first on a multi-user host.
+ */
 export function exitBase() {
-  return join(tmpdir(), "barwise-exit");
+  return join(tmpdir(), `barwise-exit-${userInfo().uid}`);
 }
+
+/**
+ * The NODE_OPTIONS token's prefix. The recorder strips tokens with it and
+ * cannot import this module (it is inlined), so a drift test holds its
+ * copy to this one.
+ */
+export const IMPORT_PREFIX = "--import=data:text/javascript;base64,";
 
 /** Must agree with the join in hooks/exit-recorder.mjs; a drift test runs both. */
 export function exitLogPath(base, session) {
@@ -32,14 +43,26 @@ function statePath(base, session) {
   return join(base, session, "state.json");
 }
 
-/** Absent state is a fresh session: nothing read, nothing said. */
+/**
+ * Absent state is a fresh session: nothing read, nothing said. Each field
+ * is checked, not merged blind: a bad `position` would fail every later
+ * read the way an unchecked log line did.
+ */
 export function readState(base, session) {
   const fresh = { position: 0, everEntry: false, nodeCalls: 0, notArmedSaid: false };
+  let saved = {};
   try {
-    return { ...fresh, ...JSON.parse(readFileSync(statePath(base, session), "utf8")) };
+    saved = JSON.parse(readFileSync(statePath(base, session), "utf8")) ?? {};
   } catch {
     return fresh;
   }
+  const count = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : 0);
+  return {
+    position: count(saved.position),
+    everEntry: saved.everEntry === true,
+    nodeCalls: count(saved.nodeCalls),
+    notArmedSaid: saved.notArmedSaid === true,
+  };
 }
 
 /** Written through a rename, so a concurrent reader never sees half a file. */
@@ -72,11 +95,12 @@ export function readUnread(base, session, position) {
   } finally {
     closeSync(fd);
   }
-  const text = buf.toString("utf8");
-  const end = text.lastIndexOf("\n") + 1;
+  // Measured in bytes, never in decoded text: an invalid byte decodes to
+  // a three-byte U+FFFD and would push the position past the next entry.
+  const end = buf.lastIndexOf(0x0a) + 1;
   const entries = [];
   let unreadable = 0;
-  for (const line of text.slice(0, end).split("\n")) {
+  for (const line of buf.subarray(0, end).toString("utf8").split("\n")) {
     if (line === "") continue;
     try {
       const e = JSON.parse(line);
@@ -91,7 +115,7 @@ export function readUnread(base, session, position) {
       unreadable += 1;
     }
   }
-  return { entries, unreadable, position: from + Buffer.byteLength(text.slice(0, end)), size };
+  return { entries, unreadable, position: from + end, size };
 }
 
 /**
@@ -170,33 +194,22 @@ export function envLines(base, recorderSource) {
   const b64 = Buffer.from(recorderSource, "utf8").toString("base64");
   return [
     `export BARWISE_EXIT_DIR="${base}"`,
-    `export NODE_OPTIONS="--import=data:text/javascript;base64,${b64}\${NODE_OPTIONS:+ $NODE_OPTIONS}"`,
+    `export NODE_OPTIONS="${IMPORT_PREFIX}${b64}\${NODE_OPTIONS:+ $NODE_OPTIONS}"`,
   ];
 }
 
-const KINDS = [
-  /^export BARWISE_EXIT_DIR=/,
-  /^export NODE_OPTIONS="--import=data:text\/javascript;base64,/,
-];
-
 /**
- * What the env file needs: null when it already holds exactly our lines;
- * `{ append }` when it holds no line of our kinds, so the common path is
- * an append that cannot race another hook's append (session-start.sh's
- * `persist_env` writes with `>>`); `{ replace }` only when an older line
- * of ours is there (a resume across a recorder change), so one recorder
- * is left, not two. Every other line, blank ones included, is kept as it
- * was: the file is shared, and only our two kinds of line are ours.
+ * What to append to the env file, or null when every line of ours is
+ * already there. Never a rewrite: the file is shared, and
+ * session-start.sh appends to it with `>>` while this runs, so a
+ * read-then-write would lose its lines. Appending is also enough when an
+ * older recorder's line is already there (a resume across a recorder
+ * change): the newer export comes later, so its token comes first in
+ * NODE_OPTIONS; that recorder consumes the switch and strips both tokens,
+ * and the older one, loaded second, records nothing.
  */
-export function envFileChange(existing, lines) {
-  const rows = existing === "" ? [] : existing.replace(/\n$/, "").split("\n");
-  const ours = rows.filter((l) => KINDS.some((k) => k.test(l)));
-  if (ours.length === lines.length && ours.every((l, i) => l === lines[i])) return null;
-  if (ours.length === 0) {
-    return {
-      append: `${existing !== "" && !existing.endsWith("\n") ? "\n" : ""}${lines.join("\n")}\n`,
-    };
-  }
-  const kept = rows.filter((l) => !KINDS.some((k) => k.test(l)));
-  return { replace: `${[...kept, ...lines].join("\n")}\n` };
+export function envAppend(existing, lines) {
+  const rows = new Set(existing.split("\n"));
+  if (lines.every((l) => rows.has(l))) return null;
+  return `${existing !== "" && !existing.endsWith("\n") ? "\n" : ""}${lines.join("\n")}\n`;
 }

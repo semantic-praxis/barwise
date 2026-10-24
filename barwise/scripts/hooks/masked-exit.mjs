@@ -25,12 +25,12 @@
  * so with exit 2 too: exit 1 reaches only a verbose transcript, where
  * "could not answer" would read as "nothing failed".
  */
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   acceptsImport,
-  envFileChange,
+  envAppend,
   envLines,
   exitBase,
   namesNode,
@@ -72,9 +72,8 @@ function session() {
   } catch {
     // A new file.
   }
-  const change = envFileChange(existing, envLines(base, source));
-  if (change?.append) appendFileSync(file, change.append);
-  else if (change?.replace) writeFileSync(file, change.replace);
+  const append = envAppend(existing, envLines(base, source));
+  if (append) appendFileSync(file, append);
 }
 
 function read(kind) {

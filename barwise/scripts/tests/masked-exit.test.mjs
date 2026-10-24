@@ -18,10 +18,19 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { acceptsImport, envFileChange, envLines, exitLogPath, HEADINGS } from "../lib/exit-log.mjs";
+import {
+  acceptsImport,
+  envAppend,
+  envLines,
+  exitBase,
+  exitLogPath,
+  HEADINGS,
+  IMPORT_PREFIX,
+  readState,
+} from "../lib/exit-log.mjs";
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "..");
 const HOOK = join(SCRIPTS, "hooks", "masked-exit.mjs");
@@ -33,7 +42,8 @@ const SID = "fixture-session";
 /** A fresh fixture: a temp dir standing in for TMPDIR, and the paths in it. */
 function fixture() {
   const dir = mkdtempSync(join(tmpdir(), "barwise-masked-"));
-  const base = join(dir, "barwise-exit");
+  // The hooks derive the base from TMPDIR; the recorder is handed it.
+  const base = join(dir, basename(exitBase()));
   const log = exitLogPath(base, SID);
   const clean = { ...process.env };
   for (
@@ -178,9 +188,18 @@ test("only the first node process records, and opted-out commands record nothing
       'node -e \'try{require("child_process").execFileSync(process.execPath,["-e","process.exit(3)"])}catch{}\'',
     );
     assert.deepEqual(f.entries().map((e) => e.code), [0], "the child's exit 3 is not recorded");
+    // The switch on its own, with the recorder handed back to the child:
+    // the strip above already keeps it from loading, so this is the case
+    // that fails if the parent does not consume BARWISE_EXIT_DIR.
+    f.sh(
+      'node -e \'try{require("child_process").execFileSync(process.execPath,["-e","process.exit(3)"],'
+        + "{env:{...process.env,NODE_OPTIONS:process.env.RECORDER}})}catch{}'",
+      { ...f.armed, RECORDER: f.armed.NODE_OPTIONS },
+    );
+    assert.deepEqual(f.entries().map((e) => e.code), [0, 0], "the child sees no switch");
     f.sh("unset BARWISE_EXIT_DIR; node -e 'process.exit(1)' | tail");
     f.sh("env -u BARWISE_EXIT_DIR node -e 'process.exit(1)'");
-    assert.equal(f.entries().length, 1, "unset and env -u (how every hook runs) record nothing");
+    assert.equal(f.entries().length, 2, "unset and env -u (how every hook runs) record nothing");
     // The post hook run exactly as its settings entry runs it, armed.
     const { hooks } = JSON.parse(readFileSync(SETTINGS, "utf8"));
     const cmd = hooks.PostToolUse[0].hooks[0].command;
@@ -190,7 +209,7 @@ test("only the first node process records, and opted-out commands record nothing
       encoding: "utf8",
     });
     assert.equal(ran.status, 0, ran.stderr);
-    assert.equal(f.entries().length, 1, "a hook never records its own exit");
+    assert.equal(f.entries().length, 2, "a hook never records its own exit");
   } finally {
     f.done();
   }
@@ -327,6 +346,7 @@ test("labels keep only words that cannot carry a value", () => {
       ["node npm-cli.js test", "npm test"],
       ["node npx-cli.js vitest run", "npx vitest"],
       ["node tok=SECRET3.js", "node"],
+      ["node -pe 1 sk-ant-SECRET4 >/dev/null", "node -e"],
     ];
     for (const [cmd] of cases) f.sh(cmd);
     assert.deepEqual(f.entries().map((e) => e.label), cases.map(([, want]) => want));
@@ -362,30 +382,26 @@ test("the recorder and exit-log.mjs agree on the log path", () => {
   }
 });
 
-test("the SessionStart mode writes two lines once, replacing a stale recorder", () => {
+test("the SessionStart mode appends two lines once, leaving other lines alone", () => {
   const f = fixture();
   try {
     const envFile = join(f.dir, "env.sh");
-    writeFileSync(
-      envFile,
-      'export PATH="/x:$PATH"\nexport NODE_OPTIONS="--import=data:text/javascript;base64,OLD"\n',
-    );
+    const old = `export NODE_OPTIONS="${IMPORT_PREFIX}OLD\${NODE_OPTIONS:+ $NODE_OPTIONS}"`;
+    writeFileSync(envFile, `export PATH="/x:$PATH"\n${old}\n`);
     const run = () =>
       spawnSync(process.execPath, [HOOK, "session"], {
-        input: "{}",
         env: { ...f.clean, TMPDIR: f.dir, CLAUDE_ENV_FILE: envFile },
         encoding: "utf8",
       });
     for (let i = 0; i < 3; i++) assert.equal(run().status, 0);
     const lines = readFileSync(envFile, "utf8").trim().split("\n");
-    assert.equal(lines.length, 3, lines.join("\n"));
-    assert.equal(lines[0], 'export PATH="/x:$PATH"');
-    assert.equal(lines[1], `export BARWISE_EXIT_DIR="${f.base}"`);
+    assert.equal(lines.length, 4, lines.join("\n"));
+    assert.deepEqual(lines.slice(0, 2), ['export PATH="/x:$PATH"', old], "never rewritten");
+    assert.equal(lines[2], `export BARWISE_EXIT_DIR="${f.base}"`);
     assert.ok(
-      lines[2].endsWith('${NODE_OPTIONS:+ $NODE_OPTIONS}"'),
+      lines[3].endsWith('${NODE_OPTIONS:+ $NODE_OPTIONS}"'),
       "an existing NODE_OPTIONS survives",
     );
-    assert.doesNotMatch(lines[2], /,OLD/);
     // A copy of the hook with no recorder beside it writes nothing.
     const bare = join(f.dir, "bare");
     mkdirSync(join(bare, "hooks"), { recursive: true });
@@ -393,7 +409,6 @@ test("the SessionStart mode writes two lines once, replacing a stale recorder", 
     cpSync(join(SCRIPTS, "lib"), join(bare, "lib"), { recursive: true });
     const before = readFileSync(envFile, "utf8");
     const r = spawnSync(process.execPath, [join(bare, "hooks", "masked-exit.mjs"), "session"], {
-      input: "{}",
       env: { ...f.clean, TMPDIR: f.dir, CLAUDE_ENV_FILE: envFile },
       encoding: "utf8",
     });
@@ -409,7 +424,6 @@ test("end to end: the written env file, inlined as the harness does, arms the re
   try {
     const envFile = join(f.dir, "env.sh");
     const s = spawnSync(process.execPath, [HOOK, "session"], {
-      input: "{}",
       env: { ...f.clean, TMPDIR: f.dir, CLAUDE_ENV_FILE: envFile, NODE_OPTIONS: "" },
       encoding: "utf8",
     });
@@ -437,15 +451,92 @@ test("only node 20.6 and later get the --import line", () => {
   for (const v of ["18.19.0", "20.5.1", "16.20.2"]) assert.equal(acceptsImport(v), false, v);
 });
 
-test("the env file is appended to, and rewritten only to replace a stale line of ours", () => {
+test("the env file is only ever appended to", () => {
   const lines = envLines("/new", "x");
   const other = 'export A=1\n\nexport B="two\n\nlines"\n';
-  assert.deepEqual(envFileChange(other, lines), { append: `${lines.join("\n")}\n` });
-  assert.equal(envFileChange(`${other}${lines.join("\n")}\n`, lines), null);
-  const stale = envFileChange(`${other}export BARWISE_EXIT_DIR="/old"\n`, lines);
-  assert.ok(stale.replace.startsWith(other), "every other line, blank ones included, kept");
-  assert.ok(stale.replace.endsWith(`${lines.join("\n")}\n`));
-  assert.doesNotMatch(stale.replace, /\/old/);
+  assert.equal(envAppend(other, lines), `${lines.join("\n")}\n`);
+  assert.equal(envAppend(`${other}${lines.join("\n")}\n`, lines), null);
+  assert.equal(envAppend("export A=1", lines), `\n${lines.join("\n")}\n`);
+});
+
+test("a newer recorder line after an older one: the newer records, once", () => {
+  const f = fixture();
+  try {
+    // An "older recorder" that would record code 99 if it ever ran armed.
+    const oldSrc = `if (process.env.BARWISE_EXIT_DIR) process.on("exit", () => require("node:fs")`
+      + `.appendFileSync(process.env.BARWISE_EXIT_DIR + "/old", "ran"));`;
+    const oldLine = `export NODE_OPTIONS="${IMPORT_PREFIX}${
+      Buffer.from(
+        `import { createRequire } from "node:module"; const require = createRequire(import.meta.url); ${oldSrc}`,
+      ).toString("base64")
+    }\${NODE_OPTIONS:+ $NODE_OPTIONS}"`;
+    const envFile = join(f.dir, "env.sh");
+    writeFileSync(envFile, `${oldLine}\n`);
+    const s = spawnSync(process.execPath, [HOOK, "session"], {
+      env: { ...f.clean, TMPDIR: f.dir, CLAUDE_ENV_FILE: envFile },
+      encoding: "utf8",
+    });
+    assert.equal(s.status, 0, s.stderr);
+    const run = f.sh(`${readFileSync(envFile, "utf8")}node -e 'process.exit(1)' | tail -1`, {
+      ...f.clean,
+      CLAUDE_CODE_SESSION_ID: SID,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(f.entries().map((e) => e.code), [1]);
+    assert.equal(existsSync(join(f.base, "old")), false, "the older recorder found no switch");
+  } finally {
+    f.done();
+  }
+});
+
+test("the recorder's import prefix is the one envLines writes", () => {
+  assert.ok(readFileSync(RECORDER, "utf8").includes(`const IMPORT_PREFIX = "${IMPORT_PREFIX}";`));
+});
+
+test("a state file with bad fields is read as fresh fields, not trusted", () => {
+  const f = fixture();
+  try {
+    mkdirSync(join(f.base, SID), { recursive: true });
+    writeFileSync(
+      join(f.base, SID, "state.json"),
+      '{"position":"12","nodeCalls":-3,"everEntry":"yes"}',
+    );
+    assert.deepEqual(readState(f.base, SID), {
+      position: 0,
+      everEntry: false,
+      nodeCalls: 0,
+      notArmedSaid: false,
+    });
+    f.sh("node -e 'process.exit(1)'");
+    assert.match(post(f).stderr, /node -e\s+exit 1/);
+  } finally {
+    f.done();
+  }
+});
+
+test("an invalid byte in a line does not move the read past the next entry", () => {
+  const f = fixture();
+  try {
+    mkdirSync(dirname(f.log), { recursive: true });
+    writeFileSync(
+      f.log,
+      Buffer.concat([
+        Buffer.from('{"t":1,"code":1,"label":"a\xff'),
+        Buffer.from([0xff]),
+        Buffer.from('"}\n'),
+      ]),
+    );
+    post(f);
+    writeFileSync(
+      f.log,
+      readFileSync(f.log).toString("latin1")
+        + `${JSON.stringify({ t: 2, code: 5, label: "next" })}\n`,
+      "latin1",
+    );
+    assert.match(post(f).stderr, /next\s+exit 5/);
+  } finally {
+    f.done();
+  }
 });
 
 test("CLAUDE.md quotes the report the hook actually prints", () => {

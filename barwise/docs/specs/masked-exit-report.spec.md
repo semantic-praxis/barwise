@@ -85,7 +85,8 @@ So:
   a report's exit 2) never reach the log.
 
 **Where the log is.** `<base>/<session id>/exits.jsonl`. The base is
-`os.tmpdir()/barwise-exit` as the hooks see it; the SessionStart hook
+`os.tmpdir()/barwise-exit-<uid>` as the hooks see it (per user, because
+it is created 0700 and a shared name would lock out every later user); the SessionStart hook
 hands that absolute path to the recorder in `BARWISE_EXIT_DIR`, so a
 sandbox that gives Bash commands a different `TMPDIR` cannot split the
 two. The session id comes from each side's own source: the Bash
@@ -246,12 +247,13 @@ below.
 In scope:
 
 - When a session starts, the SessionStart mode shall append to
-  `$CLAUDE_ENV_FILE` two static lines, each replacing any earlier line of
-  its kind (an earlier `BARWISE_EXIT_DIR` export, or a `NODE_OPTIONS`
-  export carrying an older recorder, so a resume across a recorder change
-  leaves one recorder, not two) and otherwise appended only if not
-  already present,
-  written literally so the shell expands them: `export
+  `$CLAUDE_ENV_FILE`, unless both are already there, two static lines,
+  and never rewrite the file: it is shared, and `session-start.sh`
+  appends to it with `>>` at the same time, so a read-then-write would
+  lose its lines. Appending is enough after a recorder change too: the
+  newer export comes later, so its token comes first in `NODE_OPTIONS`,
+  and that recorder consumes the switch and strips both tokens. The lines
+  are written literally so the shell expands them: `export
   BARWISE_EXIT_DIR="<base>"` and `export
   NODE_OPTIONS="--import=data:text/javascript;base64,<b64>${NODE_OPTIONS:+
   $NODE_OPTIONS}"`. If it cannot read the recorder, it writes neither.
@@ -415,8 +417,8 @@ failing with it removed:
 - the recorder with an unwritable base leaves the observed process's
   output and exit code unchanged;
 - the SessionStart mode writes each line once across repeated starts
-  (resume, clear and compact all fire SessionStart), replaces a
-  `NODE_OPTIONS` line carrying a different recorder, keeps an existing
+  (resume, clear and compact all fire SessionStart), never rewrites a
+  line already in the file, keeps an existing
   `NODE_OPTIONS` through the literal `${NODE_OPTIONS:+ ...}`, and writes
   nothing when the recorder cannot be read;
 - **end to end**: the SessionStart mode writes an env file, its text is
@@ -425,7 +427,10 @@ failing with it removed:
   'process.exit(1)' | tail` in that command produces an entry the post
   mode reports; so the encoding, the quoting and Node's parsing of
   `NODE_OPTIONS` are tested together;
-- the drift test: the recorder and `exit-log.mjs` compute the same path;
+- the drift tests: the recorder and `exit-log.mjs` compute the same path
+  and strip the same `--import` prefix;
+- a newer recorder line appended after an older one: only the newer
+  records, once;
 - **the wiring**: a test parses `.claude/settings.json` and asserts the
   four new entries, their matchers (`""` for SessionStart and Stop,
   `Bash` for the others) and mode arguments, and that every hook command in the file
