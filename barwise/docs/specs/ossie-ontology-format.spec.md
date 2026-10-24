@@ -295,7 +295,9 @@ definition, no constraint, the built-in's data type); the per-kind
 would be shared rather than copied; a `derived_by` expression that itself
 spans lines, which the one-per-line join cannot split back; and the
 `<snake_name>_id` reference mode the importer makes for a composite
-identifier, which the exporter must not report as a loss. Populations and
+identifier, which the exporter must not report as a loss. The model note holds
+the ontology description and its `requires` lines together, which the
+exporter must tell apart when a description itself has a `requires:` line. Populations and
 objectification join the loss report.
 
 `writeOssie` and `OssieExportFormat`, added to `ossieFormat`. Tests: each

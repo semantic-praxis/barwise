@@ -231,7 +231,7 @@ ontology:
     );
     expect(warnings).toEqual([
       "Employee: derived_by on an entity type with no supertype is kept in the note: EXISTS ( Employee.earns )",
-      "Employee: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode employee_id, which no relationship carries.",
+      "no identify_by and no supertype, so nothing identifies them; each is given a reference mode no relationship carries: Employee.",
     ]);
   });
 
@@ -292,7 +292,7 @@ ontology:
     });
     expect(model.preferredIdentifierOf(model.getObjectTypeByName("City")!.id)).toBeUndefined();
     expect(warnings).toEqual([
-      "State: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode state_id, which no relationship carries.",
+      "no identify_by and no supertype, so nothing identifies them; each is given a reference mode no relationship carries: State.",
       "City: identify_by [name, state] is kept as an external uniqueness; barwise cannot yet name one as a preferred identifier (barwise-alg).",
     ]);
   });
@@ -348,7 +348,9 @@ ontology:
     const x = model.getObjectTypeByName("X")!;
     expect(x.kind === "value" && x.valueConstraint).toBeUndefined();
     expect(x.note).toBe("requires: X >= 10\nrequires: X < 5");
-    expect(warnings).toHaveLength(2);
+    expect(warnings).toEqual([
+      "X: the bounds X >= 10, X < 5 admit no value; kept in the note rather than stored as a constraint nothing satisfies.",
+    ]);
   });
 
   it("writes a multi-line expression as one line, in the note and the warning", () => {
@@ -373,6 +375,34 @@ ontology:
     expect(warnings).toEqual([
       "Trip.ends: requires is not carried as a constraint (kept in the note): Trip.ends > Trip.starts AND Trip.ends < NOW()",
     ]);
+  });
+
+  it("keeps what the model stores exactly: an enumeration's literals and a derivation's lines", () => {
+    const { model } = load(`
+ontology:
+  - concept: City
+    type: ValueType
+    extends: [ String ]
+    requires: [ "City == 'New  York' OR City == 'Rome'" ]
+  - concept: Flight
+    type: EntityType
+    identify_by: [ id ]
+    relationships:
+      - { name: id, roles: [ { concept: String } ], multiplicity: OneToOne, verbalizes: [ "{Flight} has id {String}" ] }
+      - name: late
+        derived_by:
+          - |
+            EXISTS (SELECT 1 -- delayed only
+              WHERE Flight.delay > 0)
+        verbalizes: [ "{Flight} is late" ]
+`);
+    const city = model.getObjectTypeByName("City")!;
+    expect(city.kind === "value" && city.valueConstraint).toEqual({
+      values: ["New  York", "Rome"],
+    });
+    // The line end ends the SQL comment; one line would comment out the WHERE.
+    expect(factType(model, "Flight.late").derivation?.expression)
+      .toBe("EXISTS (SELECT 1 -- delayed only\n  WHERE Flight.delay > 0)\n");
   });
 
   it("reads a bare Entity.rel as a mandatory first role", () => {
@@ -419,8 +449,8 @@ ontology:
       "Size: requires is not carried as a constraint (kept in the note): Size >= 2",
       "Trip: requires is not carried as a constraint (kept in the note): COUNT[Trip] > 0",
       "Trip: requires is not carried as a constraint (kept in the note): Trip.nowhere",
-      "Trip: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode trip_id, which no relationship carries.",
       "Trip.starts: requires is not carried as a constraint (kept in the note): Trip.starts < NOW()",
+      "no identify_by and no supertype, so nothing identifies them; each is given a reference mode no relationship carries: Trip.",
     ]);
   });
 });
@@ -509,8 +539,8 @@ ontology:
       "{0} has departure- {1}",
     ]);
     expect(warnings).toEqual([
-      "Flight: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode flight_id, which no relationship carries.",
       'Flight.dep: reading "{Flight} has departure- {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
+      "no identify_by and no supertype, so nothing identifies them; each is given a reference mode no relationship carries: Flight.",
     ]);
   });
 });
@@ -643,6 +673,14 @@ ontology:
   );
 
   it(
+    "a value type naming itself as a later supertype",
+    refuses(
+      "ontology:\n  - { concept: Code, type: ValueType, extends: [ String, Code ] }\n",
+      /Code extends itself/,
+    ),
+  );
+
+  it(
     "an empty verbalizes",
     refuses(
       `
@@ -740,7 +778,7 @@ ontology:
       "requires on the ontology is not carried as a constraint (kept in the model's note): COUNT[Person] > 0",
       "Person: iri ex:Person dropped; barwise has no field for IRIs.",
       "Person.walks: iri ex:walks dropped; barwise has no field for IRIs.",
-      "Person: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode person_id, which no relationship carries.",
+      "no identify_by and no supertype, so nothing identifies them; each is given a reference mode no relationship carries: Person.",
     ]);
     expect(confidence).toBe("medium");
   });

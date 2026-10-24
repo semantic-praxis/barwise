@@ -19,5 +19,5 @@ export { NormaImportError } from "./norma/NormaXmlImporter.js";
 export { OpenApiExportFormat } from "./openapi/OpenApiExportFormat.js";
 export { OpenApiImportFormat } from "./openapi/OpenApiImportFormat.js";
 export { OssieImportFormat } from "./ossie/OssieImportFormat.js";
-export { OssieImportError } from "./ossie/OssieTypes.js";
+export { OSSIE_VERSION, OssieImportError } from "./ossie/OssieTypes.js";
 export { SqlImportFormat } from "./sql/SqlImportFormat.js";

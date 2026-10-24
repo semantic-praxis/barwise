@@ -6,7 +6,7 @@ import { registerCodeFormats } from "@barwise/code-analysis";
 import { getImporter, listImporters, OrmYamlSerializer } from "@barwise/core";
 import { SQL_DIALECTS } from "@barwise/core/sql";
 import { registerDbtFormats } from "@barwise/dbt";
-import { registerStandardFormats } from "@barwise/formats";
+import { OSSIE_VERSION, registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readSource } from "../workspace/resolve.js";
@@ -48,7 +48,7 @@ export function registerImportModelTool(server: McpServer): void {
           .describe(
             "Format of the source: 'ddl' for SQL DDL, 'openapi' for OpenAPI 3.x specs, "
               + "'norma' for NORMA .orm XML files, "
-              + "'ossie' for an Apache Ossie ontology document (YAML, version 0.2.0.dev0), "
+              + `'ossie' for an Apache Ossie ontology document (YAML, version ${OSSIE_VERSION}), `
               + "'dbt' for dbt project directory, 'sql' for raw SQL files/directories, "
               + "'typescript' for TypeScript project directory, 'java' for Java project directory, "
               + "'kotlin' for Kotlin project directory",

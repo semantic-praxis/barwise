@@ -76,9 +76,11 @@ interface Resolved {
 }
 
 /**
- * An expression as one line. Ossie expressions are SQL text and may be
- * YAML block scalars; a newline inside one would break a warning printed
- * as one comment line, and the one-expression-per-line framing of a note.
+ * An expression as one line, for where it is rendered: a warning printed
+ * as one comment line, and a note's one-expression-per-line framing. Never
+ * applied to what the model stores as data -- an enumeration's literals
+ * or a derivation's text, where whitespace and a SQL `--` comment's line
+ * end carry meaning.
  */
 function oneLine(expr: string): string {
   return expr.trim().replace(/\s+/g, " ");
@@ -89,7 +91,7 @@ export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapR
   const warnings: string[] = [];
   // The ontology-level requires has no element to hold it but the model,
   // so it joins the description in the model's note.
-  const ontologyRequires = (doc.requires ?? []).map(oneLine);
+  const ontologyRequires = doc.requires ?? [];
   const note = [doc.description, notes(ontologyRequires, [])].filter(Boolean).join("\n");
   const model = new OrmModel({ name: modelName ?? doc.name, ...(note ? { note } : {}) });
 
@@ -101,6 +103,17 @@ export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapR
     for (const r of c.relationships ?? []) {
       addRelationship(model, c, r, resolved.readings.get(r)!, warnings);
     }
+  }
+  const unidentified = doc.ontology.filter((c) =>
+    c.type === "EntityType" && !hasIdentifyBy(c) && supertypes(c).length === 0
+  );
+  if (unidentified.length > 0) {
+    // One line for all of them: an ontology that leaves most concepts
+    // unidentified would otherwise bury the warnings that name a loss.
+    warnings.push(
+      `no identify_by and no supertype, so nothing identifies them; each is given a reference `
+        + `mode no relationship carries: ${unidentified.map((c) => c.concept).join(", ")}.`,
+    );
   }
   for (const c of doc.ontology) {
     if (c.type !== "EntityType") continue;
@@ -247,6 +260,7 @@ function valueChain(c: OssieConcept, concepts: Concepts): Chain {
   // be a value type: a typo or an entity there is the mistake an entity's
   // extends is refused for.
   for (const s of (c.extends ?? []).slice(1)) {
+    if (s === c.concept) throw new OssieImportError(`Value type ${c.concept} extends itself.`);
     if (!isOssieBuiltinValueType(s) && concepts.get(s)?.type !== "ValueType") {
       throw new OssieImportError(
         `Value type ${c.concept} extends ${s}, which is not a declared value type.`,
@@ -299,7 +313,9 @@ function reportDropped(
   }
   for (const expr of ontologyRequires) {
     warnings.push(
-      `requires on the ontology is not carried as a constraint (kept in the model's note): ${expr}`,
+      `requires on the ontology is not carried as a constraint (kept in the model's note): ${
+        oneLine(expr)
+      }`,
     );
   }
   for (const c of doc.ontology) {
@@ -344,7 +360,7 @@ function playerId(model: OrmModel, name: string): string {
 }
 
 const kept = (concept: string, expr: string): string =>
-  `${concept}: requires is not carried as a constraint (kept in the note): ${expr}`;
+  `${concept}: requires is not carried as a constraint (kept in the note): ${oneLine(expr)}`;
 
 function addConcept(
   model: OrmModel,
@@ -362,16 +378,12 @@ function addConcept(
     for (const expr of unrecognized) warnings.push(kept(c.concept, expr));
     // A derivation with no supertype has no subtype fact to hold it as a
     // defining rule, so it stays as text with the requires it sits beside.
-    const unheld = supertypes(c).length > 0 ? [] : (c.derived_by ?? []).map(oneLine);
+    const unheld = supertypes(c).length > 0 ? [] : c.derived_by ?? [];
     for (const expr of unheld) {
       warnings.push(
-        `${c.concept}: derived_by on an entity type with no supertype is kept in the note: ${expr}`,
-      );
-    }
-    if (supertypes(c).length === 0 && !(c.identify_by && c.identify_by.length > 0)) {
-      warnings.push(
-        `${c.concept}: no identify_by and no supertype, so nothing identifies it; barwise gives it `
-          + `the reference mode ${referenceMode(c)}, which no relationship carries.`,
+        `${c.concept}: derived_by on an entity type with no supertype is kept in the note: ${
+          oneLine(expr)
+        }`,
       );
     }
     const note = notes(unrecognized, unheld);
@@ -384,17 +396,25 @@ function addConcept(
     return;
   }
 
-  const shapes = readValueShapes(c.concept, (c.requires ?? []).map(oneLine));
-  const derivedBy = (c.derived_by ?? []).map(oneLine);
+  const shapes = readValueShapes(c.concept, c.requires ?? []);
+  const derivedBy = c.derived_by ?? [];
   const valueConstraint: ValueConstraintDef | undefined =
     shapes.values.length > 0 || shapes.ranges.length > 0
       ? { values: shapes.values, ...(shapes.ranges.length > 0 ? { ranges: shapes.ranges } : {}) }
       : undefined;
-  for (const expr of shapes.unrecognized) warnings.push(kept(c.concept, expr));
-  for (const expr of derivedBy) {
-    warnings.push(`${c.concept}: derived_by on a value type is kept in the note: ${expr}`);
+  if (shapes.contradictory.length > 0) {
+    warnings.push(
+      `${c.concept}: the bounds ${shapes.contradictory.map(oneLine).join(", ")} admit no value; `
+        + `kept in the note rather than stored as a constraint nothing satisfies.`,
+    );
   }
-  if (c.identify_by && c.identify_by.length > 0) {
+  for (const expr of shapes.unrecognized) {
+    if (!shapes.contradictory.includes(expr)) warnings.push(kept(c.concept, expr));
+  }
+  for (const expr of derivedBy) {
+    warnings.push(`${c.concept}: derived_by on a value type is kept in the note: ${oneLine(expr)}`);
+  }
+  if (hasIdentifyBy(c)) {
     warnings.push(
       `${c.concept}: identify_by on a value type is not carried; a value identifies itself.`,
     );
@@ -430,14 +450,19 @@ function valueDataType(c: OssieConcept, chain: Chain, warnings: string[]): Conce
     );
   }
   for (const ancestor of through) {
-    for (const expr of (ancestor.requires ?? []).map(oneLine)) {
+    for (const expr of ancestor.requires ?? []) {
       warnings.push(
         `${c.concept}: inherits ${ancestor.concept}'s requires, which the flattened type does not `
-          + `carry: ${expr}`,
+          + `carry: ${oneLine(expr)}`,
       );
     }
   }
   return root;
+}
+
+/** Whether a concept names its own identifier. */
+function hasIdentifyBy(c: OssieConcept): boolean {
+  return (c.identify_by ?? []).length > 0;
 }
 
 /** The entity's declared supertypes, `Any` (every entity's) left out. */
@@ -462,7 +487,7 @@ function referenceMode(c: OssieConcept): string {
 function splitEntityRequires(c: OssieConcept): RequiresSplit {
   const mandatory: string[] = [];
   const unrecognized: string[] = [];
-  for (const expr of (c.requires ?? []).map(oneLine)) {
+  for (const expr of c.requires ?? []) {
     const rel = readMandatoryShape(c.concept, expr);
     if (rel !== undefined && (c.relationships ?? []).some((r) => r.name === rel)) {
       // `requires: [ E.x, E.x ]` states one constraint, not two.
@@ -500,7 +525,7 @@ function addRelationship(
       );
     }
   }
-  const requires = (r.requires ?? []).map(oneLine);
+  const requires = r.requires ?? [];
   for (const expr of requires) warnings.push(kept(name, expr));
   const note = notes(requires, []);
   model.addFactType({
@@ -513,7 +538,7 @@ function addRelationship(
     ...(note ? { note } : {}),
     ...(r.derived_by && r.derived_by.length > 0
       ? {
-        derivation: { kind: "derived" as const, expression: r.derived_by.map(oneLine).join("\n") },
+        derivation: { kind: "derived" as const, expression: r.derived_by.join("\n") },
       }
       : {}),
   });
@@ -597,14 +622,14 @@ function multiplicityConstraints(
  */
 function addSubtypes(model: OrmModel, c: OssieConcept): void {
   const rule = c.derived_by && c.derived_by.length > 0
-    ? { kind: "derived" as const, expression: c.derived_by.map(oneLine).join("\n") }
+    ? { kind: "derived" as const, expression: c.derived_by.join("\n") }
     : undefined;
   supertypes(c).forEach((s, i) => {
     model.addSubtypeFact({
       id: generateId(),
       subtypeId: conceptId(model, c.concept),
       supertypeId: conceptId(model, s),
-      providesIdentification: i === 0 && !(c.identify_by && c.identify_by.length > 0),
+      providesIdentification: i === 0 && !hasIdentifyBy(c),
       ...(rule ? { definingRule: rule } : {}),
     });
   });
@@ -658,7 +683,7 @@ function addMandatoryRoles(model: OrmModel, c: OssieConcept, split: RequiresSpli
 
 function notes(requires: readonly string[], derivedBy: readonly string[]): string {
   return [
-    ...requires.map((e) => `${REQUIRES_NOTE_PREFIX}${e}`),
-    ...derivedBy.map((e) => `${DERIVED_BY_NOTE_PREFIX}${e}`),
+    ...requires.map((e) => `${REQUIRES_NOTE_PREFIX}${oneLine(e)}`),
+    ...derivedBy.map((e) => `${DERIVED_BY_NOTE_PREFIX}${oneLine(e)}`),
   ].join("\n");
 }

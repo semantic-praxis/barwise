@@ -24,6 +24,8 @@ export interface ValueShapes {
   readonly ranges: readonly ValueRange[];
   /** The items that matched no shape. */
   readonly unrecognized: readonly string[];
+  /** Bound items that together admit no value; also in `unrecognized`. */
+  readonly contradictory: readonly string[];
 }
 
 const IDENT = String.raw`[A-Za-z_][A-Za-z0-9_]*`;
@@ -58,12 +60,14 @@ export function readValueShapes(concept: string, items: readonly string[]): Valu
       values: enumeration(items[enumerated]!, member)!,
       ranges: [],
       unrecognized: items.filter((_, i) => i !== enumerated),
+      contradictory: [],
     };
   }
 
   let range: { min?: string; max?: string; minInclusive?: boolean; maxInclusive?: boolean; } = {};
   let ranged = false;
   const unrecognized: string[] = [];
+  const bounds: string[] = [];
   for (const item of items) {
     const bound = boundOf(item, right, left);
     const narrowed = bound ? narrow(range, bound) : undefined;
@@ -73,14 +77,15 @@ export function readValueShapes(concept: string, items: readonly string[]): Valu
     }
     range = narrowed;
     ranged = true;
+    bounds.push(item);
   }
   // Bounds no value meets (`X >= 10`, `X < 5`) are a mistake in the
   // source, not a constraint: stored, they would refuse every value. They
   // go back as text, like any other near miss.
   if (ranged && empty(range)) {
-    return { values: [], ranges: [], unrecognized: [...items] };
+    return { values: [], ranges: [], unrecognized: [...items], contradictory: bounds };
   }
-  return { values: [], ranges: ranged ? [range] : [], unrecognized };
+  return { values: [], ranges: ranged ? [range] : [], unrecognized, contradictory: [] };
 }
 
 /** Whether a range admits no value. Both bounds are numbers: `NUMBER` matched them. */
