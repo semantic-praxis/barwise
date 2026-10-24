@@ -262,6 +262,36 @@ export function resolvePreferredIdentifier(
 }
 
 /**
+ * The entity an external uniqueness identifies, if it has the reference
+ * scheme shape: for a reader that holds the constraint and asks whom it
+ * could name (an importer reading a flag, a writer inferring a scheme the
+ * model does not store), rather than checking a stored reference.
+ */
+export function externallyIdentifiedEntity(
+  model: OrmModel,
+  c: ExternalUniquenessConstraint,
+): string | undefined {
+  const joined = inferExternalUniquenessJoin(c.roleIds, model)?.commonObjectId;
+  // The join can land on a value type; only an entity has an identifier.
+  if (joined === undefined || model.getObjectType(joined)?.kind !== "entity") return undefined;
+  return externalIdentifies(model, c, joined).ok ? joined : undefined;
+}
+
+/**
+ * Whether a role is unique on its own, alethically: what makes a reference
+ * scheme's component single-valued (rule 3 of
+ * external-preferred-identifier.spec.md). Shared with the Ossie importer,
+ * which adds the uniqueness when it is missing, so what it adds is what
+ * this accepts.
+ */
+export function isUniqueAlone(factType: FactType, roleId: string): boolean {
+  return factType.internalConstraints.some((u) =>
+    isInternalUniqueness(u) && u.roleIds.length === 1 && u.roleIds[0] === roleId
+    && (u.modality ?? "alethic") === "alethic"
+  );
+}
+
+/**
  * Whether an external uniqueness identifies `entityId`: ORM's reference
  * scheme shape (external-preferred-identifier.spec.md).
  * `inferExternalUniquenessJoin` finds the object the constraint joins on
@@ -289,11 +319,9 @@ export function externalIdentifies(
     if (factType.arity !== 2) return { ok: false, reason: "external-not-binary" };
     const nearRole = factType.getRoleById(join.keyRoleByFactType.get(factType.id)!)!;
     const farRole = factType.getRoleById(join.constrainedRoleByFactType.get(factType.id)!)!;
-    const unique = factType.internalConstraints.some((u) =>
-      isInternalUniqueness(u) && u.roleIds.length === 1 && u.roleIds[0] === nearRole.id
-      && (u.modality ?? "alethic") === "alethic"
-    );
-    if (!unique) return { ok: false, reason: "external-near-not-unique" };
+    if (!isUniqueAlone(factType, nearRole.id)) {
+      return { ok: false, reason: "external-near-not-unique" };
+    }
     components.push({ factType, nearRole, farRole });
   }
   return { ok: true, at: { kind: "external", entityId, constraint: c, components } };

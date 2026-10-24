@@ -11,6 +11,7 @@ import { mergeModels } from "../../src/diff/ModelMerge.js";
 import { renderPopulationAsOpenApiExamples } from "../../src/export/populationRenderer.js";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import {
+  externallyIdentifiedEntity,
   identificationGraph,
   preferredIdentifiers,
   resolvePreferredIdentifier,
@@ -83,6 +84,34 @@ describe("resolving an external preferred identifier", () => {
         ["ft-room-has-nr", "r-rhn-room", "r-rhn-nr"],
       ]);
     expect(errors(load(roomYaml()))).toEqual([]);
+  });
+
+  it("names no identified entity when the roles join on a value type", () => {
+    // RoomNr joins "Room has RoomNr" and "RoomNr is shown on Sign": a value
+    // type has no identifier, and an importer storing one would throw.
+    const yaml = roomYaml("", { preferred: false }).replace(
+      "  fact_types:",
+      `    - { id: ot-sign, name: Sign, kind: entity, reference_mode: sign_id }
+  fact_types:
+    - id: ft-nr-on-sign
+      name: RoomNr is shown on Sign
+      roles:
+        - { id: r-nos-nr, player: ot-roomnr, role_name: is shown on }
+        - { id: r-nos-sign, player: ot-sign, role_name: shows }
+      readings: ["{0} is shown on {1}"]
+      constraints:
+        - { id: c-nos-u, type: internal_uniqueness, roles: [r-nos-nr] }`,
+    ).replace(
+      "roles: [r-rib-building, r-rhn-nr]",
+      "roles: [r-rhn-room, r-nos-sign]",
+    ).replace(
+      "- { id: c-rhn-u, type: internal_uniqueness, roles: [r-rhn-room] }",
+      "- { id: c-rhn-u, type: internal_uniqueness, roles: [r-rhn-nr] }",
+    );
+    const model = load(yaml);
+    const c = model.getConstraint("c-room-id")!;
+    if (c.type !== "external_uniqueness") throw new Error(c.type);
+    expect(externallyIdentifiedEntity(model, c)).toBeUndefined();
   });
 
   it("makes Room depend on Building in the identification graph", () => {

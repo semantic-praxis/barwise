@@ -98,11 +98,13 @@ export {
 } from "./model/id.js";
 export {
   externalIdentifies,
+  externallyIdentifiedEntity,
   type IdentifyingComponent,
   identifyingFactTypes,
   type IdentifyingUniqueness,
   type InternalIdentifyingUniqueness,
   isIdentified,
+  isUniqueAlone,
   type PlacedFlags,
   placePreferredFlags,
   type PreferredIdentifierFailure,

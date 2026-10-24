@@ -256,10 +256,8 @@ function collectPreferredIdentifiers(
 ): Map<string, string> {
   const ids = new Map<string, string>();
   for (const [entityId, at] of identifiers.byEntity) {
-    // An external identifier is not written yet: barwise-alg WS2 writes it
-    // with the importer that reads it back (external-preferred-identifier.spec.md).
-    if (at.kind !== "internal") continue;
-    ids.set(entityId, toNormaId(constraintId(at.constraint, onFactType(at.factType))));
+    const where = at.kind === "internal" ? onFactType(at.factType) : "across fact types";
+    ids.set(entityId, toNormaId(constraintId(at.constraint, where)));
   }
   return ids;
 }
@@ -499,7 +497,7 @@ function writeConstraint(
         name: "",
         ...modality,
         isInternal: false,
-        isPreferred: false,
+        isPreferred: c.id !== undefined && preferred.has(c.id),
         roleRefs: c.roleIds.map(toNormaId),
       };
     case "mandatory":
