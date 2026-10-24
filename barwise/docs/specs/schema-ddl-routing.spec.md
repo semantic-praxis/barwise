@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-24
 Last-updated: 2026-10-24
 Tracking: barwise-zk4
+Plan-reviewed: cde74e04 (code-review, pr-review)
 Touches: barwise/packages/cli/src/commands/schema.ts,
 barwise/packages/cli/src/commands/export.ts,
 barwise/packages/cli/tests/commands/schema.test.ts,
