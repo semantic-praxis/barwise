@@ -78,18 +78,47 @@ export function checklistHeadings(file = CHECKLIST) {
  * why the gate refuses rather than the classifier shrugging.
  */
 export function tierRows(file = TABLE) {
-  let parsed;
-  try {
-    parsed = JSON.parse(readFileSync(file, "utf8"));
-  } catch (cause) {
-    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
-  }
-  const rows = parsed?.rows;
+  const rows = readTable(file)?.rows;
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error(`${file} declares no rows -- this is not the tier table`);
   }
+  return validateRows(rows, "row");
+}
+
+/**
+ * The table's `failureModes` rows: one per REVIEW.md "Always check" item,
+ * keyed by its title (docs/specs/review-routing.spec.md, WS2). Same shape
+ * and the same validator as the checklist rows, so there is one row rule
+ * and one pattern language. Required wherever it is read: pr-risk
+ * printing no failure modes with exit 0 would read as a diff that needs
+ * none.
+ */
+export function failureModeRows(file = TABLE) {
+  const modes = readTable(file)?.failureModes;
+  if (!Array.isArray(modes) || modes.length === 0) {
+    throw new Error(
+      `${file} declares no failureModes -- REVIEW.md's failure modes have no routing`,
+    );
+  }
+  return validateRows(modes, "failure mode");
+}
+
+function readTable(file) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch (cause) {
+    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
+  }
+}
+
+/**
+ * Each row checked for shape and pattern language, for both arrays. A
+ * `not-path-derivable` row carries no globs by design; any other tier
+ * without globs is an error rather than a silently unmatchable row.
+ */
+function validateRows(rows, kind) {
   for (const [i, row] of rows.entries()) {
-    const at = `row ${i} (${row?.heading ?? "no heading"})`;
+    const at = `${kind} ${i} (${row?.heading ?? "no heading"})`;
     if (typeof row?.heading !== "string" || row.heading.length === 0) {
       throw new Error(`${at}: heading must be a non-empty string`);
     }
@@ -117,6 +146,49 @@ export function tierRows(file = TABLE) {
     }
   }
   return rows;
+}
+
+/** `barwise/scripts/lib` -> the repo root -> REVIEW.md. */
+export const REVIEW = resolve(SCRIPTS, "../../REVIEW.md");
+
+/**
+ * The titles of REVIEW.md's "Always check" items: the bold lead of each
+ * numbered item under the first `## ` heading that starts with "Always
+ * check", trailing period stripped (`1. **Input dropped at a boundary.**`
+ * -> `Input dropped at a boundary`). The heading's date range can change
+ * without breaking it. Throws on a missing heading or no items, as
+ * checklistHeadings does, so the gate refuses rather than calling eight
+ * rows stale from a file it never read.
+ */
+export function reviewFailureModes(file = REVIEW) {
+  let md;
+  try {
+    md = readFileSync(file, "utf8");
+  } catch (cause) {
+    throw new Error(`cannot read REVIEW.md at ${file}`, { cause });
+  }
+  const lines = md.split("\n");
+  const start = lines.findIndex((l) => /^## Always check\b/.test(l));
+  if (start === -1) throw new Error(`no '## Always check' heading in ${file}`);
+  const titles = [];
+  let items = 0;
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith("## ")) break;
+    if (!/^\d+\. /.test(line)) continue;
+    items += 1;
+    const m = /^\d+\. \*\*(.+?)\*\*/.exec(line);
+    if (m) titles.push(m[1].replace(/\.$/, ""));
+  }
+  // A numbered item without a one-line bold title would otherwise be
+  // skipped silently: the gate would report the rest OK and pr-risk would
+  // never route the item.
+  if (items !== titles.length) {
+    throw new Error(
+      `${items - titles.length} 'Always check' item(s) in ${file} have no one-line bold title`,
+    );
+  }
+  if (titles.length === 0) throw new Error(`the 'Always check' list in ${file} has no items`);
+  return titles;
 }
 
 /**
@@ -286,12 +358,7 @@ export function classify(files, rows) {
  * should be loud. The workflow maps any refusal to "request the review".
  */
 export function trivialGlobs(file = TABLE) {
-  let parsed;
-  try {
-    parsed = JSON.parse(readFileSync(file, "utf8"));
-  } catch (cause) {
-    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
-  }
+  const parsed = readTable(file);
   const globs = parsed?.trivial?.globs;
   if (!Array.isArray(globs) || globs.length === 0) {
     throw new Error(`${file} declares no trivial.globs -- the allow-list is missing`);
