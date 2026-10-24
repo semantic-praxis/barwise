@@ -107,7 +107,7 @@ export function routeConstraints(
     // one.
     if (isOverSubtypes(c)) return;
     if (c.type === "external_uniqueness") {
-      const cols = c.roleIds.map((r) => columnForJoinedRole(r, model, schema));
+      const cols = c.roleIds.map((r) => columnsForJoinedRole(r, model, schema));
       const resolved = cols.filter((r) => r !== undefined);
       if (resolved.length === 0) {
         spill(inView, "the roles map to no column", nearestTable(inView));
@@ -123,8 +123,13 @@ export function routeConstraints(
       ];
       if (problems.length > 0) {
         spill(inView, problems.join(", and "), table);
-      } else {
-        const columnList = resolved.map((r) => r.column).join(", ");
+      } else if (
+        // Columns that are the whole primary key are unique already: an
+        // external identifier keys its table so (external-preferred-identifier.spec.md),
+        // and the internal branch skips the same case.
+        !isWholePrimaryKey({ table, columns: resolved.flatMap((r) => r.columns) }, schema)
+      ) {
+        const columnList = resolved.flatMap((r) => r.columns).join(", ");
         route("unique", `UNIQUE (${columnList})`, table, inView);
       }
       return;
@@ -300,25 +305,49 @@ function columnForRole(
 }
 
 /**
- * Resolve a role for an external uniqueness: the column representing
+ * Resolve a role for an external uniqueness: the columns representing
  * that role's PLAYER relative to the joined table. Unlike
  * `columnForRole`, the partner fallback also applies to entity roles --
- * the FK column keyed by the partner role holds which player instance
+ * the FK columns keyed by the partner role hold which player instance
  * the row relates to, which is exactly what the joint uniqueness
- * ranges over.
+ * ranges over. An entity player is every column of its foreign key, as
+ * `associativeColumns` takes them: naming only the first wrote a UNIQUE
+ * over part of a composite key, which rejects valid rows. A value player
+ * is one column, the first carrying the role, as it always was: a model
+ * that maps one binary twice puts the role on two columns, and only the
+ * first is the value (auction `catalog.orm.yaml`, Model has ModelId).
  */
-function columnForJoinedRole(
+function columnsForJoinedRole(
   roleId: string,
   model: OrmModel,
   schema: RelationalSchema,
-): ResolvedColumn | undefined {
-  const direct = findColumn(roleId, schema);
+): { table: string; columns: string[]; } | undefined {
+  const located = findRole(roleId, undefined, model);
+  const valuePlayer = located !== undefined
+    && model.getObjectType(located.role.playerId)?.kind === "value";
+  const columnsOf = (id: string) => {
+    if (!valuePlayer) return findColumns(id, schema);
+    const one = findColumn(id, schema);
+    return one && { table: one.table, columns: [one.column] };
+  };
+  const direct = columnsOf(roleId);
   if (direct) return direct;
 
-  const located = findRole(roleId, undefined, model);
   if (!located || located.factType.arity !== 2) return undefined;
   const partner = located.factType.roles.find((r) => r.id !== roleId);
-  return partner ? findColumn(partner.id, schema) : undefined;
+  return partner ? columnsOf(partner.id) : undefined;
+}
+
+/** Every column carrying a role, in the first table that has one. */
+function findColumns(
+  roleId: string,
+  schema: RelationalSchema,
+): { table: string; columns: string[]; } | undefined {
+  for (const table of schema.tables) {
+    const columns = table.columns.filter((cl) => cl.sourceRoleId === roleId).map((cl) => cl.name);
+    if (columns.length > 0) return { table: table.name, columns };
+  }
+  return undefined;
 }
 
 function findColumn(roleId: string, schema: RelationalSchema): ResolvedColumn | undefined {

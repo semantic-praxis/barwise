@@ -6,7 +6,7 @@
  */
 
 import type { RelationalSchema, Table } from "../mapping/RelationalSchema.js";
-import { preferredIdentifiers } from "../model/identification.js";
+import { type IdentifyingComponent, preferredIdentifiers } from "../model/identification.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance } from "../model/Population.js";
 
@@ -122,9 +122,15 @@ export function renderPopulationAsOpenApiExamples(
       continue;
     }
 
+    const at = identifiers.byEntity.get(objectType.id);
+    if (at?.kind === "external") {
+      const example = externalIdentifierExample(model, at.components);
+      if (example) examples.set(objectType.name, example);
+      continue;
+    }
     // The binary that identifies the entity, to a value type or another
     // entity, as the example has always taken it.
-    const identifying = identifiers.byEntity.get(objectType.id)?.factType;
+    const identifying = at?.factType;
     const idFactType = identifying?.roles.length === 2
         && identifying.roles.some((r) => r.playerId === objectType.id)
       ? identifying
@@ -170,6 +176,36 @@ export function renderPopulationAsOpenApiExamples(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * An externally identified entity's example: each component's far-role
+ * value for one entity, joined on the near role across the components'
+ * populations, starting from the first instance of the first component.
+ * Keyed by the far player's name: two components' far roles are often
+ * named alike ("is of"), and their players are what tell them apart. An
+ * entity no component population fully describes has no example, as an
+ * internal identifier with no population has none.
+ */
+function externalIdentifierExample(
+  model: OrmModel,
+  components: readonly IdentifyingComponent[],
+): Record<string, unknown> | undefined {
+  const first = components[0];
+  if (!first) return undefined;
+  const seed = model.populationsForFactType(first.factType.id).flatMap((p) => p.instances)[0];
+  const entityValue = seed?.roleValues[first.nearRole.id];
+  if (entityValue === undefined) return undefined;
+  const example: Record<string, unknown> = {};
+  for (const { factType, nearRole, farRole } of components) {
+    const match = model.populationsForFactType(factType.id)
+      .flatMap((p) => p.instances)
+      .find((inst) => inst.roleValues[nearRole.id] === entityValue);
+    const value = match?.roleValues[farRole.id];
+    if (value === undefined) return undefined;
+    example[model.getObjectType(farRole.playerId)?.name ?? farRole.name] = value;
+  }
+  return example;
+}
 
 /**
  * Quote an identifier (table or column name) for SQL.

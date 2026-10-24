@@ -3,9 +3,11 @@ import {
   type IdentificationSource,
   identificationSources,
   isIdentified,
+  type PreferredIdentifierResolution,
   preferredIdentifiers,
   resolvePreferredIdentifier,
 } from "../../model/identification.js";
+import type { ObjectType } from "../../model/ObjectType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -170,6 +172,11 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
     if (!resolved.ok && resolved.reason !== "none") {
       const constraintId = model.preferredIdentifierOf(ot.id)!;
       const named = model.getConstraint(constraintId);
+      const external = externalShapeDiagnostic(model, resolved, ot, constraintId);
+      if (external) {
+        diagnostics.push(external);
+        continue;
+      }
       diagnostics.push(
         resolved.reason === "dangling"
           ? report(RULE_ID.preferredIdentifierInvalid, "dangling", ot.id, ot.name, constraintId)
@@ -196,6 +203,31 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
   }
 
   return diagnostics;
+}
+
+/** The diagnostic for an external uniqueness that fails a shape rule, if that is the reason. */
+function externalShapeDiagnostic(
+  model: OrmModel,
+  failure: Extract<PreferredIdentifierResolution, { ok: false; }>,
+  ot: ObjectType,
+  constraintId: string,
+): Diagnostic | undefined {
+  const rule = RULE_ID.preferredIdentifierInvalid;
+  switch (failure.reason) {
+    case "external-no-common-object":
+      return report(rule, "externalNoCommonObject", ot.id, ot.name, constraintId);
+    case "external-other-entity": {
+      const joined = failure.identifies;
+      const name = joined === undefined ? "" : model.getObjectType(joined)?.name ?? joined;
+      return report(rule, "externalOtherEntity", ot.id, ot.name, constraintId, name);
+    }
+    case "external-not-binary":
+      return report(rule, "externalNotBinary", ot.id, ot.name, constraintId);
+    case "external-near-not-unique":
+      return report(rule, "externalNearNotUnique", ot.id, ot.name, constraintId);
+    default:
+      return undefined;
+  }
 }
 
 /**

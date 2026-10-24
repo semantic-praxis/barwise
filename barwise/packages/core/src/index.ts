@@ -97,10 +97,15 @@ export {
   type Uuidv7Sources,
 } from "./model/id.js";
 export {
+  externalIdentifies,
+  type IdentifyingComponent,
+  identifyingFactTypes,
   type IdentifyingUniqueness,
+  type InternalIdentifyingUniqueness,
   isIdentified,
   type PlacedFlags,
   placePreferredFlags,
+  type PreferredIdentifierFailure,
   type PreferredIdentifierResolution,
   type PreferredIdentifiers,
   preferredIdentifiers,

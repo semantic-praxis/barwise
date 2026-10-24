@@ -254,11 +254,14 @@ function collectPlayedRoles(model: OrmModel): Map<string, NormaId[]> {
 function collectPreferredIdentifiers(
   identifiers: PreferredIdentifiers,
 ): Map<string, string> {
-  return new Map(
-    [...identifiers.byEntity].map((
-      [entityId, at],
-    ) => [entityId, toNormaId(constraintId(at.constraint, onFactType(at.factType)))]),
-  );
+  const ids = new Map<string, string>();
+  for (const [entityId, at] of identifiers.byEntity) {
+    // An external identifier is not written yet: barwise-alg WS2 writes it
+    // with the importer that reads it back (external-preferred-identifier.spec.md).
+    if (at.kind !== "internal") continue;
+    ids.set(entityId, toNormaId(constraintId(at.constraint, onFactType(at.factType))));
+  }
+  return ids;
 }
 
 // `ValueType`, not `ObjectType`: the one call site is inside a

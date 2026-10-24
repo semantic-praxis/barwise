@@ -113,7 +113,9 @@ export function formatQueryResult(result: QueryResult): string {
         if (a.preferredIdentifier) {
           const ids = a.preferredIdentifier.identifierTypes.join(", ");
           lines.push(
-            `  Preferred identifier: ${a.preferredIdentifier.factType}`
+            `  Preferred identifier: ${
+              a.preferredIdentifier.factType ?? a.preferredIdentifier.factTypes.join(" + ")
+            }`
               + (ids ? ` (${ids})` : ""),
           );
         }

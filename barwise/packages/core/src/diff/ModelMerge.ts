@@ -16,6 +16,7 @@
 
 import {
   type ExternalConstraint,
+  isExternalUniqueness,
   isInternalUniqueness,
   isOverSubtypes,
   roleIdsOf,
@@ -609,11 +610,13 @@ export function mergeModels(
 }
 
 /**
- * The id of the merged model's internal uniqueness over the roles that
- * `constraintId` covers in `side`, its role ids translated through
- * `roleMap` (an id with no entry is unchanged). Undefined when the
- * constraint is not an internal uniqueness, a role did not survive the
- * merge, or no uniqueness covers exactly those roles.
+ * The id of the merged model's uniqueness of the same kind over the roles
+ * that `constraintId` covers in `side`, its role ids translated through
+ * `roleMap` (an id with no entry is unchanged): an internal one in a fact
+ * type, an external one among the model's constraints, since either can be
+ * a preferred identifier (external-preferred-identifier.spec.md).
+ * Undefined when the constraint is not a uniqueness, a role did not
+ * survive the merge, or no uniqueness covers exactly those roles.
  */
 function sameUniquenessIn(
   merged: OrmModel,
@@ -622,21 +625,23 @@ function sameUniquenessIn(
   roleMap: ReadonlyMap<string, string | null>,
 ): string | undefined {
   const c = side.getConstraint(constraintId);
-  if (!c || !isInternalUniqueness(c)) return undefined;
+  if (!c || (!isInternalUniqueness(c) && !isExternalUniqueness(c))) return undefined;
   const roles = c.roleIds.map((r) => (roleMap.has(r) ? roleMap.get(r)! : r));
   if (roles.some((r) => r === null)) return undefined;
   // Compared as sorted lists, so a role repeated on one side is not read
   // as the same uniqueness, and with the modality, as the diff's label is.
   const key = (ids: readonly (string | null)[]) => [...ids].sort().join("\u0000");
   const wanted = key(roles);
-  for (const ft of merged.factTypes) {
-    for (const u of ft.internalConstraints) {
-      if (
-        isInternalUniqueness(u) && key(u.roleIds) === wanted
-        && (u.modality ?? "alethic") === (c.modality ?? "alethic")
-      ) {
-        return u.id;
-      }
+  const sameKind = isInternalUniqueness(c) ? isInternalUniqueness : isExternalUniqueness;
+  const candidates = isInternalUniqueness(c)
+    ? merged.factTypes.flatMap((ft) => ft.internalConstraints)
+    : merged.constraints;
+  for (const u of candidates) {
+    if (
+      sameKind(u) && key(u.roleIds) === wanted
+      && (u.modality ?? "alethic") === (c.modality ?? "alethic")
+    ) {
+      return u.id;
     }
   }
   return undefined;
