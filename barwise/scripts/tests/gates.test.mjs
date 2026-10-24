@@ -5602,6 +5602,18 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
     );
     refused(dash, /\(core\)  \u2014 connector package/);
     assert.doesNotMatch(dash.stderr, /must start right of column/);
+    // Nor is a misdrawn or nested connector there.
+    for (
+      const bad of [
+        "        |--- @barwise/llm (core)",
+        "  |     |--- @barwise/llm (core)",
+        "  +--- @barwise/llm (core)",
+      ]
+    ) {
+      const r = archPlanted(dir, "CLAUDE.md", (s) => s.replace(`  |--- ${CLAUDE_LLM}`, bad));
+      refused(r, /is not one the grammar allows/);
+      assert.doesNotMatch(r.stderr, /must start right of column/, bad);
+    }
     refused(
       archPlanted(
         dir,

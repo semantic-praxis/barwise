@@ -133,14 +133,14 @@ function graphLines(claudeMd) {
     const indent = DRAWN.exec(line)[0].length;
     const drawing = indent === line.length;
     if (comment !== null && !drawing && indent > comment.at) continue;
-    const open = comment;
+    const prev = comment;
     comment = null;
     if (drawing) continue;
     // The column hint only for a line meant as comment text: a malformed
     // row would otherwise be blamed on the previous row's comment.
-    const under = open === null || /^\s{0,2}\|---/.test(line)
+    const under = prev === null || /[|+`\\^]-{2,}/.test(line)
       ? ""
-      : `; a comment line under ${open.name} must start right of column ${open.at + 1}`
+      : `; a comment line under ${prev.name} must start right of column ${prev.at + 1}`
         + `, and this one starts at column ${indent + 1}`;
     throw new Error(
       `the graph block line "${line.trimEnd()}" is not one the grammar allows${under}: ${GRAMMAR}`,
