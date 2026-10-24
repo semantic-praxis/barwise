@@ -114,6 +114,7 @@ const ROOT_DEPENDENT_GATES = [
   "audit-corrections.mjs",
   "check-lockfile-agrees.mjs",
   "check-git-listing.mjs",
+  "check-plan-review.mjs",
 ];
 
 for (const script of ROOT_DEPENDENT_GATES) {
@@ -4816,6 +4817,380 @@ test("check-tracker-closes refuses with no base rather than reporting clean", ()
 });
 
 /**
+ * check-plan-review: a spec's plan is reviewed before its implementation
+ * is committed (docs/specs/plan-scope-check.spec.md, WS6).
+ *
+ * A sandbox repository with the gate and the libraries it imports copied
+ * in. `main` holds `src/a.ts`; each case builds a branch, and `BASE_SHA`
+ * stands in for the pull request's base commit, as ci.yml passes it.
+ */
+const PLAN_SPEC = "barwise/docs/specs/x.spec.md";
+
+function planRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-planrev-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  g("init", "-q", "-b", "main");
+  g("config", "user.email", "t@example.com");
+  g("config", "user.name", "t");
+  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
+  mkdirSync(join(dir, "barwise", "docs", "specs"), { recursive: true });
+  mkdirSync(join(dir, "src"));
+  for (
+    const f of [
+      "check-plan-review.mjs",
+      join("lib", "args.mjs"),
+      join("lib", "name-status.mjs"),
+      join("lib", "review-tiers.mjs"),
+      join("lib", "spec-reader.mjs"),
+      join("lib", "tracked.mjs"),
+    ]
+  ) {
+    writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+  }
+  const commit = (msg) => {
+    g("add", "-A");
+    g("commit", "-q", "-m", msg);
+    return g("rev-parse", "HEAD");
+  };
+  /** The spec, with `Plan-reviewed:` naming `reviewed` when given. */
+  const spec = ({ status = "Draft", reviewed, body = "The plan." } = {}) =>
+    writeFileSync(
+      join(dir, PLAN_SPEC),
+      `# X\n\nStatus: ${status}\nTracking: barwise-x\n`
+        + (reviewed ? `Plan-reviewed: ${reviewed.slice(0, 8)} (code-review, pr-review)\n` : "")
+        + `Touches: src/a.ts, +src/b.ts\n\n## Plan\n\n${body}\n`,
+    );
+  const implement = (n) => writeFileSync(join(dir, "src", "a.ts"), `export const a = ${n};\n`);
+  implement(0);
+  const base = commit("base");
+  g("checkout", "-q", "-b", "feature");
+  const run = (env = { BASE_SHA: base }) =>
+    spawnSync(process.execPath, [join(dir, "scripts", "check-plan-review.mjs")], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "", ...env },
+    });
+  return { dir, g, commit, spec, implement, base, run };
+}
+
+test("check-plan-review fails an implementation whose spec has no Plan-reviewed: line", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    const first = r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /x\.spec\.md: no Plan-reviewed: line/);
+    assert.match(out.stderr, new RegExp(`first change to its Touches: is ${first.slice(0, 8)}`));
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line naming a commit after the first implementation", () => {
+  // The review happened, but of a tree that already held the code.
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    const first = r.commit("implement");
+    r.spec({ reviewed: first });
+    r.commit("record the review");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      new RegExp(`does not precede ${first.slice(0, 8)}, a change to its Touches:`),
+    );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a review recorded at a later commit than the first implementation", () => {
+  // Not the first change itself but a descendant of it: only the ancestry
+  // test can see that the review came after the code began.
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    const first = r.commit("implement");
+    r.implement(2);
+    const later = r.commit("implement more");
+    r.spec({ reviewed: later });
+    r.commit("record the review");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, new RegExp(`does not precede ${first.slice(0, 8)}`));
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails an unreviewed implementation on a side line merged in", () => {
+  // The first changing commit in topological order descends from the
+  // review; the side line's does not, and it is checked too.
+  const r = planRepo();
+  try {
+    r.spec();
+    const specAt = r.commit("spec");
+    // Cut from the base, before the spec and its review existed.
+    r.g("checkout", "-q", "-b", "side", r.base);
+    writeFileSync(join(r.dir, "src", "b.ts"), "export const b = 1;\n");
+    const side = r.commit("side implementation, before any review");
+    r.g("checkout", "-q", "feature");
+    r.spec({ reviewed: specAt });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    r.g("merge", "-q", "--no-ff", "-m", "merge side", "side");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, new RegExp(`does not precede ${side.slice(0, 8)}`));
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review compares the plan where each line of implementation began", () => {
+  // A side line cut after the review rewrites the plan, then implements
+  // it. The main line's first change still sees the reviewed body; the
+  // side line's does not, and it is compared too.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.g("checkout", "-q", "-b", "side");
+    r.spec({ reviewed, body: "A different plan." });
+    r.commit("rewrite the plan on the side line");
+    writeFileSync(join(r.dir, "src", "b.ts"), "export const b = 1;\n");
+    const side = r.commit("implement the rewritten plan");
+    r.g("checkout", "-q", "feature");
+    r.implement(1);
+    r.commit("implement");
+    r.g("merge", "-q", "--no-ff", "-X", "theirs", "-m", "merge side", "side");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      new RegExp(`the plan changed between the reviewed .* and ${side.slice(0, 8)}`),
+    );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review reads Touches: and Status at the base, so a branch cannot drop either", () => {
+  // The spec exists at the base with no Status line (read as claiming
+  // nothing built), and the branch drops the path it implements from
+  // Touches: -- a header edit, which leaves a review standing.
+  const r = planRepo();
+  try {
+    r.g("checkout", "-q", "main");
+    writeFileSync(join(r.dir, PLAN_SPEC), "# X\n\nTouches: src/a.ts\n\n## Plan\n\nThe plan.\n");
+    const base = r.commit("spec on main, no Status");
+    r.g("checkout", "-q", "-B", "feature");
+    writeFileSync(join(r.dir, PLAN_SPEC), "# X\n\nTouches: src/other.ts\n\n## Plan\n\nThe plan.\n");
+    r.implement(1);
+    r.commit("implement, and drop the entry");
+    const out = r.run({ BASE_SHA: base });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /x\.spec\.md: no Plan-reviewed: line/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a Plan-reviewed: line naming a commit without the spec", () => {
+  // `base` precedes the implementation, so only the containment test can
+  // tell that nothing reviewed there was this plan.
+  const r = planRepo();
+  try {
+    r.spec({ reviewed: r.base });
+    r.commit("spec, claiming a review at the base");
+    r.implement(1);
+    r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /does not contain the spec/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a plan rewritten after the commit its review names", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.spec({ reviewed, body: "A different plan." });
+    r.commit("rewrite the plan");
+    r.implement(1);
+    r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /the plan changed between the reviewed/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review passes a review recorded before the first implementation commit", () => {
+  // Recording the line and updating Status change only the header block,
+  // so neither disturbs the body the review vouches for; nor does a plan
+  // amended in the implementation commit itself, which is after it began.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.implement(1);
+    r.spec({ reviewed, status: "Workstream 1 implemented", body: "The plan, as built." });
+    const first = r.commit("implement");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(
+      out.stdout,
+      new RegExp(
+        `x\\.spec\\.md \\(reviewed at ${reviewed.slice(0, 8)}, first change ${
+          first.slice(0, 8)
+        }\\)`,
+      ),
+    );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review leaves a spec whose Status at the base claims work is built", () => {
+  // Named by a commit message, and changing its Touches:, but the rule
+  // applies to implementation after it lands, not to later workstreams.
+  const r = planRepo();
+  try {
+    r.g("checkout", "-q", "main");
+    r.spec({ status: "Workstream 1 implemented 2026-10-24; 2 not yet" });
+    const base = r.commit("spec with workstream 1");
+    r.g("checkout", "-q", "-B", "feature");
+    r.implement(2);
+    r.commit("workstream 2 of x.spec.md");
+    const out = r.run({ BASE_SHA: base });
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /1 spec\(s\) named, none implemented/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review leaves a pull request that does not name the Draft spec", () => {
+  // Open decision 5: editing a file a Draft spec plans to change does not
+  // make an unrelated PR answer for that spec's review.
+  const r = planRepo();
+  try {
+    r.g("checkout", "-q", "main");
+    r.spec();
+    const base = r.commit("draft spec");
+    r.g("checkout", "-q", "-B", "feature");
+    r.implement(2);
+    r.commit("an unrelated fix");
+    const out = r.run({ BASE_SHA: base });
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /0 spec\(s\) named/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review refuses when git fails to answer whether the review precedes the code", () => {
+  // `merge-base --is-ancestor` exits 128 when git itself fails (a missing
+  // object, a corrupt history). Read as "no", that would fail the author
+  // for what git could not see.
+  const r = planRepo();
+  const shim = mkdtempSync(join(tmpdir(), "barwise-planrev-git-"));
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nfor a in "$@"; do [ "$a" = --is-ancestor ] && exit 128; done\nexec "${real}" "$@"\n`,
+    );
+    chmodSync(join(shim, "git"), 0o755);
+    const out = r.run({ BASE_SHA: r.base, PATH: `${shim}:${process.env.PATH}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /--is-ancestor/);
+  } finally {
+    rmSync(shim, { recursive: true, force: true });
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review refuses when git cannot resolve the base", () => {
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    r.commit("implement");
+    const out = r.run({ BASE_SHA: "no-such-ref" });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /cannot answer/);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review refuses a shallow clone", () => {
+  // Ancestry in a truncated history is not an answer: a review commit cut
+  // off by the depth reads as "names no commit", a finding it is not.
+  const r = planRepo();
+  const shallow = mkdtempSync(join(tmpdir(), "barwise-planrev-shallow-"));
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    r.commit("implement");
+    execFileSync("git", [
+      "clone",
+      "-q",
+      "--depth",
+      "1",
+      "--branch",
+      "feature",
+      `file://${r.dir}`,
+      shallow,
+    ], {
+      stdio: "ignore",
+    });
+    const out = spawnSync(process.execPath, [join(shallow, "scripts", "check-plan-review.mjs")], {
+      cwd: shallow,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "HEAD" },
+    });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /shallow clone/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+    rmSync(shallow, { recursive: true, force: true });
+  }
+});
+
+/**
  * check-instruction-refs: every path and `node <path>` an instruction file
  * cites resolves (docs/specs/instruction-reference-check.spec.md, WS1).
  *
@@ -5290,9 +5665,14 @@ function architectureRepo() {
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
   copy("barwise/scripts/lib/intended.cjs");
-  for (const adr of readdirSync(join(REPO, "barwise", "docs", "adr"))) {
-    copy(`barwise/docs/adr/${adr}`);
-  }
+  copy("barwise/docs/ARCHITECTURE.md");
+  // The tracked ADRs only: the copied ARCHITECTURE.md indexes those, and
+  // an untracked draft in this checkout would otherwise read as "stale".
+  const adrList = execFileSync("git", ["ls-files", "-z", "barwise/docs/adr/"], {
+    cwd: REPO,
+    encoding: "utf8",
+  });
+  for (const rel of adrList.split("\0").filter(Boolean)) copy(rel);
   let manifests = 0;
   for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
     const rel = `barwise/packages/${pkg}/package.json`;
@@ -5768,13 +6148,33 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
 
 // --- check:architecture, WS2: ADR shape and references ---
 
+/** regen:architecture run against a fixture tree. */
+const regenArch = (dir) =>
+  spawnSync(process.execPath, [join(SCRIPTS, "regen-architecture.mjs"), "--root", dir], {
+    encoding: "utf8",
+  });
+
+/**
+ * Stage an ADR in an architectureRepo fixture and regenerate and stage the
+ * fixture's ARCHITECTURE.md section, as an author does after adding one --
+ * otherwise every such test also reads "stale". It runs the real
+ * regenerator, so these tests also see it agree with the check.
+ */
+function stageAdr(dir, name, text) {
+  stage(dir, `barwise/docs/adr/${name}.md`, text);
+  const r = regenArch(dir);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const doc = join(dir, "barwise", "docs", "ARCHITECTURE.md");
+  stage(dir, "barwise/docs/ARCHITECTURE.md", readFileSync(doc, "utf8"));
+}
+
 const ADR_OK = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n\n"
   + "## Context\n\nWhy.\n\n## Decision\n\nThe rule.\n\n## Consequences\n\nWhat follows.\n";
 
 test("check:architecture checks each ADR's shape", () => {
   const { dir } = architectureRepo();
   try {
-    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    stageAdr(dir, "a-concern", ADR_OK);
     execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
@@ -5788,6 +6188,7 @@ test("check:architecture checks each ADR's shape", () => {
         ],
         [(s) => s.replace("Date: 2026-10-24\n", ""), /a-concern\.md: no Date: line/],
         [(s) => s.replace("## Decision", "## The rule"), /a-concern\.md: no "## Decision" section/],
+        [(s) => s.replace("# A concern\n", ""), /a-concern\.md: no "# " title line/],
         // A field in the body is not the ADR's own.
         [
           (s) => s.replace("Scope: process\n", "").replace("Why.", "Scope: process"),
@@ -5811,7 +6212,7 @@ test("check:architecture checks each ADR's shape", () => {
 test("check:architecture resolves each ADR reference in the files that act on it", () => {
   const { dir } = architectureRepo();
   try {
-    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    stageAdr(dir, "a-concern", ADR_OK);
     // Live references in both forms, from each kind of citing file.
     stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`.\n");
     stage(dir, "barwise/packages/core/src/x.ts", "// docs/adr/a-concern.md\n");
@@ -5868,7 +6269,7 @@ test("check:architecture resolves each ADR reference in the files that act on it
 test("check:architecture reads wrapped, retiring and doc references, and skips a deleted file", () => {
   const { dir } = architectureRepo();
   try {
-    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    stageAdr(dir, "a-concern", ADR_OK);
     // A spec retiring an ADR names it in its own `-` Touches: entry.
     stage(
       dir,
@@ -5967,6 +6368,87 @@ test("check:architecture passes the real tree from any working directory", () =>
       encoding: "utf8",
     });
     assert.equal(r.status, 0, `${cwd}: ${r.stdout}${r.stderr}`);
+  }
+});
+
+test("check:architecture fails a stale generated section, and regen:architecture refreshes it", () => {
+  const { dir } = architectureRepo();
+  try {
+    // A new ADR staged without regenerating: the index no longer lists it.
+    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    const stale = runArch(dir);
+    assert.equal(stale.status, 1, stale.stdout + stale.stderr);
+    assert.match(
+      stale.stderr,
+      /generated section of barwise\/docs\/ARCHITECTURE\.md is stale .*run npm run regen:architecture/,
+    );
+    // Not reported as an ADR problem: an INTENDED edit makes it stale too.
+    assert.doesNotMatch(stale.stderr, /ADR problem/);
+    // A dollar sign in a title is text, not a replacement pattern.
+    stage(
+      dir,
+      "barwise/docs/adr/b-cost.md",
+      ADR_OK.replace("# A concern", () => "# Costs in $& terms"),
+    );
+    const regen = regenArch(dir);
+    assert.equal(regen.status, 0, regen.stdout + regen.stderr);
+    assert.match(regen.stdout, /wrote the generated section/);
+    const doc = readFileSync(join(dir, "barwise", "docs", "ARCHITECTURE.md"), "utf8");
+    assert.match(doc, /- \[A concern\]\(adr\/a-concern\.md\) -- 2026-10-24/);
+    assert.ok(doc.includes("- [Costs in $& terms](adr/b-cost.md) -- 2026-10-24"), doc);
+    stage(dir, "barwise/docs/ARCHITECTURE.md", doc);
+    const fresh = runArch(dir);
+    assert.equal(fresh.status, 0, fresh.stdout + fresh.stderr);
+    // Run again, it writes nothing.
+    assert.match(regenArch(dir).stdout, /already current/);
+    // An ADR on disk but untracked is one the check does not list, so the
+    // regenerator must not index it either: otherwise the check reads
+    // "stale" and no regen run can make it current.
+    writeFileSync(join(dir, "barwise", "docs", "adr", "draft.md"), ADR_OK);
+    assert.match(regenArch(dir).stdout, /already current/);
+    const still = runArch(dir);
+    assert.equal(still.status, 0, still.stdout + still.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture and regen:architecture refuse without the section's markers", () => {
+  const { dir } = architectureRepo();
+  try {
+    const doc = join(dir, "barwise", "docs", "ARCHITECTURE.md");
+    stage(
+      dir,
+      "barwise/docs/ARCHITECTURE.md",
+      readFileSync(doc, "utf8").replace("<!-- END regen:architecture -->", ""),
+    );
+    const check = runArch(dir);
+    assert.equal(check.status, 2, check.stdout + check.stderr);
+    assert.match(check.stderr, /ARCHITECTURE\.md has no regen:architecture markers/);
+    const regen = regenArch(dir);
+    assert.equal(regen.status, 2, regen.stdout + regen.stderr);
+    assert.match(regen.stderr, /no regen:architecture markers/);
+    // Prose quoting the END marker above the section does not hide it.
+    const quoted = readFileSync(join(REPO, "barwise", "docs", "ARCHITECTURE.md"), "utf8")
+      .replace(
+        "**Last Updated:**",
+        "Ends at `<!-- END regen:architecture -->`.\n\n**Last Updated:**",
+      );
+    stage(dir, "barwise/docs/ARCHITECTURE.md", quoted);
+    const q = runArch(dir);
+    assert.equal(q.status, 0, q.stdout + q.stderr);
+    // A misshapen INTENDED is refused, not rendered as an empty graph.
+    stage(dir, "barwise/scripts/lib/intended.cjs", "module.exports = {};\n");
+    const empty = regenArch(dir);
+    assert.equal(empty.status, 2, empty.stdout + empty.stderr);
+    assert.match(empty.stderr, /does not export a map of package to package list/);
+    // A bare --root is "could not answer" too.
+    const bare = spawnSync(process.execPath, [join(SCRIPTS, "regen-architecture.mjs"), "--root"], {
+      encoding: "utf8",
+    });
+    assert.equal(bare.status, 2, bare.stdout + bare.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

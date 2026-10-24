@@ -1,6 +1,6 @@
 # Ring constraints over a join path
 
-Status: WS1 implemented (the kind in core and every reader); WS2 (NORMA import and export) not started
+Status: Implemented (WS1 the kind in core and every reader; WS2 NORMA import and export)
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -322,8 +322,31 @@ What WS1 found that the draft did not say.
 - **The schema's ring type list is one definition.** `ring_type_def` is
   referenced by both `ring` and `join_ring`, rather than a second inline
   copy of the enum.
-- **NORMA export drops a `join_ring` until WS2.** The writer's `default`
-  arm returns nothing for a kind it does not know; WS2 writes it.
+- **NORMA export dropped a `join_ring` between WS1 and WS2.** The writer's
+  `default` arm returned nothing for a kind it did not know; WS2 writes it.
+
+What WS2 found.
+
+- **The precondition was settled from NORMA's schema, not an authored
+  file.** No file NORMA wrote with a join ring was at hand. NORMA's
+  `ORM2Core.xsd` defines `RingConstraintType` as an extension of
+  `SetConstraintWithJoinType`: one `RoleSequence` of
+  `ConstraintRoleSequenceWithJoinType`, projected roles then an optional
+  `JoinRule` -- the same `JoinRule` the set-comparison sequences carry, so
+  `parseJoinRule` reads it unchanged. A file NORMA writes is still the
+  stronger check, and the first one met should become a fixture.
+- **NORMA lists a ring under its fact type, so the misread lived in phase
+  1.** `collectProcessedRefs` marks every ref a fact's InternalConstraints
+  lists, so the ring pass the draft named never saw a listed ring;
+  `mapRingConstraint` read it per fact type. A ring carrying a `JoinRule`
+  is now mapped by the ring pass alone, listed or not: mapping it in both
+  places imported a ring two fact types list twice, and lost a one-hop ring
+  listed under a fact type other than its hop's (both found in review).
+- **An unreadable `JoinRule` is not "no join".** `parseJoinRule` returns
+  nothing for a path it cannot read, which made the ring look flat and
+  imported the flat ring again. The parser now records that a rule was
+  present (`unreadableJoin`), and such a ring imports as nothing. Saying
+  so is the import-warning channel, filed as barwise-bqy.
 
 ## Risks and testing
 

@@ -50,6 +50,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
 import {
+  CLAIMS_NOTHING_BUILT,
   CODE,
   entryPaths,
   header,
@@ -80,29 +81,6 @@ const AT = atIndex === -1 ? undefined : process.argv[atIndex + 1];
 
 const SPEC_DIR = "barwise/docs/specs/";
 const BASELINE = resolve(REPO_ROOT, "barwise/spec-status-baseline.json");
-
-/**
- * The shape of Status that claims nothing exists yet.
- *
- * Two alternatives, because the same claim appears in two positions. The
- * anchored one is the common case (`Draft ...`, `Proposed ...`). The
- * unanchored phrase catches it mid-line: `conformance-property.spec.md`
- * reads "Accepted (all decisions resolved 2026-08-25; both workstreams
- * open -- design only, no implementation in this PR)", which asserts
- * exactly what an anchored `Draft` does and escaped this gate purely on
- * where its author put it.
- *
- * This is NOT the widening to partial specs that barwise-912 warns
- * against. That would mean inferring from "workstreams 1 and 2
- * implemented" which ones actually shipped, which no header can settle.
- * This is the identical claim -- nothing was built -- matched wherever
- * it sits. "No workstream implemented" is the same claim in the words
- * two specs used on 2026-09-06, and both sat outside the gate for a
- * whole workstream of commits until the first PR to land one noticed
- * (#426, session review); the gate test plants that exact phrasing.
- */
-const CLAIMS_NOTHING_BUILT =
-  /^\s*(draft|proposed|design only)\b|\bno (implementation|workstreams? implemented)\b/i;
 
 /** A Status that claims some workstreams landed and others did not. */
 const TERMINAL = /^\s*(implemented|complete|shipped)\b/i;

@@ -433,7 +433,13 @@
       "caught_by": "execution",
       "note": "Running the first port of the gate over the real corpus reported 21 ambiguous CLAUDE.md references the prototype had passed; the missing repo-root step was found by that run, not by reading the spec."
     },
-    "join-ring-constraint::5d8a1c48056a": {
+    "join-ring-constraint::4aa634cf98aa": {
+      "spec": "join-ring-constraint.spec.md",
+      "excerpt": "- the precondition was settled from norma's schema, not an authored file. no file norma wrote with a join ring was at hand. norma's orm2core.xsd defines ringcon",
+      "caught_by": "provenance",
+      "note": "The draft required a NORMA-authored file before WS2; none was at hand, so NORMA source schema ORM2Core.xsd was read instead. RingConstraintType extends SetConstraintWithJoinType, the same JoinRule the set comparisons carry. Weaker than an authored file, and the spec says so."
+    },
+    "join-ring-constraint::932841d0dee0": {
       "spec": "join-ring-constraint.spec.md",
       "excerpt": "- verbalization does not share the flat ring's sentence builder. the draft planned to refactor verbalizering to take its predicate as an argument. that builder ",
       "caught_by": "execution",
