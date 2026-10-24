@@ -19,11 +19,20 @@ git diff --cached --name-only | grep -qx '.beads/issues.jsonl' || exit 0
 echo "validating staged .beads/issues.jsonl ..."
 tmp="$(mktemp)"
 trap 'rm -f "${tmp}"' EXIT
+# Exit 2 is "could not answer" (docs/specs/gate-refusal-contract.spec.md):
+# no uv, an unreadable file. It still stops the commit, but says so rather
+# than calling the file invalid.
 if ! git show :.beads/issues.jsonl >"${tmp}"; then
   echo "could not read the staged .beads/issues.jsonl" >&2
-  exit 1
+  exit 2
 fi
-if ! bash scripts/check-beads.sh --strict "${tmp}"; then
+bash scripts/check-beads.sh --strict "${tmp}"
+status=$?
+if [ "${status}" -eq 2 ]; then
+  echo "could not validate the staged .beads/issues.jsonl (see above); nothing was judged." >&2
+  exit 2
+fi
+if [ "${status}" -ne 0 ]; then
   echo "the staged .beads/issues.jsonl failed validation (see above)." >&2
   echo "  Fix the errors and stage the file again." >&2
   exit 1

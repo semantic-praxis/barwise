@@ -344,7 +344,7 @@ test("the hook blocks a failing commit and a refused one, each with its own mess
 
 // --- linked worktrees (barwise-hud) --------------------------------------
 
-test("both hooks see the worktree's root when run from a linked worktree", () => {
+test("every hook sees the worktree's root when run from a linked worktree", () => {
   // git runs a hook in a linked worktree with GIT_DIR set and GIT_WORK_TREE
   // relative ("."). Each hook then cds into barwise/, and without a pin every
   // git command it starts took barwise/ for the top of the tree -- which is
@@ -355,10 +355,20 @@ test("both hooks see the worktree's root when run from a linked worktree", () =>
     const main = join(dir, "main");
     mkdirSync(join(main, "barwise", "scripts", "hooks"), { recursive: true });
     writeFileSync(join(main, "barwise", "x"), "x\n");
-    // pre-commit's first step is the shared tracker check, which every real
-    // tree carries beside the hook.
+    // pre-commit and pre-merge-commit both run the shared tracker check,
+    // which every real tree carries beside the hooks. With a tracker
+    // staged it calls check-beads.sh, stubbed here to log the root it sees:
+    // that is how pre-merge-commit, which runs nothing else, is held to
+    // the same pin as the others.
+    const log = join(dir, "top.log");
     const tracker = join("scripts", "hooks", "check-staged-tracker.sh");
     copyFileSync(join(SCRIPTS, "hooks", "check-staged-tracker.sh"), join(main, "barwise", tracker));
+    writeFileSync(
+      join(main, "barwise", "scripts", "check-beads.sh"),
+      `#!/bin/sh\ngit rev-parse --show-toplevel >> "${log}"\nexit 0\n`,
+    );
+    mkdirSync(join(main, ".beads"));
+    writeFileSync(join(main, ".beads", "issues.jsonl"), "{}\n");
     const git = (...a) =>
       execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...a], {
         cwd: main,
@@ -369,10 +379,11 @@ test("both hooks see the worktree's root when run from a linked worktree", () =>
     git("commit", "-qm", "base");
     git("worktree", "add", "--detach", "--quiet", tree, "HEAD");
     const gitDir = join(main, ".git", "worktrees", "linked");
+    writeFileSync(join(tree, ".beads", "issues.jsonl"), "{}\n{}\n");
+    execFileSync("git", ["add", ".beads/issues.jsonl"], { cwd: tree });
 
     const bin = join(dir, "bin");
     mkdirSync(bin);
-    const log = join(dir, "top.log");
     for (const stub of ["npm", "npx"]) {
       writeFileSync(
         join(bin, stub),
@@ -381,7 +392,7 @@ test("both hooks see the worktree's root when run from a linked worktree", () =>
       chmodSync(join(bin, stub), 0o755);
     }
 
-    for (const name of ["pre-commit", "pre-push"]) {
+    for (const name of ["pre-commit", "pre-push", "pre-merge-commit"]) {
       rmSync(log, { force: true });
       const r = spawnSync("sh", [join(dirname(HOOK), name)], {
         cwd: tree,

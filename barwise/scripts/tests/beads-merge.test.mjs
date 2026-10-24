@@ -7,7 +7,6 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -22,7 +21,7 @@ import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { DRIVER_VERSION } from "../beads-merge-driver.mjs";
-import { DRIVER_NAME, FILES } from "../install-merge-driver.mjs";
+import { DRIVER_NAME, driverHash } from "../install-merge-driver.mjs";
 import { canonicalLine } from "../lib/beads-jsonl.mjs";
 import { MalformedInput, resolveTracker } from "../lib/beads-merge.mjs";
 
@@ -246,6 +245,16 @@ test("a rebase, which swaps the sides, yields the same lines in another order", 
   assert.notEqual(merge.text, rebase.text);
 });
 
+test("one instant spelled two ways resolves the same whichever side is current", () => {
+  const base = jsonl(issue("x"));
+  const a = jsonl(issue("x", { notes: "n", updated_at: "2026-01-02T00:00:00Z" }));
+  const b = jsonl(issue("x", { status: "closed", updated_at: "2026-01-02T00:00:00.000Z" }));
+  assert.equal(
+    find(resolveTracker(base, a, b).text, "x").updated_at,
+    find(resolveTracker(base, b, a).text, "x").updated_at,
+  );
+});
+
 test("both sides closing one issue is agreement, and the later closed_at stands", () => {
   const r = resolveTracker(
     jsonl(issue("x")),
@@ -282,24 +291,41 @@ test("the lines the driver writes are the canonical form check-beads enforces", 
   }
 });
 
-test("the installed files carry the version their hash is recorded under", () => {
+test("the installed files carry the version their hash is recorded under", (t) => {
   // The installer replaces an equal version and keeps a higher one, so a
   // change to an installed file under an unchanged version would be undone
   // by the next `prepare` from any older checkout, in every worktree.
-  const hash = createHash("sha256");
-  for (const [to, from] of FILES) {
-    hash.update(`${to}\0`).update(readFileSync(join(SCRIPTS, from))).update("\0");
-  }
-  const recorded = JSON.parse(
-    readFileSync(join(SCRIPTS, "tests", "merge-driver-versions.json"), "utf8"),
-  );
+  const versionsFile = join(SCRIPTS, "tests", "merge-driver-versions.json");
+  const recorded = JSON.parse(readFileSync(versionsFile, "utf8"));
   assert.equal(
     recorded.versions[String(DRIVER_VERSION)],
-    hash.digest("hex"),
+    driverHash(),
     `the installed driver files changed: bump DRIVER_VERSION past ${DRIVER_VERSION} in `
       + "beads-merge-driver.mjs and record the new hash under the new version in "
       + "tests/merge-driver-versions.json. Never change an existing version's hash.",
   );
+  // A shipped version's row is history: rewriting it in place, instead of
+  // adding a version, would pass the check above and still be overwritten
+  // by an older checkout's `prepare`. main is the record of what shipped.
+  const onMain = spawnSync("git", [
+    "show",
+    "origin/main:barwise/scripts/tests/merge-driver-versions.json",
+  ], {
+    cwd: REPO,
+    encoding: "utf8",
+    env: cleanEnv(),
+  });
+  if (onMain.status !== 0) {
+    t.diagnostic("origin/main has no merge-driver-versions.json; shipped rows not compared");
+    return;
+  }
+  for (const [version, sha] of Object.entries(JSON.parse(onMain.stdout).versions)) {
+    assert.equal(
+      recorded.versions[version],
+      sha,
+      `version ${version}'s recorded hash changed; add a new version instead`,
+    );
+  }
 });
 
 // --- real merges, in throwaway repositories ---------------------------------
@@ -414,9 +440,15 @@ test("installing twice leaves one registration, its wrapper on disk, and never d
 
   writeFileSync(join(installed, "driver.sh"), "# sentinel\n");
   writeFileSync(join(installed, "version"), "999\n");
+  r.git("config", "merge.beads.driver", "sh newer-driver.sh %O %A %B %P");
   const kept = r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
   assert.match(kept.stderr, /keeping the installed tracker merge driver \(version 999\)/);
   assert.equal(readFileSync(join(installed, "driver.sh"), "utf8"), "# sentinel\n");
+  assert.equal(
+    r.git("config", "--get", "merge.beads.driver"),
+    "sh newer-driver.sh %O %A %B %P",
+    "the newer copy keeps the config that runs it",
+  );
 
   writeFileSync(join(installed, "version"), "1\n");
   r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
@@ -588,6 +620,31 @@ test("a dependency on an issue the other side deleted is refused by pre-merge-co
   assert.match(m.stdout + m.stderr, /dangling depends_on_id 'x'/);
   assert.match(m.stderr, /pre-merge-commit: tracker validation failed/);
   assert.ok(existsSync(join(r.dir, ".git", "MERGE_HEAD")), "the merge is left in progress");
+});
+
+test("a hook that cannot run the validator says so, with exit 2, rather than calling the file invalid", () => {
+  const uv = spawnSync("sh", ["-c", "command -v uv"], { encoding: "utf8" }).stdout.trim();
+  const uvDir = dirname(uv);
+  const others = ["git", "node", "bash"].map((c) =>
+    dirname(spawnSync("sh", ["-c", `command -v ${c}`], { encoding: "utf8" }).stdout.trim())
+  );
+  assert.ok(
+    uv && !others.includes(uvDir),
+    `uv shares a directory with git, node or bash (${uvDir}); cannot hide it`,
+  );
+  const good = jsonl(issue("a"));
+  const r = repo(good, { hooks: true });
+  r.write(good + jsonl(issue("b")));
+  r.git("add", ".beads/issues.jsonl");
+  const path = (process.env.PATH ?? "").split(":").filter((d) => d !== uvDir).join(":");
+  const hook = spawnSync("sh", ["scripts/hooks/check-staged-tracker.sh"], {
+    cwd: join(r.dir, "barwise"),
+    encoding: "utf8",
+    env: cleanEnv({ GIT_DIR: join(r.dir, ".git"), GIT_WORK_TREE: r.dir, PATH: path }),
+  });
+  assert.equal(hook.status, 2, hook.stdout + hook.stderr);
+  assert.match(hook.stderr, /could not validate the staged \.beads\/issues\.jsonl/);
+  assert.doesNotMatch(hook.stderr, /failed validation/);
 });
 
 test("a broken tracker that was staged, then fixed on disk without restaging, is refused", () => {

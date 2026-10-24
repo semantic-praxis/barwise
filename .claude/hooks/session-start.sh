@@ -146,9 +146,13 @@ fi
 # every issue the other side added.
 merge_driver="$(git -C "${CLAUDE_PROJECT_DIR}" config --get merge.beads.driver || true)"
 common_dir="$(git -C "${CLAUDE_PROJECT_DIR}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-if [[ -z "${merge_driver}" || ! -f "${common_dir}/barwise-merge/driver.sh" ]]; then
-  echo "session-start: tracker merge driver NOT installed (merge.beads.driver='${merge_driver}')." \
+if [[ -z "${merge_driver}" ]]; then
+  echo "session-start: tracker merge driver NOT installed (merge.beads.driver unset)." \
     "Merges of .beads/issues.jsonl fall back to a line merge; run 'npm run prepare' from barwise/." >&2
+elif [[ ! -f "${common_dir}/barwise-merge/driver.sh" ]]; then
+  echo "session-start: tracker merge driver NOT installed (registered, but ${common_dir}/barwise-merge/driver.sh is missing)." \
+    "A merge of .beads/issues.jsonl would leave the file UNMARKED, and a git add would drop the other side's issues;" \
+    "run 'npm run prepare' from barwise/ before merging." >&2
 fi
 
 # The linter behind `npm run check:shell`, one of the 32 gates ci:local

@@ -87,8 +87,10 @@ export function sameIssue(a, b) {
 function laterTimestamp(a, b) {
   const ta = Date.parse(a);
   const tb = Date.parse(b);
-  if (Number.isNaN(ta) || Number.isNaN(tb)) return a >= b ? a : b;
-  return ta >= tb ? a : b;
+  // Equal instants spelled differently fall to the string order, so the
+  // answer never depends on which side is current.
+  if (Number.isNaN(ta) || Number.isNaN(tb) || ta === tb) return a >= b ? a : b;
+  return ta > tb ? a : b;
 }
 
 /**
@@ -171,13 +173,10 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
       );
       continue;
     }
-    // Rule 2: both sides agree (both deleting is handled by never listing it).
-    // Rule 6 would reach the same result field by field; this is the
-    // spec's rule stated directly, and no test can tell them apart.
-    if (c && o && sameIssue(c.obj, o.obj)) {
-      entries.push({ obj: structuredClone(c.obj), sources });
-      continue;
-    }
+    // Rule 2, both sides agreeing, needs no branch of its own: an issue
+    // both deleted is never listed, and two equal versions come through
+    // rule 3 or rule 6 unchanged (a separate branch was a mutant no test
+    // could kill).
     if (b) {
       // Rule 3: one side left it as the base had it; the other side's
       // version stands, deletion included.

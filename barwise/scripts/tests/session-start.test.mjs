@@ -190,9 +190,16 @@ test("firing again (resume) does not append duplicate PATH exports", () => {
 });
 
 test("warns when the tracker merge driver is unregistered, or registered with no wrapper on disk", () => {
-  for (const driver of ["unregistered", "wrapper-missing"]) {
-    const r = runHook(fixture({ driver }));
-    assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stderr, /tracker merge driver NOT installed/, driver);
-  }
+  const unregistered = runHook(fixture({ driver: "unregistered" }));
+  assert.equal(unregistered.status, 0, unregistered.stderr);
+  assert.match(
+    unregistered.stderr,
+    /merge driver NOT installed \(merge\.beads\.driver unset\)[^\n]*fall back to a line merge/,
+  );
+  // Registered with no wrapper is the worse case: sh exits 127, git keeps
+  // the current side unmarked. The warning must not call it a line merge.
+  const missing = runHook(fixture({ driver: "wrapper-missing" }));
+  assert.equal(missing.status, 0, missing.stderr);
+  assert.match(missing.stderr, /driver\.sh is missing[^\n]*UNMARKED/);
+  assert.doesNotMatch(missing.stderr, /fall back to a line merge/);
 });

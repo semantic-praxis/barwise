@@ -25,6 +25,7 @@
  * Exit 1 when git is there and installing fails.
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -32,6 +33,7 @@ import { DRIVER_VERSION } from "./beads-merge-driver.mjs";
 
 export const DRIVER_NAME = "beads";
 export const INSTALL_DIR = "barwise-merge";
+export const RECURSIVE = "binary";
 export const DRIVER_COMMAND =
   `sh "$(git rev-parse --git-common-dir)/${INSTALL_DIR}/driver.sh" %O %A %B %P`;
 
@@ -44,6 +46,18 @@ export const FILES = [
   ["lib/beads-merge.mjs", "lib/beads-merge.mjs"],
   ["lib/beads-jsonl.mjs", "lib/beads-jsonl.mjs"],
 ];
+
+/**
+ * What one DRIVER_VERSION means: the installed files and the config that
+ * runs them. tests/merge-driver-versions.json records it per version.
+ */
+export function driverHash() {
+  const hash = createHash("sha256");
+  for (const [to, from] of FILES) {
+    hash.update(`${to}\0`).update(readFileSync(join(HERE, from))).update("\0");
+  }
+  return hash.update(`${DRIVER_COMMAND}\0${RECURSIVE}\0`).digest("hex");
+}
 
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -73,14 +87,16 @@ function main() {
       `install-merge-driver: keeping the installed tracker merge driver (version ${installed}); `
         + `this checkout carries version ${DRIVER_VERSION}.`,
     );
-  } else {
-    for (const [to, from] of FILES) {
-      mkdirSync(dirname(join(dir, to)), { recursive: true });
-      copyFileSync(join(HERE, from), join(dir, to));
-    }
-    // Last, so an interrupted copy reads as version 0 and is replaced.
-    writeFileSync(join(dir, "version"), `${DRIVER_VERSION}\n`);
+    // The config belongs to the files it runs: this checkout's command
+    // could name a wrapper the newer copy does not have.
+    return 0;
   }
+  for (const [to, from] of FILES) {
+    mkdirSync(dirname(join(dir, to)), { recursive: true });
+    copyFileSync(join(HERE, from), join(dir, to));
+  }
+  // Last, so an interrupted copy reads as version 0 and is replaced.
+  writeFileSync(join(dir, "version"), `${DRIVER_VERSION}\n`);
   git([
     "config",
     `merge.${DRIVER_NAME}.name`,
@@ -91,7 +107,7 @@ function main() {
   // Running this driver there would put conflict blocks into that base,
   // which the outer run then refuses as malformed; `binary` takes the
   // bases' common ancestor instead.
-  git(["config", `merge.${DRIVER_NAME}.recursive`, "binary"]);
+  git(["config", `merge.${DRIVER_NAME}.recursive`, RECURSIVE]);
   if (!existsSync(join(dir, "driver.sh"))) {
     console.error(`install-merge-driver: ${join(dir, "driver.sh")} is missing after install.`);
     return 1;
