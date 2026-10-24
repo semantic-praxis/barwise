@@ -266,6 +266,52 @@ test("a timestamp cleared on one side and set on the other is reported, never pi
   }
 });
 
+test("a status conflict takes the closure fields from each candidate's own side", () => {
+  // Mixing them wrote an in-progress issue with the other side's closure.
+  const r = resolveTracker(
+    jsonl(issue("x")),
+    jsonl(issue("x", { status: "in_progress", updated_at: T1 })),
+    jsonl(issue("x", { status: "closed", closed_at: T2, close_reason: "done", updated_at: T2 })),
+  );
+  assert.equal(r.reported.length, 1);
+  const [mine, theirs] = issuesIn(r.text);
+  assert.equal(mine.status, "in_progress");
+  assert.ok(!("closed_at" in mine) && !("close_reason" in mine), JSON.stringify(mine));
+  assert.equal(theirs.closed_at, T2);
+  assert.equal(theirs.close_reason, "done");
+});
+
+test("a field named like an Object member, added on the other side, is kept", () => {
+  const r = resolveTracker(
+    jsonl(issue("x")),
+    jsonl(issue("x", { notes: "n", updated_at: T1 })),
+    jsonl(issue("x", { constructor: "c", toString: "t", updated_at: T2 })),
+  );
+  assert.deepEqual(r.reported, []);
+  const x = find(r.text, "x");
+  assert.equal(x.constructor, "c");
+  assert.equal(x.toString, "t");
+  assert.equal(x.notes, "n");
+});
+
+test("counts around a field conflict are the same whichever side is current", () => {
+  const base = jsonl(issue("x"), issue("y"));
+  const a = jsonl(issue("x", { dependencies: [blocks("x", "y")], updated_at: T1 }), issue("y"));
+  const b = jsonl(
+    issue("x", { dependencies: [{ ...blocks("x", "y"), type: "related" }], updated_at: T2 }),
+    issue("y"),
+  );
+  const merge = resolveTracker(base, a, b);
+  const rebase = resolveTracker(base, b, a);
+  assert.equal(merge.reported.length, 1);
+  assert.equal(find(merge.text, "y").dependent_count, find(rebase.text, "y").dependent_count);
+  assert.equal(
+    find(merge.text, "y").dependent_count,
+    1,
+    "counted with the union of the candidates' edges",
+  );
+});
+
 test("both sides closing one issue is agreement, and the later closed_at stands", () => {
   const r = resolveTracker(
     jsonl(issue("x")),
@@ -409,7 +455,8 @@ test("installing twice leaves one registration and its wrapper on disk", () => {
   assert.equal(again.status, 0, again.stderr);
   assert.equal(r.git("config", "--get-all", "merge.beads.driver").split("\n").length, 1);
   assert.equal(r.git("config", "--get", "merge.beads.recursive"), "binary");
-  assert.ok(existsSync(join(r.dir, ".git", "barwise-merge", "driver.sh")));
+  assert.ok(existsSync(join(r.dir, ".git", "barwise-merge.sh")));
+  assert.ok(!existsSync(join(r.dir, ".git", "barwise-merge.sh.tmp-")), "no staging file left");
 });
 
 test("every install replaces the copy, so prepare repairs a damaged one and drops stale files", () => {
@@ -418,19 +465,20 @@ test("every install replaces the copy, so prepare repairs a damaged one and drop
   // refused to touch.
   const r = repo(jsonl(issue("a")));
   const installed = join(r.dir, ".git", "barwise-merge");
-  rmSync(join(installed, "driver.sh"));
+  const wrapper = join(r.dir, ".git", "barwise-merge.sh");
+  rmSync(wrapper);
   writeFileSync(join(installed, "lib", "beads-merge.mjs"), "// damaged\n");
   writeFileSync(join(installed, "version"), "999\n");
   r.git("config", "--unset", "merge.beads.driver");
   const again = r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
   assert.equal(again.status, 0, again.stderr);
-  assert.ok(existsSync(join(installed, "driver.sh")));
+  assert.ok(existsSync(wrapper));
   assert.equal(
     readFileSync(join(installed, "lib", "beads-merge.mjs"), "utf8"),
     readFileSync(join(SCRIPTS, "lib", "beads-merge.mjs"), "utf8"),
   );
   assert.ok(!existsSync(join(installed, "version")), "a file from an earlier layout is gone");
-  assert.match(r.git("config", "--get", "merge.beads.driver"), /barwise-merge\/driver\.sh/);
+  assert.match(r.git("config", "--get", "merge.beads.driver"), /barwise-merge\.sh"/);
 });
 
 test("from below the top of a work tree the installer touches nothing", () => {
@@ -512,6 +560,18 @@ test("a deletion against an edit stops the merge with a block check-beads reject
   const check = beadsCheck(r.tracker);
   assert.equal(check.status, 1, check.stdout + check.stderr);
   assert.match(check.stdout, /git merge-conflict marker in JSONL/);
+});
+
+test("a merge while the driver's files are missing falls back to markers", () => {
+  // The installer's swap window, or an interrupted prepare: the wrapper is
+  // there (it is replaced atomically, never removed), the node files not.
+  const base = jsonl(issue("a"));
+  const r = repo(base);
+  rmSync(join(r.dir, ".git", "barwise-merge"), { recursive: true });
+  const m = r.diverge(base + jsonl(issue("b")), base + jsonl(issue("c")));
+  assert.notEqual(m.status, 0);
+  assert.match(r.read(), /^<<<<<<< current$/m);
+  assert.ok(r.read().includes('"id":"c"') && r.read().includes('"id":"b"'));
 });
 
 test("a driver that crashes falls back to git's markers, never an unmarked file", () => {
@@ -644,6 +704,22 @@ test("a hook that cannot run the validator says so, with exit 2, rather than cal
     });
     assert.equal(h.status, 2, `${name}:\n${h.stdout}${h.stderr}`);
   }
+});
+
+test("an index the hook cannot read is exit 2, not a pass", () => {
+  const r = repo(jsonl(issue("a")), { hooks: true });
+  writeFileSync(join(r.dir, ".git", "index.broken"), "not an index");
+  const broken = spawnSync("sh", ["scripts/hooks/check-staged-tracker.sh"], {
+    cwd: join(r.dir, "barwise"),
+    encoding: "utf8",
+    env: cleanEnv({
+      GIT_DIR: join(r.dir, ".git"),
+      GIT_WORK_TREE: r.dir,
+      GIT_INDEX_FILE: join(r.dir, ".git", "index.broken"),
+    }),
+  });
+  assert.equal(broken.status, 2, broken.stdout + broken.stderr);
+  assert.match(broken.stderr, /could not read the index/);
 });
 
 test("a commit that deletes the tracker is refused by name, not as an unreadable file", () => {

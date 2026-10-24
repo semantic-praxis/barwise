@@ -1,6 +1,6 @@
 #!/bin/sh
 # The command git runs to merge .beads/issues.jsonl, installed as
-# <git-common-dir>/barwise-merge/driver.sh by install-merge-driver.mjs
+# <git-common-dir>/barwise-merge.sh by install-merge-driver.mjs
 # (docs/specs/beads-merge-driver.spec.md). Arguments: %O %A %B %P.
 #
 # A wrapper rather than registering node directly, because git treats any
@@ -9,7 +9,13 @@
 # and a `git add` silently drops every issue the other side added. So only
 # the driver's own two answers pass through; every other outcome becomes
 # git's marked line merge, which check-beads.sh rejects until resolved.
-node "$(dirname "$0")/beads-merge-driver.mjs" "$@"
+# Installed, the node files sit in barwise-merge/ beside this file; in the
+# repository they sit beside it. A driver found in neither makes node fail,
+# which falls back below like any other failure.
+here=$(dirname "$0")
+driver="${here}/barwise-merge/beads-merge-driver.mjs"
+[ -f "${driver}" ] || driver="${here}/beads-merge-driver.mjs"
+node "${driver}" "$@"
 status=$?
 case "${status}" in
   0) exit 0 ;;

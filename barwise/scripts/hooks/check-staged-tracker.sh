@@ -17,12 +17,19 @@
 # Deleting the tracker deletes every issue. It is almost always a bad
 # resolution or a stray `git rm`, so it is refused by name rather than
 # read as an index copy that is not there.
-if git diff --cached --name-only --diff-filter=D | grep -qx '.beads/issues.jsonl'; then
+# Read the index once, and say so when it cannot be read: piping git into
+# grep reported a failed `git diff` as "tracker not staged" and passed.
+if ! deleted="$(git diff --cached --name-only --diff-filter=D)" \
+  || ! staged="$(git diff --cached --name-only)"; then
+  echo "could not read the index to find a staged .beads/issues.jsonl" >&2
+  exit 2
+fi
+if printf '%s\n' "${deleted}" | grep -qx '.beads/issues.jsonl'; then
   echo "this commit deletes .beads/issues.jsonl, and with it every issue in the tracker." >&2
   echo "  If that is intended, commit with --no-verify." >&2
   exit 1
 fi
-git diff --cached --name-only | grep -qx '.beads/issues.jsonl' || exit 0
+printf '%s\n' "${staged}" | grep -qx '.beads/issues.jsonl' || exit 0
 
 echo "validating staged .beads/issues.jsonl ..."
 tmp="$(mktemp)"

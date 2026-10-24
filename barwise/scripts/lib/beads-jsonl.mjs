@@ -26,12 +26,12 @@ export function canonicalLine(obj) {
 }
 
 /** How many `blocks` edges leave one issue. */
-function blocksOut(issue) {
+export function blocksOut(issue) {
   return (issue.dependencies || []).filter((d) => d.type === BLOCKS_TYPE).length;
 }
 
 /** For every id, how many `blocks` edges point at it: one pass over the edges. */
-function blocksIn(issues) {
+export function blocksIn(issues) {
   const counts = new Map();
   for (const o of issues) {
     for (const d of o.dependencies || []) {

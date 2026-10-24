@@ -35,7 +35,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { DRIVER_NAME, FILES, INSTALL_DIR } from "../install-merge-driver.mjs";
+import { DRIVER_COMMAND, DRIVER_NAME, WRAPPER } from "../install-merge-driver.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(SCRIPTS, "..", "..");
@@ -84,8 +84,12 @@ function fixture({ nvm = "ok", preinstalled = false, driver = "installed" } = {}
   // The tracker merge driver as prepare leaves it: "installed" is config and
   // wrapper, "unregistered" is neither, "wrapper-missing" is config only.
   const gitCommon = join(root, "git-common");
-  if (driver === "installed") exe(join(gitCommon, "barwise-merge", "driver.sh"), "exit 0");
-  const driverConfig = driver === "unregistered" ? "" : "echo 'sh driver.sh %O %A %B %P'";
+  if (driver === "installed") exe(join(gitCommon, WRAPPER), "exit 0");
+  const driverConfig = driver === "unregistered"
+    ? ""
+    : driver === "foreign"
+    ? "echo 'bd merge %A %O %A %B'"
+    : `echo '${DRIVER_COMMAND}'`;
   exe(
     join(stubs, "git"),
     `case "$*" in
@@ -201,8 +205,11 @@ test("warns when the tracker merge driver is unregistered, or registered with no
   // the current side unmarked. The warning must not call it a line merge.
   const missing = runHook(fixture({ driver: "wrapper-missing" }));
   assert.equal(missing.status, 0, missing.stderr);
-  assert.match(missing.stderr, /driver\.sh is missing[^\n]*UNMARKED/);
+  assert.match(missing.stderr, /barwise-merge\.sh is missing[^\n]*UNMARKED/);
   assert.doesNotMatch(missing.stderr, /fall back to a line merge/);
+  // Another tool's registration is caught even with barwise's wrapper on disk.
+  const foreign = runHook(fixture({ driver: "foreign" }));
+  assert.match(foreign.stderr, /is NOT barwise's \(merge\.beads\.driver='bd merge/);
 });
 
 test("the hook reads back the driver where the installer puts it", () => {
@@ -210,5 +217,9 @@ test("the hook reads back the driver where the installer puts it", () => {
   // see the two drift apart; this holds the hook to the installer's names.
   const hook = readFileSync(HOOK, "utf8");
   assert.ok(hook.includes(`config --get merge.${DRIVER_NAME}.driver`), "driver config key");
-  assert.ok(hook.includes(`/${INSTALL_DIR}/${FILES[0][0]}"`), "wrapper path");
+  assert.ok(hook.includes(`/${WRAPPER}"`), "wrapper path");
+  assert.ok(
+    DRIVER_COMMAND.includes(`/${WRAPPER}"`),
+    "the hook's pattern matches the registered command",
+  );
 });

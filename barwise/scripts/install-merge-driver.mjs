@@ -43,15 +43,23 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const DRIVER_NAME = "beads";
+/** The node files, swapped as one directory. */
 export const INSTALL_DIR = "barwise-merge";
-export const DRIVER_COMMAND =
-  `sh "$(git rev-parse --git-common-dir)/${INSTALL_DIR}/driver.sh" %O %A %B %P`;
+/**
+ * The registered wrapper, a single file beside that directory and replaced
+ * by an atomic rename, so it is never absent. `sh` on a missing wrapper
+ * exits 127 with nothing written, and git keeps the current side unmarked;
+ * a missing node file instead fails inside the wrapper, which falls back
+ * to git's markers. So the swap window, or an interrupted prepare, can
+ * cost a hand merge but never a silent loss.
+ */
+export const WRAPPER = "barwise-merge.sh";
+export const DRIVER_COMMAND = `sh "$(git rev-parse --git-common-dir)/${WRAPPER}" %O %A %B %P`;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** Installed path -> source path, relative to the install dir and scripts/. */
 export const FILES = [
-  ["driver.sh", "beads-merge-driver.sh"],
   ["beads-merge-driver.mjs", "beads-merge-driver.mjs"],
   ["lib/beads-merge.mjs", "lib/beads-merge.mjs"],
   ["lib/beads-jsonl.mjs", "lib/beads-jsonl.mjs"],
@@ -78,34 +86,12 @@ function main() {
     );
     return 0;
   }
-  // Built beside the live copy and swapped in, so a merge never runs a
-  // half-copied driver and no file from an earlier layout survives. The old
-  // copy is moved aside, not deleted, until the new one is in place: the
-  // only moment with no driver is between two renames, and a failed swap
-  // puts the old copy back.
-  const dir = join(common, INSTALL_DIR);
-  const next = mkdtempSync(join(common, `${INSTALL_DIR}.next-`));
-  const old = `${dir}.old-${process.pid}`;
-  try {
-    for (const [to, from] of FILES) {
-      mkdirSync(dirname(join(next, to)), { recursive: true });
-      copyFileSync(join(HERE, from), join(next, to));
-    }
-    if (existsSync(dir)) renameSync(dir, old);
-    try {
-      renameSync(next, dir);
-    } catch (err) {
-      // A concurrent prepare's copy landed first: it is a whole copy too.
-      if (!existsSync(join(dir, "driver.sh"))) {
-        if (existsSync(old) && !existsSync(dir)) renameSync(old, dir);
-        console.error(`install-merge-driver: could not install into ${dir}: ${err.message}`);
-        return 1;
-      }
-    }
-  } finally {
-    rmSync(next, { recursive: true, force: true });
-    rmSync(old, { recursive: true, force: true });
-  }
+  // The wrapper first, then the config that names it, then the node
+  // files: at every step a merge finds a wrapper, and the wrapper finds
+  // either a whole driver or none (and falls back to markers).
+  const wrapperTmp = join(common, `${WRAPPER}.tmp-${process.pid}`);
+  copyFileSync(join(HERE, "beads-merge-driver.sh"), wrapperTmp);
+  renameSync(wrapperTmp, join(common, WRAPPER));
   git([
     "config",
     `merge.${DRIVER_NAME}.name`,
@@ -117,6 +103,28 @@ function main() {
   // which the outer run then refuses as malformed; `binary` takes the
   // bases' common ancestor instead.
   git(["config", `merge.${DRIVER_NAME}.recursive`, "binary"]);
+
+  // Built beside the live copy and swapped in, so no file from an earlier
+  // layout survives and a merge never sees a half-copied driver.
+  const dir = join(common, INSTALL_DIR);
+  const next = mkdtempSync(join(common, `${INSTALL_DIR}.next-`));
+  const old = `${dir}.old-${process.pid}`;
+  try {
+    for (const [to, from] of FILES) {
+      mkdirSync(dirname(join(next, to)), { recursive: true });
+      copyFileSync(join(HERE, from), join(next, to));
+    }
+    rmSync(old, { recursive: true, force: true });
+    if (existsSync(dir)) renameSync(dir, old);
+    renameSync(next, dir);
+  } catch (err) {
+    if (!existsSync(dir) && existsSync(old)) renameSync(old, dir);
+    console.error(`install-merge-driver: could not install into ${dir}: ${err.message}`);
+    return 1;
+  } finally {
+    rmSync(next, { recursive: true, force: true });
+    rmSync(old, { recursive: true, force: true });
+  }
   return 0;
 }
 

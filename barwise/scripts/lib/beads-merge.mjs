@@ -15,7 +15,7 @@
  * careless `git add` cannot commit a guess.
  */
 import { isDeepStrictEqual as eq } from "node:util";
-import { canonicalLine, recomputeCounts } from "./beads-jsonl.mjs";
+import { blocksIn, blocksOut, canonicalLine } from "./beads-jsonl.mjs";
 
 /** Fields beads-crud derives from `dependencies`; recomputed, never compared. */
 export const DERIVED = new Set(["dependency_count", "dependent_count"]);
@@ -28,6 +28,14 @@ export const DERIVED = new Set(["dependency_count", "dependent_count"]);
  * closures make routine.
  */
 const EVENT_TIMESTAMPS = new Set(["updated_at", "closed_at"]);
+
+/**
+ * Fields that describe one state together. If any of them conflicts, each
+ * candidate takes all of them from its own side: mixing them wrote an
+ * in-progress issue carrying the other side's closed_at and close_reason,
+ * the open-and-closed row beads-crud refuses to write (barwise-1064).
+ */
+const CLOSURE = ["status", "closed_at", "close_reason"];
 
 /** An input line that is not an issue; the driver hands the file to git's line merge. */
 export class MalformedInput extends Error {
@@ -105,9 +113,11 @@ function laterTimestamp(a, b) {
  */
 function mergeFields(base, cur, oth) {
   const order = [...Object.keys(cur)];
-  for (const k of Object.keys(oth)) if (!(k in cur)) order.push(k);
-  const asCurrent = {};
-  const asOther = {};
+  for (const k of Object.keys(oth)) if (!Object.hasOwn(cur, k)) order.push(k);
+  // Prototype-free, so a field named like an Object member, or __proto__,
+  // is an ordinary key here.
+  const asCurrent = Object.create(null);
+  const asOther = Object.create(null);
   const conflicts = [];
   for (const k of order) {
     const b = base?.[k];
@@ -130,6 +140,15 @@ function mergeFields(base, cur, oth) {
     }
     if (cv !== undefined) asCurrent[k] = cv;
     if (ov !== undefined) asOther[k] = ov;
+  }
+  if (conflicts.some((k) => CLOSURE.includes(k))) {
+    for (const k of CLOSURE) {
+      for (const [into, from] of [[asCurrent, cur], [asOther, oth]]) {
+        if (Object.hasOwn(from, k)) into[k] = from[k];
+        else delete into[k];
+      }
+      if (!eq(cur[k], oth[k]) && !conflicts.includes(k)) conflicts.push(k);
+    }
   }
   return { asCurrent, asOther, conflicts };
 }
@@ -239,14 +258,13 @@ function conflictBlock(id, reason, current, other) {
 
 /**
  * The merged file's text and what was reported. Counts are recomputed over
- * the result, which for a reported issue means a guess: it is counted as
- * kept, in current's version where current has one. Leaving it out instead
- * rewrote the counts of issues neither side touched (an untouched issue
- * blocked by one that is deleted on one side and edited on the other lost
- * its dependent_count). A field conflict's candidates are each counted
- * against that same view. A person who resolves a block the other way can
- * leave a count stale; check-beads.sh does not check counts, and
- * beads-crud recomputes them on its next write to the issues concerned.
+ * the result, every issue, every merge. A reported issue counts with the
+ * union of its candidates' blocks edges: no side wins, so a merge and a
+ * rebase write the same counts, and an issue neither side touched keeps a
+ * count that matches whichever candidate has the edge. Leaving reported
+ * issues out rewrote such counts. A person who resolves a block against
+ * that guess can leave a count stale: check-beads.sh does not check counts,
+ * and the next merge of the tracker, which recounts everything, repairs it.
  */
 export function resolveTracker(baseText, curText, othText) {
   const { entries, reported } = resolveIssues(
@@ -255,29 +273,30 @@ export function resolveTracker(baseText, curText, othText) {
     parseTracker(othText, "other"),
   );
 
-  const asCurrentView = [];
-  const asOtherView = [];
+  const edgesOf = (o) => o?.dependencies || [];
+  const union = (a, b) => {
+    const seen = new Set(a.map((d) => JSON.stringify(d)));
+    return [...a, ...b.filter((d) => !seen.has(JSON.stringify(d)))];
+  };
+  const counted = entries.map((e) => {
+    if (e.obj) return e.obj;
+    const [a, b] = e.conflict.asCurrent
+      ? [e.conflict.asCurrent, e.conflict.asOther]
+      : [e.conflict.currentObj, e.conflict.otherObj];
+    return { dependencies: union(edgesOf(a), edgesOf(b)) };
+  });
+  const dependents = blocksIn(counted);
+  const count = (o) => {
+    o.dependency_count = blocksOut(o);
+    o.dependent_count = dependents.get(o.id) ?? 0;
+  };
   for (const e of entries) {
-    if (e.obj) {
-      asCurrentView.push(e.obj);
-      asOtherView.push(e.obj);
-    } else if (e.conflict.asCurrent) {
-      asCurrentView.push(e.conflict.asCurrent);
-      asOtherView.push(e.conflict.asOther);
-    } else {
-      const kept = e.conflict.currentObj || e.conflict.otherObj;
-      asCurrentView.push(kept);
-      asOtherView.push(kept);
+    if (e.obj) count(e.obj);
+    else if (e.conflict.asCurrent) {
+      count(e.conflict.asCurrent);
+      count(e.conflict.asOther);
     }
   }
-  const allIds = asCurrentView.map((o) => o.id);
-  recomputeCounts(asCurrentView, allIds);
-  // The other view shares every resolved object, already counted; only the
-  // other-side candidates need counting, against that view.
-  const otherCandidates = entries.filter((e) => e.conflict?.asOther).map((e) =>
-    e.conflict.asOther.id
-  );
-  recomputeCounts(asOtherView, otherCandidates);
 
   const lines = [];
   for (const e of entries) {

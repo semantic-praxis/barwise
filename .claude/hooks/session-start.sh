@@ -149,8 +149,13 @@ common_dir="$(git -C "${CLAUDE_PROJECT_DIR}" rev-parse --path-format=absolute --
 if [[ -z "${merge_driver}" ]]; then
   echo "session-start: tracker merge driver NOT installed (merge.beads.driver unset)." \
     "Merges of .beads/issues.jsonl fall back to a line merge; run 'npm run prepare' from barwise/." >&2
-elif [[ ! -f "${common_dir}/barwise-merge/driver.sh" ]]; then
-  echo "session-start: tracker merge driver NOT installed (registered, but ${common_dir}/barwise-merge/driver.sh is missing)." \
+elif [[ "${merge_driver}" != *"/barwise-merge.sh\""* ]]; then
+  # Another tool's registration (bd's own `bd merge`) runs a command this
+  # clone may not have, which is the same unmarked loss as a missing file.
+  echo "session-start: tracker merge driver is NOT barwise's (merge.beads.driver='${merge_driver}')." \
+    "If that command is missing, a tracker merge leaves the file UNMARKED; run 'npm run prepare' from barwise/." >&2
+elif [[ ! -f "${common_dir}/barwise-merge.sh" ]]; then
+  echo "session-start: tracker merge driver NOT installed (registered, but ${common_dir}/barwise-merge.sh is missing)." \
     "A merge of .beads/issues.jsonl would leave the file UNMARKED, and a git add would drop the other side's issues;" \
     "run 'npm run prepare' from barwise/ before merging." >&2
 fi
