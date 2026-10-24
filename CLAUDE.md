@@ -120,7 +120,9 @@ what follows is only the vocabulary, anchored to this codebase.
 Read `barwise/docs/ARCHITECTURE.md` for the original system design,
 metamodel specification, and phasing plan -- it is a historical design
 record now (its repository-shape sections predate the 12-package
-monorepo; its own header says what changed). The current structure
+monorepo; its own header says what changed), except its first section,
+"Current architecture", which is generated from the ADRs and the package
+graph and checked in CI (`npm run regen:architecture`). The current structure
 lives in this file and the per-package CLAUDE.md files below.
 
 ## Package-Specific Instructions

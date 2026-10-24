@@ -40,6 +40,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { currentSection, renderSection } from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
 import { uncommittedPaths } from "./lib/changed-class.mjs";
 import { isInstructionFile } from "./lib/instruction-files.mjs";
@@ -189,7 +190,7 @@ function graphLines(claudeMd) {
   return out;
 }
 
-let intended, drawnLines, manifests, adrs, citing, root;
+let intended, drawnLines, manifests, adrs, citing, root, section;
 try {
   // Inside the refusal: a bare `--root` throws, and that is "could not
   // answer", not the exit 1 a real disagreement uses.
@@ -261,6 +262,11 @@ try {
   // Zero ADRs is a listing that went wrong, not a tree with nothing to check.
   if (adrs.length === 0) throw new Error(`no ADR under ${join(root, ADR_DIR)}`);
   citing = read(tracked.filter(citesAdrs));
+  // The generated first section of ARCHITECTURE.md (WS3): its markers must
+  // be there to compare, so their absence is "could not answer".
+  const doc = readFileSync(join(root, "barwise", "docs", "ARCHITECTURE.md"), "utf8");
+  section = currentSection(doc);
+  if (section === null) throw new Error("ARCHITECTURE.md has no regen:architecture markers");
   // The shared listing of uncommitted paths (check:git-listing refuses a
   // hand-written one); those not tracked are the untracked ones.
   const inTree = new Set(tracked);
@@ -378,6 +384,14 @@ for (const { f, text } of citing) {
       adrProblems.push(`${f}:${line}: names ADR ${name}, and ${ADR_DIR}${name}.md does not exist`);
     }
   }
+}
+
+// The generated section is rendered from these same inputs (the tracked
+// ADRs and INTENDED), so a stale section is one regen:architecture fixes.
+if (section !== renderSection(adrs, intended)) {
+  adrProblems.push(
+    "barwise/docs/ARCHITECTURE.md: the generated section is stale; run npm run regen:architecture",
+  );
 }
 
 if (problems.length > 0) {

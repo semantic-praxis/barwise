@@ -62,6 +62,7 @@
     "regen:tutorial": "npm --prefix barwise run regen:tutorial --",
     "regen:builtins": "npm --prefix barwise run regen:builtins --",
     "regen:references": "npm --prefix barwise run regen:references --",
+    "regen:architecture": "npm --prefix barwise run regen:architecture --",
     "trial:generate": "npm --prefix barwise run trial:generate --",
     "trial:offline": "npm --prefix barwise run trial:offline --",
     "trial:keyed": "npm --prefix barwise run trial:keyed --",

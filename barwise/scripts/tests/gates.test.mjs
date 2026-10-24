@@ -42,10 +42,12 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { currentSection, renderSection } from "../lib/architecture-section.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -5248,6 +5250,7 @@ function architectureRepo() {
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
   copy("barwise/scripts/lib/intended.cjs");
+  copy("barwise/docs/ARCHITECTURE.md");
   for (const adr of readdirSync(join(REPO, "barwise", "docs", "adr"))) {
     copy(`barwise/docs/adr/${adr}`);
   }
@@ -5726,13 +5729,35 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
 
 // --- check:architecture, WS2: ADR shape and references ---
 
+/**
+ * Stage an ADR in an architectureRepo fixture and refresh the fixture's
+ * generated ARCHITECTURE.md section, as an author runs regen:architecture
+ * after adding one -- otherwise every such test also reads "stale".
+ */
+function stageAdr(dir, name, text) {
+  stage(dir, `barwise/docs/adr/${name}.md`, text);
+  const adrDir = join(dir, "barwise", "docs", "adr");
+  const adrs = readdirSync(adrDir).filter((n) => n.endsWith(".md") && n !== "README.md").sort()
+    .map((n) => ({ f: `barwise/docs/adr/${n}`, text: readFileSync(join(adrDir, n), "utf8") }));
+  const intended = createRequire(import.meta.url)(
+    join(dir, "barwise", "scripts", "lib", "intended.cjs"),
+  );
+  const doc = join(dir, "barwise", "docs", "ARCHITECTURE.md");
+  const before = readFileSync(doc, "utf8");
+  stage(
+    dir,
+    "barwise/docs/ARCHITECTURE.md",
+    before.replace(currentSection(before), renderSection(adrs, intended)),
+  );
+}
+
 const ADR_OK = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n\n"
   + "## Context\n\nWhy.\n\n## Decision\n\nThe rule.\n\n## Consequences\n\nWhat follows.\n";
 
 test("check:architecture checks each ADR's shape", () => {
   const { dir } = architectureRepo();
   try {
-    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    stageAdr(dir, "a-concern", ADR_OK);
     execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
@@ -5769,7 +5794,7 @@ test("check:architecture checks each ADR's shape", () => {
 test("check:architecture resolves each ADR reference in the files that act on it", () => {
   const { dir } = architectureRepo();
   try {
-    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    stageAdr(dir, "a-concern", ADR_OK);
     // Live references in both forms, from each kind of citing file.
     stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`.\n");
     stage(dir, "barwise/packages/core/src/x.ts", "// docs/adr/a-concern.md\n");
@@ -5826,7 +5851,7 @@ test("check:architecture resolves each ADR reference in the files that act on it
 test("check:architecture reads wrapped, retiring and doc references, and skips a deleted file", () => {
   const { dir } = architectureRepo();
   try {
-    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    stageAdr(dir, "a-concern", ADR_OK);
     // A spec retiring an ADR names it in its own `-` Touches: entry.
     stage(
       dir,
@@ -5925,6 +5950,71 @@ test("check:architecture passes the real tree from any working directory", () =>
       encoding: "utf8",
     });
     assert.equal(r.status, 0, `${cwd}: ${r.stdout}${r.stderr}`);
+  }
+});
+
+test("check:architecture fails a stale generated section, and regen:architecture refreshes it", () => {
+  const { dir } = architectureRepo();
+  try {
+    // A new ADR staged without regenerating: the index no longer lists it.
+    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    const stale = runArch(dir);
+    assert.equal(stale.status, 1, stale.stdout + stale.stderr);
+    assert.match(
+      stale.stderr,
+      /ARCHITECTURE\.md: the generated section is stale; run npm run regen:architecture/,
+    );
+    const regen = spawnSync(process.execPath, [
+      join(SCRIPTS, "regen-architecture.mjs"),
+      "--root",
+      dir,
+    ], {
+      encoding: "utf8",
+    });
+    assert.equal(regen.status, 0, regen.stdout + regen.stderr);
+    assert.match(regen.stdout, /wrote the generated section/);
+    const doc = readFileSync(join(dir, "barwise", "docs", "ARCHITECTURE.md"), "utf8");
+    assert.match(doc, /- \[A concern\]\(adr\/a-concern\.md\) -- 2026-10-24/);
+    stage(dir, "barwise/docs/ARCHITECTURE.md", doc);
+    const fresh = runArch(dir);
+    assert.equal(fresh.status, 0, fresh.stdout + fresh.stderr);
+    // Run again, it writes nothing.
+    const again = spawnSync(process.execPath, [
+      join(SCRIPTS, "regen-architecture.mjs"),
+      "--root",
+      dir,
+    ], {
+      encoding: "utf8",
+    });
+    assert.match(again.stdout, /already current/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture and regen:architecture refuse without the section's markers", () => {
+  const { dir } = architectureRepo();
+  try {
+    const doc = join(dir, "barwise", "docs", "ARCHITECTURE.md");
+    stage(
+      dir,
+      "barwise/docs/ARCHITECTURE.md",
+      readFileSync(doc, "utf8").replace("<!-- END regen:architecture -->", ""),
+    );
+    const check = runArch(dir);
+    assert.equal(check.status, 2, check.stdout + check.stderr);
+    assert.match(check.stderr, /ARCHITECTURE\.md has no regen:architecture markers/);
+    const regen = spawnSync(process.execPath, [
+      join(SCRIPTS, "regen-architecture.mjs"),
+      "--root",
+      dir,
+    ], {
+      encoding: "utf8",
+    });
+    assert.equal(regen.status, 2, regen.stdout + regen.stderr);
+    assert.match(regen.stderr, /no regen:architecture markers/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
