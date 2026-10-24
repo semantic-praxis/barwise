@@ -412,6 +412,28 @@ export interface JoinExclusionConstraint extends ConstraintBase {
 }
 
 /**
+ * Join ring constraint: a ring property of the relation a join path
+ * projects. The flat `RingConstraint` covers a relation one fact type
+ * states; this variant reaches the relation along a role path, so it may
+ * span fact types and lives in the model, as the other join kinds do
+ * (`docs/specs/join-ring-constraint.spec.md`).
+ *
+ * The operand projects exactly two nodes, both played by one object type;
+ * `constraint/join-ring-arity` and `constraint/join-ring-different-players`
+ * report an operand that does not.
+ *
+ * Example (irreflexive): "No Person is a grandparent of that same Person"
+ * over `Person is child of Person` joined to itself, projecting [0, 2].
+ */
+export interface JoinRingConstraint extends ConstraintBase {
+  readonly type: "join_ring";
+  /** The path whose two projected nodes are the relation's two ends. */
+  readonly operand: JoinOperand;
+  /** The ring property being constrained. */
+  readonly ringType: RingType;
+}
+
+/**
  * Union of all constraint types.
  */
 export type Constraint =
@@ -430,7 +452,8 @@ export type Constraint =
   | CardinalityConstraint
   | JoinSubsetConstraint
   | JoinEqualityConstraint
-  | JoinExclusionConstraint;
+  | JoinExclusionConstraint
+  | JoinRingConstraint;
 
 /**
  * Every member of the `Constraint` union, keyed for compile-checked
@@ -462,6 +485,7 @@ const CONSTRAINT_TYPE_MEMBERS: Record<Constraint["type"], true> = {
   join_subset: true,
   join_equality: true,
   join_exclusion: true,
+  join_ring: true,
 };
 
 /** Every constraint type discriminator, in declaration order. */
@@ -547,6 +571,10 @@ export function isJoinExclusion(c: Constraint): c is JoinExclusionConstraint {
   return c.type === "join_exclusion";
 }
 
+export function isJoinRing(c: Constraint): c is JoinRingConstraint {
+  return c.type === "join_ring";
+}
+
 /**
  * Every role id a constraint references, across every constraint shape.
  *
@@ -591,6 +619,7 @@ export function roleIdsOf(c: Constraint): string[] {
     case "join_subset":
     case "join_equality":
     case "join_exclusion":
+    case "join_ring":
       return joinOperandsOf(c).flatMap(operandRoleIds);
   }
 }
@@ -689,6 +718,7 @@ export function objectTypeIdsOf(c: Constraint): string[] {
     case "join_subset":
     case "join_equality":
     case "join_exclusion":
+    case "join_ring":
       return joinOperandsOf(c).map((o) => o.path.root);
   }
 }
@@ -723,6 +753,8 @@ export function joinOperandsOf(c: Constraint): readonly JoinOperand[] {
     case "join_equality":
     case "join_exclusion":
       return c.operands;
+    case "join_ring":
+      return [c.operand];
   }
 }
 
@@ -772,6 +804,7 @@ const PLACEMENT = {
   join_subset: "external",
   join_equality: "external",
   join_exclusion: "external",
+  join_ring: "external",
 } as const satisfies Record<Constraint["type"], "internal" | "external">;
 
 type InternalKind = {

@@ -1,6 +1,7 @@
 import {
   isJoinEquality,
   isJoinExclusion,
+  isJoinRing,
   isJoinSubset,
   type JoinOperand,
 } from "../../../model/Constraint.js";
@@ -9,6 +10,7 @@ import type { OrmModel } from "../../../model/OrmModel.js";
 import type { Diagnostic } from "../../Diagnostic.js";
 import { reportAs, RULE_ID } from "../../ruleId.js";
 import { constraintElementId, constraintSpan } from "../../span.js";
+import { joinRingViolationTexts } from "./ring.js";
 import { type ObjectUniverse, severityForModality } from "./shared.js";
 
 /**
@@ -27,12 +29,24 @@ export function checkJoinPathViolations(model: OrmModel, universe: ObjectUnivers
   const diagnostics: Diagnostic[] = [];
 
   for (const c of model.constraints) {
-    if (!isJoinSubset(c) && !isJoinEquality(c) && !isJoinExclusion(c)) continue;
+    if (!isJoinSubset(c) && !isJoinEquality(c) && !isJoinExclusion(c) && !isJoinRing(c)) {
+      continue;
+    }
     const elementId = constraintElementId(c);
     const span = constraintSpan(model, c);
     const severity = severityForModality(c);
 
-    if (isJoinSubset(c)) {
+    if (isJoinRing(c)) {
+      // A projection that is not two columns is `constraint/join-ring-arity`'s
+      // to report; its tuples are not pairs, so nothing is checked here.
+      if (c.operand.projection.length !== 2) continue;
+      const pairs = [...projectedTuples(model, universe, c.operand)].map(
+        (t) => JSON.parse(t) as [string, string],
+      );
+      for (const text of joinRingViolationTexts(c.ringType, pairs, span)) {
+        diagnostics.push(reportAs(severity, RULE_ID.joinRingViolation, "default", elementId, text));
+      }
+    } else if (isJoinSubset(c)) {
       const sub = projectedTuples(model, universe, c.subset);
       const sup = projectedTuples(model, universe, c.superset);
       const missing = [...sub].find((t) => !sup.has(t));

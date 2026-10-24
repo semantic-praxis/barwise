@@ -95,7 +95,15 @@ const LOCAL_STRAY_BASELINE = {
   // internal_uniqueness counterexamples, tripping rules already listed
   // (value-type data type 2, join exclusion 2, value-type domain 1, value
   // comparison 1); no other kind moved.
-  occurrences: 141,
+  // 110 from 141 when `join_ring` joined the constraint kinds
+  // (join-ring-constraint WS1). Unlike the two notes above, this is not a
+  // per-pair diff: adding a kind reshuffles every draw of the seeded
+  // sample, so the two samples hold different models. The reshuffled
+  // sample also reached three generator gaps -- a mandatory, a ring and
+  // an external uniqueness counterexample minted from a domain naming one
+  // value, which then satisfied its own constraint -- and those
+  // generators now emit none there, which removes their strays too.
+  occurrences: 110,
   reasons: {
     // barwise-1017: the MODEL is contradictory at that role. A value
     // type declaring `integer` and enumerating {v3, v1, v2} admits
@@ -112,6 +120,7 @@ const LOCAL_STRAY_BASELINE = {
     // distinct values under irreflexivity, ordered ones under a value
     // comparison, a bounded count under a cardinality.
     "population/ring-violation": "sibling-role constraint",
+    "population/join-ring-violation": "sibling-role constraint",
     "population/frequency-violation": "sibling-role constraint",
     "population/value-comparison-violation": "sibling-role constraint",
     "population/unary-role-cardinality-violation": "sibling-role constraint",

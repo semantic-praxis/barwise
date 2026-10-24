@@ -658,7 +658,20 @@ function toConstraint(
         },
       };
     }
-    case "external_uniqueness":
+    case "external_uniqueness": {
+      // An external uniqueness needs a join key the generator can infer:
+      // one player in an unconstrained role of each fact type. A blind
+      // pick reached that only by luck of the seeded stream, which every
+      // added constraint kind reshuffles (join-ring-constraint WS1), so
+      // look for a keyed pair first and fall back to the blind one.
+      const keyed = keyedPair(skeletons, ownerIndex);
+      if (keyed) {
+        return { ownerIndex, constraint: { type: raw.kind, id, roleIds: keyed, ...modality } };
+      }
+      if (!otherFactType) return null;
+      const roleIds = [roles[0]!.id!, otherFactType.roles[0]!.id!];
+      return { ownerIndex, constraint: { type: raw.kind, id, roleIds, ...modality } };
+    }
     case "disjunctive_mandatory":
     case "exclusion":
     case "exclusive_or": {
@@ -704,7 +717,56 @@ function toConstraint(
         constraint: { type: raw.kind, id, operands: [operand, operand], ...modality },
       };
     }
+    case "join_ring": {
+      // A ring needs both projected ends played by one type, so the hop
+      // is a reflexive pair, taken twice: a self-join projecting [0, 2],
+      // the two-hop shape the one-hop warning must not fire on.
+      for (const skeleton of skeletons) {
+        const pair = reflexivePair(skeleton);
+        if (!pair) continue;
+        const root = skeleton.roles.find((r) => r.id === pair[0])!.playerId;
+        const step = { entry: pair[0], exit: pair[1] };
+        return {
+          ownerIndex,
+          constraint: {
+            type: "join_ring",
+            id,
+            operand: { path: { root, steps: [step, step] }, projection: [0, 2] },
+            ringType: raw.ringType,
+            ...modality,
+          },
+        };
+      }
+      return null;
+    }
   }
+}
+
+/**
+ * A constrained role of the owner and of another binary fact type whose
+ * other roles share a player that neither constrained role has: the
+ * standard external uniqueness pattern `inferExternalUniquenessJoin` reads.
+ */
+function keyedPair(skeletons: readonly FactTypeSkeleton[], ownerIndex: number): string[] | null {
+  const owner = skeletons[ownerIndex]!;
+  if (owner.roles.length !== 2) return null;
+  for (let i = 0; i < skeletons.length; i++) {
+    const other = skeletons[i]!;
+    if (i === ownerIndex || other.roles.length !== 2) continue;
+    for (const [c1, k1] of [[0, 1], [1, 0]] as const) {
+      for (const [c2, k2] of [[0, 1], [1, 0]] as const) {
+        const key = owner.roles[k1]!.playerId;
+        if (
+          other.roles[k2]!.playerId === key
+          && owner.roles[c1]!.playerId !== key
+          && other.roles[c2]!.playerId !== key
+        ) {
+          return [owner.roles[c1]!.id!, other.roles[c2]!.id!];
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /** Two roles of one fact type sharing a player, if the skeleton has them. */

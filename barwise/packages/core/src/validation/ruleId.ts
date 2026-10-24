@@ -69,6 +69,9 @@ export const RULE_ID = {
   joinColumnTypeMismatch: "constraint/join-column-type-mismatch",
   joinDiscontiguous: "constraint/join-discontiguous",
   joinEmptyProjection: "constraint/join-empty-projection",
+  joinRingArity: "constraint/join-ring-arity",
+  joinRingDifferentPlayers: "constraint/join-ring-different-players",
+  joinRingSingleFactType: "constraint/join-ring-single-fact-type",
   joinTooFewOperands: "constraint/join-too-few-operands",
   joinUnknownRoot: "constraint/join-unknown-root",
   mandatoryInvalidRole: "constraint/mandatory-invalid-role",
@@ -125,6 +128,7 @@ export const RULE_ID = {
   joinSubsetViolation: "population/join-subset-violation",
   joinEqualityViolation: "population/join-equality-violation",
   joinExclusionViolation: "population/join-exclusion-violation",
+  joinRingViolation: "population/join-ring-violation",
   ringViolation: "population/ring-violation",
   mergeError: "merge-error",
 } as const;
@@ -435,6 +439,32 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (span: string): string =>
         `Join constraint over ${span} has an operand with an empty projection.`,
+    },
+  },
+  [RULE_ID.joinRingArity]: {
+    severity: "error",
+    description: "A join ring constraint's operand does not project exactly two path nodes.",
+    messages: {
+      default: (span: string, arity: number): string =>
+        `Join ring constraint over ${span} projects ${arity} column(s); a ring relates exactly two.`,
+    },
+  },
+  [RULE_ID.joinRingDifferentPlayers]: {
+    severity: "error",
+    description:
+      "A join ring constraint's two projected path nodes are played by different object types.",
+    messages: {
+      default: (span: string): string =>
+        `Join ring constraint over ${span} requires both projected columns to be played by the same object type.`,
+    },
+  },
+  [RULE_ID.joinRingSingleFactType]: {
+    severity: "warning",
+    description:
+      "A join ring constraint's path is one hop within one fact type, which a plain ring constraint states.",
+    messages: {
+      default: (span: string): string =>
+        `Join ring constraint over ${span} is one hop within one fact type; state it as a ring constraint on that fact type.`,
     },
   },
   [RULE_ID.joinTooFewOperands]: {
@@ -993,6 +1023,16 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (span: string, tuple: string): string =>
         `Join exclusion constraint over ${span} is violated: the tuple [${tuple}] is projected by more than one operand.`,
+    },
+  },
+  [RULE_ID.joinRingViolation]: {
+    severity: "error",
+    description:
+      "The pairs a join ring constraint's path projects break the relational property it asserts.",
+    messages: {
+      // Rendered whole by `MESSAGES` in population/ring.ts, as for
+      // `ringViolation`, with the path's span in place of a fact type.
+      default: (text: string): string => text,
     },
   },
   [RULE_ID.ringViolation]: {

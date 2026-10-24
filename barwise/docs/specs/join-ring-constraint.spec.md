@@ -1,6 +1,6 @@
 # Ring constraints over a join path
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented (the kind in core and every reader); WS2 (NORMA import and export) not started
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -278,6 +278,43 @@ Depends on WS1.
    and diff will not pair them. **Recommend a warning** naming `ring`,
    and have the NORMA importer emit `ring` when a decoded path is one hop
    in one fact type, so an import never produces the long spelling.
+
+## Implementation notes
+
+What WS1 found that the draft did not say.
+
+- **Verbalization does not share the flat ring's sentence builder.** The
+  draft planned to refactor `verbalizeRing` to take its predicate as an
+  argument. That builder forms negatives as `"does not " + predicate`,
+  and a reading's predicate already starts with its verb, so the flat
+  ring reads "Person1 does not is parent of Person3", pinned as correct
+  by `Phase2ConstraintVerbalizer.test.ts` (barwise-gzk). Sharing it would
+  have spread the defect; `verbalizeJoinRing` words its eight sentences
+  around "relates" instead, and the flat ring is untouched.
+- **The one-hop warning needs no fact-type test.** A step that passes the
+  structural rules already lies within one fact type, so the warning is
+  "one hop, projecting both of its ends"; the draft's "within one fact
+  type" is always true by then.
+- **The population entry is a sibling, not a replacement.** The flat
+  ring's messages name a population and an instance; a projected pair has
+  neither. `joinRingViolationTexts` in `population/ring.ts` runs the same
+  `PROPERTY_CHECKS` and words each finding by the constraint's span.
+- **Adding a kind reshuffles every seeded law sample.** The arbitrary
+  draws kinds from `CONSTRAINT_TYPES`, so one more kind moves every draw.
+  The new sample reached three counterexample generators that minted from
+  a domain naming one value and so built "counterexamples" that satisfy
+  their own constraint (mandatory and disjunctive mandatory through the
+  anchor's filler, ring through non-distinct witnesses, external
+  uniqueness through equal keys); each now emits none there. It stopped
+  reaching external uniqueness at all, which a blind fact-type pick had
+  only reached by luck, so the arbitrary now looks for a keyed pair. The
+  stray baseline (141 to 110) and the renamed-pair preferred-identifier
+  floor (15 to 11, measured 14) carry notes saying why they moved.
+- **The schema's ring type list is one definition.** `ring_type_def` is
+  referenced by both `ring` and `join_ring`, rather than a second inline
+  copy of the enum.
+- **NORMA export drops a `join_ring` until WS2.** The writer's `default`
+  arm returns nothing for a kind it does not know; WS2 writes it.
 
 ## Risks and testing
 

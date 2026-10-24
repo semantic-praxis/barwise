@@ -781,3 +781,123 @@ export function verbalizeJoinExclusion(
  * other fact type. External uniqueness names roles across fact types,
  * so the owner-only `getRoleById` is not enough.
  */
+
+/**
+ * A ring property of the relation a join path projects
+ * (`docs/specs/join-ring-constraint.spec.md`). The relation has no single
+ * reading to borrow a predicate from, so the sentence names the path and
+ * says it "relates" one end to the other, in the shape `verbalizeRing`
+ * gives each ring type.
+ */
+export function verbalizeJoinRing(
+  operand: JoinOperand,
+  ringType: RingType,
+  sourceId: string,
+  model: OrmModel,
+): Verbalization {
+  const typeId = pathNodeTypeId(operand.path, model, operand.projection[0] ?? 0);
+  const typeName = objName(model, typeId);
+  const name1 = refSeg(typeName + "1", typeId);
+  const name2 = refSeg(typeName + "2", typeId);
+  const name3 = refSeg(typeName + "3", typeId);
+  const same = refSeg(typeName, typeId);
+  const by = `"${pathChain(operand.path, model)}"`;
+  const relates = (a: VerbalizationSegment, b: VerbalizationSegment, verb = "relates") => [
+    textSeg(`${verb} `),
+    a,
+    textSeg(" to "),
+    b,
+  ];
+  const isSame = [name1, textSeg(` is the same ${typeName} as `), name2, textSeg(".")];
+  const build = (segments: VerbalizationSegment[]) =>
+    buildVerbalization(sourceId, "constraint", segments);
+
+  switch (ringType) {
+    case "irreflexive":
+      return build([
+        kwSeg("No "),
+        same,
+        textSeg(" is related to that same "),
+        same,
+        textSeg(` by ${by}.`),
+      ]);
+    case "acyclic":
+      return build([
+        kwSeg("No "),
+        same,
+        textSeg(" is related to that same "),
+        same,
+        textSeg(` by ${by}, directly or through a chain of such relationships.`),
+      ]);
+    case "asymmetric":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" then "),
+        textSeg("it "),
+        ...relates(name2, name1, "does not relate"),
+        textSeg("."),
+      ]);
+    case "symmetric":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" then "),
+        textSeg("it "),
+        ...relates(name2, name1, "relates"),
+        textSeg("."),
+      ]);
+    case "antisymmetric":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" and "),
+        name2,
+        textSeg(" to "),
+        name1,
+        kwSeg(" then "),
+        ...isSame,
+      ]);
+    case "transitive":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" and "),
+        name2,
+        textSeg(" to "),
+        name3,
+        kwSeg(" then "),
+        textSeg("it "),
+        ...relates(name1, name3),
+        textSeg("."),
+      ]);
+    case "intransitive":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" and "),
+        name2,
+        textSeg(" to "),
+        name3,
+        kwSeg(" then "),
+        textSeg("it "),
+        ...relates(name1, name3, "does not relate"),
+        textSeg("."),
+      ]);
+    case "purely_reflexive":
+      return build([
+        kwSeg("If "),
+        textSeg(`${by} `),
+        ...relates(name1, name2),
+        kwSeg(" then "),
+        ...isSame,
+      ]);
+    default:
+      return assertNever(ringType);
+  }
+}

@@ -314,13 +314,14 @@ function externalConsistency(model: OrmModel, constraint: ExternalConstraint): D
         ]
         : [];
 
-    // Join constraints (join_subset, join_equality, join_exclusion)
-    // carry their roles inside path-projected operands rather than a
-    // flat list of roles; their consistency is validated separately in
-    // joinConstraintRules.ts.
+    // Join constraints (join_subset, join_equality, join_exclusion,
+    // join_ring) carry their roles inside path-projected operands rather
+    // than a flat list of roles; their consistency is validated
+    // separately in joinConstraintRules.ts.
     case "join_subset":
     case "join_equality":
     case "join_exclusion":
+    case "join_ring":
       return [];
 
     default:

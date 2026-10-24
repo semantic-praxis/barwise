@@ -157,7 +157,7 @@ function probeFor(
     // No generator, deliberately and for two different reasons. A
     // value-comparison or cardinality violation needs values chosen to
     // break an ordering or a count, which the minting helpers here do not
-    // do; the three join kinds span fact types along a role path, which
+    // do; the four join kinds span fact types along a role path, which
     // this module's one-fact-type population shape cannot express. Listed
     // rather than omitted so the distinction between "no generator yet"
     // and "nobody noticed" is in the code.
@@ -166,6 +166,7 @@ function probeFor(
     case "join_subset":
     case "join_equality":
     case "join_exclusion":
+    case "join_ring":
       return undefined;
 
     default:
@@ -309,6 +310,12 @@ function forRing(
   const a = mintValue(r1, ft, model, 0);
   const b = mintValue(r1, ft, model, 1);
   const c = mintValue(r1, ft, model, 2);
+  // Every witness but irreflexive's self-loop needs distinct values. A
+  // domain too narrow to give three (a value constraint naming one value)
+  // collapses the witness into pairs that satisfy the ring, so none is
+  // emitted, as `fillsRequiredRole` does for the mandatory kinds.
+  const property = RING_PROPERTIES[rc.ringType][0];
+  if (property !== "irreflexive" && new Set([a, b, c]).size < 3) return undefined;
   const pair = (x: string, y: string): RoleValues => {
     const inst: RoleValues = {};
     for (const r of ft.roles) {
@@ -321,7 +328,7 @@ function forRing(
   // Asymmetric lists antisymmetric first for exactly this reason: the
   // reading ORM 2 gives it is the reverse pair, not the self-loop its
   // other property would yield.
-  const instances = RING_WITNESSES[RING_PROPERTIES[rc.ringType][0]](a, b, c)
+  const instances = RING_WITNESSES[property](a, b, c)
     .map(([x, y]) => pair(x, y));
 
   const reason = `a ${rc.ringType.replace(/_/g, " ")} ring violation among `
@@ -352,6 +359,7 @@ function forMandatory(
   // a narrower domain than this one's.
   const value = mintValueForAll([{ role, ft }, anchor], model, 0);
   const forbidden = anchorPopulation(anchor, value, model);
+  if (fillsRequiredRole(forbidden, [mc.roleId], value)) return undefined;
   const reason = `a ${playerName(role, model)} that exists but never plays `
     + `"${ft.name}"`;
   const rendered = `${value} appears in ${anchor.ft.name} but not in ${ft.name}`;
@@ -379,6 +387,7 @@ function forDisjunctive(
 
   const value = mintValueForAll([first, anchor], model, 0);
   const forbidden = anchorPopulation(anchor, value, model);
+  if (fillsRequiredRole(forbidden, roleIds, value)) return undefined;
   const reason = `a ${playerName(first.role, model)} that plays none of the `
     + `required roles`;
   const rendered = `${value} appears in ${anchor.ft.name} but plays none of `
@@ -600,6 +609,9 @@ function forExternalUniqueness(
   // type, so mint the two keys once and reuse them across the join.
   const common1 = mintValue(firstKeyRole, firstFt, model, 0);
   const common2 = mintValue(firstKeyRole, firstFt, model, 1);
+  // Two common instances that are one value are one instance: a domain
+  // naming a single value leaves nothing to violate, so emit none.
+  if (common1 === common2) return undefined;
 
   const forbidden: Population[] = [];
   for (const jft of join.factTypes) {
@@ -699,6 +711,23 @@ function findRoleById(
 }
 
 /** A population that puts `value` in the anchor role, others minted apart. */
+/**
+ * Whether the anchor's own instance puts the value in a role it must stay
+ * out of. The anchor's fact type can hold a required role, and when that
+ * role's domain admits only the one value, its filler is the value again:
+ * the "counterexample" then satisfies the constraint it was built to break.
+ * No value avoids it, so the generator emits none.
+ */
+function fillsRequiredRole(
+  forbidden: Population,
+  requiredRoleIds: readonly string[],
+  value: string,
+): boolean {
+  return forbidden.instances.some((inst) =>
+    requiredRoleIds.some((rid) => inst.roleValues[rid] === value)
+  );
+}
+
 function anchorPopulation(anchor: AnchorRole, value: string, model: OrmModel): Population {
   const inst: RoleValues = {};
   for (const r of anchor.ft.roles) {

@@ -195,6 +195,20 @@ model:
             - 1
             - 0
       id: c-jex
+    - type: join_ring
+      operand:
+        path:
+          root: ot-person
+          steps:
+            - entry: r-knower
+              exit: r-known
+            - entry: r-knower
+              exit: r-known
+        projection:
+          - 0
+          - 2
+      ring_type: irreflexive
+      id: c-jring
 `;
 
 describe("fact type YAML layout", () => {

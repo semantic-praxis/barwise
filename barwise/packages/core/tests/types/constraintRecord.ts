@@ -119,7 +119,12 @@ export type ConstraintRecord =
     readonly superset: JoinOperand;
   })
   | (Base & { readonly type: "join_equality"; readonly operands: Operands; })
-  | (Base & { readonly type: "join_exclusion"; readonly operands: Operands; });
+  | (Base & { readonly type: "join_exclusion"; readonly operands: Operands; })
+  | (Base & {
+    readonly type: "join_ring";
+    readonly operand: JoinOperand;
+    readonly ringType: RingType;
+  });
 
 /** Each assignable to the other: the comparison S3 names. */
 export type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false)
