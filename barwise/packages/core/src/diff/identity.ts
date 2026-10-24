@@ -18,7 +18,8 @@ import type { OrmModel } from "../model/OrmModel.js";
  *   independent LLM samples, whose ids are unrelated by construction and
  *   may coincide (positional ids such as `ot0`).
  */
-export type ElementMatching = "id-first" | "content";
+export const ELEMENT_MATCHINGS = ["id-first", "content"] as const;
+export type ElementMatching = (typeof ELEMENT_MATCHINGS)[number];
 
 /** One entry of a kind's pairing: both sides, or one. */
 export type Paired<T> =

@@ -33,7 +33,7 @@ import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
 import { type SubtypeFact, subtypePairKey, toSubtypeFactConfig } from "../model/SubtypeFact.js";
-import { derivedId } from "../serialization/derivedId.js";
+import { derivedId, MERGE_ID_TAG } from "../serialization/derivedId.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
@@ -346,6 +346,11 @@ export function mergeModels(
   const place = (id: string, fact: SubtypeFact) => {
     placedFrom.set(id, fact);
     mergedIdOf.set(fact, id);
+    // The placement stands for both sides of its delta, so a constraint
+    // from the side not placed (an existing constraint naming the existing
+    // fact, whose incoming modification was accepted) still finds it.
+    const mate = partner.get(fact);
+    if (mate !== undefined && !mergedIdOf.has(mate)) mergedIdOf.set(mate, id);
   };
   // The other side of each paired delta: a repeat from one model may sit
   // beside the fact the diff paired with its sibling from the other.
@@ -419,10 +424,20 @@ export function mergeModels(
     const holder = merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
     const origin = holder && placedFrom.get(holder.id);
     if (origin === undefined) return false;
-    return source.subtypeFacts.some((sibling) =>
-      sibling !== fact && subtypePairKey(sibling) === subtypePairKey(fact)
-      && (sibling === origin || partner.get(sibling) === origin)
-    );
+    // A sibling in this fact's own model, or in its partner's: an accepted
+    // modification brings the incoming side, whose model may no longer
+    // repeat the pair while the existing side's model still does, and the
+    // holder is then the existing sibling (barwise-m9b, from the retroactive
+    // review of #733).
+    const siblingsOf = (model: OrmModel, f: SubtypeFact) =>
+      model.subtypeFacts.filter((s) => s !== f && subtypePairKey(s) === subtypePairKey(f));
+    const mate = partner.get(fact);
+    const other = source === existing ? incoming : existing;
+    const siblings = [
+      ...siblingsOf(source, fact),
+      ...(mate === undefined ? [] : siblingsOf(other, mate)),
+    ];
+    return siblings.some((sibling) => sibling === origin || partner.get(sibling) === origin);
   }
 
   // Phase 4b: constraints over subtype facts, now that the merged model
@@ -767,10 +782,9 @@ function remapPopulationRoles(
  * left to the installed generator, so merging the same two models twice
  * gave those elements different ids, against the rule that core is
  * deterministic (barwise-yg5). Derived from what the merge already has,
- * it is the same every time. The attempt number keeps two elements that
- * prefer one id apart -- one fact type may hold several populations with
- * one id across the two models -- and walks past a derived id something
- * else already holds.
+ * it is the same every time. The attempt number walks past a derived id
+ * the inputs already hold, which is what re-merging an earlier merge's
+ * output meets: that output carries attempt 1's id.
  */
 function mergedId(
   kind: "subtype-fact" | "objectification" | "population",
@@ -779,7 +793,7 @@ function mergedId(
 ): string {
   if (!holds(preferred)) return preferred;
   for (let attempt = 1;; attempt++) {
-    const id = derivedId(`barwise.merge.${kind}`, [preferred, String(attempt)]);
+    const id = derivedId(`${MERGE_ID_TAG}.${kind}`, [preferred, String(attempt)]);
     if (!holds(id)) return id;
   }
 }

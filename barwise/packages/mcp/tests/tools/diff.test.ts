@@ -4,7 +4,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { executeDiff } from "../../src/tools/diff.js";
+import { executeDiff, registerDiffTool } from "../../src/tools/diff.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixtures = resolve(__dirname, "../fixtures");
@@ -132,5 +132,30 @@ describe("diff_models matching", () => {
 
   it("pairs by name under content matching, so nothing changed", () => {
     expect(changed("content")).toBe(0);
+  });
+});
+
+describe("diff_models handler", () => {
+  // From the retroactive review of #735: the tests called executeDiff
+  // directly, so dropping `matching` in the registered handler went unseen.
+  it("passes matching through to the diff", async () => {
+    let handler:
+      | ((args: Record<string, unknown>) => Promise<{ content: { text: string; }[]; }>)
+      | undefined;
+    const server = {
+      registerTool: (_name: string, _definition: unknown, h: typeof handler) => {
+        handler = h;
+      },
+    };
+    registerDiffTool(server as never);
+    const a =
+      'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Dog, kind: value }\n    - { id: ot1, name: Cat, kind: value }\n';
+    const b =
+      'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Cat, kind: value }\n    - { id: ot1, name: Dog, kind: value }\n';
+    const deltas = async (matching?: string) =>
+      JSON.parse((await handler!({ base: a, incoming: b, matching })).content[0]!.text).deltas
+        .length;
+    expect(await deltas()).toBe(2);
+    expect(await deltas("content")).toBe(0);
   });
 });

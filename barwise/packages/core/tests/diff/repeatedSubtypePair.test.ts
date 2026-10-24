@@ -104,3 +104,33 @@ describe("what the merge still drops, and the ids it keeps", () => {
     expect(merged.getConstraint("x")).toMatchObject({ subtypeFactIds: ["sf1", "sf2"] });
   });
 });
+
+describe("a repeat the incoming side no longer holds", () => {
+  // From the retroactive review of #733: the incoming model keeps one of the
+  // two facts, under its own id, modified. Rejecting the other's removal and
+  // accepting the modification used to drop the accepted fact, leave the
+  // constraint naming the survivor twice, and report nothing.
+  it("keeps both, and the constraint still names both", () => {
+    const existing = withRepeatedPair();
+    existing.addConstraint({ type: "exclusion", id: "x", subtypeFactIds: ["sf1", "sf2"] });
+    const incoming = new OrmModel({ name: "M" });
+    incoming.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "a_id" });
+    incoming.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "b_id" });
+    incoming.addSubtypeFact({
+      id: "sf2",
+      subtypeId: "b",
+      supertypeId: "a",
+      providesIdentification: false,
+    });
+    const { deltas } = diffModels(existing, incoming);
+    expect(deltas.filter((d) => d.elementType === "subtype_fact").map((d) => d.kind))
+      .toEqual(["removed", "modified"]);
+    // The surfaces' default: accept additions and modifications, reject removals.
+    const accepted = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
+
+    const result = mergeAndValidate(existing, incoming, deltas, accepted);
+    expect(result.model?.subtypeFacts.map((sf) => sf.id)).toEqual(["sf1", "sf2"]);
+    expect(result.model?.getConstraint("x")).toMatchObject({ subtypeFactIds: ["sf1", "sf2"] });
+    expect(result.diagnostics.map((d) => d.ruleId)).toEqual([RULE_ID.duplicateSubtypeFact]);
+  });
+});

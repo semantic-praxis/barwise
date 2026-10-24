@@ -10,6 +10,7 @@ export {
   deltaToJson,
   diffModels,
   type DiffOptions,
+  ELEMENT_MATCHINGS,
   ELEMENT_TYPES,
   elementLabel,
   type ElementMatching,
