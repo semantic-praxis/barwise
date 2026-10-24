@@ -414,7 +414,10 @@ with one rule off, `strictRequired`: the pinned `ontology.json` writes
 `required` inside an `anyOf` for properties its parent declares, valid JSON
 Schema that ajv's strict mode refuses as a style matter. The rule is about
 how the schema is written, not the document under test, so turning it off
-loses no check on the export.
+loses no check on the export. The loss report predicts, construct by construct,
+what the importer reads back; three review rounds each found another
+construct where a prediction diverged, so barwise-5bv tracks verifying the
+report by re-importing the written document instead.
 
 ## API and migration impact
 

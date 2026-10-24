@@ -218,18 +218,12 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   }
 
   const { description, requires } = splitNote(model.note);
-  {
-    // The importer writes the description, then the requires lines.
-    const lines = (model.note ?? "").split("\n");
-    const firstRequires = lines.findIndex((l) => l.startsWith(REQUIRES_NOTE_PREFIX));
-    const descriptionAfter = firstRequires >= 0
-      && lines.slice(firstRequires).some((l) => !l.startsWith(REQUIRES_NOTE_PREFIX) && l.trim());
-    const untidy = lines.some((l) =>
-      l.startsWith(REQUIRES_NOTE_PREFIX) && l !== l.replace(/\s+/g, " ").trimEnd()
-    );
-    if (descriptionAfter || untidy) {
-      lose("model", "note comes back reordered or with its whitespace collapsed");
-    }
+  // The importer's own rebuild: the description, then each requires line.
+  const keptRequires = requires.filter((r) => r.trim() !== "");
+  const modelNoteBack = [description, ...keptRequires.map((r) => REQUIRES_NOTE_PREFIX + oneLine(r))]
+    .filter(Boolean).join("\n");
+  if ((model.note ?? "") !== modelNoteBack && keptRequires.length + (description ? 1 : 0) > 0) {
+    lose("model", "note comes back reordered or with its whitespace or blank lines changed");
   }
   for (const line of requires.filter((r) => r.trim() === "")) {
     lose("model", `empty note line not written: ${line}`);
@@ -500,7 +494,10 @@ function writeRelationship(
   }
   for (const c of ft.internalConstraints) {
     if (covered.has(c.id!)) continue;
-    if (c === spanning && multiplicity === undefined) continue; // implied, and read back
+    // Implied: by set semantics with no multiplicity written, and by the
+    // narrower uniqueness a multiplicity writes otherwise. Dropping it on
+    // the way back loses no meaning.
+    if (c === spanning) continue;
     if (c.type === "mandatory" && position(c.roleId) === 0) {
       if (mandatoryWritten) {
         lose(element, "a second mandatory on the same role not written");
@@ -517,7 +514,7 @@ function writeRelationship(
   const readings = ft.readings.map((r) => reading(r.template, w, nameOf, element, lose));
   const { requires, derivedBy: noteDerivedBy, rest } = splitNoteLines(ft.note);
   if (!noteReadsBack(ft.note)) {
-    lose(element, "note comes back reordered or with its whitespace collapsed");
+    lose(element, "note comes back reordered or with its whitespace or blank lines changed");
   }
   for (const line of rest) lose(element, `note line not written: ${line}`);
   for (const line of noteDerivedBy) lose(element, `note line not written: derived_by: ${line}`);
@@ -528,8 +525,10 @@ function writeRelationship(
   if (derivation?.storage === "derived_and_stored") {
     lose(element, "stored derivation written as on request");
   }
-  const derivedItems = derivation ? splitDerivation(derivation.expression) : [];
-  if (derivation && derivedItems.join(DERIVATION_ITEM_SEPARATOR) !== derivation.expression) {
+  const { items: derivedItems, faithful } = derivation
+    ? derivationItems(derivation.expression)
+    : { items: [], faithful: true };
+  if (!faithful) {
     lose(
       element,
       derivedItems.length === 0
@@ -607,7 +606,7 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
   const { requires: noteRequires, derivedBy: noteDerivedBy, rest } = splitNoteLines(ot.note);
   for (const line of rest) lose(ot.name, `note line not written: ${line}`);
   if (!noteReadsBack(ot.note)) {
-    lose(ot.name, "note comes back reordered or with its whitespace collapsed");
+    lose(ot.name, "note comes back reordered or with its whitespace or blank lines changed");
   }
 
   const base = {
@@ -746,9 +745,15 @@ function subtypeLinks(
         "identification through the supertype not written as it is",
       );
     }
-    const items = sf.definingRule ? splitDerivation(sf.definingRule.expression) : [];
-    if (sf.definingRule && items.join(DERIVATION_ITEM_SEPARATOR) !== sf.definingRule.expression) {
-      lose(sub, "defining rule text comes back normalized, or not at all if empty");
+    const rule = sf.definingRule ? derivationItems(sf.definingRule.expression) : undefined;
+    const items = rule?.items ?? [];
+    if (rule && !rule.faithful) {
+      lose(
+        sub,
+        rule.items.length === 0
+          ? "an empty defining rule is not written; the subtype reads back as asserted"
+          : "defining rule text comes back with its blank lines normalized",
+      );
     }
     if (entry.names.length === 0) {
       entry.derivedBy = items;
@@ -796,22 +801,44 @@ function splitDerivation(expression: string): string[] {
 }
 
 /**
- * Whether the importer would rebuild this note as it is: it writes each
- * expression on one line with its whitespace collapsed, `requires` lines
- * before `derived_by` lines.
+ * Whether the importer would rebuild this note as it is, apart from the
+ * lines already reported as not written. Its rebuild is exact and simple
+ * -- each kept `requires` line, then each `derived_by` line, each
+ * expression on one line with its whitespace collapsed, joined by single
+ * line ends -- so the note is compared with that rebuild, not with a
+ * prediction of its parts.
  */
 function noteReadsBack(note: string | undefined): boolean {
-  const lines = (note ?? "").split("\n").filter((l) => l.trim().length > 0);
-  const kinds = lines.map((l) =>
-    l.startsWith(REQUIRES_NOTE_PREFIX) ? 0 : l.startsWith(DERIVED_BY_NOTE_PREFIX) ? 1 : 2
-  );
-  const ordered = kinds.every((k, i) =>
-    i === 0 || k === 2 || kinds[i - 1] === 2 || kinds[i - 1]! <= k
-  );
-  const tidy = lines.every((l) =>
-    !/^(requires|derived_by): /.test(l) || l === l.replace(/\s+/g, " ").trimEnd()
-  );
-  return ordered && tidy;
+  const { requires, derivedBy } = splitNoteLines(note);
+  const rebuilt = [
+    ...requires.map((e) => REQUIRES_NOTE_PREFIX + oneLine(e)),
+    ...derivedBy.map((e) => DERIVED_BY_NOTE_PREFIX + oneLine(e)),
+  ].join("\n");
+  const kept = (note ?? "").split("\n").filter((l) => {
+    const isKept = (prefix: string) => l.startsWith(prefix) && l.slice(prefix.length).trim();
+    return isKept(REQUIRES_NOTE_PREFIX) || isKept(DERIVED_BY_NOTE_PREFIX) || l.trim() === "";
+  });
+  // Blank lines count: the rebuild has none.
+  // Nothing kept: every line was reported as not written already.
+  return rebuilt === "" || kept.join("\n") === rebuilt;
+}
+
+/** The importer's one-line form of an expression (`mapOssieToOrm`'s oneLine). */
+function oneLine(expr: string): string {
+  return expr.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * A derivation as `derived_by` items, and whether they read back as the
+ * same text: the importer joins items with a blank line, so an empty
+ * expression or extra blank lines do not survive.
+ */
+function derivationItems(expression: string): { items: string[]; faithful: boolean; } {
+  const items = splitDerivation(expression);
+  return {
+    items,
+    faithful: items.length > 0 && items.join(DERIVATION_ITEM_SEPARATOR) === expression,
+  };
 }
 
 function splitNoteLines(note: string | undefined): {

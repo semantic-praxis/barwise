@@ -586,12 +586,45 @@ ontology:
       "String: a built-in no role uses is not written; Ossie declares none",
       "Age: value constraint is not a shape Ossie's requires can state",
       "fact type Q.r: a second mandatory on the same role not written",
-      "fact type Q.r: internal_uniqueness is not expressible in Ossie",
       "constraint solo: external_uniqueness is not expressible in Ossie",
       "fact type Z.busy: derivation text comes back with its blank lines normalized",
-      "model: note comes back reordered or with its whitespace collapsed",
+      "model: note comes back reordered or with its whitespace or blank lines changed",
     ]));
+    // The spanning uniqueness beside Q.r's ManyToOne is implied by it, not a loss.
+    expect(losses.filter((l) => l.startsWith("fact type Q.r: internal_uniqueness"))).toEqual([]);
     expect(() => importer.parse(result.text)).not.toThrow();
+  });
+
+  it("names an empty derivation or defining rule, and a note whose blank lines would not survive", () => {
+    const m = new OrmModel({ name: "M" });
+    const [a, b] = [entity(m, "A"), entity(m, "B")];
+    m.addSubtypeFact({
+      id: "s",
+      subtypeId: b.id,
+      supertypeId: a.id,
+      providesIdentification: true,
+      definingRule: { kind: "derived", expression: "" },
+    });
+    m.addFactType({
+      id: "d",
+      name: "A.idle",
+      roles: [{ id: "r", name: "A", playerId: a.id }],
+      readings: ["{0} is idle"],
+      derivation: { kind: "derived", expression: "" },
+    });
+    m.addObjectType({
+      id: "n",
+      name: "C",
+      kind: "entity",
+      referenceMode: "id",
+      note: "requires: x > 1\n\nrequires: y < 2",
+    });
+    const { losses } = exported(m);
+    expect(losses).toEqual(expect.arrayContaining([
+      "B: an empty defining rule is not written; the subtype reads back as asserted",
+      "fact type A.idle: an empty derivation is not written; the fact type reads back as asserted",
+      "C: note comes back reordered or with its whitespace or blank lines changed",
+    ]));
   });
 
   it("keeps the comment block one line per loss, whatever the lost text holds", () => {
