@@ -107,14 +107,11 @@ mostly on code that had been there since the first pass.
   purity, registered copies and the duplication ratchet, tracker
   validity and closures, instruction-file paths, secrets, Python
   invocation, spec status claims. `ci.yml` is the list.
-- Regenerated output, unless it changed with no change to its generator
-  or source: `builtins.generated.ts`, `barwise/examples/output/`,
-  `barwise/docs/tutorial/`, the CLI and diagram-ui goldens, and the
-  reference models `regen:references` writes. Review the generator.
-- Recorded data: `barwise/eval-runs/`, `barwise/eval-payloads/`,
-  `barwise/trial-baseline.json`, `package-lock.json`,
-  `.beads/issues.jsonl` -- except a count or status that contradicts the
-  PR description.
+- Files marked `linguist-generated` in the root `.gitattributes`, which is
+  the list of regenerated output and recorded data. Review a regenerated
+  file only when it changed with no change to its generator or source, and
+  recorded data only for a count or status that contradicts the PR
+  description.
 
 ## Always check: the failure modes of 2026-09-23 to 2026-10-23
 

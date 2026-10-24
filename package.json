@@ -21,6 +21,7 @@
     "check:review-tiers": "npm --prefix barwise run check:review-tiers --",
     "check:spec-touches": "npm --prefix barwise run check:spec-touches --",
     "pr:risk": "npm --prefix barwise run pr:risk --",
+    "plan-scope": "npm --prefix barwise run plan-scope --",
     "check:no-nul": "npm --prefix barwise run check:no-nul --",
     "check:git-listing": "npm --prefix barwise run check:git-listing --",
     "check:lockfile": "npm --prefix barwise run check:lockfile --",
