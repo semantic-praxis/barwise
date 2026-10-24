@@ -36,11 +36,12 @@
  * check's own tests; nothing else passes it.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { opt } from "./lib/args.mjs";
+import { uncommittedPaths } from "./lib/changed-class.mjs";
 import { isInstructionFile } from "./lib/instruction-files.mjs";
 import { header, inSpecCorpus, touches } from "./lib/spec-reader.mjs";
 
@@ -60,10 +61,11 @@ const RUNTIME = ["dependencies", "peerDependencies", "optionalDependencies"];
  */
 const ADR_DIR = "barwise/docs/adr/";
 // One line break may sit between `ADR` and the name -- dprint reflows prose,
-// and a reference split at the wrap would otherwise never be read -- but not
-// a blank line, and `ADR` is a whole word (not the tail of `MADR`).
+// and a reference split at the wrap would otherwise never be read -- with a
+// quote or comment marker (`>`, `*`, `#`, `//`) after it, but not a blank
+// line; and `ADR` is a whole word (not the tail of `MADR`).
 const ADR_REF =
-  /\bADR[ \t]*(?:\r?\n[ \t]*)?`([a-z0-9][a-z0-9-]*)`|docs\/adr\/([a-z0-9][a-z0-9-]*)\.md/g;
+  /\bADR[ \t]*(?:\r?\n[ \t]*(?:[>*#]|\/\/)?[ \t]*)?`([a-z0-9][a-z0-9-]*)`|docs\/adr\/([a-z0-9][a-z0-9-]*)\.md/g;
 const SCOPES = ["architecture", "process"];
 const isAdr = (f) => f.startsWith(ADR_DIR) && f.endsWith(".md") && !f.endsWith("/README.md");
 /**
@@ -232,36 +234,39 @@ try {
   const clash = repeated(names);
   if (clash.length > 0) throw new Error(`two package manifests are named ${clash.join(", ")}`);
   drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"));
-  // The ADRs are the files in their directory on disk: what exists is what
-  // a reference can reach, staged or not. The files that cite them come
-  // from the tracked listing of `root` -- always `git -C root`, so the list
-  // and the files read are one tree whatever the cwd.
-  const adrDir = join(root, ADR_DIR);
-  adrs = (existsSync(adrDir) ? readdirSync(adrDir) : []).map((n) => ADR_DIR + n).filter(isAdr).map((
-    f,
-  ) => ({
-    f,
-    text: readFileSync(join(root, f), "utf8"),
-  }));
-  // Zero ADRs is a listing that went wrong, not a tree with nothing to check.
-  if (adrs.length === 0) throw new Error(`no ADR under ${adrDir}`);
-  const tracked = execFileSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8" })
-    .split("\0").filter(Boolean);
+  // ADRs and the files that cite them both come from the tracked listing of
+  // `root` -- the tree CI checks -- and always `git -C root`, so the list and
+  // the files read are one tree whatever the cwd. An ADR on disk but not yet
+  // staged is named as unchecked, not silently counted.
+  const git = (...args) =>
+    execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).split("\0").filter(Boolean);
+  const tracked = git("ls-files", "-z");
   if (tracked.length === 0) throw new Error(`git ls-files lists nothing under ${root}`);
-  // A tracked path that is not a regular file on disk is one being deleted
-  // (or a symlink or gitlink): it cites nothing, and reading it would turn
+  // A tracked path that is not a regular file on disk is one being deleted,
+  // or a symlink or gitlink: it is not read, because reading it would turn
   // the run into exit 2 and hide the references a deletion left dead.
   const isFile = (p) => {
     try {
-      return statSync(p).isFile();
+      return lstatSync(p).isFile();
     } catch {
       return false;
     }
   };
-  citing = tracked.filter(citesAdrs).filter((f) => isFile(join(root, f))).map((f) => ({
-    f,
-    text: readFileSync(join(root, f), "utf8"),
-  }));
+  const read = (fs) =>
+    fs.filter((f) => isFile(join(root, f))).map((f) => ({
+      f,
+      text: readFileSync(join(root, f), "utf8"),
+    }));
+  adrs = read(tracked.filter(isAdr));
+  // Zero ADRs is a listing that went wrong, not a tree with nothing to check.
+  if (adrs.length === 0) throw new Error(`no ADR under ${join(root, ADR_DIR)}`);
+  citing = read(tracked.filter(citesAdrs));
+  // The shared listing of uncommitted paths (check:git-listing refuses a
+  // hand-written one); those not tracked are the untracked ones.
+  const inTree = new Set(tracked);
+  for (const f of uncommittedPaths(root)) {
+    if (isAdr(f) && !inTree.has(f)) console.log(`check:architecture: unchecked (untracked): ${f}`);
+  }
 } catch (err) {
   console.error(`check:architecture: cannot answer -- ${err.message}`);
   process.exit(2);
