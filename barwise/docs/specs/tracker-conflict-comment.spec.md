@@ -157,18 +157,16 @@ One PR. Acceptance:
   pull-requests: write`, and `/security-review` shall run on the PR, per
   `REVIEW.md`.
 
-## Open decisions
+## Decisions (owner, 2026-10-24)
 
-1. **Comment on a real tracker disagreement (the table's last row)?**
-   Recommended: yes. The PR still needs only a local merge to show what
-   is left, and saying nothing leaves the same silence this spec
-   removes. The alternative is to comment only when the driver resolves
-   everything, which is quieter but leaves the case that most needs a
-   person without a cue.
-2. **Edit the comment when the conflict is gone, or delete it?**
-   Recommended: edit. A deleted comment leaves a reader of a
-   notification email with no explanation, while an edited one records
-   what happened.
+1. **Comment on a real tracker disagreement (the table's last row)?
+   Decided: yes.** The PR still needs only a local merge to show what is
+   left, and silence would leave the case that most needs a person
+   without a cue. The alternative was to comment only when the driver
+   resolves everything.
+2. **When the conflict is gone? Decided: edit the comment, do not
+   delete it.** An edited comment records what happened for someone
+   reading an old notification; a deleted one leaves them nothing.
 
 ## Risks and testing
 
