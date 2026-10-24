@@ -6,9 +6,11 @@ Created: 2026-10-24
 Last-updated: 2026-10-24
 Tracking: barwise-zk4
 Touches: barwise/packages/cli/src/commands/schema.ts,
+barwise/packages/cli/src/commands/export.ts,
 barwise/packages/cli/tests/commands/schema.test.ts,
 barwise/packages/mcp/src/tools/schema.ts,
 barwise/packages/mcp/tests/tools/schema.test.ts,
+barwise/packages/vscode/tests/unit/toolRegistration.test.ts,
 barwise/docs/CLI.md
 
 When `barwise schema` or the MCP `generate_schema` tool (and the editor's
@@ -23,8 +25,9 @@ dropped in silence as they are today.
 map to" has two answers in the repository. `barwise export --format ddl`
 renders through `DdlExportFormat`: the mapper, then the dialect constraint
 routing that adds `UNIQUE` and `CHECK` clauses and spills what DDL cannot
-express into `constraintSpecs`, which every export surface now reports
-(`export-constraint-specs.spec.md`). `barwise schema` and `generate_schema`
+express into `constraintSpecs`, which every export surface that goes
+through the format registry now reports (`export-constraint-specs.spec.md`;
+the editor's palette export does not, barwise-wmm). `barwise schema` and `generate_schema`
 call `renderDdl` on the mapper's schema directly, so the same model gives
 two different DDL texts depending on which command asked, and the second
 says nothing about what it left out.
@@ -52,17 +55,27 @@ for the surfaces it covered.
 In scope:
 
 - When `barwise schema` runs with `--format ddl` (the default), the CLI
-  shall write the text the registered `ddl` exporter returns with
-  `annotate: false` and `includeExamples: false`, and write the constraint
-  report to stderr after it, through `formatConstraintReport`, as `barwise
-  export` does. The deprecation notice stays first on stderr.
+  shall write exactly what `barwise export --format ddl --no-annotate
+  --no-examples` writes to stdout for the same model, and write the
+  constraint report to stderr through the export command's own
+  `reportConstraintSpecs`, which `export.ts` exports for it rather than
+  `schema.ts` keeping a second copy. The deprecation notice stays first on
+  stderr. With `--output`, `schema` writes the file and the report and
+  nothing else: no lineage manifest and no lineage warning, which are
+  `export`'s, and which `schema` never wrote.
 - When `generate_schema` runs with `format: "ddl"` (the default), the tool
-  shall return the same text, and a second content block holding the
-  report when there is one, as `export_model` does. The editor's
-  `barwise_generate_schema` tool wraps `executeSchema` and inherits both.
+  shall return what `executeExportModel(source, "ddl", { annotate: false,
+  includeExamples: false })` returns, by calling it: the DDL block, bounded
+  to a file with a preview when it is large, and the detailed report block
+  when there is one. The bound is a change for a large model, and the one
+  every other generating tool already applies.
+- The editor's `barwise_generate_schema` tool wraps `executeSchema`, and
+  its `toToolResult` joins the two blocks into one text part, the report
+  after the DDL, as it does for `barwise_export_model`
+  (`export-constraint-specs.spec.md`); a vscode test pins it.
 - When either runs with the JSON format, its output shall not change.
-- Each test asserts the ring's verbalization and is watched red with its
-  surface change reverted.
+- Each surface test asserts the specific ring verbalization or the specific
+  clause it is about, and is watched red with its surface change reverted.
 
 Out of scope:
 
@@ -73,35 +86,44 @@ Out of scope:
 
 ## Inventory
 
-| Area                              | Current state                  | Verdict                                  |
-| --------------------------------- | ------------------------------ | ---------------------------------------- |
-| `cli/src/commands/schema.ts`      | `renderDdl(mapper.map(model))` | the `ddl` exporter's text; stderr report |
-| `mcp/src/tools/schema.ts`         | `renderDdl(mapper.map(model))` | the `ddl` exporter's text; second block  |
-| `vscode` `ToolRegistration.ts`    | wraps `executeSchema`          | unchanged: inherits the MCP change       |
-| JSON format on both surfaces      | mapper tables                  | unchanged                                |
-| `formats/src/constraintReport.ts` | shared report text             | reused, unchanged                        |
+| Area                              | Current state                   | Verdict                                       |
+| --------------------------------- | ------------------------------- | --------------------------------------------- |
+| `cli/src/commands/schema.ts`      | `renderDdl(mapper.map(model))`  | the `ddl` exporter text; export stderr report |
+| `cli/src/commands/export.ts`      | `reportConstraintSpecs` private | exported for `schema.ts`                      |
+| `mcp/src/tools/schema.ts`         | `renderDdl(mapper.map(model))`  | delegates to `executeExportModel`             |
+| `vscode` `ToolRegistration.ts`    | wraps `executeSchema`           | unchanged; a test pins the joined report      |
+| JSON format on both surfaces      | mapper tables                   | unchanged                                     |
+| `formats/src/constraintReport.ts` | shared report text              | reused, unchanged                             |
 
 ## What changes for a reader
 
 The DDL these surfaces print changes for every model whose constraints the
 router expresses or spills: it gains the `UNIQUE` and `CHECK` clauses and
-the spill comments `export` already prints. It also gains, for a model
-with validation errors, the exporter's leading `-- Validation warnings:`
-comment block (Open decision 2). WS1 measures the change over every tracked
-model and lists it in the PR; no line `schema` prints today disappears,
-only lines are added.
+the spill comments `export` already prints, and an existing last clause
+gains the comma the next clause needs, so lines change as well as appear.
+Measured at plan review over the tracked models: 43 of 119 lose at least
+one line to that rewrite. A model with validation errors also gains the
+exporter's leading `-- Validation warnings:` comment block (Open decision
+2). A consumer that line-matches `schema` output breaks on those models;
+the surfaces are deprecated and the new text is their replacement's.
 
 ## Workstreams
 
 ### 1. Both surfaces, one PR
 
-A few lines in each surface and their tests: the CLI single-model path and
-the MCP tool, with the ring fixture reused from the export report's tests.
-Acceptance: the ring's verbalization in the CLI's stderr and in the MCP
-second block; the `UNIQUE` clause for a secondary unique value column in
-both DDL texts; JSON output byte-identical before and after over every
-tracked model; DDL output over every tracked model differs only by added
-lines, measured and listed.
+A few lines in each surface, delegating to the export code, and their
+tests, with the ring fixture reused from the export report's tests.
+Acceptance:
+
+- the ring's verbalization in the CLI's stderr, in the MCP report block,
+  and in the editor tool's joined text;
+- the `UNIQUE` clause for a secondary unique value column in the CLI and
+  MCP DDL;
+- `barwise schema --format ddl` stdout byte-identical to `barwise export
+  --format ddl --no-annotate --no-examples` stdout over every tracked
+  model, which is the one-answer claim checked directly;
+- JSON output byte-identical before and after over every tracked model;
+- `schema --output` writes no lineage manifest.
 
 ## Open decisions
 
@@ -125,6 +147,6 @@ lines, measured and listed.
 
 - **A test that cannot fail.** Every surface test asserts the specific
   verbalization or clause, and is watched red with its change reverted.
-- **A consumer pinned to the old text.** The surfaces are deprecated and
-  their notices name the replacement; the added lines are the replacement's
-  own output.
+- **A consumer pinned to the old text.** Lines change on 43 of 119 tracked
+  models. The surfaces are deprecated and their notices name the
+  replacement, whose output the new text is.
