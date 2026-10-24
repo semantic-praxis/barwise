@@ -3,8 +3,9 @@
  * `history` list, each step committed to a throwaway git repository so
  * `barwise history` and `barwise diff` can be run over a real
  * revision walk. Returns the expected delta per step, which is the
- * oracle's ground truth: a rename must show as a rename candidate, a
- * removal as a removal, an added fact type as an addition.
+ * oracle's ground truth: a rename must show as a name change (or, under a
+ * fresh id, a synonym candidate), a removal as a removal, an added fact
+ * type as an addition.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -38,7 +39,14 @@ export function applyChange(doc, change) {
       if (fts.some((f) => f.name === change.name)) {
         throw new Error(`history: add_fact_type name already in the model: ${change.name}`);
       }
-      const id = `ft-hist-${d.model.fact_types.length + 1}`;
+      // An id no fact type holds. Counting fact types reused one: a removal
+      // earlier in the storm shrinks the list, so a later addition took the
+      // id an earlier one still held, and the diff (which pairs a shared id
+      // as one element) read the addition as a change to that one.
+      const held = new Set(d.model.fact_types.map((f) => f.id));
+      let n = d.model.fact_types.length + 1;
+      while (held.has(`ft-hist-${n}`)) n++;
+      const id = `ft-hist-${n}`;
       d.model.fact_types.push({
         id,
         name: change.name,

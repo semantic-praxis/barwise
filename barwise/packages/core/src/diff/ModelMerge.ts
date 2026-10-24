@@ -33,10 +33,12 @@ import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
 import { subtypePairKey, toSubtypeFactConfig } from "../model/SubtypeFact.js";
+import { groupRepeats } from "../util/groupRepeats.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
+import type { DeltaKind } from "./deltas.js";
 import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
 import type {
   ConstraintDelta,
@@ -64,6 +66,7 @@ export function mergeModels(
   deltas: readonly ModelDelta[],
   accepted: ReadonlySet<number>,
 ): OrmModel {
+  refuseNameClashes(deltas, accepted);
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
@@ -327,13 +330,7 @@ export function mergeModels(
 
   for (const [delta, idx] of sfDeltas) {
     const isAccepted = accepted.has(idx);
-    const chosen = delta.kind === "unchanged"
-      ? delta.existing
-      : delta.kind === "added"
-      ? (isAccepted ? delta.incoming : undefined)
-      : delta.kind === "removed"
-      ? (isAccepted ? undefined : delta.existing)
-      : (isAccepted ? delta.incoming : delta.existing);
+    const chosen = keptSide(delta, isAccepted);
     if (!chosen) continue;
     // Keep the existing element's id through an accepted modification,
     // as the object-type and fact-type phases do, so anything holding
@@ -421,13 +418,7 @@ export function mergeModels(
 
   for (const [delta, idx] of popDeltas) {
     const isAccepted = accepted.has(idx);
-    const chosen = delta.kind === "unchanged"
-      ? delta.existing
-      : delta.kind === "added"
-      ? (isAccepted ? delta.incoming : undefined)
-      : delta.kind === "removed"
-      ? (isAccepted ? undefined : delta.existing)
-      : (isAccepted ? delta.incoming : delta.existing);
+    const chosen = keptSide(delta, isAccepted);
     if (!chosen) continue;
 
     // Which model it came from decides both translations: an incoming
@@ -747,6 +738,71 @@ function remapPopulationRoles(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Refuse a merge that would give two object types, or two fact types, one
+ * name, before anything is built.
+ *
+ * The diff pairs a shared id as one element (model invariants, decision
+ * 1), so an accepted addition cannot collide with an id the merge keeps;
+ * what is left is a NAME clash: two elements that exchanged names under
+ * kept ids, with one rename accepted and the other not. Which one should
+ * win is not the merge's call, so it names both and stops, and
+ * `mergeAndValidate` reports it as `merge-error`. Before, `addObjectType`
+ * threw a bare "already exists" halfway through the build, naming one.
+ *
+ * Content-mode deltas are never merged (their callers compare LLM
+ * samples), so nothing here guards an id the content pass left unpaired.
+ */
+function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
+  const kept = deltas.flatMap((d, i) => {
+    if (d.elementType !== "object_type" && d.elementType !== "fact_type") return [];
+    const side = keptSide<{ readonly id: string; readonly name: string; }>(d, accepted.has(i));
+    if (!side) return [];
+    // The id the merged element will carry: an accepted modification
+    // keeps the existing one, which is the id the user can find.
+    const id = d.existing?.id ?? side.id;
+    const why = d.kind === "modified" && side === d.incoming
+      ? `renamed from ${JSON.stringify(d.existing!.name)}`
+      : d.kind === "removed"
+      ? "removed by the incoming model, kept because the removal was not accepted"
+      : d.kind === "added"
+      ? "added"
+      : d.kind === "modified"
+      ? `kept, the rename to ${JSON.stringify(d.incoming!.name)} not accepted`
+      : "unchanged";
+    return [{ kind: d.elementType, name: side.name, label: `${id} (${why})` }];
+  });
+  const clashes = [...groupRepeats(kept, (k) => `${k.kind} ${k.name}`).values()];
+  if (clashes.length === 0) return;
+  const lines = clashes.map((group) =>
+    `${group[0]!.kind.replace("_", " ")} ${JSON.stringify(group[0]!.name)}: `
+    + group.map((k) => k.label).join(", ")
+  );
+  throw new Error(
+    `two elements would take one name: ${lines.join("; ")}. `
+      + "Accept or reject the changes that share a name together, "
+      + "or rename one of them in the base model first.",
+  );
+}
+
+/**
+ * Which side of a delta the merged model keeps, or none: the one rule
+ * every phase that takes an element whole applies, and that
+ * `refuseNameClashes` reads ahead of them.
+ */
+function keptSide<T>(
+  delta: { readonly kind: DeltaKind; readonly existing?: T; readonly incoming?: T; },
+  isAccepted: boolean,
+): T | undefined {
+  return delta.kind === "unchanged"
+    ? delta.existing
+    : delta.kind === "added"
+    ? (isAccepted ? delta.incoming : undefined)
+    : delta.kind === "removed"
+    ? (isAccepted ? undefined : delta.existing)
+    : (isAccepted ? delta.incoming : delta.existing);
+}
 
 /**
  * Add a fact type to the merged model, remapping role player ids

@@ -62,6 +62,8 @@ export interface RoleSummary {
  * consumer would need and could not recover.
  */
 export type ChangeDescription =
+  // --- Object types and fact types, paired by id (model-invariants) ---
+  | { readonly change: "name"; readonly from: string; readonly to: string; }
   // --- Object types ---
   | { readonly change: "kind"; readonly from: ObjectTypeKind; readonly to: ObjectTypeKind; }
   | { readonly change: "referenceMode"; readonly from?: string; readonly to?: string; }
@@ -205,6 +207,8 @@ const NONE = "(none)";
  */
 export function describeChange(change: ChangeDescription): string {
   switch (change.change) {
+    case "name":
+      return `name: "${change.from}" -> "${change.to}"`;
     case "kind":
       return `kind: ${change.from} -> ${change.to}`;
     case "referenceMode":
