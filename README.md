@@ -238,7 +238,7 @@ barwise/
     llm/           @barwise/llm           -- LLM transcript extraction and model review
     code-analysis/ @barwise/code-analysis -- TypeScript/Java/Kotlin code importers
     dbt/           @barwise/dbt           -- dbt project importer/exporter
-    formats/       @barwise/formats       -- DDL/OpenAPI/Avro/NORMA/SQL interop formats
+    formats/       @barwise/formats       -- DDL/OpenAPI/Avro/NORMA/SQL/Ossie interop formats
     learn/         @barwise/learn         -- modeling gym and tutorial renderer
     promptlab/     @barwise/promptlab     -- deterministic prompt evaluation
     cli/           @barwise/cli           -- the barwise command-line tool

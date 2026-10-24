@@ -104,13 +104,13 @@ npx tsc --noEmit            # type-check only
 
 ## Dependencies
 
-| Direction | Package                  | What is used                                                           |
-| --------- | ------------------------ | ---------------------------------------------------------------------- |
-| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, merge, query, lineage |
-| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                          |
-| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                         |
-| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers       |
-| Upstream  | `@barwise/code-analysis` | `registerCodeFormats`; repo analysis for analyze_repository            |
-| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                             |
-| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL descriptors)     |
-| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator) for gym_list / gym_check    |
+| Direction | Package                  | What is used                                                             |
+| --------- | ------------------------ | ------------------------------------------------------------------------ |
+| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, merge, query, lineage   |
+| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                            |
+| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                           |
+| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers         |
+| Upstream  | `@barwise/code-analysis` | `registerCodeFormats`; repo analysis for analyze_repository              |
+| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                               |
+| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL/Ossie descriptors) |
+| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator) for gym_list / gym_check      |

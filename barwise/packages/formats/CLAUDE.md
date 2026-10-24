@@ -1,7 +1,7 @@
 # @barwise/formats
 
 Standard interop format descriptors for ORM models: DDL, OpenAPI, Avro,
-NORMA, and SQL. These are the formats core used to ship as "builtins".
+NORMA, SQL, and Apache Ossie ontologies. These are the formats core used to ship as "builtins".
 They now register from outside core through the `FormatDescriptor`
 registry, the same connector convention as `@barwise/code-analysis` and
 `@barwise/dbt`, so `@barwise/core` ships no interop format -- only the
@@ -28,7 +28,7 @@ absent).
 ```
 src/
   index.ts                       Public API
-  registration.ts                The 5 descriptors + registerStandardFormats()
+  registration.ts                The 6 descriptors + registerStandardFormats()
   ddl/DdlImportFormat.ts         SQL DDL -> ORM
   ddl/DdlExportFormat.ts         ORM -> SQL DDL (wraps renderDdl; applies the
                                  dialect constraint routing as a text pass)
@@ -51,9 +51,15 @@ src/
   norma/NormaXmlParser.ts        NORMA XML parsing (fast-xml-parser)
   norma/NormaToOrmMapper.ts      NORMA document -> ORM model
   norma/NormaXmlTypes.ts         NORMA XML types
+  ossie/OssieTypes.ts            The Ossie document shape, the pinned version, built-ins
+  ossie/parseOssie.ts            Ossie ontology YAML -> OssieDocument (version pin)
+  ossie/mapOssieToOrm.ts         OssieDocument -> ORM model + warnings
+  ossie/requiresShapes.ts        The requires expressions read as constraints
+  ossie/OssieImportFormat.ts     The importer adapter
 tests/
   helpers/ModelBuilder.ts  Fluent model builder (test-only)
   fixtures/*.orm           NORMA XML fixtures
+  fixtures/ossie/          The pinned Apache Ossie example (Apache-2.0 header kept)
   *.test.ts                Mirrors src/
 ```
 

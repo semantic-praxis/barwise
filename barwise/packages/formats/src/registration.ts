@@ -1,7 +1,7 @@
 /**
  * Format registration for the standard interop descriptors.
  *
- * Bundles the DDL, OpenAPI, Avro, NORMA, and SQL importers/exporters into
+ * Bundles the DDL, OpenAPI, Avro, NORMA, SQL, and Ossie importers/exporters into
  * `FormatDescriptor`s and registers them with the unified registry from
  * `@barwise/core`. These are the formats core used to ship as "builtins";
  * they now register from outside core like every other connector, so core
@@ -16,6 +16,7 @@ import { NormaExportFormat } from "./norma/NormaExportFormat.js";
 import { NormaImportFormat } from "./norma/NormaImportFormat.js";
 import { OpenApiExportFormat } from "./openapi/OpenApiExportFormat.js";
 import { OpenApiImportFormat } from "./openapi/OpenApiImportFormat.js";
+import { OssieImportFormat } from "./ossie/OssieImportFormat.js";
 import { SqlImportFormat } from "./sql/SqlImportFormat.js";
 
 /** DDL format: bidirectional (import SQL CREATE TABLE, export DDL). */
@@ -61,6 +62,17 @@ export const normaFormat: FormatDescriptor = {
 };
 
 /**
+ * Apache Ossie ontology format: import only until the exporter lands
+ * (`docs/specs/ossie-ontology-format.spec.md`, WS2).
+ */
+export const ossieFormat: FormatDescriptor = {
+  name: "ossie",
+  description: "Apache Ossie ontology documents (YAML)",
+  extension: "yaml",
+  importer: new OssieImportFormat(),
+};
+
+/**
  * Register the standard interop format descriptors with the registry.
  *
  * Call this at tool startup (CLI main, MCP server init, etc.), alongside
@@ -74,6 +86,7 @@ export function registerStandardFormats(): void {
     avroFormat,
     sqlFormat,
     normaFormat,
+    ossieFormat,
   ];
 
   for (const descriptor of formats) {

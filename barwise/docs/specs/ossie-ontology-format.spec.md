@@ -1,10 +1,11 @@
 # Apache Ossie ontology import and export
 
-Status: Draft -- no workstream implemented
+Status: In progress -- WS1 (import) implemented; WS2 (export) provisional, not started
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
 Tracking: barwise-pf2.1
+Plan-reviewed: 9a7009d1 (code-review, pr-review)
 Touches: +barwise/packages/formats/src/ossie/,
 barwise/packages/formats/src/registration.ts,
 barwise/packages/formats/src/index.ts,

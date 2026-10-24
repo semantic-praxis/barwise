@@ -4,6 +4,7 @@ export {
   ddlFormat,
   normaFormat,
   openApiFormat,
+  ossieFormat,
   registerStandardFormats,
   sqlFormat,
 } from "./registration.js";
@@ -17,4 +18,6 @@ export { NormaImportFormat } from "./norma/NormaImportFormat.js";
 export { NormaImportError } from "./norma/NormaXmlImporter.js";
 export { OpenApiExportFormat } from "./openapi/OpenApiExportFormat.js";
 export { OpenApiImportFormat } from "./openapi/OpenApiImportFormat.js";
+export { OssieImportFormat } from "./ossie/OssieImportFormat.js";
+export { OssieImportError } from "./ossie/OssieTypes.js";
 export { SqlImportFormat } from "./sql/SqlImportFormat.js";

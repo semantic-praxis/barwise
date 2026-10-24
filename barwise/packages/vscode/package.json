@@ -682,13 +682,14 @@
                 "ddl",
                 "openapi",
                 "norma",
+                "ossie",
                 "dbt",
                 "sql",
                 "typescript",
                 "java",
                 "kotlin"
               ],
-              "description": "The import format: ddl, openapi, norma, dbt, sql, typescript, java, or kotlin"
+              "description": "The import format: ddl, openapi, norma, ossie, dbt, sql, typescript, java, or kotlin"
             },
             "modelName": {
               "type": "string",
