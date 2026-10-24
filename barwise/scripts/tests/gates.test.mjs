@@ -5230,6 +5230,7 @@ function archPlanted(dir, rel, edit) {
 }
 
 const CLAUDE_LLM = "@barwise/llm             (core)";
+const ROOT_ROW = "@barwise/core               (no internal deps)";
 const MCP_ROW =
   "  |--- @barwise/mcp             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn)";
 const CORE_PKG = "barwise/packages/core/package.json";
@@ -5387,7 +5388,7 @@ test("check:architecture passes the real graph and catches each planted disagree
           ),
         (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   embedded by barwise-vscode (in-process)`),
         (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   barwise-vscode (and CLI) embed it`),
-        (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   @xyflow/react (MIT) is not used here`),
+        (x) => x.replace(ROOT_ROW, `${ROOT_ROW}  -- the kernel`),
         (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |        -- providers (Anthropic, OpenAI)`),
         (x) =>
           x.replace(
@@ -5464,7 +5465,6 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
     // a misdrawn or nested connector, a second root, a legend above the
     // root, box-drawing characters, a row with no space before its list.
     const LLM_ROW = `  |--- ${CLAUDE_LLM}`;
-    const ROOT_ROW = "@barwise/core               (no internal deps)";
     for (
       const [from, to, line] of [
         [
@@ -5481,10 +5481,21 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
         [LLM_ROW, `${LLM_ROW} extra`, /\(core\) extra/],
         [LLM_ROW, "  |---------- connectors ----------", /\|---------- connectors/],
         [LLM_ROW, `${LLM_ROW}\n\n@barwise/planned            (core)`, /@barwise\/planned/],
+        // A row that lost its connector, in any spelling, is not prose.
+        [LLM_ROW, `${LLM_ROW}\n  |   @barwise/planned   (core)`, /\|   @barwise\/planned/],
+        [LLM_ROW, `${LLM_ROW}\n  @barwise/planned   (core)`, /"@barwise\/planned/],
+        [LLM_ROW, `${LLM_ROW}\n  |   barwise-planned (core)`, /\|   barwise-planned/],
+        [LLM_ROW, `${LLM_ROW}\n  |   @xyflow/react (MIT) is not used here`, /@xyflow\/react/],
+        [LLM_ROW, "  '--- @barwise/llm   (core)", /'--- @barwise\/llm/],
+        [LLM_ROW, "  ^--- @barwise/llm   (core)", /\^--- @barwise\/llm/],
+        [LLM_ROW, `        |--- ${CLAUDE_LLM}`, /\|--- @barwise\/llm/],
+        // A name or list the grammar cannot read.
+        [LLM_ROW, "  |--- `@barwise/llm`   (core)", /\|--- `@barwise\/llm`/],
+        [LLM_ROW, "  |--- @barwise/llm   (core; diagram)", /\(core; diagram\)/],
       ]
     ) {
       const r = archPlanted(dir, "CLAUDE.md", (s) => s.replace(from, to));
-      refused(r, /the graph block line ".*" is not a row/);
+      refused(r, /the graph block line ".*" is not one the grammar allows/);
       assert.match(r.stderr, line);
     }
     refused(
@@ -5493,14 +5504,14 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
         "CLAUDE.md",
         (s) => s.replace(ROOT_ROW, `Legend: an arrow (^) points at a dependency\n${ROOT_ROW}`),
       ),
-      /the graph block must open with its root row .*not "Legend/,
+      /the graph block must open with the root line, not "Legend/,
     );
     // A legend shaped like a root row (`Legend (x)`) is taken for the root,
     // and the real root line is then refused: exit 2 either way, never
     // compared.
     refused(
       archPlanted(dir, "CLAUDE.md", (s) => s.replace(ROOT_ROW, `Legend (arrows)\n${ROOT_ROW}`)),
-      /the graph block line "@barwise\/core\s+\(no internal deps\)" is not a row/,
+      /the graph block line "@barwise\/core\s+\(no internal deps\)" is not one the grammar/,
     );
     const shapeFault = /does not export a map of package to package list/;
     for (const bad of [`"core": [[]]`, `"core": "none"`]) {

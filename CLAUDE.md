@@ -182,11 +182,10 @@ This block is a rendering for readers. The authority is `INTENDED` in
 `barwise/scripts/lib/intended.cjs`, the map dependency-cruiser enforces;
 `npm run check:architecture` fails when this block, or a package's
 runtime `dependencies`, disagrees with it, so change both in one commit.
-The block has a grammar the check reads: the root line, rows drawn
-`|--- name (a, b)` with an optional `  -- comment`, drawing lines of `|`
-and `^`, and indented comment text, which is never read. Any other line
-is refused by name, because a drawing without that syntax was misread
-five different ways.
+Draw it to the grammar in `barwise/scripts/check-architecture.mjs`
+(`GRAMMAR`): a line outside it is refused by name, and the refusal
+prints the grammar. It exists because a drawing with no syntax
+separating rows from comments was misread five different ways.
 
 The one thing outside that graph is `barwise/optimizer/`: the DSPy
 prompt-optimization lane. It is Python, it is dev-time only, and it

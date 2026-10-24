@@ -51,31 +51,33 @@ const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !==
 
 /**
  * The CLAUDE.md block, as package name to the names it lists, read by a
- * declared grammar. Every line is exactly one of:
+ * declared grammar -- GRAMMAR below, which is also the refusal message, so
+ * the rule a reader is told is the rule that is enforced. Any line outside
+ * it is refused (exit 2) with the line named.
  *
- *   root          the first line:       `name (no internal deps)`
- *   row           `|--- name (a, b)`, optionally followed by `  -- comment`
- *   drawing       only `|`, `^` and spaces
- *   continuation  indented text, after an optional `|`, opening with a word
- *                 or `-- ` -- never read
- *
- * and anything else is refused (exit 2) with the line named. Five
- * heuristics for telling hand-drawn rows from prose were tried first, and
- * each misread a realistic edit -- a nested connector skipped, a comment
- * that opened with a package name read as a second listing, a legend read
- * as a package -- because the drawing had no syntax that separated the
- * two. A grammar gives it one: the reader of a refusal learns the rule
- * from the message, where a heuristic fails as a wrong answer.
+ * Five heuristics for telling hand-drawn rows from prose were tried first,
+ * and each misread a realistic edit -- a nested connector skipped, a
+ * comment that opened with a package name read as a second listing, a
+ * legend read as a package -- because the drawing had no syntax that
+ * separated the two. A grammar gives it one, and the thing it must never
+ * do is read a misdrawn row as prose. So comment text opens with a letter
+ * or `(`, never a symbol (`'---`, `@x`, box-drawing), and is refused when
+ * it has a row's shape (`name (a, b)`): that is a row that lost its
+ * connector.
  */
-const ROOT = /^(\S+)\s+\(([^)]*)\)\s*$/;
-const ROW = /^\s*\|---\s+(\S+)\s+\(([^)]*)\)(?:\s+--\s.*)?\s*$/;
+const NAME = String.raw`[@\w](?:[\w@/.-]*\w)?`;
+const LIST = String.raw`\(([\w@/.\-, ]*)\)`;
+const COMMENT = String.raw`(?:\s+--\s.*)?\s*$`;
+const ROOT = new RegExp(String.raw`^(${NAME})\s+${LIST}${COMMENT}`);
+// At most two spaces in: a connector indented further is a nested child,
+// which the grammar does not draw.
+const ROW = new RegExp(String.raw`^\s{0,2}\|---\s+(${NAME})\s+${LIST}${COMMENT}`);
 const DRAWING = /^[\s|^]*$/;
-// Its text opens with a word or a `-- ` comment marker, never with a drawing
-// character, so a misdrawn connector (`+---`, `|----`, a nested `|  |---`,
-// box-drawing characters) is refused rather than taken for prose.
-const CONTINUATION = /^\s*\|?\s{2,}(?:[^\s|+`\\\-\u2500-\u257f]|-- )/;
-const GRAMMAR =
-  "a row (`|--- name (a, b)  -- comment`), a drawing line (`|`, `^`) or an indented comment";
+const CONTINUATION = /^\s*\|?\s{2,}([A-Za-z(].*|-- .*)$/;
+const ROW_SHAPED = new RegExp(String.raw`^${NAME}\s+\([^)]*\)${COMMENT}`);
+const GRAMMAR = "the root line (`name (no internal deps)`); rows (`|--- name (a, b)`, at most"
+  + " two spaces in), either with an optional `  -- comment`; drawing lines (`|`, `^`); and"
+  + " indented comment text opening with a letter, `(` or `-- `, never shaped like a row";
 
 function graphLines(claudeMd) {
   const lines = claudeMd.split("\n");
@@ -104,17 +106,22 @@ function graphLines(claudeMd) {
       const m = ROOT.exec(line);
       if (!m) {
         throw new Error(
-          `the graph block must open with its root row (\`name (no internal deps)\`), not "${line.trim()}"`,
+          `the graph block must open with the root line, not "${line.trim()}"; it allows ${GRAMMAR}`,
         );
       }
       out.push(listed(m[1], m[2]));
       continue;
     }
     const m = ROW.exec(line);
-    if (m) out.push(listed(m[1], m[2]));
-    else if (!DRAWING.test(line) && !CONTINUATION.test(line)) {
-      throw new Error(`the graph block line "${line.trim()}" is not ${GRAMMAR}`);
+    if (m) {
+      out.push(listed(m[1], m[2]));
+      continue;
     }
+    const text = CONTINUATION.exec(line)?.[1];
+    if (DRAWING.test(line) || (text !== undefined && !ROW_SHAPED.test(text))) continue;
+    throw new Error(
+      `the graph block line "${line.trim()}" is not one the grammar allows: ${GRAMMAR}`,
+    );
   }
   if (out.length === 0) throw new Error("the Dependency Graph block names no package");
   return out;
