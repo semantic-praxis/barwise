@@ -521,7 +521,7 @@ describe("Ossie export: the loss report", () => {
     expect(losses).toEqual(expect.arrayContaining([
       "String: written as String_, a name Ossie can read back",
       "String: aliases Str not written",
-      "fact type A.tag: has no uniqueness; Ossie's set semantics give it one spanning every role",
+      "fact type A.tag: has no uniqueness spanning every role; Ossie's set semantics add one",
     ]));
   });
 
@@ -542,6 +542,56 @@ ontology:
       roles: [{ concept: "Org" }],
       verbalizes: ["{Org.Unit} is part of {Org}"],
     });
+  });
+
+  it("names each remaining shape that would read back differently (the third review round)", () => {
+    const m = new OrmModel({ name: "M", note: "requires: a  b\nHello" });
+    // An identifier binary with no near-role uniqueness: no multiplicity, so
+    // the importer adds a spanning uniqueness this fact type never had.
+    const p = entity(m, "Person", "has");
+    const nm = value(m, "Name");
+    const has = fact(m, "Person.has", [p, nm], "{0} has {1}", { uc: [[1]] });
+    m.setPreferredIdentifier(p.id, has.internalConstraints[0]!.id!);
+    // A subtype identified through its supertype, with its own reference mode.
+    const emp = entity(m, "Employee", "emp_nr");
+    m.addSubtypeFact({
+      id: "s",
+      subtypeId: emp.id,
+      supertypeId: p.id,
+      providesIdentification: true,
+    });
+    // A built-in no role uses, contradictory bounds, a repeated mandatory,
+    // a spanning uniqueness beside a written multiplicity, a single-role
+    // external uniqueness, and a derivation with extra blank lines.
+    value(m, "String");
+    value(m, "Age", { name: "integer" }, {
+      valueConstraint: { values: [], ranges: [{ min: "10", max: "5" }] },
+    });
+    const q = entity(m, "Q");
+    const lbl = value(m, "Lbl");
+    const r = fact(m, "Q.r", [q, lbl], "{0} has {1}", { uc: [[0], [0, 1]], mandatory: [0, 0] });
+    m.addConstraint({ type: "external_uniqueness", id: "solo", roleIds: [r.roles[1]!.id] });
+    const z = entity(m, "Z");
+    m.addFactType({
+      id: "zd",
+      name: "Z.busy",
+      roles: [{ id: "zr", name: "Z", playerId: z.id }],
+      readings: ["{0} is busy"],
+      derivation: { kind: "derived", expression: "a\n\n\n\nb" },
+    });
+    const { losses, result } = exported(m);
+    expect(losses).toEqual(expect.arrayContaining([
+      "fact type Person.has: has no uniqueness spanning every role; Ossie's set semantics add one",
+      "Employee: reference mode emp_nr not written",
+      "String: a built-in no role uses is not written; Ossie declares none",
+      "Age: value constraint is not a shape Ossie's requires can state",
+      "fact type Q.r: a second mandatory on the same role not written",
+      "fact type Q.r: internal_uniqueness is not expressible in Ossie",
+      "constraint solo: external_uniqueness is not expressible in Ossie",
+      "fact type Z.busy: derivation text comes back with its blank lines normalized",
+      "model: note comes back reordered or with its whitespace collapsed",
+    ]));
+    expect(() => importer.parse(result.text)).not.toThrow();
   });
 
   it("keeps the comment block one line per loss, whatever the lost text holds", () => {

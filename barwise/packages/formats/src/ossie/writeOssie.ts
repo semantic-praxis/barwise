@@ -185,7 +185,11 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   const supertypes = subtypeLinks(model, nameOf, identifyBy, lose);
 
   const ontology: OssieConcept[] = [];
+  const played = new Set(written.flatMap((w) => w.ft.roles.map((r) => r.playerId)));
   for (const ot of model.objectTypes) {
+    if (isBuiltin(ot.id) && !played.has(ot.id)) {
+      lose(ot.name, "a built-in no role uses is not written; Ossie declares none");
+    }
     if (isBuiltin(ot.id)) continue;
     ontology.push(writeConcept(ot, {
       model,
@@ -214,6 +218,19 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   }
 
   const { description, requires } = splitNote(model.note);
+  {
+    // The importer writes the description, then the requires lines.
+    const lines = (model.note ?? "").split("\n");
+    const firstRequires = lines.findIndex((l) => l.startsWith(REQUIRES_NOTE_PREFIX));
+    const descriptionAfter = firstRequires >= 0
+      && lines.slice(firstRequires).some((l) => !l.startsWith(REQUIRES_NOTE_PREFIX) && l.trim());
+    const untidy = lines.some((l) =>
+      l.startsWith(REQUIRES_NOTE_PREFIX) && l !== l.replace(/\s+/g, " ").trimEnd()
+    );
+    if (descriptionAfter || untidy) {
+      lose("model", "note comes back reordered or with its whitespace collapsed");
+    }
+  }
   for (const line of requires.filter((r) => r.trim() === "")) {
     lose("model", `empty note line not written: ${line}`);
   }
@@ -431,7 +448,9 @@ function compositeIdentifier(
     }
     rels.push(w.name);
   }
-  return rels.length > 0 ? rels : undefined;
+  // One relationship would read back as a single identifier, not this
+  // external uniqueness.
+  return rels.length >= 2 ? rels : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -472,18 +491,34 @@ function writeRelationship(
     }
   }
 
-  if (ucs.length === 0) {
-    lose(element, "has no uniqueness; Ossie's set semantics give it one spanning every role");
+  let mandatoryWritten = false;
+  // With no multiplicity written, the importer adds a uniqueness spanning
+  // every role (set semantics); with one written, it adds only that one.
+  const spanning = ucs.find((c) => c.type === "internal_uniqueness" && c.roleIds.length === n);
+  if (multiplicity === undefined && !spanning) {
+    lose(element, "has no uniqueness spanning every role; Ossie's set semantics add one");
   }
   for (const c of ft.internalConstraints) {
     if (covered.has(c.id!)) continue;
-    if (c.type === "internal_uniqueness" && (c.roleIds.length === n || n === 1)) continue; // implied
-    if (c.type === "mandatory" && position(c.roleId) === 0 && addMandatory(w.name)) continue;
+    if (c === spanning && multiplicity === undefined) continue; // implied, and read back
+    if (c.type === "mandatory" && position(c.roleId) === 0) {
+      if (mandatoryWritten) {
+        lose(element, "a second mandatory on the same role not written");
+        continue;
+      }
+      if (addMandatory(w.name)) {
+        mandatoryWritten = true;
+        continue;
+      }
+    }
     loseConstraint([c, ft], element, `${c.type} is not expressible in Ossie`);
   }
 
   const readings = ft.readings.map((r) => reading(r.template, w, nameOf, element, lose));
   const { requires, derivedBy: noteDerivedBy, rest } = splitNoteLines(ft.note);
+  if (!noteReadsBack(ft.note)) {
+    lose(element, "note comes back reordered or with its whitespace collapsed");
+  }
   for (const line of rest) lose(element, `note line not written: ${line}`);
   for (const line of noteDerivedBy) lose(element, `note line not written: derived_by: ${line}`);
   const derivation = ft.derivation;
@@ -492,6 +527,15 @@ function writeRelationship(
   }
   if (derivation?.storage === "derived_and_stored") {
     lose(element, "stored derivation written as on request");
+  }
+  const derivedItems = derivation ? splitDerivation(derivation.expression) : [];
+  if (derivation && derivedItems.join(DERIVATION_ITEM_SEPARATOR) !== derivation.expression) {
+    lose(
+      element,
+      derivedItems.length === 0
+        ? "an empty derivation is not written; the fact type reads back as asserted"
+        : "derivation text comes back with its blank lines normalized",
+    );
   }
 
   const roles = order.slice(1).map((i, p) => ({
@@ -503,7 +547,7 @@ function writeRelationship(
     ...(ft.definition ? { description: ft.definition } : {}),
     ...(roles.length > 0 ? { roles } : {}),
     ...(multiplicity ? { multiplicity } : {}),
-    ...(derivation ? { derived_by: splitDerivation(derivation.expression) } : {}),
+    ...(derivedItems.length > 0 ? { derived_by: derivedItems } : {}),
     ...(requires.length > 0 ? { requires } : {}),
     verbalizes: readings,
   };
@@ -562,6 +606,9 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
   if (ot.sourceContext) lose(ot.name, `source context ${ot.sourceContext} not written`);
   const { requires: noteRequires, derivedBy: noteDerivedBy, rest } = splitNoteLines(ot.note);
   for (const line of rest) lose(ot.name, `note line not written: ${line}`);
+  if (!noteReadsBack(ot.note)) {
+    lose(ot.name, "note comes back reordered or with its whitespace collapsed");
+  }
 
   const base = {
     concept: name,
@@ -609,6 +656,8 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
   );
   if (!identified && !identifiedBySupertype) {
     lose(ot.name, `no identifier Ossie can state; reference mode ${ot.referenceMode} not written`);
+  } else if (!identified && ot.referenceMode !== `${snakeCase(name)}_id`) {
+    lose(ot.name, `reference mode ${ot.referenceMode} not written`);
   }
   // The importer reads a single identifier's name back as the reference
   // mode, and gives a composite one `<snake_name>_id`; any other is lost.
@@ -654,12 +703,22 @@ function valueConstraintItems(
 ): string[] {
   if (ot.kind !== "value" || !ot.valueConstraint) return [];
   const { values, ranges = [] } = ot.valueConstraint;
+  let items: string[] | undefined;
   if (values.length > 0 && ranges.length === 0) {
     const item = writeEnumeration(name, values);
-    if (item) return [item];
+    items = item ? [item] : undefined;
   } else if (values.length === 0 && ranges.length === 1) {
-    const items = writeBounds(name, ranges[0]!);
-    if (items) return items;
+    items = writeBounds(name, ranges[0]!);
+  }
+  // Written only if read back as itself: contradictory bounds, for one,
+  // read back as text.
+  if (items) {
+    const back = readValueShapes(name, items);
+    const range = ranges[0];
+    const expected = values.length > 0
+      ? { values, ranges: [] }
+      : { values: [], ranges: range ? [normalRange(range)] : [] };
+    if (back.unrecognized.length === 0 && sameShapes(back, expected)) return items;
   }
   lose(ot.name, "value constraint is not a shape Ossie's requires can state");
   return [];
@@ -688,6 +747,9 @@ function subtypeLinks(
       );
     }
     const items = sf.definingRule ? splitDerivation(sf.definingRule.expression) : [];
+    if (sf.definingRule && items.join(DERIVATION_ITEM_SEPARATOR) !== sf.definingRule.expression) {
+      lose(sub, "defining rule text comes back normalized, or not at all if empty");
+    }
     if (entry.names.length === 0) {
       entry.derivedBy = items;
     } else if ((entry.derivedBy ?? []).join("\n") !== items.join("\n")) {
@@ -712,6 +774,16 @@ function subtypeLinks(
 // Text
 // ---------------------------------------------------------------------------
 
+/** A range with the importer's spelling of inclusiveness, for comparison. */
+function normalRange(
+  r: { min?: string; max?: string; minInclusive?: boolean; maxInclusive?: boolean; },
+) {
+  return {
+    ...(r.min !== undefined ? { min: r.min, minInclusive: r.minInclusive !== false } : {}),
+    ...(r.max !== undefined ? { max: r.max, maxInclusive: r.maxInclusive !== false } : {}),
+  };
+}
+
 function sameShapes(
   a: { values: readonly string[]; ranges: readonly unknown[]; },
   b: { values: readonly string[]; ranges: readonly unknown[]; },
@@ -721,6 +793,25 @@ function sameShapes(
 
 function splitDerivation(expression: string): string[] {
   return expression.split(DERIVATION_ITEM_SEPARATOR).filter((e) => e.trim().length > 0);
+}
+
+/**
+ * Whether the importer would rebuild this note as it is: it writes each
+ * expression on one line with its whitespace collapsed, `requires` lines
+ * before `derived_by` lines.
+ */
+function noteReadsBack(note: string | undefined): boolean {
+  const lines = (note ?? "").split("\n").filter((l) => l.trim().length > 0);
+  const kinds = lines.map((l) =>
+    l.startsWith(REQUIRES_NOTE_PREFIX) ? 0 : l.startsWith(DERIVED_BY_NOTE_PREFIX) ? 1 : 2
+  );
+  const ordered = kinds.every((k, i) =>
+    i === 0 || k === 2 || kinds[i - 1] === 2 || kinds[i - 1]! <= k
+  );
+  const tidy = lines.every((l) =>
+    !/^(requires|derived_by): /.test(l) || l === l.replace(/\s+/g, " ").trimEnd()
+  );
+  return ordered && tidy;
 }
 
 function splitNoteLines(note: string | undefined): {
