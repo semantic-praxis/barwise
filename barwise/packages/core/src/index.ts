@@ -131,7 +131,13 @@ export {
   type ValueRange,
   type ValueType,
 } from "./model/ObjectType.js";
-export { type ConstraintInView, OrmModel, type OrmModelConfig } from "./model/OrmModel.js";
+export {
+  type ConstraintInView,
+  DuplicateIdError,
+  type IdKeyedKind,
+  OrmModel,
+  type OrmModelConfig,
+} from "./model/OrmModel.js";
 export {
   type ExportFormat,
   OrmProject,

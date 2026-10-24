@@ -27,15 +27,23 @@
  * parses to nothing must not read as "no edges, so none missing"
  * (docs/specs/gate-refusal-contract.spec.md).
  *
- * `--root <dir>` reads CLAUDE.md, barwise/scripts/lib/intended.cjs and
- * barwise/packages/* from another tree, for this check's own tests;
- * nothing else passes it.
+ * It also checks the ADRs (WS2): each one's shape, and that every reference
+ * to an ADR resolves -- see ADR_REF and citesAdrs below. Those inputs come
+ * from the tracked listing, so the check needs git; no ADR at all is exit 2.
+ *
+ * `--root <dir>` reads CLAUDE.md, barwise/scripts/lib/intended.cjs,
+ * barwise/packages/* and the tracked files of another git tree, for this
+ * check's own tests; nothing else passes it.
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { opt } from "./lib/args.mjs";
+import { uncommittedPaths } from "./lib/changed-class.mjs";
+import { isInstructionFile } from "./lib/instruction-files.mjs";
+import { header, inSpecCorpus, touches } from "./lib/spec-reader.mjs";
 
 /**
  * Runtime dependency fields: each is installed and resolved when the
@@ -43,6 +51,37 @@ import { opt } from "./lib/args.mjs";
  * see. `devDependencies` alone is left out (see the header).
  */
 const RUNTIME = ["dependencies", "peerDependencies", "optionalDependencies"];
+
+/**
+ * ADRs (WS2): one file per concern under `barwise/docs/adr/`, edited in
+ * place, so a name is the whole identity of a decision and a dead name is
+ * a decision an agent can no longer find. A reference takes one of the two
+ * current forms; a number such as "ADR 0001" is neither, which is why the
+ * dated records that still use numbers need no exemption.
+ */
+const ADR_DIR = "barwise/docs/adr/";
+// One line break may sit between `ADR` and the name -- dprint reflows prose,
+// and a reference split at the wrap would otherwise never be read -- with a
+// quote or comment marker (`>`, `*`, `#`, `//`) after it, but not a blank
+// line; and `ADR` is a whole word (not the tail of `MADR`).
+const ADR_REF =
+  /\bADR[ \t]*(?:\r?\n[ \t]*(?:[>*#]|\/\/)?[ \t]*)?`([a-z0-9][a-z0-9-]*)`|docs\/adr\/([a-z0-9][a-z0-9-]*)\.md/g;
+const SCOPES = ["architecture", "process"];
+const isAdr = (f) => f.startsWith(ADR_DIR) && f.endsWith(".md") && !f.endsWith("/README.md");
+/**
+ * The files whose ADR references are read: a named set, not "everything
+ * but". Instruction files, the docs (specs included) and package files act
+ * on a decision. History is left out, under the docs and the packages
+ * alike -- the tracker, eval runs and payloads, archives and dated records
+ * (a date in the path) -- because history may name
+ * what no longer exists, and the old numbered forms are not read anyway.
+ */
+const DATED = /\d{4}-\d{2}-\d{2}/;
+const HISTORY = /\/(archive|eval-runs|eval-payloads)\//;
+const citesAdrs = (f) =>
+  isInstructionFile(f)
+  || (((f.startsWith("barwise/docs/") && f.endsWith(".md")) || f.startsWith("barwise/packages/"))
+    && !HISTORY.test(f) && !DATED.test(f));
 
 const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
@@ -150,13 +189,11 @@ function graphLines(claudeMd) {
   return out;
 }
 
-let intended, drawnLines, manifests;
+let intended, drawnLines, manifests, adrs, citing, root;
 try {
   // Inside the refusal: a bare `--root` throws, and that is "could not
   // answer", not the exit 1 a real disagreement uses.
-  const root = resolve(
-    opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."),
-  );
+  root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
   const intendedPath = join(root, "barwise", "scripts", "lib", "intended.cjs");
   intended = createRequire(import.meta.url)(intendedPath);
   const shape = isMap(intended) && Object.keys(intended).length > 0
@@ -197,6 +234,39 @@ try {
   const clash = repeated(names);
   if (clash.length > 0) throw new Error(`two package manifests are named ${clash.join(", ")}`);
   drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"));
+  // ADRs and the files that cite them both come from the tracked listing of
+  // `root` -- the tree CI checks -- and always `git -C root`, so the list and
+  // the files read are one tree whatever the cwd. An ADR on disk but not yet
+  // staged is named as unchecked, not silently counted.
+  const git = (...args) =>
+    execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).split("\0").filter(Boolean);
+  const tracked = git("ls-files", "-z");
+  if (tracked.length === 0) throw new Error(`git ls-files lists nothing under ${root}`);
+  // A tracked path that is not a regular file on disk is one being deleted,
+  // or a symlink or gitlink: it is not read, because reading it would turn
+  // the run into exit 2 and hide the references a deletion left dead.
+  const isFile = (p) => {
+    try {
+      return lstatSync(p).isFile();
+    } catch {
+      return false;
+    }
+  };
+  const read = (fs) =>
+    fs.filter((f) => isFile(join(root, f))).map((f) => ({
+      f,
+      text: readFileSync(join(root, f), "utf8"),
+    }));
+  adrs = read(tracked.filter(isAdr));
+  // Zero ADRs is a listing that went wrong, not a tree with nothing to check.
+  if (adrs.length === 0) throw new Error(`no ADR under ${join(root, ADR_DIR)}`);
+  citing = read(tracked.filter(citesAdrs));
+  // The shared listing of uncommitted paths (check:git-listing refuses a
+  // hand-written one); those not tracked are the untracked ones.
+  const inTree = new Set(tracked);
+  for (const f of uncommittedPaths(root)) {
+    if (isAdr(f) && !inTree.has(f)) console.log(`check:architecture: unchecked (untracked): ${f}`);
+  }
 } catch (err) {
   console.error(`check:architecture: cannot answer -- ${err.message}`);
   process.exit(2);
@@ -271,6 +341,45 @@ for (const { dir, json } of manifests) {
   }
 }
 
+// Each ADR's shape: the two header fields and the section the index
+// reads. `Date:` is checked for form only; whether an edit changed the
+// decision is a judgment for review (the spec, "Date:").
+const adrProblems = [];
+for (const { f, text } of adrs) {
+  const scope = header(text, "Scope");
+  if (scope === undefined) adrProblems.push(`${f}: no Scope: line`);
+  else if (!SCOPES.includes(scope)) {
+    adrProblems.push(`${f}: Scope: ${scope} is not one of ${SCOPES.join(", ")}`);
+  }
+  const date = header(text, "Date");
+  if (date === undefined) adrProblems.push(`${f}: no Date: line`);
+  else if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    adrProblems.push(`${f}: Date: ${date || "(empty)"} is not YYYY-MM-DD`);
+  }
+  if (!/^## Decision\s*$/m.test(text)) adrProblems.push(`${f}: no "## Decision" section`);
+}
+// Every reference names an ADR that exists, or one the citing spec plans
+// to create or retire in its Touches: (`+` or `-`), so a spec may name the
+// ADR its own PR adds or deletes.
+const adrNames = new Set(adrs.map((a) => a.f.slice(ADR_DIR.length, -".md".length)));
+for (const { f, text } of citing) {
+  const declared = new Set(
+    (inSpecCorpus(f) ? touches(text) ?? [] : [])
+      .filter((e) => e.mark !== "" && isAdr(e.path))
+      .map((e) => e.path.slice(ADR_DIR.length, -".md".length)),
+  );
+  // Lines counted in one pass: matches arrive in order.
+  let line = 1;
+  let at = 0;
+  for (const m of text.matchAll(ADR_REF)) {
+    for (; at < m.index; at++) if (text[at] === "\n") line++;
+    const name = m[1] ?? m[2];
+    if (!adrNames.has(name) && !declared.has(name)) {
+      adrProblems.push(`${f}:${line}: names ADR ${name}, and ${ADR_DIR}${name}.md does not exist`);
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error(`check:architecture: FAIL -- ${problems.length} disagreement(s) with INTENDED:`);
   for (const p of problems) console.error(`  ${p}`);
@@ -278,9 +387,18 @@ if (problems.length > 0) {
     "INTENDED (barwise/scripts/lib/intended.cjs) is the authority: fix the copy, or change"
       + " INTENDED and every copy in the same commit.",
   );
-  process.exit(1);
 }
+if (adrProblems.length > 0) {
+  console.error(`check:architecture: FAIL -- ${adrProblems.length} ADR problem(s):`);
+  for (const p of adrProblems) console.error(`  ${p}`);
+  console.error(
+    "Fix the reference or the ADR (template: .claude/skills/spec-writer/template.adr.md);"
+      + " a spec may name an ADR its PR creates or retires as a +/- barwise/docs/adr/<name>.md Touches: entry.",
+  );
+}
+if (problems.length > 0 || adrProblems.length > 0) process.exit(1);
 console.log(
   `check:architecture: ${drawnEdges.size} edges in CLAUDE.md and ${manifests.length} package`
-    + " manifests agree with INTENDED. OK",
+    + ` manifests agree with INTENDED; ${adrs.length} ADRs are well-formed and every reference`
+    + ` in ${citing.length} files resolves. OK`,
 );

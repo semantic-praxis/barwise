@@ -1,7 +1,6 @@
 # Model invariants: what the store refuses, what validation reports, and what operations promise
 
-Status: Workstreams 1 and 2 implemented 2026-10-24; workstream 3 not
-started, 4 provisional; decisions resolved by the owner 2026-10-23
+Status: Implemented 2026-10-24 (all four workstreams); decisions resolved by the owner 2026-10-23
 (decision 1 revised the same day after review)
 
 Created: 2026-10-23
@@ -496,12 +495,55 @@ Acceptance:
   lands after that PR. A duplicate id is never caught and dropped to get
   green.
 
-### 4. The builder's list names the id rules (provisional: not yet grounded)
+Implemented 2026-10-24, as specified, with three notes:
+
+- **One conversion point.** `refusingHeldIds` in `OrmYamlSerializer.ts`
+  wraps both entry points, `migrate` (so `deserialize`) and the exported
+  `readDocument20`, rather than a `catch` around each `add*` call. The
+  message carries through unchanged.
+- **The guards are refusal methods.** `addSubtypeFact` and
+  `addObjectifiedFactType` throw the message a private
+  `subtypeFactRefusal` / `objectificationRefusal` returns, and the public
+  `canAddSubtypeFact` / `canAddObjectifiedFactType` read the same method,
+  adding only the check each element's constructor makes (the two ids
+  differ). Merge's `addableSubtypeFact` and `addableObjectification` are
+  gone.
+- **Nothing needed fixing first.** The full monorepo suite passed with the
+  refusal in place before any test was written, and over the tracked
+  corpus 89 of 116 models load leniently, the same 89 as before, with none
+  refused for a held id. So no importer was losing an element this way,
+  and no PR had to land ahead of this one.
+
+Tests: `tests/model/duplicateIdError.test.ts`, one per kind in code (with
+and without `skipPlayerValidation`), per kind through a 2.0 and a 3.0 file
+(strict and lenient), and the merge case. Each was seen failing under its
+mutant: the store check made a no-op fails 31 of 32, and the merge's
+fresh-id rule removed fails the merge test.
+
+### 4. The builder's list names the id rules
 
 Amend `core-branching-load.spec.md` WS1: `build()` refuses duplicate
 element ids and duplicate constraint ids, and the two rules workstream 1
 adds move into the builder with the other duplicate rules. A spec edit
-only; it lands whenever barwise-973 is next grounded.
+only.
+
+Done 2026-10-24, ahead of barwise-973's next grounding rather than with
+it: the amendment states what WS1 through WS3 built, which needs no
+grounding of the builder, and leaving it for later would have left the
+builder spec describing a store that no longer silently replaces. The
+WS1 section there now names the element-id refusal as a diagnostic, the
+two rules this spec added, and their helpers.
+
+Close-out check, against the built system: the store refuses each of the
+five kinds under a held id (`tests/model/duplicateIdError.test.ts`);
+validation reports the two representable repeats
+(`tests/validation/duplicateIds.test.ts`); diff pairs a shared id as one
+element and merge refuses the name clash that remains
+(`tests/diff/sharedId.test.ts`, `tests/laws/renamedPair.law.test.ts`).
+Nothing the spec set out to do is left undone; what it deferred is
+tracked: barwise-yg5 (merge's fresh ids are random), barwise-m9b (diff
+collapses two subtype facts over one pair), barwise-uy7 (content matching
+on the CLI and MCP surfaces).
 
 ## API and migration impact
 

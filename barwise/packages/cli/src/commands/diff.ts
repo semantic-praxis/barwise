@@ -22,16 +22,27 @@ export function registerDiffCommand(program: Command): void {
     .argument("<incoming>", "Path to incoming .orm.yaml file")
     .option("--format <format>", "Output format (text or json)", "text")
     .option("--no-synonyms", "Hide synonym candidates")
+    .option(
+      "--matching <mode>",
+      "How elements pair: id-first (a shared id is one element) or content "
+        + "(ids say nothing; for models whose ids are unrelated but may coincide)",
+      "id-first",
+    )
     .action(
       async (
         base: string,
         incoming: string,
-        opts: { format: string; synonyms: boolean; },
+        opts: { format: string; synonyms: boolean; matching: string; },
       ) => {
         try {
+          if (opts.matching !== "id-first" && opts.matching !== "content") {
+            throw new Error(
+              `--matching must be id-first or content, not ${JSON.stringify(opts.matching)}.`,
+            );
+          }
           const baseModel = loadModel(base);
           const incomingModel = loadModel(incoming);
-          const diff = diffModels(baseModel, incomingModel);
+          const diff = diffModels(baseModel, incomingModel, { matching: opts.matching });
 
           if (opts.format === "json") {
             process.stdout.write(

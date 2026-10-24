@@ -1,6 +1,6 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstream 1 implemented 2026-10-24 (one package graph); 2-5 not yet
+Status: Workstreams 1-2 implemented 2026-10-24 (one package graph; the ADR convention and its checks); 3-5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-24
@@ -11,10 +11,10 @@ barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
 barwise/packages/cli/CLAUDE.md, barwise/packages/core/CLAUDE.md,
 barwise/packages/mcp/CLAUDE.md, barwise/docs/adr/metamodel-evolution-policy.md,
 barwise/docs/adr/constraint-coverage-policy.md,
-+barwise/docs/adr/package-graph-authority.md, barwise/packages/llm/CLAUDE.md,
+barwise/docs/adr/package-graph-authority.md, barwise/packages/llm/CLAUDE.md,
 barwise/packages/promptlab/CLAUDE.md, barwise/packages/promptlab/evals/suite.yaml,
 +barwise/scripts/regen-architecture.mjs, barwise/scripts/check-architecture.mjs,
-barwise/review-tiers.json, +.claude/skills/spec-writer/template.adr.md,
+barwise/review-tiers.json, .claude/skills/spec-writer/template.adr.md,
 .claude/skills/pr-review/checklist.md, barwise/scripts/tests/,
 barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md
 
@@ -183,10 +183,11 @@ In scope:
 - `INTENDED` shall move to its own module, `scripts/lib/intended.cjs`,
   which `.dependency-cruiser.cjs`, `arch-triage.mjs` and
   `check-architecture.mjs` all require; no script keeps a copy.
-- When an instruction file, a live spec, an ADR or package source names
-  an ADR as ADR `<name>` or `docs/adr/<name>.md`, and no such ADR exists
-  and none is planned as a `+` entry in the citing spec's `Touches:`, the
-  check shall fail (exit 1) naming the file and line.
+- When an instruction file, an undated document under `barwise/docs/`
+  (specs and ADRs included, archives excluded) or a package file names an
+  ADR as ADR `<name>` or `docs/adr/<name>.md`, and no such ADR exists and
+  the citing spec's `Touches:` does not plan it as a `+` or `-` entry,
+  the check shall fail (exit 1) naming the file and line.
 - When a package's internal runtime `dependencies` include a package
   `INTENDED` does not allow it, the check shall fail (exit 1).
 - When the check cannot read the ADR directory, `INTENDED`, or either
@@ -259,8 +260,8 @@ resolved). The
 root `CLAUDE.md` block renders it and is checked against it. It states a policy ("may import") and
 is the one copy CI enforces through `npm run depcruise`. Runtime
 `dependencies` must stay within it, and WS1 checks that they do;
-`devDependencies` may reach further for tests (anchor 4). WS2 records this decision as
-`package-graph-authority.md`, and this heading then points to it.
+`devDependencies` may reach further for tests (anchor 4). The decision is recorded in ADR
+`package-graph-authority`.
 
 ## Alternatives considered
 
@@ -301,10 +302,16 @@ edge and sees red through `mutate.mjs`.
   were rewritten, and archived specs and dated records (such as
   `reference-rubric-audit-2026-08-27.md`) were left as they are.
 - Add the reference check to `check-architecture.mjs`. It reads a named
-  set, not "everything except": instruction files, specs outside
-  `docs/specs/archive/`, `docs/adr/`, and `barwise/packages/*/src/`. That
-  leaves out the tracker, eval runs and payloads, dated records and
-  archives, all of which are history. It resolves the two current forms,
+  set, not "everything except": instruction files, undated documents
+  under `barwise/docs/` (specs and ADRs included, archives excluded), and
+  every file under `barwise/packages/`. It leaves out, under both, the
+  tracker, eval runs and payloads, dated records and archives, all of which
+  are history.
+  (Implementation note, 2026-10-24: the set first drafted here -- specs,
+  ADRs and `packages/*/src/` only -- missed current documents that cite
+  ADRs today, such as `promptlab/evals/suite.yaml` and the book reading
+  guides, so a rename would have left them dead. A `-` entry is also
+  allowed, so a spec may name the ADR its own PR retires.) It resolves the two current forms,
   ADR `<name>` and `docs/adr/<name>.md`, to an existing ADR or to a `+`
   entry in the citing spec's `Touches:` (an ADR a Draft spec plans). A
   number such as "ADR 0001" is not a form it reads, so historical

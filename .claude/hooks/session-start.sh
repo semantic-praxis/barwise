@@ -139,6 +139,26 @@ if [[ "${hooks_path}" != "barwise/.husky/_" ]]; then
   echo "session-start: git hooks NOT wired (core.hooksPath='${hooks_path}')." \
     "Commits skip pre-commit and pushes skip ci:local; run 'npm run prepare' from barwise/." >&2
 fi
+# The same `prepare` installs the tracker's merge driver
+# (docs/specs/beads-merge-driver.spec.md). Read back the file as well as the
+# config: `sh` on a missing wrapper exits 127 having written nothing, git
+# keeps the current side of the tracker unmarked, and a `git add` then drops
+# every issue the other side added.
+merge_driver="$(git -C "${CLAUDE_PROJECT_DIR}" config --get merge.beads.driver || true)"
+common_dir="$(git -C "${CLAUDE_PROJECT_DIR}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [[ -z "${merge_driver}" ]]; then
+  echo "session-start: tracker merge driver NOT installed (merge.beads.driver unset)." \
+    "Merges of .beads/issues.jsonl fall back to a line merge; run 'npm run prepare' from barwise/." >&2
+elif [[ "${merge_driver}" != *"/barwise-merge.sh\""* ]]; then
+  # Another tool's registration (bd's own `bd merge`) runs a command this
+  # clone may not have, which is the same unmarked loss as a missing file.
+  echo "session-start: tracker merge driver is NOT barwise's (merge.beads.driver='${merge_driver}')." \
+    "If that command is missing, a tracker merge leaves the file UNMARKED; run 'npm run prepare' from barwise/." >&2
+elif [[ ! -f "${common_dir}/barwise-merge.sh" ]]; then
+  echo "session-start: tracker merge driver NOT installed (registered, but ${common_dir}/barwise-merge.sh is missing)." \
+    "A merge of .beads/issues.jsonl would leave the file UNMARKED, and a git add would drop the other side's issues;" \
+    "run 'npm run prepare' from barwise/ before merging." >&2
+fi
 
 # The linter behind `npm run check:shell`, one of the 32 gates ci:local
 # derives from ci.yml. GitHub's runners ship it and this container does not,

@@ -1,6 +1,6 @@
 # Constraint-extraction coverage policy
 
-Status: Accepted
+Scope: process
 Date: 2026-08-27
 Tracking: barwise-878 (the reference audit; its first-pass inventory
 lives in `docs/specs/constraint-extraction-coverage.spec.md`, the

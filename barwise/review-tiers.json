@@ -93,6 +93,14 @@
       "why": "audit:specs guards the Status claim; the rest is judgment the deep review applies"
     },
     {
+      "heading": "When an ADR changed",
+      "tier": "high-risk",
+      "globs": [
+        "barwise/docs/adr/"
+      ],
+      "why": "a changed decision is rework for everything that follows it, and only review can tell a changed decision from a reflow"
+    },
+    {
       "heading": "When Python was touched",
       "tier": "routine",
       "globs": [

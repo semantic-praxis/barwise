@@ -250,6 +250,7 @@ it is qualified by `barwise.enableMcpServer`, which defaults on.
 | multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass                                                                                                        |
 | thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row                                                                                     |
 | reference inference (`--infer-references`)            | yes | no  | no      | deliberate: a warehouse-import option, no use elsewhere yet                                                                                       |
+| content-only matching on diff (`--matching content`)  | yes | yes | yes     | none on diff (VS Code as a language-model tool); merge stays id-first on every surface, since its id lookups assume a shared id is one element    |
 
 Every remaining gap is marked deliberate, which is the point: an
 unmarked gap is a bug.
@@ -618,6 +619,17 @@ to read it, `update <id>` to claim it, `close <id>` when it is done.
 highest number plus one. The counter read a tracker that is stale on
 every branch behind main, and two open branches minted the same id at
 least five times (barwise-w1u). Older numeric ids keep working.
+
+A conflict on the tracker is resolved by a merge driver, not by hand:
+`npm run prepare` installs `scripts/beads-merge-driver.mjs` into the
+clone's git directory, and a local `git merge` then merges the file per
+issue and per field, writing conflict markers only for what it cannot
+decide (steward skill, section 1;
+`docs/specs/beads-merge-driver.spec.md`). Before it, the
+`.gitattributes` line named a driver nothing registered, git fell back
+to a line merge without a word, and PR #704 resolved six conflicts by
+hand in three days.
+
 There is no `remember` subcommand -- persistent project knowledge goes
 in this file, as a convention with the reason attached, not a
 MEMORY.md.
