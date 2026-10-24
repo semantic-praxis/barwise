@@ -1,10 +1,12 @@
 # Report how a pull request's diff compares with the plan its spec wrote down, and how big it is
 
-Status: Draft -- no workstream implemented
+Status: Workstreams 1-2 implemented 2026-10-24 (plan.md deleted; the shared
+spec reader, Touches: read by audit:specs, check:spec-touches); 3-6 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-23
 Tracking: barwise-2jy
+Plan-reviewed: 45f824a9 (code-review, pr-review)
 Touches: -plan.md, .gitattributes, barwise/review-tiers.json,
 barwise/scripts/audit-spec-status.mjs, +barwise/scripts/lib/spec-reader.mjs,
 +barwise/scripts/plan-scope.mjs, +barwise/scripts/check-spec-touches.mjs,
