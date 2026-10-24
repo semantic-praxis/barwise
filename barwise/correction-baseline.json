@@ -733,12 +733,6 @@
       "caught_by": "execution",
       "note": "Row indices turned out to be enough; the selector was left undesigned after implementing."
     },
-    "review-tier-reach::b523a34ed18d": {
-      "spec": "review-tier-reach.spec.md",
-      "excerpt": "- (a) refuse a glob that matches zero tracked files. already shipped, by barwise-fs0, after the issue was filed: the gate fails on a dead glob. today 0 of 70 no",
-      "caught_by": "not-a-correction",
-      "note": "An alternatives entry saying what the existing zero-match check would and would not have caught; it records no defect in this spec's draft."
-    },
     "skills-restructure::c0dd5c845c4f": {
       "spec": "skills-restructure.spec.md",
       "excerpt": "add, from the fable field guide: an interview step before drafting (\"interview the requester one question at a time about ambiguities; prioritize questions whos",
