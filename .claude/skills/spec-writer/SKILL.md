@@ -198,7 +198,10 @@ reverse.
   nothing a user experiences; the user's question replaced it with 1
   second, where a wait starts to break a train of thought.
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
-  (bumped if this push revises an existing spec), `Tracking`.
+  (bumped if this push revises an existing spec), `Tracking`, and
+  `Touches:` for a new spec: the paths the plan changes, `+` for a file it
+  creates and `-` for one it deletes (`template.spec.md`;
+  `check:spec-touches` keeps it live).
 - **Parity check**: if the design introduces a copy that must agree
   with other code -- a parallel implementation, a re-listed union, a
   derived file, a table restating code facts -- the spec names its

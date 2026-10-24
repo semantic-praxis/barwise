@@ -5,10 +5,12 @@
     "baseline-merge.test.mjs": 14,
     "beads-ids.test.mjs": 3,
     "ci-conditions.test.mjs": 13,
-    "gates.test.mjs": 212,
+    "gates.test.mjs": 213,
+    "masked-exit.test.mjs": 28,
     "measure-comparison.test.mjs": 31,
     "pushed-tree.test.mjs": 12,
     "python-uv-guard.test.mjs": 32,
-    "session-start.test.mjs": 5
+    "session-start.test.mjs": 5,
+    "spec-reader.test.mjs": 14
   }
 }
