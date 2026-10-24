@@ -1,6 +1,6 @@
 # Review-tier reach: refuse a file-shaped pattern whose name lives elsewhere unreached
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-24 -- the single workstream (see Implementation notes); decisions resolved by the owner 2026-10-24
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -225,7 +225,22 @@ Record those three exit codes in the PR body. The field and the check
 land together: the check alone cannot be green on today's table, and
 the field alone is an annotation nothing reads.
 
-## Open decisions (for review)
+## Open decisions (resolved by the owner, 2026-10-24)
+
+All five were resolved as recommended:
+
+1. Ship the gate.
+2. Widen the wiring row to reach the root `package.json`, the
+   npm-script forwarder. Acknowledge the twelve
+   `barwise/packages/*/package.json` files in `reachAcknowledged` for
+   `barwise/package.json`. The core row's
+   `barwise/packages/core/package.json` is acknowledged with its exact
+   shadow list.
+3. Acknowledgements are exact lists.
+4. The field is a per-row `reachAcknowledged` object.
+5. `trivial` stays out of the check.
+
+The text below is the decision record as reviewed.
 
 1. **Ship this, or close the issue on (a) alone?** (a) already shipped
    and is honest about what it misses. This adds one function, one
@@ -256,6 +271,37 @@ the field alone is an annotation nothing reads.
    the shape of every `globs` array that every reader walks.
 5. **`trivial` excluded.** Recommend keeping it out, for the
    safe-direction reason in Scope.
+
+## Implementation notes
+
+- **Decision 2 needed a second acknowledgement.** Widening the wiring
+  row adds `package.json`, which is itself file-shaped, and its shadow
+  is the same twelve package manifests. So the row acknowledges those
+  twelve under both `barwise/package.json` and `package.json`. Open
+  decision 2 anticipated this ("the shadow of both manifest patterns");
+  the owner's wording names only the first key, and the gate cannot be
+  green without the second.
+- **An entry that waives nothing is a stale key.** Scope names a key
+  that is not a file-shaped pattern of the row. The implementation also
+  calls a key stale when its pattern's shadow is empty, even if it lists
+  nothing (`[]`). Without that, an empty list would sit on a pattern
+  that needs no waiver and agree with its shadow forever.
+- **The `fileShaped` clauses are only observable through stale keys.**
+  No tracked file is named `**`, the empty string or `*`, so a pattern of
+  those shapes always has an empty shadow, with or without the clause.
+  The test that makes each clause matter acknowledges `**`, `x/` and
+  `x/*` on a row that carries them, and expects each to be a stale key,
+  not a list of stale paths.
+- **Watched red.** Before the acknowledgements, the gate on the real
+  table exited 1, naming the core row's
+  `barwise/packages/core/package.json` and the wiring row's
+  `barwise/package.json`, 13 paths each. With them it exited 0. With
+  `--table` pointing at a copy whose instructions row lists `CLAUDE.md`
+  without the package and optimizer copies, it exited 1, naming
+  `CLAUDE.md` and its 13-path shadow. Every new guard in
+  `shadowedPatterns`, its validator and the gate's count was mutated
+  with `scripts/mutate.mjs` and reported CAUGHT, and so was moving the
+  validation into `validateRows` (the `pr-risk` assertion catches it).
 
 ## Risks and testing
 

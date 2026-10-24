@@ -212,6 +212,103 @@ export function compareTable(headings, rows) {
 }
 
 /**
+ * Is `pattern` file-shaped: one that names a file by its final segment?
+ *
+ * Not `**`, not a directory (trailing `/`), and a final segment that is
+ * a literal name rather than `*`. Earlier segments may be `*`, so
+ * `barwise/packages/<*>/CLAUDE.md` is file-shaped and `a/*` is not: a
+ * directory has no file name to compare, and a final `*` names none.
+ * PRECONDITION, as for `matchesPattern`: `patternFault(pattern)` is null.
+ */
+function fileShaped(pattern) {
+  return pattern !== "**" && !pattern.endsWith("/") && pattern.split("/").at(-1) !== "*";
+}
+
+/**
+ * `reachAcknowledged` is optional; when present it is an object whose
+ * values are arrays of non-empty strings. Checked here and not in
+ * `validateRows`, because `pr-risk` reads rows through that validator and
+ * never reads this field: a malformed waiver must not make the classifier
+ * refuse (and so request a review on every PR) over a field it does not
+ * use. The gate calls this, and maps the throw to exit 2.
+ */
+function acknowledgements(row, at) {
+  const ack = row.reachAcknowledged;
+  if (ack === undefined) return {};
+  if (ack === null || typeof ack !== "object" || Array.isArray(ack)) {
+    throw new Error(`${at}: reachAcknowledged must be an object of pattern -> path list`);
+  }
+  for (const [key, paths] of Object.entries(ack)) {
+    if (!Array.isArray(paths) || paths.some((p) => typeof p !== "string" || p.length === 0)) {
+      throw new Error(
+        `${at}: reachAcknowledged[${JSON.stringify(key)}] must be an array of non-empty strings`,
+      );
+    }
+  }
+  return ack;
+}
+
+/**
+ * Which file-shaped patterns reach less than their name suggests
+ * (docs/specs/review-tier-reach.spec.md, barwise-1046).
+ *
+ * A file-shaped pattern's SHADOW is every tracked file with the same
+ * final segment that no pattern in the same row matches. The instructions
+ * row once listed `CLAUDE.md`, which matched the root file and none of the
+ * thirteen package and optimizer copies, and the zero-match check stayed
+ * green because the pattern matched one file. That is the shape this
+ * detects. It cannot tell whether a row SHOULD reach a same-named file,
+ * which is why a non-empty shadow can be waived -- but only by
+ * `reachAcknowledged` listing exactly that shadow. A waiver by count, or
+ * by "some shadow remains", would silently cover the next same-named file
+ * anyone adds; an exact list fails on the PR that adds it.
+ *
+ * Pure: `rows` are validated rows (tier rows and failure modes alike),
+ * `tracked` the repository's file list. Throws on a malformed
+ * `reachAcknowledged`. Returns:
+ *   findings  { heading, pattern, shadow, unacknowledged, acknowledged }
+ *             for each pattern whose shadow has paths the row does not
+ *             acknowledge (`acknowledged` false: no entry at all)
+ *   stale     { heading, key, paths } for each acknowledgement that no
+ *             longer agrees: `paths` are listed but not in the shadow, or
+ *             `null` when the key itself waives nothing -- it is not a
+ *             file-shaped pattern of the row, or its shadow is empty
+ */
+export function shadowedPatterns(rows, tracked) {
+  const findings = [];
+  const stale = [];
+  const name = (p) => p.split("/").at(-1);
+  for (const row of rows) {
+    const ack = acknowledgements(row, `row ${JSON.stringify(row.heading)}`);
+    const globs = row.globs ?? [];
+    const shaped = globs.filter(fileShaped);
+    const reached = (f) => globs.some((g) => matchesPattern(f, g));
+    for (const pattern of shaped) {
+      const shadow = tracked.filter((f) => name(f) === name(pattern) && !reached(f)).sort();
+      const listed = Object.hasOwn(ack, pattern) ? ack[pattern] : undefined;
+      const unacknowledged = shadow.filter((p) => !listed?.includes(p));
+      if (unacknowledged.length > 0) {
+        findings.push({
+          heading: row.heading,
+          pattern,
+          shadow,
+          unacknowledged,
+          acknowledged: listed !== undefined,
+        });
+      }
+      if (listed === undefined) continue;
+      const gone = listed.filter((p) => !shadow.includes(p));
+      if (gone.length > 0) stale.push({ heading: row.heading, key: pattern, paths: gone });
+      else if (shadow.length === 0) stale.push({ heading: row.heading, key: pattern, paths: null });
+    }
+    for (const key of Object.keys(ack)) {
+      if (!shaped.includes(key)) stale.push({ heading: row.heading, key, paths: null });
+    }
+  }
+  return { findings, stale };
+}
+
+/**
  * The pattern language of `review-tiers.json`, stated once.
  *
  * These are NOT globs, despite the field name they are stored under.

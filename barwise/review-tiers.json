@@ -1,5 +1,5 @@
 {
-  "$comment": "The risk tier of a diff, keyed by the trigger headings of .claude/skills/pr-review/checklist.md. Checked by scripts/check-review-tiers.mjs (npm run check:review-tiers; CI runs it), which fails BOTH on a heading with no row and on a row naming a heading that no longer exists -- the bidirectional shape check:root-scripts uses. This file is a declared copy of those headings, kept honest by that gate rather than by a comment. Spec: docs/specs/tiered-pr-review.spec.md (WS2, barwise-1037). Consumers read it through scripts/lib/review-tiers.mjs; two parsers over one table is the copy the rule forbids.",
+  "$comment": "The risk tier of a diff, keyed by the trigger headings of .claude/skills/pr-review/checklist.md. Checked by scripts/check-review-tiers.mjs (npm run check:review-tiers; CI runs it), which fails BOTH on a heading with no row and on a row naming a heading that no longer exists -- the bidirectional shape check:root-scripts uses. This file is a declared copy of those headings, kept honest by that gate rather than by a comment. Spec: docs/specs/tiered-pr-review.spec.md (WS2, barwise-1037). Consumers read it through scripts/lib/review-tiers.mjs; two parsers over one table is the copy the rule forbids. A file-shaped glob (one naming a file, like CLAUDE.md) also fails the gate when same-named tracked files exist that its row does not reach, unless the row's reachAcknowledged lists exactly those paths under that glob (docs/specs/review-tier-reach.spec.md, barwise-1046).",
   "tiers": {
     "always": "Applies to every pull request; not a path trigger.",
     "high-risk": "Liability concentrates here -- rework across downstream packages, or external harm through a shipped surface. WS4 blocks merge on these.",
@@ -38,7 +38,24 @@
         "barwise/packages/core/src/",
         "barwise/packages/core/package.json"
       ],
-      "why": "rework: eleven downstream packages absorb a bad decision here (root CLAUDE.md). src/ and the exports map, not the whole package -- a change to core's own tests is the tests row, and measured over the last 40 merged PRs the wider glob made 4 of 13 core triggers reach nothing under src/ (tests, core's CLAUDE.md, mutation configs). The package.json half has fired 0 times in that window and is reasoning rather than measurement"
+      "why": "rework: eleven downstream packages absorb a bad decision here (root CLAUDE.md). src/ and the exports map, not the whole package -- a change to core's own tests is the tests row, and measured over the last 40 merged PRs the wider glob made 4 of 13 core triggers reach nothing under src/ (tests, core's CLAUDE.md, mutation configs). The package.json half has fired 0 times in that window and is reasoning rather than measurement. Its reach is acknowledged: the other package.json files are not core's exports map, so the row deliberately does not reach them",
+      "reachAcknowledged": {
+        "barwise/packages/core/package.json": [
+          "barwise/package.json",
+          "barwise/packages/cli/package.json",
+          "barwise/packages/code-analysis/package.json",
+          "barwise/packages/dbt/package.json",
+          "barwise/packages/diagram-ui/package.json",
+          "barwise/packages/diagram/package.json",
+          "barwise/packages/formats/package.json",
+          "barwise/packages/learn/package.json",
+          "barwise/packages/llm/package.json",
+          "barwise/packages/mcp/package.json",
+          "barwise/packages/promptlab/package.json",
+          "barwise/packages/vscode/package.json",
+          "package.json"
+        ]
+      }
     },
     {
       "heading": "When a type was introduced, or a field's type chosen",
@@ -191,9 +208,40 @@
         "barwise/packages/formats/src/registration.ts",
         "barwise/packages/dbt/src/registration.ts",
         "barwise/packages/code-analysis/src/formats/registration.ts",
-        "barwise/package.json"
+        "barwise/package.json",
+        "package.json"
       ],
-      "why": "bundle entries, surface commands and tools, format registrations, and npm scripts, each of which has siblings (REVIEW.md failure mode 4)"
+      "why": "bundle entries, surface commands and tools, format registrations, and npm scripts, each of which has siblings (REVIEW.md failure mode 4). The root package.json is the generated npm-script forwarder (scripts/regen-root-package.mjs), the sibling of barwise/package.json's scripts. The twelve package manifests are acknowledged rather than reached: the forwarder runs npm --prefix barwise, so their scripts are not forwarded",
+      "reachAcknowledged": {
+        "barwise/package.json": [
+          "barwise/packages/cli/package.json",
+          "barwise/packages/code-analysis/package.json",
+          "barwise/packages/core/package.json",
+          "barwise/packages/dbt/package.json",
+          "barwise/packages/diagram-ui/package.json",
+          "barwise/packages/diagram/package.json",
+          "barwise/packages/formats/package.json",
+          "barwise/packages/learn/package.json",
+          "barwise/packages/llm/package.json",
+          "barwise/packages/mcp/package.json",
+          "barwise/packages/promptlab/package.json",
+          "barwise/packages/vscode/package.json"
+        ],
+        "package.json": [
+          "barwise/packages/cli/package.json",
+          "barwise/packages/code-analysis/package.json",
+          "barwise/packages/core/package.json",
+          "barwise/packages/dbt/package.json",
+          "barwise/packages/diagram-ui/package.json",
+          "barwise/packages/diagram/package.json",
+          "barwise/packages/formats/package.json",
+          "barwise/packages/learn/package.json",
+          "barwise/packages/llm/package.json",
+          "barwise/packages/mcp/package.json",
+          "barwise/packages/promptlab/package.json",
+          "barwise/packages/vscode/package.json"
+        ]
+      }
     },
     {
       "heading": "A restated fact went stale",
