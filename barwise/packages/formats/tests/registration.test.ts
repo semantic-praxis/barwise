@@ -1,7 +1,7 @@
 /**
  * Tests for the standard format descriptors and registerStandardFormats.
  *
- * Verifies that all standard descriptors (DDL, OpenAPI, Avro, SQL, NORMA)
+ * Verifies that all standard descriptors (DDL, OpenAPI, Avro, SQL, NORMA, Ossie)
  * are correctly shaped and that registerStandardFormats populates the
  * unified registry. The dbt connector lives in @barwise/dbt; code
  * connectors in @barwise/code-analysis.
@@ -22,6 +22,7 @@ import {
   ddlFormat,
   normaFormat,
   openApiFormat,
+  ossieFormat,
   registerStandardFormats,
   sqlFormat,
 } from "../src/registration.js";
@@ -103,6 +104,14 @@ describe("Standard format descriptors", () => {
     });
   });
 
+  describe("ossieFormat", () => {
+    it("is import-only until the exporter lands (WS2)", () => {
+      expect(ossieFormat.name).toBe("ossie");
+      expect(ossieFormat.importer).toBeDefined();
+      expect(ossieFormat.exporter).toBeUndefined();
+    });
+  });
+
   describe("normaFormat", () => {
     it("has name 'norma'", () => {
       expect(normaFormat.name).toBe("norma");
@@ -156,7 +165,7 @@ describe("registerStandardFormats", () => {
     expect(getFormat("sql")).toBeDefined();
     expect(getFormat("norma")).toBeDefined();
     expect(getFormat("avro")).toBeDefined();
-    expect(listFormats()).toHaveLength(5);
+    expect(listFormats()).toHaveLength(6);
   });
 
   it("makes DDL available as both importer and exporter", () => {
@@ -179,11 +188,17 @@ describe("registerStandardFormats", () => {
     const importers = listImporters();
     const exporters = listExporters();
 
-    // 4 formats (ddl, openapi, sql, norma) have importers.
-    expect(importers).toHaveLength(4);
+    // 5 formats (ddl, openapi, sql, norma, ossie) have importers.
+    expect(importers).toHaveLength(5);
     // 4 formats (ddl, openapi, avro, norma) have exporters.
     expect(exporters).toHaveLength(4);
-    expect(importers.map((f) => f.name).sort()).toEqual(["ddl", "norma", "openapi", "sql"]);
+    expect(importers.map((f) => f.name).sort()).toEqual([
+      "ddl",
+      "norma",
+      "openapi",
+      "ossie",
+      "sql",
+    ]);
     expect(exporters.map((f) => f.name).sort()).toEqual(["avro", "ddl", "norma", "openapi"]);
   });
 
@@ -192,7 +207,7 @@ describe("registerStandardFormats", () => {
     registerStandardFormats();
     registerStandardFormats();
 
-    expect(listFormats()).toHaveLength(5);
+    expect(listFormats()).toHaveLength(6);
   });
 
   it("skips already-registered formats", () => {
@@ -202,7 +217,7 @@ describe("registerStandardFormats", () => {
     // registerStandardFormats should skip DDL and register the rest.
     registerStandardFormats();
 
-    expect(listFormats()).toHaveLength(5);
+    expect(listFormats()).toHaveLength(6);
     expect(getFormat("ddl")).toBe(ddlFormat);
     expect(getFormat("openapi")).toBeDefined();
     expect(getFormat("sql")).toBeDefined();
