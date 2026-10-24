@@ -10,10 +10,15 @@
  * `check:root-scripts` fails both ways for the same reason -- a stale
  * entry and a missing one are different defects and both are silent.
  *
+ * The same holds for REVIEW.md's "Always check" items and the table's
+ * failureModes rows (docs/specs/review-routing.spec.md, WS2), so an
+ * edit to a failure mode's title in REVIEW.md fails this gate until the
+ * table follows.
+ *
  * Three results, per docs/specs/gate-refusal-contract.spec.md:
- *   0  the two agree
+ *   0  the table agrees with the checklist and with REVIEW.md
  *   1  they disagree, and the disagreement is named
- *   2  one of them could not be read, so the question was never asked
+ *   2  an input could not be read, so the question was never asked
  *
  * Exit 2 matters here more than usual. If this gate treated an
  * unreadable checklist as "no headings", it would report that every row

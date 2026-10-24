@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * The risk tier of a diff, and every checklist heading it triggers.
+ * The risk tier of a diff, every checklist heading it triggers, and
+ * REVIEW.md's failure modes routed by the same paths
+ * (docs/specs/review-routing.spec.md).
  *
  * WS3 of docs/specs/tiered-pr-review.spec.md (barwise-1038). Reads
  * `review-tiers.json` through `lib/review-tiers.mjs` -- the same parser
@@ -250,10 +252,7 @@ function checkPaths(paths) {
 let rows, modes, trivial;
 try {
   rows = tierRows(opt("--table", TABLE));
-  // Optional only for a fixture table (--table), which may carry no
-  // failureModes block. The real table must have one: without it every
-  // REVIEW.md failure mode would vanish from the routing with exit 0.
-  modes = failureModeRows(opt("--table", TABLE), { optional: opt("--table", null) !== null });
+  modes = failureModeRows(opt("--table", TABLE));
   trivial = trivialGlobs(opt("--table", TABLE));
 } catch (err) {
   refuse(err.message, err.cause?.message);
@@ -320,7 +319,10 @@ if (modes.length > 0) {
   console.log();
   console.log("REVIEW.md failure modes -- run all of them; these first, for these files:");
   if (routed.length === 0) console.log("  none triggered by path");
-  for (const row of routed) printRow(row, width);
+  // No tier column: a failure mode's tier never changes the verdict, and
+  // "high-risk" beside a mode above a "routine" verdict reads as a
+  // contradiction.
+  for (const row of routed) printRow({ ...row, tier: "" }, 0);
   const untriggered = failureModesBeyondReach.filter((m) => m.tier !== "not-path-derivable");
   const pathless = failureModesBeyondReach.filter((m) => m.tier === "not-path-derivable");
   if (untriggered.length > 0) {

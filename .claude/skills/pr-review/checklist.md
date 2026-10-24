@@ -3,7 +3,8 @@
 Everything `npm run ci:local` runs is excluded here by construction;
 `.github/workflows/ci.yml` owns that list and CI will report it. What
 remains is judgment, grouped by what the diff touches. Which groups
-apply is not chosen by hand: `npm run pr:risk` lists the groups the
+apply is not chosen by hand: `npm run pr:risk -- --base
+origin/<the PR's base branch>` lists the groups the
 diff triggers, with their files, and the groups no path can detect,
 which apply to every PR (`pr-review` section 3). Run those, and say in
 the review which ran. Each item is a test to apply, followed by the authority it

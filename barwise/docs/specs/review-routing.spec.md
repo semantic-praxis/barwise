@@ -202,7 +202,7 @@ eight stale rows from a file it never opened.
 ### 1. Put the existing output in front of reviewers
 
 No new data. Change `pr-review` section 3 from "Say which groups
-applied" to "Run `npm run pr:risk -- --base origin/main` on the head;
+applied" to "Run `npm run pr:risk -- --base origin/<the PR's base>` on the head;
 the groups it lists, and every group it lists as not path-derivable, are
 the ones you run; say which ran." Add the same line to `pr-creation`'s
 readiness list for the author's own pass. Reorder `pr-risk`'s text

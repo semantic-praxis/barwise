@@ -3297,6 +3297,35 @@ test("check-review-tiers fails both ways on REVIEW.md failure modes, and refuses
   }
 });
 
+test("an Always check item without a one-line bold title is refused, not skipped", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    writeFileSync(
+      join(dir, "REVIEW.md"),
+      "# Review\n\n## Always check: x\n\n1. **F.** Body.\n2. Retry storms, not bold.\n",
+    );
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /1 'Always check' item\(s\) .* have no one-line bold title/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk refuses a table with no failureModes rather than routing none", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { noModes: true });
+    const table = args[args.indexOf("--table") + 1];
+    const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["x/a.ts"]), "--table", table);
+    assert.equal(run.status, 2, run.stdout);
+    assert.match(run.stderr, /declares no failureModes/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check-review-tiers checks failureModes rows as it checks the checklist rows", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
   try {
@@ -3704,6 +3733,7 @@ test("pr-risk leads with the routing and prints every REVIEW.md failure mode", (
     );
     assert.deepEqual(json.failureModes.map((m) => m.heading).sort(), [
       "A gate answers without seeing its input",
+      "A test that cannot fail",
       "PR description claims",
     ]);
     assert.equal(json.failureModes.length + json.failureModesBeyondReach.length, 8);

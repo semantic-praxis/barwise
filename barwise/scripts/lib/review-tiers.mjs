@@ -89,13 +89,12 @@ export function tierRows(file = TABLE) {
  * The table's `failureModes` rows: one per REVIEW.md "Always check" item,
  * keyed by its title (docs/specs/review-routing.spec.md, WS2). Same shape
  * and the same validator as the checklist rows, so there is one row rule
- * and one pattern language. `optional` is for pr-risk, which reads
- * fixture tables that carry no block; the gate never passes it, so a real
- * table without the block fails there, both ways against REVIEW.md.
+ * and one pattern language. Required wherever it is read: pr-risk
+ * printing no failure modes with exit 0 would read as a diff that needs
+ * none.
  */
-export function failureModeRows(file = TABLE, { optional = false } = {}) {
+export function failureModeRows(file = TABLE) {
   const modes = readTable(file)?.failureModes;
-  if (modes === undefined && optional) return [];
   if (!Array.isArray(modes) || modes.length === 0) {
     throw new Error(
       `${file} declares no failureModes -- REVIEW.md's failure modes have no routing`,
@@ -172,10 +171,21 @@ export function reviewFailureModes(file = REVIEW) {
   const start = lines.findIndex((l) => /^## Always check\b/.test(l));
   if (start === -1) throw new Error(`no '## Always check' heading in ${file}`);
   const titles = [];
+  let items = 0;
   for (const line of lines.slice(start + 1)) {
     if (line.startsWith("## ")) break;
+    if (!/^\d+\. /.test(line)) continue;
+    items += 1;
     const m = /^\d+\. \*\*(.+?)\*\*/.exec(line);
     if (m) titles.push(m[1].replace(/\.$/, ""));
+  }
+  // A numbered item without a one-line bold title would otherwise be
+  // skipped silently: the gate would report the rest OK and pr-risk would
+  // never route the item.
+  if (items !== titles.length) {
+    throw new Error(
+      `${items - titles.length} 'Always check' item(s) in ${file} have no one-line bold title`,
+    );
   }
   if (titles.length === 0) throw new Error(`the 'Always check' list in ${file} has no items`);
   return titles;

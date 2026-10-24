@@ -155,19 +155,18 @@
       "globs": [
         "barwise/scripts/",
         "barwise/.husky/",
+        ".github/workflows/",
         ".claude/hooks/"
       ],
-      "why": "the gates, hooks and scripts themselves (REVIEW.md failure mode 2)"
+      "why": "the gates, hooks, workflows and scripts themselves, the same paths as the checklist's gate row (REVIEW.md failure mode 2)"
     },
     {
       "heading": "A test that cannot fail",
-      "tier": "routine",
+      "tier": "always",
       "globs": [
-        "barwise/packages/*/tests/",
-        "barwise/scripts/tests/",
-        "barwise/optimizer/tests/"
+        "**"
       ],
-      "why": "a changed test is where an assertion that cannot fail arrives; routine, as the checklist's tests row is (REVIEW.md failure mode 3)"
+      "why": "changed tests fire on 21 of the last 40 PRs (barwise/scripts/tests/, packages/*/tests/, optimizer/tests/, trial/tests/), more than half, so by review-routing WS2's rule it is always rather than routed (REVIEW.md failure mode 3)"
     },
     {
       "heading": "Wired in one place, not its siblings",
