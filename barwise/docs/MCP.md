@@ -340,6 +340,12 @@ Generate a relational schema (DDL or JSON) from an ORM model.
 | `source`  | string              | yes      | File path to an `.orm.yaml` file, or inline YAML content |
 | `format`  | `"ddl"` or `"json"` | no       | Output format. Defaults to `"ddl"`.                      |
 
+Deprecated in favour of `export_model`; with `format: "ddl"` it returns
+what `export_model` returns for `format: "ddl"` with no annotations and no
+examples: the DDL, bounded to a file with a preview when it is large, and
+a second content block naming each constraint DDL could not express, when
+there is one (`docs/specs/schema-ddl-routing.spec.md`).
+
 **Returns** with `format: "ddl"`:
 
 ```sql

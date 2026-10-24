@@ -11,10 +11,11 @@ import { getExporter, listExporters } from "@barwise/core";
 import { hashModel, type ManifestExport, updateManifest } from "@barwise/core/lineage";
 import { SQL_DIALECTS } from "@barwise/core/sql";
 import { registerDbtFormats } from "@barwise/dbt";
-import { formatConstraintReport, registerStandardFormats } from "@barwise/formats";
+import { registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { reportConstraintSpecs } from "../workspace/constraintReport.js";
 import { resolveDomainModels } from "../workspace/domainModels.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
 import { readManifest, writeManifest } from "../workspace/lineageIo.js";
@@ -116,20 +117,6 @@ function exportOpts(opts: ExportOptions) {
     includeExamples: opts.examples,
     ...(opts.dialect ? { dialect: opts.dialect } : {}),
   };
-}
-
-/**
- * Name on stderr the constraints the format reported it could not
- * express. Beside the artifact, not in it: stdout may be a pipeline's
- * input.
- */
-function reportConstraintSpecs(
-  result: ReturnType<ExportFormatAdapter["export"]>,
-  format: string,
-  domain?: string,
-): void {
-  const report = formatConstraintReport(result.constraintSpecs, format, domain ? { domain } : {});
-  if (report) process.stderr.write(report + "\n");
 }
 
 /** Write a single export result to a file or directory (no lineage manifest). */
