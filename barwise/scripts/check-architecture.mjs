@@ -35,12 +35,19 @@
  * barwise/packages/* and the tracked files of another git tree, for this
  * check's own tests; nothing else passes it.
  */
-import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ADR_DIR, currentSection, isAdr, renderSection } from "./lib/architecture-section.mjs";
+import {
+  ADR_DIR,
+  currentSection,
+  isAdr,
+  isMap,
+  loadIntended,
+  readFiles,
+  renderSection,
+  trackedPaths,
+} from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
 import { uncommittedPaths } from "./lib/changed-class.mjs";
 import { isInstructionFile } from "./lib/instruction-files.mjs";
@@ -81,8 +88,6 @@ const citesAdrs = (f) =>
   isInstructionFile(f)
   || (((f.startsWith("barwise/docs/") && f.endsWith(".md")) || f.startsWith("barwise/packages/"))
     && !HISTORY.test(f) && !DATED.test(f));
-
-const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
 /** The values in `list` that occur more than once. */
 const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !== i))];
@@ -193,15 +198,7 @@ try {
   // Inside the refusal: a bare `--root` throws, and that is "could not
   // answer", not the exit 1 a real disagreement uses.
   root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
-  const intendedPath = join(root, "barwise", "scripts", "lib", "intended.cjs");
-  intended = createRequire(import.meta.url)(intendedPath);
-  const shape = isMap(intended) && Object.keys(intended).length > 0
-    && Object.values(intended).every(
-      (v) => Array.isArray(v) && v.every((d) => typeof d === "string"),
-    );
-  if (!shape) {
-    throw new Error(`${intendedPath} does not export a map of package to package list`);
-  }
+  intended = loadIntended(root);
   const pkgs = join(root, "barwise", "packages");
   manifests = readdirSync(pkgs, { withFileTypes: true })
     .filter((e) => e.isDirectory())
@@ -233,33 +230,14 @@ try {
   const clash = repeated(names);
   if (clash.length > 0) throw new Error(`two package manifests are named ${clash.join(", ")}`);
   drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"));
-  // ADRs and the files that cite them both come from the tracked listing of
-  // `root` -- the tree CI checks -- and always `git -C root`, so the list and
-  // the files read are one tree whatever the cwd. An ADR on disk but not yet
-  // staged is named as unchecked, not silently counted.
-  const git = (...args) =>
-    execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).split("\0").filter(Boolean);
-  const tracked = git("ls-files", "-z");
-  if (tracked.length === 0) throw new Error(`git ls-files lists nothing under ${root}`);
-  // A tracked path that is not a regular file on disk is one being deleted,
-  // or a symlink or gitlink: it is not read, because reading it would turn
-  // the run into exit 2 and hide the references a deletion left dead.
-  const isFile = (p) => {
-    try {
-      return lstatSync(p).isFile();
-    } catch {
-      return false;
-    }
-  };
-  const read = (fs) =>
-    fs.filter((f) => isFile(join(root, f))).map((f) => ({
-      f,
-      text: readFileSync(join(root, f), "utf8"),
-    }));
-  adrs = read(tracked.filter(isAdr));
+  // ADRs and the files that cite them both come from the tracked listing
+  // (lib/architecture-section.mjs, which regen:architecture reads too). An
+  // ADR on disk but not yet staged is named as unchecked, not silently counted.
+  const tracked = trackedPaths(root);
+  adrs = readFiles(root, tracked.filter(isAdr));
   // Zero ADRs is a listing that went wrong, not a tree with nothing to check.
   if (adrs.length === 0) throw new Error(`no ADR under ${join(root, ADR_DIR)}`);
-  citing = read(tracked.filter(citesAdrs));
+  citing = readFiles(root, tracked.filter(citesAdrs));
   // The generated first section of ARCHITECTURE.md (WS3): its markers must
   // be there to compare, so their absence is "could not answer".
   const doc = readFileSync(join(root, "barwise", "docs", "ARCHITECTURE.md"), "utf8");
@@ -361,6 +339,8 @@ for (const { f, text } of adrs) {
     adrProblems.push(`${f}: Date: ${date || "(empty)"} is not YYYY-MM-DD`);
   }
   if (!/^## Decision\s*$/m.test(text)) adrProblems.push(`${f}: no "## Decision" section`);
+  // The generated index lists an ADR by its title.
+  if (!/^# \S/m.test(text)) adrProblems.push(`${f}: no "# " title line`);
 }
 // Every reference names an ADR that exists, or one the citing spec plans
 // to create or retire in its Touches: (`+` or `-`), so a spec may name the
@@ -386,11 +366,7 @@ for (const { f, text } of citing) {
 
 // The generated section is rendered from these same inputs (the tracked
 // ADRs and INTENDED), so a stale section is one regen:architecture fixes.
-if (section !== renderSection(adrs, intended)) {
-  adrProblems.push(
-    "barwise/docs/ARCHITECTURE.md: the generated section is stale; run npm run regen:architecture",
-  );
-}
+const stale = section !== renderSection(adrs, intended);
 
 if (problems.length > 0) {
   console.error(`check:architecture: FAIL -- ${problems.length} disagreement(s) with INTENDED:`);
@@ -408,7 +384,13 @@ if (adrProblems.length > 0) {
       + " a spec may name an ADR its PR creates or retires as a +/- barwise/docs/adr/<name>.md Touches: entry.",
   );
 }
-if (problems.length > 0 || adrProblems.length > 0) process.exit(1);
+if (stale) {
+  console.error(
+    "check:architecture: FAIL -- the generated section of barwise/docs/ARCHITECTURE.md is stale"
+      + " (an ADR or INTENDED changed); run npm run regen:architecture and commit the result.",
+  );
+}
+if (problems.length > 0 || adrProblems.length > 0 || stale) process.exit(1);
 console.log(
   `check:architecture: ${drawnEdges.size} edges in CLAUDE.md and ${manifests.length} package`
     + ` manifests agree with INTENDED; ${adrs.length} ADRs are well-formed and every reference`

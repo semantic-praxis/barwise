@@ -42,12 +42,10 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { currentSection, renderSection } from "../lib/architecture-section.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -5251,9 +5249,13 @@ function architectureRepo() {
   copy("CLAUDE.md");
   copy("barwise/scripts/lib/intended.cjs");
   copy("barwise/docs/ARCHITECTURE.md");
-  for (const adr of readdirSync(join(REPO, "barwise", "docs", "adr"))) {
-    copy(`barwise/docs/adr/${adr}`);
-  }
+  // The tracked ADRs only: the copied ARCHITECTURE.md indexes those, and
+  // an untracked draft in this checkout would otherwise read as "stale".
+  const adrList = execFileSync("git", ["ls-files", "-z", "barwise/docs/adr/"], {
+    cwd: REPO,
+    encoding: "utf8",
+  });
+  for (const rel of adrList.split("\0").filter(Boolean)) copy(rel);
   let manifests = 0;
   for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
     const rel = `barwise/packages/${pkg}/package.json`;
@@ -5729,26 +5731,24 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
 
 // --- check:architecture, WS2: ADR shape and references ---
 
+/** regen:architecture run against a fixture tree. */
+const regenArch = (dir) =>
+  spawnSync(process.execPath, [join(SCRIPTS, "regen-architecture.mjs"), "--root", dir], {
+    encoding: "utf8",
+  });
+
 /**
- * Stage an ADR in an architectureRepo fixture and refresh the fixture's
- * generated ARCHITECTURE.md section, as an author runs regen:architecture
- * after adding one -- otherwise every such test also reads "stale".
+ * Stage an ADR in an architectureRepo fixture and regenerate and stage the
+ * fixture's ARCHITECTURE.md section, as an author does after adding one --
+ * otherwise every such test also reads "stale". It runs the real
+ * regenerator, so these tests also see it agree with the check.
  */
 function stageAdr(dir, name, text) {
   stage(dir, `barwise/docs/adr/${name}.md`, text);
-  const adrDir = join(dir, "barwise", "docs", "adr");
-  const adrs = readdirSync(adrDir).filter((n) => n.endsWith(".md") && n !== "README.md").sort()
-    .map((n) => ({ f: `barwise/docs/adr/${n}`, text: readFileSync(join(adrDir, n), "utf8") }));
-  const intended = createRequire(import.meta.url)(
-    join(dir, "barwise", "scripts", "lib", "intended.cjs"),
-  );
+  const r = regenArch(dir);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
   const doc = join(dir, "barwise", "docs", "ARCHITECTURE.md");
-  const before = readFileSync(doc, "utf8");
-  stage(
-    dir,
-    "barwise/docs/ARCHITECTURE.md",
-    before.replace(currentSection(before), () => renderSection(adrs, intended)),
-  );
+  stage(dir, "barwise/docs/ARCHITECTURE.md", readFileSync(doc, "utf8"));
 }
 
 const ADR_OK = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n\n"
@@ -5771,6 +5771,7 @@ test("check:architecture checks each ADR's shape", () => {
         ],
         [(s) => s.replace("Date: 2026-10-24\n", ""), /a-concern\.md: no Date: line/],
         [(s) => s.replace("## Decision", "## The rule"), /a-concern\.md: no "## Decision" section/],
+        [(s) => s.replace("# A concern\n", ""), /a-concern\.md: no "# " title line/],
         // A field in the body is not the ADR's own.
         [
           (s) => s.replace("Scope: process\n", "").replace("Why.", "Scope: process"),
@@ -5962,43 +5963,32 @@ test("check:architecture fails a stale generated section, and regen:architecture
     assert.equal(stale.status, 1, stale.stdout + stale.stderr);
     assert.match(
       stale.stderr,
-      /ARCHITECTURE\.md: the generated section is stale; run npm run regen:architecture/,
+      /generated section of barwise\/docs\/ARCHITECTURE\.md is stale .*run npm run regen:architecture/,
     );
-    const regen = spawnSync(process.execPath, [
-      join(SCRIPTS, "regen-architecture.mjs"),
-      "--root",
+    // Not reported as an ADR problem: an INTENDED edit makes it stale too.
+    assert.doesNotMatch(stale.stderr, /ADR problem/);
+    // A dollar sign in a title is text, not a replacement pattern.
+    stage(
       dir,
-    ], {
-      encoding: "utf8",
-    });
+      "barwise/docs/adr/b-cost.md",
+      ADR_OK.replace("# A concern", () => "# Costs in $& terms"),
+    );
+    const regen = regenArch(dir);
     assert.equal(regen.status, 0, regen.stdout + regen.stderr);
     assert.match(regen.stdout, /wrote the generated section/);
     const doc = readFileSync(join(dir, "barwise", "docs", "ARCHITECTURE.md"), "utf8");
     assert.match(doc, /- \[A concern\]\(adr\/a-concern\.md\) -- 2026-10-24/);
+    assert.ok(doc.includes("- [Costs in $& terms](adr/b-cost.md) -- 2026-10-24"), doc);
     stage(dir, "barwise/docs/ARCHITECTURE.md", doc);
     const fresh = runArch(dir);
     assert.equal(fresh.status, 0, fresh.stdout + fresh.stderr);
     // Run again, it writes nothing.
-    const again = spawnSync(process.execPath, [
-      join(SCRIPTS, "regen-architecture.mjs"),
-      "--root",
-      dir,
-    ], {
-      encoding: "utf8",
-    });
-    assert.match(again.stdout, /already current/);
+    assert.match(regenArch(dir).stdout, /already current/);
     // An ADR on disk but untracked is one the check does not list, so the
     // regenerator must not index it either: otherwise the check reads
     // "stale" and no regen run can make it current.
     writeFileSync(join(dir, "barwise", "docs", "adr", "draft.md"), ADR_OK);
-    const untracked = spawnSync(process.execPath, [
-      join(SCRIPTS, "regen-architecture.mjs"),
-      "--root",
-      dir,
-    ], {
-      encoding: "utf8",
-    });
-    assert.match(untracked.stdout, /already current/);
+    assert.match(regenArch(dir).stdout, /already current/);
     const still = runArch(dir);
     assert.equal(still.status, 0, still.stdout + still.stderr);
   } finally {
@@ -6018,15 +6008,28 @@ test("check:architecture and regen:architecture refuse without the section's mar
     const check = runArch(dir);
     assert.equal(check.status, 2, check.stdout + check.stderr);
     assert.match(check.stderr, /ARCHITECTURE\.md has no regen:architecture markers/);
-    const regen = spawnSync(process.execPath, [
-      join(SCRIPTS, "regen-architecture.mjs"),
-      "--root",
-      dir,
-    ], {
-      encoding: "utf8",
-    });
+    const regen = regenArch(dir);
     assert.equal(regen.status, 2, regen.stdout + regen.stderr);
     assert.match(regen.stderr, /no regen:architecture markers/);
+    // Prose quoting the END marker above the section does not hide it.
+    const quoted = readFileSync(join(REPO, "barwise", "docs", "ARCHITECTURE.md"), "utf8")
+      .replace(
+        "**Last Updated:**",
+        "Ends at `<!-- END regen:architecture -->`.\n\n**Last Updated:**",
+      );
+    stage(dir, "barwise/docs/ARCHITECTURE.md", quoted);
+    const q = runArch(dir);
+    assert.equal(q.status, 0, q.stdout + q.stderr);
+    // A misshapen INTENDED is refused, not rendered as an empty graph.
+    stage(dir, "barwise/scripts/lib/intended.cjs", "module.exports = {};\n");
+    const empty = regenArch(dir);
+    assert.equal(empty.status, 2, empty.stdout + empty.stderr);
+    assert.match(empty.stderr, /does not export a map of package to package list/);
+    // A bare --root is "could not answer" too.
+    const bare = spawnSync(process.execPath, [join(SCRIPTS, "regen-architecture.mjs"), "--root"], {
+      encoding: "utf8",
+    });
+    assert.equal(bare.status, 2, bare.stdout + bare.stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

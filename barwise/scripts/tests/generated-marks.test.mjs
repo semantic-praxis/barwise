@@ -75,6 +75,15 @@ test("generated marks: every regen:* output is marked linguist-generated", () =>
   }
 });
 
+test("generated marks: a file a regenerator writes only a section of is tracked and not marked", () => {
+  for (const [script, files] of Object.entries(SECTION_WRITERS)) {
+    for (const f of files) {
+      assert.ok(tracked.includes(f), `${script}: ${f} is not a tracked file`);
+      assert.ok(!generatedPaths([f], REPO).has(f), `${script}: ${f} is marked generated`);
+    }
+  }
+});
+
 test("generated marks: the review-tiers generated row routes marked files only, and every output it can name", () => {
   const rows = JSON.parse(readFileSync(join(REPO, "barwise", "review-tiers.json"), "utf8")).rows;
   const row = rows.find((r) => r.heading === "When generated output changed");

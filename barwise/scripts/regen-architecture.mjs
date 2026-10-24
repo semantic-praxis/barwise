@@ -11,38 +11,28 @@
  * markers are missing, or there is no ADR -- a parse failure must not
  * write an empty index.
  */
-import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { currentSection, isAdr, renderSection } from "./lib/architecture-section.mjs";
+import {
+  currentSection,
+  isAdr,
+  loadIntended,
+  readFiles,
+  renderSection,
+  trackedPaths,
+} from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
 
-// --root runs against another tree, for check:architecture's own tests.
-const root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
-const DOC = join(root, "barwise", "docs", "ARCHITECTURE.md");
-const isFile = (p) => {
-  try {
-    return lstatSync(p).isFile();
-  } catch {
-    return false;
-  }
-};
 try {
-  // The inputs as check:architecture reads them -- the tracked ADRs and
-  // root's INTENDED -- because the section written here must be the one
-  // the check renders, or the check reports stale a section no run of this
-  // script can make current. A tracked path that is not a file on disk is
-  // being deleted, and the check skips it too.
-  const adrs = execFileSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8" })
-    .split("\0")
-    .filter((f) => isAdr(f) && isFile(join(root, f)))
-    .map((f) => ({ f, text: readFileSync(join(root, f), "utf8") }));
+  // Inside the refusal: a bare `--root` throws, and that is exit 2.
+  // --root runs against another tree, for check:architecture's own tests.
+  const root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
+  const DOC = join(root, "barwise", "docs", "ARCHITECTURE.md");
+  // The inputs exactly as check:architecture reads them (the shared reader).
+  const adrs = readFiles(root, trackedPaths(root).filter(isAdr));
   if (adrs.length === 0) throw new Error(`no tracked ADR under ${root}`);
-  const intended = createRequire(import.meta.url)(
-    join(root, "barwise", "scripts", "lib", "intended.cjs"),
-  );
+  const intended = loadIntended(root);
   const doc = readFileSync(DOC, "utf8");
   const now = currentSection(doc);
   if (now === null) throw new Error("ARCHITECTURE.md has no regen:architecture markers");
