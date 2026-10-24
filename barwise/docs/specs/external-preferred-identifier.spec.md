@@ -13,12 +13,17 @@ barwise/packages/core/src/query/evaluate.ts,
 barwise/packages/core/src/diff/ModelMerge.ts,
 barwise/packages/core/src/diff/elementDiff.ts,
 barwise/packages/core/schemas/orm-model.schema.json,
+barwise/packages/core/src/query/types.ts,
+barwise/packages/core/src/query/format.ts,
 barwise/packages/core/tests/,
+barwise/packages/llm/src/DraftModelParser.ts,
 barwise/packages/llm/src/ModelContext.ts,
 barwise/packages/vscode/src/sidebar/ModelTreeProvider.ts,
 barwise/packages/formats/src/norma/NormaToOrmMapper.ts,
 barwise/packages/formats/src/norma/NormaXmlWriter.ts,
 barwise/packages/formats/src/norma/populationGraph.ts,
+barwise/packages/formats/src/norma/mapping/constraintPasses.ts,
+barwise/packages/formats/src/ddl/constraintRouting.ts,
 barwise/packages/formats/src/ossie/writeOssie.ts,
 barwise/packages/formats/src/ossie/mapOssieToOrm.ts,
 barwise/packages/formats/tests/,
@@ -47,8 +52,12 @@ warns. Each of those is the model saying less than its author did.
 **Determinism and orthogonality.** Which constraint identifies which
 entity stays one pure function, `resolvePreferredIdentifier`, that every
 reader asks. The external case extends that function; no reader grows its
-own rule. Ossie's writer has one today (`compositeIdentifier`), which this
-change replaces with the core answer.
+own rule. Ossie's writer has one today (`compositeIdentifier`), and core
+has another that answers half the question: `inferExternalUniquenessJoin`
+(`core/src/externalUniqueness.ts`), which population validation and the
+counterexample generator use to find the object an external uniqueness
+joins on. The resolver builds on that helper rather than restating it,
+and the Ossie writer asks the resolver's shape check instead of its own.
 
 ## Observed today (2026-10-24, at 6bf215b9 plus #765)
 
@@ -71,12 +80,22 @@ roles, and `preferred_identifier: c-room-id` on Room:
 
 An external uniqueness `U` identifies entity `E` when:
 
-1. `U` spans two roles or more;
-2. each role of `U` belongs to a distinct binary fact type whose other
-   role is played by `E` (the "near" role; `U`'s role is the "far" one);
+1. `inferExternalUniquenessJoin(U.roleIds)` finds a common object, and it
+   is `E`. That helper already requires two roles or more, one per fact
+   type, and a common object that plays exactly one other role in each of
+   those fact types and plays none of `U`'s roles -- so `E` is never
+   identified by a role it plays itself;
+2. each of those fact types is binary, so the role `E` plays (the "near"
+   role) and `U`'s role (the "far" one) are the whole fact;
 3. each near role carries an internal uniqueness over that role alone, so
-   each `E` has at most one of each component;
-4. no far role is played by `E` itself.
+   each `E` has at most one of each component.
+
+Rules 2 and 3 are what an identifier needs beyond a join: the helper
+allows an n-ary fact type and never asks whether the near role is unique,
+because a population check joining on `E` needs neither. The resolver
+calls the helper and adds the two checks; it does not re-derive the
+common object, so the object population validation joins on and the one
+the mapper keys on cannot differ.
 
 This is the shape Halpin's reference schemes take, the shape NORMA's
 `PreferredIdentifierFor` on an external constraint denotes, and the shape
@@ -86,11 +105,14 @@ identification graph acyclic at its shortest length; a longer cycle
 `identificationOrder` cycle, reported the way an objectification cycle
 is.
 
-A near role that is not mandatory does not stop `U` identifying `E`, but
-validation warns: the mapper's key columns are `NOT NULL`, so the schema
-states a stronger rule than the model. ORM requires a preferred reference
-scheme's components to be mandatory; a warning rather than a refusal
-matches how the internal case treats the same omission today.
+A near role that is not mandatory does not stop `U` identifying `E`, and
+validation says nothing about it. ORM requires a reference scheme's roles
+to be mandatory, and the mapper's key columns are `NOT NULL` whatever the
+model says; but no rule checks that for an internal identifier either
+(an identifying binary whose entity role is optional validates clean
+today), so a warning for the external case alone would be an asymmetry.
+One rule for both kinds is barwise-i77; it changes tracked models'
+`validate` output, which this spec's acceptance holds fixed.
 
 ## Scope
 
@@ -100,30 +122,59 @@ In scope:
   of the shape above, `resolvePreferredIdentifier` shall resolve it, and
   `completeness/preferred-identifier-invalid` shall not report it.
 - When the external uniqueness does not have that shape, validation shall
-  report it as not identifying the entity, naming which rule failed.
+  report it as not identifying the entity, naming which rule failed: no
+  common object, a common object other than this entity, a component
+  that is not binary, or a near role without its own uniqueness.
 - When an entity is identified by an external uniqueness, the relational
   mapper shall key its table on the far roles' columns: a value player's
   column, or a foreign key to an entity player's settled key. The
   component fact types are spent on the key, as an identifying binary is
   today, and the entity takes no reference-mode column (Open decision 2).
   An entity player's key settles first: `identificationGraph` gains an
-  edge from `E` to each entity far player.
+  edge from `E` to each entity far player. Each key column carries the
+  far role as its `sourceRoleId`, as the columns an objectified entity
+  absorbs carry their roles (`addRoleColumns`), so the DDL router and the
+  annotator find them by role as they find any other column.
+- When an external uniqueness is an entity's identifier and its columns
+  are the table's whole primary key, the DDL router shall not route it as
+  a separate `UNIQUE` clause, as it already skips an internal uniqueness
+  that is the whole key (`isWholePrimaryKey`); its external branch has no
+  such check today.
 - When another table references such an entity, its foreign key shall
   name every key column, as references to an objectified entity's
   composite key already do.
-- When a near role is not mandatory, validation shall warn as above.
 - Every reader of `preferredIdentifiers` shall handle the external case
   explicitly (Inventory), so none treats an external identifier as
   absent or reads a fact type that is not there.
 - When a NORMA file's `PreferredIdentifier` names an external uniqueness
-  constraint the mapping kept, the NORMA importer shall store it; the
-  NORMA exporter shall write `PreferredIdentifier` and `IsPreferred` for
-  a stored external identifier.
+  constraint, the NORMA importer shall keep that constraint and store it:
+  the duplicate-dropping pass (`constraintPasses.ts` `addUnlessHeld`) shall
+  not drop an external uniqueness a `PreferredIdentifier` names, as the
+  internal pass already spares a named one (`namedIdentifiers`). When an
+  external uniqueness is marked `IsPreferred` and its entity names no
+  `PreferredIdentifier`, the importer shall store it when the resolver
+  accepts it, as the internal fallback does.
+- When an entity's stored identifier is external, the NORMA exporter shall
+  write `PreferredIdentifier` and `IsPreferred` for it, and write no
+  `_ReferenceMode` for that entity: NORMA reads a reference mode as the
+  entity's identifier, so writing both states two.
 - When an Ossie concept's `identify_by` names two relationships or more,
   the Ossie importer shall store the external uniqueness it creates as
-  the concept's preferred identifier, and drop its barwise-alg warning;
-  the Ossie writer shall write `identify_by` from a stored external
-  identifier through core's resolver rather than its own shape check.
+  the concept's preferred identifier, and drop its barwise-alg warning.
+  Where a relationship's multiplicity left its near role without a
+  single-role uniqueness, the importer shall add one and warn, as its
+  single-relationship branch already does for the far role:
+  `identify_by` states each component is single-valued, and without that
+  uniqueness the stored identifier would fail rule 3.
+- When the Ossie writer decides `identify_by`, it shall use core's shape
+  check for both cases it handles today: a stored external identifier,
+  and the inference it makes for an entity with no stored identifier
+  whose external uniqueness has the identifying shape. An external
+  uniqueness that fails rule 3 is then no longer written as
+  `identify_by` but reported as a loss, which changes Ossie output for
+  any tracked model holding one; WS2 measures that over every tracked
+  model and lists each change. Each component relationship is written
+  with `E`'s role first, so `identify_by` can name it.
 
 Out of scope:
 
@@ -135,34 +186,45 @@ Out of scope:
   identifier. The llm parser reads 2.0-style flags on internal
   uniquenesses only, and asking a model for a composite scheme is a
   prompt change with its own evaluation.
+- A rule that a reference scheme's roles are mandatory, for either kind
+  (barwise-i77).
 - A reference scheme through a join longer than one fact type per
   component (Room identified by the Campus of its Building). ORM allows
   it; NORMA models it as a join path; nothing here reads one.
 
 ## Inventory
 
-Verified against the code at 6bf215b9 unless marked provisional.
+Verified against the code at 6bf215b9 unless marked provisional. Every
+row that reads `.factType` or builds an `IdentifyingUniqueness` fails to
+compile under the union until it decides the external case; that is what
+makes this list checkable rather than remembered.
 
-| Reader                                      | Reads today                          | Verdict                                                                      |
-| ------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------- |
-| `model/identification.ts` resolver          | internal uniqueness only             | resolves the external shape; `IdentifyingUniqueness` becomes a union         |
-| `identificationGraph`                       | objectification, identifying subtype | adds `E` -> entity far player for an external identifier                     |
-| `RelationalMapper` phase 0/1                | identifying binary or reference mode | composite key from the far roles, settled in identification order            |
-| `completenessWarnings`                      | refuses external with an error       | accepts the shape; reports a failed rule; warns on a non-mandatory near role |
-| `identificationSources`                     | `factTypeId` of the identifier       | `constraintId` for the preferred-uniqueness arm (one id either kind)         |
-| `preferredIdentifyingBinary`, `diagramView` | binary only                          | unchanged: external is not a binary, and they already answer undefined       |
-| `isIdentified`, `OrmYamlAnnotator`          | `byEntity.has`                       | unchanged: an external identifier is in `byEntity`                           |
-| `populationRenderer`                        | identifying fact type                | provisional: the component fact types; ground in WS1                         |
-| `query/evaluate.ts` anchors                 | identifying fact type and its roles  | provisional: the components' far players; ground in WS1                      |
-| `ModelMerge` reference following            | uniqueness over the same roles       | also follows an external uniqueness over the same roles                      |
-| `elementDiff` preferred-identifier delta    | stored id                            | unchanged: compares ids; confirm in WS1                                      |
-| `llm/ModelContext.ts`                       | `at.factType.id`                     | the component fact types                                                     |
-| `vscode` `ModelTreeProvider`                | `byConstraint` keys                  | provisional: marks the external constraint; ground where it is drawn         |
-| `NormaXmlWriter`, `populationGraph`         | internal identifier, binary seat     | writes `PreferredIdentifier`/`IsPreferred` for external (WS2)                |
-| `NormaToOrmMapper.mapPreferredIdentifiers`  | stores internal refs only            | stores an external ref the mapping kept (WS2)                                |
-| `ossie/writeOssie.ts` `compositeIdentifier` | its own shape check                  | replaced by the resolver for a stored identifier (WS2)                       |
-| `ossie/mapOssieToOrm.ts` `addIdentifier`    | keeps external, warns                | stores it as preferred (WS2)                                                 |
-| `schemas/orm-model.schema.json`             | "the uniqueness constraint"          | description names both kinds; no shape change                                |
+| Reader or builder                                                        | Reads today                                   | Verdict                                                                                                                                                        |
+| ------------------------------------------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `identification.ts` `resolvePreferredIdentifier`                         | internal uniqueness only                      | resolves the external shape through `inferExternalUniquenessJoin` plus rules 2 and 3                                                                           |
+| `identification.ts` `identifiedBy`, `placePreferredFlags`, `PlacedFlags` | build internal identifiers from 2.0 flags     | narrowed to `InternalIdentifyingUniqueness`: a 2.0 flag is only ever internal                                                                                  |
+| `identification.ts` `preferredIdentifyingBinary`                         | `at.factType`                                 | guards on `kind === "internal"`; external is not a binary                                                                                                      |
+| `identificationGraph`                                                    | objectification, identifying subtype          | adds `E` -> each entity far player of an external identifier                                                                                                   |
+| `identificationSources`                                                  | `factTypeId` of the identifier                | preferred-uniqueness arm carries `constraintId`, one id for either kind                                                                                        |
+| `isIdentified`, `OrmYamlAnnotator`, `diagramView`                        | `byEntity.has`, the binary helper             | unchanged: an external identifier is in `byEntity`, and is not a binary                                                                                        |
+| `RelationalMapper` phases 0 and 1                                        | identifying binary or reference mode          | composite key from the far roles, settled in identification order                                                                                              |
+| `formats/src/ddl/constraintRouting.ts` `routeAcross`                     | routes every external uniqueness              | skips the identifying one when it is the whole primary key                                                                                                     |
+| `completenessWarnings`                                                   | refuses external with an error                | accepts the shape; names the failed rule otherwise                                                                                                             |
+| `populationRenderer`                                                     | identifying fact type                         | provisional: renders an instance by its components' values; ground in WS1                                                                                      |
+| `query/evaluate.ts` anchors and `query/types.ts`                         | one `factType` and its roles                  | `factTypes` added for every identifier (Open decision 4)                                                                                                       |
+| `query/format.ts`                                                        | prints `factType`                             | prints `factTypes`                                                                                                                                             |
+| `elementDiff` `preferredIdentifierLabel`                                 | labels by fact type and role position         | an external identifier is labelled by its components, each fact type and far-role position, in constraint role order, so `--matching content` compares content |
+| `ModelMerge` reference following                                         | uniqueness over the same roles                | also follows an external uniqueness over the same roles                                                                                                        |
+| `llm/ModelContext.ts`                                                    | hides identifying fact types                  | hides only an internal identifier's: an external scheme's components are not implied by the reference mode, so they stay in the context                        |
+| `llm/DraftModelParser.ts`                                                | `kept.factType.name` in a warning             | reads the internal arm: the parser stores 2.0-style flags, which are internal                                                                                  |
+| `vscode` `ModelTreeProvider`                                             | `byConstraint` keys                           | provisional: marks the external constraint where the tree draws it; ground in WS1                                                                              |
+| `NormaXmlWriter` `collectPreferredIdentifiers`                           | internal identifier                           | WS1 skips an external one; WS2 writes it                                                                                                                       |
+| `norma/populationGraph.ts` `findIdentifyingSeat`                         | binary seat                                   | unchanged in WS1 (no binary, so it synthesizes as for any unseated entity); WS2 grounds whether NORMA needs more                                               |
+| `NormaToOrmMapper.mapPreferredIdentifiers`                               | stores internal refs only                     | stores an external ref, and the `IsPreferred` fallback reads external (WS2)                                                                                    |
+| `norma/mapping/constraintPasses.ts` `addUnlessHeld`                      | drops a duplicate external uniqueness         | spares one a `PreferredIdentifier` names (WS2)                                                                                                                 |
+| `ossie/writeOssie.ts` `compositeIdentifier`, `roleOrder`                 | its own shape check; internal-only role order | core's shape check; `E`'s role first in each component (WS2)                                                                                                   |
+| `ossie/mapOssieToOrm.ts` `addIdentifier`                                 | keeps external, warns                         | adds missing near-role uniquenesses, stores it as preferred (WS2)                                                                                              |
+| `schemas/orm-model.schema.json`                                          | "the uniqueness constraint"                   | description names both kinds; no shape change                                                                                                                  |
 
 ## Target architecture
 
@@ -191,6 +253,12 @@ export interface IdentifyingComponent {
   readonly farRole: Role;
 }
 
+/** The internal arm: what a 2.0 flag, and so `PlacedFlags`, can name. */
+export type InternalIdentifyingUniqueness = Extract<
+  IdentifyingUniqueness,
+  { kind: "internal"; }
+>;
+
 /** The fact types an identifier spends: one internal, one per component external. */
 export function identifyingFactTypes(
   at: IdentifyingUniqueness,
@@ -198,8 +266,8 @@ export function identifyingFactTypes(
 ```
 
 `PreferredIdentifierResolution`'s failure reasons gain one per shape rule
-(`"external-arity"`, `"external-not-binary-on-entity"`,
-`"external-near-not-unique"`, `"external-self-reference"`), so validation
+(`"external-no-common-object"`, `"external-other-entity"`,
+`"external-not-binary"`, `"external-near-not-unique"`), so validation
 names the rule and the resolver stays the one place it is decided.
 
 ## Workstreams
@@ -211,9 +279,10 @@ compile in every reader until each decides the external case: the
 resolver and its failure reasons, validation, `identificationGraph`, the
 mapper, `identificationSources`, the population renderer, query anchors,
 merge, and the downstream readers that compile against the type
-(`llm/ModelContext.ts`, the vscode tree, `NormaXmlWriter`'s
-`collectPreferredIdentifiers`, which in this workstream skips an external
-identifier rather than writing it).
+(`llm/ModelContext.ts`, `llm/DraftModelParser.ts`, the vscode tree,
+`NormaXmlWriter`'s `collectPreferredIdentifiers`, which in this workstream
+skips an external identifier rather than writing it), the diff label, the
+query anchors, and the DDL router's external branch.
 
 Acceptance:
 
@@ -222,8 +291,10 @@ Acceptance:
   `room_id` column, and no separate `UNIQUE (building_code, room_nr)`.
 - A table referencing Room carries both columns and a two-column foreign
   key.
-- Each failed shape rule is a test that names the rule in the message; a
-  non-mandatory near role warns.
+- Each failed shape rule is a test that names the rule in the message.
+- `barwise diff --matching content` on two separately built Room models
+  reports no identifier change, and reports one when a component differs.
+- `barwise query` anchors for Room list both component fact types.
 - A cycle (`E` identified through `F`, `F` through `E`) is reported by
   validation and leaves the mapper total.
 - Every tracked model's `barwise validate` output and DDL export are
@@ -252,6 +323,10 @@ identifiers are kept unnamed is updated in the same PR.
   rather than reading the wrong thing, which is the intent of the union.
 - `IdentificationSource`'s preferred-uniqueness arm carries
   `constraintId` instead of `factTypeId`.
+- The query anchors' `preferredIdentifier` gains `factTypes`; `factType`
+  stays for an internal identifier and is absent for an external one (Open
+  decision 4). That result reaches the CLI `query` command's JSON and the
+  MCP `query_model` and `describe_domain` tools.
 - No file format change: 3.0 already stores the reference by id, and its
   schema does not restrict which constraint kind it names.
 
@@ -279,6 +354,16 @@ identifiers are kept unnamed is updated in the same PR.
    external, so it is a gap for both and a verbalization change with its
    own fidelity check, barwise-k5q's territory), or add the NORMA
    sentence for both kinds in WS1.
+
+4. **The query anchors' identifier shape.** `EntityAnchors.preferredIdentifier`
+   has one `factType: string`, and an external identifier has several.
+   Options: (a) add `factTypes: string[]` for every identifier and keep
+   `factType` only for an internal one; (b) replace `factType` with
+   `factTypes`. **Recommend (a)**: a JSON consumer reading `factType` keeps
+   working for every model it can read today, since none names an external
+   identifier, and the one that does gets an absent field rather than a
+   wrong one. (b) is the cleaner shape and breaks every reader of the
+   field at once.
 
 ## Risks and testing
 
