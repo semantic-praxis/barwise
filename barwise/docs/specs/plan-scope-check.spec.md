@@ -101,10 +101,10 @@ In scope:
   exit 1 naming the spec and the entry.
 - When a PR names a spec (the spec file is in its diff, or its file name
   is in a commit message on the branch) and changes a path in that spec's
-  `Touches:` while the spec's Status at the merge base claims nothing is
-  built, and the spec has no `Plan-reviewed:`
-  line naming an ancestor of the first such change that contains the
-  spec, `check:plan-review` shall exit 1 naming the spec.
+  `Touches:` (at the merge base or at HEAD) while the spec is new or its
+  Status at the merge base claims nothing is built (or is missing), and the
+  spec has no `Plan-reviewed:` line naming a proper ancestor of every such
+  change that contains the spec, `check:plan-review` shall exit 1 naming the spec.
 - When either check cannot read git or a spec, it shall exit 2.
 
 Out of scope: blocking a merge on size or scope (see the resolved question
@@ -290,10 +290,10 @@ Plan-reviewed: <commit> (code-review, pr-review)
   `template.spec.md` tells authors to update Status in the commit that
   lands a workstream, so a head-side reading would exempt every compliant
   first-workstream PR.
-- **What it requires.** A `Plan-reviewed:` line naming a commit that is an
-  ancestor of the diff's first change to a `Touches:` entry, and at which
-  the
-  spec's body -- everything but the header block -- is identical to the
+- **What it requires.** A `Plan-reviewed:` line naming a commit that is a
+  proper ancestor of every branch commit changing a `Touches:` entry --
+  a side line merged in included, not only the first in topological
+  order -- and at which the spec's body -- everything but the header block -- is identical to the
   body as that first change began, in its parent (WS6 says why not the
   first change itself). A review of an earlier draft does not cover
   a plan rewritten afterwards; this PR is the example, where the owner's

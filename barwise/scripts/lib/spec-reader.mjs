@@ -155,6 +155,18 @@ export function touches(text) {
 }
 
 /**
+ * The specs a branch names: each in `corpus` that the branch changes, or
+ * whose file name a commit message on it mentions. One rule for the scope
+ * report (plan-scope) and the plan-review gate, which the spec says use
+ * the same one; a name matches a spec at any depth of the corpus.
+ */
+export function namedSpecs(changed, corpus, messages) {
+  const mentioned = new Set([...messages.matchAll(/[A-Za-z0-9_.-]+\.spec\.md/g)].map((m) => m[0]));
+  const changes = new Set(changed);
+  return corpus.filter((s) => changes.has(s) || mentioned.has(s.slice(s.lastIndexOf("/") + 1)));
+}
+
+/**
  * Repo paths a spec names in backticks. Specs write them relative to
  * `barwise/`, to `barwise/packages/`, or from the repo root, so each
  * candidate is tried against all three and kept only if `exists` knows

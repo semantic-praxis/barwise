@@ -24,16 +24,19 @@ fails on an unmarked entry that names nothing tracked. Shared wiring
 belongs here when the plan changes it; the audit ignores it.
 docs/specs/plan-scope-check.spec.md. -->
 
-Plan-reviewed: <commit> (code-review, pr-review)
+<!-- Plan-reviewed: <commit> (code-review, pr-review)
 
-<!-- Added after /code-review and /pr-review have run on the spec, and
-before any implementation commit: <commit> is the head those reviews
-read (spec-writer, step 8). Leave the line out until then. The line
-vouches for the body, everything below the header block, as it stood at
-that commit, so header edits such as Status do not void it and a
-rewritten plan does. check:plan-review fails a pull request that names
-this spec and changes a Touches: path while Status claims nothing is
-built, unless this line names a commit before that first change. -->
+Add that line to the header above after /code-review and /pr-review have
+run on the spec, and before any implementation commit: <commit> is the
+head those reviews read (spec-writer, step 8). It is left in this comment
+because a template that carried it would ship a spec claiming a review
+that never ran. The line vouches for the body, everything below the
+header block, as it stood at that commit, so header edits such as Status
+do not void it and a rewritten plan does. check:plan-review fails a pull
+request that names this spec and changes a Touches: path, while the spec
+is new or its Status claims nothing is built, unless the line names a
+commit that precedes every such change and whose body matches the plan
+as implementation began. -->
 
 ## Principle
 

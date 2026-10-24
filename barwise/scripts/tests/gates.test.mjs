@@ -4841,6 +4841,7 @@ function planRepo() {
     const f of [
       "check-plan-review.mjs",
       join("lib", "args.mjs"),
+      join("lib", "name-status.mjs"),
       join("lib", "review-tiers.mjs"),
       join("lib", "spec-reader.mjs"),
       join("lib", "tracked.mjs"),
@@ -4902,7 +4903,77 @@ test("check-plan-review fails a Plan-reviewed: line naming a commit after the fi
     r.commit("record the review");
     const out = r.run();
     assert.equal(out.status, 1, out.stdout + out.stderr);
-    assert.match(out.stderr, /does not precede the first change/);
+    assert.match(
+      out.stderr,
+      new RegExp(`does not precede ${first.slice(0, 8)}, a change to its Touches:`),
+    );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails a review recorded at a later commit than the first implementation", () => {
+  // Not the first change itself but a descendant of it: only the ancestry
+  // test can see that the review came after the code began.
+  const r = planRepo();
+  try {
+    r.spec();
+    r.commit("spec");
+    r.implement(1);
+    const first = r.commit("implement");
+    r.implement(2);
+    const later = r.commit("implement more");
+    r.spec({ reviewed: later });
+    r.commit("record the review");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, new RegExp(`does not precede ${first.slice(0, 8)}`));
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review fails an unreviewed implementation on a side line merged in", () => {
+  // The first changing commit in topological order descends from the
+  // review; the side line's does not, and it is checked too.
+  const r = planRepo();
+  try {
+    r.spec();
+    const specAt = r.commit("spec");
+    // Cut from the base, before the spec and its review existed.
+    r.g("checkout", "-q", "-b", "side", r.base);
+    writeFileSync(join(r.dir, "src", "b.ts"), "export const b = 1;\n");
+    const side = r.commit("side implementation, before any review");
+    r.g("checkout", "-q", "feature");
+    r.spec({ reviewed: specAt });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    r.g("merge", "-q", "--no-ff", "-m", "merge side", "side");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, new RegExp(`does not precede ${side.slice(0, 8)}`));
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review reads Touches: and Status at the base, so a branch cannot drop either", () => {
+  // The spec exists at the base with no Status line (read as claiming
+  // nothing built), and the branch drops the path it implements from
+  // Touches: -- a header edit, which leaves a review standing.
+  const r = planRepo();
+  try {
+    r.g("checkout", "-q", "main");
+    writeFileSync(join(r.dir, PLAN_SPEC), "# X\n\nTouches: src/a.ts\n\n## Plan\n\nThe plan.\n");
+    const base = r.commit("spec on main, no Status");
+    r.g("checkout", "-q", "-B", "feature");
+    writeFileSync(join(r.dir, PLAN_SPEC), "# X\n\nTouches: src/other.ts\n\n## Plan\n\nThe plan.\n");
+    r.implement(1);
+    r.commit("implement, and drop the entry");
+    const out = r.run({ BASE_SHA: base });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /x\.spec\.md: no Plan-reviewed: line/);
   } finally {
     rmSync(r.dir, { recursive: true, force: true });
   }
@@ -5006,6 +5077,34 @@ test("check-plan-review leaves a pull request that does not name the Draft spec"
     assert.equal(out.status, 0, out.stdout + out.stderr);
     assert.match(out.stdout, /0 spec\(s\) named/);
   } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-plan-review refuses when git fails to answer whether the review precedes the code", () => {
+  // `merge-base --is-ancestor` exits 128 when git itself fails (a missing
+  // object, a corrupt history). Read as "no", that would fail the author
+  // for what git could not see.
+  const r = planRepo();
+  const shim = mkdtempSync(join(tmpdir(), "barwise-planrev-git-"));
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nfor a in "$@"; do [ "$a" = --is-ancestor ] && exit 128; done\nexec "${real}" "$@"\n`,
+    );
+    chmodSync(join(shim, "git"), 0o755);
+    const out = r.run({ BASE_SHA: r.base, PATH: `${shim}:${process.env.PATH}` });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /--is-ancestor/);
+  } finally {
+    rmSync(shim, { recursive: true, force: true });
     rmSync(r.dir, { recursive: true, force: true });
   }
 });

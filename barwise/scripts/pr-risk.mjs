@@ -51,6 +51,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+import { parseNameStatus } from "./lib/name-status.mjs";
 import {
   classify,
   failureModeRows,
@@ -206,21 +207,17 @@ async function readChanges() {
         + `\n  A shallow clone or a missing '${base}' both land here.`,
     );
   }
-  const fields = out.split("\u0000");
-  if (fields.at(-1) === "") fields.pop();
-  if (fields.length % 2 !== 0) {
-    refuse("git printed a status without a path", `${fields.length} NUL-separated fields`);
+  let records;
+  try {
+    records = parseNameStatus(out);
+  } catch (err) {
+    refuse("git printed a status without a path", err.message);
   }
-  const changes = [];
-  for (let i = 0; i < fields.length; i += 2) {
-    const letter = fields[i];
-    changes.push({
-      path: fields[i + 1],
-      status: GIT_STATUS[letter] ?? `git:${letter}`,
-      previous: null,
-    });
-  }
-  return changes;
+  return records.map(({ letter, path }) => ({
+    path,
+    status: GIT_STATUS[letter] ?? `git:${letter}`,
+    previous: null,
+  }));
 }
 
 /**

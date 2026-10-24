@@ -47,8 +47,8 @@ least once:
   two reviews read (`spec-writer`, step 8). Reviewing the plan beside
   the code it was meant to shape is what the rule replaces.
   `npm run check:plan-review` runs it locally and in CI; it covers a
-  spec the PR names that declares `Touches:` and whose Status still
-  claims nothing is built.
+  spec the PR names that declares `Touches:` and is new in the PR or
+  whose Status at the base claims nothing is built.
 - **The tracking issue exists and this PR does not close it.** File
   it with `node barwise/scripts/beads-crud.mjs create` if missing. Closure is
   a tracker-only follow-up after merge (`steward`, section 5); the

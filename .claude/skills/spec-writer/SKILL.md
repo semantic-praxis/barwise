@@ -103,9 +103,10 @@ alongside this file.
    the review again: the line vouches for the spec's body as it stood at
    that commit. `npm run check:plan-review` (a CI gate on pull requests)
    fails a PR that names the spec and changes a path in its `Touches:`
-   while the spec still claims nothing is built, unless the line names a
-   commit before the first such change whose body matches the plan the
-   implementation started from (`docs/specs/plan-scope-check.spec.md`).
+   while the spec is new in the PR or its Status at the base claims
+   nothing is built, unless the line names a commit that precedes every
+   such change and whose body matches the plan the implementation
+   started from (`docs/specs/plan-scope-check.spec.md`).
    The spec may land alone or with its first workstream; either way the
    review commit comes first. Before implementing
    each workstream, ground it again and verify or correct the

@@ -12,8 +12,10 @@
  *
  * WHICH SPECS. A spec is covered when the PR names it -- its file is in
  * the diff, or its file name is in a commit message on the branch -- and
- * the diff changes a path in its `Touches:`, and its Status at the merge
- * base claims nothing is built (or it is new in the diff). Only specs the
+ * the diff changes a path in its `Touches:` (read at the merge base and at
+ * HEAD, so dropping an entry or archiving the spec does not take it out),
+ * and it is new in the diff or its Status at the merge base claims nothing
+ * is built (a missing Status counts as claiming nothing). Only specs the
  * PR names: covering every spec whose `Touches:` lists a changed file
  * made unrelated PRs that edit `ci.yml` or a skill answer for some Draft
  * spec's review, six findings in three rounds on PR #714 (Open decision
@@ -21,9 +23,11 @@
  * first workstream updates Status in the commit that lands it.
  *
  * WHAT IT REQUIRES. A `Plan-reviewed:` line, at HEAD, naming a commit R
- * that (1) is a proper ancestor of F, the branch's first commit to change
- * one of those `Touches:` paths, (2) contains the spec, and (3) carries
- * the same spec body -- everything but the header block -- as F's parent,
+ * that (1) is a proper ancestor of every commit on the branch that changes
+ * one of those `Touches:` paths -- on a merged side line too, not only
+ * the first in topological order -- (2) contains the spec, and (3) carries
+ * the same spec body -- everything but the header block -- as the parent
+ * of F, the first such commit,
  * the plan as implementation began. A review of an earlier draft does not
  * vouch for a plan rewritten after it; adding the line itself, or a
  * Status update, leaves the body alone. The spec says "the body at that
@@ -49,11 +53,13 @@
  */
 import { execFileSync } from "node:child_process";
 import { opt } from "./lib/args.mjs";
+import { parseNameStatus } from "./lib/name-status.mjs";
 import {
   CLAIMS_NOTHING_BUILT,
   entryPaths,
   header,
   inSpecCorpus,
+  namedSpecs,
   specBody,
   touches,
 } from "./lib/spec-reader.mjs";
@@ -80,13 +86,17 @@ function git(args) {
   }
 }
 
-/** Whether git says yes (exit 0) or no (exit 1) to a question; anything else refuses. */
+/**
+ * Whether git says yes (exit 0) or no (exit 1) to a question; anything
+ * else refuses. 128 is git failing -- a missing object, a corrupt history
+ * -- and read as "no" it would blame the author for what git could not see.
+ */
 function gitAnswers(args) {
   try {
     execFileSync("git", args, { cwd: REPO_ROOT, stdio: "ignore" });
     return true;
   } catch (err) {
-    if (err.status === 1 || err.status === 128) return false;
+    if (err.status === 1) return false;
     return refuse(`\`git ${args.join(" ")}\` exited ${err.status ?? err.signal}`);
   }
 }
@@ -105,8 +115,12 @@ function resolveCommit(sha) {
   }
 }
 
-/** Whether `rev` holds `path`. */
-const holds = (rev, path) => gitAnswers(["cat-file", "-e", `${rev}:${path}`]);
+/**
+ * Whether `rev` holds `path`, from a listing rather than an exit status:
+ * `cat-file -e` exits 128 both for an absent path and for a git that
+ * failed, and only the listing tells them apart.
+ */
+const holds = (rev, path) => git(["ls-tree", "-z", "--name-only", rev, "--", path]) !== "";
 
 let base, head;
 try {
@@ -128,24 +142,24 @@ if (!mergeBase) refuse(`no merge base between ${base} and ${head}.`);
 
 // -z prints names exactly; --no-renames keeps a rename's source path,
 // which is as much a change to a planned file as its destination.
-const fields = git(["diff", "--name-status", "-z", "--no-renames", `${base}...${head}`])
-  .split("\u0000");
-if (fields.at(-1) === "") fields.pop();
-if (fields.length % 2 !== 0) refuse("git printed a status without a path.");
-const changed = [];
-for (let i = 1; i < fields.length; i += 2) changed.push(fields[i]);
+let changed;
+try {
+  changed = parseNameStatus(
+    git(["diff", "--name-status", "-z", "--no-renames", `${base}...${head}`]),
+  ).map((r) => r.path);
+} catch (err) {
+  refuse(err.message);
+}
 
-// The specs the branch names: changed ones it still holds, and any spec
-// whose file name a commit message on the branch mentions.
-const corpus = git(["ls-tree", "-r", "--name-only", "-z", head, "--", "barwise/docs/specs/"])
-  .split("\u0000").filter(inSpecCorpus);
+// The specs the branch names (the rule plan-scope shares), from the corpus
+// at HEAD and at the merge base: a spec the branch archives or deletes is
+// still one whose plan it may be implementing.
+const corpusAt = (rev) =>
+  git(["ls-tree", "-r", "--name-only", "-z", rev, "--", "barwise/docs/specs/"])
+    .split("\u0000").filter(inSpecCorpus);
+const corpus = [...new Set([...corpusAt(head), ...corpusAt(mergeBase)])].sort();
 const messages = git(["log", "--format=%B", `${mergeBase}..${head}`]);
-const mentioned = new Set(
-  [...messages.matchAll(/[A-Za-z0-9_.-]+\.spec\.md/g)].map((m) => m[0]),
-);
-const named = corpus.filter(
-  (s) => changed.includes(s) || mentioned.has(s.slice(s.lastIndexOf("/") + 1)),
-);
+const named = namedSpecs(changed, corpus, messages);
 
 const read = (rev, path) => git(["show", `${rev}:${path}`]);
 const short = (sha) => sha.slice(0, 8);
@@ -153,15 +167,22 @@ const short = (sha) => sha.slice(0, 8);
 const failures = [];
 const checked = [];
 for (const spec of named) {
-  const text = read(head, spec);
-  const entries = touches(text);
+  const atBase = holds(mergeBase, spec) ? read(mergeBase, spec) : undefined;
+  // The spec as the branch leaves it, or as it stood when the branch
+  // removes it; the review line is read from this.
+  const text = holds(head, spec) ? read(head, spec) : atBase;
+  // Both sides' entries: a branch that drops an implemented path from
+  // Touches: (a header edit, which leaves a review standing) is still
+  // implementing it.
+  const entries = [...(touches(text) ?? []), ...(atBase ? touches(atBase) ?? [] : [])];
   // No declaration, no plan to hold the diff against. check:spec-touches
   // owns an empty one.
-  if (!entries || entries.length === 0) continue;
+  if (entries.length === 0) continue;
 
-  if (holds(mergeBase, spec)) {
-    const status = header(read(mergeBase, spec), "Status");
-    if (status === undefined || !CLAIMS_NOTHING_BUILT.test(status)) continue;
+  if (atBase !== undefined) {
+    // A missing Status is read as claiming nothing, as a new spec's is.
+    const status = header(atBase, "Status");
+    if (status !== undefined && !CLAIMS_NOTHING_BUILT.test(status)) continue;
   }
 
   // The spec's own file is the plan, not its implementation, even when
@@ -171,9 +192,10 @@ for (const spec of named) {
   const implemented = others.filter((p) => planned.has(p));
   if (implemented.length === 0) continue;
 
-  // The first commit on the branch to change one of them. Topological and
-  // reversed, so an ancestor always comes before its descendants.
-  const first = git([
+  // Every commit on the branch to change one of them, topological and
+  // reversed, so an ancestor always comes before its descendants and the
+  // first is where implementation began.
+  const changing = git([
     "rev-list",
     "--reverse",
     "--topo-order",
@@ -181,7 +203,8 @@ for (const spec of named) {
     "--",
     ...implemented,
   ])
-    .split("\n").find(Boolean);
+    .split("\n").filter(Boolean);
+  const first = changing[0];
   if (!first) refuse(`the diff changes ${implemented[0]} but no commit on the branch does.`);
   const id = spec.slice(spec.lastIndexOf("/") + 1);
   const at = `first change to its Touches: is ${short(first)} (${implemented[0]})`;
@@ -197,11 +220,16 @@ for (const spec of named) {
     failures.push(`${id}: Plan-reviewed: "${line}" names no commit in this repository; ${at}.`);
     continue;
   }
-  if (reviewed === first || !gitAnswers(["merge-base", "--is-ancestor", reviewed, first])) {
+  // Each changing commit, not only the first: one on a side line merged
+  // in later can precede the review while the first does not.
+  const early = changing.find((c) =>
+    c === reviewed || !gitAnswers(["merge-base", "--is-ancestor", reviewed, c])
+  );
+  if (early !== undefined) {
     failures.push(
-      `${id}: Plan-reviewed: names ${
-        short(reviewed)
-      }, which does not precede the ${at}. The plan must be reviewed before it is implemented.`,
+      `${id}: Plan-reviewed: names ${short(reviewed)}, which does not precede ${
+        short(early)
+      }, a change to its Touches: (the ${at}). The plan must be reviewed before it is implemented.`,
     );
     continue;
   }
