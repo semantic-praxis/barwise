@@ -137,7 +137,7 @@ working in a package:
 - `barwise/packages/llm/CLAUDE.md` -- LLM transcript extraction
 - `barwise/packages/code-analysis/CLAUDE.md` -- code connector package; registers TypeScript/Java/Kotlin importers into the `FormatDescriptor` registry
 - `barwise/packages/dbt/CLAUDE.md` -- dbt connector package; registers the dbt importer/exporter into the `FormatDescriptor` registry (owns its fs + subprocess I/O)
-- `barwise/packages/formats/CLAUDE.md` -- standard interop connector package; registers the DDL/OpenAPI/Avro/NORMA/SQL descriptors into the `FormatDescriptor` registry
+- `barwise/packages/formats/CLAUDE.md` -- standard interop connector package; registers the DDL/OpenAPI/Avro/NORMA/SQL/Ossie descriptors into the `FormatDescriptor` registry
 - `barwise/packages/learn/CLAUDE.md` -- learning artifacts: the modeling gym (exercise format, deterministic evaluator, miss cards) and the tutorial renderer
 - `barwise/packages/promptlab/CLAUDE.md` -- deterministic prompt evaluation: eval suite, scorer, runner, score history for the LLM surfaces
 - `barwise/packages/cli/CLAUDE.md` -- CLI tool (the full command surface is the capability matrix below plus `barwise --help`; docs/CLI.md documents every command)
@@ -166,7 +166,7 @@ working in a package:
   |                                        its fs + subprocess I/O
   |--- @barwise/formats         (core)  -- connector package: registers
   |                                        the standard DDL/OpenAPI/Avro/
-  |                                        NORMA/SQL descriptors
+  |                                        NORMA/SQL/Ossie descriptors
   |--- @barwise/learn           (core)  -- learning artifacts: the modeling
   |                                        gym (exercise format, deterministic
   |                                        evaluator, miss-card emission) and
@@ -206,7 +206,7 @@ rather than putting that I/O in `core`. `@barwise/dbt` follows the same
 convention for the dbt importer/exporter (project-directory scanning and
 the `dbt compile` subprocess), registering via `registerDbtFormats()`.
 `@barwise/formats` carries the standard interop descriptors (DDL,
-OpenAPI, Avro, NORMA, SQL) via `registerStandardFormats()`, so `core`
+OpenAPI, Avro, NORMA, SQL, Ossie) via `registerStandardFormats()`, so `core`
 ships no interop format at all -- only the registry, the format
 interfaces, and the native `.orm.yaml`.
 

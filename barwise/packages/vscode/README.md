@@ -39,7 +39,7 @@ Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and type
 | **Barwise: Set Anthropic API Key** | Store an Anthropic key in the OS keychain                    |
 | **ORM: Analyze Repository**        | Profile a repository and import it                           |
 
-Other import and export formats (DDL, OpenAPI, NORMA, SQL) are reachable
+Other import and export formats (DDL, OpenAPI, NORMA, SQL, Ossie) are reachable
 through Copilot Chat as `#barwiseImportModel` and `#barwiseExport`.
 
 ## Configuration

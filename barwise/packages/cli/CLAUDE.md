@@ -188,14 +188,14 @@ npx tsc --noEmit            # type-check only
 
 ## Dependencies
 
-| Direction | Package                  | What is used                                                       |
-| --------- | ------------------------ | ------------------------------------------------------------------ |
-| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, query, describe   |
-| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                      |
-| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                     |
-| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers   |
-| Upstream  | `@barwise/code-analysis` | `registerCodeFormats` for TypeScript/Java/Kotlin import            |
-| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                         |
-| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL descriptors) |
-| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator, miss cards)             |
-| Upstream  | `@barwise/promptlab`     | Eval suite, scorer, runner, score history for `barwise prompt`     |
+| Direction | Package                  | What is used                                                             |
+| --------- | ------------------------ | ------------------------------------------------------------------------ |
+| Upstream  | `@barwise/core`          | Model, validation, verbalization, mapping, diff, query, describe         |
+| Upstream  | `@barwise/diagram`       | Diagram layout for SVG output                                            |
+| Upstream  | `@barwise/diagram-ui`    | Headless SVG rendering of the positioned graph                           |
+| Upstream  | `@barwise/llm`           | `processTranscript`, `reviewModel`, `createLlmClient`, providers         |
+| Upstream  | `@barwise/code-analysis` | `registerCodeFormats` for TypeScript/Java/Kotlin import                  |
+| Upstream  | `@barwise/dbt`           | `registerDbtFormats` for dbt import/export                               |
+| Upstream  | `@barwise/formats`       | `registerStandardFormats` (DDL/OpenAPI/Avro/NORMA/SQL/Ossie descriptors) |
+| Upstream  | `@barwise/learn`         | Modeling gym (exercise catalog, evaluator, miss cards)                   |
+| Upstream  | `@barwise/promptlab`     | Eval suite, scorer, runner, score history for `barwise prompt`           |

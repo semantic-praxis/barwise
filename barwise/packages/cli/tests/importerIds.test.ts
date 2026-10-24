@@ -122,6 +122,34 @@ models:
               values: ['open', 'closed']
 `;
 
+/**
+ * Every id path the Ossie importer takes: a declared concept, a built-in a
+ * role names (`String`), each multiplicity, a subtype fact, a single
+ * identifier whose far-role uniqueness the importer adds, a composite one
+ * (an external uniqueness), and a mandatory role from `requires`.
+ */
+const OSSIE = `version: 0.2.0.dev0
+name: Ids
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ] }
+  - concept: Party
+    type: EntityType
+    identify_by: [ code ]
+    requires: [ Party.code ]
+    relationships:
+      - { name: code, roles: [ { concept: Code } ], multiplicity: ManyToOne, verbalizes: [ "{Party} has {Code}" ] }
+      - { name: nick, roles: [ { concept: String } ], verbalizes: [ "{Party} has nick {String}" ] }
+  - concept: Person
+    type: EntityType
+    extends: [ Party ]
+  - concept: Seat
+    type: EntityType
+    identify_by: [ party, label ]
+    relationships:
+      - { name: party, roles: [ { concept: Party } ], multiplicity: ManyToOne, verbalizes: [ "{Seat} is for {Party}" ] }
+      - { name: label, roles: [ { concept: String } ], multiplicity: OneToOne, verbalizes: [ "{Seat} has label {String}" ] }
+`;
+
 const tempDirs: string[] = [];
 afterAll(() => {
   for (const d of tempDirs) rmSync(d, { recursive: true, force: true });
@@ -172,6 +200,7 @@ const FIXTURES: Record<string, () => Promise<OrmModel>> = {
   ddl: async () => text("ddl", DDL),
   openapi: async () => text("openapi", OPENAPI),
   sql: async () => text("sql", SQL),
+  ossie: async () => text("ossie", OSSIE),
   dbt: async () => directory("dbt", dbtProject()),
   typescript: async () => directory("typescript", codeProject()),
   java: async () => directory("java", codeProject()),
@@ -204,6 +233,12 @@ function allIds(model: OrmModel): string[] {
   for (const ft of model.factTypes) {
     ids.push(`fact type ${ft.name}: ${ft.id}`);
     for (const r of ft.roles) ids.push(`role ${ft.name}/${r.name}: ${r.id}`);
+  }
+  // Subtype facts too: an importer that maps a supertype (Ossie's extends)
+  // mints their ids, and a hand-built one there passed unseen before.
+  for (const sf of model.subtypeFacts) {
+    const end = (id: string) => model.getObjectType(id)?.name ?? id;
+    ids.push(`subtype fact ${end(sf.subtypeId)} -> ${end(sf.supertypeId)}: ${sf.id}`);
   }
   for (const [c, ft] of model.everyConstraint()) {
     ids.push(`constraint ${ft?.name ?? "(across fact types)"}/${c.type}: ${c.id}`);
