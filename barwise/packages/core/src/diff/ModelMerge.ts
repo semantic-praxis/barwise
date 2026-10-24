@@ -32,7 +32,7 @@ import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
-import { subtypePairKey, toSubtypeFactConfig } from "../model/SubtypeFact.js";
+import { type SubtypeFact, subtypePairKey, toSubtypeFactConfig } from "../model/SubtypeFact.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
@@ -283,7 +283,13 @@ export function mergeModels(
         ? resolveObjectTypeId(merged, source.supertypeId, incomingIdToMergedId)
         : source.supertypeId;
       const pair = subtypePairKey({ subtypeId, supertypeId });
-      const kept = merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
+      // The fact under its own id first: with two over one pair carried
+      // (barwise-m9b), the first by pair would retarget a constraint naming
+      // the second.
+      const same = merged.getSubtypeFact(id);
+      const kept = same && subtypePairKey(same) === pair
+        ? same
+        : merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
       ids.push(kept?.id ?? LEFT_OUT);
     }
     return withoutSubtypeFacts(
@@ -328,58 +334,86 @@ export function mergeModels(
     .map((d, i) => [d, i] as const)
     .filter(([d]) => d.elementType === "subtype_fact") as [SubtypeFactDelta, number][];
 
+  // Which source fact each merged subtype fact came from, so a repeated
+  // pair is carried only beside its own sibling.
+  const placedFrom = new Map<string, SubtypeFact>();
+  // The other side of each paired delta: a repeat from one model may sit
+  // beside the fact the diff paired with its sibling from the other.
+  const partner = new Map<SubtypeFact, SubtypeFact>();
+  for (const [d] of sfDeltas) {
+    if (d.existing && d.incoming) {
+      partner.set(d.existing, d.incoming);
+      partner.set(d.incoming, d.existing);
+    }
+  }
   for (const [delta, idx] of sfDeltas) {
     const isAccepted = accepted.has(idx);
     const chosen = keptSide(delta, isAccepted);
     if (!chosen) continue;
-    // Keep the existing element's id through an accepted modification,
-    // as the object-type and fact-type phases do, so anything holding
-    // the old id still resolves.
+    const source = chosen === delta.incoming ? incoming : existing;
     // The chosen element may come from the INCOMING model, whose object
     // type ids are not the merged model's: an element matched by name
     // keeps the existing model's id. Phase 1 recorded the translation.
     const subtypeId = resolveObjectTypeId(merged, chosen.subtypeId, incomingIdToMergedId);
     const supertypeId = resolveObjectTypeId(merged, chosen.supertypeId, incomingIdToMergedId);
+    // An accepted modification keeps the existing id so anything holding
+    // it still resolves, as the object-type and fact-type phases do.
+    // Otherwise the element's own id -- unless the merged model already
+    // holds it, in which case `addSubtypeFact` refuses it
+    // (`DuplicateIdError`) and the whole merge is lost.
+    const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
+    const id = merged.getSubtypeFact(preferredId) ? undefined : preferredId;
+    const config = { ...toSubtypeFactConfig(chosen), id, subtypeId, supertypeId };
     // Asked before adding because a throw loses the WHOLE merge rather than
     // one element (`mergeAndValidate` returns a null model). An accepted
     // modification can turn an end into a value type, and a rejected
     // removal plus an accepted addition can resolve to a pair already held.
-    if (!merged.canAddSubtypeFact({ subtypeId, supertypeId })) {
-      // The same split the population phase makes below: an accepted
-      // removal took the endpoint and the drop is the decision; a
-      // reference NEITHER model ever defined is a dangling reference,
-      // and deleting it here would delete the evidence before
-      // `structural/subtype-dangling-*` could report it (barwise-997).
-      const dangling = isDanglingPlayer(existing, incoming, chosen.subtypeId)
-        || isDanglingPlayer(existing, incoming, chosen.supertypeId);
-      // The same holds for a pair its own model already repeated (a lenient
-      // load): `structural/duplicate-subtype-fact` reports it, and dropping
-      // one here is what left nothing to report (barwise-m9b). A repeat the
-      // merge itself creates, two pairs resolving onto one, is still dropped.
-      const source = chosen === delta.incoming ? incoming : existing;
-      const repeated = source.subtypeFacts.some((sf) =>
-        sf !== chosen && subtypePairKey(sf) === subtypePairKey(chosen)
-      );
-      if (!dangling && !repeated) continue;
-      const held = merged.subtypeFacts.some((sf) => sf.id === chosen.id);
-      merged.addSubtypeFact(
-        {
-          ...toSubtypeFactConfig(chosen),
-          id: dangling || held ? undefined : chosen.id,
-          subtypeId,
-          supertypeId,
-        },
-        { skipPlayerValidation: true },
-      );
+    if (merged.canAddSubtypeFact({ subtypeId, supertypeId })) {
+      placedFrom.set(merged.addSubtypeFact(config).id, chosen);
       continue;
     }
-    // An accepted modification keeps the existing id so anything holding
-    // it still resolves. Otherwise the element's own id -- unless the
-    // merged model already holds that id, in which case `addSubtypeFact`
-    // refuses it (`DuplicateIdError`) and the whole merge is lost.
-    const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
-    const id = merged.subtypeFacts.some((sf) => sf.id === preferredId) ? undefined : preferredId;
-    merged.addSubtypeFact({ ...toSubtypeFactConfig(chosen), id, subtypeId, supertypeId });
+    // The same split the population phase makes below: an accepted
+    // removal took the endpoint and the drop is the decision; a
+    // reference NEITHER model ever defined is a dangling reference,
+    // and deleting it here would delete the evidence before
+    // `structural/subtype-dangling-*` could report it (barwise-997).
+    if (
+      isDanglingPlayer(existing, incoming, chosen.subtypeId)
+      || isDanglingPlayer(existing, incoming, chosen.supertypeId)
+    ) {
+      merged.addSubtypeFact({ ...config, id: undefined }, { skipPlayerValidation: true });
+      continue;
+    }
+    // A pair its own model already repeated (a lenient load) is carried
+    // too, so `structural/duplicate-subtype-fact` still reports it; dropping
+    // one is what left nothing to report (barwise-m9b). Only when the pair
+    // is the sole refusal and the fact holding it is this one's sibling in
+    // its own model, or the fact the diff paired with that sibling: a
+    // value-type end, a self pair, or a repeat the merge itself creates is
+    // still dropped.
+    if (isSiblingRepeat(source, chosen, subtypeId, supertypeId)) {
+      const placed = merged.addSubtypeFact(config, { skipPlayerValidation: true });
+      placedFrom.set(placed.id, chosen);
+    }
+  }
+  function isSiblingRepeat(
+    source: OrmModel,
+    fact: SubtypeFact,
+    subtypeId: string,
+    supertypeId: string,
+  ): boolean {
+    // No check on the ends here: the holder was placed only after
+    // `canAddSubtypeFact` passed for this same pair, so its ends are
+    // entities and differ. A value-type end or a self pair has no holder
+    // and is dropped below.
+    const pair = subtypePairKey({ subtypeId, supertypeId });
+    const holder = merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
+    const origin = holder && placedFrom.get(holder.id);
+    if (origin === undefined) return false;
+    return source.subtypeFacts.some((sibling) =>
+      sibling !== fact && subtypePairKey(sibling) === subtypePairKey(fact)
+      && (sibling === origin || partner.get(sibling) === origin)
+    );
   }
 
   // Phase 4b: constraints over subtype facts, now that the merged model

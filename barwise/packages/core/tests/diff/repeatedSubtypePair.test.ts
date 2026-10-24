@@ -60,3 +60,47 @@ describe("two subtype facts over one pair", () => {
     expect(result.diagnostics.map((d) => d.ruleId)).toEqual([RULE_ID.duplicateSubtypeFact]);
   });
 });
+
+describe("what the merge still drops, and the ids it keeps", () => {
+  it("drops both when an accepted change makes an end a value type", () => {
+    const existing = withRepeatedPair();
+    const incoming = new OrmModel({ name: "M" });
+    incoming.addObjectType({ id: "a", name: "A", kind: "value" });
+    incoming.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "b_id" });
+    for (const id of ["sf1", "sf2"]) {
+      incoming.addSubtypeFact({ id, subtypeId: "b", supertypeId: "a" }, {
+        skipPlayerValidation: true,
+      });
+    }
+    const { deltas } = diffModels(existing, incoming);
+    const result = mergeAndValidate(existing, incoming, deltas, new Set(deltas.keys()));
+    expect(result.model?.subtypeFacts).toEqual([]);
+  });
+
+  it("keeps the existing id when a repeat's modification is accepted", () => {
+    const existing = withRepeatedPair();
+    const incoming = new OrmModel({ name: "M" });
+    incoming.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "a_id" });
+    incoming.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "b_id" });
+    incoming.addSubtypeFact({ id: "sf1", subtypeId: "b", supertypeId: "a" });
+    incoming.addSubtypeFact({
+      id: "sfZ",
+      subtypeId: "b",
+      supertypeId: "a",
+      providesIdentification: false,
+    }, { skipPlayerValidation: true });
+    const { deltas } = diffModels(existing, incoming);
+    expect(deltas.filter((d) => d.elementType === "subtype_fact").map((d) => d.kind))
+      .toEqual(["unchanged", "modified"]);
+    const result = mergeAndValidate(existing, incoming, deltas, new Set(deltas.keys()));
+    expect(result.model?.subtypeFacts.map((sf) => sf.id)).toEqual(["sf1", "sf2"]);
+  });
+
+  it("a constraint naming the second keeps naming the second", () => {
+    const model = withRepeatedPair();
+    model.addConstraint({ type: "exclusion", id: "x", subtypeFactIds: ["sf1", "sf2"] });
+    const { deltas } = diffModels(model, model);
+    const merged = mergeAndValidate(model, model, deltas, new Set()).model!;
+    expect(merged.getConstraint("x")).toMatchObject({ subtypeFactIds: ["sf1", "sf2"] });
+  });
+});

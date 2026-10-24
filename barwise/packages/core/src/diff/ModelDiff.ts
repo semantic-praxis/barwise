@@ -319,7 +319,9 @@ export function diffModels(
     const groups = new Map<string, SubtypeFact[]>();
     for (const sf of model.subtypeFacts) {
       const key = sfKey(sf, model, other);
-      groups.set(key, [...(groups.get(key) ?? []), sf]);
+      const group = groups.get(key);
+      if (group) group.push(sf);
+      else groups.set(key, [sf]);
     }
     return groups;
   };
