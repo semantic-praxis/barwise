@@ -33,7 +33,7 @@ import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
 import { type SubtypeFact, subtypePairKey, toSubtypeFactConfig } from "../model/SubtypeFact.js";
-import { derivedId } from "../serialization/derivedId.js";
+import { derivedId, MERGE_ID_TAG } from "../serialization/derivedId.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
@@ -264,9 +264,11 @@ export function mergeModels(
   // accepted removal) leaves of the constraint what still holds without it,
   // as `removeSubtypeFact` does; one neither model held is carried through
   // for validation to report.
-  // Each source subtype fact the merge placed, to the id it took there.
-  // Filled by phase 4; read by phase 4b, which runs after it.
+  // Each source subtype fact the merge placed, to the id it took there,
+  // and each one the decision left out. Filled by phase 4; read by phase
+  // 4b, which runs after it.
   const mergedIdOf = new Map<SubtypeFact, string>();
+  const decidedOut = new Set<SubtypeFact>();
   const overMergedSubtypeFacts = (
     chosen: ExternalConstraint,
     fromIncoming: boolean,
@@ -291,10 +293,16 @@ export function mergeModels(
       // took (its own, or one `mergedId` derived): with two over one pair
       // carried (barwise-m9b), the first by pair would retarget a
       // constraint naming the second.
+      // One the decision left out is left out: the fact holding its pair
+      // is at most a sibling repeat, and pointing at it named that sibling
+      // twice (from the pr-review of #740). The pair fallback is for a fact
+      // kept but refused as a repeat the merge itself would create.
       const placedAs = mergedIdOf.get(source);
       const same = placedAs === undefined ? undefined : merged.getSubtypeFact(placedAs);
       const kept = same && subtypePairKey(same) === pair
         ? same
+        : decidedOut.has(source)
+        ? undefined
         : merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
       ids.push(kept?.id ?? LEFT_OUT);
     }
@@ -340,13 +348,6 @@ export function mergeModels(
     .map((d, i) => [d, i] as const)
     .filter(([d]) => d.elementType === "subtype_fact") as [SubtypeFactDelta, number][];
 
-  // Which source fact each merged subtype fact came from, so a repeated
-  // pair is carried only beside its own sibling.
-  const placedFrom = new Map<string, SubtypeFact>();
-  const place = (id: string, fact: SubtypeFact) => {
-    placedFrom.set(id, fact);
-    mergedIdOf.set(fact, id);
-  };
   // The other side of each paired delta: a repeat from one model may sit
   // beside the fact the diff paired with its sibling from the other.
   const partner = new Map<SubtypeFact, SubtypeFact>();
@@ -356,10 +357,26 @@ export function mergeModels(
       partner.set(d.incoming, d.existing);
     }
   }
+  // Which source fact each merged subtype fact came from, so a repeated
+  // pair is carried only beside its own sibling.
+  const placedFrom = new Map<string, SubtypeFact>();
+  const place = (id: string, fact: SubtypeFact) => {
+    placedFrom.set(id, fact);
+    mergedIdOf.set(fact, id);
+    // The placement stands for both sides of its delta, so a constraint
+    // from the side not placed (an existing constraint naming the existing
+    // fact, whose incoming modification was accepted) still finds it.
+    const mate = partner.get(fact);
+    if (mate !== undefined) mergedIdOf.set(mate, id);
+  };
   for (const [delta, idx] of sfDeltas) {
     const isAccepted = accepted.has(idx);
     const chosen = keptSide(delta, isAccepted);
-    if (!chosen) continue;
+    if (!chosen) {
+      // An accepted removal or a rejected addition: one side, left out.
+      decidedOut.add((delta.existing ?? delta.incoming)!);
+      continue;
+    }
     const source = chosen === delta.incoming ? incoming : existing;
     // The chosen element may come from the INCOMING model, whose object
     // type ids are not the merged model's: an element matched by name
@@ -419,10 +436,20 @@ export function mergeModels(
     const holder = merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
     const origin = holder && placedFrom.get(holder.id);
     if (origin === undefined) return false;
-    return source.subtypeFacts.some((sibling) =>
-      sibling !== fact && subtypePairKey(sibling) === subtypePairKey(fact)
-      && (sibling === origin || partner.get(sibling) === origin)
-    );
+    // A sibling in this fact's own model, or in its partner's: an accepted
+    // modification brings the incoming side, whose model may no longer
+    // repeat the pair while the existing side's model still does, and the
+    // holder is then the existing sibling (barwise-m9b, from the retroactive
+    // review of #733).
+    const siblingsOf = (model: OrmModel, f: SubtypeFact) =>
+      model.subtypeFacts.filter((s) => s !== f && subtypePairKey(s) === subtypePairKey(f));
+    const mate = partner.get(fact);
+    const other = source === existing ? incoming : existing;
+    const siblings = [
+      ...siblingsOf(source, fact),
+      ...(mate === undefined ? [] : siblingsOf(other, mate)),
+    ];
+    return siblings.some((sibling) => sibling === origin || partner.get(sibling) === origin);
   }
 
   // Phase 4b: constraints over subtype facts, now that the merged model
@@ -767,10 +794,10 @@ function remapPopulationRoles(
  * left to the installed generator, so merging the same two models twice
  * gave those elements different ids, against the rule that core is
  * deterministic (barwise-yg5). Derived from what the merge already has,
- * it is the same every time. The attempt number keeps two elements that
- * prefer one id apart -- one fact type may hold several populations with
- * one id across the two models -- and walks past a derived id something
- * else already holds.
+ * it is the same every time. The attempt number walks past every id the
+ * merged store already holds: a third element preferring the same id, and
+ * an element that kept a derived id from an earlier merge whose output is
+ * being merged again.
  */
 function mergedId(
   kind: "subtype-fact" | "objectification" | "population",
@@ -779,7 +806,7 @@ function mergedId(
 ): string {
   if (!holds(preferred)) return preferred;
   for (let attempt = 1;; attempt++) {
-    const id = derivedId(`barwise.merge.${kind}`, [preferred, String(attempt)]);
+    const id = derivedId(`${MERGE_ID_TAG}.${kind}`, [preferred, String(attempt)]);
     if (!holds(id)) return id;
   }
 }

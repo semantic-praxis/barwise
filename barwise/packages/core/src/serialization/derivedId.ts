@@ -61,6 +61,14 @@ export function canonicalJson(value: unknown): string {
 export const CONSTRAINT_ID_TAG = "barwise.constraint";
 
 /**
+ * The tag merge derives an element's id under where the merged store
+ * already holds the one it prefers (`ModelMerge.mergedId`), followed by
+ * the element's kind. Named here beside the others so every derivation's
+ * domain is in one place.
+ */
+export const MERGE_ID_TAG = "barwise.merge";
+
+/**
  * One fact type's constraints, as read from a file, each with an id: the
  * file's own, or one derived from the fact type's id and the constraint's
  * content when the file gave none. (`deserializeConstraint` already drops

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { mergeAndValidate } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { derivedId, MERGE_ID_TAG } from "../../src/serialization/derivedId.js";
 
 function entities(m: OrmModel, ...ids: string[]): OrmModel {
   for (const id of ids) {
@@ -103,5 +104,26 @@ describe("a constraint follows a subtype fact to its derived id", () => {
     const overD = merged.subtypeFacts.filter((sf) => sf.subtypeId === "d").map((sf) => sf.id);
     expect(overD).toHaveLength(2);
     expect(merged.getConstraint("x")).toMatchObject({ subtypeFactIds: overD });
+  });
+});
+
+describe("re-merging an earlier merge's output", () => {
+  // That output holds attempt 1's derived id, so a further collision on the
+  // same preferred id has to walk to attempt 2 (from the retroactive review
+  // of #734: no test reached it, and dropping the walk passed every test).
+  it("walks past a derived id the input already holds", () => {
+    const existing = entities(new OrmModel({ name: "M" }), "a", "b", "c", "d");
+    existing.addSubtypeFact({ id: "s", subtypeId: "b", supertypeId: "a" });
+    existing.addSubtypeFact({
+      id: derivedId(`${MERGE_ID_TAG}.subtype-fact`, ["s", "1"]),
+      subtypeId: "c",
+      supertypeId: "a",
+    });
+    const incoming = entities(new OrmModel({ name: "M" }), "a", "b", "c", "d");
+    incoming.addSubtypeFact({ id: "s", subtypeId: "d", supertypeId: "a" });
+    const ids = () => mergeKeeping(existing, incoming).subtypeFacts.map((sf) => sf.id);
+    const once = ids();
+    expect(new Set(once).size).toBe(3);
+    expect(ids()).toEqual(once);
   });
 });

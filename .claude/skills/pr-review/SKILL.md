@@ -124,7 +124,9 @@ first-class checks, run on every PR, not incidental coverage:
   pass.
 - **Scope drift and volume.** Files the reading guide cannot account
   for; work beyond what the spec workstream or issue asked, arriving
-  unnamed. The body's first paragraph is where it should have been
+  unnamed. Read `npm run plan-scope -- --base origin/<the PR's base>`
+  rather than re-deriving the file list: it names the files outside the
+  spec's plan, and the size with generated files left out. The body's first paragraph is where it should have been
   declared (`pr-creation`, section 4).
 - **Intent absent.** A change with no stated reason. Ask for one on
   the thread; never supply one for the author, because the next

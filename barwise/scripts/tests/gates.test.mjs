@@ -46,6 +46,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { ciLocalLibs } from "./ci-local-files.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -1974,7 +1975,7 @@ function tempCiRepo() {
   // `lib/changed-class.mjs` likewise: the change classification ci.yml's
   // detect step runs, which ci-local imports to apply the same `if:`s.
   mkdirSync(join(root, "scripts", "lib"), { recursive: true });
-  for (const lib of ["ci-gates.mjs", "changed-class.mjs"]) {
+  for (const lib of ciLocalLibs(SCRIPTS)) {
     writeFileSync(join(root, "scripts", "lib", lib), readFileSync(join(SCRIPTS, "lib", lib)));
   }
   return {
@@ -4759,6 +4760,47 @@ test("check-tracker-closes reads a tracker larger than execFileSync's default 1 
     assert.equal(out.status, 0, out.stderr);
     assert.match(out.stdout, /1 close\(s\), tracker-only/);
   } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("check-tracker-closes, run as ci:local --commit runs it, fails a close beside a code change", () => {
+  // The pre-push shape: no BASE_SHA, the base taken from
+  // `git merge-base origin/main HEAD`, in a detached linked worktree of the
+  // pushed commit. barwise-40t suspected this path of passing #723's close;
+  // it does not -- that push ran no hook at all, because core.hooksPath is
+  // relative and a `git worktree add` checkout has no barwise/.husky/_
+  // (barwise-qma). Pinned so the fallback stays the one CI's base agrees with.
+  const r = trackerRepo();
+  const tree = mkdtempSync(join(tmpdir(), "barwise-closes-wt-"));
+  try {
+    // Only origin/main can supply the base: the local default branch is
+    // deleted (a fresh ci:local worktree need not have one), so a fallback
+    // that read it would refuse instead of passing.
+    r.g("update-ref", "refs/remotes/origin/main", r.base);
+    const local = r.g("rev-parse", "--abbrev-ref", "HEAD").trim();
+    r.g("checkout", "-q", "-b", "feature");
+    r.g("branch", "-q", "-D", local);
+    // The close and the code change in separate commits, so a base of
+    // HEAD~1 would see the code change alone and report clean.
+    r.issues([["a", "closed"], ["b", "open"]]);
+    r.commit("close a");
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 6;\n");
+    const head = r.commit("fix");
+    rmSync(tree, { recursive: true, force: true });
+    r.g("worktree", "add", "--detach", "-q", tree, head);
+    // From a subdirectory of the worktree, as ci:local runs gates from its
+    // barwise/: a cwd-scoped listing would miss the root-level tracker.
+    const out = spawnSync(process.execPath, [join(tree, "scripts", "check-tracker-closes.mjs")], {
+      cwd: join(tree, "scripts"),
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "" },
+    });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /closed: {2}a\b/);
+    assert.match(out.stderr, /src\.ts/);
+  } finally {
+    rmSync(tree, { recursive: true, force: true });
     rmSync(r.dir, { recursive: true, force: true });
   }
 });
