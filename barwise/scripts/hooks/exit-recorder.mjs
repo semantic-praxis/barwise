@@ -67,7 +67,9 @@ function label() {
   return WORD.test(name) ? name : "node";
 }
 
-if (base && session) {
+// A path segment: no separators or dots, so it cannot leave the base.
+// Must agree with SESSION_ID in scripts/lib/exit-log.mjs.
+if (base && /^[A-Za-z0-9_-]{1,128}$/.test(session ?? "")) {
   const what = label();
   // An EPIPE that was fatal is the reader leaving early (`| head`), not
   // the gate failing. The monitor observes without changing behaviour;

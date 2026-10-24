@@ -63,6 +63,13 @@ export const LIST_AT_MOST = 20;
  */
 export const IMPORT_PREFIX = "--import=data:text/javascript;base64,";
 
+/**
+ * A session id is a path segment, so it is held to a shape with no
+ * separators or dots: `../x` would otherwise read and write outside the
+ * base. Must agree with the recorder's own check; the drift test covers it.
+ */
+export const SESSION_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
 /** Must agree with the join in hooks/exit-recorder.mjs; a drift test runs both. */
 export function exitLogPath(base, session) {
   return join(base, session, "exits.jsonl");

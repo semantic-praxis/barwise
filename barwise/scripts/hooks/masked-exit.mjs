@@ -39,6 +39,7 @@ import {
   readState,
   readUnread,
   report,
+  SESSION_ID,
   writeState,
 } from "../lib/exit-log.mjs";
 
@@ -85,7 +86,9 @@ function read(kind) {
   // What it would have read stays unread for the next call.
   if (kind === "stop" && input?.stop_hook_active) process.exit(0);
   const sid = input?.session_id;
-  if (typeof sid !== "string" || sid === "") throw new Error("no session_id in the hook input");
+  if (typeof sid !== "string" || !SESSION_ID.test(sid)) {
+    throw new Error("no usable session_id in the hook input");
+  }
   const base = exitBase();
   checkBase(base);
   const state = readState(base, sid);

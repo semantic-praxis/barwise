@@ -31,6 +31,7 @@ import {
   HEADINGS,
   IMPORT_PREFIX,
   readState,
+  SESSION_ID,
 } from "../lib/exit-log.mjs";
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -354,7 +355,7 @@ test("a report mode that cannot answer says so to the model", () => {
   try {
     const r = f.hook("post", "not json");
     assert.equal(r.status, 2);
-    assert.match(r.stderr, /could not answer -- no session_id/);
+    assert.match(r.stderr, /could not answer -- no usable session_id/);
   } finally {
     f.done();
   }
@@ -538,8 +539,23 @@ test("a newer recorder line after an older one: the newer records, once", () => 
   }
 });
 
-test("the recorder's import prefix is the one envLines writes", () => {
-  assert.ok(readFileSync(RECORDER, "utf8").includes(`const IMPORT_PREFIX = "${IMPORT_PREFIX}";`));
+test("the recorder's import prefix and session-id shape are the library's", () => {
+  const src = readFileSync(RECORDER, "utf8");
+  assert.ok(src.includes(`const IMPORT_PREFIX = "${IMPORT_PREFIX}";`));
+  assert.ok(src.includes(SESSION_ID.source), "the recorder's session-id check has drifted");
+});
+
+test("a session id that could leave the base is refused on both sides", () => {
+  const f = fixture();
+  try {
+    f.sh("node -e 'process.exit(1)'", { ...f.armed, CLAUDE_CODE_SESSION_ID: "../escape" });
+    assert.equal(existsSync(join(f.dir, "escape")), false, "the recorder wrote outside the base");
+    const r = f.hook("post", { session_id: "../escape" });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /no usable session_id/);
+  } finally {
+    f.done();
+  }
 });
 
 test("a state file with bad fields is read as fresh fields, not trusted", () => {
