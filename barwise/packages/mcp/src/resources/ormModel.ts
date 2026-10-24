@@ -1,8 +1,15 @@
 /**
- * orm-model://{path} resource template: returns a deserialized model as JSON.
+ * orm-model://{path} resource template: returns the model as JSON, as the
+ * current-format document a save would write (the orm-schema://json-schema
+ * resource describes it). A file in an older format comes back current.
+ *
+ * The model itself is not JSON: its element stores are `Map`s, which
+ * `JSON.stringify` writes as `{}`. Stringifying it directly served every
+ * client an empty model under the right name (barwise-8n5), so the model
+ * goes through the writer, as a save does.
  */
 
-import { OrmYamlSerializer } from "@barwise/core";
+import { OrmYamlSerializer, writeDocument } from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFileSync } from "node:fs";
@@ -15,7 +22,8 @@ export function registerOrmModelResource(server: McpServer): void {
     new ResourceTemplate("orm-model://{+path}", { list: undefined }),
     {
       title: "ORM Model",
-      description: "Returns the deserialized ORM model from a .orm.yaml file as JSON. "
+      description: "Returns the ORM model from a .orm.yaml file as JSON: the current-format "
+        + "document a save would write (orm-schema://json-schema describes it). "
         + "Note: this returns the ENTIRE model and is unbounded -- a large model "
         + "can consume a lot of context. For specific questions prefer the "
         + "query_model tool, and for an overview prefer describe_domain; read this "
@@ -23,8 +31,10 @@ export function registerOrmModelResource(server: McpServer): void {
       mimeType: "application/json",
     },
     async (uri, variables) => {
+      // The matched variable is still percent-encoded: the SDK matches the
+      // URI's string form, which encodes a space or a non-ASCII character.
       const path = variables.path;
-      const filePath = typeof path === "string" ? path : String(path);
+      const filePath = decodeURIComponent(typeof path === "string" ? path : String(path));
       const yaml = readFileSync(filePath, "utf-8");
       const model = serializer.deserialize(yaml);
 
@@ -33,7 +43,7 @@ export function registerOrmModelResource(server: McpServer): void {
           {
             uri: uri.href,
             mimeType: "application/json",
-            text: JSON.stringify(model, null, 2),
+            text: JSON.stringify(writeDocument(model), null, 2),
           },
         ],
       };

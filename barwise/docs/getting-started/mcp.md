@@ -217,7 +217,7 @@ without the rules that span domains that `barwise validate` runs. The
 Besides tools, the server offers:
 
 - `orm-schema://json-schema`: the JSON Schema for `.orm.yaml` files.
-- `orm-model://{path}`: a model file, parsed, as JSON.
+- `orm-model://{path}`: a model file as JSON, in the document shape the schema resource describes.
 - `reasoning-trail://{path}`: the reasoning trail for a model, from its
   `.trail.json` sidecar when the CLI wrote one at import, or else computed from
   the model.
