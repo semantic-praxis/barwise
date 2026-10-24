@@ -180,7 +180,9 @@ export function renderPopulationAsOpenApiExamples(
 /**
  * An externally identified entity's example: each component's far-role
  * value for one entity, joined on the near role across the components'
- * populations, starting from the first component's first instance. An
+ * populations, starting from the first instance of the first component.
+ * Keyed by the far player's name: two components' far roles are often
+ * named alike ("is of"), and their players are what tell them apart. An
  * entity no component population fully describes has no example, as an
  * internal identifier with no population has none.
  */
@@ -190,7 +192,7 @@ function externalIdentifierExample(
 ): Record<string, unknown> | undefined {
   const first = components[0];
   if (!first) return undefined;
-  const seed = model.populationsForFactType(first.factType.id)[0]?.instances[0];
+  const seed = model.populationsForFactType(first.factType.id).flatMap((p) => p.instances)[0];
   const entityValue = seed?.roleValues[first.nearRole.id];
   if (entityValue === undefined) return undefined;
   const example: Record<string, unknown> = {};
@@ -200,7 +202,7 @@ function externalIdentifierExample(
       .find((inst) => inst.roleValues[nearRole.id] === entityValue);
     const value = match?.roleValues[farRole.id];
     if (value === undefined) return undefined;
-    example[farRole.name] = value;
+    example[model.getObjectType(farRole.playerId)?.name ?? farRole.name] = value;
   }
   return example;
 }

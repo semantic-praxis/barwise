@@ -47,7 +47,10 @@ export interface PreferredIdentifyingBinary {
  * metamodel question -- the validator asks it to report a cycle and the
  * mapper asks it to order settlement, and neither owns the answer.
  */
-export function identificationGraph(model: OrmModel): Map<string, readonly string[]> {
+export function identificationGraph(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers = preferredIdentifiers(model),
+): Map<string, readonly string[]> {
   const edges = new Map<string, string[]>();
   const add = (from: string, to: string): void => {
     const existing = edges.get(from);
@@ -72,10 +75,9 @@ export function identificationGraph(model: OrmModel): Map<string, readonly strin
   // An entity identified by an external uniqueness takes its key from the
   // far roles' players, so an entity among them settles first
   // (external-preferred-identifier.spec.md).
-  for (const [entityId] of model.preferredIdentifierRefs) {
-    const resolved = resolvePreferredIdentifier(model, entityId);
-    if (!resolved.ok || resolved.at.kind !== "external") continue;
-    for (const { farRole } of resolved.at.components) {
+  for (const [entityId, at] of identifiers.byEntity) {
+    if (at.kind !== "external") continue;
+    for (const { farRole } of at.components) {
       if (model.getObjectType(farRole.playerId)?.kind === "entity") add(entityId, farRole.playerId);
     }
   }
@@ -99,8 +101,9 @@ export function identificationGraph(model: OrmModel): Map<string, readonly strin
  */
 export function identificationOrder(
   model: OrmModel,
+  identifiers?: PreferredIdentifiers,
 ): { readonly order: readonly string[]; } | { readonly cycle: readonly string[]; } {
-  const edges = identificationGraph(model);
+  const edges = identificationGraph(model, identifiers);
   const order: string[] = [];
   const settled = new Set<string>();
   const onPath: string[] = [];
@@ -213,7 +216,12 @@ export function preferredIdentifiers(model: OrmModel): PreferredIdentifiers {
 /** Why an entity's stored reference identifies nothing, when it does not. */
 export type PreferredIdentifierResolution =
   | { readonly ok: true; readonly at: IdentifyingUniqueness; }
-  | { readonly ok: false; readonly reason: PreferredIdentifierFailure; };
+  | {
+    readonly ok: false;
+    readonly reason: PreferredIdentifierFailure;
+    /** For `external-other-entity`: the object the constraint does identify. */
+    readonly identifies?: string;
+  };
 
 /**
  * Why a stored reference identifies nothing. The `external-` reasons are
@@ -263,7 +271,8 @@ export function resolvePreferredIdentifier(
  * the object they join on and the one the mapper keys cannot differ. An
  * identifier needs two things more than a join: each fact type a binary,
  * and each near role unique on its own, so each entity has one of each
- * component.
+ * component. Alethically unique: a deontic uniqueness says each entity
+ * ought to have one, which does not make a column single-valued.
  */
 export function externalIdentifies(
   model: OrmModel,
@@ -272,7 +281,9 @@ export function externalIdentifies(
 ): PreferredIdentifierResolution {
   const join = inferExternalUniquenessJoin(c.roleIds, model);
   if (!join) return { ok: false, reason: "external-no-common-object" };
-  if (join.commonObjectId !== entityId) return { ok: false, reason: "external-other-entity" };
+  if (join.commonObjectId !== entityId) {
+    return { ok: false, reason: "external-other-entity", identifies: join.commonObjectId };
+  }
   const components: IdentifyingComponent[] = [];
   for (const factType of join.factTypes) {
     if (factType.arity !== 2) return { ok: false, reason: "external-not-binary" };
@@ -280,6 +291,7 @@ export function externalIdentifies(
     const farRole = factType.getRoleById(join.constrainedRoleByFactType.get(factType.id)!)!;
     const unique = factType.internalConstraints.some((u) =>
       isInternalUniqueness(u) && u.roleIds.length === 1 && u.roleIds[0] === nearRole.id
+      && (u.modality ?? "alethic") === "alethic"
     );
     if (!unique) return { ok: false, reason: "external-near-not-unique" };
     components.push({ factType, nearRole, farRole });
@@ -585,9 +597,8 @@ export function identificationSources(
   const sources: IdentificationSource[] = [];
 
   const at = identifiers.byEntity.get(entity.id);
-  if (at?.constraint.id !== undefined) {
-    sources.push({ kind: "preferred-uniqueness", constraintId: at.constraint.id });
-  }
+  // A resolved identifier was looked up by its id, so it has one.
+  if (at) sources.push({ kind: "preferred-uniqueness", constraintId: at.constraint.id! });
 
   for (const oft of model.objectifiedFactTypes) {
     if (oft.objectTypeId === entity.id) {

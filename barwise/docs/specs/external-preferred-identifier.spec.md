@@ -133,9 +133,9 @@ In scope:
   today, and the entity takes no reference-mode column (Open decision 2).
   An entity player's key settles first: `identificationGraph` gains an
   edge from `E` to each entity far player. Each key column carries the
-  far role as its `sourceRoleId`, as the columns an objectified entity
-  absorbs carry their roles (`addRoleColumns`), so the DDL router and the
-  annotator find them by role as they find any other column.
+  component's near role (the role the entity plays) as its `sourceRoleId`,
+  as every column of an entity table does, so the DDL router and the
+  annotation find them by role as they find any other column.
 - When an external uniqueness is an entity's identifier and its columns
   are the table's whole primary key, the DDL router shall not route it as
   a separate `UNIQUE` clause, as it already skips an internal uniqueness
@@ -330,6 +330,18 @@ identifiers are kept unnamed is updated in the same PR.
   skips any external uniqueness whose columns are exactly the table's
   primary key, which is implied whatever names it, as the internal branch
   already did.
+- **Code review of the first cut found three DDL defects, each
+  reproduced.** The key columns carried the far role, as an
+  objectification's absorbed columns do; but those sit in fact-row tables,
+  and an entity table's readers expect the entity's own role, so the
+  annotation dropped both key columns and the router lost a uniqueness on
+  a far value role. They now carry the near role (the Scope bullet is
+  corrected). The router's external branch read only the first column of
+  a composite foreign key, so a Desk identified through Room got `UNIQUE
+  (building_code, desk_nr)` over part of its key; it now reads every
+  column for an entity player and keeps one for a value player, since the
+  auction catalog maps one binary twice and only the first column is the
+  value. A deontic near-role uniqueness no longer satisfies rule 3.
 - **Acceptance measured.** `barwise validate` and `barwise export --format
   ddl` over all 117 tracked `.orm.yaml` files, before (the change stashed)
   and after: byte-identical, 13,995 lines.

@@ -1,11 +1,9 @@
-import { inferExternalUniquenessJoin } from "../../externalUniqueness.js";
-import { isExternalUniqueness } from "../../model/Constraint.js";
 import {
   IDENTIFICATION_SOURCE_LABEL,
   type IdentificationSource,
   identificationSources,
   isIdentified,
-  type PreferredIdentifierFailure,
+  type PreferredIdentifierResolution,
   preferredIdentifiers,
   resolvePreferredIdentifier,
 } from "../../model/identification.js";
@@ -174,7 +172,7 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
     if (!resolved.ok && resolved.reason !== "none") {
       const constraintId = model.preferredIdentifierOf(ot.id)!;
       const named = model.getConstraint(constraintId);
-      const external = externalShapeDiagnostic(model, resolved.reason, ot, constraintId);
+      const external = externalShapeDiagnostic(model, resolved, ot, constraintId);
       if (external) {
         diagnostics.push(external);
         continue;
@@ -210,19 +208,16 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
 /** The diagnostic for an external uniqueness that fails a shape rule, if that is the reason. */
 function externalShapeDiagnostic(
   model: OrmModel,
-  reason: PreferredIdentifierFailure,
+  failure: Extract<PreferredIdentifierResolution, { ok: false; }>,
   ot: ObjectType,
   constraintId: string,
 ): Diagnostic | undefined {
   const rule = RULE_ID.preferredIdentifierInvalid;
-  switch (reason) {
+  switch (failure.reason) {
     case "external-no-common-object":
       return report(rule, "externalNoCommonObject", ot.id, ot.name, constraintId);
     case "external-other-entity": {
-      const c = model.getConstraint(constraintId);
-      const joined = c && isExternalUniqueness(c)
-        ? inferExternalUniquenessJoin(c.roleIds, model)?.commonObjectId
-        : undefined;
+      const joined = failure.identifies;
       const name = joined === undefined ? "" : model.getObjectType(joined)?.name ?? joined;
       return report(rule, "externalOtherEntity", ot.id, ot.name, constraintId, name);
     }

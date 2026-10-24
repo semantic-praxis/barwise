@@ -85,7 +85,8 @@ export class RelationalMapper {
     // gives every entity its reference-mode key -- what the mapper did
     // before it had phases. The output is best-effort; the diagnostic is
     // where the answer lives.
-    const settlement = identificationOrder(model);
+    const identifiers = preferredIdentifiers(model);
+    const settlement = identificationOrder(model, identifiers);
     const settleable = "order" in settlement;
     const order = settleable
       ? settlement.order
@@ -100,7 +101,6 @@ export class RelationalMapper {
 
     // Phase 0: one table per entity type, carrying its identifying key
     // unless phase 1 is going to replace that key anyway.
-    const identifiers = preferredIdentifiers(model);
     for (const ot of model.objectTypes) {
       if (!isEntityType(ot)) continue;
 
@@ -119,7 +119,7 @@ export class RelationalMapper {
       // An objectification it shares the entity with wins, as it wins over
       // an identifying subtype fact below.
       const external = settleable && !absorbing
-        ? externalIdentifier(identifiers, ot.id)
+        ? externalIdentifier(identifiers, ot.id, model)
         : undefined;
       if (external) {
         for (const ft of identifyingFactTypes(external)) identifyingFactTypeIds.add(ft.id);
@@ -195,7 +195,7 @@ export class RelationalMapper {
         // that key to be composite by the time it ran.
         continue;
       }
-      const external = settleable ? externalIdentifier(identifiers, entityId) : undefined;
+      const external = settleable ? externalIdentifier(identifiers, entityId, model) : undefined;
       if (external) {
         this.settleExternalKey(external, model, settling, strategy);
         continue;
@@ -667,21 +667,13 @@ export class RelationalMapper {
   }
 
   /**
-   * Phase 1: an objectified entity's key is the composite of the columns
-   * absorbed from its fact type's entity players.
-   *
-   * Each absorbed column mirrors a column of that player's key, which
-   * the settlement order guarantees is already final -- so the foreign
-   * key this pushes names a key that will not move under it, which is
-   * the whole point of the phase split (barwise-963).
-   */
-  /**
    * Key an externally identified entity's table on its components' far
    * roles: a value player's column, typed as an identifying value is, or
    * a foreign key to an entity player's key, which the settlement order
-   * has already fixed. Each column carries its far role, as the columns an
-   * objectification absorbs carry theirs, so the DDL router finds the
-   * identifier's columns by role.
+   * has already fixed. Each column carries the component's near role --
+   * the role the entity plays, as every column of an entity table does
+   * (an identifying binary's key column carries its entity role) -- so
+   * the DDL router and the annotation read it as they read any other.
    */
   private settleExternalKey(
     at: Extract<IdentifyingUniqueness, { kind: "external"; }>,
@@ -692,14 +684,14 @@ export class RelationalMapper {
     const table = tables.get(at.entityId);
     if (!table) return;
     const keyColumns: string[] = [];
-    for (const { factType, farRole } of at.components) {
+    for (const { factType, nearRole, farRole } of at.components) {
       const player = model.getObjectType(farRole.playerId);
       if (player?.kind === "value") {
         keyColumns.push(pushColumn(table.columns, {
           name: toSnake(player.name),
           ...keyTypeOf(player.dataType, strategy),
           nullable: false,
-          sourceRoleId: farRole.id,
+          sourceRoleId: nearRole.id,
         }, `${toSnake(farRole.name)}_${toSnake(player.name)}`));
         continue;
       }
@@ -709,7 +701,7 @@ export class RelationalMapper {
         table.columns,
         target,
         false,
-        farRole.id,
+        nearRole.id,
         (pkColName) => `${toSnake(farRole.name)}_${pkColName}`,
       );
       keyColumns.push(...cols);
@@ -723,6 +715,15 @@ export class RelationalMapper {
     table.primaryKey = { columnNames: keyColumns };
   }
 
+  /**
+   * Phase 1: an objectified entity's key is the composite of the columns
+   * absorbed from its fact type's entity players.
+   *
+   * Each absorbed column mirrors a column of that player's key, which
+   * the settlement order guarantees is already final -- so the foreign
+   * key this pushes names a key that will not move under it, which is
+   * the whole point of the phase split (barwise-963).
+   */
   private settleObjectifiedKey(
     oft: ObjectifiedFactType,
     model: OrmModel,
@@ -842,13 +843,20 @@ interface MutableTable {
 /** The same table during phase 1, where the key is still being decided. */
 type SettlingTable = Omit<MutableTable, "primaryKey"> & { primaryKey: PrimaryKey; };
 
-/** The entity's identifier when it is external. */
+/**
+ * The entity's identifier when it is external and every far player
+ * resolves. One that does not -- a model that reached the mapper
+ * unvalidated -- keeps the reference-mode key, rather than spending a
+ * component fact type phase 1 could not map.
+ */
 function externalIdentifier(
   identifiers: PreferredIdentifiers,
   entityId: string,
+  model: OrmModel,
 ): Extract<IdentifyingUniqueness, { kind: "external"; }> | undefined {
   const at = identifiers.byEntity.get(entityId);
-  return at?.kind === "external" ? at : undefined;
+  if (at?.kind !== "external") return undefined;
+  return at.components.every((c) => model.getObjectType(c.farRole.playerId)) ? at : undefined;
 }
 
 function freezeTable(t: MutableTable): Table {

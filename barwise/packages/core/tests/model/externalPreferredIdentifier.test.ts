@@ -108,7 +108,7 @@ describe("resolving an external preferred identifier", () => {
       "reference_mode: building_code, preferred_identifier: c-room-id }",
     );
     expect(resolvePreferredIdentifier(load(yaml), "ot-building"))
-      .toEqual({ ok: false, reason: "external-other-entity" });
+      .toEqual({ ok: false, reason: "external-other-entity", identifies: "ot-room" });
     expect(errors(load(yaml)).map((d) => d.message).join("\n"))
       .toContain('but that constraint identifies "Room"');
   });
@@ -124,6 +124,16 @@ describe("resolving an external preferred identifier", () => {
     expect(resolvePreferredIdentifier(load(yaml), "ot-room"))
       .toEqual({ ok: false, reason: "external-not-binary" });
     expect(errors(load(yaml)).map((d) => d.message).join("\n")).toMatch(/is not binary/);
+  });
+
+  it("refuses a near role whose only uniqueness is deontic", () => {
+    // "Ought to be in one building" does not make building_code single-valued.
+    const yaml = roomYaml().replace(
+      "- { id: c-rib-u, type: internal_uniqueness, roles: [r-rib-room] }",
+      "- { id: c-rib-u, type: internal_uniqueness, roles: [r-rib-room], modality: deontic }",
+    );
+    expect(resolvePreferredIdentifier(load(yaml), "ot-room"))
+      .toEqual({ ok: false, reason: "external-near-not-unique" });
   });
 
   it("refuses a near role with no uniqueness of its own", () => {
@@ -148,10 +158,11 @@ describe("mapping an externally identified entity", () => {
       referencedColumns: ["building_code"],
       sourceConstraintId: "ft-room-in-building",
     }]);
-    // Each key column carries its far role, so a router finds it by role.
+    // Each key column carries the role Room plays, as every column of an
+    // entity table does, so the router and the annotation read it.
     expect(room.columns.slice(0, 2).map((c) => c.sourceRoleId)).toEqual([
-      "r-rib-building",
-      "r-rhn-nr",
+      "r-rib-room",
+      "r-rhn-room",
     ]);
   });
 
@@ -247,7 +258,7 @@ describe("the other readers of an external identifier", () => {
         - { id: i3, role_values: { r-rhn-room: "R1", r-rhn-nr: "101" } }
 `;
     expect(renderPopulationAsOpenApiExamples(load(yaml)).get("Room"))
-      .toEqual({ houses: "HQ", "is of": "101" });
+      .toEqual({ Building: "HQ", RoomNr: "101" });
   });
 
   it("merge follows an external identifier to the other side's copy", () => {
