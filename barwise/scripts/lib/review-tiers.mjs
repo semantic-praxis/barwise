@@ -348,12 +348,7 @@ export function classify(files, rows) {
  * should be loud. The workflow maps any refusal to "request the review".
  */
 export function trivialGlobs(file = TABLE) {
-  let parsed;
-  try {
-    parsed = JSON.parse(readFileSync(file, "utf8"));
-  } catch (cause) {
-    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
-  }
+  const parsed = readTable(file);
   const globs = parsed?.trivial?.globs;
   if (!Array.isArray(globs) || globs.length === 0) {
     throw new Error(`${file} declares no trivial.globs -- the allow-list is missing`);

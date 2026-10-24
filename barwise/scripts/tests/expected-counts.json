@@ -5,7 +5,7 @@
     "baseline-merge.test.mjs": 14,
     "beads-ids.test.mjs": 3,
     "ci-conditions.test.mjs": 13,
-    "gates.test.mjs": 215,
+    "gates.test.mjs": 216,
     "masked-exit.test.mjs": 28,
     "measure-comparison.test.mjs": 31,
     "pushed-tree.test.mjs": 12,

@@ -141,9 +141,13 @@
         "barwise/packages/core/src/serialization/",
         "barwise/packages/core/src/mapping/",
         "barwise/packages/core/src/format/",
-        "barwise/packages/cli/src/commands/"
+        "barwise/packages/cli/src/commands/",
+        "barwise/packages/llm/src/parse/",
+        "barwise/packages/core/src/lineage/",
+        "barwise/packages/cli/src/workspace/",
+        "barwise/packages/mcp/src/tools/"
       ],
-      "why": "importers, exporters, loaders, serializers, mappers and the CLI's argument parsing: the month's longest-lived defects (REVIEW.md failure mode 1)"
+      "why": "importers, exporters, loaders, serializers, mappers, the LLM output parser, the lineage manifest and argument parsing: the sites of REVIEW.md failure mode 1's cited defects (c3e8bd75, b0f408dc, aaf5837c, barwise-tn4)"
     },
     {
       "heading": "A gate answers without seeing its input",
@@ -176,6 +180,7 @@
         "barwise/packages/mcp/src/tools/",
         "barwise/packages/formats/src/registration.ts",
         "barwise/packages/dbt/src/registration.ts",
+        "barwise/packages/code-analysis/src/formats/registration.ts",
         "barwise/package.json"
       ],
       "why": "bundle entries, surface commands and tools, format registrations, and npm scripts, each of which has siblings (REVIEW.md failure mode 4)"
@@ -201,9 +206,14 @@
       "tier": "high-risk",
       "globs": [
         "barwise/packages/core/src/model/",
-        "barwise/packages/core/src/validation/"
+        "barwise/packages/core/src/validation/",
+        "barwise/packages/core/src/mapping/",
+        "barwise/packages/core/src/verbalization/",
+        "barwise/packages/formats/src/ddl/",
+        "barwise/packages/formats/src/openapi/",
+        "barwise/packages/dbt/src/dbtMapping/"
       ],
-      "why": "role loops, ids and invariants live in the model and its validation (REVIEW.md failure mode 7)"
+      "why": "the model and every place that walks roles or builds ids: the sites of REVIEW.md failure mode 7's cited defects (bb9b4660 in mapping, 35ee5c4a in the importers and dbtMapping)"
     },
     {
       "heading": "PR description claims",

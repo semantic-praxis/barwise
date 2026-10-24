@@ -210,8 +210,9 @@ output to lead with the groups to run and their files, with the tier
 line after them, since a reviewer reads the list and the workflow reads
 the JSON.
 
-Acceptance: a `pr-review` run on any open PR quotes the routing in its
-Read line; `gates.test.mjs` cases for `pr-risk`'s text output are
+Acceptance: a `pr-review` run on any open PR says under Cleared and Not
+checked which of the routed groups and failure modes ran (section 5's
+Read line stays the reading guide); `gates.test.mjs` cases for `pr-risk`'s text output are
 updated and still pass.
 
 ### 2. Route REVIEW.md's failure modes (after #712 merges)

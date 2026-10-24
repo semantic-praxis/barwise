@@ -250,10 +250,10 @@ function checkPaths(paths) {
 let rows, modes, trivial;
 try {
   rows = tierRows(opt("--table", TABLE));
-  // Optional here: a fixture table may carry no failureModes block.
-  // check:review-tiers is where the real table must have one per
-  // REVIEW.md failure mode.
-  modes = failureModeRows(opt("--table", TABLE), { optional: true });
+  // Optional only for a fixture table (--table), which may carry no
+  // failureModes block. The real table must have one: without it every
+  // REVIEW.md failure mode would vanish from the routing with exit 0.
+  modes = failureModeRows(opt("--table", TABLE), { optional: opt("--table", null) !== null });
   trivial = trivialGlobs(opt("--table", TABLE));
 } catch (err) {
   refuse(err.message, err.cause?.message);
@@ -321,9 +321,15 @@ if (modes.length > 0) {
   console.log("REVIEW.md failure modes -- run all of them; these first, for these files:");
   if (routed.length === 0) console.log("  none triggered by path");
   for (const row of routed) printRow(row, width);
-  if (failureModesBeyondReach.length > 0) {
-    console.log("  not triggered by path -- still run:");
-    for (const m of failureModesBeyondReach) console.log(`  - ${m.heading}`);
+  const untriggered = failureModesBeyondReach.filter((m) => m.tier !== "not-path-derivable");
+  const pathless = failureModesBeyondReach.filter((m) => m.tier === "not-path-derivable");
+  if (untriggered.length > 0) {
+    console.log("  not triggered by the paths in this diff -- still run:");
+    for (const m of untriggered) console.log(`  - ${m.heading}`);
+  }
+  if (pathless.length > 0) {
+    console.log("  no path can detect -- run on every PR:");
+    for (const m of pathless) console.log(`  - ${m.heading}`);
   }
 }
 console.log();

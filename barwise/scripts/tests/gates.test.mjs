@@ -3207,7 +3207,7 @@ function tierFixture(
   headings,
   rows,
   tracked = ["x/a.ts", ".beads/issues.jsonl"],
-  { titles = ["F"], modes = ["F"] } = {},
+  { titles = ["F"], modes = ["F"], modeGlobs = ["x/"], noModes = false } = {},
 ) {
   writeFileSync(join(dir, "tracked.txt"), tracked.join("\n"));
   const md = ["# Checklist", "", ...headings.flatMap((h) => [`## ${h}`, "", "- item", ""])];
@@ -3233,7 +3233,9 @@ function tierFixture(
     JSON.stringify({
       trivial: VALID_TRIVIAL,
       rows: rows.map(row),
-      failureModes: modes.map((heading) => row({ heading })),
+      ...(noModes
+        ? {}
+        : { failureModes: modes.map((heading) => ({ ...row({ heading }), globs: modeGlobs })) }),
     }),
   );
   return [
@@ -3290,6 +3292,37 @@ test("check-review-tiers fails both ways on REVIEW.md failure modes, and refuses
     run = gate("check-review-tiers.mjs", dir, ...args);
     assert.equal(run.status, 2, "an empty Always check list");
     assert.match(run.stderr, /'Always check' list .* has no items/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers checks failureModes rows as it checks the checklist rows", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    // A dead failure-mode glob, distinct from the row globs.
+    let args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { modeGlobs: ["nowhere/"] });
+    let run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /glob matches no tracked file: F: nowhere\//);
+    // A mode declared twice.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, {
+      titles: ["F"],
+      modes: ["F", "F"],
+    });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /failure mode declared by more than one row: F/);
+    // A malformed mode row is refused by the same validator.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { modeGlobs: ["*.ts"] });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /failure mode 0 \(F\): pattern "\*\.ts"/);
+    // A table with no failureModes block at all.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { noModes: true });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /declares no failureModes/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -3654,13 +3687,18 @@ test("pr-risk leads with the routing and prints every REVIEW.md failure mode", (
     assert.ok(at(/^REVIEW\.md failure modes -- run all of them/m) > 0);
     assert.ok(at(/^pr-risk: high-risk/m) > at(/^REVIEW\.md failure modes/m), "the tier comes last");
     const triggered = out.indexOf("A gate answers without seeing its input");
-    const rest = out.indexOf("not triggered by path -- still run:");
+    const rest = out.indexOf("not triggered by the paths in this diff -- still run:");
     assert.ok(triggered > 0 && rest > triggered, "the triggered mode is listed before the rest");
     for (
       const title of ["Input dropped at a boundary", "A restated fact went stale", "ORM shape"]
     ) {
       assert.ok(out.indexOf(title) > rest, `${title} is still listed, after the triggered ones`);
     }
+    // The mode no path can ever detect has its own heading, apart from the
+    // ones this diff's paths happened not to trigger.
+    const pathless = out.indexOf("no path can detect -- run on every PR:");
+    assert.ok(pathless > rest && out.indexOf("A restated fact went stale") > pathless);
+    assert.ok(out.indexOf("ORM shape") < pathless, "a path-routed mode is not listed as pathless");
     const json = JSON.parse(
       gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/scripts/x.mjs"]), "--json").stdout,
     );
@@ -3785,6 +3823,13 @@ test("check-review-tiers REFUSES a table whose pattern the language does not def
       const run = gate("check-review-tiers.mjs", dir, ...args);
       assert.equal(run.status, 2, `${glob} is valid JSON and an invalid pattern`);
       assert.match(`${run.stdout}${run.stderr}`, /cannot answer/);
+      // The pattern's own fault, not any refusal: the table also lacks a
+      // failureModes block, which the gate refuses too, so the exit code
+      // alone would pass with pattern validation deleted (round-1 review).
+      assert.ok(
+        `${run.stdout}${run.stderr}`.includes(`pattern ${JSON.stringify(glob)}`),
+        `${glob}: refused for its pattern`,
+      );
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
