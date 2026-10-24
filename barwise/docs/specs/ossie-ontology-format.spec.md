@@ -9,7 +9,8 @@ Touches: +barwise/packages/formats/src/ossie/,
 barwise/packages/formats/src/registration.ts,
 barwise/packages/formats/src/index.ts,
 barwise/packages/formats/tests/,
-barwise/packages/formats/CLAUDE.md
+barwise/packages/formats/CLAUDE.md,
+barwise/packages/formats/package.json
 
 barwise reads and writes Apache Ossie ontology documents through one
 `ossie` format descriptor in `@barwise/formats`, mapping each Ossie
@@ -191,7 +192,8 @@ license header, which is what redistributing it requires.
 `writeOssie` and `OssieExportFormat`, added to `ossieFormat`. Tests: each
 inverse mapping; every unexpressible constraint kind in `constraintSpecs`;
 the exported flights document accepted by the pinned `ontology.json`
-(validated in the test with `ajv`, which the workspace already locks); and
+(validated in the test with `ajv`, which the workspace already locks for
+`@barwise/core`; WS2 adds it to `@barwise/formats` as a devDependency); and
 the round trip in Scope, construct by construct. Depends on WS1.
 
 ## API and migration impact
@@ -222,8 +224,9 @@ the round trip in Scope, construct by construct. Depends on WS1.
    every role. Options: emit that uniqueness on import (validation then
    has nothing to report, and export omits it again as implied); or emit
    nothing (the model carries a fact type with no uniqueness, which
-   barwise's validation warns about). **Recommend emitting it**, as the
-   NORMA exporter already treats implied constraints.
+   barwise's validation warns about). **Recommend emitting it**: it is
+   what the Ossie document states, and leaving it out would make a valid
+   Ossie relationship import as a validation warning.
 
 ## Risks and testing
 
