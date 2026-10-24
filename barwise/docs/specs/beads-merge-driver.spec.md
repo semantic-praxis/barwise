@@ -1,9 +1,9 @@
 # A merge driver for the tracker, registered where the repository is set up
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-24 -- the single workstream
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
 Tracking: barwise-nto
 
 ## Principle
@@ -32,8 +32,9 @@ The driver reads all three versions git passes: the base (`%O`), the
 current side (`%A`, written back as the result) and the other side
 (`%B`). Below, "base", "current" and "other" mean those three. In a
 merge, current is the branch being merged into. In a rebase, git swaps
-them, and current is the upstream. The rules are symmetric except for
-output order, so the swap changes nothing but the order of lines.
+them, and current is the upstream. The rules are symmetric, so the swap decides nothing: it changes the
+order of lines and, within an issue merged field by field, the order of
+its keys.
 
 A two-way union, which is what PR #704 used by hand, cannot tell a
 deletion from an addition, so it resurrects every issue one side
@@ -71,7 +72,10 @@ instead of the dangling dependency it is.
 - If only one side changed the field from base, take that side's value.
   This includes adding a key and removing one.
 - If both sides changed it to the same value, take that value.
-- `updated_at` changed on both sides: take the later value.
+- `updated_at` or `closed_at` changed on both sides: take the later
+  value. Both are when an event happened, and two sides that each closed
+  an issue agree that it is closed (added in implementation: a steward
+  follow-up closing an issue the branch also closed is routine).
 - `dependency_count` and `dependent_count` are derived. They are
   recomputed after the merge (below) and never compared.
 - Any other field changed on both sides to different values:
@@ -180,18 +184,30 @@ In scope:
 - When `npm run prepare` runs, it shall copy the wrapper, the driver
   and the modules it imports into
   `$(git rev-parse --git-common-dir)/barwise-merge/`, and register
-  `sh "$(git rev-parse --git-common-dir)/barwise-merge/driver.sh" %O %A %B %P`
+  `sh "$(git rev-parse --git-common-dir)/barwise-merge.sh" %O %A %B %P`
   as `merge.beads.driver`, with `merge.beads.name` and
   `merge.beads.recursive = binary`. The path is resolved by git at merge
   time and quoted, so a clone that is moved, or whose path has a space,
   keeps working (checked with a probe in a linked worktree under a
-  directory named `my dir`). Running it again shall replace all three.
-- When the installed copy carries a higher `DRIVER_VERSION` than the
-  one `prepare` would install, `prepare` shall keep the installed copy
-  and say so. The copy is shared by every worktree of the clone, so
-  without this a `prepare` run from an older branch would change how
-  every later merge in the clone resolves. Equal versions are
-  replaced, so a fix that forgets to bump the constant still installs.
+  directory named `my dir`). Running it again shall replace the copy and the config.
+- The registered wrapper shall be one file, `<git-common-dir>/barwise-merge.sh`,
+  replaced by an atomic rename and never removed, beside the swapped
+  `barwise-merge/` directory of node files. A missing node file then fails
+  inside the wrapper, which falls back to markers; only a missing wrapper
+  could leave the file unmarked.
+- Every `prepare` shall install the current checkout's driver, building
+  the copy beside the live one and swapping it in, so the last run wins,
+  a damaged copy is repaired, and no file from an earlier layout
+  survives. The copy is shared by every worktree, so a `prepare` on an
+  older branch installs that branch's rules until the next one on a
+  newer branch: older rules, still a working driver. (Changed in
+  implementation, by the owner's decision: three designs that kept a
+  "newer" copy instead -- a hand-bumped version, the installing commit,
+  the driver's own last commit -- each let review find a way to pin a
+  stale or damaged copy that `prepare` then refused to repair.)
+- When `prepare` runs from a directory that is not the top of its work
+  tree, or outside any repository, the installer shall change nothing
+  and exit 0, as husky does beside it.
 - When the session-start hook runs `prepare`, it shall also read back
   `merge.beads.driver` and check that the installed wrapper exists,
   and warn if either is missing, the way it already warns about
@@ -236,29 +252,29 @@ file unmarked and the other side's line gone). A copy under the git
 common directory exists for every branch and every linked worktree,
 and `prepare` refreshes it. The wrapper's fallback covers a driver
 copy that is broken or cannot run. It cannot cover its own absence:
-if `driver.sh` itself is gone, `sh` exits 127 having written nothing,
+if `barwise-merge.sh` itself is gone, `sh` exits 127 having written nothing,
 which is the silent case again. That is why the session-start hook
 checks the file exists, not only that the config is set.
 
 ## Inventory
 
-| Path                                            | Current state                                                 | Verdict                                                                                                                                               |
-| ----------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.gitattributes`                                | `merge=beads`, comment "Use bd merge"                         | keeps the attribute; the comment names the driver and where it is installed                                                                           |
-| `barwise/package.json` `prepare`                | `cd .. && husky barwise/.husky`                               | also runs the installer                                                                                                                               |
-| `barwise/scripts/lib/beads-jsonl.mjs`           | does not exist                                                | new: `canonicalLine` and `recomputeCounts`, moved out of `beads-crud.mjs`, which imports them                                                         |
-| `barwise/scripts/beads-crud.mjs`                | owns `canonicalLine` and `recomputeCounts`                    | imports both from `lib/beads-jsonl.mjs`; output unchanged                                                                                             |
-| `barwise/scripts/lib/beads-merge.mjs`           | does not exist                                                | new: the pure resolution (`resolveTracker`), no I/O                                                                                                   |
-| `barwise/scripts/beads-merge-driver.mjs`        | does not exist                                                | new: the `%O %A %B %P` entry point; exits 0, 3 (conflict blocks written) or 2 (malformed input); carries `DRIVER_VERSION`                             |
-| `barwise/scripts/beads-merge-driver.sh`         | does not exist                                                | new: the registered wrapper; passes 0 and 3 through, falls back to `git merge-file` on anything else                                                  |
-| `barwise/scripts/install-merge-driver.mjs`      | does not exist                                                | new: copies the wrapper, the driver and its imports into the git common directory and sets the config; never downgrades; refuses outside a repository |
-| `barwise/scripts/hooks/check-staged-tracker.sh` | does not exist; the logic is inline in pre-commit             | new: validates the index copy of the tracker, keeping the `GIT_DIR`/`GIT_WORK_TREE` pin (barwise-hud)                                                 |
-| `barwise/.husky/pre-commit`                     | validates the working-tree tracker when it is staged          | calls the shared script                                                                                                                               |
-| `barwise/.husky/pre-merge-commit`               | does not exist; pre-commit does not run for a clean merge     | new: calls the shared script                                                                                                                          |
-| `.claude/hooks/session-start.sh`                | runs `npm run prepare`; reads back only `core.hooksPath`      | also reads back `merge.beads.driver` and checks the installed wrapper exists; warns if either is missing                                              |
-| `barwise/scripts/tests/beads-merge.test.mjs`    | does not exist                                                | new: the rules against the lib, and real `git merge` runs in temp repositories                                                                        |
-| `.claude/skills/steward/SKILL.md` section 1     | the rule in prose, applied by hand; collision tested by title | says the driver applies it; collision by `created_at`; the field rule; the hand procedure for reported cases                                          |
-| root `CLAUDE.md`, Beads section                 | no mention of merging                                         | one sentence: the driver and where it is installed                                                                                                    |
+| Path                                            | Current state                                                 | Verdict                                                                                                                                                                                                                        |
+| ----------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `.gitattributes`                                | `merge=beads`, comment "Use bd merge"                         | keeps the attribute; the comment names the driver and where it is installed                                                                                                                                                    |
+| `barwise/package.json` `prepare`                | `cd .. && husky barwise/.husky`                               | also runs the installer                                                                                                                                                                                                        |
+| `barwise/scripts/lib/beads-jsonl.mjs`           | does not exist                                                | new: `canonicalLine` and `recomputeCounts`, moved out of `beads-crud.mjs`, which imports them                                                                                                                                  |
+| `barwise/scripts/beads-crud.mjs`                | owns `canonicalLine` and `recomputeCounts`                    | imports both from `lib/beads-jsonl.mjs`; output unchanged                                                                                                                                                                      |
+| `barwise/scripts/lib/beads-merge.mjs`           | does not exist                                                | new: the pure resolution (`resolveTracker`), no I/O                                                                                                                                                                            |
+| `barwise/scripts/beads-merge-driver.mjs`        | does not exist                                                | new: the `%O %A %B %P` entry point; exits 0, 3 (conflict blocks written) or 2 (malformed input)                                                                                                                                |
+| `barwise/scripts/beads-merge-driver.sh`         | does not exist                                                | new: the registered wrapper; passes 0 and 3 through, falls back to `git merge-file` on anything else                                                                                                                           |
+| `barwise/scripts/install-merge-driver.mjs`      | does not exist                                                | new: copies the wrapper, the driver and its imports into the git common directory and sets the config; every run replaces the copy (last `prepare` wins); changes nothing outside a repository or below the top of a work tree |
+| `barwise/scripts/hooks/check-staged-tracker.sh` | does not exist; the logic is inline in pre-commit             | new: validates the index copy of the tracker, keeping the `GIT_DIR`/`GIT_WORK_TREE` pin (barwise-hud)                                                                                                                          |
+| `barwise/.husky/pre-commit`                     | validates the working-tree tracker when it is staged          | calls the shared script                                                                                                                                                                                                        |
+| `barwise/.husky/pre-merge-commit`               | does not exist; pre-commit does not run for a clean merge     | new: calls the shared script                                                                                                                                                                                                   |
+| `.claude/hooks/session-start.sh`                | runs `npm run prepare`; reads back only `core.hooksPath`      | also reads back `merge.beads.driver` and checks the installed wrapper exists; warns if either is missing                                                                                                                       |
+| `barwise/scripts/tests/beads-merge.test.mjs`    | does not exist                                                | new: the rules against the lib, and real `git merge` runs in temp repositories                                                                                                                                                 |
+| `.claude/skills/steward/SKILL.md` section 1     | the rule in prose, applied by hand; collision tested by title | says the driver applies it; collision by `created_at`; the field rule; the hand procedure for reported cases                                                                                                                   |
+| root `CLAUDE.md`, Beads section                 | no mention of merging                                         | one sentence: the driver and where it is installed                                                                                                                                                                             |
 
 `canonicalLine` and `recomputeCounts` move to a shared module rather
 than being copied into the driver, because CLAUDE.md forbids a copy
@@ -271,11 +287,11 @@ next `beads-crud.mjs` write would rewrite every merged line.
 ```
 .gitattributes            .beads/issues.jsonl merge=beads
 git config (per clone)    merge.beads.driver =
-                            sh "$(git rev-parse --git-common-dir)/barwise-merge/driver.sh" %O %A %B %P
+                            sh "$(git rev-parse --git-common-dir)/barwise-merge.sh" %O %A %B %P
                           merge.beads.recursive = binary
                           written by scripts/install-merge-driver.mjs, run from `prepare`
 
-driver.sh                 node beads-merge-driver.mjs "$@"
+barwise-merge.sh          node barwise-merge/beads-merge-driver.mjs "$@"
                           0 -> exit 0;  3 -> exit 1
                           anything else -> git merge-file (marked line merge) into %A, exit 1
 
@@ -361,8 +377,8 @@ Acceptance:
   non-zero exit.
 - When `npm run prepare` runs twice, `git config --get
   merge.beads.driver` shall print one value, and the wrapper it names
-  shall exist. When the installed copy has a higher `DRIVER_VERSION`,
-  `prepare` shall leave it in place.
+  shall exist. After the wrapper is deleted or a copied file damaged,
+  `prepare` shall restore it.
 - When the clone sits under a directory whose name contains a space,
   and when the merge runs in a linked worktree, the driver shall run.
 

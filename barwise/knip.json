@@ -8,6 +8,7 @@
     ".": {
       "entry": [
         "scripts/at-root.mjs",
+        "scripts/beads-merge-driver.mjs",
         "scripts/hooks/*.mjs",
         "scripts/lib/module-count-hook.mjs",
         "scripts/tests/*.test.mjs"

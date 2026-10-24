@@ -1,3 +1,6 @@
 
-# Use bd merge for beads JSONL files
+# Merged by barwise/scripts/beads-merge-driver.mjs, which `npm run prepare`
+# installs into the clone's git directory as the driver named `beads`
+# (docs/specs/beads-merge-driver.spec.md). Without it git falls back to a
+# line merge silently.
 .beads/issues.jsonl merge=beads
