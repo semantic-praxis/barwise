@@ -14,25 +14,31 @@
  * time and quotes it, so a moved clone, a path with a space, and a linked
  * worktree all work.
  *
- * The copy is shared by every worktree of the clone, so a `prepare` run
- * from an older branch must not change how every later merge resolves. The
- * copy records the last commit that changed the driver's files, and is
- * kept only when a branch still carries that commit and this checkout's
- * driver does not descend from it -- a sibling with a driver change this
- * one lacks, or an older branch. Keyed on the driver's own last commit,
- * so a branch that never touched the driver agrees with main; and
- * reachability matters because an amend or a rebase leaves the recorded
- * commit on no branch at all, which must not pin the copy for good.
- * A hand-bumped version number did this first; it held only while every
- * change remembered the bump.
+ * Every run installs this checkout's driver; the last `prepare` wins. The
+ * copy is shared by every worktree, so a `prepare` on an older branch puts
+ * that branch's rules in place until the next one on a newer branch --
+ * older rules, still a working driver. Three designs tried to keep the
+ * newer copy instead (a hand-bumped version, the installing commit, the
+ * driver's own last commit), and review found each one could pin a stale
+ * or damaged copy that `prepare` then refused to repair. A copy that is
+ * always replaced cannot get stuck.
  *
- * Exit 0 installed or kept, and also when there is no git repository (an
- * unpacked archive, an export): like husky beside it in `prepare`, it says
- * so and lets the install go on, because a driver is no reason to fail one.
- * Exit 1 when git is there and installing fails.
+ * Exit 0 installed, and also when there is nothing to install into: no git
+ * repository (an unpacked archive), or a cwd that is not the top of the
+ * work tree (barwise unpacked inside another project's checkout, whose
+ * repository is not ours to configure). Like husky beside it in `prepare`,
+ * it says so and lets the install go on. Exit 1 when installing fails.
  */
-import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -55,85 +61,33 @@ function git(args) {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
-function readOr(path, fallback) {
-  try {
-    return readFileSync(path, "utf8").trim();
-  } catch {
-    return fallback;
-  }
-}
-
-/**
- * The last commit that changed the driver's files here, or HEAD when they
- * are not tracked by this repository (nothing finer to key on).
- */
-function driverCommit() {
-  const paths = FILES.map(([, from]) => join(HERE, from));
-  try {
-    const last = git(["log", "-1", "--format=%H", "--", ...paths]);
-    if (last) return last;
-  } catch {
-    // Paths outside this repository: fall through to HEAD.
-  }
-  try {
-    return git(["rev-parse", "--verify", "--quiet", "HEAD"]);
-  } catch {
-    return ""; // no commit yet
-  }
-}
-
-/**
- * Why the installed copy must stay, or undefined to replace it. A copy
- * with no record, from this same driver commit, from an ancestor of it,
- * from a commit this clone does not have, or from one no ref carries any
- * more (amended, rebased) is replaced.
- */
-function keepReason(installed, current) {
-  if (!installed || !current || installed === current) return undefined;
-  const r = spawnSync("git", ["merge-base", "--is-ancestor", installed, current], {
-    stdio: "ignore",
-  });
-  if (r.status !== 1) return undefined; // 0: an ancestor; otherwise not a commit here
-  let carried = "";
-  try {
-    carried = git(["for-each-ref", "--count=1", "--format=%(refname)", "--contains", installed]);
-  } catch {
-    return undefined;
-  }
-  if (!carried) return undefined;
-  return `installed from ${
-    installed.slice(0, 8)
-  }, carried by ${carried}, which this checkout's driver (${current.slice(0, 8)}) does not contain`;
-}
-
 function main() {
   let common;
+  let top;
   try {
     common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    top = git(["rev-parse", "--show-toplevel"]);
   } catch {
     console.error("install-merge-driver: not inside a git repository; nothing installed.");
     return 0;
   }
-  const dir = join(common, INSTALL_DIR);
-  const current = driverCommit();
-  const reason = keepReason(readOr(join(dir, "commit"), ""), current);
-  if (reason) {
+  if (realpathSync(top) !== realpathSync(process.cwd())) {
     console.error(
-      `install-merge-driver: keeping the installed tracker merge driver (${reason}). `
-        + "Run `npm run prepare` from a branch that contains it to replace it.",
+      `install-merge-driver: ${process.cwd()} is not the top of its work tree (${top}); `
+        + "nothing installed. Run it through `npm run prepare`.",
     );
-    // The config belongs to the files it runs: this checkout's command
-    // could name a wrapper the kept copy does not have.
     return 0;
   }
-  // The record goes first and comes back last, so an interrupted copy has
-  // none and is replaced next time rather than kept under the old one.
-  rmSync(join(dir, "commit"), { force: true });
+  // Built beside the live copy and swapped in, so a merge never runs a
+  // half-copied driver and no file from an earlier layout survives.
+  const dir = join(common, INSTALL_DIR);
+  const next = mkdtempSync(join(common, `${INSTALL_DIR}.next-`));
   for (const [to, from] of FILES) {
-    mkdirSync(dirname(join(dir, to)), { recursive: true });
-    copyFileSync(join(HERE, from), join(dir, to));
+    mkdirSync(dirname(join(next, to)), { recursive: true });
+    copyFileSync(join(HERE, from), join(next, to));
   }
-  writeFileSync(join(dir, "commit"), `${current}\n`);
+  rmSync(dir, { recursive: true, force: true });
+  renameSync(next, dir);
   git([
     "config",
     `merge.${DRIVER_NAME}.name`,

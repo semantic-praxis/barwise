@@ -397,126 +397,43 @@ test("installing twice leaves one registration and its wrapper on disk", () => {
   assert.equal(again.status, 0, again.stderr);
   assert.equal(r.git("config", "--get-all", "merge.beads.driver").split("\n").length, 1);
   assert.equal(r.git("config", "--get", "merge.beads.recursive"), "binary");
+  assert.ok(existsSync(join(r.dir, ".git", "barwise-merge", "driver.sh")));
+});
+
+test("every install replaces the copy, so prepare repairs a damaged one and drops stale files", () => {
+  // The last prepare wins. Designs that kept a "newer" copy could pin a
+  // damaged one that prepare -- the remedy session-start prints -- then
+  // refused to touch.
+  const r = repo(jsonl(issue("a")));
   const installed = join(r.dir, ".git", "barwise-merge");
+  rmSync(join(installed, "driver.sh"));
+  writeFileSync(join(installed, "lib", "beads-merge.mjs"), "// damaged\n");
+  writeFileSync(join(installed, "version"), "999\n");
+  r.git("config", "--unset", "merge.beads.driver");
+  const again = r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
+  assert.equal(again.status, 0, again.stderr);
   assert.ok(existsSync(join(installed, "driver.sh")));
-  assert.equal(readFileSync(join(installed, "commit"), "utf8").trim(), r.git("rev-parse", "HEAD"));
-});
-
-test("the installed copy is replaced only from a checkout that contains the commit it came from", () => {
-  // The copy is shared by every worktree of the clone, so an older branch's
-  // `prepare` must not put back older rules -- and no number has to be
-  // remembered for that to hold.
-  const r = repo(jsonl(issue("a")));
-  const installed = join(r.dir, ".git", "barwise-merge");
-  const install = () => r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
-  const older = r.git("rev-parse", "HEAD");
-  r.write(jsonl(issue("a"), issue("b")));
-  r.commit("newer");
-  const newer = r.git("rev-parse", "HEAD");
-
-  // From a descendant of the installed commit: replaced.
-  writeFileSync(join(installed, "driver.sh"), "# stale\n");
-  assert.equal(install().status, 0);
-  assert.notEqual(readFileSync(join(installed, "driver.sh"), "utf8"), "# stale\n");
-  assert.equal(readFileSync(join(installed, "commit"), "utf8").trim(), newer);
-
-  // From an older checkout: kept, with the config that runs it.
-  writeFileSync(join(installed, "driver.sh"), "# newer copy\n");
-  r.git("config", "merge.beads.driver", "sh newer-driver.sh %O %A %B %P");
-  r.git("checkout", "-q", older);
-  const kept = install();
-  assert.equal(kept.status, 0, kept.stderr);
-  assert.match(
-    kept.stderr,
-    new RegExp(`keeping the installed tracker merge driver \\(installed from ${newer.slice(0, 8)}`),
-  );
-  assert.equal(readFileSync(join(installed, "driver.sh"), "utf8"), "# newer copy\n");
-  assert.equal(r.git("config", "--get", "merge.beads.driver"), "sh newer-driver.sh %O %A %B %P");
-
-  // A record naming a commit this clone does not have is no reason to keep.
-  writeFileSync(join(installed, "commit"), `${"0".repeat(40)}\n`);
-  assert.equal(install().status, 0);
-  assert.notEqual(readFileSync(join(installed, "driver.sh"), "utf8"), "# newer copy\n");
-});
-
-/**
- * A repository that tracks its own copy of the installer and the driver at
- * barwise/scripts, as a real clone does, so the installer keys on the
- * driver's own history there rather than falling back to HEAD.
- */
-function driverRepo() {
-  const r = repo(jsonl(issue("a")));
-  const scripts = join(r.dir, "barwise", "scripts");
-  mkdirSync(join(scripts, "lib"), { recursive: true });
-  for (
-    const f of [
-      "install-merge-driver.mjs",
-      "beads-merge-driver.mjs",
-      "beads-merge-driver.sh",
-      "lib/beads-merge.mjs",
-      "lib/beads-jsonl.mjs",
-    ]
-  ) {
-    writeFileSync(join(scripts, f), readFileSync(join(SCRIPTS, f)));
-  }
-  r.git("add", "-A");
-  r.git("commit", "-qm", "driver");
-  const install = () => r.run("node", [join(scripts, "install-merge-driver.mjs")]);
-  const record = () => readFileSync(join(r.dir, ".git", "barwise-merge", "commit"), "utf8").trim();
-  const touchDriver = (msg) => {
-    writeFileSync(
-      join(scripts, "lib", "beads-merge.mjs"),
-      `// ${msg}\n${readFileSync(join(SCRIPTS, "lib", "beads-merge.mjs"), "utf8")}`,
-    );
-    r.git("commit", "-qam", msg);
-  };
-  return { ...r, install, record, touchDriver };
-}
-
-test("a branch that never touched the driver does not pin the copy against main", () => {
-  const r = driverRepo();
-  const driverOnMain = r.git("rev-parse", "HEAD");
-  r.git("checkout", "-qb", "feature");
-  r.write(jsonl(issue("a"), issue("b")));
-  r.commit("unrelated");
-  assert.equal(r.install().status, 0);
-  assert.equal(r.record(), driverOnMain, "keyed on the driver's last commit, not HEAD");
-  r.git("checkout", "-q", "main");
-  const back = r.install();
-  assert.doesNotMatch(back.stderr, /keeping/);
-});
-
-test("an amended driver commit does not pin the copy it replaced", () => {
-  const r = driverRepo();
-  r.touchDriver("first draft");
-  assert.equal(r.install().status, 0);
-  const drafted = r.record();
-  writeFileSync(join(r.dir, "barwise", "scripts", "lib", "beads-merge.mjs"), "// amended\n");
-  r.git("commit", "-q", "--amend", "-a", "--no-edit");
-  const after = r.install();
-  assert.doesNotMatch(after.stderr, /keeping/, "the drafted commit is on no branch any more");
-  assert.notEqual(r.record(), drafted);
   assert.equal(
-    readFileSync(join(r.dir, ".git", "barwise-merge", "lib", "beads-merge.mjs"), "utf8"),
-    "// amended\n",
+    readFileSync(join(installed, "lib", "beads-merge.mjs"), "utf8"),
+    readFileSync(join(SCRIPTS, "lib", "beads-merge.mjs"), "utf8"),
   );
+  assert.ok(!existsSync(join(installed, "version")), "a file from an earlier layout is gone");
+  assert.match(r.git("config", "--get", "merge.beads.driver"), /barwise-merge\/driver\.sh/);
 });
 
-test("a sibling branch's driver change is kept against a checkout that lacks it", () => {
-  const r = driverRepo();
-  r.git("checkout", "-qb", "driver-change");
-  r.touchDriver("sibling change");
-  assert.equal(r.install().status, 0);
-  r.git("checkout", "-q", "main");
-  const kept = r.install();
-  assert.match(
-    kept.stderr,
-    /keeping the installed tracker merge driver \(installed from [0-9a-f]{8}, carried by refs\/heads\/driver-change/,
-  );
-  assert.match(
-    readFileSync(join(r.dir, ".git", "barwise-merge", "lib", "beads-merge.mjs"), "utf8"),
-    /^\/\/ sibling change/,
-  );
+test("from below the top of a work tree the installer touches nothing", () => {
+  // barwise unpacked inside another project's checkout runs `prepare` from
+  // a directory that is not that repository's top; its config is not ours.
+  const r = repo(jsonl(issue("a")));
+  r.git("config", "merge.beads.driver", "theirs");
+  const below = spawnSync("node", [join(SCRIPTS, "install-merge-driver.mjs")], {
+    cwd: join(r.dir, ".beads"),
+    encoding: "utf8",
+    env: cleanEnv(),
+  });
+  assert.equal(below.status, 0, below.stderr);
+  assert.match(below.stderr, /is not the top of its work tree/);
+  assert.equal(r.git("config", "--get", "merge.beads.driver"), "theirs");
 });
 
 test("outside a git repository the installer says so and lets prepare go on", () => {
@@ -678,7 +595,7 @@ test("a dependency on an issue the other side deleted is refused by pre-merge-co
   );
   assert.notEqual(m.status, 0, "the merge commit must not be created");
   assert.match(m.stdout + m.stderr, /dangling depends_on_id 'x'/);
-  assert.match(m.stderr, /pre-merge-commit: tracker validation failed/);
+  assert.match(m.stderr, /pre-merge-commit: the merge is still in progress/);
   assert.ok(existsSync(join(r.dir, ".git", "MERGE_HEAD")), "the merge is left in progress");
 });
 
@@ -705,6 +622,23 @@ test("a hook that cannot run the validator says so, with exit 2, rather than cal
   assert.equal(hook.status, 2, hook.stdout + hook.stderr);
   assert.match(hook.stderr, /could not validate the staged \.beads\/issues\.jsonl/);
   assert.doesNotMatch(hook.stderr, /failed validation/);
+  // And through both real hooks, which used to report it as a failure.
+  // pre-commit stops at this, its first step, before any build.
+  for (const name of ["pre-commit", "pre-merge-commit"]) {
+    const h = spawnSync("sh", [join("barwise", ".husky", name)], {
+      cwd: r.dir,
+      encoding: "utf8",
+      env: cleanEnv({ GIT_DIR: join(r.dir, ".git"), PATH: path }),
+    });
+    assert.equal(h.status, 2, `${name}:\n${h.stdout}${h.stderr}`);
+  }
+});
+
+test("a commit that deletes the tracker is not blocked for want of an index copy", () => {
+  const r = repo(jsonl(issue("a")), { hooks: true });
+  r.git("rm", "-q", ".beads/issues.jsonl");
+  const c = r.run("git", ["commit", "-qm", "drop the tracker"]);
+  assert.equal(c.status, 0, c.stdout + c.stderr);
 });
 
 test("a broken tracker that was staged, then fixed on disk without restaging, is refused", () => {

@@ -190,21 +190,19 @@ In scope:
   time and quoted, so a clone that is moved, or whose path has a space,
   keeps working (checked with a probe in a linked worktree under a
   directory named `my dir`). Running it again shall replace all three.
-- When the installed copy records a driver commit (the last commit that
-  changed the installed files) that a branch still carries and that the
-  current checkout's driver commit does not descend from, `prepare`
-  shall keep it, leave the config alone, and say so. The copy is shared
-  by every worktree of the clone, so without this a `prepare` run from
-  an older branch would change how every later merge in the clone
-  resolves. Keying on the driver's own last commit means a branch that
-  never touched the driver agrees with main; requiring a branch to carry
-  the recorded commit means an amend or a rebase, which leaves it on no
-  branch, cannot pin the copy for good. A copy with no record is
-  replaced, and the record is removed before a reinstall and written
-  after it, so an interrupted copy has none. (Changed in
-  implementation: the first version compared a hand-bumped
-  `DRIVER_VERSION`, which held only while every change remembered the
-  bump.)
+- Every `prepare` shall install the current checkout's driver, building
+  the copy beside the live one and swapping it in, so the last run wins,
+  a damaged copy is repaired, and no file from an earlier layout
+  survives. The copy is shared by every worktree, so a `prepare` on an
+  older branch installs that branch's rules until the next one on a
+  newer branch: older rules, still a working driver. (Changed in
+  implementation, by the owner's decision: three designs that kept a
+  "newer" copy instead -- a hand-bumped version, the installing commit,
+  the driver's own last commit -- each let review find a way to pin a
+  stale or damaged copy that `prepare` then refused to repair.)
+- When `prepare` runs from a directory that is not the top of its work
+  tree, or outside any repository, the installer shall change nothing
+  and exit 0, as husky does beside it.
 - When the session-start hook runs `prepare`, it shall also read back
   `merge.beads.driver` and check that the installed wrapper exists,
   and warn if either is missing, the way it already warns about
@@ -374,9 +372,8 @@ Acceptance:
   non-zero exit.
 - When `npm run prepare` runs twice, `git config --get
   merge.beads.driver` shall print one value, and the wrapper it names
-  shall exist. A sibling branch's driver change shall be kept against
-  a checkout that lacks it; a branch that never touched the driver, and
-  an amended driver commit, shall not pin the copy.
+  shall exist. After the wrapper is deleted or a copied file damaged,
+  `prepare` shall restore it.
 - When the clone sits under a directory whose name contains a space,
   and when the merge runs in a linked worktree, the driver shall run.
 

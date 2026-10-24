@@ -17,10 +17,8 @@ cd barwise || exit 1
 #    the bd binary. Runs first so a corrupt tracker fails fast, before
 #    build/test. Shared with pre-merge-commit, which git runs instead of this
 #    hook for a clean merge commit.
-if ! sh scripts/hooks/check-staged-tracker.sh; then
-  echo "pre-commit: tracker validation failed." >&2
-  exit 1
-fi
+# Its exit status passes through: 2 is "could not validate", not "invalid".
+sh scripts/hooks/check-staged-tracker.sh || exit $?
 
 # 1. Refuse a credential in what is about to be committed. This one is at
 #    the COMMIT and not the push, unlike the rest of the gate list, because

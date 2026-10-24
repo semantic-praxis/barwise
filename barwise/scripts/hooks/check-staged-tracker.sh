@@ -14,7 +14,9 @@
 # The index copy, not the working-tree file: a broken tracker that was
 # staged and then fixed on disk without restaging would otherwise pass here
 # and be committed broken. Paths from `git diff` are repo-root-relative.
-git diff --cached --name-only | grep -qx '.beads/issues.jsonl' || exit 0
+# --diff-filter=d leaves out a staged deletion, which has no index copy to
+# read and nothing to validate.
+git diff --cached --name-only --diff-filter=d | grep -qx '.beads/issues.jsonl' || exit 0
 
 echo "validating staged .beads/issues.jsonl ..."
 tmp="$(mktemp)"
