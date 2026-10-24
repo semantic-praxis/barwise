@@ -73,8 +73,9 @@ In scope:
   Ossie ontology document at version `0.2.0.dev0`, the system shall
   produce a model in which:
   - the ontology's `name` is the model's name unless the caller names the
-    model (the CLI's `--name`, which defaults to the file name), and its
-    `description` is the model's note;
+    model -- and the CLI always does, its `--name` defaulting to the file
+    name, as for every format -- and its `description` is the model's
+    note;
   - each `EntityType` concept is an entity object type, and each
     `ValueType` concept a value type whose data type is the built-in at
     the root of its `extends` chain (`String` to `text`, `Integer` to
@@ -139,13 +140,17 @@ In scope:
 - When a document is malformed in a way the mapping depends on -- a concept
   declared twice or redeclaring a built-in, a relationship name repeated on
   one concept, two roles with one name, an empty `verbalizes`, a placeholder naming no
-  role, a pattern leaving a role out, a
+  role, a pattern leaving a role out, an unknown multiplicity, an entity
+  extending a value type or a value type extending no built-in, an
+  `identify_by` naming a relationship the entity does not itself declare
+  (a supertype's included) or one that is not binary, a
   role or supertype that is not declared, an `extends` cycle -- the
   importer shall refuse it with an `OssieImportError` naming the place.
   An empty or null `description` is read as absent.
 - When an ontology carries an `iri`, a `prefixes` map, an `ai_context`,
-  an ontology-level `requires`, a value type that extends another user
-  value type (naming any `requires` on the chain that the flattening does
+  an ontology-level `requires`, a value type extending more than one
+  concept (its data type from the first), a value type that extends another
+  user value type (naming any `requires` on the chain that the flattening does
   not carry), an `identify_by` on a value type, or a deprecated embedded
   `ontology_mappings`, the importer shall name each in `warnings` and keep
   what barwise can hold.
@@ -270,6 +275,25 @@ change to what is carried is a visible diff. The fixture keeps its Apache
 license header, which is what redistributing it requires.
 
 ### 2. Export and the round trip
+
+**Provisional: not yet grounded.** Drafted before WS1 was built, and the
+plan review of WS1 raised these for WS2 to settle when it is grounded:
+`constraintSpecs` reaches no surface today (nothing in the CLI, MCP or
+editor reads it), so an unexpressible constraint needs the loss report as
+well (Open decision 5); the pinned schema's `"format": "iri"`, which ajv's
+strict mode refuses unless the format is declared; a value constraint that
+is a disjunction (values and a range, two ranges, a role-level one), which
+Ossie's all-hold `requires` items cannot state; role order, since barwise
+does not put the declaring concept first (a fact type is declared under the
+entity whose role makes it expressible, and a reference fact type under its
+referent); how a value type named like a built-in is recognized as one (no
+definition, no constraint, the built-in's data type); the per-kind
+`ConstraintSpec` builder, which today is private to the DDL router and
+would be shared rather than copied; a `derived_by` expression that itself
+spans lines, which the one-per-line join cannot split back; and the
+`<snake_name>_id` reference mode the importer makes for a composite
+identifier, which the exporter must not report as a loss. Populations and
+objectification join the loss report.
 
 `writeOssie` and `OssieExportFormat`, added to `ossieFormat`. Tests: each
 inverse mapping; every unexpressible constraint kind in `constraintSpecs`;
