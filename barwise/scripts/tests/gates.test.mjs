@@ -4762,6 +4762,37 @@ test("check-tracker-closes reads a tracker larger than execFileSync's default 1 
   }
 });
 
+test("check-tracker-closes, run as ci:local --commit runs it, fails a close beside a code change", () => {
+  // The pre-push shape: no BASE_SHA, the base taken from
+  // `git merge-base origin/main HEAD`, in a detached linked worktree of the
+  // pushed commit. barwise-40t suspected this path of passing #723's close;
+  // it does not -- that push ran no hook at all, because core.hooksPath is
+  // relative and a `git worktree add` checkout has no barwise/.husky/_
+  // (barwise-mub). Pinned so the fallback stays the one CI's base agrees with.
+  const r = trackerRepo();
+  const tree = mkdtempSync(join(tmpdir(), "barwise-closes-wt-"));
+  try {
+    r.g("update-ref", "refs/remotes/origin/main", r.base);
+    r.g("checkout", "-q", "-b", "feature");
+    r.issues([["a", "closed"], ["b", "open"]]);
+    writeFileSync(join(r.dir, "src.ts"), "export const x = 6;\n");
+    const head = r.commit("fix and close");
+    rmSync(tree, { recursive: true, force: true });
+    r.g("worktree", "add", "--detach", "-q", tree, head);
+    const out = spawnSync(process.execPath, [join(tree, "scripts", "check-tracker-closes.mjs")], {
+      cwd: tree,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "" },
+    });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /closed: {2}a\b/);
+    assert.match(out.stderr, /src\.ts/);
+  } finally {
+    rmSync(tree, { recursive: true, force: true });
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
 test("check-tracker-closes refuses with no base rather than reporting clean", () => {
   const r = trackerRepo();
   try {
