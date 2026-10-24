@@ -51,38 +51,38 @@ const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !==
 
 /**
  * The CLAUDE.md block, as package name to the names it lists, read by a
- * declared grammar -- GRAMMAR below, which is also the refusal message, so
- * the rule a reader is told is the rule that is enforced. Any line outside
- * it is refused (exit 2) with the line named.
+ * declared grammar -- GRAMMAR below, which is also the refusal message.
+ * Any line outside it is refused (exit 2) with the line named.
  *
  * Five heuristics for telling hand-drawn rows from prose were tried first,
  * and each misread a realistic edit -- a nested connector skipped, a
  * comment that opened with a package name read as a second listing, a
- * legend read as a package -- because the drawing had no syntax that
- * separated the two. The grammar gives it one, and the thing it must never
- * do is read a misdrawn row as prose. So comment text is placed, not
- * guessed: it may only continue a root or row that carries `-- comment`
- * (or the comment line before it), which is where the real block wraps.
- * It opens with a letter or `-- ` and does not have a whole row's shape
- * (`name (a, b)` and nothing after), so a row that lost its connector
- * right after a commented row is refused too.
+ * legend read as a package -- and a shape test on comment text then failed
+ * both ways (a lost row with a trailing note passed; `registry (x)`
+ * prose was refused). Position settles it: a comment line starts in the
+ * exact column where its row's comment text starts, as every wrap in the
+ * real block is drawn, so a row that lost its connector sits at the
+ * wrong column and is refused whatever its text says.
  */
 const NAME = String.raw`[@\w](?:[\w@/.-]*\w)?`;
 const LIST = String.raw`\(([\w@/.\-, ]*)\)`;
-// Captured, so a row can say whether a comment opened after it.
+// Captured, so the comment's column can be read off the row.
 const COMMENT = String.raw`(\s+--\s.*)?\s*$`;
 const ROOT = new RegExp(String.raw`^(${NAME})\s+${LIST}${COMMENT}`);
 // At most two spaces in: a connector indented further is a nested child,
 // which the grammar does not draw.
 const ROW = new RegExp(String.raw`^\s{0,2}\|---\s+(${NAME})\s+${LIST}${COMMENT}`);
 const DRAWING = /^[\s|^]*$/;
-const CONTINUATION = /^\s*\|?\s{2,}([A-Za-z].*|-- .*)$/;
-const ROW_SHAPED = new RegExp(String.raw`^${NAME}\s*\([^)]*\)${COMMENT}`);
 const GRAMMAR = "the root line (`name (no internal deps)`); rows (`|--- name (a, b)`, at most"
-  + " two spaces in; names and lists of letters, digits and @ / . - _ ,); either may end with"
-  + " `  -- comment`, and only then may the next lines continue it -- indented two or more"
-  + " spaces after an optional `|`, opening with a letter or `-- `, never a whole row's shape;"
-  + " and drawing lines of `|` and `^`";
+  + " two spaces in, package names separated by commas); either may end with ` -- comment`,"
+  + " and the comment may wrap onto lines whose text starts in the column its first word"
+  + " starts in, after an optional `|`; and drawing lines of `|` and `^`";
+
+/** The column a row's comment text starts in, or null when it has none. */
+function commentColumn(line, group) {
+  if (group === undefined) return null;
+  return line.length - group.length + /^\s+--\s+/.exec(group)[0].length;
+}
 
 function graphLines(claudeMd) {
   // CRLF too: `.` stops at `\r`, so a Windows checkout would refuse every
@@ -108,8 +108,8 @@ function graphLines(claudeMd) {
       ? []
       : list.split(",").map((x) => x.trim()).filter(Boolean),
   });
-  // Whether the line before opened or continued a comment.
-  let commenting = false;
+  // The column the open comment wraps at, or null when none is open.
+  let wrap = null;
   for (const [i, line] of body.entries()) {
     if (i === first) {
       const m = ROOT.exec(line);
@@ -119,18 +119,19 @@ function graphLines(claudeMd) {
         );
       }
       out.push(listed(m[1], m[2]));
-      commenting = m[3] !== undefined;
+      wrap = commentColumn(line, m[3]);
       continue;
     }
     const m = ROW.exec(line);
     if (m) {
       out.push(listed(m[1], m[2]));
-      commenting = m[3] !== undefined;
+      wrap = commentColumn(line, m[3]);
       continue;
     }
-    const text = CONTINUATION.exec(line)?.[1];
-    if (commenting && text !== undefined && !ROW_SHAPED.test(text)) continue;
-    commenting = false;
+    const indent = /^(\s*\|?\s+)\S/.exec(line)?.[1].length;
+    // A null wrap never equals an indent, so no comment is open then.
+    if (indent === wrap) continue;
+    wrap = null;
     if (DRAWING.test(line)) continue;
     throw new Error(
       `the graph block line "${line.trim()}" is not one the grammar allows: ${GRAMMAR}`,
