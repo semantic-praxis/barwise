@@ -33,11 +33,6 @@ import {
 import { type DialectCapabilityProfile, resolveDialectProfile } from "./dialectCapabilities.js";
 
 /**
- * DDL (SQL CREATE TABLE) export format.
- *
- * Produces SQL DDL from an ORM model via relational mapping.
- */
-/**
  * The options that render DDL alone: no annotation comments and no
  * population INSERTs. What the deprecated `barwise schema` and
  * `generate_schema` print, held once so the two cannot drift
@@ -45,6 +40,11 @@ import { type DialectCapabilityProfile, resolveDialectProfile } from "./dialectC
  */
 export const PLAIN_DDL_OPTIONS = { annotate: false, includeExamples: false } as const;
 
+/**
+ * DDL (SQL CREATE TABLE) export format.
+ *
+ * Produces SQL DDL from an ORM model via relational mapping.
+ */
 export class DdlExportFormat implements ExportFormatAdapter {
   readonly name = "ddl";
   readonly description = "SQL DDL (CREATE TABLE statements)";
