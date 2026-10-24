@@ -1,6 +1,6 @@
 # Tell a pull request when only the tracker stands between it and main
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-24 -- the single workstream
 
 Created: 2026-10-24
 Last-updated: 2026-10-24

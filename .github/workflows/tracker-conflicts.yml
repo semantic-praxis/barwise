@@ -1,0 +1,67 @@
+name: Tracker conflicts
+
+# Comments on each open pull request into main whose ONLY conflict with
+# main is .beads/issues.jsonl, saying what a local `git merge origin/main`
+# will do (barwise/docs/specs/tracker-conflict-comment.spec.md,
+# barwise-ojo). GitHub runs no custom merge driver, so such a PR shows as
+# conflicted although the tracker merge driver resolves it locally, and
+# nothing else tells its owner.
+#
+# WHY pull_request_target, and why that is safe here:
+#   - The trigger that conflicts a PR is main moving (push), but a PR's own
+#     push can make or clear the conflict too, and a stacked PR retargeted
+#     to main fires `edited`. Fork PRs get a read-only token under plain
+#     pull_request, so the comment could not be posted or edited.
+#   - No PR code runs. The checkout below is pinned to the default branch
+#     under every trigger, so the script and the driver function come from
+#     main. The PR head is fetched as refs/pull/<n>/head and read only as
+#     data, by `git merge-tree` (in memory: no checkout, no hooks) and
+#     `git show`. git reads .gitattributes from main's work tree, merge
+#     drivers live in git config, and the script refuses to run if this
+#     clone has any merge.beads.* config. No PR-controlled string is
+#     interpolated here or quoted in a comment.
+#   - The token can comment, and nothing else: contents read,
+#     pull-requests write.
+#
+# EVERY RUN IS THE SAME FULL SCAN of all open PRs into main, whatever
+# triggered it, in one concurrency group that queues rather than cancels.
+# GitHub keeps one pending run per group and replaces it with a newer one,
+# which loses nothing only because each run checks everything; and two
+# runs never post on one PR at the same time.
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: tracker-conflicts
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # Builtins and two lib files only: no npm install, so no dependency
+      # code runs with this token.
+      - name: Comment on tracker-only conflicts
+        run: node barwise/scripts/tracker-conflicts.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

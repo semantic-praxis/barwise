@@ -17,6 +17,9 @@
 import { isDeepStrictEqual as eq } from "node:util";
 import { blocksIn, blocksOut, canonicalLine } from "./beads-jsonl.mjs";
 
+/** What a reported issue is, without the PR data its reason quotes. */
+export const REPORT_KINDS = Object.freeze(["collision", "deleted-vs-edited", "field-conflict"]);
+
 /** Fields beads-crud derives from `dependencies`; recomputed, never compared. */
 export const DERIVED = new Set(["dependency_count", "dependent_count"]);
 
@@ -170,8 +173,11 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
 
   const entries = [];
   const reported = [];
-  const report = (id, reason, candidates) => {
-    reported.push({ id, reason });
+  // `kind` is one of REPORT_KINDS, so a reader that must not echo PR
+  // data (the tracker-conflicts workflow's comment) can name the case
+  // without printing `reason`, which quotes field names and values.
+  const report = (id, kind, reason, candidates) => {
+    reported.push({ id, kind, reason });
     entries.push({ conflict: { id, reason, ...candidates } });
   };
   const sides = (c, o) => ({
@@ -192,6 +198,7 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
     if (c && o && c.obj.created_at !== o.obj.created_at) {
       report(
         id,
+        "collision",
         `id collision: created_at ${c.obj.created_at} on current, ${o.obj.created_at} on other`,
         sides(c, o),
       );
@@ -214,11 +221,11 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
       }
       // Rule 4: deleted on one side, changed on the other.
       if (!c) {
-        report(id, "deleted on current, edited on other", sides(c, o));
+        report(id, "deleted-vs-edited", "deleted on current, edited on other", sides(c, o));
         continue;
       }
       if (!o) {
-        report(id, "deleted on other, edited on current", sides(c, o));
+        report(id, "deleted-vs-edited", "deleted on other, edited on current", sides(c, o));
         continue;
       }
     } else if (!c || !o) {
@@ -231,7 +238,7 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
     if (merged.conflicts.length === 0) {
       entries.push({ obj: merged.asCurrent, sources });
     } else {
-      report(id, `both sides changed ${merged.conflicts.join(", ")}`, {
+      report(id, "field-conflict", `both sides changed ${merged.conflicts.join(", ")}`, {
         asCurrent: merged.asCurrent,
         asOther: merged.asOther,
       });
