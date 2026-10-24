@@ -5209,7 +5209,11 @@ function architectureRepo() {
   return { dir, manifests };
 }
 
-const ARCH = ["--", process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
+const ARCH_CMD = [process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
+const ARCH = ["--", ...ARCH_CMD];
+/** Run check:architecture over the fixture in `dir`, or with other arguments. */
+const runArch = (dir, args = ARCH_CMD.slice(1)) =>
+  spawnSync(ARCH_CMD[0], args, { cwd: dir, encoding: "utf8" });
 
 /** Run check:architecture in `dir` with one file edited, then restore it. */
 function archPlanted(dir, rel, edit) {
@@ -5219,7 +5223,7 @@ function archPlanted(dir, rel, edit) {
   assert.notEqual(after, before, `${rel}: the edit did not apply`);
   writeFileSync(path, after);
   try {
-    return spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+    return runArch(dir);
   } finally {
     writeFileSync(path, before);
   }
@@ -5271,6 +5275,19 @@ const ARCH_DISAGREEMENTS = [
     /CLAUDE\.md lists @barwise\/ghost, INTENDED does not/,
   ],
   [INTENDED_CJS, `"learn": ["core"],`, "", /packages\/learn: not in INTENDED/],
+  // Any connector is a row, and a misdrawn one is still compared.
+  [
+    "CLAUDE.md",
+    `  |--- ${CLAUDE_LLM}`,
+    "  |---- @barwise/planned      (core)",
+    /CLAUDE\.md lists @barwise\/planned, INTENDED does not/,
+  ],
+  [
+    "CLAUDE.md",
+    `  |--- ${CLAUDE_LLM}`,
+    "  +--- @barwise/llm             (core, diagram)",
+    /CLAUDE\.md draws llm -> diagram, INTENDED does not/,
+  ],
   // The map agreeing with the picture is not enough.
   [
     INTENDED_CJS,
@@ -5320,7 +5337,7 @@ const ARCH_DISAGREEMENTS = [
 test("check:architecture passes the real graph and catches each planted disagreement", () => {
   const { dir, manifests } = architectureRepo();
   try {
-    const clean = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+    const clean = runArch(dir);
     assert.equal(clean.status, 0, clean.stdout + clean.stderr);
     assert.match(clean.stdout, new RegExp(`and ${manifests} package manifests agree`));
     for (const [file, old, replacement, why] of ARCH_DISAGREEMENTS) {
@@ -5345,9 +5362,26 @@ test("check:architecture passes the real graph and catches each planted disagree
     assert.equal(twice.status, 1, twice.stderr);
     assert.match(twice.stderr, /CLAUDE\.md lists llm twice/);
     assert.doesNotMatch(twice.stderr, /llm -> /);
+    // Neither a wrapped comment under the last row nor npm names inside a
+    // list is a disagreement.
+    const vscodeRow =
+      "  |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)";
+    for (
+      const edit of [
+        (x) =>
+          x.replace(
+            vscodeRow,
+            `${vscodeRow}  -- the editor;\n                                 bundles (esbuild) everything`,
+          ),
+        (x) => x.replace(CLAUDE_LLM, "@barwise/llm             (@barwise/core)"),
+      ]
+    ) {
+      const ok = archPlanted(dir, "CLAUDE.md", edit);
+      assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    }
     // A package removed from packages/ while the map and picture keep it.
     rmSync(join(dir, "barwise", "packages", "learn"), { recursive: true });
-    const gone = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+    const gone = runArch(dir);
     assert.equal(gone.status, 1, gone.stderr);
     assert.match(gone.stderr, /INTENDED has learn, which is not a package under packages\//);
   } finally {
@@ -5402,7 +5436,7 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
       archPlanted(
         dir,
         "CLAUDE.md",
-        (s) => s.replace(/(## Dependency Graph\n\n```\n)[\s\S]*?(\n```\n)/, "$1nothing here$2"),
+        (s) => s.replace(/(## Dependency Graph\n\n```\n)[\s\S]*?(\n```\n)/, "$1$2"),
       ),
       /the Dependency Graph block names no package/,
     );
@@ -5412,7 +5446,11 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
         "CLAUDE.md",
         (s) => s.replace(CLAUDE_LLM, "@barwise/llm             (core,\n  |   diagram)"),
       ),
-      /cannot parse the graph line "\|--- @barwise\/llm\s+\(core,"/,
+      /cannot parse the graph row "\|--- @barwise\/llm\s+\(core,": its list must close/,
+    );
+    refused(
+      archPlanted(dir, "CLAUDE.md", (s) => s.replace(`  |--- ${CLAUDE_LLM}`, "  |--- (core)")),
+      /cannot parse the graph row "\|--- \(core\)"/,
     );
     const shapeFault = /does not export a map of package to package list/;
     for (const bad of [`"core": [[]]`, `"core": "none"`]) {
@@ -5424,14 +5462,14 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
     mkdirSync(copyDir);
     writeFileSync(join(copyDir, "package.json"), readFileSync(join(dir, CORE_PKG), "utf8"));
     refused(
-      spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" }),
+      runArch(dir),
       /two package manifests are named @barwise\/core/,
     );
     rmSync(copyDir, { recursive: true });
     // A directory with no manifest is not a package, and no manifest at
     // all is nothing to compare.
     mkdirSync(join(dir, "barwise", "packages", "stray-build"));
-    const stray = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+    const stray = runArch(dir);
     assert.equal(stray.status, 0, stray.stdout + stray.stderr);
     const empty = mkdtempSync(join(tmpdir(), "barwise-arch-empty-"));
     try {
@@ -5440,14 +5478,14 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
       writeFileSync(join(empty, "CLAUDE.md"), readFileSync(join(dir, "CLAUDE.md")));
       writeFileSync(join(empty, INTENDED_CJS), readFileSync(join(dir, INTENDED_CJS)));
       refused(
-        spawnSync(ARCH[1], [ARCH[2], "--root", empty], { encoding: "utf8" }),
+        runArch(dir, [ARCH_CMD[1], "--root", empty]),
         /no package\.json under/,
       );
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }
     refused(
-      spawnSync(ARCH[1], [ARCH[2], "--root"], { cwd: dir, encoding: "utf8" }),
+      runArch(dir, [ARCH_CMD[1], "--root"]),
       /--root needs a value/,
     );
   } finally {

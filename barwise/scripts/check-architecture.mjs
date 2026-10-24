@@ -50,12 +50,17 @@ const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !== i))];
 
 /**
- * The CLAUDE.md block, as package name to the dependency directory names
- * it lists. A package line is `name (a, b)` or `|--- name (a, b)  --
- * comment`, for any name: which names are packages is the manifests'
- * answer, not a prefix rule here. Continuation lines of a comment begin
- * with `|` and spaces, so they never start with a name.
+ * The CLAUDE.md block, as package name to the names it lists. A row is
+ * the block's first line (`name (none)`) or a line that starts with a
+ * connector (`|---`, `+---`, and the like) followed by `name (a, b)`,
+ * for any name: which names are packages is the manifests' answer, not a
+ * prefix rule here. Every other line is drawing or a wrapped comment, so
+ * a comment such as `bundles (esbuild)` is never read as a row, while a
+ * connector line that does not parse is refused rather than skipped.
  */
+const CONNECTOR = /^\s*[|+`\\]-{2,}\s*/;
+const ROW = /^([@\w][\w@/.-]*)\s+\((?:([^)]*)\))?/;
+
 function graphLines(claudeMd) {
   const lines = claudeMd.split("\n");
   const heading = lines.findIndex((l) => /^##\s+Dependency Graph\s*$/.test(l));
@@ -70,20 +75,22 @@ function graphLines(claudeMd) {
     throw new Error("the Dependency Graph section has no fenced block");
   }
   const out = [];
-  for (const line of lines.slice(open + 1, close)) {
-    const start = /^\s*(?:\|---\s+)?([@\w][\w@/.-]*)\s+\(/.exec(line);
-    if (!start) continue;
-    const m = /^\s*(?:\|---\s+)?([@\w][\w@/.-]*)\s+\(([^)]*)\)/.exec(line);
-    // A list wrapped onto the next line would otherwise be skipped and
-    // reported as a package the picture does not draw.
-    if (!m) {
+  const body = lines.slice(open + 1, close);
+  const first = body.findIndex((l) => l.trim() !== "");
+  for (const [i, line] of body.entries()) {
+    const connector = CONNECTOR.exec(line);
+    if (i !== first && !connector) continue;
+    const m = ROW.exec(connector ? line.slice(connector[0].length) : line.trim());
+    if (!m) throw new Error(`cannot parse the graph row "${line.trim()}"`);
+    // A list wrapped onto the next line would otherwise lose its tail.
+    if (m[2] === undefined) {
       throw new Error(
-        `cannot parse the graph line "${line.trim()}": its list must close on the line`,
+        `cannot parse the graph row "${line.trim()}": its list must close on the line`,
       );
     }
     const deps = m[2].trim() === "no internal deps"
       ? []
-      : m[2].split(",").map((s) => s.trim()).filter(Boolean);
+      : m[2].split(",").map((x) => x.trim()).filter(Boolean);
     out.push({ name: m[1], deps });
   }
   if (out.length === 0) throw new Error("the Dependency Graph block names no package");
@@ -125,7 +132,9 @@ try {
       // keys are indices.
       const fieldsOk = RUNTIME.every((f) => json?.[f] === undefined || isMap(json[f]));
       if (!isMap(json) || typeof json.name !== "string" || !fieldsOk) {
-        throw new Error(`${p}: not an object with a string name and object-valued ${RUNTIME}`);
+        throw new Error(
+          `${p}: not an object with a string name and object-valued ${RUNTIME.join(", ")}`,
+        );
       }
       return { dir, json };
     });
@@ -156,7 +165,8 @@ for (const { name, deps } of drawnLines) {
     continue;
   }
   for (const d of repeated(deps)) problems.push(`CLAUDE.md lists ${pkg} -> ${d} twice`);
-  drawn.set(pkg, deps);
+  // Either vocabulary inside the list: `core` or `@barwise/core`.
+  drawn.set(pkg, deps.map((x) => dirOf.get(x) ?? x));
 }
 for (const [p, ds] of Object.entries(intended)) {
   for (const d of repeated(ds)) problems.push(`INTENDED lists ${p} -> ${d} twice`);
