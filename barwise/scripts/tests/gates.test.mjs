@@ -4772,15 +4772,25 @@ test("check-tracker-closes, run as ci:local --commit runs it, fails a close besi
   const r = trackerRepo();
   const tree = mkdtempSync(join(tmpdir(), "barwise-closes-wt-"));
   try {
+    // Only origin/main can supply the base: the local default branch is
+    // deleted (a fresh ci:local worktree need not have one), so a fallback
+    // that read it would refuse instead of passing.
     r.g("update-ref", "refs/remotes/origin/main", r.base);
+    const local = r.g("rev-parse", "--abbrev-ref", "HEAD").trim();
     r.g("checkout", "-q", "-b", "feature");
+    r.g("branch", "-q", "-D", local);
+    // The close and the code change in separate commits, so a base of
+    // HEAD~1 would see the code change alone and report clean.
     r.issues([["a", "closed"], ["b", "open"]]);
+    r.commit("close a");
     writeFileSync(join(r.dir, "src.ts"), "export const x = 6;\n");
-    const head = r.commit("fix and close");
+    const head = r.commit("fix");
     rmSync(tree, { recursive: true, force: true });
     r.g("worktree", "add", "--detach", "-q", tree, head);
+    // From a subdirectory of the worktree, as ci:local runs gates from its
+    // barwise/: a cwd-scoped listing would miss the root-level tracker.
     const out = spawnSync(process.execPath, [join(tree, "scripts", "check-tracker-closes.mjs")], {
-      cwd: tree,
+      cwd: join(tree, "scripts"),
       encoding: "utf8",
       env: { ...process.env, BASE_SHA: "" },
     });
