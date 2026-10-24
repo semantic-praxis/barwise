@@ -20,6 +20,7 @@
     "check:review-tiers": "node scripts/check-review-tiers.mjs",
     "check:spec-touches": "node scripts/check-spec-touches.mjs",
     "pr:risk": "node scripts/pr-risk.mjs",
+    "plan-scope": "node scripts/plan-scope.mjs",
     "check:no-nul": "node scripts/check-no-nul.mjs",
     "check:git-listing": "node scripts/check-git-listing.mjs",
     "check:lockfile": "node scripts/check-lockfile-agrees.mjs",

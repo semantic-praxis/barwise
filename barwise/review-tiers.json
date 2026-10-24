@@ -60,7 +60,10 @@
       "tier": "routine",
       "globs": [
         "barwise/examples/output/",
-        "barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts"
+        "barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts",
+        "barwise/docs/tutorial/",
+        "barwise/packages/cli/tests/characterization/golden/",
+        "barwise/packages/diagram-ui/tests/golden/goldens/"
       ],
       "why": "drift tests already fail when output disagrees with its regenerator"
     },
