@@ -4768,7 +4768,7 @@ test("check-tracker-closes, run as ci:local --commit runs it, fails a close besi
   // pushed commit. barwise-40t suspected this path of passing #723's close;
   // it does not -- that push ran no hook at all, because core.hooksPath is
   // relative and a `git worktree add` checkout has no barwise/.husky/_
-  // (barwise-mub). Pinned so the fallback stays the one CI's base agrees with.
+  // (barwise-qma). Pinned so the fallback stays the one CI's base agrees with.
   const r = trackerRepo();
   const tree = mkdtempSync(join(tmpdir(), "barwise-closes-wt-"));
   try {
