@@ -2,8 +2,10 @@
 
 Command-line tool for ORM 2 modeling. Wraps the platform-independent
 packages into a `barwise` CLI binary; the authoritative list of
-internal dependencies is the root CLAUDE.md dependency graph (and
-this package's `package.json`).
+internal dependencies is `INTENDED` in
+`barwise/scripts/lib/intended.cjs`, which the root CLAUDE.md graph
+and this package's `package.json` are checked against
+(`npm run check:architecture`).
 
 ## Dependency Rule
 

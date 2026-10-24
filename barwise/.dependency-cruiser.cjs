@@ -21,41 +21,10 @@
 // mapping is missing or stale, and probes that a forbidden subpath
 // import is actually reported.
 
-// The intended graph: which @barwise/* packages each package may import.
-// Source of truth is the root CLAUDE.md dependency graph.
-const INTENDED = {
-  "core": [],
-  "diagram": ["core"],
-  "diagram-ui": ["diagram"],
-  "llm": ["core"],
-  "code-analysis": ["core"],
-  "dbt": ["core"],
-  "formats": ["core"],
-  "learn": ["core"],
-  "promptlab": ["core", "llm", "learn"],
-  "cli": [
-    "core",
-    "diagram",
-    "diagram-ui",
-    "llm",
-    "code-analysis",
-    "dbt",
-    "formats",
-    "learn",
-    "promptlab",
-  ],
-  "mcp": ["core", "diagram", "diagram-ui", "llm", "code-analysis", "dbt", "formats", "learn"],
-  "vscode": [
-    "core",
-    "diagram",
-    "diagram-ui",
-    "llm",
-    "code-analysis",
-    "dbt",
-    "formats",
-    "mcp",
-  ],
-};
+// The intended graph lives in scripts/lib/intended.cjs, which is the
+// authority for it; the root CLAUDE.md graph is checked against it
+// (scripts/check-architecture.mjs).
+const INTENDED = require("./scripts/lib/intended.cjs");
 
 // One rule per package: forbid importing any sibling package's src that
 // is not in its permitted set (itself plus its allowed dependencies).

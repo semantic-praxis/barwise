@@ -1,9 +1,10 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Draft -- no workstream implemented
+Status: Workstream 1 implemented 2026-10-24 (one package graph); 2-5 not yet
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
+Plan-reviewed: 57072cf4 (code-review, pr-review)
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
 +barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,

@@ -194,8 +194,9 @@ it, so knip sees an unused file where there is a live edge.
 
 ## Downstream Dependents
 
-Every other package in the monorepo depends on this one; the root
-CLAUDE.md dependency graph is the authoritative list.
+Every other package in the monorepo depends on this one; `INTENDED`
+in `barwise/scripts/lib/intended.cjs` is the authoritative list, and
+the root CLAUDE.md graph is checked against it.
 
 Changes to exported types or behavior in this package can break all
 downstream packages. Run the full monorepo build (`npm run build` from

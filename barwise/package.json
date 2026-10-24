@@ -30,6 +30,7 @@
     "check:root-scripts": "node scripts/regen-root-package.mjs --check",
     "check:book-citations": "node scripts/check-book-citations.mjs",
     "check:instruction-refs": "node scripts/check-instruction-refs.mjs",
+    "check:architecture": "node scripts/check-architecture.mjs",
     "test:scripts": "node scripts/run-script-tests.mjs",
     "test:optimizer": "uv run --frozen --extra dev pytest -q",
     "audit:duplication": "node scripts/audit-duplication.mjs",

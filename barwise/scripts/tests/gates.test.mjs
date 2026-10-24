@@ -4980,3 +4980,84 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- check:architecture: the package graph's copies agree with INTENDED ---
+
+/**
+ * A committed copy of the three inputs check:architecture reads, from
+ * this repo's real files, so the test proves the real graph passes before
+ * each mutation proves a planted disagreement is seen.
+ */
+function architectureRepo() {
+  const dir = tempRepo();
+  const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
+  copy("CLAUDE.md");
+  copy("barwise/scripts/lib/intended.cjs");
+  for (const pkg of ["core", "llm", "promptlab", "vscode"]) {
+    copy(`barwise/packages/${pkg}/package.json`);
+  }
+  execFileSync("git", ["commit", "-qm", "inputs"], { cwd: dir });
+  return dir;
+}
+
+const ARCH = ["--", process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
+
+test("check:architecture passes the real graph and catches each planted disagreement", () => {
+  const dir = architectureRepo();
+  try {
+    const clean = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+    assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+    for (
+      const [file, old, replacement, why] of [
+        // An extra edge in the picture: llm drawn as depending on diagram.
+        [
+          "CLAUDE.md",
+          "@barwise/llm             (core)",
+          "@barwise/llm             (core, diagram)",
+          /CLAUDE\.md draws llm -> diagram, INTENDED does not/,
+        ],
+        // An edge dropped from the map: the picture now draws one too many.
+        [
+          "barwise/scripts/lib/intended.cjs",
+          `"promptlab": ["core", "llm", "learn"]`,
+          `"promptlab": ["core", "llm"]`,
+          /CLAUDE\.md draws promptlab -> learn/,
+        ],
+        // A runtime dependency the map does not allow.
+        [
+          "barwise/packages/core/package.json",
+          `"dependencies": {`,
+          `"dependencies": {\n    "@barwise/llm": "*",`,
+          /packages\/core: depends on @barwise\/llm, INTENDED does not allow it/,
+        ],
+      ]
+    ) {
+      const r = mutate(dir, ["--file", file, "--old", old, "--new", replacement, ...ARCH]);
+      assert.equal(r.status, 0, `${file}: expected CAUGHT:\n${r.stdout}${r.stderr}`);
+      // mutate restores the file, so rerun the planted state by hand to
+      // read WHICH disagreement was reported, not merely that one was.
+      const path = join(dir, file);
+      const before = readFileSync(path, "utf8");
+      writeFileSync(path, before.replace(old, replacement));
+      const red = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+      writeFileSync(path, before);
+      assert.equal(red.status, 1, red.stderr);
+      assert.match(red.stderr, why);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture cannot answer when the graph block is gone", () => {
+  const dir = architectureRepo();
+  try {
+    const path = join(dir, "CLAUDE.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace("## Dependency Graph", "## Packages"));
+    const r = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /cannot answer -- CLAUDE\.md has no "## Dependency Graph" heading/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
