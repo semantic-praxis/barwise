@@ -1,7 +1,7 @@
 /**
- * orm-model://{path} resource template: returns the model as JSON, in the
- * document shape a `.orm.yaml` file states it (the orm-schema://json-schema
- * resource describes it).
+ * orm-model://{path} resource template: returns the model as JSON, as the
+ * current-format document a save would write (the orm-schema://json-schema
+ * resource describes it). A file in an older format comes back current.
  *
  * The model itself is not JSON: its element stores are `Map`s, which
  * `JSON.stringify` writes as `{}`. Stringifying it directly served every
@@ -22,8 +22,8 @@ export function registerOrmModelResource(server: McpServer): void {
     new ResourceTemplate("orm-model://{+path}", { list: undefined }),
     {
       title: "ORM Model",
-      description: "Returns the ORM model from a .orm.yaml file as JSON, in the document "
-        + "shape the file uses (orm-schema://json-schema describes it). "
+      description: "Returns the ORM model from a .orm.yaml file as JSON: the current-format "
+        + "document a save would write (orm-schema://json-schema describes it). "
         + "Note: this returns the ENTIRE model and is unbounded -- a large model "
         + "can consume a lot of context. For specific questions prefer the "
         + "query_model tool, and for an overview prefer describe_domain; read this "
@@ -31,8 +31,10 @@ export function registerOrmModelResource(server: McpServer): void {
       mimeType: "application/json",
     },
     async (uri, variables) => {
+      // The matched variable is still percent-encoded: the SDK matches the
+      // URI's string form, which encodes a space or a non-ASCII character.
       const path = variables.path;
-      const filePath = typeof path === "string" ? path : String(path);
+      const filePath = decodeURIComponent(typeof path === "string" ? path : String(path));
       const yaml = readFileSync(filePath, "utf-8");
       const model = serializer.deserialize(yaml);
 

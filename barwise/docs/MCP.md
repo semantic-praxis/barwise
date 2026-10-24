@@ -835,8 +835,9 @@ validation.
 
 ### orm-model://{path}
 
-Returns a deserialized ORM model from a file path as JSON. Allows AI
-tools to inspect model contents programmatically without parsing YAML
+Returns the model at a file path as JSON: the current-format document a
+save would write, in the shape `orm-schema://json-schema` describes. Allows
+AI tools to inspect model contents programmatically without parsing YAML
 themselves.
 
 ---

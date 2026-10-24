@@ -48,7 +48,12 @@ function registeredToolNames(): Set<string> {
   return names;
 }
 
-/** Every snake_case word a prompt mentions; `isToolLike` keeps the tool-shaped ones. */
+/**
+ * Every snake_case word a prompt mentions. Each must be a registered tool:
+ * the prompts and their guidance hold no other snake_case word today, and one
+ * added later fails here, to be named an exception on purpose rather than by
+ * an allowlist that hides a renamed tool.
+ */
 function toolsNamedIn(text: string): string[] {
   return [...new Set(text.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? [])];
 }
@@ -78,7 +83,7 @@ describe("analyze-domain prompt", () => {
   it("names only tools this server registers", () => {
     const tools = registeredToolNames();
     const named = toolsNamedIn(handler({ transcript: "x" }).messages[0]!.content.text);
-    expect(named.filter((n) => !tools.has(n) && isToolLike(n))).toEqual([]);
+    expect(named.filter((n) => !tools.has(n))).toEqual([]);
     expect(named).toContain("import_transcript");
   });
 });
@@ -110,16 +115,6 @@ describe("review-model prompt", () => {
   it("names only tools this server registers", () => {
     const tools = registeredToolNames();
     const named = toolsNamedIn(handler({ filePath: "a.orm.yaml" }).messages[0]!.content.text);
-    expect(named.filter((n) => !tools.has(n) && isToolLike(n))).toEqual([]);
+    expect(named.filter((n) => !tools.has(n))).toEqual([]);
   });
 });
-
-/**
- * A snake_case word that reads as a tool name: ends in one of the nouns the
- * server's tools end in. Guidance prose has other snake_case words (field
- * names such as `reference_mode`), which are not tools and must not count.
- */
-function isToolLike(word: string): boolean {
-  return /_(model|models|transcript|domain|schema|diagram|repository|status|analysis|list|check)$/
-    .test(word);
-}
