@@ -57,13 +57,22 @@ describe("structural/duplicate-constraint-id", () => {
     expect(findings(twoFactTypes("c1", "c2"), RULE)).toEqual([]);
   });
 
-  it("names a constraint stored on the model as across fact types", () => {
+  it("names a constraint stored on the model by the roles it names", () => {
     const model = twoFactTypes("c1", "c2");
     model.addConstraint({ type: "exclusion", id: "c1", roleIds: ["r1", "r2"] });
     const found = findings(model, RULE);
     expect(found).toHaveLength(1);
     expect(found[0]!.message).toContain(
-      'mandatory in fact type "A runs"; exclusion across fact types',
+      'mandatory in fact type "A runs"; exclusion over roles r1, r2',
+    );
+  });
+
+  it("tells apart two constraints of one kind stored on the model", () => {
+    const model = twoFactTypes("c1", "c2");
+    model.addConstraint({ type: "exclusion", id: "x", roleIds: ["r1", "r2"] });
+    model.addConstraint({ type: "exclusion", id: "x", roleIds: ["r2", "r1"] });
+    expect(findings(model, RULE)[0]!.message).toContain(
+      "exclusion over roles r1, r2; exclusion over roles r2, r1",
     );
   });
 
@@ -91,7 +100,9 @@ model:
   it("reports it from a 2.0 file, which the 2.0 reader does not refuse", () => {
     const found = findings(serializer.deserialize(twoZero("r2")), RULE);
     expect(found).toHaveLength(1);
-    expect(found[0]!.message).toContain('mandatory in fact type "A runs"; exclusion across');
+    expect(found[0]!.message).toContain(
+      'mandatory in fact type "A runs"; exclusion over roles r1, r2',
+    );
   });
 
   it("still reports it when the duplicated constraint's own role dangles", () => {
@@ -135,6 +146,24 @@ model:
   });
 });
 
+describe("a merge whose base already holds a duplicate constraint id", () => {
+  it("is refused, since the merged file would not load as 3.0", () => {
+    // The merge did not add the repeat, but it writes 3.0, and the 3.0
+    // loader refuses a repeated constraint id: refusing here is what
+    // stops a merge from writing a file nothing can read back.
+    const existing = twoFactTypes("c", "c");
+    const incoming = twoFactTypes("c", "c");
+    incoming.addObjectType({ id: "y", name: "B", kind: "entity", referenceMode: "b_id" });
+    const diff = diffModels(existing, incoming);
+    const all = new Set(diff.deltas.map((_, i) => i));
+    const result = mergeAndValidate(existing, incoming, diff.deltas, all);
+    expect(result.isValid).toBe(false);
+    expect(result.diagnostics.map((d) => d.ruleId)).toContain(
+      "structural/duplicate-constraint-id",
+    );
+  });
+});
+
 describe("structural/duplicate-subtype-fact", () => {
   const RULE = "structural/duplicate-subtype-fact";
 
@@ -158,7 +187,8 @@ model:
       expect(found).toHaveLength(1);
       expect(found[0]).toMatchObject({ severity: "error", elementId: "sf2" });
       expect(found[0]!.message).toBe(
-        'Subtype facts "sf1" and "sf2" both make "Manager" a subtype of "Person".',
+        'Subtype facts "sf1", "sf2" each make "Manager" a subtype of "Person"; '
+          + "a subtype relationship is stated once.",
       );
     });
 
@@ -166,6 +196,13 @@ model:
       expect(() => serializer.deserialize(file(version))).toThrow("already exists");
     });
   }
+
+  it("reports three over one pair once, naming all three", () => {
+    const yaml = file("3.0") + "    - { id: sf3, subtype: m, supertype: p }\n";
+    const found = findings(serializer.deserialize(yaml, { lenient: true }), RULE);
+    expect(found).toHaveLength(1);
+    expect(found[0]!.message).toContain('Subtype facts "sf1", "sf2", "sf3" each make');
+  });
 
   it("is refused by addSubtypeFact in code", () => {
     const model = new OrmModel({ name: "People" });

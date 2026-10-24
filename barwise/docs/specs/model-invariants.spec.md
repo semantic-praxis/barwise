@@ -296,9 +296,19 @@ Acceptance:
 
 Implemented 2026-10-24 (`validation/rules/structural.ts`,
 `tests/validation/duplicateIds.test.ts`). A constraint is named by its
-`type` as the file spells it (`mandatory in fact type "A runs"`,
-`exclusion across fact types`), since no label table covers all sixteen
-kinds and the file's own word is the one a reader can search for. Each
+`type` as the file spells it and by where it lives (`mandatory in fact type
+"A runs"`), or, stored on the model, by the role or subtype-fact ids it
+names (`exclusion over roles r1, r2`), since no label table covers all
+sixteen kinds and two of one kind can share the id. What a repeat is is
+stated once: `OrmModel.constraintsSharingAnId`, which the 3.0 loader now
+refuses on in place of its own `claim`, and `subtypePairKey`, which
+`addSubtypeFact` and the rule share. The 3.0 refusal stays under a lenient
+load: `barwise migrate` re-reads its own output leniently to refuse writing
+a file a strict load would reject. A merge is refused when the merged model
+holds a repeated constraint id even if the base already held it, because
+the merge writes 3.0 and the 3.0 loader would refuse the result. The
+diagnostic's element is the shared id, so an editor that maps ids to YAML
+nodes places it on one holder; the message names all of them. Each
 rule's tests were seen failing with the rule removed (5 and 2 tests). Over
 the tracked corpus, 89 of 116 models load leniently and neither rule fires
 on any of them.

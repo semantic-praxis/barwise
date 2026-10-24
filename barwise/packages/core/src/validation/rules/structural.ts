@@ -1,7 +1,10 @@
+import { type Constraint, roleIdsOf, subtypeFactIdsOf } from "../../model/Constraint.js";
 import { isScopedView } from "../../model/DiagramLayout.js";
+import type { FactType } from "../../model/FactType.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
+import { type SubtypeFact, subtypePairKey } from "../../model/SubtypeFact.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
 
@@ -27,9 +30,9 @@ import { report, RULE_ID } from "../ruleId.js";
  * a rule id is a promise to whoever reads validator output.
  *
  * They ship as two exports rather than one, and the split is worth more
- * than it looks. Most of the checks read no reference at all: two
+ * than it looks. Seven of the ten checks read no reference at all: two
  * compare names, one counts readings, one walks subtype ids as a graph
- * of ids, and two compare ids. Left in the graph-taking export they would be suppressed
+ * of ids, one checks a diagram's ids, and two compare element ids. Left in the graph-taking export they would be suppressed
  * whenever any id in the model dangled -- and `barwise validate` on a
  * file with one bad constraint role would stop reporting that a binary
  * fact type has only one reading, which has nothing to do with the bad
@@ -69,59 +72,74 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
  *
  * Constraints are arrays, so the model can hold the duplicate, and a
  * defect the model can hold is validation's to report
- * (`docs/specs/model-invariants.spec.md`). The 3.0 loader refuses one
- * (`claim` in `OrmYamlSerializer`); a 2.0 file, a model built in code and
- * a merge do not, and before this rule a merge wrote a file the 3.0 loader
- * then refused to read back (barwise-b2s). Reported once per id, naming
- * every holder, because every reader keys a constraint by its id and
- * `getConstraint` returns whichever comes first.
+ * (`docs/specs/model-invariants.spec.md`). The 3.0 loader refuses one; a
+ * 2.0 file, a model built in code and a merge do not, and before this rule
+ * a merge wrote a file the 3.0 loader then refused to read back
+ * (barwise-b2s). Both read `OrmModel.constraintsSharingAnId`, so they
+ * agree on what a repeat is. Reported once per id, naming every holder.
+ *
+ * The diagnostic's element is the shared id, and an editor that maps ids
+ * to YAML nodes can place it on only one of the holders; the message names
+ * all of them.
  */
 function checkDuplicateConstraintIds(model: OrmModel): Diagnostic[] {
-  const holders = new Map<string, string[]>();
-  for (const [c, ft] of model.everyConstraint()) {
-    if (c.id === undefined) continue;
-    const where = ft ? `${c.type} in fact type "${ft.name}"` : `${c.type} across fact types`;
-    const list = holders.get(c.id);
-    if (list) list.push(where);
-    else holders.set(c.id, [where]);
-  }
-  return [...holders]
-    .filter(([, list]) => list.length > 1)
-    .map(([id, list]) => report(RULE_ID.duplicateConstraintId, "default", id, id, list.join("; ")));
+  return [...model.constraintsSharingAnId()].map(([id, holders]) =>
+    report(
+      RULE_ID.duplicateConstraintId,
+      "default",
+      id,
+      id,
+      holders.map(([c, ft]) => describeHolder(c, ft)).join("; "),
+    )
+  );
+}
+
+/**
+ * A constraint as a reader can find it in the file, from what it states
+ * and never from what its references resolve to, so a dangling role cannot
+ * hide the duplicate. One stored on the model is told apart by the ids it
+ * names, since two of one kind can share the id.
+ */
+function describeHolder(c: Constraint, ft: FactType | undefined): string {
+  if (ft) return `${c.type} in fact type "${ft.name}"`;
+  const subtypeFacts = subtypeFactIdsOf(c);
+  return subtypeFacts.length > 0
+    ? `${c.type} over subtype facts ${subtypeFacts.join(", ")}`
+    : `${c.type} over roles ${roleIdsOf(c).join(", ")}`;
 }
 
 /**
  * No two subtype facts may relate the same subtype to the same supertype.
  *
- * `OrmModel.addSubtypeFact` refuses the pair, but only outside a lenient
- * load, so a lenient load is the one path that can hold it, and nothing
- * reported it there. Names come from the model where it has them and fall
- * back to the id, so a dangling end still lets the duplicate be seen.
+ * `OrmModel.addSubtypeFact` refuses the pair except under a lenient load,
+ * so a lenient load can hold two such subtype facts under different ids,
+ * and nothing reported them. Two that also share an id collapse in the
+ * id-keyed store before any rule runs; refusing that is workstream 3 of
+ * the spec. Reported once per pair, naming every id, as the constraint
+ * rule reports once per id. Names fall back to the id, so a dangling end
+ * still lets the duplicate be seen.
  */
 function checkDuplicateSubtypeFacts(model: OrmModel): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  const seen = new Map<string, string>(); // "sub\0super" -> first subtype fact id
-  const nameOf = (id: string) => model.getObjectType(id)?.name ?? id;
+  const byPair = new Map<string, SubtypeFact[]>();
   for (const sf of model.subtypeFacts) {
-    const key = `${sf.subtypeId}\u0000${sf.supertypeId}`;
-    const earlier = seen.get(key);
-    if (earlier === undefined) {
-      seen.set(key, sf.id);
-      continue;
-    }
-    diagnostics.push(
+    const key = subtypePairKey(sf);
+    const list = byPair.get(key);
+    if (list) list.push(sf);
+    else byPair.set(key, [sf]);
+  }
+  const nameOf = (id: string) => model.getObjectType(id)?.name ?? id;
+  return [...byPair.values()]
+    .filter((list) => list.length > 1)
+    .map((list) =>
       report(
         RULE_ID.duplicateSubtypeFact,
         "default",
-        sf.id,
-        sf.id,
-        earlier,
-        nameOf(sf.subtypeId),
-        nameOf(sf.supertypeId),
-      ),
+        list[1]!.id,
+        list.map((sf) => `"${sf.id}"`).join(", "),
+        nameOf(list[0]!.subtypeId),
+        nameOf(list[0]!.supertypeId),
+      )
     );
-  }
-  return diagnostics;
 }
 
 /**

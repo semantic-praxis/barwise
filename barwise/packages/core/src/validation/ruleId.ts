@@ -860,8 +860,8 @@ const RULE_DESCRIPTORS = {
     description:
       "Two subtype facts relate the same subtype to the same supertype, so the relationship is stated twice under two ids.",
     messages: {
-      default: (laterId: string, earlierId: string, subtype: string, supertype: string): string =>
-        `Subtype facts "${earlierId}" and "${laterId}" both make "${subtype}" a subtype of "${supertype}".`,
+      default: (ids: string, subtype: string, supertype: string): string =>
+        `Subtype facts ${ids} each make "${subtype}" a subtype of "${supertype}"; a subtype relationship is stated once.`,
     },
   },
   [RULE_ID.duplicateFactTypeName]: {

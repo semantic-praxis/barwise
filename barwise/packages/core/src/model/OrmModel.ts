@@ -15,7 +15,7 @@ import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./Objectifi
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
 import type { Role } from "./Role.js";
-import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
+import { SubtypeFact, type SubtypeFactConfig, subtypePairKey } from "./SubtypeFact.js";
 
 /**
  * A constraint in a view of fact types: an internal one with the fact type
@@ -293,6 +293,26 @@ export class OrmModel {
   }
 
   /**
+   * Each constraint id more than one constraint holds, with its holders in
+   * `everyConstraint` order. A constraint id is model-wide -- another
+   * element, another file, a diff or a merge names a constraint by it -- so
+   * this is the one statement of what a repeat is: the 3.0 loader refuses
+   * on it and `structural/duplicate-constraint-id` reports it.
+   */
+  constraintsSharingAnId(): ReadonlyMap<string, readonly ConstraintInView[]> {
+    const holders = new Map<string, ConstraintInView[]>();
+    for (const entry of this.everyConstraint()) {
+      const id = entry[0].id;
+      if (id === undefined) continue;
+      const list = holders.get(id);
+      if (list) list.push(entry);
+      else holders.set(id, [entry]);
+    }
+    for (const [id, list] of holders) if (list.length < 2) holders.delete(id);
+    return holders;
+  }
+
+  /**
    * Every constraint in the model, each once: each fact type's own
    * constraints in fact type order, then the constraints across fact types
    * (`constraints`). The whole-model view query and describe both list; a
@@ -566,10 +586,7 @@ export class OrmModel {
 
       // Check for duplicate subtype relationship.
       for (const existing of this._subtypeFacts.values()) {
-        if (
-          existing.subtypeId === config.subtypeId
-          && existing.supertypeId === config.supertypeId
-        ) {
+        if (subtypePairKey(existing) === subtypePairKey(config)) {
           throw new Error(
             `Subtype relationship from "${subtype.name}" to "${supertype.name}" already exists.`,
           );

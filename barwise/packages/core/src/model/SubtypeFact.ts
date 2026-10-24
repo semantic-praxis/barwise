@@ -77,6 +77,19 @@ export class SubtypeFact extends ModelElement {
  * annotation makes the next field added to `SubtypeFactConfig` a
  * compile error here until it is listed.
  */
+/**
+ * What makes two subtype facts the same relationship: the subtype and
+ * the supertype they relate. One key, read by `OrmModel.addSubtypeFact`
+ * when it refuses a repeat and by `structural/duplicate-subtype-fact`
+ * when it reports one a lenient load let through, so the store and the
+ * rule cannot disagree about what a repeat is.
+ */
+export function subtypePairKey(
+  sf: { readonly subtypeId: string; readonly supertypeId: string; },
+): string {
+  return `${sf.subtypeId}\u0000${sf.supertypeId}`;
+}
+
 export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
   const config: Complete<SubtypeFactConfig> = {
     id: sf.id,

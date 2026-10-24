@@ -263,23 +263,8 @@ export class OrmYamlSerializer {
       model.addObjectType(deserializeObjectType(otDoc));
     }
 
-    // Every constraint id is stated (the schema requires it) and is
-    // model-wide: another element, another file, a diff or a merge names a
-    // constraint by it, so two constraints sharing one is refused, naming it.
-    const seen = new Set<string>();
-    const claim = (c: { id?: string; }) => {
-      if (c.id === undefined) return;
-      if (seen.has(c.id)) {
-        throw new DeserializationError(
-          `Two constraints share the id "${c.id}"; a constraint id names one constraint.`,
-        );
-      }
-      seen.add(c.id);
-    };
-
     for (const ftDoc of doc.model.fact_types ?? []) {
       const { config, constraints } = deserializeFactType(ftDoc);
-      constraints.forEach(claim);
       model.addFactType(
         { ...config, constraints: constraints.filter(isInternalConstraint) },
         { skipPlayerValidation: options?.lenient },
@@ -295,8 +280,20 @@ export class OrmYamlSerializer {
 
     for (const cDoc of doc.model.constraints ?? []) {
       const c = deserializeConstraint(cDoc);
-      claim(c);
       if (isExternalConstraint(c)) model.addConstraint(c);
+    }
+
+    // Every constraint id is stated (the schema requires it) and is
+    // model-wide, so a 3.0 file holding a repeat is refused, lenient or
+    // not. The lenient refusal is load-bearing: `barwise migrate` re-reads
+    // its own 3.0 output leniently to refuse writing a file a strict load
+    // would reject. A 2.0 file and a model built in code are reported by
+    // `structural/duplicate-constraint-id` instead, from the same method.
+    const [repeated] = model.constraintsSharingAnId().keys();
+    if (repeated !== undefined) {
+      throw new DeserializationError(
+        `Two constraints share the id "${repeated}"; a constraint id names one constraint.`,
+      );
     }
 
     // After every constraint, so a reference resolves whatever order the
