@@ -285,8 +285,10 @@ a test can fix its output.
 - **Role order and the declaring concept, by precedence; the first rule
   that applies decides.** An Ossie relationship is declared under the
   concept playing its first role, and barwise puts no concept first.
-  1. A fact type named `X.rel` where `X` plays one of its roles: that role
-     first, the others in their barwise order. This is the importer's own
+  1. A fact type named `X.rel` -- `X` the text before the first `.` -- where
+     `X` plays one of its roles: that role first (the first such role in
+     barwise order, when `X` plays several), the others in their barwise
+     order. This is the importer's own
      record of where the relationship was declared, so an imported
      document comes back where it was.
   2. A binary that holds an entity's preferred identifier: the identified
@@ -298,22 +300,28 @@ a test can fix its output.
   5. Otherwise the barwise order.
      Then, if the first role is played by a built-in (below), the first role
      whose player is declared moves to the front, keeping rule 4's last role
-     last; a fact type all of whose roles are built-ins is a loss. Readings
-     follow the order, since a template names roles by position.
+     last; a fact type all of whose roles are built-ins is a loss. Readings follow the order, since a template names roles by position:
+     `{0}` becomes `{Concept}`, and a later role `{Player:name}` when it is
+     named (below) or `{Player}` when it is not. A reading with brace text
+     that is not a role position has the braces written as parentheses, so
+     the importer's placeholder grammar does not read it as one, and that is
+     a loss.
 - **What is written from constraints, after ordering.** `ManyToOne` for a
   uniqueness over exactly every role but the last; `OneToOne` for a binary
   with a single-role uniqueness on each role; nothing for a uniqueness
   spanning every role, or a unary's, which are implied. `identify_by` names
   a relationship when the entity's preferred identifier is a single-role
-  uniqueness on role 2 of a binary declared under that entity; an entity
-  with no preferred identifier gets `identify_by` over the relationships of
-  an external uniqueness whose every role is role 2 of a binary declared
-  under it (the importer's composite shape). Any other preferred
+  uniqueness on role 2 of a binary declared under that entity; an entity with no preferred identifier gets `identify_by` over the
+  relationships of an external uniqueness whose every role is role 2 of a
+  binary declared under it whose role 2 the entity itself does not play
+  (the importer's composite shape; it refuses a ring binary there). Any other preferred
   identifier -- on an n-ary fact type, on an objectification, on a binary
   declared elsewhere -- is a loss, not an `identify_by` the importer would
-  refuse. A mandatory first role is a bare `Entity.rel` in the entity's
-  `requires`. A value constraint whose values contain no `OR` between
-  spaces is one enumeration item, each `'` doubled; one whose single range
+  refuse. A mandatory first role is a bare `Entity.rel` in the entity's `requires`
+  when the declaring concept is an entity type; the importer reads that
+  shape only there, so on a value type it is a loss. A value constraint of values only, none containing what the importer
+  splits an enumeration at (its `\s+OR\s+`, shared from `requiresShapes`
+  rather than restated), is one enumeration item, each `'` doubled; one whose single range
   has numeric bounds (the importer's number shape) is its bound items;
   every other value constraint -- values and ranges, several ranges, a
   non-numeric bound, a role's -- is a loss. Every other uniqueness, and
@@ -324,9 +332,9 @@ a test can fix its output.
   words joined by `_`. A relationship or role name keeps only letters,
   digits and `_` (each other character becomes `_`, and a leading digit
   gets a `_` before it), so `Entity.rel` and placeholders parse; a name
-  repeated under one concept gets a numeric suffix. A role is named only
-  where Ossie needs it -- its player also plays another role, or its
-  barwise name differs from its player's -- and never by the declaring
+  repeated under one concept gets a numeric suffix. The first role is never named: Ossie keys it by its concept. A later role
+  is named where Ossie needs it -- its player also plays another role, or
+  its barwise name differs from its player's -- and never by the declaring
   concept's name or a key another role already has; then
   `{Player}_{position}`. barwise role names are otherwise not written and
   not reported: they are verbalization aids the readings carry, and Ossie
@@ -348,8 +356,10 @@ a test can fix its output.
   lines; WS2 changes the importer to join a list's items with a blank line
   (it joins with a line end today), so one multi-line expression stays one
   item, and a list item that itself holds a blank line is named in an
-  import warning. A note's lines that begin `requires: ` go back to
-  `requires` and `derived_by: ` lines to `derived_by`; the model note's
+  import warning. A note's lines that begin `requires: ` go back to `requires`, after the
+  items written from a value constraint (the importer takes the first
+  enumeration and the first bound on each side as the constraint, so the
+  constraint's own items lead), and `derived_by: ` lines to `derived_by`; the model note's
   `requires: ` lines go to the ontology's `requires` and the rest is its
   `description`, and WS2 changes the importer to warn when a description
   has a line beginning `requires: `, since the export would read it as one.
@@ -358,10 +368,15 @@ a test can fix its output.
   loss: `money` as `Decimal`, `timestamp` as `DateTime`, `auto_counter` as
   `Integer`, and `time`, `binary`, `uuid` and `other` as `String`; so is a
   `length` or `scale`, and a value type with no data type (`String`).
-- **Other losses**: a semiderived rule; a note line that is not one of the
-  two kinds above; a population; an objectification; and an entity written
-  with no `identify_by`, whose reference mode is then the only identifier
-  barwise had (the importer's `<snake_name>_id` for an unidentified concept
+- **Other losses**: a semiderived rule, whose text is still written as
+  `derived_by` (which reads back as fully derived); a stored derivation's
+  storage; a note line that is not one of the
+  two kinds above; a population; an objectification; an object type's aliases, `independent`, default value, cardinality and
+  source context; an identified entity's reference mode where it differs
+  from its identifying relationship's name (the importer reads that name
+  back as the reference mode); and an entity written with no `identify_by`
+  and no supertype that identifies it, whose reference mode is then the
+  only identifier barwise had (the importer's `<snake_name>_id` for an unidentified concept
   included -- that import already warned, so the round trip excludes it).
 - **The loss report (Open decision 5, now taken).** Every loss is a line
   `# barwise: <element>: <what was not written>` in a comment block at the
