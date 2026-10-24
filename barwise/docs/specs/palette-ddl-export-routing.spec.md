@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-wmm
+Plan-reviewed: 316d0812 (code-review, pr-review)
 Touches: barwise/packages/vscode/src/commands/ExportDdlCommand.ts,
 barwise/packages/vscode/src/diagram/tabPanels.ts,
 +barwise/packages/vscode/src/export/ddlExport.ts,
