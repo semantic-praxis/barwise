@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { canonicalLine } from "../lib/beads-jsonl.mjs";
+import { envWithoutRepoLocation } from "../lib/git-env.mjs";
 import {
   BOT,
   commentAction,
@@ -20,7 +21,7 @@ import {
   TRACKER,
   verdict,
 } from "../lib/tracker-conflicts.mjs";
-import { gitIn, run } from "../tracker-conflicts.mjs";
+import { gitIn, restClient, run } from "../tracker-conflicts.mjs";
 
 const T0 = "2026-01-01T00:00:00Z";
 const T1 = "2026-01-02T00:00:00Z";
@@ -53,14 +54,20 @@ test("the verdict follows the spec's table, first matching rule", () => {
   assert.equal(verdict([]).verdict, "clean");
   assert.equal(verdict(["src/a.ts"]).verdict, "other");
   assert.equal(verdict([TRACKER, "src/a.ts"]).verdict, "other");
-  assert.equal(verdict([TRACKER], { reported: [] }).verdict, "resolves");
+  assert.equal(verdict([TRACKER], () => ({ reported: [] })).verdict, "resolves");
   assert.equal(
-    verdict([TRACKER], { reported: [{ id: "x", kind: "collision" }] }).verdict,
+    verdict([TRACKER], () => ({ reported: [{ id: "x", kind: "collision" }] })).verdict,
     "needs-person",
   );
   assert.equal(
-    verdict([TRACKER], { malformed: { label: "other", lineNo: 3 } }).verdict,
+    verdict([TRACKER], () => ({ malformed: { label: "other", lineNo: 3 } })).verdict,
     "malformed",
+  );
+  assert.equal(verdict([TRACKER], () => ({ needsHand: true })).verdict, "other");
+  assert.equal(
+    verdict(["src/a.ts"], () => assert.fail("step 2 runs only for a tracker-only conflict"))
+      .verdict,
+    "other",
   );
 });
 
@@ -141,11 +148,7 @@ after(() => {
   for (const r of roots) rmSync(r, { recursive: true, force: true });
 });
 
-const env = () => {
-  const e = { ...process.env };
-  for (const k of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) delete e[k];
-  return e;
-};
+const env = () => envWithoutRepoLocation();
 
 /**
  * A bare origin whose main carries `base`, a work clone to build PR
@@ -197,7 +200,9 @@ function origin(base) {
     pulls,
     scanClone() {
       const scan = join(root, `scan-${Math.random().toString(36).slice(2)}`);
-      g(root, "clone", "-q", bare, scan);
+      // --no-local: a local clone copies the whole object store, so a
+      // commit no ref names would be present without being fetched.
+      g(root, "clone", "-q", "--no-local", bare, scan);
       return scan;
     },
   };
@@ -356,16 +361,52 @@ test("a clone with the driver configured refuses with exit 2", async () => {
   assert.match(r.refused, /merge\.beads\.\* config/);
 });
 
-test("a head that moved since the API listed it is left for the next run", async () => {
+test("a lagging pull ref is read by sha, and an unfetchable head is named, not guessed", async () => {
   const o = origin(jsonl(issue("a")));
-  o.pr(10, { [TRACKER]: jsonl(issue("a"), issue("b")) });
+  const head = o.pr(10, { [TRACKER]: jsonl(issue("a"), issue("b")) });
   o.main({ [TRACKER]: jsonl(issue("a"), issue("c")) });
-  const stale = [{ ...o.pulls[0], head: { sha: o.baseSha } }];
-  const gh = fakeGithub(stale);
+  // GitHub updates refs/pull/<n>/head after a push: the ref still names the
+  // base while the API already lists the new head. A ref no clone fetches
+  // keeps it reachable, so only a fetch by sha can bring it.
+  o.g("push", "-q", "-f", "origin", `${o.baseSha}:refs/pull/10/head`, `${head}:refs/keep/pr10`);
+  o.g(
+    "--git-dir",
+    join(o.root, "origin.git"),
+    "config",
+    "uploadpack.allowReachableSHA1InWant",
+    "true",
+  );
+  const lagging = await run({ git: gitIn(o.scanClone()), github: fakeGithub(o.pulls) });
+  assert.deepEqual(lagging.checked, [{ number: 10, verdict: "resolves", action: "post" }]);
+
+  const gone = [{ ...o.pulls[0], head: { sha: SHA } }];
+  const gh = fakeGithub(gone);
   const r = await run({ git: gitIn(o.scanClone()), github: gh });
-  assert.deepEqual(r.unchecked.map((u) => u.reason), ["the head moved during this run"]);
+  assert.deepEqual(r.unchecked.map((u) => u.reason), ["the listed head is not fetchable yet"]);
   assert.equal(r.exit, 0, "undecidable is an answer, not a failure to read");
   assert.equal(gh.posted.length, 0);
+});
+
+test("a PR the triggering event closed has its open comment closed", async () => {
+  const o = origin(jsonl(issue("a")));
+  const gh = fakeGithub([], { 13: [bot(7, "open")] });
+  const r = await run({ git: gitIn(o.scanClone()), github: gh, closedPull: 13 });
+  assert.deepEqual(r.checked, [{ number: 13, verdict: "closed-pr", action: "edit" }]);
+  assert.ok(gh.comments[13][0].body.startsWith(marker("closed")));
+  assert.match(gh.comments[13][0].body, /This PR is closed/);
+});
+
+test("a PR that deletes the tracker needs a hand merge, since git runs no driver for modify/delete", async () => {
+  const o = origin(jsonl(issue("a")));
+  o.pr(14, { "src/b.ts": "b\n" });
+  o.g("rm", "-q", TRACKER);
+  o.g("commit", "-qm", "drop tracker");
+  const head = o.g("rev-parse", "HEAD");
+  o.g("push", "-q", "-f", "origin", `${head}:refs/pull/14/head`);
+  o.main({ [TRACKER]: jsonl(issue("a"), issue("c")) });
+  const gh = fakeGithub([{ number: 14, head: { sha: head }, base: { ref: "main" } }]);
+  const r = await run({ git: gitIn(o.scanClone()), github: gh });
+  assert.deepEqual(r.checked, [{ number: 14, verdict: "other", action: "none" }]);
 });
 
 test("a PR retargeted away from main has its open comment closed", async () => {
@@ -404,4 +445,25 @@ test("git that cannot run is exit 2, not a crash", async () => {
   });
   assert.equal(r.exit, 2);
   assert.match(r.refused, /git could not run/);
+});
+
+test("the REST client lists every open PR, whatever its base", async () => {
+  // Filtering by base in the query is what kept a PR retargeted away from
+  // main out of every scan, so its open comment was never closed.
+  const urls = [];
+  const saved = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    return { ok: true, json: async () => [] };
+  };
+  try {
+    await restClient({ token: "t", repo: "o/r", api: "https://api.test" }).listPulls();
+  } finally {
+    globalThis.fetch = saved;
+  }
+  assert.equal(urls.length, 1);
+  assert.match(
+    urls[0],
+    /^https:\/\/api\.test\/repos\/o\/r\/pulls\?state=open&per_page=100&page=1$/,
+  );
 });

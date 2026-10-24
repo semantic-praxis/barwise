@@ -32,13 +32,18 @@ const SIDE = {
 };
 
 /**
- * The verdict for one PR (the spec's table). `tracker` is what step 2
- * found, and is read only when the tracker is the sole conflicted path:
- * `{ reported: [{ id, kind }] }` or `{ malformed: { label, lineNo } }`.
+ * The verdict for one PR (the spec's table), the one place the table's
+ * rules live. `tracker` is a function returning what step 2 found, called
+ * only when the tracker is the sole conflicted path, since step 2 costs
+ * three blob reads: `{ reported: [{ id, kind }] }`,
+ * `{ malformed: { label, lineNo } }`, or `{ needsHand: true }` when one
+ * side deleted the file.
  */
-export function verdict(conflictedPaths, tracker) {
+export function verdict(conflictedPaths, trackerResult) {
   if (conflictedPaths.length === 0) return { verdict: "clean" };
   if (conflictedPaths.length !== 1 || conflictedPaths[0] !== TRACKER) return { verdict: "other" };
+  const tracker = trackerResult();
+  if (tracker.needsHand) return { verdict: "other" };
   if (tracker.malformed) return { verdict: "malformed", malformed: tracker.malformed };
   if (tracker.reported.length > 0) return { verdict: "needs-person", reported: tracker.reported };
   return { verdict: "resolves" };
@@ -113,9 +118,11 @@ export function commentBody(v, state, mainSha) {
     lines.push("Resolved: this PR no longer conflicts with `main`.");
   } else if (v.verdict === "elsewhere") {
     lines.push("This PR no longer targets `main`, so this note no longer applies.");
+  } else if (v.verdict === "closed-pr") {
+    lines.push("This PR is closed, so this note no longer applies.");
   } else {
     lines.push(
-      "This PR now conflicts with `main` on other files as well, so it needs a hand merge; the tracker alone is no longer the obstacle.",
+      "This PR now needs a hand merge with `main`: it conflicts on other files too, or on the tracker in a way the merge driver does not resolve.",
     );
   }
   lines.push(

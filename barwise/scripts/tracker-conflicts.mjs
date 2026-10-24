@@ -21,9 +21,10 @@
  * (gate-refusal-contract.spec.md).
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MalformedInput, resolveTracker } from "./lib/beads-merge.mjs";
+import { envWithoutRepoLocation } from "./lib/git-env.mjs";
 import { commentAction, commentBody, TRACKER, verdict } from "./lib/tracker-conflicts.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -35,8 +36,7 @@ const SHA = /^[0-9a-f]{40}$/;
  * outer checkout.
  */
 export function gitIn(cwd) {
-  const env = { ...process.env };
-  for (const k of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) delete env[k];
+  const env = envWithoutRepoLocation();
   return (args, { allow = [0] } = {}) => {
     const r = spawnSync("git", args, { cwd, env, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
     if (r.error) throw new Error(`git could not run: ${r.error.message}`);
@@ -64,17 +64,17 @@ export function refusal(git) {
   return undefined;
 }
 
-/** The tracker at a revision, or "" where the file does not exist. */
+/** The tracker at a revision, or undefined where the file does not exist. */
 function trackerAt(git, rev) {
   const r = git(["show", `${rev}:${TRACKER}`], { allow: [0, 128] });
-  return r.status === 0 ? r.stdout : "";
+  return r.status === 0 ? r.stdout : undefined;
 }
 
 /**
  * The verdict for one PR head against main, or `{ unchecked: reason }`.
- * Step 1: which paths conflict as GitHub merges. Step 2, for a
- * tracker-only conflict: what the driver's own function does with the
- * three versions.
+ * Step 1: which paths conflict as GitHub merges. Step 2, which verdict()
+ * asks for only when the tracker is the sole conflict: what the driver's
+ * own function does with the three versions.
  */
 export function classify(git, mainRef, head) {
   const bases = git(["merge-base", "--all", mainRef, head], { allow: [0, 1] });
@@ -88,31 +88,39 @@ export function classify(git, mainRef, head) {
     allow: [0, 1],
   });
   const conflicted = tree.status === 0 ? [] : tree.stdout.split("\n").slice(1).filter(Boolean);
-  if (conflicted.length !== 1 || conflicted[0] !== TRACKER) return verdict(conflicted);
-
-  try {
-    const { reported } = resolveTracker(
-      trackerAt(git, baseList[0]),
-      trackerAt(git, mainRef),
-      trackerAt(git, head),
-    );
-    return verdict(conflicted, { reported });
-  } catch (err) {
-    if (!(err instanceof MalformedInput)) throw err;
-    return verdict(conflicted, { malformed: { label: err.label, lineNo: err.lineNo } });
-  }
+  return verdict(conflicted, () => {
+    const [base, main, pr] = [baseList[0], mainRef, head].map((rev) => trackerAt(git, rev));
+    // A side that deleted the file is a modify/delete conflict, and git
+    // runs no merge driver for one: a local merge would stop by hand.
+    if (main === undefined || pr === undefined) return { needsHand: true };
+    try {
+      return { reported: resolveTracker(base ?? "", main, pr).reported };
+    } catch (err) {
+      if (!(err instanceof MalformedInput)) throw err;
+      return { malformed: { label: err.label, lineNo: err.lineNo } };
+    }
+  });
 }
 
 /**
  * Check every open PR into main and post or edit its comment. `github` is
  * { listPulls(), listComments(n), post(n, body), edit(id, body) }.
  *
- * An unchecked PR is either undecidable (criss-cross history, a head that
- * moved while the run read it) or unreadable (a fetch or API failure).
- * Only "nothing could be read" is exit 2: an undecidable PR is an answer,
- * and one that stays undecidable must not turn every run red.
+ * An unchecked PR is either undecidable (criss-cross history, a head not
+ * yet fetchable) or unreadable (a fetch or API failure). Exit 2 means every
+ * PR into main was unreadable: an undecidable PR is an answer, and one that
+ * stays undecidable must not turn every run red.
+ *
+ * `closedPull` is the number of a PR the triggering event just closed: no
+ * open-PR listing includes it, so its open comment is closed here.
  */
-export async function run({ git, github, mainRef = "origin/main", log = () => {} }) {
+export async function run({
+  git,
+  github,
+  mainRef = "origin/main",
+  closedPull,
+  log = () => {},
+}) {
   let mainSha;
   try {
     const why = refusal(git);
@@ -173,12 +181,22 @@ export async function run({ git, github, mainRef = "origin/main", log = () => {}
       if (!batched) {
         git(["fetch", "--quiet", "--no-tags", "origin", `+refs/pull/${n}/head:${refOf(n)}`]);
       }
-      // Classify the commit the API listed, or nothing: GitHub updates
-      // refs/pull/<n>/head asynchronously after a push, and the next run
-      // (this push's own synchronize) sees the new head.
-      const fetched = git(["rev-parse", "--verify", `${refOf(n)}^{commit}`]).stdout.trim();
-      if (fetched !== pr.head.sha) {
-        unchecked.push({ number: n, reason: "the head moved during this run", undecidable: true });
+      // Classify the commit the API listed. GitHub updates
+      // refs/pull/<n>/head asynchronously after a push, so when the ref
+      // lags, the commit is fetched by its sha; when even that fails, no
+      // run may follow (this can be the push's own synchronize), so it is
+      // named as unchecked rather than guessed.
+      const has = () =>
+        git(["cat-file", "-e", `${pr.head.sha}^{commit}`], { allow: [0, 1, 128] }).status === 0;
+      if (!has()) {
+        git(["fetch", "--quiet", "--no-tags", "origin", pr.head.sha], { allow: [0, 1, 128] });
+      }
+      if (!has()) {
+        unchecked.push({
+          number: n,
+          reason: "the listed head is not fetchable yet",
+          undecidable: true,
+        });
         continue;
       }
       const v = classify(git, mainSha, pr.head.sha);
@@ -193,23 +211,29 @@ export async function run({ git, github, mainRef = "origin/main", log = () => {}
       unchecked.push({ number: n, reason: err.message });
     }
   }
-  // A PR retargeted away from main keeps no open comment saying it
-  // conflicts with main.
-  for (const pr of elsewhere) {
+  // A PR retargeted away from main, or just closed, keeps no open comment
+  // saying it conflicts with main.
+  const closing = [
+    ...elsewhere.map((p) => [p.number, "elsewhere"]),
+    ...(Number.isInteger(closedPull) && closedPull > 0 ? [[closedPull, "closed-pr"]] : []),
+  ];
+  for (const [n, kind] of closing) {
     try {
-      const action = await act(pr.number, { verdict: "elsewhere" });
-      if (action !== "none") checked.push({ number: pr.number, verdict: "elsewhere", action });
+      const action = await act(n, { verdict: kind });
+      if (action !== "none") checked.push({ number: n, verdict: kind, action });
     } catch (err) {
-      unchecked.push({ number: pr.number, reason: err.message });
+      unchecked.push({ number: n, reason: err.message });
     }
   }
-  const unreadable = unchecked.filter((u) => !u.undecidable).length;
-  const exit = pulls.length > 0 && checked.length === 0 && unreadable > 0 ? 2 : 0;
+  const unreadable = unchecked.filter((u) =>
+    !u.undecidable && pulls.some((p) => p.number === u.number)
+  );
+  const exit = pulls.length > 0 && unreadable.length === pulls.length ? 2 : 0;
   return { exit, checked, unchecked };
 }
 
 /** The GitHub REST client the workflow uses; tests pass a fake. */
-function restClient({ token, repo, api = "https://api.github.com" }) {
+export function restClient({ token, repo, api = "https://api.github.com" }) {
   const call = async (method, path, body) => {
     const res = await fetch(`${api}${path}`, {
       method,
@@ -236,7 +260,9 @@ function restClient({ token, repo, api = "https://api.github.com" }) {
     }
   };
   return {
-    listPulls: () => all(`/repos/${repo}/pulls?state=open&base=main`),
+    // Every open PR, whatever its base: one retargeted away from main
+    // must still have its open comment closed.
+    listPulls: () => all(`/repos/${repo}/pulls?state=open`),
     listComments: (n) => all(`/repos/${repo}/issues/${n}/comments`),
     post: (n, body) => call("POST", `/repos/${repo}/issues/${n}/comments`, { body }),
     edit: (id, body) => call("PATCH", `/repos/${repo}/issues/comments/${id}`, { body }),
@@ -258,7 +284,16 @@ async function main() {
     );
     return 2;
   }
+  // The PR a `closed` event names, so its open comment can be closed.
+  let closedPull;
+  try {
+    const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8"));
+    if (event.action === "closed") closedPull = event.pull_request?.number;
+  } catch {
+    // no event file, or not a pull_request event
+  }
   const result = await run({
+    closedPull,
     git: gitIn(top),
     github: restClient({ token, repo, api }),
     log: (line) => console.log(line),
