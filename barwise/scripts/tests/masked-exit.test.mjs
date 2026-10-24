@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -129,7 +130,7 @@ test("the failure mode lists every non-zero exit it reads, never silent", () => 
     assert.equal(r.status, 2);
     assert.match(r.stderr, /exit 2[\s\S]*exit 1/);
     // A background entry already in the log when a failing call ends.
-    mkdirSync(dirname(f.log), { recursive: true });
+    mkdirSync(dirname(f.log), { recursive: true, mode: 0o700 });
     writeFileSync(
       f.log,
       readFileSync(f.log, "utf8") + `${JSON.stringify({ t: Date.now(), code: 7, label: "bg" })}\n`,
@@ -231,7 +232,7 @@ test("the recorder takes its own --import out of NODE_OPTIONS for descendants", 
 test("the read survives a bad line, waits for a torn one, and restarts on a shorter log", () => {
   const f = fixture();
   try {
-    mkdirSync(dirname(f.log), { recursive: true });
+    mkdirSync(dirname(f.log), { recursive: true, mode: 0o700 });
     writeFileSync(f.log, `garbage\n${JSON.stringify({ t: 1, code: 1, label: "x" })}\n`);
     let r = post(f);
     assert.equal(r.status, 2);
@@ -295,6 +296,54 @@ test("a recorder that never records is said once, after three node commands", ()
     assert.equal(third.status, 2, "failing calls count too");
     assert.match(third.stderr, /exit recorder is not recording/);
     assert.equal(post(f, "npm test").status, 0, "once per session");
+  } finally {
+    f.done();
+  }
+});
+
+test("a long report lists twenty and counts the rest", () => {
+  const f = fixture();
+  try {
+    mkdirSync(dirname(f.log), { recursive: true, mode: 0o700 });
+    const many = Array.from(
+      { length: 25 },
+      (_, i) => JSON.stringify({ t: i + 1, code: 1, label: `p${i}` }),
+    );
+    writeFileSync(f.log, `${many.join("\n")}\n`);
+    const r = post(f);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /p19\s+exit 1/);
+    assert.doesNotMatch(r.stderr, /p20\s/);
+    assert.match(r.stderr, /\.\.\. and 5 more/);
+  } finally {
+    f.done();
+  }
+});
+
+test("a base directory other users can write is refused, not read", () => {
+  const f = fixture();
+  try {
+    mkdirSync(dirname(f.log), { recursive: true, mode: 0o700 });
+    writeFileSync(f.log, `${JSON.stringify({ t: 1, code: 1, label: "planted" })}\n`);
+    chmodSync(f.base, 0o777);
+    const r = post(f);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /could not answer -- .* is open to other users/);
+    assert.doesNotMatch(r.stderr, /planted/);
+  } finally {
+    f.done();
+  }
+});
+
+test("a report survives a read position that cannot be saved", () => {
+  const f = fixture();
+  try {
+    f.sh("node -e 'process.exit(1)'");
+    mkdirSync(join(f.base, SID, "state.json"), { recursive: true });
+    const r = post(f);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /node -e\s+exit 1/);
+    assert.match(r.stderr, /read position could not be saved/);
   } finally {
     f.done();
   }
@@ -496,7 +545,7 @@ test("the recorder's import prefix is the one envLines writes", () => {
 test("a state file with bad fields is read as fresh fields, not trusted", () => {
   const f = fixture();
   try {
-    mkdirSync(join(f.base, SID), { recursive: true });
+    mkdirSync(join(f.base, SID), { recursive: true, mode: 0o700 });
     writeFileSync(
       join(f.base, SID, "state.json"),
       '{"position":"12","nodeCalls":-3,"everEntry":"yes"}',
@@ -517,7 +566,7 @@ test("a state file with bad fields is read as fresh fields, not trusted", () => 
 test("an invalid byte in a line does not move the read past the next entry", () => {
   const f = fixture();
   try {
-    mkdirSync(dirname(f.log), { recursive: true });
+    mkdirSync(dirname(f.log), { recursive: true, mode: 0o700 });
     writeFileSync(
       f.log,
       Buffer.concat([

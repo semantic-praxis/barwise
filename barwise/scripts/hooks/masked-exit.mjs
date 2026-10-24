@@ -30,6 +30,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   acceptsImport,
+  checkBase,
   envAppend,
   envLines,
   exitBase,
@@ -61,6 +62,7 @@ function session() {
     throw new Error(`node ${process.versions.node} cannot --import in NODE_OPTIONS`);
   }
   const base = exitBase();
+  checkBase(base);
   // The base lands inside a double-quoted export; anything a shell reads
   // there would break every later command, so refuse instead.
   if (/["$`\\\n]/.test(base)) throw new Error(`unsafe characters in ${base}`);
@@ -85,6 +87,7 @@ function read(kind) {
   const sid = input?.session_id;
   if (typeof sid !== "string" || sid === "") throw new Error("no session_id in the hook input");
   const base = exitBase();
+  checkBase(base);
   const state = readState(base, sid);
   const got = readUnread(base, sid, state.position);
   state.position = got.position;
@@ -101,7 +104,13 @@ function read(kind) {
         + "will not be reported this session (docs/specs/masked-exit-report.spec.md).",
     );
   }
-  writeState(base, sid, state);
+  // The report goes out even if the position cannot be saved: losing it
+  // to "could not answer" would hide the very failure it names.
+  try {
+    writeState(base, sid, state);
+  } catch (err) {
+    out.push(`(The read position could not be saved, so this may repeat: ${err.message})`);
+  }
   if (out.length === 0) process.exit(0);
   console.error(out.join("\n\n"));
   process.exit(2);

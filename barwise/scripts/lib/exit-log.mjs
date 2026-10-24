@@ -7,6 +7,7 @@
 import {
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -15,7 +16,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir, userInfo } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /**
@@ -24,8 +25,36 @@ import { join } from "node:path";
  * every user after the first on a multi-user host.
  */
 export function exitBase() {
-  return join(tmpdir(), `barwise-exit-${userInfo().uid}`);
+  // process.getuid, not os.userInfo: the latter throws for a uid with no
+  // passwd entry (a container run with an arbitrary --user).
+  return join(tmpdir(), `barwise-exit-${process.getuid?.() ?? "user"}`);
 }
+
+/**
+ * Refuses a base this user does not own alone. The path is predictable
+ * under a shared /tmp, and an entry's label reaches the model, so a
+ * directory someone else created (or opened) is a way to put text in
+ * front of the agent. An absent base is fine: the recorder creates it
+ * 0700. On a platform without uids only the type is checked.
+ */
+export function checkBase(base) {
+  let st;
+  try {
+    st = lstatSync(base);
+  } catch {
+    return;
+  }
+  if (!st.isDirectory()) throw new Error(`${base} is not a directory`);
+  if (process.getuid && st.uid !== process.getuid()) {
+    throw new Error(`${base} is owned by uid ${st.uid}`);
+  }
+  if (process.getuid && (st.mode & 0o077) !== 0) {
+    throw new Error(`${base} is open to other users (mode ${(st.mode & 0o777).toString(8)})`);
+  }
+}
+
+/** At most this many processes are listed; the rest are counted. */
+export const LIST_AT_MOST = 20;
 
 /**
  * The NODE_OPTIONS token's prefix. The recorder strips tokens with it and
@@ -156,13 +185,17 @@ export function report(kind, entries, unreadable, status) {
   const failed = entries.filter((e) => e.code !== 0 && !e.epipe);
   const piped = entries.filter((e) => e.epipe);
   if (failed.length === 0 && piped.length === 0 && unreadable === 0) return null;
-  const width = Math.max(0, ...failed.map((e) => e.label.length));
+  // A loop, not Math.max(...spread): a large unread delta overflowed the
+  // stack before the read position was saved, wedging every later read.
+  const shown = failed.slice(0, LIST_AT_MOST);
+  const width = shown.reduce((w, e) => Math.max(w, e.label.length), 0);
   const lines = [];
   if (failed.length > 0) {
     lines.push(kind === "failure" ? HEADINGS.failure(status) : HEADINGS[kind]);
-    for (const e of failed) {
+    for (const e of shown) {
       lines.push(`  ${e.label.padEnd(width)}   exit ${e.code}   ${clock(e.t)}`);
     }
+    if (failed.length > shown.length) lines.push(`  ... and ${failed.length - shown.length} more`);
     if (kind !== "failure") {
       lines.push("The status was hidden (a pipe, or a later command), or you handled it.");
     }

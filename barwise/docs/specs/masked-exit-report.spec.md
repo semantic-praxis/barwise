@@ -271,6 +271,13 @@ In scope:
   shall exit 2, once per session, saying the recorder is not recording.
 - When a report mode cannot read its input or the log, or throws, it
   shall exit 2 saying so.
+- When the base directory exists but is not a directory owned by this
+  user with no access for others, every mode shall refuse it (exit 2 for
+  a report mode) rather than read it: the path is predictable under a
+  shared /tmp, and a label reaches the model.
+- A report shall list at most 20 processes and count the rest, and shall
+  be printed even when the read position cannot be saved, with a note
+  that it may repeat.
 - When a script runs node processes that fail by design and checks them
   itself, it shall unset `BARWISE_EXIT_DIR` for them: a declared opt-out.
   Today that is `test-plan/cli-checks.sh` (asserts the CLI's exit codes),
