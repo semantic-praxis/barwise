@@ -327,6 +327,18 @@ last line, a sentinel the command writes on exit). The general shape is
 the one the gates follow: an instrument that can report the state it was
 asked about, rather than one that looks identical whether or not it can.
 
+**A gate's status read through a pipe is the pipe's.** `npm run
+test:scripts | tail -2; echo $?` printed 0 with a test failing, and
+`mutate.mjs ... | tail -1` printed 0 while mutate had refused
+(barwise-40a, after barwise-906 had already named the trap). So every
+node process a Bash command starts directly records its exit code, and
+a hook names the non-zero ones after each call: "These processes exited
+non-zero, and the command still reported 0" means a status was hidden
+or handled, and is the cue to re-read it
+(`docs/specs/masked-exit-report.spec.md`). To change `NODE_OPTIONS` for
+one command, append to it (`NODE_OPTIONS="$NODE_OPTIONS ..."`):
+replacing it unloads the recorder for that process.
+
 `npm run build`, `test`, and `lint` fan out via Turborepo in dependency
 order; per-package runs use `npx vitest run` / `npx tsc --noEmit` from
 the package directory.
