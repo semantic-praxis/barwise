@@ -135,10 +135,18 @@ const PROPERTY_CHECKS: Record<RingProperty, (r: RingRelation) => RingFinding[]> 
  * with opposite verdicts, which is why they share it.
  */
 function composed(r: RingRelation, reject: (a: string, c: string) => boolean): RingFinding[] {
+  // Indexed by first element, so the walk visits only the pairs that
+  // compose: a join path can project far more pairs than one population.
+  const from = new Map<string, string[]>();
+  for (const [x, y] of r.pairs) {
+    const outs = from.get(x);
+    if (outs) outs.push(y);
+    else from.set(x, [y]);
+  }
   const findings: RingFinding[] = [];
   for (const [a, b] of r.pairs) {
-    for (const [b2, c] of r.pairs) {
-      if (b === b2 && reject(a, c)) findings.push({ a, b, c });
+    for (const c of from.get(b) ?? []) {
+      if (reject(a, c)) findings.push({ a, b, c });
     }
   }
   return findings;
@@ -269,8 +277,11 @@ export function joinRingViolationTexts(
     pairs,
     has: (a, b) => seen.has(`${a}\0${b}`),
   };
+  // The first finding per property, as the other join kinds report their
+  // first offending tuple: a projected pair set can be large, and one
+  // finding names the constraint as broken.
   return RING_PROPERTIES[ringType].flatMap((property) =>
-    PROPERTY_CHECKS[property](relation).map((v) =>
+    PROPERTY_CHECKS[property](relation).slice(0, 1).map((v) =>
       `Join ${ringType.replace("_", " ")} ring constraint over ${span} is violated: `
       + `${JOIN_DETAIL[property](v)}.`
     )

@@ -37,10 +37,16 @@ export function checkJoinPathViolations(model: OrmModel, universe: ObjectUnivers
     const severity = severityForModality(c);
 
     if (isJoinRing(c)) {
-      // A projection that is not two columns is `constraint/join-ring-arity`'s
-      // to report; its tuples are not pairs, so nothing is checked here.
-      if (c.operand.projection.length !== 2) continue;
-      const pairs = [...projectedTuples(model, universe, c.operand)].map(
+      // A projection that is not two distinct nodes of one type is a
+      // structural error (`constraint/join-ring-arity`,
+      // `-different-players`); its tuples are no ring's pairs.
+      const [from, to] = c.operand.projection;
+      if (c.operand.projection.length !== 2 || from === to) continue;
+      if (nodeType(model, c.operand, from!) !== nodeType(model, c.operand, to!)) continue;
+      // A ring reads data PRESENT, so samples count, as the flat ring's
+      // populations do: start from every value the first hop's entry role
+      // plays, not from the universe, which leaves samples out.
+      const pairs = [...projectedTuples(model, entryRoots(model, c.operand), c.operand)].map(
         (t) => JSON.parse(t) as [string, string],
       );
       for (const text of joinRingViolationTexts(c.ringType, pairs, span)) {
@@ -90,6 +96,32 @@ export function checkJoinPathViolations(model: OrmModel, universe: ObjectUnivers
 }
 
 const EMPTY: ReadonlySet<string> = new Set();
+
+/** The object type at path node `index`: the root, or the player after step `index`. */
+function nodeType(model: OrmModel, operand: JoinOperand, index: number): string | undefined {
+  if (index === 0) return operand.path.root;
+  const step = operand.path.steps[index - 1];
+  return step && factTypeOfRole(model, step.entry)?.getRoleById(step.exit)?.playerId;
+}
+
+/**
+ * A universe holding, for the path root, every value the first hop's entry
+ * role plays in any population, samples included. A binding that does not
+ * play that role ends at the first hop, so nothing else could be a root.
+ */
+function entryRoots(model: OrmModel, operand: JoinOperand): ObjectUniverse {
+  const first = operand.path.steps[0];
+  const values = new Set<string>();
+  if (first) {
+    for (const pop of model.populations) {
+      for (const inst of pop.instances) {
+        const v = inst.roleValues[first.entry];
+        if (v !== undefined) values.add(v);
+      }
+    }
+  }
+  return new Map([[operand.path.root, values]]);
+}
 
 /** The fact type owning a role id, scanning the model. */
 function factTypeOfRole(model: OrmModel, roleId: string): FactType | undefined {

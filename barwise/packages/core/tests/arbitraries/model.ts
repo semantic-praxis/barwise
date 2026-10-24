@@ -664,7 +664,7 @@ function toConstraint(
       // pick reached that only by luck of the seeded stream, which every
       // added constraint kind reshuffles (join-ring-constraint WS1), so
       // look for a keyed pair first and fall back to the blind one.
-      const keyed = keyedPair(skeletons, ownerIndex);
+      const keyed = keyedPair(skeletons, ownerIndex, raw.factTypePick);
       if (keyed) {
         return { ownerIndex, constraint: { type: raw.kind, id, roleIds: keyed, ...modality } };
       }
@@ -747,10 +747,17 @@ function toConstraint(
  * other roles share a player that neither constrained role has: the
  * standard external uniqueness pattern `inferExternalUniquenessJoin` reads.
  */
-function keyedPair(skeletons: readonly FactTypeSkeleton[], ownerIndex: number): string[] | null {
+function keyedPair(
+  skeletons: readonly FactTypeSkeleton[],
+  ownerIndex: number,
+  start: number,
+): string[] | null {
   const owner = skeletons[ownerIndex]!;
   if (owner.roles.length !== 2) return null;
-  for (let i = 0; i < skeletons.length; i++) {
+  // From the draw's own fact-type pick, so two draws on one model need not
+  // name the same pair.
+  for (let n = 0; n < skeletons.length; n++) {
+    const i = (start + n) % skeletons.length;
     const other = skeletons[i]!;
     if (i === ownerIndex || other.roles.length !== 2) continue;
     for (const [c1, k1] of [[0, 1], [1, 0]] as const) {

@@ -777,12 +777,6 @@ export function verbalizeJoinExclusion(
 }
 
 /**
- * Find a role by id model-wide: the owner fact type first, then any
- * other fact type. External uniqueness names roles across fact types,
- * so the owner-only `getRoleById` is not enough.
- */
-
-/**
  * A ring property of the relation a join path projects
  * (`docs/specs/join-ring-constraint.spec.md`). The relation has no single
  * reading to borrow a predicate from, so the sentence names the path and

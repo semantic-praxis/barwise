@@ -727,8 +727,8 @@ export function objectTypeIdsOf(c: Constraint): string[] {
  * The join operands a constraint carries, or none for the kinds that
  * have no role path.
  *
- * The three join kinds spell their operands differently -- `join_subset`
- * names its two, the other two hold a list -- and three call sites had
+ * The join kinds spell their operands differently -- `join_subset`
+ * names its two, equality and exclusion hold a list, a ring has one -- and three call sites had
  * each grown their own version of that switch. Exhaustive with no
  * `default` arm, for the reason `roleIdsOf` gives.
  */

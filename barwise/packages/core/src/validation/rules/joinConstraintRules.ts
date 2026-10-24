@@ -83,17 +83,24 @@ function checkRing(
 ): void {
   const columns = checkOperand(c.operand, at, graph, diagnostics);
   if (!columns) return;
-  if (columns.length !== 2) {
-    diagnostics.push(report(RULE_ID.joinRingArity, "default", at.id, at.span, columns.length));
+  const [from, to] = c.operand.projection;
+  // One node named twice relates each object only to itself, whatever the
+  // path: every pair is (x, x), so it is malformed rather than a ring.
+  if (columns.length !== 2 || from === to) {
+    diagnostics.push(
+      report(RULE_ID.joinRingArity, "default", at.id, at.span, c.operand.projection.join(", ")),
+    );
     return;
   }
   if (columns[0] !== columns[1]) {
+    // Returns: a ring over two types is not a plain ring either, so the
+    // one-hop advice below would name another malformed constraint.
     diagnostics.push(report(RULE_ID.joinRingDifferentPlayers, "default", at.id, at.span));
+    return;
   }
   // A well-formed hop is within one fact type by construction, so one
   // hop projecting both of its ends is exactly what a plain ring states.
-  const [from, to] = c.operand.projection;
-  if (c.operand.path.steps.length === 1 && from !== to) {
+  if (c.operand.path.steps.length === 1) {
     diagnostics.push(report(RULE_ID.joinRingSingleFactType, "default", at.id, at.span));
   }
 }

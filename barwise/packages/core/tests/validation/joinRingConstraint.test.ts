@@ -30,7 +30,11 @@ function ring(ringType: RingType, operand: JoinOperand = grandparent): JoinRingC
 }
 
 /** Person, Country, parenthood and birthplace; `rows` are (child, parent). */
-function model(constraint: JoinRingConstraint, rows: readonly [string, string][] = []) {
+function model(
+  constraint: JoinRingConstraint,
+  rows: readonly [string, string][] = [],
+  sample = false,
+) {
   const m = new OrmModel({ name: "M" });
   m.addObjectType({ id: "person", name: "Person", kind: "entity", referenceMode: "nr" });
   m.addObjectType({ id: "country", name: "Country", kind: "entity", referenceMode: "code" });
@@ -54,7 +58,7 @@ function model(constraint: JoinRingConstraint, rows: readonly [string, string][]
   });
   m.addConstraint(constraint);
   if (rows.length > 0) {
-    const pop = m.addPopulation({ id: "pop", factTypeId: "ft-parent" });
+    const pop = m.addPopulation({ id: "pop", factTypeId: "ft-parent", sample });
     for (const [child, parent] of rows) {
       pop.addInstance({ roleValues: { "r-child": child, "r-parent": parent } });
     }
@@ -100,9 +104,18 @@ describe("structural rules", () => {
       path: { root: "person", steps: [{ entry: "r-born", exit: "r-place" }] },
       projection: [0, 1],
     };
-    expect(structural(model(ring("irreflexive", personCountry)))).toContain(
+    // Only that: the one-hop advice would name a plain ring over two
+    // types, which is just as malformed.
+    expect(structural(model(ring("irreflexive", personCountry)))).toEqual([
       "constraint/join-ring-different-players",
-    );
+    ]);
+  });
+
+  it("report one node projected twice, which relates each object only to itself", () => {
+    const sameNode = { ...grandparent, projection: [2, 2] };
+    expect(structural(model(ring("irreflexive", sameNode)))).toEqual([
+      "constraint/join-ring-arity",
+    ]);
   });
 
   it("warn that one hop projecting both ends is a plain ring", () => {
@@ -181,6 +194,10 @@ describe("population: each property, satisfied and violated", () => {
       expect(found.some((m) => m.includes(says))).toBe(true);
     });
   }
+
+  it("reads sample data, as the flat ring does: a ring rejects data present", () => {
+    expect(population(model(ring("irreflexive"), [["A", "B"], ["B", "A"]], true))).toHaveLength(1);
+  });
 
   it("names the ring type and the path's span in the message", () => {
     const [message] = population(model(ring("purely_reflexive"), [["A", "B"], ["B", "C"]]));

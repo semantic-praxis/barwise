@@ -443,10 +443,11 @@ const RULE_DESCRIPTORS = {
   },
   [RULE_ID.joinRingArity]: {
     severity: "error",
-    description: "A join ring constraint's operand does not project exactly two path nodes.",
+    description:
+      "A join ring constraint's operand does not project exactly two distinct path nodes.",
     messages: {
-      default: (span: string, arity: number): string =>
-        `Join ring constraint over ${span} projects ${arity} column(s); a ring relates exactly two.`,
+      default: (span: string, projection: string): string =>
+        `Join ring constraint over ${span} projects [${projection}]; a ring relates exactly two distinct path nodes.`,
     },
   },
   [RULE_ID.joinRingDifferentPlayers]: {
@@ -1030,8 +1031,9 @@ const RULE_DESCRIPTORS = {
     description:
       "The pairs a join ring constraint's path projects break the relational property it asserts.",
     messages: {
-      // Rendered whole by `MESSAGES` in population/ring.ts, as for
-      // `ringViolation`, with the path's span in place of a fact type.
+      // Rendered whole by `joinRingViolationTexts` in population/ring.ts
+      // (its `JOIN_DETAIL` table), with the path's span in place of a
+      // population and instance.
       default: (text: string): string => text,
     },
   },

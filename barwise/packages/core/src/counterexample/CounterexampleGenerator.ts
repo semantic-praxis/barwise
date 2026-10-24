@@ -310,12 +310,13 @@ function forRing(
   const a = mintValue(r1, ft, model, 0);
   const b = mintValue(r1, ft, model, 1);
   const c = mintValue(r1, ft, model, 2);
-  // Every witness but irreflexive's self-loop needs distinct values. A
-  // domain too narrow to give three (a value constraint naming one value)
-  // collapses the witness into pairs that satisfy the ring, so none is
-  // emitted, as `fillsRequiredRole` does for the mandatory kinds.
+  // Every witness but irreflexive's self-loop needs a != b; c may equal a,
+  // and the transitive and intransitive witnesses still violate then. A
+  // domain naming one value collapses the witness into a self-loop that
+  // satisfies the ring, so none is emitted, as `fillsRequiredRole` does
+  // for the mandatory kinds.
   const property = RING_PROPERTIES[rc.ringType][0];
-  if (property !== "irreflexive" && new Set([a, b, c]).size < 3) return undefined;
+  if (property !== "irreflexive" && a === b) return undefined;
   const pair = (x: string, y: string): RoleValues => {
     const inst: RoleValues = {};
     for (const r of ft.roles) {
@@ -710,7 +711,6 @@ function findRoleById(
   return undefined;
 }
 
-/** A population that puts `value` in the anchor role, others minted apart. */
 /**
  * Whether the anchor's own instance puts the value in a role it must stay
  * out of. The anchor's fact type can hold a required role, and when that
@@ -728,6 +728,7 @@ function fillsRequiredRole(
   );
 }
 
+/** A population that puts `value` in the anchor role, others minted apart. */
 function anchorPopulation(anchor: AnchorRole, value: string, model: OrmModel): Population {
   const inst: RoleValues = {};
   for (const r of anchor.ft.roles) {

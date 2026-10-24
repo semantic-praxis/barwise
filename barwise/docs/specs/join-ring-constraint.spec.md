@@ -293,8 +293,17 @@ What WS1 found that the draft did not say.
   around "relates" instead, and the flat ring is untouched.
 - **The one-hop warning needs no fact-type test.** A step that passes the
   structural rules already lies within one fact type, so the warning is
-  "one hop, projecting both of its ends"; the draft's "within one fact
-  type" is always true by then.
+  "one hop"; the draft's "within one fact type" is always true by then.
+  A projection naming one node twice ([2, 2]) relates each object only to
+  itself, so `constraint/join-ring-arity` refuses it as not two distinct
+  nodes, and an operand whose ends differ in type stops at
+  `-different-players` rather than also being advised to become a ring.
+- **Population reads samples.** The draft fed `projectedTuples` the object
+  universe, as the other join kinds do, and the universe leaves samples
+  out. A ring rejects data present, as the flat ring's direct population
+  read does, so a join ring's roots are every value its first hop's entry
+  role plays, samples included. It reports the first finding per property,
+  as the other join kinds report their first offending tuple.
 - **The population entry is a sibling, not a replacement.** The flat
   ring's messages name a population and an instance; a projected pair has
   neither. `joinRingViolationTexts` in `population/ring.ts` runs the same

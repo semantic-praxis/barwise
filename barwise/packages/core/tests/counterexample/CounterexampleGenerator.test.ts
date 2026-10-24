@@ -187,6 +187,46 @@ describe("counterexample generation", () => {
     });
   }
 
+  // A narrow domain on the ring's role: two values are enough for every
+  // witness (each needs a != b; c may equal a), and one value is enough
+  // only for irreflexive's self-loop. From the review of join-ring WS1,
+  // where the guard first demanded three.
+  for (const [values, expected] of [[["x", "y"], "every"], [["x"], "irreflexive only"]] as const) {
+    it(`emits a ring counterexample over a domain of ${values.length} for ${expected}`, () => {
+      for (const ringType of ringTypes) {
+        const model = new ModelBuilder()
+          .withEntityType("Person")
+          .withBinaryFactType("Person reports to Person", {
+            role1: { player: "Person", name: "reports to" },
+            role2: { player: "Person", name: "is reported to by" },
+          })
+          .build();
+        const ft = model.getFactTypeByName("Person reports to Person")!;
+        for (
+          const roleId of ["Person reports to Person::role1", "Person reports to Person::role2"]
+        ) {
+          ft.addConstraint({ type: "value_constraint", roleId, values: [...values] });
+        }
+        ft.addConstraint({
+          type: "ring",
+          roleId1: "Person reports to Person::role1",
+          roleId2: "Person reports to Person::role2",
+          ringType,
+        });
+        const rc = ft.internalConstraints.find((c) => c.type === "ring")!;
+        const ce = generateCounterexampleForConstraint(rc, ft, model);
+        const wanted = values.length === 2 || ringType === "irreflexive";
+        expect([ringType, ce !== undefined]).toEqual([ringType, wanted]);
+        if (ce) {
+          expect([ringType, forbids(model, ce, "population/ring-violation")]).toEqual([
+            ringType,
+            true,
+          ]);
+        }
+      }
+    });
+  }
+
   // The shape of each witness, which the round-trip above cannot pin:
   // a self-loop violates an asymmetric constraint too, so "the population
   // rule rejects it" holds whichever property the generator drew from.
