@@ -806,36 +806,48 @@ export function isExternalConstraint(c: Constraint): c is ExternalConstraint {
 /**
  * A constraint as a reader finds it in the file, for a message that must
  * tell two constraints sharing an id apart: its kind as the file spells it,
- * and the fact type it lives in, or for one stored on the model the role
- * or subtype-fact ids it names. Built only from what the constraint states,
+ * where it lives (its fact type, or the model), and the role or
+ * subtype-fact ids it names. Built only from what the constraint states,
  * never from what its references resolve to, so a dangling role cannot
- * hide the repeat. The one description the 3.0 loader's refusal and
- * `structural/duplicate-constraint-id` both print.
+ * hide the repeat.
  */
 export function describeConstraintPlace(c: Constraint, factTypeName: string | undefined): string {
-  if (factTypeName !== undefined) return `${c.type} in fact type ${JSON.stringify(factTypeName)}`;
+  const home = factTypeName !== undefined ? ` in fact type ${JSON.stringify(factTypeName)}` : "";
   if (isOverSubtypes(c)) {
     const facts = subtypeFactIdsOf(c);
-    return facts.length > 0
-      ? `${c.type} over subtype facts ${facts.join(", ")}`
-      : `${c.type} over no subtype facts`;
+    return `${c.type}${home} over ${
+      facts.length > 0 ? `subtype facts ${facts.join(", ")}` : "no subtype facts"
+    }`;
   }
   const roles = roleIdsOf(c);
-  return roles.length > 0 ? `${c.type} over roles ${roles.join(", ")}` : `${c.type} over no roles`;
+  return `${c.type}${home} over ${roles.length > 0 ? `roles ${roles.join(", ")}` : "no roles"}`;
+}
+
+/** How many entries a repeat message lists before it counts the rest. */
+const REPEAT_LIST_LIMIT = 5;
+
+function listCapped(items: readonly string[], separator: string): string {
+  const rest = items.length - REPEAT_LIST_LIMIT;
+  return items.slice(0, REPEAT_LIST_LIMIT).join(separator)
+    + (rest > 0 ? `${separator}and ${rest} more` : "");
 }
 
 /**
- * Every repeated constraint id, each with its holders described, at most
- * `limit` of them and a count of the rest, for a one-line message.
+ * One repeated constraint id and its holders, as both the 3.0 loader's
+ * refusal and `structural/duplicate-constraint-id` print it, so the same
+ * repeat reads the same whichever path reports it: the id JSON-quoted, then
+ * each holder's place, at most five and a count of the rest.
  */
-export function describeRepeatedConstraintIds(
-  repeats: Iterable<readonly [string, readonly string[]]>,
-  limit = 5,
+export function describeConstraintRepeat(
+  id: string,
+  holders: readonly (readonly [Constraint, string | undefined])[],
 ): string {
-  const all = [...repeats];
-  const shown = all.slice(0, limit).map(([id, places]) =>
-    `${JSON.stringify(id)} (${places.join("; ")})`
-  );
-  const rest = all.length - shown.length;
-  return shown.join(", ") + (rest > 0 ? `, and ${rest} more` : "");
+  return `${JSON.stringify(id)} (${
+    listCapped(holders.map(([c, ft]) => describeConstraintPlace(c, ft)), "; ")
+  })`;
+}
+
+/** Several repeats, as the loader lists them: at most five, then a count. */
+export function describeConstraintRepeats(repeats: readonly string[]): string {
+  return listCapped(repeats, ", ");
 }

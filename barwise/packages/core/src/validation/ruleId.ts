@@ -846,12 +846,12 @@ const RULE_DESCRIPTORS = {
     description:
       "Two constraints share an id, so any reference to that id (a preferred identifier, a diff, a merge, another file) names one of them arbitrarily.",
     messages: {
-      // Names each constraint by its kind and where it lives rather than by
-      // its roles: resolving roles would need the graph, and a dangling role
-      // in one of the two must not hide the duplicate (model-invariants,
-      // workstream 1).
-      default: (constraintId: string, holders: string): string =>
-        `Constraint id "${constraintId}" is used by more than one constraint: ${holders}. `
+      // The repeat is described by `describeConstraintRepeat`, which the
+      // 3.0 loader's refusal prints too, from what each constraint states
+      // rather than what its roles resolve to, so a dangling role cannot
+      // hide it (model-invariants, workstream 1).
+      default: (repeat: string): string =>
+        `Constraint id ${repeat} is held by more than one constraint. `
         + `A constraint id names one constraint.`,
     },
   },

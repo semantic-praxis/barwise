@@ -1,8 +1,8 @@
 import { parse, stringify } from "yaml";
 import {
   type Constraint,
-  describeConstraintPlace,
-  describeRepeatedConstraintIds,
+  describeConstraintRepeat,
+  describeConstraintRepeats,
   type ExternalConstraint,
   isExternalConstraint,
   isInternalConstraint,
@@ -284,17 +284,18 @@ export class OrmYamlSerializer {
     );
     const stated = [
       ...factTypes.flatMap(({ config, constraints }) =>
-        constraints.map((c) => ({ c, place: describeConstraintPlace(c, config.name) }))
+        constraints.map((c) => [c, config.name] as const)
       ),
-      ...modelConstraints.map((c) => ({ c, place: describeConstraintPlace(c, undefined) })),
+      ...modelConstraints.map((c) => [c, undefined] as const),
     ];
-    const repeats = [...groupRepeats(stated, ({ c }) => c.id)];
+    const repeats = [...groupRepeats(stated, ([c]) => c.id)];
     if (repeats.length > 0) {
-      const named = describeRepeatedConstraintIds(
-        repeats.map(([id, holders]) => [id, holders.map(({ place }) => place)] as const),
+      const named = describeConstraintRepeats(
+        repeats.map(([id, holders]) => describeConstraintRepeat(id, holders)),
       );
       throw new DeserializationError(
-        `More than one constraint holds the id ${named}; a constraint id names one constraint.`,
+        `Constraint ids are held by more than one constraint: ${named}. `
+          + "A constraint id names one constraint.",
       );
     }
 

@@ -1,4 +1,4 @@
-import { describeConstraintPlace } from "../../model/Constraint.js";
+import { describeConstraintRepeat } from "../../model/Constraint.js";
 import { isScopedView } from "../../model/DiagramLayout.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
@@ -88,8 +88,7 @@ function checkDuplicateConstraintIds(model: OrmModel): Diagnostic[] {
       RULE_ID.duplicateConstraintId,
       "default",
       id,
-      id,
-      holders.map(([c, ft]) => describeConstraintPlace(c, ft?.name)).join("; "),
+      describeConstraintRepeat(id, holders.map(([c, ft]) => [c, ft?.name] as const)),
     )
   );
 }

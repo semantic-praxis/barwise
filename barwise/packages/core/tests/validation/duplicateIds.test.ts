@@ -47,8 +47,8 @@ describe("structural/duplicate-constraint-id", () => {
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ severity: "error", elementId: "c" });
     expect(found[0]!.message).toBe(
-      'Constraint id "c" is used by more than one constraint: '
-        + 'mandatory in fact type "A runs"; mandatory in fact type "A walks". '
+      'Constraint id "c" (mandatory in fact type "A runs" over roles r1; '
+        + 'mandatory in fact type "A walks" over roles r2) is held by more than one constraint. '
         + "A constraint id names one constraint.",
     );
   });
@@ -63,7 +63,7 @@ describe("structural/duplicate-constraint-id", () => {
     const found = findings(model, RULE);
     expect(found).toHaveLength(1);
     expect(found[0]!.message).toContain(
-      'mandatory in fact type "A runs"; exclusion over roles r1, r2',
+      'mandatory in fact type "A runs" over roles r1; exclusion over roles r1, r2',
     );
   });
 
@@ -101,7 +101,7 @@ model:
     const found = findings(serializer.deserialize(twoZero("r2")), RULE);
     expect(found).toHaveLength(1);
     expect(found[0]!.message).toContain(
-      'mandatory in fact type "A runs"; exclusion over roles r1, r2',
+      'mandatory in fact type "A runs" over roles r1; exclusion over roles r1, r2',
     );
   });
 
@@ -118,7 +118,7 @@ model:
   it("is refused at load in a 3.0 file, before any rule runs", () => {
     const yaml = serializer.serialize(twoFactTypes("c", "c"));
     expect(() => serializer.deserialize(yaml)).toThrow(
-      'More than one constraint holds the id "c"',
+      'Constraint ids are held by more than one constraint: "c"',
     );
   });
 
@@ -133,7 +133,7 @@ ${body}`;
   it("is refused under a lenient 3.0 load too, which barwise migrate relies on", () => {
     const yaml = serializer.serialize(twoFactTypes("c", "c"));
     expect(() => serializer.deserialize(yaml, { lenient: true })).toThrow(
-      'More than one constraint holds the id "c"',
+      'Constraint ids are held by more than one constraint: "c"',
     );
   });
 
@@ -155,7 +155,9 @@ ${body}`;
       constraints:
         - { id: c, type: mandatory, role: r2 }
 `);
-    expect(() => serializer.deserialize(yaml)).toThrow('More than one constraint holds the id "c"');
+    expect(() => serializer.deserialize(yaml)).toThrow(
+      'Constraint ids are held by more than one constraint: "c"',
+    );
   });
 
   it("names every repeated id and its holders when it refuses", () => {
@@ -163,9 +165,9 @@ ${body}`;
     model.addConstraint({ type: "exclusion", id: "d", roleIds: ["r1", "r2"] });
     model.addConstraint({ type: "exclusion", id: "d", roleIds: ["r2", "r1"] });
     expect(() => serializer.deserialize(serializer.serialize(model))).toThrow(
-      'More than one constraint holds the id "c" (mandatory in fact type "A runs"; '
-        + 'mandatory in fact type "A walks"), "d" (exclusion over roles r1, r2; '
-        + "exclusion over roles r2, r1); a constraint id names one constraint.",
+      'Constraint ids are held by more than one constraint: "c" (mandatory in fact type "A runs" '
+        + 'over roles r1; mandatory in fact type "A walks" over roles r2), "d" (exclusion over '
+        + "roles r1, r2; exclusion over roles r2, r1). A constraint id names one constraint.",
     );
   });
 
@@ -184,7 +186,9 @@ ${body}`;
       constraints:
         - { id: c, type: mandatory, role: r2 }
 `);
-    expect(() => serializer.deserialize(yaml)).toThrow('More than one constraint holds the id "c"');
+    expect(() => serializer.deserialize(yaml)).toThrow(
+      'Constraint ids are held by more than one constraint: "c"',
+    );
   });
 
   it("names a constraint over subtypes by its subtype facts", () => {

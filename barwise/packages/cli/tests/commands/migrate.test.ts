@@ -132,7 +132,7 @@ describe("barwise migrate", () => {
     const result = await runCli(["migrate", path]);
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe(
-      `${path}: not migrated: its 3.0 form would not load: More than one constraint holds the id "u-nr" (internal_uniqueness in fact type "Customer has CustomerNr"; internal_uniqueness in fact type "Customer has Name"); a constraint id names one constraint.\n`,
+      `${path}: not migrated: its 3.0 form would not load: Constraint ids are held by more than one constraint: "u-nr" (internal_uniqueness in fact type "Customer has CustomerNr" over roles r-nr; internal_uniqueness in fact type "Customer has Name" over roles r-cn). A constraint id names one constraint.\n`,
     );
     expect(readFileSync(path, "utf-8")).toBe(twice);
   });
