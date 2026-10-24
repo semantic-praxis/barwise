@@ -304,8 +304,9 @@ edge and sees red through `mutate.mjs`.
 - Add the reference check to `check-architecture.mjs`. It reads a named
   set, not "everything except": instruction files, undated documents
   under `barwise/docs/` (specs and ADRs included, archives excluded), and
-  every file under `barwise/packages/`. That leaves out the tracker, eval
-  runs and payloads, dated records and archives, all of which are history.
+  every file under `barwise/packages/`. It leaves out, under both, the
+  tracker, eval runs and payloads, dated records and archives, all of which
+  are history.
   (Implementation note, 2026-10-24: the set first drafted here -- specs,
   ADRs and `packages/*/src/` only -- missed current documents that cite
   ADRs today, such as `promptlab/evals/suite.yaml` and the book reading

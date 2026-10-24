@@ -5796,6 +5796,11 @@ test("check:architecture reads wrapped, retiring and doc references, and skips a
     );
     // An undated doc and an evals file act on decisions too.
     stage(dir, "barwise/docs/guide.md", "See ADR\n`a-concern`.\n");
+    // Not references: a word ending in ADR, a blank line between, and
+    // package history (an eval run, a dated file).
+    stage(dir, "barwise/docs/notes.md", "MADR `gone`. See the ADR\n\n`gone` too.\n");
+    stage(dir, "barwise/packages/core/eval-runs/r.json", '"docs/adr/gone.md"\n');
+    stage(dir, "barwise/packages/core/evals/2026-01-01.yaml", "# docs/adr/gone.md\n");
     stage(dir, "barwise/packages/core/evals/suite.yaml", "# docs/adr/a-concern.md\n");
     execFileSync("git", ["commit", "-qm", "refs"], { cwd: dir });
     const ok = runArch(dir);
@@ -5846,6 +5851,13 @@ test("check:architecture reads wrapped, retiring and doc references, and skips a
     assert.equal(r.status, 1, r.stderr);
     assert.match(r.stderr, /draws llm -> diagram/);
     assert.match(r.stderr, /guide\.md:1: names ADR nope/);
+    // An ADR written but not yet staged is reachable: it exists.
+    writeFileSync(join(dir, "barwise/docs/adr/unstaged.md"), ADR_OK);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`unstaged`.\n");
+    const unstaged = runArch(dir);
+    assert.equal(unstaged.status, 0, unstaged.stdout + unstaged.stderr);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`a-concern`.\n");
+    rmSync(join(dir, "barwise/docs/adr/unstaged.md"));
     // A tracked file deleted from disk is one being removed: it is skipped,
     // and the references it leaves dead are reported, not a refusal.
     rmSync(join(dir, "barwise/docs/adr/a-concern.md"));
@@ -5854,6 +5866,17 @@ test("check:architecture reads wrapped, retiring and doc references, and skips a
     assert.match(gone.stderr, /guide\.md:1: names ADR a-concern/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture passes the real tree from any working directory", () => {
+  // No --root: the list and the files read must be one tree, whatever the cwd.
+  for (const cwd of [REPO, tmpdir()]) {
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-architecture.mjs")], {
+      cwd,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 0, `${cwd}: ${r.stdout}${r.stderr}`);
   }
 });
 

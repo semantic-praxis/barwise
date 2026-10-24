@@ -36,7 +36,7 @@
  * check's own tests; nothing else passes it.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,24 +59,27 @@ const RUNTIME = ["dependencies", "peerDependencies", "optionalDependencies"];
  * dated records that still use numbers need no exemption.
  */
 const ADR_DIR = "barwise/docs/adr/";
-// `\s+`, not a space: dprint reflows prose, and a reference split at the
-// wrap would otherwise never be read.
-const ADR_REF = /ADR\s+`([a-z0-9][a-z0-9-]*)`|docs\/adr\/([a-z0-9][a-z0-9-]*)\.md/g;
+// One line break may sit between `ADR` and the name -- dprint reflows prose,
+// and a reference split at the wrap would otherwise never be read -- but not
+// a blank line, and `ADR` is a whole word (not the tail of `MADR`).
+const ADR_REF =
+  /\bADR[ \t]*(?:\r?\n[ \t]*)?`([a-z0-9][a-z0-9-]*)`|docs\/adr\/([a-z0-9][a-z0-9-]*)\.md/g;
 const SCOPES = ["architecture", "process"];
 const isAdr = (f) => f.startsWith(ADR_DIR) && f.endsWith(".md") && !f.endsWith("/README.md");
 /**
  * The files whose ADR references are read: a named set, not "everything
  * but". Instruction files, the docs (specs included) and package files act
- * on a decision. History is left out -- the tracker, eval runs, archives
- * and dated records (a date in the file name) -- because history may name
+ * on a decision. History is left out, under the docs and the packages
+ * alike -- the tracker, eval runs and payloads, archives and dated records
+ * (a date in the path) -- because history may name
  * what no longer exists, and the old numbered forms are not read anyway.
  */
 const DATED = /\d{4}-\d{2}-\d{2}/;
+const HISTORY = /\/(archive|eval-runs|eval-payloads)\//;
 const citesAdrs = (f) =>
   isInstructionFile(f)
-  || (f.startsWith("barwise/docs/") && f.endsWith(".md") && !f.includes("/archive/")
-    && !DATED.test(f))
-  || f.startsWith("barwise/packages/");
+  || (((f.startsWith("barwise/docs/") && f.endsWith(".md")) || f.startsWith("barwise/packages/"))
+    && !HISTORY.test(f) && !DATED.test(f));
 
 const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
@@ -184,12 +187,11 @@ function graphLines(claudeMd) {
   return out;
 }
 
-let intended, drawnLines, manifests, adrs, citing, root, rootFlag;
+let intended, drawnLines, manifests, adrs, citing, root;
 try {
   // Inside the refusal: a bare `--root` throws, and that is "could not
   // answer", not the exit 1 a real disagreement uses.
-  rootFlag = opt("--root");
-  root = resolve(rootFlag ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
+  root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
   const intendedPath = join(root, "barwise", "scripts", "lib", "intended.cjs");
   intended = createRequire(import.meta.url)(intendedPath);
   const shape = isMap(intended) && Object.keys(intended).length > 0
@@ -230,33 +232,36 @@ try {
   const clash = repeated(names);
   if (clash.length > 0) throw new Error(`two package manifests are named ${clash.join(", ")}`);
   drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"));
-  // ADRs and the files that cite them, from the tracked listing: the shared
-  // one for the real tree, the same `-z` spelling for a --root fixture.
-  const tracked = rootFlag === null
-    ? (await import("./lib/tracked.mjs")).trackedFiles()
-    : execFileSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8" })
-      .split("\0").filter(Boolean);
-  if (tracked.length === 0) throw new Error(`git ls-files lists nothing under ${root}`);
-  // A tracked file gone from disk is one being deleted: it is not an ADR,
-  // and it cites nothing. Read on, it would turn the run into exit 2 and
-  // hide the references the deletion left dead.
-  const read = (fs) =>
-    fs.filter((f) => existsSync(join(root, f))).map((f) => ({
-      f,
-      text: readFileSync(join(root, f), "utf8"),
-    }));
-  adrs = read(tracked.filter(isAdr));
+  // The ADRs are the files in their directory on disk: what exists is what
+  // a reference can reach, staged or not. The files that cite them come
+  // from the tracked listing of `root` -- always `git -C root`, so the list
+  // and the files read are one tree whatever the cwd.
+  const adrDir = join(root, ADR_DIR);
+  adrs = (existsSync(adrDir) ? readdirSync(adrDir) : []).map((n) => ADR_DIR + n).filter(isAdr).map((
+    f,
+  ) => ({
+    f,
+    text: readFileSync(join(root, f), "utf8"),
+  }));
   // Zero ADRs is a listing that went wrong, not a tree with nothing to check.
-  if (adrs.length === 0) throw new Error(`no ADR under ${join(root, ADR_DIR)}`);
-  citing = read(tracked.filter(citesAdrs));
-  if (rootFlag === null) {
-    (await import("./lib/tracked.mjs")).noteUntrackedInput({
-      pathspec: ADR_DIR,
-      suffix: ".md",
-      include: isAdr,
-      gate: "check:architecture",
-    });
-  }
+  if (adrs.length === 0) throw new Error(`no ADR under ${adrDir}`);
+  const tracked = execFileSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8" })
+    .split("\0").filter(Boolean);
+  if (tracked.length === 0) throw new Error(`git ls-files lists nothing under ${root}`);
+  // A tracked path that is not a regular file on disk is one being deleted
+  // (or a symlink or gitlink): it cites nothing, and reading it would turn
+  // the run into exit 2 and hide the references a deletion left dead.
+  const isFile = (p) => {
+    try {
+      return statSync(p).isFile();
+    } catch {
+      return false;
+    }
+  };
+  citing = tracked.filter(citesAdrs).filter((f) => isFile(join(root, f))).map((f) => ({
+    f,
+    text: readFileSync(join(root, f), "utf8"),
+  }));
 } catch (err) {
   console.error(`check:architecture: cannot answer -- ${err.message}`);
   process.exit(2);
@@ -358,10 +363,13 @@ for (const { f, text } of citing) {
       .filter((e) => e.mark !== "" && isAdr(e.path))
       .map((e) => e.path.slice(ADR_DIR.length, -".md".length)),
   );
+  // Lines counted in one pass: matches arrive in order.
+  let line = 1;
+  let at = 0;
   for (const m of text.matchAll(ADR_REF)) {
+    for (; at < m.index; at++) if (text[at] === "\n") line++;
     const name = m[1] ?? m[2];
     if (!adrNames.has(name) && !declared.has(name)) {
-      const line = text.slice(0, m.index).split("\n").length;
       adrProblems.push(`${f}:${line}: names ADR ${name}, and ${ADR_DIR}${name}.md does not exist`);
     }
   }
@@ -380,7 +388,7 @@ if (adrProblems.length > 0) {
   for (const p of adrProblems) console.error(`  ${p}`);
   console.error(
     "Fix the reference or the ADR (template: .claude/skills/spec-writer/template.adr.md);"
-      + " a spec may cite an ADR it creates as a +barwise/docs/adr/<name>.md Touches: entry.",
+      + " a spec may name an ADR its PR creates or retires as a +/- barwise/docs/adr/<name>.md Touches: entry.",
   );
 }
 if (problems.length > 0 || adrProblems.length > 0) process.exit(1);
