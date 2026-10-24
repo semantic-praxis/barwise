@@ -30,6 +30,7 @@
  * repo has form for built-but-never-called code (barwise-811).
  */
 
+import { ELEMENT_MATCHINGS } from "@barwise/core/diff";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,14 +45,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * factory and the tests hold, so `mcpEnabled` is a knob rather than a
  * second `vi.doMock` that the already-imported binding would ignore.
  */
-const state = vi.hoisted(() => ({ registered: [] as string[], mcpEnabled: true }));
+const state = vi.hoisted(() => ({
+  registered: [] as string[],
+  tools: new Map<string, { invoke: (options: { input: unknown; }, token: unknown) => unknown; }>(),
+  mcpEnabled: true,
+}));
 
 vi.mock("vscode", () => ({
   lm: {
-    registerTool: (name: string) => {
+    registerTool: (
+      name: string,
+      tool: { invoke: (options: { input: unknown; }, token: unknown) => unknown; },
+    ) => {
       state.registered.push(name);
+      state.tools.set(name, tool);
       return { dispose: () => {} };
     },
+  },
+  // What `toToolResult` builds, so a registered tool can be invoked here.
+  LanguageModelToolResult: class {
+    constructor(readonly content: { value: string; }[]) {}
+  },
+  LanguageModelTextPart: class {
+    constructor(readonly value: string) {}
   },
   workspace: {
     getConfiguration: () => ({ get: (_key: string, _fallback?: unknown) => state.mcpEnabled }),
@@ -126,5 +142,35 @@ describe("VS Code language-model tool registration", () => {
     // qualifier is visible in the suite rather than discovered later.
     state.mcpEnabled = false;
     expect(registerAll()).toEqual([]);
+  });
+});
+
+describe("barwise_diff_models passes matching through", () => {
+  // From the retroactive review of #735: dropping `matching` at the
+  // registration survived the whole vscode suite, and the manifest's enum
+  // was an unchecked copy of the modes core defines.
+  const a =
+    'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Dog, kind: value }\n    - { id: ot1, name: Cat, kind: value }\n';
+  const b =
+    'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Cat, kind: value }\n    - { id: ot1, name: Dog, kind: value }\n';
+  const changed = async (matching?: string) => {
+    registerAll();
+    const tool = state.tools.get("barwise_diff_models")!;
+    const result = (await tool.invoke({ input: { base: a, incoming: b, matching } }, {})) as {
+      content: { value: string; }[];
+    };
+    return JSON.parse(result.content[0]!.value).deltas.length as number;
+  };
+
+  it("reads a swap of coinciding ids as renames by default, and as nothing under content", async () => {
+    expect(await changed()).toBe(2);
+    expect(await changed("content")).toBe(0);
+  });
+
+  it("declares exactly the modes core defines", () => {
+    const tool = (manifest.contributes?.languageModelTools ?? []).find(
+      (t) => t.name === "barwise_diff_models",
+    ) as { inputSchema?: { properties?: { matching?: { enum?: string[]; }; }; }; } | undefined;
+    expect(tool?.inputSchema?.properties?.matching?.enum).toEqual([...ELEMENT_MATCHINGS]);
   });
 });

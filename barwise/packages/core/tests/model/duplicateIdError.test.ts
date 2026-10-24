@@ -213,3 +213,23 @@ describe("the exported 2.0 reader converts too", () => {
     expect(() => readDocument20(doc as never)).toThrow(DeserializationError);
   });
 });
+
+describe("the guards refuse what each element's constructor refuses", () => {
+  // From the retroactive review of #730: nothing pinned the self-pair half,
+  // so losing it would let merge reach a constructor throw that loses the
+  // whole merge.
+  it("canAddSubtypeFact refuses an entity as its own subtype", () => {
+    const m = base();
+    expect(m.canAddSubtypeFact({ subtypeId: "d", supertypeId: "d" })).toBe(false);
+    expect(m.canAddSubtypeFact({ subtypeId: "d", supertypeId: "a" })).toBe(true);
+  });
+
+  it("canAddObjectifiedFactType refuses one id for both halves", () => {
+    const m = base();
+    // An entity under the fact type's id (the stores are separate), so only
+    // the self-pair check can refuse the pair.
+    m.addObjectType({ id: "f2", name: "F2E", kind: "entity", referenceMode: "f2_id" });
+    expect(m.canAddObjectifiedFactType({ factTypeId: "f2", objectTypeId: "f2" })).toBe(false);
+    expect(m.canAddObjectifiedFactType({ factTypeId: "f2", objectTypeId: "d" })).toBe(true);
+  });
+});
