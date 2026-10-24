@@ -21,7 +21,7 @@ import {
   type RoleConfig,
   type ValueConstraintDef,
 } from "@barwise/core";
-import { snakeCase } from "../norma/mapping/objectTypes.js";
+import { snakeCase } from "../naming.js";
 import {
   isOssieBuiltinValueType,
   OSSIE_ANY,
@@ -51,26 +51,62 @@ export const DERIVED_BY_NOTE_PREFIX = "derived_by: ";
 
 type Concepts = ReadonlyMap<string, OssieConcept>;
 
-export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapResult {
-  const concepts = checkDocument(doc);
-  const warnings: string[] = [];
-  const model = new OrmModel({
-    name: modelName ?? doc.name,
-    ...(doc.description ? { note: doc.description } : {}),
-  });
+/** A value type's chain up to its built-in: the user value types passed through, and the root. */
+interface Chain {
+  readonly through: readonly OssieConcept[];
+  readonly root: ConceptualDataTypeName;
+}
 
-  reportDropped(doc, warnings);
+/** An entity's `requires`, split: the relationships made mandatory, and the rest. */
+interface RequiresSplit {
+  readonly mandatory: readonly string[];
+  readonly unrecognized: readonly string[];
+}
+
+/**
+ * What the document check resolved, so building the model reads each
+ * decision rather than making it a second time: two copies of "which
+ * requires items are mandatory" could disagree, and an item would land in
+ * the note and the constraints both, or in neither.
+ */
+interface Resolved {
+  readonly readings: ReadonlyMap<OssieRelationship, readonly string[]>;
+  readonly chains: ReadonlyMap<OssieConcept, Chain>;
+  readonly requires: ReadonlyMap<OssieConcept, RequiresSplit>;
+}
+
+/**
+ * An expression as one line. Ossie expressions are SQL text and may be
+ * YAML block scalars; a newline inside one would break a warning printed
+ * as one comment line, and the one-expression-per-line framing of a note.
+ */
+function oneLine(expr: string): string {
+  return expr.trim().replace(/\s+/g, " ");
+}
+
+export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapResult {
+  const resolved = checkDocument(doc);
+  const warnings: string[] = [];
+  // The ontology-level requires has no element to hold it but the model,
+  // so it joins the description in the model's note.
+  const ontologyRequires = (doc.requires ?? []).map(oneLine);
+  const note = [doc.description, notes(ontologyRequires, [])].filter(Boolean).join("\n");
+  const model = new OrmModel({ name: modelName ?? doc.name, ...(note ? { note } : {}) });
+
+  reportDropped(doc, ontologyRequires, warnings);
 
   // Object types first: relationships name concepts declared further down.
-  for (const c of doc.ontology) addConcept(model, c, concepts, warnings);
+  for (const c of doc.ontology) addConcept(model, c, resolved, warnings);
   for (const c of doc.ontology) {
-    for (const r of c.relationships ?? []) addRelationship(model, c, r, warnings);
+    for (const r of c.relationships ?? []) {
+      addRelationship(model, c, r, resolved.readings.get(r)!, warnings);
+    }
   }
   for (const c of doc.ontology) {
     if (c.type !== "EntityType") continue;
     addSubtypes(model, c);
     addIdentifier(model, c, warnings);
-    addMandatoryRoles(model, c);
+    addMandatoryRoles(model, c, resolved.requires.get(c)!);
   }
   return { model, warnings };
 }
@@ -79,8 +115,11 @@ export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapR
 // The document check: every refusal the spec's Scope lists, in one place.
 // ---------------------------------------------------------------------------
 
-function checkDocument(doc: OssieDocument): Concepts {
+function checkDocument(doc: OssieDocument): Resolved {
   const concepts = new Map<string, OssieConcept>();
+  const readings = new Map<OssieRelationship, readonly string[]>();
+  const chains = new Map<OssieConcept, Chain>();
+  const requires = new Map<OssieConcept, RequiresSplit>();
   for (const c of doc.ontology) {
     if (concepts.has(c.concept)) {
       throw new OssieImportError(`Concept ${c.concept} is declared twice.`);
@@ -91,19 +130,23 @@ function checkDocument(doc: OssieDocument): Concepts {
     concepts.set(c.concept, c);
   }
   for (const c of doc.ontology) {
-    if (c.type === "EntityType") checkEntity(c, concepts);
-    else valueChain(c, concepts);
+    if (c.type === "EntityType") {
+      checkEntity(c, concepts);
+      requires.set(c, splitEntityRequires(c));
+    } else {
+      chains.set(c, valueChain(c, concepts));
+    }
     const seen = new Set<string>();
     for (const r of c.relationships ?? []) {
       if (seen.has(r.name)) {
         throw new OssieImportError(`${c.concept} declares relationship ${r.name} twice.`);
       }
       seen.add(r.name);
-      checkRelationship(c, r, concepts);
+      readings.set(r, checkRelationship(c, r, concepts));
     }
   }
   checkNoSubtypeCycle(doc, concepts);
-  return concepts;
+  return { readings, chains, requires };
 }
 
 function checkEntity(c: OssieConcept, concepts: Concepts): void {
@@ -119,7 +162,11 @@ function checkEntity(c: OssieConcept, concepts: Concepts): void {
   if (new Set(c.extends ?? []).size !== (c.extends ?? []).length) {
     throw new OssieImportError(`Entity type ${c.concept} lists a supertype twice.`);
   }
-  for (const rel of c.identify_by ?? []) {
+  const identifiers = c.identify_by ?? [];
+  if (new Set(identifiers).size !== identifiers.length) {
+    throw new OssieImportError(`${c.concept}: identify_by lists a relationship twice.`);
+  }
+  for (const rel of identifiers) {
     const r = (c.relationships ?? []).find((x) => x.name === rel);
     if (!r) {
       throw new OssieImportError(
@@ -128,6 +175,14 @@ function checkEntity(c: OssieConcept, concepts: Concepts): void {
     }
     if ((r.roles ?? []).length !== 1) {
       throw new OssieImportError(`${c.concept}: identify_by names ${rel}, which is not binary.`);
+    }
+    // A ring binary relates the entity to another of its kind; core does
+    // not read it as identifying its player, so the preferred identifier
+    // would fail validation instead of the import naming the place.
+    if (r.roles![0]!.concept === c.concept) {
+      throw new OssieImportError(
+        `${c.concept}: identify_by names ${rel}, which relates ${c.concept} to itself.`,
+      );
     }
   }
 }
@@ -156,7 +211,12 @@ function rolePlayers(c: OssieConcept, r: OssieRelationship): string[] {
   return [c.concept, ...(r.roles ?? []).map((role) => role.concept)];
 }
 
-function checkRelationship(c: OssieConcept, r: OssieRelationship, concepts: Concepts): void {
+/** Checks a relationship and returns its reading templates. */
+function checkRelationship(
+  c: OssieConcept,
+  r: OssieRelationship,
+  concepts: Concepts,
+): readonly string[] {
   const name = ossieFactTypeName(c.concept, r.name);
   for (const player of rolePlayers(c, r)) {
     if (!concepts.has(player) && !isOssieBuiltinValueType(player)) {
@@ -175,17 +235,24 @@ function checkRelationship(c: OssieConcept, r: OssieRelationship, concepts: Conc
   if (r.verbalizes.length === 0) {
     throw new OssieImportError(`${name}: verbalizes lists no reading.`);
   }
-  for (const pattern of r.verbalizes) reading(pattern, keys, rolePlayers(c, r), name);
+  return r.verbalizes.map((pattern) => reading(pattern, keys, rolePlayers(c, r), name));
 }
 
 /**
  * A value type's chain up to its built-in: the user value types it passes
  * through, then the built-in's data type.
  */
-function valueChain(
-  c: OssieConcept,
-  concepts: Concepts,
-): { through: OssieConcept[]; root: ConceptualDataTypeName; } {
+function valueChain(c: OssieConcept, concepts: Concepts): Chain {
+  // Only the first supertype gives the data type, but every one named must
+  // be a value type: a typo or an entity there is the mistake an entity's
+  // extends is refused for.
+  for (const s of (c.extends ?? []).slice(1)) {
+    if (!isOssieBuiltinValueType(s) && concepts.get(s)?.type !== "ValueType") {
+      throw new OssieImportError(
+        `Value type ${c.concept} extends ${s}, which is not a declared value type.`,
+      );
+    }
+  }
   const through: OssieConcept[] = [];
   let at = c.extends?.[0];
   if (at === undefined) {
@@ -214,7 +281,11 @@ function valueChain(
 // Building the model.
 // ---------------------------------------------------------------------------
 
-function reportDropped(doc: OssieDocument, warnings: string[]): void {
+function reportDropped(
+  doc: OssieDocument,
+  ontologyRequires: readonly string[],
+  warnings: string[],
+): void {
   if (doc.prefixes) {
     warnings.push(`prefixes: barwise has no field for namespace prefixes; dropped.`);
   }
@@ -226,8 +297,10 @@ function reportDropped(doc: OssieDocument, warnings: string[]): void {
       `ontology_mappings: embedded mappings (deprecated in Ossie) are not imported; dropped.`,
     );
   }
-  for (const expr of doc.requires ?? []) {
-    warnings.push(`requires on the ontology is not carried as a constraint: ${expr}`);
+  for (const expr of ontologyRequires) {
+    warnings.push(
+      `requires on the ontology is not carried as a constraint (kept in the model's note): ${expr}`,
+    );
   }
   for (const c of doc.ontology) {
     if (c.iri) warnings.push(`${c.concept}: iri ${c.iri} dropped; barwise has no field for IRIs.`);
@@ -276,7 +349,7 @@ const kept = (concept: string, expr: string): string =>
 function addConcept(
   model: OrmModel,
   c: OssieConcept,
-  concepts: Concepts,
+  resolved: Resolved,
   warnings: string[],
 ): void {
   const base = {
@@ -285,14 +358,20 @@ function addConcept(
     ...(c.description ? { definition: c.description } : {}),
   };
   if (c.type === "EntityType") {
-    const { unrecognized } = entityRequires(c);
+    const { unrecognized } = resolved.requires.get(c)!;
     for (const expr of unrecognized) warnings.push(kept(c.concept, expr));
     // A derivation with no supertype has no subtype fact to hold it as a
     // defining rule, so it stays as text with the requires it sits beside.
-    const unheld = supertypes(c).length > 0 ? [] : c.derived_by ?? [];
+    const unheld = supertypes(c).length > 0 ? [] : (c.derived_by ?? []).map(oneLine);
     for (const expr of unheld) {
       warnings.push(
         `${c.concept}: derived_by on an entity type with no supertype is kept in the note: ${expr}`,
+      );
+    }
+    if (supertypes(c).length === 0 && !(c.identify_by && c.identify_by.length > 0)) {
+      warnings.push(
+        `${c.concept}: no identify_by and no supertype, so nothing identifies it; barwise gives it `
+          + `the reference mode ${referenceMode(c)}, which no relationship carries.`,
       );
     }
     const note = notes(unrecognized, unheld);
@@ -305,13 +384,14 @@ function addConcept(
     return;
   }
 
-  const shapes = readValueShapes(c.concept, c.requires ?? []);
+  const shapes = readValueShapes(c.concept, (c.requires ?? []).map(oneLine));
+  const derivedBy = (c.derived_by ?? []).map(oneLine);
   const valueConstraint: ValueConstraintDef | undefined =
     shapes.values.length > 0 || shapes.ranges.length > 0
       ? { values: shapes.values, ...(shapes.ranges.length > 0 ? { ranges: shapes.ranges } : {}) }
       : undefined;
   for (const expr of shapes.unrecognized) warnings.push(kept(c.concept, expr));
-  for (const expr of c.derived_by ?? []) {
+  for (const expr of derivedBy) {
     warnings.push(`${c.concept}: derived_by on a value type is kept in the note: ${expr}`);
   }
   if (c.identify_by && c.identify_by.length > 0) {
@@ -319,11 +399,11 @@ function addConcept(
       `${c.concept}: identify_by on a value type is not carried; a value identifies itself.`,
     );
   }
-  const note = notes(shapes.unrecognized, c.derived_by ?? []);
+  const note = notes(shapes.unrecognized, derivedBy);
   model.addObjectType({
     ...base,
     kind: "value",
-    dataType: { name: valueDataType(c, concepts, warnings) },
+    dataType: { name: valueDataType(c, resolved.chains.get(c)!, warnings) },
     ...(valueConstraint ? { valueConstraint } : {}),
     ...(note ? { note } : {}),
   });
@@ -335,18 +415,14 @@ function addConcept(
  * named (Open decision 1), together with any `requires` on the chain that
  * the flattened type does not inherit.
  */
-function valueDataType(
-  c: OssieConcept,
-  concepts: Concepts,
-  warnings: string[],
-): ConceptualDataTypeName {
+function valueDataType(c: OssieConcept, chain: Chain, warnings: string[]): ConceptualDataTypeName {
   const supers = c.extends ?? [];
   if (supers.length > 1) {
     warnings.push(
       `${c.concept}: extends ${supers.join(", ")}; barwise keeps one data type, from ${supers[0]}.`,
     );
   }
-  const { through, root } = valueChain(c, concepts);
+  const { through, root } = chain;
   if (through.length > 0) {
     warnings.push(
       `${c.concept}: extends ${supers[0]}; barwise has no value-type subtyping, so ${c.concept} `
@@ -354,7 +430,7 @@ function valueDataType(
     );
   }
   for (const ancestor of through) {
-    for (const expr of ancestor.requires ?? []) {
+    for (const expr of (ancestor.requires ?? []).map(oneLine)) {
       warnings.push(
         `${c.concept}: inherits ${ancestor.concept}'s requires, which the flattened type does not `
           + `carry: ${expr}`,
@@ -379,15 +455,14 @@ function referenceMode(c: OssieConcept): string {
 }
 
 /**
- * An entity's `requires`, split once: a bare `Entity.rel` naming one of its
- * own relationships is a mandatory first role on `rel`, and everything else
- * is kept in the note. Both the note and the constraints read this split,
- * so no item can land in both or neither.
+ * An entity's `requires`, split: a bare `Entity.rel` naming one of its own
+ * relationships is a mandatory first role on `rel`, and everything else is
+ * kept in the note. Computed once, by the document check (`Resolved`).
  */
-function entityRequires(c: OssieConcept): { mandatory: string[]; unrecognized: string[]; } {
+function splitEntityRequires(c: OssieConcept): RequiresSplit {
   const mandatory: string[] = [];
   const unrecognized: string[] = [];
-  for (const expr of c.requires ?? []) {
+  for (const expr of (c.requires ?? []).map(oneLine)) {
     const rel = readMandatoryShape(c.concept, expr);
     if (rel !== undefined && (c.relationships ?? []).some((r) => r.name === rel)) {
       // `requires: [ E.x, E.x ]` states one constraint, not two.
@@ -406,6 +481,7 @@ function addRelationship(
   model: OrmModel,
   c: OssieConcept,
   r: OssieRelationship,
+  readings: readonly string[],
   warnings: string[],
 ): void {
   const name = ossieFactTypeName(c.concept, r.name);
@@ -424,18 +500,21 @@ function addRelationship(
       );
     }
   }
-  for (const expr of r.requires ?? []) warnings.push(kept(name, expr));
-  const note = notes(r.requires ?? [], []);
+  const requires = (r.requires ?? []).map(oneLine);
+  for (const expr of requires) warnings.push(kept(name, expr));
+  const note = notes(requires, []);
   model.addFactType({
     id: generateId(),
     name,
     roles,
-    readings: r.verbalizes.map((pattern) => reading(pattern, keys, players, name)),
+    readings,
     constraints: multiplicityConstraints(name, roles, r.multiplicity, warnings),
     ...(r.description ? { definition: r.description } : {}),
     ...(note ? { note } : {}),
     ...(r.derived_by && r.derived_by.length > 0
-      ? { derivation: { kind: "derived" as const, expression: r.derived_by.join("\n") } }
+      ? {
+        derivation: { kind: "derived" as const, expression: r.derived_by.map(oneLine).join("\n") },
+      }
       : {}),
   });
 }
@@ -518,7 +597,7 @@ function multiplicityConstraints(
  */
 function addSubtypes(model: OrmModel, c: OssieConcept): void {
   const rule = c.derived_by && c.derived_by.length > 0
-    ? { kind: "derived" as const, expression: c.derived_by.join("\n") }
+    ? { kind: "derived" as const, expression: c.derived_by.map(oneLine).join("\n") }
     : undefined;
   supertypes(c).forEach((s, i) => {
     model.addSubtypeFact({
@@ -570,8 +649,8 @@ function addIdentifier(model: OrmModel, c: OssieConcept, warnings: string[]): vo
 }
 
 /** The mandatory first roles an entity's `requires` states. */
-function addMandatoryRoles(model: OrmModel, c: OssieConcept): void {
-  for (const rel of entityRequires(c).mandatory) {
+function addMandatoryRoles(model: OrmModel, c: OssieConcept, split: RequiresSplit): void {
+  for (const rel of split.mandatory) {
     const ft = relationshipFact(model, c.concept, rel);
     ft.addConstraint({ type: "mandatory", id: generateId(), roleId: ft.roles[0]!.id });
   }

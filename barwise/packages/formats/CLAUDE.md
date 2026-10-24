@@ -29,6 +29,7 @@ absent).
 src/
   index.ts                       Public API
   registration.ts                The 6 descriptors + registerStandardFormats()
+  naming.ts                      Name helpers shared by the adapters (snakeCase)
   ddl/DdlImportFormat.ts         SQL DDL -> ORM
   ddl/DdlExportFormat.ts         ORM -> SQL DDL (wraps renderDdl; applies the
                                  dialect constraint routing as a text pass)

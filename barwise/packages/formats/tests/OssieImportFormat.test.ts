@@ -231,6 +231,7 @@ ontology:
     );
     expect(warnings).toEqual([
       "Employee: derived_by on an entity type with no supertype is kept in the note: EXISTS ( Employee.earns )",
+      "Employee: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode employee_id, which no relationship carries.",
     ]);
   });
 
@@ -291,6 +292,7 @@ ontology:
     });
     expect(model.preferredIdentifierOf(model.getObjectTypeByName("City")!.id)).toBeUndefined();
     expect(warnings).toEqual([
+      "State: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode state_id, which no relationship carries.",
       "City: identify_by [name, state] is kept as an external uniqueness; barwise cannot yet name one as a preferred identifier (barwise-alg).",
     ]);
   });
@@ -338,6 +340,41 @@ ontology:
     ]);
   });
 
+  it("keeps bounds no value meets as text, not as a range that refuses everything", () => {
+    const { model, warnings } = load(`
+ontology:
+  - { concept: X, type: ValueType, extends: [ Integer ], requires: [ "X >= 10", "X < 5" ] }
+`);
+    const x = model.getObjectTypeByName("X")!;
+    expect(x.kind === "value" && x.valueConstraint).toBeUndefined();
+    expect(x.note).toBe("requires: X >= 10\nrequires: X < 5");
+    expect(warnings).toHaveLength(2);
+  });
+
+  it("writes a multi-line expression as one line, in the note and the warning", () => {
+    const { model, warnings } = load(`
+ontology:
+  - concept: Trip
+    type: EntityType
+    identify_by: [ id ]
+    relationships:
+      - { name: id, roles: [ { concept: String } ], multiplicity: OneToOne, verbalizes: [ "{Trip} has id {String}" ] }
+      - name: ends
+        roles: [ { concept: DateTime } ]
+        requires:
+          - |
+            Trip.ends > Trip.starts
+              AND Trip.ends < NOW()
+        verbalizes: [ "{Trip} ends at {DateTime}" ]
+`);
+    expect(factType(model, "Trip.ends").note).toBe(
+      "requires: Trip.ends > Trip.starts AND Trip.ends < NOW()",
+    );
+    expect(warnings).toEqual([
+      "Trip.ends: requires is not carried as a constraint (kept in the note): Trip.ends > Trip.starts AND Trip.ends < NOW()",
+    ]);
+  });
+
   it("reads a bare Entity.rel as a mandatory first role", () => {
     const { model } = load(`
 ontology:
@@ -382,6 +419,7 @@ ontology:
       "Size: requires is not carried as a constraint (kept in the note): Size >= 2",
       "Trip: requires is not carried as a constraint (kept in the note): COUNT[Trip] > 0",
       "Trip: requires is not carried as a constraint (kept in the note): Trip.nowhere",
+      "Trip: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode trip_id, which no relationship carries.",
       "Trip.starts: requires is not carried as a constraint (kept in the note): Trip.starts < NOW()",
     ]);
   });
@@ -393,6 +431,11 @@ describe("Ossie import: the model, readings and reference modes", () => {
       + "ontology:\n  - { concept: Airport, type: EntityType }\n";
     const own = new OssieImportFormat().parse(text).model;
     expect([own.name, own.note]).toEqual(["Flights", "Ontology of flights."]);
+    // The ontology-level requires has nowhere else to live.
+    const withRequires = new OssieImportFormat().parse(
+      text.replace("ontology:", 'requires: [ "COUNT[Airport] > 0" ]\nontology:'),
+    ).model;
+    expect(withRequires.note).toBe("Ontology of flights.\nrequires: COUNT[Airport] > 0");
     expect(new OssieImportFormat().parse(text, { modelName: "mine" }).model.name).toBe("mine");
   });
 
@@ -466,6 +509,7 @@ ontology:
       "{0} has departure- {1}",
     ]);
     expect(warnings).toEqual([
+      "Flight: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode flight_id, which no relationship carries.",
       'Flight.dep: reading "{Flight} has departure- {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
     ]);
   });
@@ -552,6 +596,49 @@ ontology:
       - { name: flag, verbalizes: [ "{A} is flagged" ] }
 `,
       /identify_by names flag, which is not binary/,
+    ),
+  );
+
+  it(
+    "identify_by listing a relationship twice",
+    refuses(
+      `
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ] }
+  - concept: A
+    type: EntityType
+    identify_by: [ code, code ]
+    relationships:
+      - { name: code, roles: [ { concept: Code } ], multiplicity: OneToOne, verbalizes: [ "{A} has {Code}" ] }
+`,
+      /A: identify_by lists a relationship twice/,
+    ),
+  );
+
+  it(
+    "identify_by naming a ring relationship",
+    refuses(
+      `
+ontology:
+  - concept: Person
+    type: EntityType
+    identify_by: [ twin ]
+    relationships:
+      - { name: twin, roles: [ { concept: Person, name: other } ], multiplicity: OneToOne, verbalizes: [ "{Person} is the twin of {Person:other}" ] }
+`,
+      /Person: identify_by names twin, which relates Person to itself/,
+    ),
+  );
+
+  it(
+    "a value type whose later supertype is not a value type",
+    refuses(
+      `
+ontology:
+  - { concept: Flight, type: EntityType }
+  - { concept: Code, type: ValueType, extends: [ String, Flight ] }
+`,
+      /Code extends Flight, which is not a declared value type/,
     ),
   );
 
@@ -650,9 +737,10 @@ ontology:
       "prefixes: barwise has no field for namespace prefixes; dropped.",
       "ai_context: barwise has no field for AI context; dropped.",
       "ontology_mappings: embedded mappings (deprecated in Ossie) are not imported; dropped.",
-      "requires on the ontology is not carried as a constraint: COUNT[Person] > 0",
+      "requires on the ontology is not carried as a constraint (kept in the model's note): COUNT[Person] > 0",
       "Person: iri ex:Person dropped; barwise has no field for IRIs.",
       "Person.walks: iri ex:walks dropped; barwise has no field for IRIs.",
+      "Person: no identify_by and no supertype, so nothing identifies it; barwise gives it the reference mode person_id, which no relationship carries.",
     ]);
     expect(confidence).toBe("medium");
   });
@@ -677,8 +765,8 @@ describe("Ossie import: the pinned flights example", () => {
   // The full list, so a change to what is carried is a visible diff here.
   it("names exactly what it could not carry", () => {
     expect(warnings).toEqual([
-      "requires on the ontology is not carried as a constraint: COUNT[Airport] > 0",
-      "requires on the ontology is not carried as a constraint: COUNT[Carrier] > 0",
+      "requires on the ontology is not carried as a constraint (kept in the model's note): COUNT[Airport] > 0",
+      "requires on the ontology is not carried as a constraint (kept in the model's note): COUNT[Carrier] > 0",
       "Capacity: extends NrPounds; barwise has no value-type subtyping, so Capacity takes the integer data type at the chain's root and the chain is not kept.",
       "Delay: extends NrMinutes; barwise has no value-type subtyping, so Delay takes the decimal data type at the chain's root and the chain is not kept.",
       "Distance: extends NrMiles; barwise has no value-type subtyping, so Distance takes the decimal data type at the chain's root and the chain is not kept.",

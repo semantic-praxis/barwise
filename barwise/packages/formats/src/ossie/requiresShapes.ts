@@ -74,7 +74,23 @@ export function readValueShapes(concept: string, items: readonly string[]): Valu
     range = narrowed;
     ranged = true;
   }
+  // Bounds no value meets (`X >= 10`, `X < 5`) are a mistake in the
+  // source, not a constraint: stored, they would refuse every value. They
+  // go back as text, like any other near miss.
+  if (ranged && empty(range)) {
+    return { values: [], ranges: [], unrecognized: [...items] };
+  }
   return { values: [], ranges: ranged ? [range] : [], unrecognized };
+}
+
+/** Whether a range admits no value. Both bounds are numbers: `NUMBER` matched them. */
+function empty(
+  range: { min?: string; max?: string; minInclusive?: boolean; maxInclusive?: boolean; },
+): boolean {
+  if (range.min === undefined || range.max === undefined) return false;
+  const lo = Number(range.min);
+  const hi = Number(range.max);
+  return lo > hi || (lo === hi && (range.minInclusive === false || range.maxInclusive === false));
 }
 
 /** `X == 'A' OR X == 'B'` to `["A", "B"]`, or undefined for any other shape. */
