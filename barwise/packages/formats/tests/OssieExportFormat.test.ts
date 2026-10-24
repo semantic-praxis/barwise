@@ -44,9 +44,9 @@ const importer = new OssieImportFormat();
 function exported(model: OrmModel) {
   const result = exporter.export(model);
   const document = parse(result.text) as OssieDocument;
-  const losses = result.text.split("\n").filter((l) =>
-    l.startsWith("# barwise: ") && !l.endsWith(":")
-  )
+  const header = "# barwise: what this document could not carry from the model:";
+  const losses = result.text.split("\n")
+    .filter((l) => l.startsWith("# barwise: ") && l !== header)
     .map((l) => l.slice("# barwise: ".length));
   return { result, document, losses };
 }
@@ -392,7 +392,7 @@ describe("Ossie export: the loss report", () => {
     });
     expect(losses).toEqual(expect.arrayContaining([
       "Person -> Taxpayer: identification through the supertype not written as it is",
-      "Person: a second, different defining rule not written",
+      "Person: its subtype facts' defining rules differ; only the first is written",
     ]));
     // Person is identified through Party, so no "no identifier" loss for it.
     expect(losses.some((l) => l.startsWith("Person: no identifier"))).toBe(false);
@@ -436,6 +436,112 @@ describe("Ossie export: the loss report", () => {
     expect(concept(document, "Person").identify_by).toBeUndefined();
     expect(losses).toContain("constraint ext: external_uniqueness is not expressible in Ossie");
     expect(() => importer.parse(result.text)).not.toThrow();
+  });
+
+  it("refuses a model with no concept to declare, rather than writing an invalid document", () => {
+    expect(() => exporter.export(new OrmModel({ name: "Empty" }))).toThrow(
+      /has no concept to declare/,
+    );
+  });
+
+  it("names, and does not write, a note line the importer would read back differently", () => {
+    const m = new OrmModel({ name: "M" });
+    value(m, "Age", { name: "integer" }, {
+      valueConstraint: { values: [], ranges: [{ min: "0" }] },
+      note: "requires: Age <= 150\nrequires: \nrequires: Age % 2 == 0",
+    });
+    const a = m.addObjectType({
+      id: "a",
+      name: "A",
+      kind: "entity",
+      referenceMode: "id",
+      note: "requires: A.label",
+    });
+    const label = value(m, "Label");
+    fact(m, "A.label", [a, label], "{0} has {1}", { uc: [[0]] });
+    const { document, losses, result } = exported(m);
+    expect(concept(document, "Age").requires).toEqual(["Age >= 0", "Age % 2 == 0"]);
+    expect(concept(document, "A").requires).toBeUndefined();
+    expect(losses).toEqual(expect.arrayContaining([
+      "Age: note line not written, it would read back as a constraint: requires: Age <= 150",
+      "Age: note line not written: requires:",
+      "A: note line not written, it would read back as a mandatory role: requires: A.label",
+    ]));
+    expect(() => importer.parse(result.text)).not.toThrow();
+  });
+
+  it("names a mix of supertypes with and without a defining rule, and a subtype rule's kind and storage", () => {
+    const m = new OrmModel({ name: "M" });
+    const [a, b, c] = [entity(m, "A"), entity(m, "B"), entity(m, "C")];
+    m.addSubtypeFact({
+      id: "s1",
+      subtypeId: c.id,
+      supertypeId: a.id,
+      providesIdentification: true,
+    });
+    m.addSubtypeFact({
+      id: "s2",
+      subtypeId: c.id,
+      supertypeId: b.id,
+      providesIdentification: false,
+      definingRule: { kind: "semiderived", storage: "derived_and_stored", expression: "x" },
+    });
+    const { document, losses } = exported(m);
+    expect(concept(document, "C").derived_by).toBeUndefined();
+    expect(losses).toEqual(expect.arrayContaining([
+      "C: its subtype facts' defining rules differ; only the first is written",
+      "C: semiderived defining rule written as fully derived",
+      "C: stored defining rule written as on request",
+    ]));
+  });
+
+  it("names a reference mode a composite identifier cannot carry", () => {
+    const m = new OrmModel({ name: "M" });
+    const p = entity(m, "Person", "pid");
+    const [x, y] = [value(m, "X"), value(m, "Y")];
+    const fx = fact(m, "Person.x", [p, x], "{0} has {1}", { uc: [[0]] });
+    const fy = fact(m, "Person.y", [p, y], "{0} has {1}", { uc: [[0]] });
+    m.addConstraint({
+      type: "external_uniqueness",
+      id: "pk",
+      roleIds: [fx.roles[1]!.id, fy.roles[1]!.id],
+    });
+    const { document, losses } = exported(m);
+    expect(concept(document, "Person").identify_by).toEqual(["x", "y"]);
+    expect(losses).toContain("Person: reference mode pid not written");
+  });
+
+  it("does not write a built-in whose value type carries anything else, and names a fact type with no uniqueness", () => {
+    const m = new OrmModel({ name: "M" });
+    const s = value(m, "String", { name: "text" }, { aliases: ["Str"] });
+    const a = entity(m, "A");
+    fact(m, "A.tag", [a, s], "{0} is tagged {1}");
+    const { document, losses } = exported(m);
+    expect(document.ontology.map((c) => c.concept)).toEqual(["String_", "A"]);
+    expect(losses).toEqual(expect.arrayContaining([
+      "String: written as String_, a name Ossie can read back",
+      "String: aliases Str not written",
+      "fact type A.tag: has no uniqueness; Ossie's set semantics give it one spanning every role",
+    ]));
+  });
+
+  it("keeps a relationship under a concept whose name holds a dot (rule 1, longest name)", () => {
+    const text = `version: 0.2.0.dev0
+name: T
+ontology:
+  - { concept: Org, type: EntityType, identify_by: [ nr ], relationships: [ { name: nr, roles: [ { concept: Integer } ], multiplicity: OneToOne, verbalizes: [ "{Org} has {Integer}" ] } ] }
+  - concept: Org.Unit
+    type: EntityType
+    identify_by: [ code ]
+    relationships:
+      - { name: code, roles: [ { concept: String } ], multiplicity: OneToOne, verbalizes: [ "{Org.Unit} has {String}" ] }
+      - { name: part_of, roles: [ { concept: Org } ], multiplicity: ManyToOne, verbalizes: [ "{Org.Unit} is part of {Org}" ] }
+`;
+    const { document } = exported(importer.parse(text).model);
+    expect(relationship(document, "Org.Unit", "part_of")).toMatchObject({
+      roles: [{ concept: "Org" }],
+      verbalizes: ["{Org.Unit} is part of {Org}"],
+    });
   });
 
   it("keeps the comment block one line per loss, whatever the lost text holds", () => {

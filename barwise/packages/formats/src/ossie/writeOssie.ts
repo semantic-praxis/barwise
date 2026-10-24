@@ -22,6 +22,7 @@ import {
 } from "@barwise/core";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
 import { buildConstraintSpec } from "../constraintSpec.js";
+import { snakeCase } from "../naming.js";
 import {
   DERIVATION_ITEM_SEPARATOR,
   DERIVED_BY_NOTE_PREFIX,
@@ -37,7 +38,13 @@ import {
   type OssieDocument,
   type OssieRelationship,
 } from "./OssieTypes.js";
-import { IDENT_PATTERN, writeBounds, writeEnumeration } from "./requiresShapes.js";
+import {
+  IDENT_PATTERN,
+  readMandatoryShape,
+  readValueShapes,
+  writeBounds,
+  writeEnumeration,
+} from "./requiresShapes.js";
 
 export interface OssieWriteResult {
   readonly document: OssieDocument;
@@ -198,12 +205,25 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   for (const d of model.definitions) lose(`definition ${d.term}`, "Ossie has no glossary");
   if (model.domainContext) lose("model", `domain context ${model.domainContext} not written`);
 
+  if (ontology.length === 0) {
+    // The schema requires one concept, and the importer refuses none; a
+    // document the format cannot hold is refused, not written invalid.
+    throw new Error(
+      `Model "${model.name}" has no concept to declare; an Ossie ontology needs at least one.`,
+    );
+  }
+
   const { description, requires } = splitNote(model.note);
+  for (const line of requires.filter((r) => r.trim() === "")) {
+    lose("model", `empty note line not written: ${line}`);
+  }
   const document: OssieDocument = {
     version: OSSIE_VERSION,
     name: model.name,
     ...(description ? { description } : {}),
-    ...(requires.length > 0 ? { requires } : {}),
+    ...(requires.filter((r) => r.trim() !== "").length > 0
+      ? { requires: requires.filter((r) => r.trim() !== "") }
+      : {}),
     ontology,
   };
   return { document, losses, constraintSpecs: specs };
@@ -250,7 +270,8 @@ function isPlainBuiltin(ot: ObjectType): boolean {
   return ot.kind === "value" && isOssieBuiltinValueType(ot.name)
     && ot.dataType?.name === OSSIE_BUILTIN_VALUE_TYPES[ot.name]
     && ot.dataType.length === undefined && ot.dataType.scale === undefined
-    && !ot.definition && !ot.valueConstraint && !ot.note;
+    && !ot.definition && !ot.valueConstraint && !ot.note && ot.defaultValue === undefined
+    && ot.aliases.length === 0 && !ot.independent && !ot.sourceContext && !ot.cardinality;
 }
 
 /** Letters, digits and `_` only, not starting with a digit: what `Entity.rel` parses. */
@@ -338,11 +359,17 @@ function roleOrder(
   let order = all;
   let lastFixed = false;
 
-  const dot = ft.name.indexOf(".");
-  const x = dot > 0 ? ft.name.slice(0, dot) : undefined;
-  const xRole = x === undefined
-    ? -1
-    : ft.roles.findIndex((r) => model.getObjectType(r.playerId)?.name === x);
+  // `X.rel`: X is the longest player name the fact type name begins with,
+  // followed by a dot, so a concept named with a dot is found whole.
+  let xRole = -1;
+  let xLength = -1;
+  ft.roles.forEach((r, i) => {
+    const player = model.getObjectType(r.playerId)?.name ?? "";
+    if (ft.name.startsWith(`${player}.`) && player.length > xLength) {
+      xRole = i;
+      xLength = player.length;
+    }
+  });
   if (xRole >= 0) {
     order = first(xRole);
   } else if (n === 2 && identifierRole(ft, model) !== undefined) {
@@ -445,6 +472,9 @@ function writeRelationship(
     }
   }
 
+  if (ucs.length === 0) {
+    lose(element, "has no uniqueness; Ossie's set semantics give it one spanning every role");
+  }
   for (const c of ft.internalConstraints) {
     if (covered.has(c.id!)) continue;
     if (c.type === "internal_uniqueness" && (c.roleIds.length === n || n === 1)) continue; // implied
@@ -453,8 +483,9 @@ function writeRelationship(
   }
 
   const readings = ft.readings.map((r) => reading(r.template, w, nameOf, element, lose));
-  const { requires, rest } = splitNoteLines(ft.note);
+  const { requires, derivedBy: noteDerivedBy, rest } = splitNoteLines(ft.note);
   for (const line of rest) lose(element, `note line not written: ${line}`);
+  for (const line of noteDerivedBy) lose(element, `note line not written: derived_by: ${line}`);
   const derivation = ft.derivation;
   if (derivation?.kind === "semiderived") {
     lose(element, "semiderived rule written as fully derived");
@@ -549,7 +580,19 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
       lose(ot.name, "data type length or scale not written");
     }
     const constraintItems = valueConstraintItems(ot, name, lose);
-    const requires = [...constraintItems, ...noteRequires];
+    const requires = [...constraintItems];
+    const intended = readValueShapes(name, constraintItems);
+    for (const line of noteRequires) {
+      // Kept only if, read back after the constraint's own items, it stays
+      // text and leaves the constraint as it is; else it would merge into
+      // the constraint or replace it.
+      const after = readValueShapes(name, [...requires, line]);
+      if (sameShapes(after, intended) && after.unrecognized.includes(line)) requires.push(line);
+      else {lose(
+          ot.name,
+          `note line not written, it would read back as a constraint: requires: ${line}`,
+        );}
+    }
     return {
       ...base,
       type: "ValueType",
@@ -567,11 +610,31 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
   if (!identified && !identifiedBySupertype) {
     lose(ot.name, `no identifier Ossie can state; reference mode ${ot.referenceMode} not written`);
   }
-  if (ctx.identifyBy?.length === 1 && ot.referenceMode !== ctx.identifyBy[0]) {
+  // The importer reads a single identifier's name back as the reference
+  // mode, and gives a composite one `<snake_name>_id`; any other is lost.
+  const readBack = ctx.identifyBy?.length === 1 ? ctx.identifyBy[0] : `${snakeCase(name)}_id`;
+  if (identified && ot.referenceMode !== readBack) {
     lose(ot.name, `reference mode ${ot.referenceMode} not written`);
   }
-  const derivedBy = ctx.supertypes?.derivedBy ?? noteDerivedBy;
-  const requires = [...ctx.mandatory.map((rel) => `${name}.${rel}`), ...noteRequires];
+  // A subtype's derived_by is its subtype facts' defining rule on import,
+  // so note lines there would become one; the importer only writes them
+  // into the note of an entity with no supertype.
+  const hasSupertypes = (ctx.supertypes?.names.length ?? 0) > 0;
+  if (hasSupertypes) {
+    for (const line of noteDerivedBy) lose(ot.name, `note line not written: derived_by: ${line}`);
+  }
+  const derivedBy = hasSupertypes ? ctx.supertypes?.derivedBy ?? [] : noteDerivedBy;
+  const ownRelationships = new Set(ctx.relationships.map((r) => r.name));
+  const requires = [...ctx.mandatory.map((rel) => `${name}.${rel}`)];
+  for (const line of noteRequires) {
+    const rel = readMandatoryShape(name, line);
+    if (rel !== undefined && ownRelationships.has(rel)) {
+      lose(
+        ot.name,
+        `note line not written, it would read back as a mandatory role: requires: ${line}`,
+      );
+    } else requires.push(line);
+  }
   return {
     ...base,
     type: "EntityType",
@@ -624,14 +687,22 @@ function subtypeLinks(
         "identification through the supertype not written as it is",
       );
     }
-    entry.names.push(nameOf(sf.supertypeId));
-    if (sf.definingRule) {
-      const items = splitDerivation(sf.definingRule.expression);
-      if (entry.derivedBy === undefined) entry.derivedBy = items;
-      else if (entry.derivedBy.join("\n") !== items.join("\n")) {
-        lose(sub, "a second, different defining rule not written");
-      }
+    const items = sf.definingRule ? splitDerivation(sf.definingRule.expression) : [];
+    if (entry.names.length === 0) {
+      entry.derivedBy = items;
+    } else if ((entry.derivedBy ?? []).join("\n") !== items.join("\n")) {
+      // The importer gives one concept-level derived_by to every subtype
+      // fact, so supertypes whose rules differ -- one with a rule, one
+      // without included -- cannot come back as they were.
+      lose(sub, "its subtype facts' defining rules differ; only the first is written");
     }
+    if (sf.definingRule?.kind === "semiderived") {
+      lose(sub, "semiderived defining rule written as fully derived");
+    }
+    if (sf.definingRule?.storage === "derived_and_stored") {
+      lose(sub, "stored defining rule written as on request");
+    }
+    entry.names.push(nameOf(sf.supertypeId));
     out.set(sf.subtypeId, entry);
   }
   return out;
@@ -640,6 +711,13 @@ function subtypeLinks(
 // ---------------------------------------------------------------------------
 // Text
 // ---------------------------------------------------------------------------
+
+function sameShapes(
+  a: { values: readonly string[]; ranges: readonly unknown[]; },
+  b: { values: readonly string[]; ranges: readonly unknown[]; },
+): boolean {
+  return JSON.stringify([a.values, a.ranges]) === JSON.stringify([b.values, b.ranges]);
+}
 
 function splitDerivation(expression: string): string[] {
   return expression.split(DERIVATION_ITEM_SEPARATOR).filter((e) => e.trim().length > 0);
@@ -654,9 +732,12 @@ function splitNoteLines(note: string | undefined): {
   const derivedBy: string[] = [];
   const rest: string[] = [];
   for (const line of (note ?? "").split("\n")) {
-    if (line.startsWith(REQUIRES_NOTE_PREFIX)) {
+    // An empty item is refused by the importer, so a bare prefix is a loss.
+    if (line.startsWith(REQUIRES_NOTE_PREFIX) && line.slice(REQUIRES_NOTE_PREFIX.length).trim()) {
       requires.push(line.slice(REQUIRES_NOTE_PREFIX.length));
-    } else if (line.startsWith(DERIVED_BY_NOTE_PREFIX)) {
+    } else if (
+      line.startsWith(DERIVED_BY_NOTE_PREFIX) && line.slice(DERIVED_BY_NOTE_PREFIX.length).trim()
+    ) {
       derivedBy.push(line.slice(DERIVED_BY_NOTE_PREFIX.length));
     } else if (line.trim().length > 0) rest.push(line);
   }

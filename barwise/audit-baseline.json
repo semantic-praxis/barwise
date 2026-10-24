@@ -250,6 +250,11 @@
       "status": "accepted-benign",
       "note": "doc-comment example: both comments cite the same n-ary fact type (barwise-kgh) to explain the mapping and the routing; repetition is not a decision that must agree",
       "detail": "\"Encounter has Diagnosis at DiagnosisRank\" in packages/core/src/mapping/RelationalMapper.ts, packages/formats/src/ddl/constraintRouting.ts"
+    },
+    "union:efe33cd8a63e": {
+      "status": "accepted-benign",
+      "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
+      "detail": "ConceptualDataTypeName restated as record in packages/formats/src/ossie/writeOssie.ts"
     }
   }
 }
