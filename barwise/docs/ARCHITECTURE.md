@@ -8,9 +8,52 @@ import/export shipped (`@barwise/formats`) despite the non-goal below;
 dbt, the MCP server, and the CLI are in-repo packages, not separate
 repositories; and the dependency gate is `.dependency-cruiser.cjs`,
 not per-package tsconfig checks. For current structure, read the root
-`CLAUDE.md` and each package's `CLAUDE.md` (barwise-873).
+`CLAUDE.md` and each package's `CLAUDE.md` (barwise-873). The first
+section below, "Current architecture", is the exception: it is current,
+generated from the ADRs and the package graph, and checked in CI.
 
 **Last Updated:** February 2026
+
+---
+
+<!-- BEGIN regen:architecture -- generated; edit the ADRs or INTENDED, then run npm run regen:architecture -->
+
+## Current architecture
+
+This section is current and generated, from the ADRs in `docs/adr/` and
+`INTENDED` in `barwise/scripts/lib/intended.cjs`; `npm run
+check:architecture` fails when it is stale. Everything below it is the
+February 2026 design record.
+
+### Decisions
+
+Architecture:
+
+- [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17
+- [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23
+
+Process:
+
+- [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27
+
+### Package graph
+
+Each package and the internal packages it may import:
+
+- `core`: none
+- `diagram`: core
+- `diagram-ui`: diagram
+- `llm`: core
+- `code-analysis`: core
+- `dbt`: core
+- `formats`: core
+- `learn`: core
+- `promptlab`: core, llm, learn
+- `cli`: core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn, promptlab
+- `mcp`: core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn
+- `vscode`: core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp
+
+<!-- END regen:architecture -->
 
 ---
 
@@ -807,11 +850,7 @@ orm-modeler/
 ├── docs/
 │   ├── ARCHITECTURE.md          # this file
 │   ├── CONTRIBUTING.md
-│   ├── metamodel.md             # detailed metamodel documentation
-│   └── decisions/               # Architecture Decision Records
-│       ├── 001-yaml-over-xml.md
-│       ├── 002-multi-file-models.md
-│       └── 003-llm-as-import-boundary.md
+│   └── metamodel.md             # detailed metamodel documentation
 │
 ├── examples/                    # Example ORM projects
 │   └── order-management/
@@ -1002,8 +1041,6 @@ NORMA uses XML. We use YAML because:
 - YAML diffs are meaningful in pull requests. XML diffs are noisy.
 - YAML supports inline comments, which are valuable for documenting modeling decisions.
 - The trade-off is that YAML lacks a schema validation ecosystem as mature as XML's XSD. We compensate with a JSON Schema validator applied on load.
-
-See `docs/decisions/001-yaml-over-xml.md`.
 
 ### 8.2 Why a monorepo with separate packages
 

@@ -987,6 +987,9 @@ function remapConstraintIds<C extends import("../model/Constraint.js").Constrain
         operands: c.operands.map((o) => remapJoinOperand(o, merged, idMap)),
       };
     }
+    if (c.type === "join_ring") {
+      return { ...c, operand: remapJoinOperand(c.operand, merged, idMap) };
+    }
     return c;
   });
 }

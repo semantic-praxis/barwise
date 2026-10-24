@@ -64,6 +64,7 @@
     "regen:tutorial": "node scripts/regen-tutorial.mjs",
     "regen:builtins": "node scripts/regen-builtin-artifacts.mjs",
     "regen:references": "node scripts/regen-references.mjs",
+    "regen:architecture": "node scripts/regen-architecture.mjs",
     "trial:generate": "node trial/lib/run.mjs generate",
     "trial:offline": "node trial/lib/run.mjs offline",
     "trial:keyed": "node trial/lib/run.mjs keyed",

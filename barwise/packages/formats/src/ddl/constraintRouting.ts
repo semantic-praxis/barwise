@@ -376,6 +376,8 @@ function constraintPseudocode(c: Constraint, ft: FactType | undefined, model: Or
       return `projected tuples of all join-path operands are identical`;
     case "join_exclusion":
       return `no tuple appears in the projection of more than one join-path operand`;
+    case "join_ring":
+      return `the pairs the join path projects are ${c.ringType.replace("_", " ")}`;
     default:
       return `${(c as Constraint).type} holds over ${fact}`;
   }

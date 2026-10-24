@@ -1,6 +1,6 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstreams 1-2 implemented 2026-10-24 (one package graph; the ADR convention and its checks); 3-5 not yet
+Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4-5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-24
@@ -13,7 +13,8 @@ barwise/packages/mcp/CLAUDE.md, barwise/docs/adr/metamodel-evolution-policy.md,
 barwise/docs/adr/constraint-coverage-policy.md,
 barwise/docs/adr/package-graph-authority.md, barwise/packages/llm/CLAUDE.md,
 barwise/packages/promptlab/CLAUDE.md, barwise/packages/promptlab/evals/suite.yaml,
-+barwise/scripts/regen-architecture.mjs, barwise/scripts/check-architecture.mjs,
+barwise/scripts/regen-architecture.mjs, barwise/scripts/lib/architecture-section.mjs,
+.claude/skills/steward/SKILL.md, barwise/scripts/check-architecture.mjs,
 barwise/review-tiers.json, .claude/skills/spec-writer/template.adr.md,
 .claude/skills/pr-review/checklist.md, barwise/scripts/tests/,
 barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md
@@ -325,7 +326,7 @@ edge and sees red through `mutate.mjs`.
 - Write `package-graph-authority.md` and point the resolved heading above
   at it.
 
-### 3. The generated section in ARCHITECTURE.md (provisional: not yet grounded)
+### 3. The generated section in ARCHITECTURE.md
 
 `regen-architecture.mjs` writes the ADR index and a rendering of
 `INTENDED` between markers at the top of ARCHITECTURE.md, and the check
@@ -339,11 +340,17 @@ none of which has ever existed). Below the markers, `git diff` must show
 those lines and nothing else. `plan-scope-check.spec.md` WS4 exempts this partial writer
 from marking ARCHITECTURE.md generated.
 
-Not grounded: what becomes of section 8's six historical decisions. 8.4
-("read-only diagrams") no longer holds, since the canvas saves layouts
-and views; 8.2's enforcement moved from tsconfig to dependency-cruiser.
-Which of the rest still hold, and whether any deserve an ADR, is for the
-grounding of this workstream.
+Grounded 2026-10-24, section 8's six historical decisions: 8.1 (YAML over
+XML), 8.3 (the separate LLM package), 8.5 (multi-file models with explicit
+context mapping) and 8.6 (migration on load; MCP and VS Code write 3.0 on
+save) still hold. 8.2 holds, with its enforcement moved from tsconfig to
+dependency-cruiser, which ADR `package-graph-authority` records. 8.4
+("read-only diagrams") no longer holds: the canvas saves layouts and views.
+Whether any of them gets an ADR is WS4's question, taken by the owner one
+at a time; WS3 leaves section 8 as the record it is. The section renders
+as lists, not tables, because dprint realigns table padding and the check
+compares byte for byte; one renderer (`lib/architecture-section.mjs`)
+serves the writer and the check.
 
 ### 4. Backfill ADRs one at a time (provisional: the owner takes each in turn)
 

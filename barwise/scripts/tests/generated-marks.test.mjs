@@ -26,7 +26,7 @@ const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "
  * What each regen:* script writes. A script missing here fails the first
  * test, so a new regenerator cannot ship without saying where its output
  * goes -- and then the second test asks for the mark. A regenerator that
- * writes only a section of a hand-written file would be listed in
+ * writes only a section of a hand-written file is listed in
  * SECTION_WRITERS instead: marking the whole file would hide its
  * hand-written body from diffs and from `plan-scope`.
  */
@@ -36,7 +36,9 @@ const REGEN = {
   "regen:builtins": ["barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts"],
   "regen:references": ["barwise/packages/promptlab/evals/*.reference.orm.yaml"],
 };
-const SECTION_WRITERS = {};
+const SECTION_WRITERS = {
+  "regen:architecture": ["barwise/docs/ARCHITECTURE.md"],
+};
 
 /** Tracked files an output entry stands for: a directory, a file, or one `*` in the last segment. */
 function filesOf(output) {
@@ -69,6 +71,15 @@ test("generated marks: every regen:* output is marked linguist-generated", () =>
       assert.ok(files.length > 0, `${script}: ${output} matches no tracked file`);
       const marked = generatedPaths(files, REPO);
       assert.deepEqual(files.filter((f) => !marked.has(f)), [], `${script}: unmarked output`);
+    }
+  }
+});
+
+test("generated marks: a file a regenerator writes only a section of is tracked and not marked", () => {
+  for (const [script, files] of Object.entries(SECTION_WRITERS)) {
+    for (const f of files) {
+      assert.ok(tracked.includes(f), `${script}: ${f} is not a tracked file`);
+      assert.ok(!generatedPaths([f], REPO).has(f), `${script}: ${f} is marked generated`);
     }
   }
 });

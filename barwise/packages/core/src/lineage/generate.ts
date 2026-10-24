@@ -275,7 +275,12 @@ export function generateModelLineage(
  * whether that was intended (barwise-869).
  */
 const GENERIC_LABELED: Record<
-  "value_comparison" | "cardinality" | "join_subset" | "join_equality" | "join_exclusion",
+  | "value_comparison"
+  | "cardinality"
+  | "join_subset"
+  | "join_equality"
+  | "join_exclusion"
+  | "join_ring",
   true
 > = {
   value_comparison: true,
@@ -283,6 +288,7 @@ const GENERIC_LABELED: Record<
   join_subset: true,
   join_equality: true,
   join_exclusion: true,
+  join_ring: true,
 };
 
 /**

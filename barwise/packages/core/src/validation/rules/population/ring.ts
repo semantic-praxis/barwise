@@ -135,10 +135,18 @@ const PROPERTY_CHECKS: Record<RingProperty, (r: RingRelation) => RingFinding[]> 
  * with opposite verdicts, which is why they share it.
  */
 function composed(r: RingRelation, reject: (a: string, c: string) => boolean): RingFinding[] {
+  // Indexed by first element, so the walk visits only the pairs that
+  // compose: a join path can project far more pairs than one population.
+  const from = new Map<string, string[]>();
+  for (const [x, y] of r.pairs) {
+    const outs = from.get(x);
+    if (outs) outs.push(y);
+    else from.set(x, [y]);
+  }
   const findings: RingFinding[] = [];
   for (const [a, b] of r.pairs) {
-    for (const [b2, c] of r.pairs) {
-      if (b === b2 && reject(a, c)) findings.push({ a, b, c });
+    for (const c of from.get(b) ?? []) {
+      if (reject(a, c)) findings.push({ a, b, c });
     }
   }
   return findings;
@@ -250,3 +258,46 @@ export function ringViolationsFor(
   }
   return diagnostics;
 }
+
+/**
+ * The same property checks over pairs a join path projects
+ * (`docs/specs/join-ring-constraint.spec.md`), worded by the constraint's
+ * span: a projected pair comes from a chain of instances across fact
+ * types, so there is no one instance or population to name. Rendered
+ * sentences, one per finding, for `population/join-ring-violation`.
+ */
+export function joinRingViolationTexts(
+  ringType: RingType,
+  pairs: ReadonlyArray<readonly [string, string]>,
+  span: string,
+): string[] {
+  const seen = new Set(pairs.map(([a, b]) => `${a}\0${b}`));
+  const relation: RingRelation = {
+    stated: pairs.map(([a, b]) => ({ instanceId: "", a, b })),
+    pairs,
+    has: (a, b) => seen.has(`${a}\0${b}`),
+  };
+  // The first finding per property, as the other join kinds report their
+  // first offending tuple: a projected pair set can be large, and one
+  // finding names the constraint as broken.
+  return RING_PROPERTIES[ringType].flatMap((property) =>
+    PROPERTY_CHECKS[property](relation).slice(0, 1).map((v) =>
+      `Join ${ringType.replace("_", " ")} ring constraint over ${span} is violated: `
+      + `${JOIN_DETAIL[property](v)}.`
+    )
+  );
+}
+
+/** What each property's finding says about projected pairs. */
+const JOIN_DETAIL: Record<RingProperty, (v: RingFinding) => string> = {
+  irreflexive: (v) => `the path relates "${v.a}" to itself`,
+  antisymmetric: (v) =>
+    `the path relates ${v.a} to ${v.b} and ${v.b} to ${v.a}, and ${v.a} != ${v.b}`,
+  symmetric: (v) => `the path relates ${v.a} to ${v.b} but not ${v.b} to ${v.a}`,
+  purely_reflexive: (v) => `the path relates ${v.a} to ${v.b}, and only self-loops are allowed`,
+  transitive: (v) =>
+    `the path relates ${v.a} to ${v.b} and ${v.b} to ${v.c} but not ${v.a} to ${v.c}`,
+  intransitive: (v) =>
+    `the path relates ${v.a} to ${v.b}, ${v.b} to ${v.c}, and also ${v.a} to ${v.c}`,
+  acyclic: (v) => `a cycle involves "${v.a}" and "${v.b}"`,
+};

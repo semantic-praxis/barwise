@@ -590,13 +590,15 @@ function constraintTypeKey(
     // Join constraints carry inline role paths whose role ids span fact
     // types, so they key by their (stable) role ids rather than by the
     // owner fact type's positional index. Subset is ordered; equality and
-    // exclusion are an unordered set of operand paths.
+    // exclusion are an unordered set of operand paths; a ring has one.
     case "join_subset":
       return `JSUB:${operandKey(c.subset)}::${operandKey(c.superset)}`;
     case "join_equality":
       return `JEQ:${c.operands.map(operandKey).sort().join("::")}`;
     case "join_exclusion":
       return `JEXC:${c.operands.map(operandKey).sort().join("::")}`;
+    case "join_ring":
+      return `JRING:${operandKey(c.operand)}:${c.ringType}`;
   }
 }
 

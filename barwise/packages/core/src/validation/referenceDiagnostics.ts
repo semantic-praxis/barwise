@@ -38,7 +38,7 @@ import { report, RULE_ID } from "./ruleId.js";
 import { constraintElementId, constraintSpan, spanPhrase } from "./span.js";
 
 /** The constraint kinds whose role references live in a join path. */
-type JoinConstraintType = "join_subset" | "join_equality" | "join_exclusion";
+type JoinConstraintType = "join_subset" | "join_equality" | "join_exclusion" | "join_ring";
 
 /**
  * The invalid-role ids, every one of which renders from (factTypeName,
@@ -140,6 +140,7 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
         constraint.type === "join_subset"
         || constraint.type === "join_equality"
         || constraint.type === "join_exclusion"
+        || constraint.type === "join_ring"
       ) {
         return joinStepDiagnostic(
           joinOperandsOf(constraint),

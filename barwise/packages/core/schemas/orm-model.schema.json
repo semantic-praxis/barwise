@@ -260,6 +260,20 @@
         }
       }
     },
+    "ring_type_def": {
+      "type": "string",
+      "enum": [
+        "irreflexive",
+        "asymmetric",
+        "antisymmetric",
+        "intransitive",
+        "acyclic",
+        "symmetric",
+        "transitive",
+        "purely_reflexive"
+      ],
+      "description": "The ring property being constrained."
+    },
     "cardinality_range_def": {
       "type": "object",
       "additionalProperties": false,
@@ -872,18 +886,7 @@
               "description": "Second role id."
             },
             "ring_type": {
-              "type": "string",
-              "enum": [
-                "irreflexive",
-                "asymmetric",
-                "antisymmetric",
-                "intransitive",
-                "acyclic",
-                "symmetric",
-                "transitive",
-                "purely_reflexive"
-              ],
-              "description": "The ring property being constrained."
+              "$ref": "#/definitions/ring_type_def"
             }
           },
           "required": [
@@ -1466,6 +1469,39 @@
           "required": [
             "type",
             "operands",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "join_ring"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "operand": {
+              "$ref": "#/definitions/join_operand_def"
+            },
+            "ring_type": {
+              "$ref": "#/definitions/ring_type_def"
+            }
+          },
+          "required": [
+            "type",
+            "operand",
+            "ring_type",
             "id"
           ],
           "additionalProperties": false
