@@ -5244,7 +5244,6 @@ const INTENDED_CJS = "barwise/scripts/lib/intended.cjs";
 
 /** Each planted disagreement: file, anchor, replacement, the line it must report. */
 const ARCH_DISAGREEMENTS = [
-  // Both directions of an edge disagreement.
   // A dependency added to a commented row: its untouched wraps still read
   // as its comment, so the new edge is compared, not refused.
   [
@@ -5253,6 +5252,7 @@ const ARCH_DISAGREEMENTS = [
     "@barwise/dbt             (core, llm)",
     /CLAUDE\.md draws dbt -> llm, INTENDED does not/,
   ],
+  // Both directions of an edge disagreement.
   [
     "CLAUDE.md",
     CLAUDE_LLM,
@@ -5552,8 +5552,8 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
           `${MCP_ROW}  -- the server\n  |   lost (core)`,
           new RegExp(
             `under @barwise/mcp must start right of column ${
-              MCP_ROW.indexOf("(")
-            }, and this one starts at 6`,
+              MCP_ROW.indexOf("(") + 1
+            }, and this one starts at column 7`,
           ),
         ],
         // A drawing line ends the comment: text after it continues nothing.
@@ -5590,6 +5590,18 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
       refused(r, /the graph block line ".*" is not one the grammar allows/);
       assert.match(r.stderr, line);
     }
+    // A malformed row after a commented row is not blamed on that comment.
+    const dash = archPlanted(
+      dir,
+      "CLAUDE.md",
+      (s) =>
+        s.replace(
+          "(core)  -- connector package: registers\n  |                                        the dbt",
+          "(core)  \u2014 connector package: registers\n  |                                        the dbt",
+        ),
+    );
+    refused(dash, /\(core\)  \u2014 connector package/);
+    assert.doesNotMatch(dash.stderr, /must start right of column/);
     refused(
       archPlanted(
         dir,

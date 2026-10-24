@@ -74,11 +74,13 @@ const ROOT = new RegExp(String.raw`^(${NAME})\s+${LIST}${COMMENT}`, "d");
 // At most two spaces in: a connector indented further is a nested child,
 // which the grammar does not draw.
 const ROW = new RegExp(String.raw`^\s{0,2}\|---\s+(${NAME})\s+${LIST}${COMMENT}`, "d");
-const DRAWING = /^[\s|^]*$/;
+// The drawing characters; a line of nothing else is a drawing line.
+const DRAWN = /^[\s|^]*/;
 const GRAMMAR = "the root line (`name (no internal deps)`); rows (`|--- name (a, b)`, at most"
   + " two spaces in, package names separated by commas); either may end with ` -- comment`,"
   + " and the comment may wrap onto the lines below it, whose text starts right of the"
-  + " column where that row's list opens; and drawing lines of `|` and `^`";
+  + " column where that row's list opens, until a drawing line ends it; and drawing lines"
+  + " of `|` and `^`. Columns count from 1, as an editor does";
 
 /** What a root or row match leaves open: its name and list column, if it has a comment. */
 const opened = (m) => (m[3] === undefined ? null : { name: m[1], at: m.indices[2][0] - 1 });
@@ -114,7 +116,7 @@ function graphLines(claudeMd) {
       const m = ROOT.exec(line);
       if (!m) {
         throw new Error(
-          `the graph block must open with the root line, not "${line.trim()}"; it allows ${GRAMMAR}`,
+          `the graph block must open with the root line, not "${line.trimEnd()}"; it allows ${GRAMMAR}`,
         );
       }
       out.push(listed(m[1], m[2]));
@@ -128,14 +130,18 @@ function graphLines(claudeMd) {
       continue;
     }
     // Text starts after the drawing characters, so a wrap may sit beside `^`.
-    const indent = /^[\s|^]*/.exec(line)[0].length;
-    if (comment !== null && indent < line.length && indent > comment.at) continue;
-    const under = comment === null
-      ? ""
-      : `; a comment line under ${comment.name} must start right of column ${comment.at}`
-        + `, and this one starts at ${indent}`;
+    const indent = DRAWN.exec(line)[0].length;
+    const drawing = indent === line.length;
+    if (comment !== null && !drawing && indent > comment.at) continue;
+    const open = comment;
     comment = null;
-    if (DRAWING.test(line)) continue;
+    if (drawing) continue;
+    // The column hint only for a line meant as comment text: a malformed
+    // row would otherwise be blamed on the previous row's comment.
+    const under = open === null || /^\s{0,2}\|---/.test(line)
+      ? ""
+      : `; a comment line under ${open.name} must start right of column ${open.at + 1}`
+        + `, and this one starts at column ${indent + 1}`;
     throw new Error(
       `the graph block line "${line.trimEnd()}" is not one the grammar allows${under}: ${GRAMMAR}`,
     );
