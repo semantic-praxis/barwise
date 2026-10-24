@@ -309,26 +309,55 @@ export function diffModels(
     subtype: { id: sf.subtypeId, name: playerName(model, sf.subtypeId, other) },
     supertype: { id: sf.supertypeId, name: playerName(model, sf.supertypeId, other) },
   });
-  const existingSfs = new Map(
-    existing.subtypeFacts.map((sf) => [sfKey(sf, existing, incoming), sf]),
-  );
-  const incomingSfs = new Map(
-    incoming.subtypeFacts.map((sf) => [sfKey(sf, incoming, existing), sf]),
-  );
+  // Grouped, not mapped: a lenient load can hold two subtype facts over
+  // one pair, and `structural/duplicate-subtype-fact` reports them. A plain
+  // map kept the second and dropped the first, so a merge wrote one and
+  // the rule had nothing left to report (barwise-m9b). Within a group the
+  // facts pair by id, then in order, and what is left over is removed or
+  // added.
+  const byPair = (model: OrmModel, other: OrmModel) => {
+    const groups = new Map<string, SubtypeFact[]>();
+    for (const sf of model.subtypeFacts) {
+      const key = sfKey(sf, model, other);
+      groups.set(key, [...(groups.get(key) ?? []), sf]);
+    }
+    return groups;
+  };
+  const existingSfs = byPair(existing, incoming);
+  const incomingSfs = byPair(incoming, existing);
 
-  for (const [key, sf] of existingSfs) {
-    const match = incomingSfs.get(key);
-    if (!match) {
-      deltas.push({
-        kind: "removed",
-        elementType: "subtype_fact",
-        ...sfRefs(sf, existing, incoming),
-        existing: sf,
-        changes: [],
-        changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("removed", [], "subtype_fact"),
-      });
-    } else {
+  const sfRemoved = (sf: SubtypeFact): ModelDelta => ({
+    kind: "removed",
+    elementType: "subtype_fact",
+    ...sfRefs(sf, existing, incoming),
+    existing: sf,
+    changes: [],
+    changeDescriptions: [],
+    breakingLevel: classifyBreakingLevel("removed", [], "subtype_fact"),
+  });
+  const sfAdded = (sf: SubtypeFact): ModelDelta => ({
+    kind: "added",
+    elementType: "subtype_fact",
+    ...sfRefs(sf, incoming, existing),
+    incoming: sf,
+    changes: [],
+    changeDescriptions: [],
+    breakingLevel: classifyBreakingLevel("added", [], "subtype_fact"),
+  });
+
+  for (const [key, group] of existingSfs) {
+    const candidates = [...(incomingSfs.get(key) ?? [])];
+    const take = (sf: SubtypeFact): SubtypeFact | undefined => {
+      const at = candidates.findIndex((c) => c.id === sf.id);
+      return at >= 0 ? candidates.splice(at, 1)[0] : undefined;
+    };
+    const byId = new Map(group.map((sf) => [sf, take(sf)]));
+    for (const sf of group) {
+      const match = byId.get(sf) ?? candidates.shift();
+      if (!match) {
+        deltas.push(sfRemoved(sf));
+        continue;
+      }
       const changes = diffSubtypeFact(sf, match);
       const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
       deltas.push({
@@ -342,20 +371,11 @@ export function diffModels(
         breakingLevel: classifyBreakingLevel(kind, changes, "subtype_fact"),
       });
     }
+    for (const sf of candidates) deltas.push(sfAdded(sf));
   }
 
-  for (const [key, sf] of incomingSfs) {
-    if (!existingSfs.has(key)) {
-      deltas.push({
-        kind: "added",
-        elementType: "subtype_fact",
-        ...sfRefs(sf, incoming, existing),
-        incoming: sf,
-        changes: [],
-        changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("added", [], "subtype_fact"),
-      });
-    }
+  for (const [key, group] of incomingSfs) {
+    if (!existingSfs.has(key)) { for (const sf of group) deltas.push(sfAdded(sf)); }
   }
 
   // --- Objectified fact types ---

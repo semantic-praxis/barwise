@@ -352,9 +352,23 @@ export function mergeModels(
       // `structural/subtype-dangling-*` could report it (barwise-997).
       const dangling = isDanglingPlayer(existing, incoming, chosen.subtypeId)
         || isDanglingPlayer(existing, incoming, chosen.supertypeId);
-      if (!dangling) continue;
+      // The same holds for a pair its own model already repeated (a lenient
+      // load): `structural/duplicate-subtype-fact` reports it, and dropping
+      // one here is what left nothing to report (barwise-m9b). A repeat the
+      // merge itself creates, two pairs resolving onto one, is still dropped.
+      const source = chosen === delta.incoming ? incoming : existing;
+      const repeated = source.subtypeFacts.some((sf) =>
+        sf !== chosen && subtypePairKey(sf) === subtypePairKey(chosen)
+      );
+      if (!dangling && !repeated) continue;
+      const held = merged.subtypeFacts.some((sf) => sf.id === chosen.id);
       merged.addSubtypeFact(
-        { ...toSubtypeFactConfig(chosen), id: undefined, subtypeId, supertypeId },
+        {
+          ...toSubtypeFactConfig(chosen),
+          id: dangling || held ? undefined : chosen.id,
+          subtypeId,
+          supertypeId,
+        },
         { skipPlayerValidation: true },
       );
       continue;
