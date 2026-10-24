@@ -69,15 +69,6 @@ export class SubtypeFact extends ModelElement {
 }
 
 /**
- * Project a SubtypeFact back to the config shape that constructed it,
- * listing every field once -- the `toObjectTypeConfig` convention
- * (barwise-927) applied to the element kinds the merge started carrying
- * through in barwise-937. A caller that rebuilds a subtype fact spreads
- * this instead of hand-copying its fields, and the `Complete<...>`
- * annotation makes the next field added to `SubtypeFactConfig` a
- * compile error here until it is listed.
- */
-/**
  * What makes two subtype facts the same relationship: the subtype and
  * the supertype they relate. One key, read by `OrmModel.addSubtypeFact`
  * when it refuses a repeat and by `structural/duplicate-subtype-fact`
@@ -89,6 +80,16 @@ export function subtypePairKey(
 ): string {
   return `${sf.subtypeId}\u0000${sf.supertypeId}`;
 }
+
+/**
+ * Project a SubtypeFact back to the config shape that constructed it,
+ * listing every field once -- the `toObjectTypeConfig` convention
+ * (barwise-927) applied to the element kinds the merge started carrying
+ * through in barwise-937. A caller that rebuilds a subtype fact spreads
+ * this instead of hand-copying its fields, and the `Complete<...>`
+ * annotation makes the next field added to `SubtypeFactConfig` a
+ * compile error here until it is listed.
+ */
 
 export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
   const config: Complete<SubtypeFactConfig> = {

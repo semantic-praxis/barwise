@@ -1,10 +1,16 @@
-import { type Constraint, roleIdsOf, subtypeFactIdsOf } from "../../model/Constraint.js";
+import {
+  type Constraint,
+  isOverSubtypes,
+  roleIdsOf,
+  subtypeFactIdsOf,
+} from "../../model/Constraint.js";
 import { isScopedView } from "../../model/DiagramLayout.js";
 import type { FactType } from "../../model/FactType.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import { type SubtypeFact, subtypePairKey } from "../../model/SubtypeFact.js";
+import { subtypePairKey } from "../../model/SubtypeFact.js";
+import { groupRepeats } from "../../util/groupRepeats.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
 
@@ -75,8 +81,8 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
  * (`docs/specs/model-invariants.spec.md`). The 3.0 loader refuses one; a
  * 2.0 file, a model built in code and a merge do not, and before this rule
  * a merge wrote a file the 3.0 loader then refused to read back
- * (barwise-b2s). Both read `OrmModel.constraintsSharingAnId`, so they
- * agree on what a repeat is. Reported once per id, naming every holder.
+ * (barwise-b2s). Both group through `groupRepeats`, so they agree on what
+ * a repeat is. Reported once per id, naming every holder.
  *
  * The diagnostic's element is the shared id, and an editor that maps ids
  * to YAML nodes can place it on only one of the holders; the message names
@@ -102,10 +108,9 @@ function checkDuplicateConstraintIds(model: OrmModel): Diagnostic[] {
  */
 function describeHolder(c: Constraint, ft: FactType | undefined): string {
   if (ft) return `${c.type} in fact type "${ft.name}"`;
-  const subtypeFacts = subtypeFactIdsOf(c);
-  return subtypeFacts.length > 0
-    ? `${c.type} over subtype facts ${subtypeFacts.join(", ")}`
-    : `${c.type} over roles ${roleIdsOf(c).join(", ")}`;
+  if (isOverSubtypes(c)) return `${c.type} over subtype facts ${subtypeFactIdsOf(c).join(", ")}`;
+  const roles = roleIdsOf(c);
+  return roles.length > 0 ? `${c.type} over roles ${roles.join(", ")}` : `${c.type} over no roles`;
 }
 
 /**
@@ -120,16 +125,8 @@ function describeHolder(c: Constraint, ft: FactType | undefined): string {
  * still lets the duplicate be seen.
  */
 function checkDuplicateSubtypeFacts(model: OrmModel): Diagnostic[] {
-  const byPair = new Map<string, SubtypeFact[]>();
-  for (const sf of model.subtypeFacts) {
-    const key = subtypePairKey(sf);
-    const list = byPair.get(key);
-    if (list) list.push(sf);
-    else byPair.set(key, [sf]);
-  }
   const nameOf = (id: string) => model.getObjectType(id)?.name ?? id;
-  return [...byPair.values()]
-    .filter((list) => list.length > 1)
+  return [...groupRepeats(model.subtypeFacts, subtypePairKey).values()]
     .map((list) =>
       report(
         RULE_ID.duplicateSubtypeFact,

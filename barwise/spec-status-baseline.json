@@ -104,7 +104,7 @@
       "commits": [
         "88c8d466"
       ],
-      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here is model-invariants workstream 1 (barwise-b2s): it adds OrmModel.constraintsSharingAnId and two structural rules (duplicate constraint ids, duplicate subtype facts), files this spec names because its workstream 1 adds subject areas to OrmModel and an undeclared-area diagnostic. Neither is built. Remove this row when WS1 ships and the Status says so."
+      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here, 88c8d466, is a review fix inside model-invariants workstream 1 (barwise-b2s): it adds OrmModel.constraintsSharingAnId. This spec names core/src/model/OrmModel.ts because its own workstream 1 adds subject-area declarations there; none is built. Remove this row when WS1 ships and the Status says so."
     }
   }
 }

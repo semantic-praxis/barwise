@@ -106,8 +106,9 @@ model:
   });
 
   it("still reports it when the duplicated constraint's own role dangles", () => {
-    // The rule names a constraint by kind and home, never by its roles, so
-    // the dangling role that suppresses the graph-taking rules cannot hide it.
+    // The holders are named from what the file states (kind, home, the
+    // role ids as written), never from what a role resolves to, so the
+    // dangling role that suppresses the graph-taking rules cannot hide it.
     const model = serializer.deserialize(twoZero("nowhere"), { lenient: true });
     const all = new ValidationEngine().validate(model).map((d) => d.ruleId);
     expect(all).toContain("constraint/across-fact-types-unknown-role");
@@ -118,6 +119,74 @@ model:
     const yaml = serializer.serialize(twoFactTypes("c", "c"));
     expect(() => serializer.deserialize(yaml)).toThrow(
       'Two constraints share the id "c"',
+    );
+  });
+
+  const threeZero = (body: string) =>
+    `orm_version: "3.0"
+model:
+  name: M
+  object_types:
+    - { id: x, name: A, kind: entity, reference_mode: a_id }
+${body}`;
+
+  it("is refused under a lenient 3.0 load too, which barwise migrate relies on", () => {
+    const yaml = serializer.serialize(twoFactTypes("c", "c"));
+    expect(() => serializer.deserialize(yaml, { lenient: true })).toThrow(
+      'Two constraints share the id "c"',
+    );
+  });
+
+  it("is refused in a 3.0 file even when the two holders' fact types share an id", () => {
+    // Read from what the file states: the id-keyed store keeps one of two
+    // fact types with one id, and checking the built model would see one
+    // constraint and load the file silently, losing the other.
+    const yaml = threeZero(`  fact_types:
+    - id: f
+      name: A runs
+      roles: [{ id: r1, role_name: runs, player: x }]
+      readings: ["{0} runs"]
+      constraints:
+        - { id: c, type: mandatory, role: r1 }
+    - id: f
+      name: A swims
+      roles: [{ id: r2, role_name: swims, player: x }]
+      readings: ["{0} swims"]
+      constraints:
+        - { id: c, type: mandatory, role: r2 }
+`);
+    expect(() => serializer.deserialize(yaml)).toThrow('Two constraints share the id "c"');
+  });
+
+  it("is the error a strict 3.0 load reports when a role also dangles", () => {
+    const yaml = threeZero(`  fact_types:
+    - id: f1
+      name: A runs
+      roles: [{ id: r1, role_name: runs, player: nowhere }]
+      readings: ["{0} runs"]
+      constraints:
+        - { id: c, type: mandatory, role: r1 }
+    - id: f2
+      name: A swims
+      roles: [{ id: r2, role_name: swims, player: x }]
+      readings: ["{0} swims"]
+      constraints:
+        - { id: c, type: mandatory, role: r2 }
+`);
+    expect(() => serializer.deserialize(yaml)).toThrow('Two constraints share the id "c"');
+  });
+
+  it("names a constraint over subtypes by its subtype facts", () => {
+    const model = new OrmModel({ name: "People" });
+    model.addObjectType({ id: "p", name: "Person", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "m", name: "Male", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "f", name: "Female", kind: "entity", referenceMode: "id" });
+    model.addSubtypeFact({ id: "sf-m", subtypeId: "m", supertypeId: "p" });
+    model.addSubtypeFact({ id: "sf-f", subtypeId: "f", supertypeId: "p" });
+    model.addConstraint({ type: "exclusion", id: "x", subtypeFactIds: ["sf-m", "sf-f"] });
+    model.addConstraint({ type: "exclusive_or", id: "x", subtypeFactIds: ["sf-m", "sf-f"] });
+    expect(findings(model, RULE)[0]!.message).toContain(
+      "exclusion over subtype facts sf-m, sf-f; exclusive_or over subtype facts sf-m, sf-f",
     );
   });
 

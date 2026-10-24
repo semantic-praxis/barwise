@@ -1,3 +1,4 @@
+import { groupRepeats } from "../util/groupRepeats.js";
 import {
   type Constraint,
   type ExternalConstraint,
@@ -296,20 +297,12 @@ export class OrmModel {
    * Each constraint id more than one constraint holds, with its holders in
    * `everyConstraint` order. A constraint id is model-wide -- another
    * element, another file, a diff or a merge names a constraint by it -- so
-   * this is the one statement of what a repeat is: the 3.0 loader refuses
-   * on it and `structural/duplicate-constraint-id` reports it.
+   * `structural/duplicate-constraint-id` reports these. The 3.0 loader
+   * asks the same `groupRepeats` of the constraints the file states,
+   * before building, since the id-keyed stores can drop a holder.
    */
   constraintsSharingAnId(): ReadonlyMap<string, readonly ConstraintInView[]> {
-    const holders = new Map<string, ConstraintInView[]>();
-    for (const entry of this.everyConstraint()) {
-      const id = entry[0].id;
-      if (id === undefined) continue;
-      const list = holders.get(id);
-      if (list) list.push(entry);
-      else holders.set(id, [entry]);
-    }
-    for (const [id, list] of holders) if (list.length < 2) holders.delete(id);
-    return holders;
+    return groupRepeats(this.everyConstraint(), ([c]) => c.id);
   }
 
   /**

@@ -8,6 +8,7 @@ import {
 } from "../model/Constraint.js";
 import { type PlacedFlags, storePreferredFlags } from "../model/identification.js";
 import { OrmModel } from "../model/OrmModel.js";
+import { groupRepeats } from "../util/groupRepeats.js";
 import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
@@ -263,8 +264,29 @@ export class OrmYamlSerializer {
       model.addObjectType(deserializeObjectType(otDoc));
     }
 
-    for (const ftDoc of doc.model.fact_types ?? []) {
-      const { config, constraints } = deserializeFactType(ftDoc);
+    // Every constraint id is stated (the schema requires it) and is
+    // model-wide, so a 3.0 file holding a repeat is refused, lenient or
+    // not, before anything is added. Read from what the file states, not
+    // from the built model: two fact types sharing an id collapse into one
+    // in the id-keyed store, and the dropped one's constraints would go
+    // with it unreported. The lenient refusal is load-bearing: `barwise
+    // migrate` re-reads its own 3.0 output leniently to refuse writing a
+    // file a strict load would reject. A 2.0 file and a model built in code
+    // are reported by `structural/duplicate-constraint-id` instead, which
+    // asks the same `groupRepeats` of the built model.
+    const factTypes = (doc.model.fact_types ?? []).map(deserializeFactType);
+    const modelConstraints = (doc.model.constraints ?? []).map(deserializeConstraint);
+    const [repeated] = groupRepeats(
+      [...factTypes.flatMap((ft) => ft.constraints), ...modelConstraints],
+      (c) => c.id,
+    ).keys();
+    if (repeated !== undefined) {
+      throw new DeserializationError(
+        `Two constraints share the id "${repeated}"; a constraint id names one constraint.`,
+      );
+    }
+
+    for (const { config, constraints } of factTypes) {
       model.addFactType(
         { ...config, constraints: constraints.filter(isInternalConstraint) },
         { skipPlayerValidation: options?.lenient },
@@ -278,22 +300,8 @@ export class OrmYamlSerializer {
       );
     }
 
-    for (const cDoc of doc.model.constraints ?? []) {
-      const c = deserializeConstraint(cDoc);
+    for (const c of modelConstraints) {
       if (isExternalConstraint(c)) model.addConstraint(c);
-    }
-
-    // Every constraint id is stated (the schema requires it) and is
-    // model-wide, so a 3.0 file holding a repeat is refused, lenient or
-    // not. The lenient refusal is load-bearing: `barwise migrate` re-reads
-    // its own 3.0 output leniently to refuse writing a file a strict load
-    // would reject. A 2.0 file and a model built in code are reported by
-    // `structural/duplicate-constraint-id` instead, from the same method.
-    const [repeated] = model.constraintsSharingAnId().keys();
-    if (repeated !== undefined) {
-      throw new DeserializationError(
-        `Two constraints share the id "${repeated}"; a constraint id names one constraint.`,
-      );
     }
 
     // After every constraint, so a reference resolves whatever order the
