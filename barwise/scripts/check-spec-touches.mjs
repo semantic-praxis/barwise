@@ -21,17 +21,9 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { opt } from "./lib/args.mjs";
 import { matchesPattern, patternFault } from "./lib/review-tiers.mjs";
 import { inSpecCorpus, touches } from "./lib/spec-reader.mjs";
-
-/** `--flag value`; a flag with no value refuses rather than falling back. */
-function opt(flag) {
-  const i = process.argv.indexOf(flag);
-  if (i === -1) return null;
-  const value = process.argv[i + 1];
-  if (!value || value.startsWith("--")) throw new Error(`${flag} needs a value`);
-  return value;
-}
 
 // Every input is read inside the refusal: an unreadable spec is "could
 // not answer" (exit 2), never a crash that exits 1 like a real finding.
@@ -39,6 +31,11 @@ let tracked, specs;
 try {
   const list = opt("--tracked");
   const dir = opt("--specs");
+  // The fixture overrides go together: --tracked alone would read specs
+  // from a repository root it has no way to know.
+  if ((list === null) !== (dir === null)) {
+    throw new Error("--tracked and --specs are given together");
+  }
   // Imported only without --tracked: lib/tracked.mjs resolves the repo
   // root at import and refuses outside one, which is where fixtures run.
   const lib = list ? null : await import("./lib/tracked.mjs");
@@ -48,6 +45,16 @@ try {
     ? readdirSync(dir).filter((f) => f.endsWith(".spec.md")).map((f) => [f, join(dir, f)])
     : tracked.filter(inSpecCorpus).map((f) => [f, join(lib.REPO_ROOT, f)]);
   specs = paths.map(([id, path]) => ({ id, entries: touches(readFileSync(path, "utf8")) }));
+  // A spec being written is not yet tracked; say it was not read, so OK
+  // does not claim to cover it (the audit does the same).
+  if (lib) {
+    lib.noteUntrackedInput({
+      pathspec: "barwise/docs/specs",
+      suffix: ".spec.md",
+      include: inSpecCorpus,
+      gate: "check:spec-touches",
+    });
+  }
 } catch (err) {
   console.error(`check:spec-touches: cannot answer -- ${err.message}`);
   if (err.cause) console.error(`  cause: ${err.cause.message}`);
@@ -80,6 +87,12 @@ let declaring = 0;
 for (const spec of specs) {
   if (spec.entries === undefined) continue;
   declaring += 1;
+  if (spec.entries.length === 0) {
+    // An empty declaration is not "touches nothing": the audit would have
+    // no subject and skip the spec silently.
+    dead.push(`${spec.id}: Touches: has no entries`);
+    continue;
+  }
   for (const e of spec.entries) {
     if (e.path === "") {
       dead.push(`${spec.id}: an empty entry`);

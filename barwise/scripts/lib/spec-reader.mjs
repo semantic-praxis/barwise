@@ -25,7 +25,10 @@ export function inSpecCorpus(f) {
  * directory), every tracked path it matches.
  */
 export function entryPaths(path, files) {
-  return path.includes("*") ? files.filter((f) => matchesPattern(f, path)) : [path];
+  // A directory stands for the files under it, so the audit's filters
+  // (wiring, code, barrels) apply to each, as they do to inferred paths.
+  if (path.includes("*") || path.endsWith("/")) return files.filter((f) => matchesPattern(f, path));
+  return [path];
 }
 
 /** Extensions the audit treats as code. Markdown and the like are not. */
@@ -99,7 +102,9 @@ export function header(text, field) {
 export function touches(text) {
   const value = header(text, "Touches");
   if (value === undefined) return undefined;
-  return value.split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
+  // Commas or line ends: a wrapped header whose author dropped the comma
+  // is still two entries, not one path with a newline in it.
+  return value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).map((s) => {
     const mark = s[0] === "+" || s[0] === "-" ? s[0] : "";
     // Trimmed after the mark, so `+ path` is `path`, not " path", which
     // would skip the gate (marked) and match nothing in the audit.
@@ -118,7 +123,9 @@ export function touches(text) {
 export function namedPaths(text, exists, opts = {}) {
   const { dirs = false, anyExtension = false, bare = false, barrels = false } = opts;
   const out = new Set();
-  const token = bare ? /`([^`\s]+)`/g : /`([^`\s]+\/[^`\s]+)`/g;
+  // A slash anywhere, so a single-segment directory (`optimizer/`) is a
+  // token too; the filters below still decide what counts.
+  const token = bare ? /`([^`\s]+)`/g : /`([^`\s]*\/[^`\s]*)`/g;
   for (const m of text.matchAll(token)) {
     const raw = m[1].replace(/[.,;:)]+$/, "");
     const isDir = raw.endsWith("/");

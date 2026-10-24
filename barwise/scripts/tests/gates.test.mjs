@@ -4856,6 +4856,28 @@ test("audit-spec-status reads Touches: instead of every cited path, and ignores 
     writeFileSync(join(dir, "barwise", "lib", "c.ts"), "1\n");
     g("commit", "-qam", "lib");
     assert.match(run().stderr, /NEW: dir\.spec\.md/);
+    // Declared entries pass the audit's filters too: Markdown, a barrel,
+    // and wiring under a declared directory are never a spec's subject.
+    mkdirSync(join(dir, "barwise", "tool", "tests"), { recursive: true });
+    for (const p of ["README.md", "index.ts", "tests/t.mjs", "real.ts"]) {
+      writeFileSync(join(dir, "barwise", "tool", p), "0\n");
+    }
+    mkdirSync(join(dir, "barwise", "scripts", "tests"), { recursive: true });
+    writeFileSync(join(dir, "barwise", "scripts", "tests", "w.mjs"), "0\n");
+    writeFileSync(
+      join(specs, "filtered.spec.md"),
+      "# F\n\nStatus: Draft -- no workstream implemented\n"
+        + "Touches: barwise/tool/README.md, barwise/tool/index.ts, barwise/scripts/\n\n## Body\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "filtered spec");
+    for (
+      const p of ["barwise/tool/README.md", "barwise/tool/index.ts", "barwise/scripts/tests/w.mjs"]
+    ) {
+      writeFileSync(join(dir, p), "1\n");
+    }
+    g("commit", "-qam", "markdown, a barrel, wiring");
+    assert.doesNotMatch(run().stderr, /filtered\.spec\.md/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

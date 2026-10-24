@@ -47,6 +47,11 @@ test("touches parses entries and their marks", () => {
     { path: "x/", mark: "" },
   ]);
   assert.equal(touches("# T\n\nStatus: Draft\n"), undefined);
+  // A wrapped header whose author dropped the comma is still two entries.
+  assert.deepEqual(touches("# T\n\nTouches: a/b.ts\nc/d.ts\n").map((e) => e.path), [
+    "a/b.ts",
+    "c/d.ts",
+  ]);
   // A space after the mark is not part of the path.
   assert.deepEqual(touches("# T\n\nTouches: + a/new.mjs, - old.md\n"), [
     { path: "a/new.mjs", mark: "+" },
@@ -56,7 +61,15 @@ test("touches parses entries and their marks", () => {
 
 test("isWiring covers the shared files and directories, nothing else", () => {
   for (
-    const p of [".github/workflows/ci.yml", "package.json", "barwise/package.json", "CLAUDE.md"]
+    const p of [
+      ".github/workflows/ci.yml",
+      "package.json",
+      "barwise/package.json",
+      "CLAUDE.md",
+      "barwise/scripts/tests/gates.test.mjs",
+      "barwise/docs/specs/x.spec.md",
+      ".beads/issues.jsonl",
+    ]
   ) {
     assert.equal(isWiring(p), true, p);
   }
@@ -118,6 +131,10 @@ test("namedPaths keeps the audit's defaults and widens per option", () => {
   assert.ok(!without("anyExtension").includes(".claude/skills/x/SKILL.md"));
   assert.ok(!without("bare").includes("plan.md"));
   assert.equal(namedPaths(text, exists, all).length, 5);
+  // A single-segment directory is a token too.
+  assert.deepEqual(namedPaths("`optimizer/`", (p) => p === "optimizer", { dirs: true }), [
+    "optimizer/",
+  ]);
 });
 
 /** A fixture: a specs directory and a tracked-file list. */
@@ -186,6 +203,33 @@ test("check:spec-touches rejects a pattern outside the review-tiers language, ma
     assert.equal(r.status, 1);
     assert.match(r.stderr, /barwise\/\*\.mjs -- .*\*/);
     assert.match(r.stderr, /2 Touches: entries do not resolve/);
+  } finally {
+    f.done();
+  }
+});
+
+test("check:spec-touches fails an empty Touches: and an empty entry", () => {
+  const f = gateFixture({ "a.spec.md": spec(""), "b.spec.md": spec("barwise/x.ts, +") }, [
+    "barwise/x.ts",
+  ]);
+  try {
+    const r = f.run();
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /a\.spec\.md: Touches: has no entries/);
+    assert.match(r.stderr, /b\.spec\.md: an empty entry/);
+  } finally {
+    f.done();
+  }
+});
+
+test("check:spec-touches refuses --tracked without --specs", () => {
+  const f = gateFixture({}, ["barwise/x.ts"]);
+  try {
+    const r = spawnSync(process.execPath, [GATE, "--tracked", join(f.dir, "tracked.txt")], {
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /--tracked and --specs are given together/);
   } finally {
     f.done();
   }

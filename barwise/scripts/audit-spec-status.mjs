@@ -197,17 +197,19 @@ function unseenCommits(found, recorded = []) {
  * context (`ci.yml`, a gate's test) is no longer read as the subject
  * (plan-scope-check.spec.md). From it the audit drops shared wiring,
  * non-code files and barrels, as it always has for inferred paths. A
- * directory entry stays (git log takes a directory), and a pattern is
- * expanded against the tracked files by the same matcher
+ * directory or pattern entry is expanded to the tracked files it covers,
+ * and those are filtered the same way, by the same matcher
  * check:spec-touches validates it with, so the two read one language.
  * Without the header, the paths the spec names, as before.
  */
 function subjectPaths(text) {
   const declared = touches(text);
-  if (declared === undefined) return namedPaths(text, exists);
+  // An empty header is check:spec-touches' finding; here it falls back to
+  // inference rather than leaving the spec with no subject at all.
+  if (declared === undefined || declared.length === 0) return namedPaths(text, exists);
   return declared
     .flatMap((e) => entryPaths(e.path, allFiles()))
-    .filter((p) => !isWiring(p) && (p.endsWith("/") || (CODE.test(p) && !HUB.test(p))));
+    .filter((p) => !isWiring(p) && CODE.test(p) && !HUB.test(p));
 }
 
 /** Specs claiming nothing is built, with the commits that say otherwise. */

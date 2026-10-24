@@ -34,6 +34,7 @@
  * Spec: docs/specs/tiered-pr-review.spec.md (WS2, barwise-1037).
  */
 import { readFileSync } from "node:fs";
+import { opt } from "./lib/args.mjs";
 import {
   CHECKLIST,
   checklistHeadings,
@@ -43,19 +44,6 @@ import {
   tierRows,
   trivialGlobs,
 } from "./lib/review-tiers.mjs";
-
-/**
- * `--flag value`, or the default. No dependency, and no partial matching.
- * A flag given without a value refuses: falling back would answer about
- * the live repository when a fixture was asked about.
- */
-function opt(flag, fallback) {
-  const i = process.argv.indexOf(flag);
-  if (i === -1) return fallback;
-  const value = process.argv[i + 1];
-  if (!value || value.startsWith("--")) throw new Error(`${flag} needs a value`);
-  return value;
-}
 
 let headings, rows, trivial, tracked;
 try {
