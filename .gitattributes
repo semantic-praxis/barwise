@@ -8,7 +8,7 @@
 # by line (docs/specs/plan-scope-check.spec.md, Open decision 2). Three
 # readers: `npm run plan-scope` leaves them out of a PR's size, REVIEW.md
 # points the review service here, and GitHub collapses them in PR diffs.
-# A drift test (scripts/tests/gates.test.mjs, "generated marks") fails when
+# A drift test (barwise/scripts/tests/generated-marks.test.mjs) fails when
 # a regen:* script's output is not marked here. barwise/trial/ fixtures are
 # deliberately absent: a reviewer may need to read them (owner, 2026-10-24).
 
@@ -23,6 +23,9 @@ barwise/packages/promptlab/evals/*.reference.orm.yaml linguist-generated=true
 # Recorded data: written by a run or a tool, not by hand.
 barwise/eval-runs/** linguist-generated=true
 barwise/eval-payloads/** linguist-generated=true
+# A README there explains the record; a person wrote it.
+barwise/eval-payloads/**/README.md -linguist-generated
 barwise/trial-baseline.json linguist-generated=true
 barwise/package-lock.json linguist-generated=true
+barwise/uv.lock linguist-generated=true
 .beads/issues.jsonl linguist-generated=true

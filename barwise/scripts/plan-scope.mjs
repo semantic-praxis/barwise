@@ -89,8 +89,13 @@ try {
 
   // The specs the branch names.
   const trackedList = lines(git("ls-files", "-z"));
+  // A repository always tracks files: an empty listing is git answering
+  // emptily, and a report built on it would say "nothing changed".
+  if (trackedList.length === 0) throw new Error(`git ls-files lists nothing under ${root}`);
   const tracked = new Set([...trackedList, ...added]);
-  const specs = new Set(changed.filter(inSpecCorpus));
+  // Only specs that still exist: one the branch deletes, archives or
+  // renames away is a change to a plan, not a plan to read.
+  const specs = new Set(changed.filter((f) => inSpecCorpus(f) && trackedList.includes(f)));
   const messages = git("log", "--format=%B", `${base}..HEAD`);
   for (const m of messages.matchAll(/([\w.-]+\.spec\.md)/g)) {
     const f = SPEC_DIR + m[1];
@@ -114,7 +119,10 @@ try {
       read.push(`${spec.slice(SPEC_DIR.length)} (Touches:)`);
     } else {
       plan.push(
-        ...namedPaths(text, exists, { dirs: true, anyExtension: true, bare: true, barrels: true }),
+        // No directories: a spec's prose names `barwise/` or `packages/`
+        // in passing, and as a plan entry that would cover the whole tree.
+        // Only a Touches: header may plan a directory, deliberately.
+        ...namedPaths(text, exists, { anyExtension: true, bare: true, barrels: true }),
       );
       read.push(`${spec.slice(SPEC_DIR.length)} (the paths it names; no Touches:)`);
     }

@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -91,7 +91,9 @@ test("plan-scope finds a spec through a commit message, and falls back to the pa
     const out = r.run();
     assert.equal(out.status, 0, out.stderr);
     assert.match(out.stdout, /q\.spec\.md \(the paths it names; no Touches:\)/);
-    assert.match(out.stdout, /Outside the plan \(1 of 3 files\):\n {2}src\/a\.ts/);
+    // The fallback plans named files only: `docs/` in the spec's prose is
+    // not a plan for everything under it (only a Touches: entry is).
+    assert.match(out.stdout, /Outside the plan \(2 of 3 files\):\n {2}docs\/e\.md\n {2}src\/a\.ts/);
   } finally {
     r.done();
   }
@@ -164,6 +166,46 @@ test("plan-scope prints no report and exits 2 when git cannot resolve the base",
     assert.match(out.stderr, /plan-scope: cannot answer/);
     assert.equal(out.stdout, "");
   } finally {
+    r.done();
+  }
+});
+
+test("plan-scope does not read a spec the branch archives or deletes", () => {
+  const r = planRepo();
+  try {
+    r.g("rm", "-q", "barwise/docs/specs/q.spec.md");
+    r.commit("archive q", {
+      "barwise/docs/specs/archive/q.spec.md": "# Q\n\nStatus: Draft\n",
+      "src/b.ts": "b2\n",
+    });
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /No plan found/);
+  } finally {
+    r.done();
+  }
+});
+
+test("plan-scope refuses when git answers with an empty listing", () => {
+  const r = planRepo();
+  const shim = mkdtempSync(join(tmpdir(), "barwise-plan-scope-git-"));
+  try {
+    r.commit("work", { "src/c.ts": "c2\n" });
+    // A git that answers every ls-files with nothing, and is real otherwise.
+    const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nfor a in "$@"; do [ "$a" = ls-files ] && exit 0; done\nexec ${real} "$@"\n`,
+    );
+    chmodSync(join(shim, "git"), 0o755);
+    const out = spawnSync(process.execPath, [SCRIPT, "--root", r.dir, "--base", "main"], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${shim}:${process.env.PATH}` },
+    });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /git ls-files lists nothing/);
+  } finally {
+    rmSync(shim, { recursive: true, force: true });
     r.done();
   }
 });
