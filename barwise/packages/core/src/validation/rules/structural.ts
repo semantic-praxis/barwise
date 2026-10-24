@@ -16,6 +16,8 @@ import { report, RULE_ID } from "../ruleId.js";
  * - Subtype hierarchy has no cycles.
  * - Objectified fact types objectify entity types.
  * - No duplicate objectification of the same fact type.
+ * - No two constraints share an id.
+ * - No two subtype facts relate the same pair.
  *
  * What is NOT here any more: whether each of those references resolves
  * at all. `graphOf` owns that, so these rules receive a graph in which
@@ -25,9 +27,9 @@ import { report, RULE_ID } from "../ruleId.js";
  * a rule id is a promise to whoever reads validator output.
  *
  * They ship as two exports rather than one, and the split is worth more
- * than it looks. Four of the seven checks read no reference at all: two
+ * than it looks. Most of the checks read no reference at all: two
  * compare names, one counts readings, one walks subtype ids as a graph
- * of ids. Left in the graph-taking export they would be suppressed
+ * of ids, and two compare ids. Left in the graph-taking export they would be suppressed
  * whenever any id in the model dangled -- and `barwise validate` on a
  * file with one bad constraint role would stop reporting that a binary
  * fact type has only one reading, which has nothing to do with the bad
@@ -56,7 +58,69 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkBinaryFactTypeReadings(model));
   diagnostics.push(...checkSubtypeCycles(model));
   diagnostics.push(...checkDiagramReferences(model));
+  diagnostics.push(...checkDuplicateConstraintIds(model));
+  diagnostics.push(...checkDuplicateSubtypeFacts(model));
 
+  return diagnostics;
+}
+
+/**
+ * No two constraints may share an id.
+ *
+ * Constraints are arrays, so the model can hold the duplicate, and a
+ * defect the model can hold is validation's to report
+ * (`docs/specs/model-invariants.spec.md`). The 3.0 loader refuses one
+ * (`claim` in `OrmYamlSerializer`); a 2.0 file, a model built in code and
+ * a merge do not, and before this rule a merge wrote a file the 3.0 loader
+ * then refused to read back (barwise-b2s). Reported once per id, naming
+ * every holder, because every reader keys a constraint by its id and
+ * `getConstraint` returns whichever comes first.
+ */
+function checkDuplicateConstraintIds(model: OrmModel): Diagnostic[] {
+  const holders = new Map<string, string[]>();
+  for (const [c, ft] of model.everyConstraint()) {
+    if (c.id === undefined) continue;
+    const where = ft ? `${c.type} in fact type "${ft.name}"` : `${c.type} across fact types`;
+    const list = holders.get(c.id);
+    if (list) list.push(where);
+    else holders.set(c.id, [where]);
+  }
+  return [...holders]
+    .filter(([, list]) => list.length > 1)
+    .map(([id, list]) => report(RULE_ID.duplicateConstraintId, "default", id, id, list.join("; ")));
+}
+
+/**
+ * No two subtype facts may relate the same subtype to the same supertype.
+ *
+ * `OrmModel.addSubtypeFact` refuses the pair, but only outside a lenient
+ * load, so a lenient load is the one path that can hold it, and nothing
+ * reported it there. Names come from the model where it has them and fall
+ * back to the id, so a dangling end still lets the duplicate be seen.
+ */
+function checkDuplicateSubtypeFacts(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const seen = new Map<string, string>(); // "sub\0super" -> first subtype fact id
+  const nameOf = (id: string) => model.getObjectType(id)?.name ?? id;
+  for (const sf of model.subtypeFacts) {
+    const key = `${sf.subtypeId}\u0000${sf.supertypeId}`;
+    const earlier = seen.get(key);
+    if (earlier === undefined) {
+      seen.set(key, sf.id);
+      continue;
+    }
+    diagnostics.push(
+      report(
+        RULE_ID.duplicateSubtypeFact,
+        "default",
+        sf.id,
+        sf.id,
+        earlier,
+        nameOf(sf.subtypeId),
+        nameOf(sf.supertypeId),
+      ),
+    );
+  }
   return diagnostics;
 }
 
