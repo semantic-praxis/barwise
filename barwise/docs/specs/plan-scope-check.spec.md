@@ -294,7 +294,8 @@ Plan-reviewed: <commit> (code-review, pr-review)
   proper ancestor of every branch commit changing a `Touches:` entry --
   a side line merged in included, not only the first in topological
   order -- and at which the spec's body -- everything but the header block -- is identical to the
-  body as that first change began, in its parent (WS6 says why not the
+  body where each line of implementation began (the first change, and the
+  start of any side line merged in), in its parent (WS6 says why not the
   first change itself). A review of an earlier draft does not cover
   a plan rewritten afterwards; this PR is the example, where the owner's
   decisions were written after the first `/code-review` round, so only a

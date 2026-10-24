@@ -27,8 +27,9 @@
  * one of those `Touches:` paths -- on a merged side line too, not only
  * the first in topological order -- (2) contains the spec, and (3) carries
  * the same spec body -- everything but the header block -- as the parent
- * of F, the first such commit,
- * the plan as implementation began. A review of an earlier draft does not
+ * of each commit where a line of implementation began (F, the first such
+ * commit, and the start of any side line merged in): the plan as
+ * implementation began. A review of an earlier draft does not
  * vouch for a plan rewritten after it; adding the line itself, or a
  * Status update, leaves the body alone. The spec says "the body at that
  * first change"; read literally, that includes F's own edits, so a spec
@@ -239,14 +240,25 @@ for (const spec of named) {
     );
     continue;
   }
-  // Against F's parent: the plan as implementation began. Comparing with F
-  // itself failed a spec amended in its first implementation commit while
-  // passing the same amendment one commit later (#721, measured).
-  const began = `${first}^`;
-  if (!holds(began, spec) || specBody(read(reviewed, spec)) !== specBody(read(began, spec))) {
+  // Against the parent of each commit where a line of implementation
+  // began -- one with no other changing commit among its ancestors: F, and
+  // the start of any side line merged in. A side line cut after the review
+  // can rewrite the plan before implementing it while F still sees the
+  // reviewed body. The parent, not the commit: comparing with F itself
+  // failed a spec amended in its first implementation commit while passing
+  // the same amendment one commit later (#721, measured).
+  const starts = changing.filter((c) =>
+    !changing.some((d) => d !== c && gitAnswers(["merge-base", "--is-ancestor", d, c]))
+  );
+  const plan = specBody(read(reviewed, spec));
+  const drifted = starts.find((c) =>
+    !holds(`${c}^`, spec) || specBody(read(`${c}^`, spec)) !== plan
+  );
+  if (drifted !== undefined) {
     failures.push(
-      `${id}: the plan changed between the reviewed ${short(reviewed)} and the ${at}; `
-        + "the review covers the plan it read.",
+      `${id}: the plan changed between the reviewed ${short(reviewed)} and ${
+        short(drifted)
+      }, where implementation began (the ${at}); the review covers the plan it read.`,
     );
     continue;
   }

@@ -4958,6 +4958,36 @@ test("check-plan-review fails an unreviewed implementation on a side line merged
   }
 });
 
+test("check-plan-review compares the plan where each line of implementation began", () => {
+  // A side line cut after the review rewrites the plan, then implements
+  // it. The main line's first change still sees the reviewed body; the
+  // side line's does not, and it is compared too.
+  const r = planRepo();
+  try {
+    r.spec();
+    const reviewed = r.commit("spec");
+    r.spec({ reviewed });
+    r.commit("record the review");
+    r.g("checkout", "-q", "-b", "side");
+    r.spec({ reviewed, body: "A different plan." });
+    r.commit("rewrite the plan on the side line");
+    writeFileSync(join(r.dir, "src", "b.ts"), "export const b = 1;\n");
+    const side = r.commit("implement the rewritten plan");
+    r.g("checkout", "-q", "feature");
+    r.implement(1);
+    r.commit("implement");
+    r.g("merge", "-q", "--no-ff", "-X", "theirs", "-m", "merge side", "side");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      new RegExp(`the plan changed between the reviewed .* and ${side.slice(0, 8)}`),
+    );
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
 test("check-plan-review reads Touches: and Status at the base, so a branch cannot drop either", () => {
   // The spec exists at the base with no Status line (read as claiming
   // nothing built), and the branch drops the path it implements from
