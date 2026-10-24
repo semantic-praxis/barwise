@@ -1,7 +1,7 @@
 # Model invariants: what the store refuses, what validation reports, and what operations promise
 
-Status: Workstreams 1 and 2 implemented 2026-10-24; workstream 3 not
-started, 4 provisional; decisions resolved by the owner 2026-10-23
+Status: Workstreams 1, 2 and 3 implemented 2026-10-24; workstream 4
+provisional; decisions resolved by the owner 2026-10-23
 (decision 1 revised the same day after review)
 
 Created: 2026-10-23
@@ -495,6 +495,31 @@ Acceptance:
   fixed in its own PR, with the input that triggers it, and this workstream
   lands after that PR. A duplicate id is never caught and dropped to get
   green.
+
+Implemented 2026-10-24, as specified, with three notes:
+
+- **One conversion point.** `refusingHeldIds` in `OrmYamlSerializer.ts`
+  wraps both entry points, `migrate` (so `deserialize`) and the exported
+  `readDocument20`, rather than a `catch` around each `add*` call. The
+  message carries through unchanged.
+- **The guards are refusal methods.** `addSubtypeFact` and
+  `addObjectifiedFactType` throw the message a private
+  `subtypeFactRefusal` / `objectificationRefusal` returns, and the public
+  `canAddSubtypeFact` / `canAddObjectifiedFactType` read the same method,
+  adding only the check each element's constructor makes (the two ids
+  differ). Merge's `addableSubtypeFact` and `addableObjectification` are
+  gone.
+- **Nothing needed fixing first.** The full monorepo suite passed with the
+  refusal in place before any test was written, and over the tracked
+  corpus 89 of 116 models load leniently, the same 89 as before, with none
+  refused for a held id. So no importer was losing an element this way,
+  and no PR had to land ahead of this one.
+
+Tests: `tests/model/duplicateIdError.test.ts`, one per kind in code (with
+and without `skipPlayerValidation`), per kind through a 2.0 and a 3.0 file
+(strict and lenient), and the merge case. Each was seen failing under its
+mutant: the store check made a no-op fails 31 of 32, and the merge's
+fresh-id rule removed fails the merge test.
 
 ### 4. The builder's list names the id rules (provisional: not yet grounded)
 

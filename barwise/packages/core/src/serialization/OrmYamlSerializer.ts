@@ -9,7 +9,7 @@ import {
   placementOf,
 } from "../model/Constraint.js";
 import { type PlacedFlags, storePreferredFlags } from "../model/identification.js";
-import { OrmModel } from "../model/OrmModel.js";
+import { DuplicateIdError, OrmModel } from "../model/OrmModel.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
@@ -175,6 +175,10 @@ export class OrmYamlSerializer {
    * them; every other caller wants only the model (orm-format-3 WS4b-iii).
    */
   migrate(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
+    return refusingHeldIds(() => this.read(yaml, options));
+  }
+
+  private read(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
     const raw = parse(yaml) as unknown;
     const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
@@ -275,9 +279,9 @@ export class OrmYamlSerializer {
     // migrate` re-reads its own 3.0 output leniently to refuse writing a
     // file a strict load would reject. A 2.0 file and a model built in code
     // are reported by `structural/duplicate-constraint-id` instead, which
-    // asks the same `groupRepeats` of the built model -- except where the
-    // holders' fact types also share an id, which collapses them before any
-    // rule runs; refusing that is model-invariants workstream 3 (barwise-1l0).
+    // asks the same `groupRepeats` of the built model. Holders whose fact
+    // types also share an id never reach it: the store refuses the second
+    // fact type (`DuplicateIdError`, model-invariants WS3).
     const factTypes = (doc.model.fact_types ?? []).map((ftDoc) => deserializeFactType(ftDoc));
     const modelConstraints = (doc.model.constraints ?? []).map((cDoc) =>
       deserializeConstraint(cDoc)
@@ -484,7 +488,24 @@ function isPlacedKind(c: unknown, where: "internal" | "external"): c is { type: 
  *   no entity is dropped; two naming one entity resolve as that rule says.
  */
 export function readDocument20(doc: OrmYamlDocument, options?: { lenient?: boolean; }): OrmModel {
-  return readLegacy(doc, options).model;
+  return refusingHeldIds(() => readLegacy(doc, options).model);
+}
+
+/**
+ * Run a reader, reporting a file that states two elements of one kind
+ * under one id as a `DeserializationError`. The model refuses the second
+ * (`DuplicateIdError`), lenient or not, since it has nowhere to hold it,
+ * and a reader reports a file it cannot load as a `DeserializationError`,
+ * which is what every caller catches. Both entry points go through here:
+ * `migrate` (so `deserialize`) and the exported 2.0 reader.
+ */
+function refusingHeldIds<T>(read: () => T): T {
+  try {
+    return read();
+  } catch (err) {
+    if (err instanceof DuplicateIdError) throw new DeserializationError(err.message);
+    throw err;
+  }
 }
 
 /** `readDocument20`, with what step 4 made of the file's flags. */
