@@ -42,6 +42,10 @@ function role(name: string, playerName: string) {
 const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
   { sample: { change: "kind", from: "entity", to: "value" }, text: "kind: entity -> value" },
   {
+    sample: { change: "name", from: "Customer", to: "Client" },
+    text: 'name: "Customer" -> "Client"',
+  },
+  {
     sample: { change: "referenceMode", from: "customer_id", to: undefined },
     text: `reference mode: "customer_id" -> "(none)"`,
   },

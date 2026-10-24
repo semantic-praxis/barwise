@@ -802,3 +802,52 @@ export function isInternalConstraint(c: Constraint): c is InternalConstraint {
 export function isExternalConstraint(c: Constraint): c is ExternalConstraint {
   return PLACEMENT[c.type] === "external";
 }
+
+/**
+ * A constraint as a reader finds it in the file, for a message that must
+ * tell two constraints sharing an id apart: its kind as the file spells it,
+ * where it lives (its fact type, or the model), and the role or
+ * subtype-fact ids it names. Built only from what the constraint states,
+ * never from what its references resolve to, so a dangling role cannot
+ * hide the repeat.
+ */
+export function describeConstraintPlace(c: Constraint, factTypeName: string | undefined): string {
+  const home = factTypeName !== undefined ? ` in fact type ${JSON.stringify(factTypeName)}` : "";
+  if (isOverSubtypes(c)) {
+    const facts = subtypeFactIdsOf(c);
+    return `${c.type}${home} over ${
+      facts.length > 0 ? `subtype facts ${facts.join(", ")}` : "no subtype facts"
+    }`;
+  }
+  const roles = roleIdsOf(c);
+  return `${c.type}${home} over ${roles.length > 0 ? `roles ${roles.join(", ")}` : "no roles"}`;
+}
+
+/** How many entries a repeat message lists before it counts the rest. */
+const REPEAT_LIST_LIMIT = 5;
+
+function listCapped(items: readonly string[], separator: string): string {
+  const rest = items.length - REPEAT_LIST_LIMIT;
+  return items.slice(0, REPEAT_LIST_LIMIT).join(separator)
+    + (rest > 0 ? `${separator}and ${rest} more` : "");
+}
+
+/**
+ * One repeated constraint id and its holders, as both the 3.0 loader's
+ * refusal and `structural/duplicate-constraint-id` print it, so the same
+ * repeat reads the same whichever path reports it: the id JSON-quoted, then
+ * each holder's place, at most five and a count of the rest.
+ */
+export function describeConstraintRepeat(
+  id: string,
+  holders: readonly (readonly [Constraint, string | undefined])[],
+): string {
+  return `${JSON.stringify(id)} (${
+    listCapped(holders.map(([c, ft]) => describeConstraintPlace(c, ft)), "; ")
+  })`;
+}
+
+/** Several repeats, as the loader lists them: at most five, then a count. */
+export function describeConstraintRepeats(repeats: readonly string[]): string {
+  return listCapped(repeats, ", ");
+}

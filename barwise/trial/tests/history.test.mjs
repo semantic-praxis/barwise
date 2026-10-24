@@ -109,9 +109,10 @@ test("the add_subtype expectation is satisfied by the CLI's own diff output", ()
   }
 });
 
-test("the rename expectation is satisfied by the CLI's own synonym candidate", () => {
-  // Same reason as the subtype test above: the rename grader's fixture was
-  // a candidate shape the CLI never emits.
+test("the rename expectation is satisfied by the CLI's own name change", () => {
+  // Graded against the CLI's real output, for the reason the subtype test
+  // above gives. The change storm keeps ids, so since model invariants WS2
+  // the rename is one name change; it used to be a synonym candidate.
   const dir = mkdtempSync(join(tmpdir(), "trial-rename-"));
   try {
     const step = applyChange(doc, { kind: "rename_object_type", from: "Encounter", to: "Visit" });
@@ -127,4 +128,54 @@ test("the rename expectation is satisfied by the CLI's own synonym candidate", (
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a rename under a fresh id is satisfied by the CLI's own synonym candidate", () => {
+  // The other form the grader accepts, against real output too: the same
+  // rename with every reference to the object type moved to a new id, as
+  // a re-extraction would mint one.
+  const dir = mkdtempSync(join(tmpdir(), "trial-rename-fresh-"));
+  try {
+    const step = applyChange(doc, { kind: "rename_object_type", from: "Encounter", to: "Visit" });
+    const oldId = doc.model.object_types.find((ot) => ot.name === "Encounter").id;
+    const swap = (v) =>
+      v === oldId
+        ? `${oldId}-fresh`
+        : Array.isArray(v)
+        ? v.map(swap)
+        : v && typeof v === "object"
+        ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swap(x)]))
+        : v;
+    const before = join(dir, "before.orm.yaml");
+    const after = join(dir, "after.orm.yaml");
+    writeFileSync(before, stringify(doc, { lineWidth: 0 }));
+    writeFileSync(after, stringify(swap(step.doc), { lineWidth: 0 }));
+    const d = runCli(["diff", before, after, "--format", "json"]);
+    assert.equal(d.exit, 0, d.stderr);
+    const graded = gradeHistoryStep(step.expect, JSON.parse(d.stdout));
+    assert.equal(graded.status, "pass", graded.detail);
+    assert.match(graded.detail, /synonym candidate/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an added fact type takes an id no fact type holds, even after a removal", () => {
+  // Counting fact types reused an id once a removal shrank the list, so the
+  // file held two fact types under one id and diff read the addition as a
+  // change to the earlier one (three S1 findings in the 2026-10-24 run).
+  const first = applyChange(doc, {
+    kind: "add_fact_type",
+    name: "Encounter has Payer",
+    between: ["Encounter", "Payer"],
+  }).doc;
+  const shrunk = structuredClone(first);
+  shrunk.model.fact_types.splice(0, 1);
+  const second = applyChange(shrunk, {
+    kind: "add_fact_type",
+    name: "Payer has Encounter",
+    between: ["Payer", "Encounter"],
+  }).doc;
+  const ids = second.model.fact_types.map((f) => f.id);
+  assert.equal(new Set(ids).size, ids.length);
 });

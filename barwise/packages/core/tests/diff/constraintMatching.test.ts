@@ -3,7 +3,7 @@
  * 2026-10-18; barwise-18n). A constraint whose id occurs once on each side
  * is paired by id, so an edit that keeps it is one `constraintsModified`
  * change; the rest pair by content key, so an import with fresh ids still
- * matches; and `constraintMatching: "content"` pairs by content alone, for
+ * matches; and `matching: "content"` pairs by content alone, for
  * independent LLM samples whose ids are unrelated.
  */
 import { describe, expect, it } from "vitest";
@@ -332,7 +332,7 @@ describe("which key reads a role", () => {
     // different role under the same id, and a different constraint.
     expect(
       constraintChanges(swapped(["r-1", "r-2"]), swapped(["r-2", "r-1"]), {
-        constraintMatching: "content",
+        matching: "content",
       }),
     ).toEqual([
       ["constraintsAdded", ["c-1"]],
@@ -371,9 +371,12 @@ describe("which key reads a role", () => {
       .toEqual([["constraintsModified", [["eu-1", "eu-1"]]]]);
   });
 
-  it("reads a renamed holder as a change, since the diff matches fact types by name", () => {
+  it("reads a holder renamed under its kept id as no change, since the diff pairs it by id", () => {
+    // Before model-invariants workstream 2 the diff paired fact types by
+    // name, so the rename read as a modification of every constraint
+    // across the renamed fact type.
     expect(constraintChanges(threeFacts("ft-2"), threeFacts("ft-2", "Person leases Car")))
-      .toEqual([["constraintsModified", [["eu-1", "eu-1"]]]]);
+      .toEqual([]);
   });
 
   it("reads a holder that changed only its id as no change", () => {
@@ -402,7 +405,7 @@ describe("content-only constraint matching", () => {
   it("names the modality in the added and removed prose too", () => {
     const a = drives([{ id: "c-1", type: "mandatory", roleId: "r-1" }]);
     const b = drives([{ id: "c-1", type: "mandatory", roleId: "r-1", modality: "deontic" }]);
-    const delta = diffModels(a, b, { constraintMatching: "content" }).deltas
+    const delta = diffModels(a, b, { matching: "content" }).deltas
       .find((d) => d.elementType === "fact_type")!;
     expect(delta.changeDescriptions).toEqual([
       "constraints added: mandatory (deontic)",
@@ -413,7 +416,7 @@ describe("content-only constraint matching", () => {
   it("never pairs two different constraints by a coincidental id", () => {
     const a = drives([uc("c-1", ["r-1"])]);
     const b = drives([uc("c-1", ["r-2"])]);
-    expect(constraintChanges(a, b, { constraintMatching: "content" })).toEqual([
+    expect(constraintChanges(a, b, { matching: "content" })).toEqual([
       ["constraintsAdded", ["c-1"]],
       ["constraintsRemoved", ["c-1"]],
     ]);
@@ -422,7 +425,7 @@ describe("content-only constraint matching", () => {
   it("still pairs equal content whatever the ids", () => {
     expect(
       constraintChanges(drives([uc("c-a", ["r-1"])]), drives([uc("c-b", ["r-1"])]), {
-        constraintMatching: "content",
+        matching: "content",
       }),
     ).toEqual([]);
   });
