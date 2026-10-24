@@ -12,18 +12,14 @@ fi
 # failed cd runs lint-staged and the build against the repo root.
 cd barwise || exit 1
 
-# 0. Validate the beads tracker when it is part of this commit. This guards
-#    the cross-branch clobber (REPO_REVIEW-2026-06-23 F6) even without the bd
-#    binary: --strict makes a non-canonical line an error, not a warning.
-#    Runs first so a corrupt tracker fails fast, before build/test. Paths from
-#    `git diff` are repo-root-relative regardless of the cd above.
-if git diff --cached --name-only | grep -qx '.beads/issues.jsonl'; then
-  echo "pre-commit: validating .beads/issues.jsonl ..."
-  if ! bash scripts/check-beads.sh --strict; then
-    echo "pre-commit: .beads/issues.jsonl failed validation (see above)." >&2
-    echo "  Fix the errors, or stage a canonical version (ideally written by bd)." >&2
-    exit 1
-  fi
+# 0. Validate the staged beads tracker when it is part of this commit. This
+#    guards the cross-branch clobber (REPO_REVIEW-2026-06-23 F6) even without
+#    the bd binary. Runs first so a corrupt tracker fails fast, before
+#    build/test. Shared with pre-merge-commit, which git runs instead of this
+#    hook for a clean merge commit.
+if ! sh scripts/hooks/check-staged-tracker.sh; then
+  echo "pre-commit: tracker validation failed." >&2
+  exit 1
 fi
 
 # 1. Refuse a credential in what is about to be committed. This one is at

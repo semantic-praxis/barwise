@@ -1,9 +1,9 @@
 # A merge driver for the tracker, registered where the repository is set up
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-24 -- the single workstream
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
 Tracking: barwise-nto
 
 ## Principle
@@ -32,8 +32,9 @@ The driver reads all three versions git passes: the base (`%O`), the
 current side (`%A`, written back as the result) and the other side
 (`%B`). Below, "base", "current" and "other" mean those three. In a
 merge, current is the branch being merged into. In a rebase, git swaps
-them, and current is the upstream. The rules are symmetric except for
-output order, so the swap changes nothing but the order of lines.
+them, and current is the upstream. The rules are symmetric, so the swap decides nothing: it changes the
+order of lines and, within an issue merged field by field, the order of
+its keys.
 
 A two-way union, which is what PR #704 used by hand, cannot tell a
 deletion from an addition, so it resurrects every issue one side
@@ -71,7 +72,10 @@ instead of the dangling dependency it is.
 - If only one side changed the field from base, take that side's value.
   This includes adding a key and removing one.
 - If both sides changed it to the same value, take that value.
-- `updated_at` changed on both sides: take the later value.
+- `updated_at` or `closed_at` changed on both sides: take the later
+  value. Both are when an event happened, and two sides that each closed
+  an issue agree that it is closed (added in implementation: a steward
+  follow-up closing an issue the branch also closed is routine).
 - `dependency_count` and `dependent_count` are derived. They are
   recomputed after the merge (below) and never compared.
 - Any other field changed on both sides to different values:

@@ -56,7 +56,7 @@
     "validate:examples": "bash scripts/validate-examples.sh",
     "regen:examples": "bash scripts/regen-example-output.sh",
     "arch:triage": "node scripts/arch-triage.mjs",
-    "prepare": "cd .. && husky barwise/.husky",
+    "prepare": "cd .. && husky barwise/.husky && node barwise/scripts/install-merge-driver.mjs",
     "regen:tutorial": "node scripts/regen-tutorial.mjs",
     "regen:builtins": "node scripts/regen-builtin-artifacts.mjs",
     "regen:references": "node scripts/regen-references.mjs",
