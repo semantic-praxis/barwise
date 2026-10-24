@@ -3,8 +3,9 @@
  * `history` list, each step committed to a throwaway git repository so
  * `barwise history` and `barwise diff` can be run over a real
  * revision walk. Returns the expected delta per step, which is the
- * oracle's ground truth: a rename must show as a rename candidate, a
- * removal as a removal, an added fact type as an addition.
+ * oracle's ground truth: a rename must show as a name change (or, under a
+ * fresh id, a synonym candidate), a removal as a removal, an added fact
+ * type as an addition.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";

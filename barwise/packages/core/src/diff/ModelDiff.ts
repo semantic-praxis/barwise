@@ -1,8 +1,8 @@
 /**
  * Model-level diff engine.
  *
- * Compares two OrmModels element-by-element, matching by name (since LLM
- * re-extractions produce fresh UUIDs). Produces a flat list of ModelDelta
+ * Compares two OrmModels element-by-element, pairing by id first and then by
+ * name (LLM re-extractions mint fresh ids). Produces a flat list of ModelDelta
  * items (added / removed / modified / unchanged) over object types, fact
  * types, and definitions, plus synonym candidates. The per-element
  * comparisons, breaking-level classification, and synonym detection live
@@ -70,7 +70,7 @@ export type {
 } from "./deltas.js";
 
 /**
- * Diff two ORM models, matching elements by name.
+ * Diff two ORM models, pairing elements by id and then by name.
  *
  * @param existing The model already on disk (reviewed/approved).
  * @param incoming The freshly extracted model from the LLM.
@@ -278,12 +278,11 @@ export function diffModels(
 
   // --- Subtype facts ---
   //
-  // No name, so the identity is the pair it relates, resolved to names
-  // against the model it came from and then against the other -- the
-  // same reason the kinds above match by name rather than by id:
-  // re-extraction mints fresh ids and only names survive. A renamed
-  // subtype therefore reads as removed-plus-added, exactly as a renamed
-  // object type does.
+  // No name, so the identity is the pair it relates, as `identity` keys
+  // its ends: a pair by id or by name reads as one key, so a subtype
+  // renamed under its kept id is no change here, and one re-extracted
+  // under a fresh id still matches by name. An end read in the model
+  // that does not define it is read in the other (barwise-957).
   //
   // The pair whose endpoints NEITHER model defines IS reported, and
   // this is a correction to the rule that shipped here in barwise-957.
@@ -426,8 +425,10 @@ export function diffModels(
 
   // --- Populations ---
   //
-  // Identity is `(fact type name, sample)`; see `PopulationDelta` for
-  // why the flag is in it and the description is not.
+  // Identity is `(fact type key, sample)`, the key being `identity`'s,
+  // so a population under a fact type renamed under its kept id stays
+  // in its group; see `PopulationDelta` for why the flag is in it and
+  // the description is not.
   //
   // Within a group the metamodel permits several -- nothing limits a
   // fact type to one population -- and they have no identity of their
@@ -451,8 +452,9 @@ export function diffModels(
   //
   // A population's fact type is resolved against both models for the
   // reason the pair-matched kinds are: a lenient fragment can carry a
-  // population without the fact type it belongs to, and grouping by a
-  // UUID would split it from the population it should have matched.
+  // population without the fact type it belongs to, and grouping by
+  // the raw id would split it from the population it should have
+  // matched; `identity`'s key reads such an id in the other model.
   // The roles are read the same way -- `instancesKey` orders a tuple by
   // them, so reading them from the model that does not have the fact
   // type keys every tuple against an empty role list.

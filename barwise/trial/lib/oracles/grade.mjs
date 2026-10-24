@@ -548,8 +548,19 @@ export function gradeHistoryStep(expect, diff) {
   const synonyms = diff.synonymCandidates ?? [];
   const has = (kind, elementType, name) =>
     deltas.some((d) => d.kind === kind && d.elementType === elementType && d.name === name);
+  // A rename under a kept id is one modification carrying a `name` change
+  // (model invariants WS2): the diff pairs a shared id as one element. The
+  // synonym candidate is the other form, for a rename under a fresh id.
+  const renamedInPlace = (elementType, from, to) =>
+    deltas.some((d) =>
+      d.kind === "modified" && d.elementType === elementType
+      && (d.changes ?? []).some((c) => c.change === "name" && c.from === from && c.to === to)
+    );
   if (expect.renamed) {
     const { from, to } = expect.renamed;
+    if (renamedInPlace("object_type", from, to)) {
+      return { status: "pass", detail: `rename ${from} -> ${to} reported as a name change` };
+    }
     // A synonym candidate names its pair as removedName and addedName
     // (barwise diff --format json). Matched on the serialised candidate as a
     // substring, an object-type rename passed on the strength of a
@@ -636,6 +647,9 @@ export function gradeHistoryStep(expect, diff) {
   }
   if (expect.renamedFactType) {
     const { from, to } = expect.renamedFactType;
+    if (renamedInPlace("fact_type", from, to)) {
+      return { status: "pass", detail: "fact-type rename reported as a name change" };
+    }
     const asRename = synonyms.some((s) =>
       s.elementType === "fact_type" && s.removedName === from && s.addedName === to
     );
@@ -644,7 +658,8 @@ export function gradeHistoryStep(expect, diff) {
       : {
         status: "fail",
         severity: "S5",
-        detail: `fact-type rename ${from} -> ${to} not reported as a synonym candidate`,
+        detail:
+          `fact-type rename ${from} -> ${to} reported neither as a name change nor as a synonym candidate`,
       };
   }
   return { status: "could_not_answer", detail: "no expectation for this change kind" };

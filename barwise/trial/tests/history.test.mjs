@@ -109,9 +109,10 @@ test("the add_subtype expectation is satisfied by the CLI's own diff output", ()
   }
 });
 
-test("the rename expectation is satisfied by the CLI's own synonym candidate", () => {
-  // Same reason as the subtype test above: the rename grader's fixture was
-  // a candidate shape the CLI never emits.
+test("the rename expectation is satisfied by the CLI's own name change", () => {
+  // Graded against the CLI's real output, for the reason the subtype test
+  // above gives. The change storm keeps ids, so since model invariants WS2
+  // the rename is one name change; it used to be a synonym candidate.
   const dir = mkdtempSync(join(tmpdir(), "trial-rename-"));
   try {
     const step = applyChange(doc, { kind: "rename_object_type", from: "Encounter", to: "Visit" });
@@ -124,6 +125,36 @@ test("the rename expectation is satisfied by the CLI's own synonym candidate", (
     assert.equal(gradeHistoryStep(step.expect, JSON.parse(d.stdout)).status, "pass");
     const same = runCli(["diff", before, before, "--format", "json"]);
     assert.notEqual(gradeHistoryStep(step.expect, JSON.parse(same.stdout)).status, "pass");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a rename under a fresh id is satisfied by the CLI's own synonym candidate", () => {
+  // The other form the grader accepts, against real output too: the same
+  // rename with every reference to the object type moved to a new id, as
+  // a re-extraction would mint one.
+  const dir = mkdtempSync(join(tmpdir(), "trial-rename-fresh-"));
+  try {
+    const step = applyChange(doc, { kind: "rename_object_type", from: "Encounter", to: "Visit" });
+    const oldId = doc.model.object_types.find((ot) => ot.name === "Encounter").id;
+    const swap = (v) =>
+      v === oldId
+        ? `${oldId}-fresh`
+        : Array.isArray(v)
+        ? v.map(swap)
+        : v && typeof v === "object"
+        ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swap(x)]))
+        : v;
+    const before = join(dir, "before.orm.yaml");
+    const after = join(dir, "after.orm.yaml");
+    writeFileSync(before, stringify(doc, { lineWidth: 0 }));
+    writeFileSync(after, stringify(swap(step.doc), { lineWidth: 0 }));
+    const d = runCli(["diff", before, after, "--format", "json"]);
+    assert.equal(d.exit, 0, d.stderr);
+    const graded = gradeHistoryStep(step.expect, JSON.parse(d.stdout));
+    assert.equal(graded.status, "pass", graded.detail);
+    assert.match(graded.detail, /synonym candidate/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

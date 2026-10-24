@@ -6,7 +6,7 @@ import { referenceModeOf, valueConstraintOf } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactTypeDelta, ModelDelta, ObjectTypeDelta, SynonymCandidate } from "./deltas.js";
 import { playerName } from "./elementDiff.js";
-import { type DiffIdentity, diffIdentity } from "./identity.js";
+import type { DiffIdentity } from "./identity.js";
 
 /**
  * Extract the reference mode suffix: the part after stripping the
@@ -51,7 +51,7 @@ export function detectSynonymCandidates(
   deltas: readonly ModelDelta[],
   existingModel: OrmModel,
   incomingModel: OrmModel,
-  identity: DiffIdentity = diffIdentity(existingModel, incomingModel, "id-first"),
+  identity: DiffIdentity,
 ): SynonymCandidate[] {
   const candidates: SynonymCandidate[] = [];
 

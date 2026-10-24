@@ -106,12 +106,40 @@ describe("a shared id is the same element", () => {
     expect(result.model).toBeNull();
     expect(result.diagnostics.map((d) => d.message)).toEqual([
       'Merge failed: two elements would take one name: object type "Client": '
-      + 'a (renamed from "Customer"), b. Decide the changes that share a name together.',
+      + 'a (renamed from "Customer"), b (kept, the rename to "Customer" not accepted). '
+      + "Accept or reject the changes that share a name together, "
+      + "or rename one of them in the base model first.",
     ]);
     // Deciding both together is fine either way.
     const all = new Set(deltas.map((_, i) => i));
     expect(mergeAndValidate(existing, incoming, deltas, all).model?.getObjectType("a")?.name)
       .toBe("Client");
+  });
+
+  it("refuses a rename onto a removed name when the removal is rejected", () => {
+    // The default policy of `barwise merge`, the MCP merge tool and
+    // transcript import: accept additions and modifications, reject
+    // removals. Pairing by name used to read this as A removed and B
+    // unchanged, so that policy kept A and silently lost the rename.
+    const existing = new OrmModel({ name: "M" });
+    existing.addObjectType({ id: "1", name: "A", kind: "value" });
+    existing.addObjectType({ id: "2", name: "B", kind: "value" });
+    const incoming = new OrmModel({ name: "M" });
+    incoming.addObjectType({ id: "1", name: "B", kind: "value" });
+    const { deltas } = diffModels(existing, incoming);
+    const policy = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
+
+    expect(mergeAndValidate(existing, incoming, deltas, policy).diagnostics.map((d) => d.message))
+      .toEqual([
+        'Merge failed: two elements would take one name: object type "B": '
+        + '1 (renamed from "A"), '
+        + "2 (removed by the incoming model, kept because the removal was not accepted). "
+        + "Accept or reject the changes that share a name together, "
+        + "or rename one of them in the base model first.",
+      ]);
+    const all = new Set(deltas.map((_, i) => i));
+    expect(mergeAndValidate(existing, incoming, deltas, all).model?.objectTypes.map((o) => o.id))
+      .toEqual(["1"]);
   });
 
   it("under content matching, coinciding positional ids pair by name", () => {

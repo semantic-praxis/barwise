@@ -32,7 +32,7 @@ export function diffObjectType(
   b: ObjectType,
   existingModel: OrmModel,
   incomingModel: OrmModel,
-  identity: DiffIdentity = diffIdentity(existingModel, incomingModel, "id-first"),
+  identity: DiffIdentity,
 ): ChangeDescription[] {
   const changes: ChangeDescription[] = [];
 

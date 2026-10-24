@@ -445,7 +445,18 @@ checklist above:
   each object type and fact type ends with before anything is built and
   throws, naming every holder; `mergeAndValidate` turns it into
   `merge-error`. It also covers an accepted addition taking the name a
-  rejected rename keeps, which is not a swap.
+  rejected rename keeps, which is not a swap. Which side each delta keeps
+  is one helper, `keptSide`, shared with the subtype-fact and population
+  phases, so the pre-check cannot drift from what they build.
+
+  One case reaches the surfaces' default policy (accept additions and
+  modifications, reject removals): A renamed to B while the old B is
+  deleted. The rename is accepted, the removal rejected, and two object
+  types would be named B, so `barwise merge`, the MCP merge tool and
+  transcript import now refuse it, naming both and why each is there.
+  Under name pairing the same input merged cleanly by keeping A and
+  dropping the rename without a word; a refusal is the honest form of
+  that, and the message says what to change.
 - **Options and labels** as listed: `matching` replaces
   `constraintMatching` (llm's `UNRELATED_IDS_DIFF`), a `name` change rated
   `safe`, the delta labelled with the existing name.
