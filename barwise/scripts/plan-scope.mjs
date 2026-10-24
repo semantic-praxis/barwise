@@ -32,7 +32,7 @@
  *   --root <dir> runs against another git tree, for this script's tests.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { opt } from "./lib/args.mjs";
@@ -68,6 +68,12 @@ try {
     lineCount.set(path, (Number(a) || 0) + (Number(d) || 0));
   }
 
+  const trackedList = lines(git("ls-files", "-z"));
+  // A repository always tracks files: an empty listing is git answering
+  // emptily, and a report built on it would read no spec and plan nothing.
+  // Checked before the merge history, so a refusal costs nothing.
+  if (trackedList.length === 0) throw new Error(`git ls-files lists nothing under ${root}`);
+
   const generated = generatedPaths(changed, root);
   const counted = changed.filter((f) => !generated.has(f));
   const size = counted.reduce((n, f) => n + (lineCount.get(f) ?? 0), 0);
@@ -88,18 +94,15 @@ try {
   const below = sizes.filter((s) => s < size).length;
 
   // The specs the branch names.
-  const trackedList = lines(git("ls-files", "-z"));
-  // A repository always tracks files: an empty listing is git answering
-  // emptily, and a report built on it would say "nothing changed".
-  if (trackedList.length === 0) throw new Error(`git ls-files lists nothing under ${root}`);
   const tracked = new Set([...trackedList, ...added]);
-  // Only specs that still exist: one the branch deletes, archives or
-  // renames away is a change to a plan, not a plan to read.
-  const specs = new Set(changed.filter((f) => inSpecCorpus(f) && trackedList.includes(f)));
+  // Only specs on disk: one the branch deletes, archives or renames away
+  // (staged or not) is a change to a plan, not a plan to read.
+  const onDisk = (f) => existsSync(join(root, f));
+  const specs = new Set(changed.filter((f) => inSpecCorpus(f) && onDisk(f)));
   const messages = git("log", "--format=%B", `${base}..HEAD`);
   for (const m of messages.matchAll(/([\w.-]+\.spec\.md)/g)) {
     const f = SPEC_DIR + m[1];
-    if (tracked.has(f) && inSpecCorpus(f)) specs.add(f);
+    if (tracked.has(f) && inSpecCorpus(f) && onDisk(f)) specs.add(f);
   }
 
   // Each spec's plan: its Touches: entries, or the paths its text names.
@@ -128,9 +131,11 @@ try {
     }
   }
   // A file is planned when an entry names it, a directory entry holds it,
-  // or a pattern entry matches it; a named spec is part of its own plan.
+  // or a pattern entry matches it. Any change under the specs directory is
+  // the plan itself being edited -- a spec revised, archived or retired --
+  // not work outside it.
   const planned = (f) =>
-    specs.has(f)
+    f.startsWith(SPEC_DIR)
     || plan.some((p) =>
       p === f || (p.endsWith("/") && f.startsWith(p)) || (p.includes("*") && matchesPattern(f, p))
     );

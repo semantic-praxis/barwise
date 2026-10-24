@@ -181,6 +181,19 @@ test("plan-scope does not read a spec the branch archives or deletes", () => {
     const out = r.run();
     assert.equal(out.status, 0, out.stdout + out.stderr);
     assert.match(out.stdout, /No plan found/);
+    // With another spec named, the archived spec's two paths are the plan
+    // being edited, not files outside it.
+    r.commit("work on p", {
+      "barwise/docs/specs/p.spec.md": "# P\n\nStatus: Draft\nTouches: src/a.ts, src/b.ts\n\n## B\n",
+      "src/a.ts": "a2\n",
+    });
+    const named = r.run();
+    assert.equal(named.status, 0, named.stdout + named.stderr);
+    assert.match(named.stdout, /Every changed file is in the plan\./);
+    // A spec removed from disk but still in the index is not read either.
+    rmSync(join(r.dir, "barwise/docs/specs/p.spec.md"));
+    const gone = r.run();
+    assert.equal(gone.status, 0, gone.stdout + gone.stderr);
   } finally {
     r.done();
   }
@@ -195,7 +208,7 @@ test("plan-scope refuses when git answers with an empty listing", () => {
     const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
     writeFileSync(
       join(shim, "git"),
-      `#!/bin/sh\nfor a in "$@"; do [ "$a" = ls-files ] && exit 0; done\nexec ${real} "$@"\n`,
+      `#!/bin/sh\nfor a in "$@"; do [ "$a" = ls-files ] && exit 0; done\nexec "${real}" "$@"\n`,
     );
     chmodSync(join(shim, "git"), 0o755);
     const out = spawnSync(process.execPath, [SCRIPT, "--root", r.dir, "--base", "main"], {
