@@ -225,24 +225,33 @@ function fileShaped(pattern) {
 }
 
 /**
- * `reachAcknowledged` is optional; when present it is an object whose
- * values are arrays of non-empty strings. Checked here and not in
- * `validateRows`, because `pr-risk` reads rows through that validator and
- * never reads this field: a malformed waiver must not make the classifier
- * refuse (and so request a review on every PR) over a field it does not
- * use. The gate calls this, and maps the throw to exit 2.
+ * `reachAcknowledged` is optional; when present it is an object of file
+ * name -> array of distinct, non-empty path strings. Checked here and not
+ * in `validateRows`, because `pr-risk` reads rows through that validator
+ * and never reads this field: a malformed waiver must not make the
+ * classifier refuse (and so request a review on every PR) over a field it
+ * does not use. The gate calls this, and maps the throw to exit 2.
+ *
+ * A path listed twice is malformed, not a finding. A finding (exit 1)
+ * says the table disagrees with the TREE, and editing the table to match
+ * the tree fixes it. A duplicate cannot arise from any tree: the list
+ * declares a set, and a list that repeats a member is a broken
+ * declaration of one, like an empty string in it.
  */
 function acknowledgements(row, at) {
   const ack = row.reachAcknowledged;
   if (ack === undefined) return {};
   if (ack === null || typeof ack !== "object" || Array.isArray(ack)) {
-    throw new Error(`${at}: reachAcknowledged must be an object of pattern -> path list`);
+    throw new Error(`${at}: reachAcknowledged must be an object of file name -> path list`);
   }
   for (const [key, paths] of Object.entries(ack)) {
+    const at2 = `${at}: reachAcknowledged[${JSON.stringify(key)}]`;
     if (!Array.isArray(paths) || paths.some((p) => typeof p !== "string" || p.length === 0)) {
-      throw new Error(
-        `${at}: reachAcknowledged[${JSON.stringify(key)}] must be an array of non-empty strings`,
-      );
+      throw new Error(`${at2} must be an array of non-empty strings`);
+    }
+    const twice = paths.filter((p, i) => paths.indexOf(p) !== i);
+    if (twice.length > 0) {
+      throw new Error(`${at2} lists ${twice.map((p) => JSON.stringify(p)).join(", ")} twice`);
     }
   }
   return ack;
@@ -263,46 +272,72 @@ function acknowledgements(row, at) {
  * by "some shadow remains", would silently cover the next same-named file
  * anyone adds; an exact list fails on the PR that adds it.
  *
- * Pure: `rows` are validated rows (tier rows and failure modes alike),
- * `tracked` the repository's file list. Throws on a malformed
- * `reachAcknowledged`. Returns:
- *   findings  { heading, pattern, shadow, unacknowledged, acknowledged }
- *             for each pattern whose shadow has paths the row does not
- *             acknowledge (`acknowledged` false: no entry at all)
- *   stale     { heading, key, paths } for each acknowledgement that no
- *             longer agrees: `paths` are listed but not in the shadow, or
- *             `null` when the key itself waives nothing -- it is not a
- *             file-shaped pattern of the row, or its shadow is empty
+ * The shadow depends only on the row and the FILE NAME, never on which
+ * pattern carried the name: two same-named patterns in one row exclude
+ * the same reached files and so always share one shadow. So it is
+ * computed once per (row, file name), and `reachAcknowledged` is keyed by
+ * file name. Keyed by pattern, the wiring row repeated twelve paths under
+ * `barwise/package.json` and `package.json`, and one new workspace
+ * package meant editing three lists that could only ever agree.
+ *
+ * Pure: `rows` are validated rows of one kind, `kind` names them in
+ * messages as `validateRows` does ("row", "failure mode"), `tracked` is
+ * the repository's file list. Throws on a malformed `reachAcknowledged`.
+ * Returns, each entry carrying `label` (`row "<heading>"`):
+ *   findings  { label, name, patterns, unacknowledged, acknowledged }
+ *             for each file name whose shadow has paths the row does not
+ *             acknowledge; `patterns` are the row's patterns with that
+ *             name, each once; `acknowledged` is false when there is no
+ *             entry at all, and then `unacknowledged` IS the whole shadow
+ *   stale     { label, key, paths, reason } for each acknowledgement that
+ *             no longer agrees: `paths` are listed but not in the shadow;
+ *             or `paths` is null and `reason` says why the whole key
+ *             waives nothing
  */
-export function shadowedPatterns(rows, tracked) {
+export function shadowedPatterns(rows, tracked, kind = "row") {
   const findings = [];
   const stale = [];
   const name = (p) => p.split("/").at(-1);
   for (const row of rows) {
-    const ack = acknowledgements(row, `row ${JSON.stringify(row.heading)}`);
-    const globs = row.globs ?? [];
-    const shaped = globs.filter(fileShaped);
+    const label = `${kind} ${JSON.stringify(row.heading)}`;
+    const ack = acknowledgements(row, label);
+    // Deduped first, so a glob listed twice is named once in a finding.
+    const globs = [...new Set(row.globs ?? [])];
     const reached = (f) => globs.some((g) => matchesPattern(f, g));
-    for (const pattern of shaped) {
-      const shadow = tracked.filter((f) => name(f) === name(pattern) && !reached(f)).sort();
-      const listed = Object.hasOwn(ack, pattern) ? ack[pattern] : undefined;
+    const names = new Map();
+    for (const g of globs.filter(fileShaped)) {
+      names.set(name(g), [...(names.get(name(g)) ?? []), g]);
+    }
+    for (const [n, patterns] of names) {
+      const shadow = tracked.filter((f) => name(f) === n && !reached(f)).sort();
+      const listed = Object.hasOwn(ack, n) ? ack[n] : undefined;
       const unacknowledged = shadow.filter((p) => !listed?.includes(p));
       if (unacknowledged.length > 0) {
         findings.push({
-          heading: row.heading,
-          pattern,
-          shadow,
+          label,
+          name: n,
+          patterns,
           unacknowledged,
           acknowledged: listed !== undefined,
         });
       }
       if (listed === undefined) continue;
       const gone = listed.filter((p) => !shadow.includes(p));
-      if (gone.length > 0) stale.push({ heading: row.heading, key: pattern, paths: gone });
-      else if (shadow.length === 0) stale.push({ heading: row.heading, key: pattern, paths: null });
+      if (gone.length > 0) {
+        stale.push({ label, key: n, paths: gone, reason: null });
+      } else if (shadow.length === 0) {
+        stale.push({ label, key: n, paths: null, reason: "its shadow is empty" });
+      }
     }
     for (const key of Object.keys(ack)) {
-      if (!shaped.includes(key)) stale.push({ heading: row.heading, key, paths: null });
+      if (!names.has(key)) {
+        stale.push({
+          label,
+          key,
+          paths: null,
+          reason: "not the file name of any file-shaped pattern in this row",
+        });
+      }
     }
   }
   return { findings, stale };

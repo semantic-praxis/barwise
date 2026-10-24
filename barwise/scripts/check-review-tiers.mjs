@@ -32,7 +32,8 @@
  * said so (barwise-fs0).
  *
  * So does a file-shaped glob whose name lives elsewhere unreached, unless
- * the row's `reachAcknowledged` lists exactly those paths. The
+ * the row's `reachAcknowledged` lists exactly those paths under that file
+ * name. The
  * instructions row's `CLAUDE.md` matched the root file and none of the
  * thirteen package copies, and the zero-match check could not see it
  * because one file matched (docs/specs/review-tier-reach.spec.md,
@@ -90,7 +91,9 @@ try {
   // Inside the try: a malformed reachAcknowledged is "cannot answer"
   // (exit 2). Validated by shadowedPatterns rather than tierRows, so
   // pr-risk, which never reads the field, cannot be made to refuse over it.
-  reach = shadowedPatterns([...rows, ...modes], tracked);
+  const r = shadowedPatterns(rows, tracked, "row");
+  const m = shadowedPatterns(modes, tracked, "failure mode");
+  reach = { findings: [...r.findings, ...m.findings], stale: [...r.stale, ...m.stale] };
 } catch (err) {
   console.error(`check:review-tiers: cannot answer -- ${err.message}`);
   if (err.cause) console.error(`  cause: ${err.cause.message}`);
@@ -128,18 +131,18 @@ if (problems > 0) {
     const what = f.acknowledged
       ? "same-named path(s) missing from its reachAcknowledged list"
       : "unreached same-named path(s), unacknowledged";
-    console.error(`  shadowed: ${f.heading}: ${f.pattern} has ${f.unacknowledged.length} ${what}:`);
+    console.error(
+      `  shadowed: ${f.label}: ${f.name} (${f.patterns.join(", ")}) has `
+        + `${f.unacknowledged.length} ${what}:`,
+    );
     for (const p of f.unacknowledged) console.error(`    ${p}`);
   }
   for (const s of reach.stale) {
     if (s.paths === null) {
-      console.error(
-        `  stale reachAcknowledged key: ${s.heading}: ${s.key} `
-          + "(not a file-shaped pattern of the row, or nothing in its shadow)",
-      );
+      console.error(`  stale reachAcknowledged key: ${s.label}: ${s.key} (${s.reason})`);
       continue;
     }
-    console.error(`  stale reachAcknowledged path(s): ${s.heading}: ${s.key}, no longer shadowed:`);
+    console.error(`  stale reachAcknowledged path(s): ${s.label}: ${s.key}, no longer shadowed:`);
     for (const p of s.paths) console.error(`    ${p}`);
   }
   console.error(
