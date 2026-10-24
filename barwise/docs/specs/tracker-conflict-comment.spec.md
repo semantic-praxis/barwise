@@ -11,131 +11,166 @@ Touches: +.github/workflows/tracker-conflicts.yml, +barwise/scripts/tracker-conf
 
 The merge driver (`beads-merge-driver.spec.md`) solved the tracker
 conflict once, centrally, but only where git runs it: a local merge.
-GitHub runs no custom driver, so after every push to main a PR that
-added an issue can show as conflicted, and nothing tells its owner that
-one local `git merge origin/main` clears it. No event wakes an agent
-when main moves under a PR, and PR #704 sat conflicted for hours at a
-time. The owner chose (decision 1(c) of that spec) a workflow that
-notices and comments, and pushes nothing.
+GitHub runs no custom driver, so a PR that added an issue can show as
+conflicted after main moves, and nothing tells its owner that one local
+`git merge origin/main` clears it. No event wakes an agent when main
+moves under a PR, and PR #704 sat conflicted for hours at a time. The
+owner chose (decision 1(c) of that spec) a workflow that notices and
+comments, and pushes nothing.
 
-**Resolution in one sentence:** on every push to main, a workflow
-test-merges each open PR with `git merge-tree`, with and without the
-driver. Where the tracker is the only conflict, it posts one comment on
-that PR, saying a local merge resolves it, and edits that same comment
-on later runs instead of adding another.
+**Resolution in one sentence:** when main moves, or when a PR into main
+is pushed, a workflow finds each PR whose only conflict with main is the
+tracker. It runs the driver's own merge on that file in-process and
+keeps one comment per conflict episode on the PR saying what a local
+merge will do.
 
-## How does the workflow know the tracker is the only conflict? (resolved: two in-memory test merges)
+## How does the workflow decide? (resolved: git's merge for the paths, the driver's own function for the tracker)
 
-GitHub's `mergeable` flag says that a PR conflicts, not where. So the
-workflow merges each open PR's head with main itself, twice, using
-`git merge-tree --write-tree --name-only`:
+For each open PR whose base is `main`:
 
-1. **Without the driver**: the runner's clone has no `merge.beads.*`
-   config, so git line-merges the tracker as GitHub does. The conflicted
-   paths are what the PR page is complaining about.
-2. **With the driver**: the same merge with
-   `-c merge.beads.driver="sh barwise/scripts/beads-merge-driver.sh %O %A %B %P"`
-   and `-c merge.beads.recursive=binary`, from main's checkout. The
-   conflicted paths are what a local merge would leave.
+1. **Which paths conflict on GitHub.** `git merge-tree --write-tree
+   --name-only main <pr-head>`, in a clone with no `merge.beads.*`
+   config, so the tracker is line-merged as GitHub merges it. It runs in
+   memory: no checkout, no index, no hooks. Probe against git 2.43: an
+   undefined driver line-merges and lists the tracker as conflicted.
+2. **What a local merge would do to the tracker**, only when the
+   tracker is the sole conflicted path. The script reads the tracker
+   from the merge base, main and the PR head (`git show <rev>:.beads/issues.jsonl`)
+   and calls `resolveTracker` from `scripts/lib/beads-merge.mjs`, the
+   driver's own function, in-process. When there is more than one merge
+   base, it uses their common ancestor, the base
+   `merge.beads.recursive=binary` gives the installed driver.
 
-`merge-tree` merges in memory: no checkout, no index, no hooks. It
-honours `.gitattributes` and a driver given on the command line. Both
-were checked with probes against git 2.43: an undefined driver
-line-merges and reports the conflict, and a configured one resolves the
-tracker and reports only the other paths.
+Calling the function rather than running the driver through git returns
+a structured answer instead of an exit code: the ids that need a person
+and the reason for each, or which version is malformed. Nothing has to
+locate a driver script or parse its stderr.
 
-**Per open PR, the first matching rule decides:**
+**The verdict, first matching rule:**
 
-| Without driver           | With driver    | Action                                                                                  |
-| ------------------------ | -------------- | --------------------------------------------------------------------------------------- |
-| no conflict              | (not run)      | none                                                                                    |
-| any path but the tracker | (not run)      | none: a conflict a person must resolve anyway, and the PR page already says so          |
-| only the tracker         | no conflict    | comment: a local `git merge origin/main` resolves it with no hand work                  |
-| only the tracker         | still conflict | comment: a local merge resolves everything except issues both sides changed differently |
+| Conflicted paths (step 1) | Tracker (step 2)             | Verdict        | The comment says                                                                                 |
+| ------------------------- | ---------------------------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| none                      | (not run)                    | `clean`        | (only edits an open comment: the conflict is gone)                                               |
+| any path but the tracker  | (not run)                    | `other`        | (only edits an open comment: it now conflicts elsewhere too, and needs hand resolution)          |
+| only the tracker          | merges with nothing reported | `resolves`     | a local merge resolves it with no hand work                                                      |
+| only the tracker          | reports ids                  | `needs-person` | a local merge resolves all but these ids, each with its reason                                   |
+| only the tracker          | an input is malformed        | `malformed`    | the tracker on main or on the PR is not valid, naming which; a local merge falls back to markers |
 
-The comment carries a hidden marker, `<!-- barwise:tracker-conflict -->`.
-When a marked comment already exists, the workflow edits it, recording
-main's commit and the current verdict, and never posts a second. When a
-PR stops conflicting, the existing comment is edited to say so, so a
-reader never acts on a stale instruction.
+Every comment that tells someone to merge also says to run
+`npm run prepare` first if their clone has not installed the driver,
+since without it git line-merges the file.
+
+## One comment per conflict episode (resolved: open while it applies, then closed)
+
+The comment carries a hidden marker with its state:
+`<!-- barwise:tracker-conflict state=open -->` or `state=closed`.
+
+- When the verdict calls for a comment (`resolves`, `needs-person`,
+  `malformed`) and the PR has an **open** marked comment, the workflow
+  edits it to the current verdict and main's commit.
+- When it calls for a comment and the PR has none, or only **closed**
+  ones, the workflow posts a new comment. A new conflict episode is a
+  new comment, because an edit sends no notification and fires no
+  `issue_comment` event, and notifying is the point.
+- When the verdict is `clean` or `other` and the PR has an open marked
+  comment, the workflow edits it to say so and marks it closed. Nothing
+  is posted for `clean` or `other` otherwise: the PR page already shows
+  a non-tracker conflict.
+
+## What triggers a run? (resolved: main moving, and a PR into main being pushed)
+
+- **`push` to `main`**: every open PR into main is checked, because
+  main moving is what conflicts them.
+- **`pull_request_target`** (`opened`, `synchronize`, `reopened`) on a
+  PR into main: that PR alone is checked. This closes an open comment
+  as soon as the owner pushes the merge, and catches a PR whose own push
+  made the conflict.
+- **`workflow_dispatch`**: every open PR into main, for a manual
+  re-check.
+
+One `concurrency` group per PR number for the PR trigger, and one for
+the full scan, each cancelling the older run.
 
 ## Why is this safe with a write token? (resolved: no PR code runs)
 
 `REVIEW.md` lists "a workflow that runs PR code with a write token" as a
 security trigger, so this spec answers it directly.
 
-- **Trigger and checkout.** The workflow runs on `push` to `main` (and
-  `workflow_dispatch`). It checks out main. Both the driver it registers
-  and the script it runs come from main.
-- **What the PR supplies.** Each PR's head is fetched as
-  `refs/pull/<n>/head` and passed to `git merge-tree` as data. merge-tree
-  runs no hooks and checks nothing out.
-- **The one PR-controlled input git acts on is `.gitattributes`.** A PR
-  can route other files to the `beads` driver, which only runs main's
-  driver on more data. Drivers, filters and their commands live in git
-  config, not in the tree, so a PR cannot name a command to run.
-- **No PR-controlled string reaches a shell.** PR numbers arrive from
-  the API as integers. Titles and branch names are never used.
-- **Token scope.** `contents: read` and `pull-requests: write`. The
-  second is only for posting and editing the comment. It cannot push to
-  any branch.
+- **Checkout.** Every trigger checks out `main` explicitly (`ref:` set
+  to the default branch, as `copilot-review.yml` does), so the script
+  and the driver function always come from main. That holds under
+  `workflow_dispatch` from another branch and under
+  `pull_request_target`.
+- **What the PR supplies.** The PR head is fetched as
+  `refs/pull/<n>/head`, which lives in the base repository for fork PRs
+  too. It is read as data: by `git merge-tree`, which runs no hooks and
+  checks nothing out, and by `git show`, which prints a blob.
+- **`.gitattributes` is the one PR-controlled input git acts on.** With
+  no `merge.*` config in the clone, any driver it names is undefined and
+  git line-merges. Drivers, filters and their commands live in git
+  config, never in the tree, so a PR cannot name a command to run.
+- **No PR-controlled string reaches a shell.** PR numbers and SHAs come
+  from the event or the API and are validated as an integer and 40 hex
+  characters before use. Titles and branch names are never used. Comment
+  bodies are built from the verdict and from issue ids, which are
+  checked against the tracker's id pattern before they are quoted.
+- **Token scope.** `contents: read` and `pull-requests: write`, the
+  second only to post and edit the comment. It cannot push to a branch.
 
 ## Scope
 
 In scope:
 
-- When main receives a push, the workflow shall classify every open PR
-  by the table above and act on its row.
-- When a PR's row calls for a comment and a marked comment exists, the
-  workflow shall edit that comment instead of posting another.
-- When a PR with a marked comment no longer conflicts, the workflow
-  shall edit the comment to say the conflict is gone.
-- When the GitHub API or a fetch fails for one PR, the workflow shall
-  report that PR as unchecked and go on to the rest. It shall exit
-  non-zero at the end if any PR went unchecked, so the run is red rather
-  than silently partial (`gate-refusal-contract.spec.md`).
-- When two pushes to main arrive close together, the workflow shall
-  cancel the older run (one `concurrency` group).
-- When `git merge-tree` is too old to support `--write-tree`, the script
-  shall refuse with exit 2, naming the version it needs.
+- When a run checks a PR, the workflow shall assign it a verdict by the
+  table above and act on the comment rules.
+- When a PR's base is not `main`, the workflow shall skip it.
+- When fetching or classifying one PR fails, the workflow shall record
+  that PR as unchecked, with the reason, in the job summary and as a
+  warning annotation, and go on to the rest.
+- When every PR in a run went unchecked, or the PR list itself cannot be
+  read, the script shall exit 2, "could not answer"
+  (`gate-refusal-contract.spec.md`). One unreadable PR does not turn
+  every later run red, which would teach readers to ignore the color.
+- When `git merge-tree` does not support `--write-tree` (git older than
+  2.38), the script shall exit 2, naming the version it needs.
 
 Out of scope:
 
 - Pushing the merge for the PR's owner (decision 1(b) of the driver
   spec). It needs write access to people's branches. It can follow if
   these comments turn out to be ignored.
-- Naming the issues behind a real tracker disagreement in the comment.
-  The local merge names them, and parsing driver stderr in CI adds a
-  second consumer of a message format meant for people.
-- Fork PRs whose head cannot be fetched with the default token. They
-  are reported as unchecked, by the rule above.
+- PRs into branches other than `main`. Stacked PRs merge into their own
+  base, and a verdict against main would be wrong.
 
 ## Inventory
 
-| Path                                               | Current state                     | Verdict                                                                                                               |
-| -------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `.github/workflows/tracker-conflicts.yml`          | does not exist                    | new: on push to main; checkout with full history; setup-node from `.nvmrc`; runs the script                           |
-| `barwise/scripts/lib/tracker-conflicts.mjs`        | does not exist                    | new, pure: `classify(without, with)` returning the table's action, and `commentBody(verdict, mainSha)`                |
-| `barwise/scripts/tracker-conflicts.mjs`            | does not exist                    | new: lists open PRs, fetches heads, runs the two merge-trees, posts or edits comments; GitHub client injectable       |
-| `barwise/scripts/tests/tracker-conflicts.test.mjs` | does not exist                    | new: `classify` for every row; real merge-trees in temp repos for each row; posting and editing against a fake client |
-| `barwise/scripts/tests/expected-counts.json`       | registered test counts            | gains the new file's count                                                                                            |
-| `.claude/skills/steward/SKILL.md` section 1        | says GitHub runs no driver        | one sentence: the workflow's comment is the cue to merge main                                                         |
-| `barwise/scripts/beads-merge-driver.sh`            | the wrapper; finds its node files | untouched: run in place from the repository, where it finds the driver beside itself                                  |
+| Path                                               | Current state                | Verdict                                                                                                                        |
+| -------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `.github/workflows/tracker-conflicts.yml`          | does not exist               | new: the three triggers; checkout of `main` with full history; setup-node from `.nvmrc`; runs the script                       |
+| `barwise/scripts/lib/tracker-conflicts.mjs`        | does not exist               | new, pure: `verdict(conflictedPaths, trackerResult)`, `commentAction(verdict, existingComments)`, `commentBody(verdict, ...)`  |
+| `barwise/scripts/tracker-conflicts.mjs`            | does not exist               | new: lists PRs, fetches heads, runs `merge-tree`, reads the three tracker versions, calls `resolveTracker`, posts or edits     |
+| `barwise/scripts/lib/beads-merge.mjs`              | the driver's pure resolution | untouched: imported and called, as the driver calls it                                                                         |
+| `barwise/scripts/tests/tracker-conflicts.test.mjs` | does not exist               | new: every verdict and comment rule against the pure lib; real `merge-tree` and `git show` in temp repos; a fake GitHub client |
+| `barwise/scripts/tests/expected-counts.json`       | registered test counts       | gains the new file's count                                                                                                     |
+| `.claude/skills/steward/SKILL.md` section 1        | says GitHub runs no driver   | one sentence: the workflow's comment is the cue to merge main                                                                  |
 
 ## Alternatives considered
 
+- **Run the driver through `git merge-tree` a second time.** The first
+  draft did this. An exit code cannot tell a real disagreement from a
+  malformed file or a driver that never started, so a failure read as
+  "issues both sides changed differently". Calling `resolveTracker`
+  returns which of those it is.
 - **GitHub's `mergeable` flag alone.** It says a PR conflicts, not on
-  which paths. It is also computed lazily, so right after a push it is
-  often `null`.
-- **Check out each PR and run `git merge`.** This touches a work tree
-  and runs hooks, which is heavier for the same answer and gives PR
-  content a working directory. merge-tree needs neither.
-- **`pull_request_target` on each PR.** The trigger is main moving, not
-  the PR changing. A PR-triggered workflow would miss exactly the case
-  this exists for.
-- **A scheduled run.** Main moving is the cause, so a push trigger
-  answers at the moment it changes. A schedule adds latency and runs
-  when nothing moved.
+  which paths, and it is computed lazily, so it is often `null` right
+  after a push.
+- **Check out each PR and run `git merge`.** This is heavier for the
+  same answer, runs hooks, and gives PR content a working directory.
+- **Edit one comment forever.** The first draft did this. A PR that
+  conflicts a second time would be updated silently, because GitHub
+  sends no notification for an edit.
+- **A scheduled run.** Main moving and the PR moving are the causes, so
+  triggering on them answers when it matters. A schedule adds latency.
 
 ## Workstreams
 
@@ -143,40 +178,45 @@ Out of scope:
 
 One PR. Acceptance:
 
-- When the test suite runs, every row of the table shall have a case
-  against `classify`, and a case running both real merge-trees in a temp
+- When the test suite runs, every verdict row and every comment rule
+  shall have a case against the pure lib. Each verdict shall also have a
+  case running the real `merge-tree` and `git show` in a temp
   repository. Each case shall have been seen failing first, through
   `mutate.mjs`.
-- When the script runs against a fake client for a PR with no marked
-  comment, it shall post one; with one, it shall edit it and post none.
-- When a PR with a marked comment no longer conflicts, the script shall
-  edit the comment to say so.
-- When fetching one PR fails, the others shall still be classified, and
-  the script shall exit non-zero naming the unchecked PR.
-- The workflow shall have `permissions: contents: read,
-  pull-requests: write`, and `/security-review` shall run on the PR, per
-  `REVIEW.md`.
+- When a PR conflicts on the tracker a second time after its comment
+  was closed, the script shall post a new comment and leave the closed
+  one alone.
+- When an open comment's PR moves to `other` or `clean`, the script
+  shall edit that comment and mark it closed.
+- When one PR cannot be fetched, the others shall still be checked, the
+  summary shall name it, and the script shall exit 0. When none can be
+  checked, it shall exit 2.
+- When a PR's base is not `main`, it shall not be checked.
+- The workflow shall check out `main` explicitly under every trigger
+  and have `permissions: contents: read, pull-requests: write`.
+  `/security-review` shall run on the PR, per `REVIEW.md`.
 
 ## Decisions (owner, 2026-10-24)
 
-1. **Comment on a real tracker disagreement (the table's last row)?
-   Decided: yes.** The PR still needs only a local merge to show what is
-   left, and silence would leave the case that most needs a person
-   without a cue. The alternative was to comment only when the driver
-   resolves everything.
+1. **Comment on a real tracker disagreement? Decided: yes.** The PR
+   still needs only a local merge to show what is left, and silence
+   would leave the case that most needs a person without a cue. The
+   comment names the ids, which the in-process call makes available.
 2. **When the conflict is gone? Decided: edit the comment, do not
    delete it.** An edited comment records what happened for someone
-   reading an old notification; a deleted one leaves them nothing.
+   reading an old notification. A later conflict gets a new comment, by
+   the episode rule above.
 
 ## Risks and testing
 
-- **A wrong "only the tracker" verdict sends someone to merge a PR with
-  a real conflict.** Guarded: the verdict comes from git's own merge,
-  run twice, and the tests run real merge-trees for every row.
-- **Comment noise.** One comment per PR, edited in place. The marker is
-  the key, and the tests pin it.
-- **Runner git too old for `merge-tree --write-tree` (needs 2.38).** The
-  script refuses with exit 2 rather than misreporting.
+- **A wrong `resolves` verdict sends someone to merge a PR with a real
+  conflict.** Guarded: the paths come from git's own merge, and the
+  tracker verdict from the same function the driver runs. The tests run
+  both for real.
+- **Comment noise.** At most one open comment per PR, and a new one only
+  for a new episode. The marker and its state are pinned by tests.
+- **Runner git too old for `merge-tree --write-tree`.** The script
+  refuses with exit 2.
 
 ## Non-goals
 
