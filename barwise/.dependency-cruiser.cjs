@@ -2,8 +2,8 @@
 // docs/specs/archive/architecture-analysis.spec.md.
 //
 // This config IS the reflexion model: the intended one-way dependency
-// graph from the root CLAUDE.md, encoded as machine-checkable rules and
-// diffed against the actual import graph on every CI run. It owns the
+// graph (INTENDED, scripts/lib/intended.cjs, the authority), encoded as
+// machine-checkable rules and diffed against the actual import graph on every CI run. It owns the
 // orthogonality pillar -- direction (S-ORTH-1..3) and acyclicity
 // (S-ORTH-4, which replaces the former madge check).
 //
@@ -21,41 +21,10 @@
 // mapping is missing or stale, and probes that a forbidden subpath
 // import is actually reported.
 
-// The intended graph: which @barwise/* packages each package may import.
-// Source of truth is the root CLAUDE.md dependency graph.
-const INTENDED = {
-  "core": [],
-  "diagram": ["core"],
-  "diagram-ui": ["diagram"],
-  "llm": ["core"],
-  "code-analysis": ["core"],
-  "dbt": ["core"],
-  "formats": ["core"],
-  "learn": ["core"],
-  "promptlab": ["core", "llm", "learn"],
-  "cli": [
-    "core",
-    "diagram",
-    "diagram-ui",
-    "llm",
-    "code-analysis",
-    "dbt",
-    "formats",
-    "learn",
-    "promptlab",
-  ],
-  "mcp": ["core", "diagram", "diagram-ui", "llm", "code-analysis", "dbt", "formats", "learn"],
-  "vscode": [
-    "core",
-    "diagram",
-    "diagram-ui",
-    "llm",
-    "code-analysis",
-    "dbt",
-    "formats",
-    "mcp",
-  ],
-};
+// The intended graph lives in scripts/lib/intended.cjs, which is the
+// authority for it; the root CLAUDE.md graph is checked against it
+// (scripts/check-architecture.mjs).
+const INTENDED = require("./scripts/lib/intended.cjs");
 
 // One rule per package: forbid importing any sibling package's src that
 // is not in its permitted set (itself plus its allowed dependencies).

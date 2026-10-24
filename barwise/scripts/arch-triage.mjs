@@ -11,8 +11,9 @@
 //      size, and which files in different packages change together
 //      (temporal coupling, an orthogonality smell)?
 //
-// No dependencies: the gate tool (dependency-cruiser) is decided in
-// WS4. This snapshot stays self-contained on purpose.
+// No npm dependencies: the gate tool (dependency-cruiser) is decided in
+// WS4. The one local require is the package graph itself
+// (lib/intended.cjs), so this snapshot cannot drift from the gate.
 //
 // Usage: node barwise/scripts/arch-triage.mjs [--base <ref>]
 //
@@ -23,6 +24,7 @@
 
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join, relative } from "node:path";
 
 const gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -30,31 +32,9 @@ const gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
 }).trim();
 const pkgRoot = join(gitRoot, "barwise", "packages");
 
-// The intended one-way graph: the @barwise/* packages each package is
-// allowed to import. Source of truth is the root CLAUDE.md graph; this
-// snapshot diffs reality against it. (WS4 moves this into the gate.)
-const INTENDED = {
-  core: [],
-  diagram: ["core"],
-  "diagram-ui": ["diagram"],
-  llm: ["core"],
-  "code-analysis": ["core"],
-  dbt: ["core"],
-  formats: ["core"],
-  learn: ["core"],
-  cli: ["core", "diagram", "llm", "code-analysis", "dbt", "formats", "learn"],
-  mcp: ["core", "diagram", "llm", "code-analysis", "dbt", "formats", "learn"],
-  vscode: [
-    "core",
-    "diagram",
-    "diagram-ui",
-    "llm",
-    "code-analysis",
-    "dbt",
-    "formats",
-    "mcp",
-  ],
-};
+// The intended one-way graph, from its one home (scripts/lib/intended.cjs);
+// this snapshot diffs reality against it.
+const INTENDED = createRequire(import.meta.url)("./lib/intended.cjs");
 
 const PACKAGES = Object.keys(INTENDED);
 

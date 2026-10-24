@@ -1,18 +1,19 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Draft -- no workstream implemented
+Status: Workstream 1 implemented 2026-10-24 (one package graph); 2-5 not yet
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
+Plan-reviewed: 57072cf4 (code-review, pr-review)
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
-+barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
+barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
 barwise/packages/cli/CLAUDE.md, barwise/packages/core/CLAUDE.md,
 barwise/packages/mcp/CLAUDE.md, barwise/docs/adr/metamodel-evolution-policy.md,
 barwise/docs/adr/constraint-coverage-policy.md,
 +barwise/docs/adr/package-graph-authority.md, barwise/packages/llm/CLAUDE.md,
 barwise/packages/promptlab/CLAUDE.md, barwise/packages/promptlab/evals/suite.yaml,
-+barwise/scripts/regen-architecture.mjs, +barwise/scripts/check-architecture.mjs,
++barwise/scripts/regen-architecture.mjs, barwise/scripts/check-architecture.mjs,
 barwise/review-tiers.json, +.claude/skills/spec-writer/template.adr.md,
 .claude/skills/pr-review/checklist.md, barwise/scripts/tests/,
 barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md
