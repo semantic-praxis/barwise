@@ -11,7 +11,7 @@ import { getExporter, listExporters } from "@barwise/core";
 import { hashModel, type ManifestExport, updateManifest } from "@barwise/core/lineage";
 import { SQL_DIALECTS } from "@barwise/core/sql";
 import { registerDbtFormats } from "@barwise/dbt";
-import { registerStandardFormats } from "@barwise/formats";
+import { formatConstraintReport, registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -71,6 +71,9 @@ export function registerExportCommand(program: Command): void {
 
         if (opts.output) {
           writeExportResult(result, opts.output);
+          // Before the manifest: a manifest failure must not hide what the
+          // artifact already on disk is missing.
+          reportConstraintSpecs(result, opts.format);
 
           // An empty sources list reads as "depends on nothing", so a format
           // that records no lineage is named instead (barwise-ofb, R3).
@@ -97,8 +100,8 @@ export function registerExportCommand(program: Command): void {
         } else {
           process.stdout.write(result.text);
           if (!result.text.endsWith("\n")) process.stdout.write("\n");
+          reportConstraintSpecs(result, opts.format);
         }
-        reportConstraintSpecs(result, opts.format);
       } catch (err) {
         process.stderr.write(`Error: ${(err as Error).message}\n`);
         process.exitCode = 1;
@@ -116,27 +119,17 @@ function exportOpts(opts: ExportOptions) {
 }
 
 /**
- * Name on stderr the constraints the format reported it could not express.
- * Beside the artifact, not in it: stdout may be a pipeline's input. One
- * line per distinct verbalization, since the DDL router spills the same
- * rule once per table it touches; the pseudocode and example are in the
- * artifact and the MCP report.
+ * Name on stderr the constraints the format reported it could not
+ * express. Beside the artifact, not in it: stdout may be a pipeline's
+ * input.
  */
 function reportConstraintSpecs(
   result: ReturnType<ExportFormatAdapter["export"]>,
   format: string,
   domain?: string,
 ): void {
-  const specs = result.constraintSpecs ?? [];
-  if (specs.length === 0) return;
-  const counts = new Map<string, number>();
-  for (const spec of specs) {
-    counts.set(spec.verbalization, (counts.get(spec.verbalization) ?? 0) + 1);
-  }
-  const where = domain ? ` (domain ${domain})` : "";
-  const lines = [`${specs.length} constraint(s) the ${format} format could not express${where}:`];
-  for (const [text, n] of counts) lines.push(`  - ${text}${n > 1 ? ` (x${n})` : ""}`);
-  process.stderr.write(lines.join("\n") + "\n");
+  const report = formatConstraintReport(result.constraintSpecs, format, domain ? { domain } : {});
+  if (report) process.stderr.write(report + "\n");
 }
 
 /** Write a single export result to a file or directory (no lineage manifest). */

@@ -5,7 +5,7 @@
  * dropped the list: with `--output`, or behind `| psql`, nobody learned
  * that the irreflexive ring below has no CHECK in the artifact.
  */
-import { registerFormat } from "@barwise/core";
+import { getFormat, registerFormat } from "@barwise/core";
 import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -104,19 +104,23 @@ describe("export reports what the format could not express", () => {
     // The DDL router spills a rule once per table it touches; a person
     // needs to read it once.
     const spec = (verbalization: string) => ({ verbalization, pseudocode: "p", example: "e" });
-    registerFormat({
-      name: "repeat-spill-test",
-      description: "a test format that spills one rule twice",
-      extension: "txt",
-      exporter: {
+    // The registry is process-wide and refuses a second registration of a
+    // name, and has no way to remove one.
+    if (!getFormat("repeat-spill-test")) {
+      registerFormat({
         name: "repeat-spill-test",
         description: "a test format that spills one rule twice",
-        export: () => ({
-          text: "x",
-          constraintSpecs: [spec("Rule A."), spec("Rule B."), spec("Rule A.")],
-        }),
-      },
-    });
+        extension: "txt",
+        exporter: {
+          name: "repeat-spill-test",
+          description: "a test format that spills one rule twice",
+          export: () => ({
+            text: "x",
+            constraintSpecs: [spec("Rule A."), spec("Rule B."), spec("Rule A.")],
+          }),
+        },
+      });
+    }
     const r = await runCli([
       "export",
       join(dir, "simple.orm.yaml"),
@@ -125,7 +129,7 @@ describe("export reports what the format could not express", () => {
     ]);
     expect(r.exitCode, r.stderr).toBe(0);
     expect(r.stderr).toBe(
-      "3 constraint(s) the repeat-spill-test format could not express:\n  - Rule A. (x2)\n  - Rule B.\n",
+      "2 constraint(s) the repeat-spill-test format could not express:\n  - Rule A. (x2)\n  - Rule B.\n",
     );
   });
 });

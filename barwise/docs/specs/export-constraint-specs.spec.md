@@ -12,6 +12,10 @@ barwise/packages/mcp/src/tools/exportModel.ts,
 barwise/packages/mcp/tests/tools/,
 barwise/packages/vscode/tests/unit/,
 barwise/packages/formats/src/ossie/OssieExportFormat.ts,
++barwise/packages/formats/src/constraintReport.ts,
+barwise/packages/formats/src/index.ts,
+barwise/packages/formats/tests/,
+barwise/packages/cli/tests/fixtures/,
 barwise/docs/CLI.md
 
 `barwise export`, the MCP `export_model` tool, and the editor's
@@ -48,11 +52,13 @@ In scope:
 
 - When `barwise export` produces a result with one or more
   `constraintSpecs`, the CLI shall write to stderr, after the artifact is
-  written, a heading naming the count and the format, then one line per
-  distinct verbalization (an identical verbalization spilled for several
-  tables is one line with `(xN)`), and shall leave stdout and the exit
-  code unchanged. Verbalizations only: a person reads this in a terminal,
-  and the pseudocode and example are in the artifact and the MCP report.
+  written, a heading naming the number of distinct rules and the format,
+  then one line per distinct verbalization (an identical verbalization
+  spilled for several tables is one line with `(xN)`), and shall leave
+  stdout and the exit code unchanged. Verbalizations only: a person reads
+  this in a terminal. Neither artifact carries the pseudocode or example
+  (the DDL comment and the Ossie block hold the sentence only), so the
+  MCP report is the one place they appear.
 - When a project export (`.orm-project.yaml`) writes a domain, the CLI
   shall report that domain's specs the same way immediately after writing
   it, the heading naming the domain (its context name, as the export loop
@@ -60,8 +66,10 @@ In scope:
   reports printed, since each is printed as its domain completes.
 - When the MCP `export_model` tool's result has one or more
   `constraintSpecs`, the tool shall return a second content block after the
-  artifact block: a heading with the count and format, then each spec's
-  verbalization, pseudocode and example. That block goes through the same
+  artifact block: the same heading (naming the domain when one was
+  passed), then each distinct rule's verbalization, pseudocode and example,
+  grouped as the CLI groups them. One formatter in `@barwise/formats`
+  (`formatConstraintReport`) writes both, so the two cannot drift. That block goes through the same
   `boundedTextResult` as the artifact, under its own `kind`, so a large
   report spills to a file with a preview instead of flooding the context.
   The artifact block is unchanged.
@@ -79,7 +87,9 @@ Out of scope:
   `ExportDbtCommand`). They call the renderers directly rather than the
   format registry, so the palette DDL export has no routing and no
   `constraintSpecs` at all -- a divergence from the language-model tool
-  that predates this change and is filed as barwise-wmm.
+  that predates this change and is filed as barwise-wmm. `barwise schema`
+  and the MCP `generate_schema` tool call `renderDdl` directly too, with
+  the same gap (barwise-zk4).
 - Widening `ExportResult` to carry the DDL router's table name and reason;
   the report uses the public type as it is.
 
@@ -121,6 +131,17 @@ comment drops its "nothing reads constraintSpecs" sentence.
   there is something to report; a client reading `content[0]` sees what it
   saw before. The editor tool's single text part gains the report after
   the artifact text.
+
+## Implementation notes
+
+- Code review of the first cut found the CLI and MCP reports written
+  separately: the MCP block repeated a rule once per spilled table, both
+  headings counted spills rather than rules, and only the CLI named the
+  domain. They now share `formatConstraintReport`. The same review found
+  the Scope bullet's claim that the artifact carries pseudocode and
+  example false; the bullet is corrected above. On the single-model
+  `--output` path the report is printed before the lineage manifest is
+  written, so a manifest failure cannot hide it.
 
 ## Risks and testing
 

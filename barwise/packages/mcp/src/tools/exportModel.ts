@@ -2,9 +2,9 @@
  * export_model tool: exports an ORM model to a specified format.
  */
 
-import { type ConstraintSpec, getExporter, listExporters } from "@barwise/core";
+import { getExporter, listExporters } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
-import { registerStandardFormats } from "@barwise/formats";
+import { formatConstraintReport, registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveModels, type SourceInput, sourcePath } from "../workspace/resolve.js";
@@ -141,12 +141,17 @@ export function executeExportModel(
       outputPath,
       extension: extensionForFormat(format),
     });
-    const specs = result.constraintSpecs ?? [];
-    if (specs.length === 0) return artifact;
+    // In full: an agent acting on the export needs the predicate and the
+    // example, not only the sentence.
+    const reportText = formatConstraintReport(result.constraintSpecs, format, {
+      detail: true,
+      ...(domain ? { domain } : {}),
+    });
+    if (!reportText) return artifact;
     // A second block, so `content[0]` stays the artifact. Bounded on its
     // own, and never to `outputPath`: that path names the artifact, and
     // a spilled report written there would overwrite it.
-    const report = boundedTextResult(constraintReport(specs, format), {
+    const report = boundedTextResult(reportText, {
       kind: `export-${format}-constraints`,
       source: sourcePath(source),
     });
@@ -154,24 +159,6 @@ export function executeExportModel(
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : String(error));
   }
-}
-
-/**
- * The constraints the format reported it could not express, in full: an
- * agent acting on the export needs the predicate and example, not only
- * the sentence.
- */
-function constraintReport(specs: readonly ConstraintSpec[], format: string): string {
-  const lines = [`${specs.length} constraint(s) the ${format} format could not express:`];
-  for (const spec of specs) {
-    lines.push(
-      "",
-      `- ${spec.verbalization}`,
-      `  Pseudocode: ${spec.pseudocode}`,
-      `  Example: ${spec.example}`,
-    );
-  }
-  return lines.join("\n");
 }
 
 /** A single-field error result, formatted as pretty JSON. */
