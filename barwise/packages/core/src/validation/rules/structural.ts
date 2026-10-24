@@ -98,9 +98,9 @@ function checkDuplicateConstraintIds(model: OrmModel): Diagnostic[] {
  *
  * `OrmModel.addSubtypeFact` refuses the pair except under a lenient load,
  * so a lenient load can hold two such subtype facts under different ids,
- * and nothing reported them. Two that also share an id collapse in the
- * id-keyed store before any rule runs; refusing that is workstream 3 of
- * the spec. Reported once per pair, naming every id, as the constraint
+ * and nothing reported them. Two that also share an id never reach this
+ * rule: the store refuses the second (`DuplicateIdError`, workstream 3 of
+ * the spec). Reported once per pair, naming every id, as the constraint
  * rule reports once per id. Names fall back to the id, so a dangling end
  * still lets the duplicate be seen.
  */

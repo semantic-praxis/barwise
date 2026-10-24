@@ -144,6 +144,18 @@ it, so knip sees an unused file where there is a live edge.
   looks for a flag, because no constraint carries one any more. A file
   below 3.0 is read by the 2.0 reader against the frozen
   `schemas/orm-model-2.0.schema.json`, and saved as 3.0.
+- **A held id is refused, not replaced.** The five id-keyed stores
+  (object types, fact types, subtype facts, objectifications,
+  populations) are `Map`s, and `set` overwrites without a word, so each
+  `add*` checks first and throws `DuplicateIdError`, whatever
+  `skipPlayerValidation` says: that option skips checks on what an element
+  references, and this is a check on the store. Both readers convert it to
+  a `DeserializationError`. Do not catch it to drop the second element; an
+  importer that trips it was already losing one
+  (`docs/specs/model-invariants.spec.md`, WS3). Merge's pre-checks ask
+  `canAddSubtypeFact` and `canAddObjectifiedFactType`, which read the
+  same refusal `add*` throws for the pair, rather than restating it; the
+  id is the caller's to choose, as merge does when it takes a fresh one.
 - Constraint types use discriminated unions with type guard functions
   (`isInternalUniqueness`, `isMandatoryRole`, etc.) rather than class
   hierarchies.

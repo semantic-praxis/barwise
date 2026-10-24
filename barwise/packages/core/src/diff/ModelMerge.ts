@@ -340,7 +340,11 @@ export function mergeModels(
     // keeps the existing model's id. Phase 1 recorded the translation.
     const subtypeId = resolveObjectTypeId(merged, chosen.subtypeId, incomingIdToMergedId);
     const supertypeId = resolveObjectTypeId(merged, chosen.supertypeId, incomingIdToMergedId);
-    if (!addableSubtypeFact(merged, subtypeId, supertypeId)) {
+    // Asked before adding because a throw loses the WHOLE merge rather than
+    // one element (`mergeAndValidate` returns a null model). An accepted
+    // modification can turn an end into a value type, and a rejected
+    // removal plus an accepted addition can resolve to a pair already held.
+    if (!merged.canAddSubtypeFact({ subtypeId, supertypeId })) {
       // The same split the population phase makes below: an accepted
       // removal took the endpoint and the drop is the decision; a
       // reference NEITHER model ever defined is a dangling reference,
@@ -357,9 +361,8 @@ export function mergeModels(
     }
     // An accepted modification keeps the existing id so anything holding
     // it still resolves. Otherwise the element's own id -- unless the
-    // merged model already holds that id, in which case reusing it would
-    // silently EVICT the other one, because `_subtypeFacts` is a Map
-    // keyed by id and `set` overwrites without complaint.
+    // merged model already holds that id, in which case `addSubtypeFact`
+    // refuses it (`DuplicateIdError`) and the whole merge is lost.
     const preferredId = delta.kind === "modified" && isAccepted ? delta.existing!.id : chosen.id;
     const id = merged.subtypeFacts.some((sf) => sf.id === preferredId) ? undefined : preferredId;
     merged.addSubtypeFact({ ...toSubtypeFactConfig(chosen), id, subtypeId, supertypeId });
@@ -379,6 +382,8 @@ export function mergeModels(
       number,
     ][];
 
+  const freshIfHeld = (id: string) =>
+    merged.getObjectifiedFactType(id) === undefined ? id : undefined;
   for (const [delta, idx] of oftDeltas) {
     const isAccepted = accepted.has(idx);
     const chosen = delta.kind === "unchanged"
@@ -389,8 +394,8 @@ export function mergeModels(
     if (!chosen) continue;
     const objectTypeId = resolveObjectTypeId(merged, chosen.objectTypeId, incomingIdToMergedId);
     const factTypeId = resolveFactTypeId(merged, chosen.factTypeId, incomingFtIdToMergedId);
-    if (!addableObjectification(merged, objectTypeId, factTypeId)) {
-      // As above. `addableObjectification` also refuses a pair whose
+    if (!merged.canAddObjectifiedFactType({ objectTypeId, factTypeId })) {
+      // As above. The guard also refuses a pair whose
       // halves are already objectified, which is a real conflict the
       // merge resolves silently and deliberately; only the dangling
       // case is carried through to be reported.
@@ -398,13 +403,22 @@ export function mergeModels(
         || isDanglingFactType(existing, incoming, chosen.factTypeId);
       if (!dangling) continue;
       merged.addObjectifiedFactType(
-        { ...toObjectifiedFactTypeConfig(chosen), objectTypeId, factTypeId },
+        {
+          ...toObjectifiedFactTypeConfig(chosen),
+          id: freshIfHeld(chosen.id),
+          objectTypeId,
+          factTypeId,
+        },
         { skipPlayerValidation: true },
       );
       continue;
     }
+    // Its own id unless the merged model holds it, as subtype facts and
+    // populations do: nothing refers to an objectification by id, and
+    // `addObjectifiedFactType` refuses a held one (model invariants WS3).
     merged.addObjectifiedFactType({
       ...toObjectifiedFactTypeConfig(chosen),
+      id: freshIfHeld(chosen.id),
       objectTypeId,
       factTypeId,
     });
@@ -545,33 +559,6 @@ function sameUniquenessIn(
 }
 
 /**
- * Can the merged model hold this subtype fact?
- *
- * This mirrors every guard `OrmModel.addSubtypeFact` enforces, because
- * a throw here loses the WHOLE merge rather than one element:
- * `mergeAndValidate` catches it and returns a null model. Skipping the
- * element instead degrades one relationship; throwing degrades
- * everything.
- *
- * Both ends must exist and be entity types -- an accepted modification
- * can turn an entity into a value type. And the pair must not already
- * be present: a rejected removal and an accepted addition can resolve
- * to the SAME merged pair (a supertype rename over id-stable files does
- * exactly this), which `addSubtypeFact` rejects as a duplicate
- * relationship.
- */
-function addableSubtypeFact(merged: OrmModel, subtypeId: string, supertypeId: string): boolean {
-  // `SubtypeFact`'s own constructor rejects self-subtyping, and both ids
-  // pass through a resolver here, so the two could in principle land on
-  // one merged element even though the source model kept them apart.
-  if (subtypeId === supertypeId) return false;
-  if (merged.getObjectType(subtypeId)?.kind !== "entity") return false;
-  if (merged.getObjectType(supertypeId)?.kind !== "entity") return false;
-  const pair = subtypePairKey({ subtypeId, supertypeId });
-  return !merged.subtypeFacts.some((sf) => subtypePairKey(sf) === pair);
-}
-
-/**
  * Carry populations and diagram layouts from the existing model into
  * the merged one.
  *
@@ -605,8 +592,8 @@ function addableSubtypeFact(merged: OrmModel, subtypeId: string, supertypeId: st
  * rather than one element: `mergeAndValidate` catches it and returns a
  * null model. An accepted removal is a decision to remove, so dropping
  * what depended on it is the merge doing what the user asked. The same
- * rule now guards the two diffed phases above, as
- * `addableSubtypeFact` and `addableObjectification`.
+ * rule now guards the two diffed phases above, through
+ * `OrmModel.canAddSubtypeFact` and `canAddObjectifiedFactType`.
  */
 function carryUnmodelledElements(merged: OrmModel, existing: OrmModel): void {
   // A layout references elements by id, and every element the merge keeps
@@ -622,32 +609,6 @@ function carryUnmodelledElements(merged: OrmModel, existing: OrmModel): void {
   for (const layout of existing.diagramLayouts) {
     merged.addDiagramLayout(withoutDiagramReferences(layout, removed));
   }
-}
-
-/**
- * Can the merged model hold this objectification?
- *
- * The same reasoning as `addableSubtypeFact`, against
- * `OrmModel.addObjectifiedFactType`'s guards: the fact type and the
- * entity type must exist, and NEITHER may already take part in an
- * objectification -- one fact type is objectified by at most one entity
- * type and vice versa. A rejected removal plus an accepted addition,
- * which is the default accept-added / reject-removed policy, reaches
- * exactly that state after a fact type is renamed.
- */
-function addableObjectification(
-  merged: OrmModel,
-  objectTypeId: string,
-  factTypeId: string,
-): boolean {
-  // `ObjectifiedFactType`'s constructor rejects the two being equal, for
-  // the same reason as above: both ids pass through a resolver.
-  if (objectTypeId === factTypeId) return false;
-  if (merged.getObjectType(objectTypeId)?.kind !== "entity") return false;
-  if (!merged.getFactType(factTypeId)) return false;
-  return !merged.objectifiedFactTypes.some(
-    (oft) => oft.factTypeId === factTypeId || oft.objectTypeId === objectTypeId,
-  );
 }
 
 /**
