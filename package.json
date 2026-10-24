@@ -20,6 +20,7 @@
     "check:parity": "npm --prefix barwise run check:parity --",
     "check:review-tiers": "npm --prefix barwise run check:review-tiers --",
     "check:spec-touches": "npm --prefix barwise run check:spec-touches --",
+    "check:plan-review": "npm --prefix barwise run check:plan-review --",
     "pr:risk": "npm --prefix barwise run pr:risk --",
     "check:no-nul": "npm --prefix barwise run check:no-nul --",
     "check:git-listing": "npm --prefix barwise run check:git-listing --",

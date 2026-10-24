@@ -63,15 +63,57 @@ export function isWiring(path) {
 }
 
 /**
+ * The shape of Status that claims nothing exists yet. Shared by
+ * audit:specs and check:plan-review, which ask the same question of a
+ * Status: one at HEAD, the other at a pull request's merge base.
+ *
+ * Two alternatives, because the same claim appears in two positions. The
+ * anchored one is the common case (`Draft ...`, `Proposed ...`). The
+ * unanchored phrase catches it mid-line: `conformance-property.spec.md`
+ * reads "Accepted (all decisions resolved 2026-08-25; both workstreams
+ * open -- design only, no implementation in this PR)", which asserts
+ * exactly what an anchored `Draft` does and escaped the audit purely on
+ * where its author put it.
+ *
+ * This is NOT the widening to partial specs that barwise-912 warns
+ * against. That would mean inferring from "workstreams 1 and 2
+ * implemented" which ones actually shipped, which no header can settle.
+ * This is the identical claim -- nothing was built -- matched wherever
+ * it sits. "No workstream implemented" is the same claim in the words
+ * two specs used on 2026-09-06, and both sat outside the audit for a
+ * whole workstream of commits until the first PR to land one noticed
+ * (#426, session review); the audit's test plants that exact phrasing.
+ */
+export const CLAIMS_NOTHING_BUILT =
+  /^\s*(draft|proposed|design only)\b|\bno (implementation|workstreams? implemented)\b/i;
+
+/**
  * The header block: the lines after the title and before the first `##`
  * heading. Fields are read only here, so an example of a field inside a
  * code block in the body is never taken as the spec's own.
  */
 export function headerBlock(text) {
+  const { lines, start, end } = headerBounds(text);
+  return lines.slice(start, end).join("\n");
+}
+
+/**
+ * Everything but the header block: the title and the body. The plan a
+ * `Plan-reviewed:` line vouches for is this text, so adding that line (or
+ * updating Status) after the review leaves it unchanged, while any edit
+ * to the plan itself does not (plan-scope-check.spec.md, WS6).
+ */
+export function specBody(text) {
+  const { lines, start, end } = headerBounds(text);
+  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+}
+
+/** One boundary for the header block, so the two readers above split alike. */
+function headerBounds(text) {
   const lines = text.split("\n");
   const start = lines.findIndex((l) => l.startsWith("# ")) + 1;
   const end = lines.findIndex((l, i) => i >= start && l.startsWith("## "));
-  return lines.slice(start, end === -1 ? undefined : end).join("\n");
+  return { lines, start, end: end === -1 ? lines.length : end };
 }
 
 /**

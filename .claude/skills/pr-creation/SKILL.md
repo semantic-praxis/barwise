@@ -35,6 +35,15 @@ least once:
   --check` catches only a spec claiming _no_ implementation, so a
   partial claim decays unwatched (barwise-912). Record what the spec
   did not anticipate in its implementation notes.
+- **The plan was reviewed before the code.** A PR that adds a spec and
+  implements it shows, in its commit list, the spec's
+  `Plan-reviewed: <commit> (code-review, pr-review)` line landing
+  before the first implementation commit, with `<commit>` the head the
+  two reviews read (`spec-writer`, step 8). Reviewing the plan beside
+  the code it was meant to shape is what the rule replaces.
+  `npm run check:plan-review` runs it locally and in CI; it covers a
+  spec the PR names that declares `Touches:` and whose Status still
+  claims nothing is built.
 - **The tracking issue exists and this PR does not close it.** File
   it with `node barwise/scripts/beads-crud.mjs create` if missing. Closure is
   a tracker-only follow-up after merge (`steward`, section 5); the
