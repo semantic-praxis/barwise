@@ -98,6 +98,7 @@ export function registerExportCommand(program: Command): void {
           process.stdout.write(result.text);
           if (!result.text.endsWith("\n")) process.stdout.write("\n");
         }
+        reportConstraintSpecs(result, opts.format);
       } catch (err) {
         process.stderr.write(`Error: ${(err as Error).message}\n`);
         process.exitCode = 1;
@@ -112,6 +113,30 @@ function exportOpts(opts: ExportOptions) {
     includeExamples: opts.examples,
     ...(opts.dialect ? { dialect: opts.dialect } : {}),
   };
+}
+
+/**
+ * Name on stderr the constraints the format reported it could not express.
+ * Beside the artifact, not in it: stdout may be a pipeline's input. One
+ * line per distinct verbalization, since the DDL router spills the same
+ * rule once per table it touches; the pseudocode and example are in the
+ * artifact and the MCP report.
+ */
+function reportConstraintSpecs(
+  result: ReturnType<ExportFormatAdapter["export"]>,
+  format: string,
+  domain?: string,
+): void {
+  const specs = result.constraintSpecs ?? [];
+  if (specs.length === 0) return;
+  const counts = new Map<string, number>();
+  for (const spec of specs) {
+    counts.set(spec.verbalization, (counts.get(spec.verbalization) ?? 0) + 1);
+  }
+  const where = domain ? ` (domain ${domain})` : "";
+  const lines = [`${specs.length} constraint(s) the ${format} format could not express${where}:`];
+  for (const [text, n] of counts) lines.push(`  - ${text}${n > 1 ? ` (x${n})` : ""}`);
+  process.stderr.write(lines.join("\n") + "\n");
 }
 
 /** Write a single export result to a file or directory (no lineage manifest). */
@@ -162,6 +187,7 @@ function exportProject(source: string, exporter: ExportFormatAdapter, opts: Expo
       process.stdout.write(result.text);
       if (!result.text.endsWith("\n")) process.stdout.write("\n");
     }
+    reportConstraintSpecs(result, opts.format, resolved[0]!.context);
     return;
   }
 
@@ -190,6 +216,8 @@ function exportProject(source: string, exporter: ExportFormatAdapter, opts: Expo
       writeFileSync(p, result.text, "utf-8");
       written.push(p);
     }
+    // Printed as each domain completes, so a later failure leaves it shown.
+    reportConstraintSpecs(result, opts.format, context);
   }
 
   if (written.length === 0) {

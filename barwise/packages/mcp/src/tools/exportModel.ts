@@ -2,7 +2,7 @@
  * export_model tool: exports an ORM model to a specified format.
  */
 
-import { getExporter, listExporters } from "@barwise/core";
+import { type ConstraintSpec, getExporter, listExporters } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -135,15 +135,43 @@ export function executeExportModel(
 
     // Return the primary text output, spilling to a file when large.
     // For multi-file formats, the text field contains a combined view.
-    return boundedTextResult(result.text, {
+    const artifact = boundedTextResult(result.text, {
       kind: `export-${format}`,
       source: sourcePath(source),
       outputPath,
       extension: extensionForFormat(format),
     });
+    const specs = result.constraintSpecs ?? [];
+    if (specs.length === 0) return artifact;
+    // A second block, so `content[0]` stays the artifact. Bounded on its
+    // own, and never to `outputPath`: that path names the artifact, and
+    // a spilled report written there would overwrite it.
+    const report = boundedTextResult(constraintReport(specs, format), {
+      kind: `export-${format}-constraints`,
+      source: sourcePath(source),
+    });
+    return { content: [...artifact.content, ...report.content] };
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : String(error));
   }
+}
+
+/**
+ * The constraints the format reported it could not express, in full: an
+ * agent acting on the export needs the predicate and example, not only
+ * the sentence.
+ */
+function constraintReport(specs: readonly ConstraintSpec[], format: string): string {
+  const lines = [`${specs.length} constraint(s) the ${format} format could not express:`];
+  for (const spec of specs) {
+    lines.push(
+      "",
+      `- ${spec.verbalization}`,
+      `  Pseudocode: ${spec.pseudocode}`,
+      `  Example: ${spec.example}`,
+    );
+  }
+  return lines.join("\n");
 }
 
 /** A single-field error result, formatted as pretty JSON. */

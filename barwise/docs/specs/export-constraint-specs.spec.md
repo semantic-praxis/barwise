@@ -1,10 +1,11 @@
 # Export reports the constraints its format could not express
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- WS1
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
 Tracking: barwise-wc0
+Plan-reviewed: 03489998 (code-review, pr-review)
 Touches: barwise/packages/cli/src/commands/export.ts,
 barwise/packages/cli/tests/commands/,
 barwise/packages/mcp/src/tools/exportModel.ts,

@@ -279,3 +279,60 @@ describe("the project's identifier strategy (identifier-strategy-in-exports.spec
     expect(ddl).toContain("customer_id TEXT NOT NULL");
   });
 });
+
+describe("export_model reports what the format could not express (barwise-wc0)", () => {
+  // DDL has no clause for an irreflexive ring, so the router spills it.
+  const ringModel = `
+orm_version: "1.0"
+model:
+  name: Ring
+  object_types:
+    - { id: ot-person, name: Person, kind: entity, reference_mode: person_id }
+  fact_types:
+    - id: ft-parent
+      name: Person is parent of Person
+      roles:
+        - { id: r-parent, player: ot-person, role_name: is parent of }
+        - { id: r-child, player: ot-person, role_name: is child of }
+      readings: ["{0} is parent of {1}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [r-parent, r-child] }
+        - { type: ring, role_1: r-parent, role_2: r-child, ring_type: irreflexive }
+`;
+  const RING = "No Person is parent of that same Person.";
+
+  afterEach(() => {
+    delete process.env.BARWISE_MCP_INLINE_LIMIT;
+  });
+
+  it("returns the report as a second block, with pseudocode and example", () => {
+    const result = executeExportModel(ringModel, "ddl");
+    expect(result.content).toHaveLength(2);
+    expect(result.content[0]!.text).toContain("CREATE TABLE person_is_parent_of_person");
+    const report = result.content[1]!.text;
+    expect(report).toMatch(/^1 constraint\(s\) the ddl format could not express:/);
+    expect(report).toContain(`- ${RING}`);
+    expect(report).toMatch(/ {2}Pseudocode: \S/);
+    expect(report).toMatch(/ {2}Example: \S/);
+  });
+
+  it("returns one block when every constraint was expressed", () => {
+    const plain = ringModel.replace(/\n {8}- \{ type: ring.*\n/, "\n");
+    expect(plain).not.toContain("ring");
+    expect(executeExportModel(plain, "ddl").content).toHaveLength(1);
+  });
+
+  it("bounds the report on its own, and never writes it to outputPath", () => {
+    process.env.BARWISE_MCP_INLINE_LIMIT = "50";
+    const outputPath = join(ws.dir(), "out.sql");
+    const result = executeExportModel(ringModel, "ddl", undefined, outputPath);
+    expect(result.content).toHaveLength(2);
+    expect(result.content[0]!.text).toContain(`Full content written to: ${outputPath}`);
+    expect(readFileSync(outputPath, "utf8")).toContain("CREATE TABLE");
+    const report = result.content[1]!.text;
+    expect(report).toContain("Full content written to:");
+    expect(report).not.toContain(outputPath);
+    // The preview still names the ring.
+    expect(report).toContain(RING);
+  });
+});
