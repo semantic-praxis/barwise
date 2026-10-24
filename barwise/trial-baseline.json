@@ -63,13 +63,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C01/small/5/diff:5:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Payer -> InsurancePayer reported as a removal plus an addition with no synonym candidate"
-    },
     "C01/small/6/acceptance:clinical-informaticist:fhir-openapi": {
       "severity": "S5",
       "class": "acceptance-edit-distance-openapi",
@@ -97,13 +90,6 @@
       "issue": "barwise-dnm",
       "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-dnm).",
       "detail": "117 delta(s) outside the declared loss set: removed object_type PartyId; removed object_type LegalName; removed object_type TaxIdentifier; removed object_type KycStatus; removed object_type KycScreeningDate; removed object_type DateOfBirth; removed object_type GivenName; removed object_type FamilyNa"
-    },
-    "C02/small/1/model-roundtrip:norma": {
-      "severity": "S1",
-      "class": "norma-roundtrip",
-      "issue": "barwise-ro8",
-      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-ro8).",
-      "detail": "5 delta(s) outside the declared loss set: modified fact_type Party has KycStatus; modified fact_type DepositAccount is routed by RoutingNumber; modified fact_type DepositAccount has AccountNumber; modified fact_type Party borrows under LoanAccount; modified fact_type Transaction affects DepositAccou"
     },
     "C02/small/1/model-roundtrip:openapi": {
       "severity": "S1",
@@ -224,20 +210,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C03/small/5/diff:1:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Adjuster -> ClaimHandler reported as a removal plus an addition with no synonym candidate"
-    },
-    "C03/small/5/diff:9:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Invoice -> Statement reported as a removal plus an addition with no synonym candidate"
-    },
     "C03/small/6/acceptance:actuarial-analyst:claims-dbt": {
       "severity": "S5",
       "class": "acceptance-dbt-composite-reference",
@@ -343,20 +315,6 @@
       "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-oph). Restoring only that flag takes the round-tripped model from 49 errors to 0.",
       "detail": "the model the importer wrote has 49 structural error(s): population/mandatory-violation"
     },
-    "C04/small/5/diff:1:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Listing -> Offer reported as a removal plus an addition with no synonym candidate"
-    },
-    "C04/small/5/diff:5:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Offer -> Listing reported as a removal plus an addition with no synonym candidate"
-    },
     "C04/small/6/acceptance:analytics-engineer:warehouse-dbt": {
       "severity": "S5",
       "class": "acceptance-edit-distance-dbt",
@@ -391,13 +349,6 @@
       "issue": "barwise-dnm",
       "note": "DDL export then import is not a fixed point: annotated exports re-import with zero fact types, unannotated ones lose value types and fact types beyond the declared loss set (barwise-dnm).",
       "detail": "123 delta(s) outside the declared loss set: removed object_type MaterialNumber; removed object_type MaterialDescription; removed object_type MaterialTypeCode; removed object_type UomCode; removed object_type Quantity; removed object_type CharacteristicName; removed object_type PlantCode; removed obj"
-    },
-    "C05/small/1/model-roundtrip:norma": {
-      "severity": "S1",
-      "class": "norma-roundtrip",
-      "issue": "barwise-ro8",
-      "note": "NORMA export then import re-homes subset, exclusion and external uniqueness constraints onto sibling fact types and drops definitions, on an importer documented as nearly lossless (barwise-ro8).",
-      "detail": "5 delta(s) outside the declared loss set: modified fact_type MaterialPlantData is for Material; modified fact_type InspectionLot inspects Batch; modified fact_type Batch is released to StorageLocation; modified fact_type PurchaseOrderItem belongs to PurchaseOrder; modified fact_type PurchaseOrderIte"
     },
     "C05/small/1/model-roundtrip:openapi": {
       "severity": "S1",
@@ -531,20 +482,6 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
-    },
-    "C06/small/5/diff:1:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Vehicle -> Conveyance reported as a removal plus an addition with no synonym candidate"
-    },
-    "C06/small/5/diff:5:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Conveyance -> Vehicle reported as a removal plus an addition with no synonym candidate"
     },
     "C06/small/6/release-bundle:gym-list": {
       "severity": "S3",
@@ -693,20 +630,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C08/small/5/diff:1:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Premise -> ServiceLocation reported as a removal plus an addition with no synonym candidate"
-    },
-    "C08/small/5/diff:5:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename ServiceLocation -> Premise reported as a removal plus an addition with no synonym candidate"
-    },
     "C08/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
@@ -769,20 +692,6 @@
       "issue": "barwise-s4x",
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
-    },
-    "C09/small/5/diff:1:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Treatment -> InvestigationalProduct reported as a removal plus an addition with no synonym candidate"
-    },
-    "C09/small/5/diff:9:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Site -> InvestigationalSite reported as a removal plus an addition with no synonym candidate"
     },
     "C09/small/6/acceptance:biostatistician:legacy-norma": {
       "severity": "S5",
@@ -875,20 +784,6 @@
       "note": "A blind spot, not a finding: barwise registers no Avro importer, so the lane cannot read its own Avro export back, and no other step checks it. Avro export correctness is unverified until barwise-s4x gives it a check that can fail.",
       "detail": "barwise registers no avro importer, so its own export cannot be read back"
     },
-    "C10/small/5/diff:1:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Term -> Semester reported as a removal plus an addition with no synonym candidate"
-    },
-    "C10/small/5/diff:4:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Semester -> Term reported as a removal plus an addition with no synonym candidate"
-    },
     "C10/small/6/release-bundle:gym-list": {
       "severity": "S3",
       "class": "bundle-gym-catalog",
@@ -972,20 +867,6 @@
       "issue": "barwise-oph",
       "note": "Reading barwise's own NORMA export back yields a model that fails barwise's own validation with population/mandatory-violation. The cause is the lost `sample: true` flag: NORMA has no seat for a sample instance, so the populations come back significant, their instances enter the object universe, and every mandatory role they must play reports a violation (barwise-oph). Restoring only that flag takes the round-tripped model from 49 errors to 0.",
       "detail": "the model the importer wrote has 37 structural error(s): population/mandatory-violation"
-    },
-    "C11/small/5/diff:1:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Workspace -> Team reported as a removal plus an addition with no synonym candidate"
-    },
-    "C11/small/5/diff:5:rename_object_type": {
-      "severity": "S5",
-      "class": "diff-rename-no-synonym",
-      "issue": "barwise-rkm",
-      "note": "diff reports this rename as a removal plus an addition with no synonym candidate while other renames in the same history are reported as candidates (barwise-rkm).",
-      "detail": "rename Team -> Workspace reported as a removal plus an addition with no synonym candidate"
     },
     "C11/small/6/acceptance:data-platform-lead:metrics-dbt": {
       "severity": "S5",
