@@ -11,7 +11,6 @@
  * These mappings are derived from publicly documented format information.
  */
 import {
-  externalIdentifies,
   externallyIdentifiedEntity,
   isExternalUniqueness,
   OrmModel,
@@ -50,8 +49,9 @@ export { NormaMappingError };
 /**
  * Each entity's preferred identifier (orm-format-3 WS4b): NORMA's own
  * `PreferredIdentifier` reference where it names a uniqueness the mapping
- * kept, by the id it kept: an internal one, or an external one core reads
- * as identifying the entity (external-preferred-identifier.spec.md). An
+ * kept, internal or external, by the id it kept; one that does not
+ * identify the entity is stored anyway and reported by validation, as an
+ * internal one always was (external-preferred-identifier.spec.md). An
  * entity without one is placed from the uniquenesses NORMA marks
  * `IsPreferred`: an internal one by the rule a 2.0 file's flag is read
  * with, an external one when core reads it as identifying an entity, so a
@@ -65,8 +65,7 @@ function mapPreferredIdentifiers(ctx: NormaMappingContext): void {
     if (entityId === undefined || ref === undefined) continue;
     const c = model.getConstraint(ref);
     if (model.getObjectType(entityId)?.kind !== "entity") continue;
-    if (c?.type === "internal_uniqueness") model.setPreferredIdentifier(entityId, ref);
-    else if (c && isExternalUniqueness(c) && externalIdentifies(model, c, entityId).ok) {
+    if (c?.type === "internal_uniqueness" || (c && isExternalUniqueness(c))) {
       model.setPreferredIdentifier(entityId, ref);
     }
   }

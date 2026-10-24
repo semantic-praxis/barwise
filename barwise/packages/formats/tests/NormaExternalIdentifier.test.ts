@@ -60,4 +60,31 @@ describe("NORMA and an external preferred identifier", () => {
     expect(back.preferredIdentifierOf(back.getObjectTypeByName("Room")!.id)).toBe("_c-dup");
     expect(back.getConstraint("_c-dup")).toBeDefined();
   });
+
+  it("keeps a duplicate NORMA marks IsPreferred, with no entity reference", () => {
+    // The employeeProject shape (marked on the constraint only), duplicated
+    // with the flagged copy second.
+    const xml = roomXml()
+      .replace(/<orm:PreferredIdentifier ref="_c-room-id"\/>/, "")
+      .replace(
+        /(<orm:UniquenessConstraint id="_c-room-id"[\s\S]*?<\/orm:UniquenessConstraint>)/,
+        (m) =>
+          m.replace(' IsPreferred="true"', "") + m.replace('id="_c-room-id"', 'id="_c-flagged"'),
+      );
+    const back = importNorma(xml);
+    expect(back.preferredIdentifierOf(back.getObjectTypeByName("Room")!.id)).toBe("_c-flagged");
+  });
+
+  it("stores an explicit reference that does not identify, for validation to report", () => {
+    // Both roles in one fact type: no common object. An internal reference
+    // of the wrong shape was always stored and reported; so is this one.
+    const xml = roomXml().replace(
+      /(<orm:UniquenessConstraint id="_c-room-id"[\s\S]*?<orm:Role ref=")_r-rhn-nr(")/,
+      "$1_r-rib-room$2",
+    );
+    const back = importNorma(xml.replace(/(id="_c-room-id"[^>]*) IsPreferred="true"/, "$1"));
+    const room = back.getObjectTypeByName("Room")!.id;
+    expect(back.preferredIdentifierOf(room)).toBe("_c-room-id");
+    expect(resolvePreferredIdentifier(back, room).ok).toBe(false);
+  });
 });

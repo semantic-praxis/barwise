@@ -15,12 +15,13 @@ import {
   type ConstraintInView,
   type ConstraintSpec,
   externalIdentifies,
-  externallyIdentifiedEntity,
   type FactType,
   type IdentifyingComponent,
   isOverSubtypes,
   type ObjectType,
   type OrmModel,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
   resolvePreferredIdentifier,
   roleIdsOf,
 } from "@barwise/core";
@@ -104,13 +105,15 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   const names = conceptNames(model, lose);
   const nameOf = (id: string): string => names.written.get(id)!;
   const isBuiltin = (id: string): boolean => names.builtins.has(id);
+  // Resolved once: role order asks it for every binary.
+  const identifiers = preferredIdentifiers(model);
 
   // Which internal constraints are written, by id; every other is a loss.
   const covered = new Set<string>();
   const written: Written[] = [];
   const usedNames = new Map<string, Set<string>>();
   for (const ft of model.factTypes) {
-    const order = roleOrder(ft, model, isBuiltin);
+    const order = roleOrder(ft, model, isBuiltin, identifiers);
     if (!order) {
       lose(
         `fact type ${ft.name}`,
@@ -163,7 +166,6 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     // claimed as an identifier (external-preferred-identifier.spec.md).
     for (const ext of model.constraints) {
       if (ext.type !== "external_uniqueness" || covered.has(ext.id!)) continue;
-      if (externallyIdentifiedEntity(model, ext) !== ot.id) continue;
       const resolvedExt = externalIdentifies(model, ext, ot.id);
       const rels = resolvedExt.ok && resolvedExt.at.kind === "external"
         ? componentRelationships(resolvedExt.at.components, written)
@@ -377,6 +379,7 @@ function roleOrder(
   ft: FactType,
   model: OrmModel,
   isBuiltin: (id: string) => boolean,
+  identifiers: PreferredIdentifiers,
 ): number[] | undefined {
   const n = ft.roles.length;
   const all = ft.roles.map((_, i) => i);
@@ -402,8 +405,8 @@ function roleOrder(
   });
   if (xRole >= 0) {
     order = first(xRole);
-  } else if (n === 2 && identifierRole(ft, model) !== undefined) {
-    order = first(1 - identifierRole(ft, model)!);
+  } else if (n === 2 && identifierRole(ft, model, identifiers) !== undefined) {
+    order = first(1 - identifierRole(ft, model, identifiers)!);
   } else if (n === 2 && new Set(singles).size === 1) {
     order = first(singles[0]!);
   } else if (n >= 3) {
@@ -431,7 +434,11 @@ function roleOrder(
  * preferred identifier: the uniqueness on it, or the role an external
  * identifier's component names in this fact type.
  */
-function identifierRole(ft: FactType, model: OrmModel): number | undefined {
+function identifierRole(
+  ft: FactType,
+  model: OrmModel,
+  identifiers: PreferredIdentifiers,
+): number | undefined {
   for (const c of ft.internalConstraints) {
     if (c.type !== "internal_uniqueness" || c.roleIds.length !== 1) continue;
     const far = ft.roles.findIndex((r) => r.id === c.roleIds[0]);
@@ -441,10 +448,10 @@ function identifierRole(ft: FactType, model: OrmModel): number | undefined {
   for (const [far, role] of ft.roles.entries()) {
     const near = ft.roles[1 - far];
     if (!near) continue;
-    const resolved = resolvePreferredIdentifier(model, near.playerId);
+    const at = identifiers.byEntity.get(near.playerId);
     if (
-      resolved.ok && resolved.at.kind === "external"
-      && resolved.at.components.some((k) => k.factType === ft && k.farRole === role)
+      at?.kind === "external"
+      && at.components.some((k) => k.factType === ft && k.farRole === role)
     ) {
       return far;
     }

@@ -17,6 +17,7 @@ import {
   type ConceptualDataTypeName,
   generateId,
   type InternalConstraint,
+  isUniqueAlone,
   OrmModel,
   type RoleConfig,
   type ValueConstraintDef,
@@ -671,11 +672,7 @@ function addIdentifier(model: OrmModel, c: OssieConcept, warnings: string[]): vo
   }
   for (const [i, ft] of facts.entries()) {
     const near = ft.roles[0]!.id;
-    const held = ft.internalConstraints.some((k) =>
-      k.type === "internal_uniqueness" && k.roleIds.length === 1 && k.roleIds[0] === near
-      && (k.modality ?? "alethic") === "alethic"
-    );
-    if (held) continue;
+    if (isUniqueAlone(ft, near)) continue;
     ft.addConstraint({ type: "internal_uniqueness", id: generateId(), roleIds: [near] });
     warnings.push(
       `${c.concept}: identify_by [${names.join(", ")}] implies each ${c.concept} has at most `

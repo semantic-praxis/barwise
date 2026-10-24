@@ -104,6 +104,7 @@ export {
   type IdentifyingUniqueness,
   type InternalIdentifyingUniqueness,
   isIdentified,
+  isUniqueAlone,
   type PlacedFlags,
   placePreferredFlags,
   type PreferredIdentifierFailure,

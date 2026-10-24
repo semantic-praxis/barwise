@@ -367,6 +367,18 @@ identifiers are kept unnamed is updated in the same PR.
 - **The Ossie writer's inference** asks core
   (`externallyIdentifiedEntity`, then `externalIdentifies`) instead of its
   own `compositeIdentifier`, which is gone.
+- **Code review of WS2** found a flagged duplicate dropped (the NORMA
+  duplicate pass now spares an `IsPreferred` copy as well as a named one),
+  a join landing on a value type that would have made the importer throw
+  (`externallyIdentifiedEntity` now returns entities only), the near-role
+  rule restated in the Ossie importer (now `isUniqueAlone`, shared with
+  the resolver), and an explicit reference of the wrong shape dropped in
+  silence; it is stored and reported by validation, as an internal one
+  always was. Two findings stand as designed: a component Ossie declares
+  under the far player cannot be named by `identify_by` and is reported
+  as a loss, and the writer still infers `identify_by` for an unstored
+  identifying external uniqueness, so Ossie output does not change; the
+  cost is that such a round trip adds the stored reference.
 - **Measured.** Ossie and NORMA export over all 117 tracked `.orm.yaml`
   files, with WS2 stashed and applied: byte-identical. No tracked model
   holds an external uniqueness the old shape check and core's disagree

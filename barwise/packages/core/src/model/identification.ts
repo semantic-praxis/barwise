@@ -272,7 +272,23 @@ export function externallyIdentifiedEntity(
   c: ExternalUniquenessConstraint,
 ): string | undefined {
   const joined = inferExternalUniquenessJoin(c.roleIds, model)?.commonObjectId;
-  return joined !== undefined && externalIdentifies(model, c, joined).ok ? joined : undefined;
+  // The join can land on a value type; only an entity has an identifier.
+  if (joined === undefined || model.getObjectType(joined)?.kind !== "entity") return undefined;
+  return externalIdentifies(model, c, joined).ok ? joined : undefined;
+}
+
+/**
+ * Whether a role is unique on its own, alethically: what makes a reference
+ * scheme's component single-valued (rule 3 of
+ * external-preferred-identifier.spec.md). Shared with the Ossie importer,
+ * which adds the uniqueness when it is missing, so what it adds is what
+ * this accepts.
+ */
+export function isUniqueAlone(factType: FactType, roleId: string): boolean {
+  return factType.internalConstraints.some((u) =>
+    isInternalUniqueness(u) && u.roleIds.length === 1 && u.roleIds[0] === roleId
+    && (u.modality ?? "alethic") === "alethic"
+  );
 }
 
 /**
@@ -303,11 +319,9 @@ export function externalIdentifies(
     if (factType.arity !== 2) return { ok: false, reason: "external-not-binary" };
     const nearRole = factType.getRoleById(join.keyRoleByFactType.get(factType.id)!)!;
     const farRole = factType.getRoleById(join.constrainedRoleByFactType.get(factType.id)!)!;
-    const unique = factType.internalConstraints.some((u) =>
-      isInternalUniqueness(u) && u.roleIds.length === 1 && u.roleIds[0] === nearRole.id
-      && (u.modality ?? "alethic") === "alethic"
-    );
-    if (!unique) return { ok: false, reason: "external-near-not-unique" };
+    if (!isUniqueAlone(factType, nearRole.id)) {
+      return { ok: false, reason: "external-near-not-unique" };
+    }
     components.push({ factType, nearRole, farRole });
   }
   return { ok: true, at: { kind: "external", entityId, constraint: c, components } };
