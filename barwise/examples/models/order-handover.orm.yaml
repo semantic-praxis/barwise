@@ -1,0 +1,131 @@
+# The "Why it is worth learning" example in the repository README: one
+# business rule -- every order is either shipped to an address or
+# collected from a store, never both and never neither -- stated as an ORM
+# exclusive-or constraint. cli/tests/docs/whyOrmExample.test.ts checks
+# that the README quotes what barwise actually says about this file.
+orm_version: "3.0"
+model:
+  name: Order Handover
+  domain_context: shop
+  object_types:
+    - id: sales-order
+      name: SalesOrder
+      kind: entity
+      reference_mode: order_number
+      preferred_identifier: 098b6905-f336-8aad-a254-4d640731b186
+      definition: A request by one customer for goods, from checkout to handover.
+    - id: order-number
+      name: OrderNumber
+      kind: value
+      definition: The number printed on the order confirmation.
+      data_type:
+        name: integer
+    - id: address
+      name: Address
+      kind: value
+      definition: A postal address the shop delivers to.
+      data_type:
+        name: text
+        length: 200
+    - id: store
+      name: Store
+      kind: entity
+      reference_mode: store_code
+      preferred_identifier: 7818cc64-88e7-8ce7-a610-bbf644087613
+      definition: A shop location where customers can collect orders.
+    - id: store-code
+      name: StoreCode
+      kind: value
+      definition: The short code the shop uses for each of its locations.
+      data_type:
+        name: text
+        length: 10
+  fact_types:
+    - id: order-has-number
+      name: SalesOrder has OrderNumber
+      roles:
+        - id: order-has-number.order
+          player: sales-order
+          role_name: has
+        - id: order-has-number.number
+          player: order-number
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - order-has-number.number
+          id: 098b6905-f336-8aad-a254-4d640731b186
+        - type: internal_uniqueness
+          roles:
+            - order-has-number.order
+          id: 44c39cc8-87ec-8d7a-9594-57f7c049c8ba
+        - type: mandatory
+          role: order-has-number.order
+          id: 94aaaa04-2fd8-87bb-80e4-5022a18084ec
+    - id: store-has-code
+      name: Store has StoreCode
+      roles:
+        - id: store-has-code.store
+          player: store
+          role_name: has
+        - id: store-has-code.code
+          player: store-code
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+        - "{1} is of {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - store-has-code.code
+          id: 7818cc64-88e7-8ce7-a610-bbf644087613
+        - type: internal_uniqueness
+          roles:
+            - store-has-code.store
+          id: 844359b9-cb6c-894f-a658-59557788dc7d
+        - type: mandatory
+          role: store-has-code.store
+          id: acce5ee0-fa21-8e9f-80c4-70b4fae8d408
+    - id: order-shipped-to-address
+      name: SalesOrder is shipped to Address
+      roles:
+        - id: order-shipped-to-address.order
+          player: sales-order
+          role_name: is shipped to
+        - id: order-shipped-to-address.address
+          player: address
+          role_name: receives
+      readings:
+        - "{0} is shipped to {1}"
+        - "{1} receives {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - order-shipped-to-address.order
+          id: 16954706-2c8c-8c37-be3e-49a4cb91a9de
+    - id: order-collected-from-store
+      name: SalesOrder is collected from Store
+      roles:
+        - id: order-collected-from-store.order
+          player: sales-order
+          role_name: is collected from
+        - id: order-collected-from-store.store
+          player: store
+          role_name: hands over
+      readings:
+        - "{0} is collected from {1}"
+        - "{1} hands over {0}"
+      constraints:
+        - type: internal_uniqueness
+          roles:
+            - order-collected-from-store.order
+          id: 9efab1b4-f3cc-8e72-9f44-5e4ef3e83254
+  constraints:
+    - type: exclusive_or
+      roles:
+        - order-shipped-to-address.order
+        - order-collected-from-store.order
+      id: 40aa7a3b-5f4a-891b-a835-4a3507baaa4d
