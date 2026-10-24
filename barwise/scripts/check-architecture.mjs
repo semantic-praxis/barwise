@@ -11,15 +11,20 @@
  *     (and an agent) actually reads. Every edge it shows must be in
  *     `INTENDED` and every edge in `INTENDED` must be shown; a one-way
  *     check would let a removed package linger in the picture.
- *   - each package's runtime `dependencies` in package.json. An internal
+ *   - each package's runtime dependencies in package.json. An internal
  *     dependency `INTENDED` does not allow is a layering decision taken in
  *     the manifest, where depcruise never looks (peer and optional
- *     dependencies count too). `devDependencies` are not compared: `@barwise/llm` lists `@barwise/diagram` there for its
- *     tests, which ship nothing.
+ *     dependencies count too). `devDependencies` are not compared:
+ *     `@barwise/llm` lists `@barwise/diagram` there for its tests, which
+ *     ship nothing.
+ *
+ * Package names map to directories through the manifests themselves, not
+ * a naming rule, so `barwise-vscode` needs no special case and a package
+ * outside the `@barwise/` scope is still recognised as internal.
  *
  * Exit 0 all agree, 1 an edge or dependency disagrees (each named), 2 an
- * input could not be read or parsed -- a graph block that parses to
- * nothing must not read as "no edges, so none missing"
+ * input could not be read or has the wrong shape -- a graph block that
+ * parses to nothing must not read as "no edges, so none missing"
  * (docs/specs/gate-refusal-contract.spec.md).
  *
  * `--root <dir>` reads CLAUDE.md, barwise/scripts/lib/intended.cjs and
@@ -32,20 +37,25 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { opt } from "./lib/args.mjs";
 
-/** The internal package an npm name refers to, by directory name, or null. */
-function internal(name) {
-  if (name.startsWith("@barwise/")) return name.slice("@barwise/".length);
-  if (name === "barwise-vscode") return "vscode";
-  return null;
-}
+/**
+ * Runtime dependency fields: each is installed and resolved when the
+ * package runs, so a layering edge in any of them is one depcruise cannot
+ * see. `devDependencies` alone is left out (see the header).
+ */
+const RUNTIME = ["dependencies", "peerDependencies", "optionalDependencies"];
+
+const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+/** The values in `list` that occur more than once. */
+const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !== i))];
 
 /**
- * The edges the CLAUDE.md block draws, as a map of package to the
- * packages it lists. A package line is `@barwise/x (a, b)` or
- * `|--- @barwise/x (a, b)  -- comment`; continuation lines of a comment
- * begin with `|` and spaces, so they never start with a package name.
+ * The CLAUDE.md block, as package name to the dependency directory names
+ * it lists. A package line is `@barwise/x (a, b)` or `|--- @barwise/x
+ * (a, b)  -- comment`; continuation lines of a comment begin with `|`
+ * and spaces, so they never start with a package name.
  */
-function graphEdges(claudeMd) {
+function graphLines(claudeMd) {
   const lines = claudeMd.split("\n");
   const heading = lines.findIndex((l) => /^##\s+Dependency Graph\s*$/.test(l));
   if (heading === -1) throw new Error('CLAUDE.md has no "## Dependency Graph" heading');
@@ -58,30 +68,20 @@ function graphEdges(claudeMd) {
   if (open === -1 || close === -1) {
     throw new Error("the Dependency Graph section has no fenced block");
   }
-  const edges = new Map();
-  const twice = [];
+  const out = [];
   for (const line of lines.slice(open + 1, close)) {
-    const m = /^\s*(?:\|---\s+)?(@barwise\/[\w-]+|barwise-vscode)\s+\(([^)]*)\)/.exec(line);
+    const m = /^\s*(?:\|---\s+)?(@barwise\/[\w-]+|barwise-[\w-]+)\s+\(([^)]*)\)/.exec(line);
     if (!m) continue;
-    const pkg = internal(m[1]);
     const deps = m[2].trim() === "no internal deps"
       ? []
       : m[2].split(",").map((s) => s.trim()).filter(Boolean);
-    if (edges.has(pkg)) twice.push(pkg);
-    edges.set(pkg, deps);
+    out.push({ name: m[1], deps });
   }
-  if (edges.size === 0) throw new Error("the Dependency Graph block names no package");
-  return { edges, twice };
+  if (out.length === 0) throw new Error("the Dependency Graph block names no package");
+  return out;
 }
 
-/**
- * Runtime dependency fields: each is installed and resolved when the
- * package runs, so a layering edge in any of them is one depcruise cannot
- * see. `devDependencies` alone is left out (see the header).
- */
-const RUNTIME = ["dependencies", "peerDependencies", "optionalDependencies"];
-
-let intended, graph, manifests;
+let intended, drawnLines, manifests;
 try {
   // Inside the refusal: a bare `--root` throws, and that is "could not
   // answer", not the exit 1 a real disagreement uses.
@@ -90,14 +90,14 @@ try {
   );
   const intendedPath = join(root, "barwise", "scripts", "lib", "intended.cjs");
   intended = createRequire(import.meta.url)(intendedPath);
-  const shape = intended && typeof intended === "object"
+  const shape = isMap(intended) && Object.keys(intended).length > 0
     && Object.values(intended).every(
       (v) => Array.isArray(v) && v.every((d) => typeof d === "string"),
     );
-  if (!shape || Object.keys(intended).length === 0) {
+  if (!shape) {
     throw new Error(`${intendedPath} does not export a map of package to package list`);
   }
-  graph = graphEdges(readFileSync(join(root, "CLAUDE.md"), "utf8"));
+  drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"));
   const pkgs = join(root, "barwise", "packages");
   manifests = readdirSync(pkgs, { withFileTypes: true })
     .filter((e) => e.isDirectory())
@@ -105,11 +105,20 @@ try {
     // A directory without a manifest (a stray build folder) is not a package.
     .filter(([, p]) => existsSync(p))
     .map(([dir, p]) => {
+      let json;
       try {
-        return { dir, json: JSON.parse(readFileSync(p, "utf8")) };
+        json = JSON.parse(readFileSync(p, "utf8"));
       } catch (err) {
         throw new Error(`${p}: ${err.message}`);
       }
+      // A manifest that parses to the wrong shape is unreadable too: read
+      // on, it would crash with exit 1 or skip an array-form field whose
+      // keys are indices.
+      const fieldsOk = RUNTIME.every((f) => json?.[f] === undefined || isMap(json[f]));
+      if (!isMap(json) || typeof json.name !== "string" || !fieldsOk) {
+        throw new Error(`${p}: not an object with a string name and object-valued ${RUNTIME}`);
+      }
+      return { dir, json };
     });
   if (manifests.length === 0) throw new Error(`no package.json under ${pkgs}`);
 } catch (err) {
@@ -117,46 +126,60 @@ try {
   process.exit(2);
 }
 
+// Own keys only: `in` would accept `constructor` or `toString` as a package.
+const has = (p) => Object.hasOwn(intended, p);
+const dirOf = new Map(manifests.map((m) => [m.json.name, m.dir]));
+
 const problems = [];
-for (const pkg of graph.twice) problems.push(`CLAUDE.md lists ${pkg} twice`);
+const drawn = new Map();
+for (const { name, deps } of drawnLines) {
+  // An unknown name stays as written, so it is reported, not dropped.
+  const pkg = dirOf.get(name) ?? name;
+  if (drawn.has(pkg)) problems.push(`CLAUDE.md lists ${pkg} twice`);
+  for (const d of repeated(deps)) problems.push(`CLAUDE.md lists ${pkg} -> ${d} twice`);
+  drawn.set(pkg, deps);
+}
+for (const [p, ds] of Object.entries(intended)) {
+  for (const d of repeated(ds)) problems.push(`INTENDED lists ${p} -> ${d} twice`);
+}
 
 const edgeSet = (m) => new Set([...m].flatMap(([p, ds]) => ds.map((d) => `${p} -> ${d}`)));
-const drawn = edgeSet(graph.edges);
+const drawnEdges = edgeSet(drawn);
 const allowed = edgeSet(Object.entries(intended));
-for (const e of drawn) {
+for (const e of drawnEdges) {
   if (!allowed.has(e)) problems.push(`CLAUDE.md draws ${e}, INTENDED does not`);
 }
-for (const e of allowed) if (!drawn.has(e)) problems.push(`INTENDED has ${e}, CLAUDE.md does not`);
-for (const p of Object.keys(intended)) {
-  if (!graph.edges.has(p)) problems.push(`CLAUDE.md does not list ${p}`);
+for (const e of allowed) {
+  if (!drawnEdges.has(e)) problems.push(`INTENDED has ${e}, CLAUDE.md does not`);
 }
-for (const p of graph.edges.keys()) {
-  if (!(p in intended)) problems.push(`CLAUDE.md lists ${p}, INTENDED does not`);
+for (const p of Object.keys(intended)) {
+  if (!drawn.has(p)) problems.push(`CLAUDE.md does not list ${p}`);
+}
+for (const p of drawn.keys()) {
+  if (!has(p)) problems.push(`CLAUDE.md lists ${p}, INTENDED does not`);
 }
 // INTENDED and the picture agreeing is not enough: a deleted or misspelled
 // package would pass in both. Every key is a package with a manifest, and
-// every target is a key -- depcruise's group would silently drop a
-// misspelled one.
+// every target is another key -- depcruise's group would silently drop a
+// misspelled one, and a self-edge means nothing.
 const dirs = new Set(manifests.map((m) => m.dir));
 for (const [p, ds] of Object.entries(intended)) {
   if (!dirs.has(p)) problems.push(`INTENDED has ${p}, which is not a package under packages/`);
   for (const d of ds) {
-    if (!(d in intended)) problems.push(`INTENDED has ${p} -> ${d}, and ${d} is not a key`);
+    if (d === p) problems.push(`INTENDED has ${p} -> ${p}, a self-edge`);
+    else if (!has(d)) problems.push(`INTENDED has ${p} -> ${d}, and ${d} is not a key`);
   }
 }
 
 for (const { dir, json } of manifests) {
-  if (internal(json.name ?? "") !== dir) {
-    problems.push(`packages/${dir}: name ${json.name} does not match its directory`);
-  }
-  if (!(dir in intended)) {
+  if (!has(dir)) {
     problems.push(`packages/${dir}: not in INTENDED`);
     continue;
   }
   for (const field of RUNTIME) {
     for (const dep of Object.keys(json[field] ?? {})) {
-      const target = internal(dep);
-      if (target !== null && !intended[dir].includes(target)) {
+      const target = dirOf.get(dep);
+      if (target !== undefined && !intended[dir].includes(target)) {
         problems.push(`packages/${dir}: ${field} has ${dep}, INTENDED does not allow it`);
       }
     }
@@ -173,6 +196,6 @@ if (problems.length > 0) {
   process.exit(1);
 }
 console.log(
-  `check:architecture: ${drawn.size} edges in CLAUDE.md and ${manifests.length} package manifests`
-    + " agree with INTENDED. OK",
+  `check:architecture: ${drawnEdges.size} edges in CLAUDE.md and ${manifests.length} package`
+    + " manifests agree with INTENDED. OK",
 );

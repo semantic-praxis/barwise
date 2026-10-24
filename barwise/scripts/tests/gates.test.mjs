@@ -5189,19 +5189,24 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
  * A committed copy of every input check:architecture reads, from this
  * repo's real files -- all the package manifests, not a sample -- so the
  * test proves the real graph passes before each mutation proves a planted
- * disagreement is seen.
+ * disagreement is seen. Returns the directory and how many manifests it
+ * copied, so no count is restated here.
  */
 function architectureRepo() {
   const dir = tempRepo();
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
   copy("barwise/scripts/lib/intended.cjs");
+  let manifests = 0;
   for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
     const rel = `barwise/packages/${pkg}/package.json`;
-    if (existsSync(join(REPO, rel))) copy(rel);
+    if (existsSync(join(REPO, rel))) {
+      copy(rel);
+      manifests += 1;
+    }
   }
   execFileSync("git", ["commit", "-qm", "inputs"], { cwd: dir });
-  return dir;
+  return { dir, manifests };
 }
 
 const ARCH = ["--", process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
@@ -5220,51 +5225,105 @@ function archPlanted(dir, rel, edit) {
   }
 }
 
+const CLAUDE_LLM = "@barwise/llm             (core)";
+const CORE_PKG = "barwise/packages/core/package.json";
+const INTENDED_CJS = "barwise/scripts/lib/intended.cjs";
+
+/** Each planted disagreement: file, anchor, replacement, the line it must report. */
+const ARCH_DISAGREEMENTS = [
+  // Both directions of an edge disagreement.
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    "@barwise/llm             (core, diagram)",
+    /CLAUDE\.md draws llm -> diagram, INTENDED does not/,
+  ],
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    "@barwise/llm             ()",
+    /INTENDED has llm -> core, CLAUDE\.md does not/,
+  ],
+  [
+    INTENDED_CJS,
+    `"promptlab": ["core", "llm", "learn"]`,
+    `"promptlab": ["core", "llm"]`,
+    /CLAUDE\.md draws promptlab -> learn/,
+  ],
+  // Packages present on one side only, or listed twice.
+  ["CLAUDE.md", `  |--- ${CLAUDE_LLM}\n`, "", /CLAUDE\.md does not list llm/],
+  [
+    "CLAUDE.md",
+    `  |--- ${CLAUDE_LLM}\n`,
+    `  |--- ${CLAUDE_LLM}\n  |--- ${CLAUDE_LLM}\n`,
+    /CLAUDE\.md lists llm twice/,
+  ],
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    "@barwise/llm             (core, core)",
+    /CLAUDE\.md lists llm -> core twice/,
+  ],
+  [
+    "CLAUDE.md",
+    CLAUDE_LLM,
+    `${CLAUDE_LLM}\n  |--- @barwise/ghost           (core)`,
+    /CLAUDE\.md lists @barwise\/ghost, INTENDED does not/,
+  ],
+  [INTENDED_CJS, `"learn": ["core"],`, "", /packages\/learn: not in INTENDED/],
+  // The map agreeing with the picture is not enough.
+  [
+    INTENDED_CJS,
+    `"learn": ["core"],`,
+    `"learn": ["cor"],`,
+    /INTENDED has learn -> cor, and cor is not a key/,
+  ],
+  [
+    INTENDED_CJS,
+    `"learn": ["core"],`,
+    `"learn": ["core", "constructor"],`,
+    /INTENDED has learn -> constructor, and constructor is not a key/,
+  ],
+  [
+    INTENDED_CJS,
+    `"learn": ["core"],`,
+    `"learn": ["core", "core"],`,
+    /INTENDED lists learn -> core twice/,
+  ],
+  [
+    INTENDED_CJS,
+    `"learn": ["core"],`,
+    `"learn": ["core", "learn"],`,
+    /INTENDED has learn -> learn, a self-edge/,
+  ],
+  // Each runtime dependency field.
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"dependencies": {\n    "@barwise/llm": "*",`,
+    /packages\/core: dependencies has @barwise\/llm, INTENDED does not allow it/,
+  ],
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"peerDependencies": { "@barwise/llm": "*" },\n  "dependencies": {`,
+    /packages\/core: peerDependencies has @barwise\/llm/,
+  ],
+  [
+    CORE_PKG,
+    `"dependencies": {`,
+    `"optionalDependencies": { "barwise-vscode": "*" },\n  "dependencies": {`,
+    /packages\/core: optionalDependencies has barwise-vscode/,
+  ],
+];
+
 test("check:architecture passes the real graph and catches each planted disagreement", () => {
-  const dir = architectureRepo();
+  const { dir, manifests } = architectureRepo();
   try {
     const clean = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
     assert.equal(clean.status, 0, clean.stdout + clean.stderr);
-    assert.match(clean.stdout, /12 package manifests/);
-    for (
-      const [file, old, replacement, why] of [
-        // An extra edge in the picture: llm drawn as depending on diagram.
-        [
-          "CLAUDE.md",
-          "@barwise/llm             (core)",
-          "@barwise/llm             (core, diagram)",
-          /CLAUDE\.md draws llm -> diagram, INTENDED does not/,
-        ],
-        // An edge dropped from the map: the picture now draws one too many.
-        [
-          "barwise/scripts/lib/intended.cjs",
-          `"promptlab": ["core", "llm", "learn"]`,
-          `"promptlab": ["core", "llm"]`,
-          /CLAUDE\.md draws promptlab -> learn/,
-        ],
-        // A runtime dependency the map does not allow, and a peer one.
-        [
-          "barwise/packages/core/package.json",
-          `"dependencies": {`,
-          `"dependencies": {\n    "@barwise/llm": "*",`,
-          /packages\/core: dependencies has @barwise\/llm, INTENDED does not allow it/,
-        ],
-        [
-          "barwise/packages/core/package.json",
-          `"dependencies": {`,
-          `"peerDependencies": { "@barwise/llm": "*" },\n  "dependencies": {`,
-          /packages\/core: peerDependencies has @barwise\/llm/,
-        ],
-        // A misspelled target, in the map and the picture alike: they agree
-        // with each other, and depcruise would drop the edge silently.
-        [
-          "barwise/scripts/lib/intended.cjs",
-          `"learn": ["core"],`,
-          `"learn": ["cor"],`,
-          /INTENDED has learn -> cor, and cor is not a key/,
-        ],
-      ]
-    ) {
+    assert.match(clean.stdout, new RegExp(`and ${manifests} package manifests agree`));
+    for (const [file, old, replacement, why] of ARCH_DISAGREEMENTS) {
       const r = mutate(dir, ["--file", file, "--old", old, "--new", replacement, ...ARCH]);
       assert.equal(r.status, 0, `${file}: expected CAUGHT:\n${r.stdout}${r.stderr}`);
       // mutate restores the file, so plant it again by hand to read WHICH
@@ -5283,12 +5342,13 @@ test("check:architecture passes the real graph and catches each planted disagree
   }
 });
 
-test("check:architecture cannot answer when an input is unreadable or empty", () => {
-  const dir = architectureRepo();
+test("check:architecture cannot answer when an input is unreadable or misshapen", () => {
+  const { dir } = architectureRepo();
   const refused = (r, why) => {
     assert.equal(r.status, 2, r.stdout + r.stderr);
     assert.match(r.stderr, why);
   };
+  const core = /cannot answer -- \S*packages\/core\/package\.json: /;
   try {
     refused(
       archPlanted(dir, "CLAUDE.md", (s) => s.replace("## Dependency Graph", "## Packages")),
@@ -5304,16 +5364,28 @@ test("check:architecture cannot answer when an input is unreadable or empty", ()
       ),
       /the Dependency Graph section has no fenced block/,
     );
+    refused(archPlanted(dir, CORE_PKG, (s) => s.replace("{", "{,")), core);
+    // Valid JSON of the wrong shape: read on, each would crash with exit 1
+    // or skip a field whose keys are array indices.
+    refused(archPlanted(dir, CORE_PKG, () => "null\n"), core);
     refused(
-      archPlanted(dir, "barwise/packages/core/package.json", (s) => s.replace("{", "{,")),
-      /cannot answer -- \S*packages\/core\/package\.json: /,
+      archPlanted(dir, CORE_PKG, (s) => s.replace(`"name": "@barwise/core"`, `"name": 5`)),
+      core,
     );
     refused(
       archPlanted(
         dir,
-        "barwise/scripts/lib/intended.cjs",
-        (s) => s.replace(`"core": []`, `"core": [[]]`),
+        CORE_PKG,
+        (s) =>
+          s.replace(
+            `"dependencies": {`,
+            `"peerDependencies": ["@barwise/cli"],\n  "dependencies": {`,
+          ),
       ),
+      core,
+    );
+    refused(
+      archPlanted(dir, INTENDED_CJS, (s) => s.replace(`"core": []`, `"core": [[]]`)),
       /does not export a map of package to package list/,
     );
     refused(
