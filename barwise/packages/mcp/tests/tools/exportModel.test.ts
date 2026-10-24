@@ -322,6 +322,19 @@ model:
     expect(executeExportModel(plain, "ddl").content).toHaveLength(1);
   });
 
+  it("names the project domain the report came from", () => {
+    // The domain is the one input the CLI and this tool both pass to the
+    // shared formatter; dropping it here would leave no surface test red.
+    writeFileSync(join(ws.dir(), "family.orm.yaml"), ringModel);
+    const manifest = join(ws.dir(), "p.orm-project.yaml");
+    writeFileSync(
+      manifest,
+      'project:\n  name: P\n  domains:\n    - path: "./family.orm.yaml"\n      context: "family"\n',
+    );
+    const result = executeExportModel(manifest, "ddl", undefined, undefined, "family");
+    expect(result.content[1]!.text).toMatch(/could not express \(domain family\):/);
+  });
+
   it("bounds the report on its own, and never writes it to outputPath", () => {
     process.env.BARWISE_MCP_INLINE_LIMIT = "50";
     const outputPath = join(ws.dir(), "out.sql");

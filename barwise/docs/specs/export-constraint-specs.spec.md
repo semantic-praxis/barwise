@@ -15,6 +15,7 @@ barwise/packages/formats/src/ossie/OssieExportFormat.ts,
 +barwise/packages/formats/src/constraintReport.ts,
 barwise/packages/formats/src/index.ts,
 barwise/packages/formats/tests/,
+barwise/packages/formats/CLAUDE.md,
 barwise/packages/cli/tests/fixtures/,
 barwise/docs/CLI.md
 
