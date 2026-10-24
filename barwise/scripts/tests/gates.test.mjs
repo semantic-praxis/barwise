@@ -4896,6 +4896,12 @@ for (
       { ".github/copilot-instructions.md": "Apply `barwise/docs/gone.md`.\n" },
       /\.github\/copilot-instructions\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
     ],
+    [
+      // Copilot's path-specific instructions, at any depth (barwise-yi6).
+      "a dead path in a nested .github/instructions/*.instructions.md",
+      { ".github/instructions/ts/code.instructions.md": "Apply `barwise/docs/gone.md`.\n" },
+      /\.github\/instructions\/ts\/code\.instructions\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
   ]
 ) {
   test(`check-instruction-refs fails ${name}`, () => {
@@ -4909,6 +4915,21 @@ for (
     }
   });
 }
+
+test("check-instruction-refs does not read a bare URI scheme as a path", () => {
+  // `orm-schema://` ends in `/`, so without the scheme rule it is an
+  // unrooted directory that no tracked path ends with (barwise-yi6).
+  const r = refsRepo({
+    files: { "CLAUDE.md": "Read the `orm-schema://` resource; see `https://example.com/a.md`.\n" },
+  });
+  try {
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.doesNotMatch(out.stderr, /orm-schema/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
 
 test("check-instruction-refs fails an ignored untracked path unless allowlisted, and a stale row", () => {
   // `git check-ignore` cannot tell a build output from a typo under dist/.

@@ -61,8 +61,9 @@ known zero rather than a backlog.
 
 In scope:
 
-- When an instruction file (`CLAUDE.md`, `AGENTS.md` or `REVIEW.md` at any depth, or
-  any `.md` under `.claude/`) contains a backticked token that the rules
+- When an instruction file (`CLAUDE.md`, `AGENTS.md` or `REVIEW.md` at any depth,
+  any `.md` under `.claude/`, or Copilot's `.github/copilot-instructions.md`
+  and `.github/instructions/**/*.instructions.md`) contains a backticked token that the rules
   below classify as a path, and the token resolves under none of them,
   the gate shall exit 1 and name the file, line and token.
 - When an unrooted path token matches more than one tracked path, and
@@ -114,7 +115,7 @@ Out of scope:
 ## Resolution rules
 
 A backticked token is a path candidate if it has no whitespace or glob
-or placeholder characters (`* < > { } $ |`), is not a URL, a scoped
+or placeholder characters (`* < > { } $ |`), is not a URL or a bare URI scheme (`orm-model://`), a scoped
 package (`@x/y`) or a slash command (`/code-review`), and either starts
 with `barwise/`, `.claude/`, `.github/` or `.beads/` (rooted), starts
 with `./` or `../` (relative), or contains `/` and ends in a known file
@@ -167,6 +168,7 @@ it locally as CI does.
 ```
 check-instruction-refs.mjs
   files    = trackedFiles() filtered to CLAUDE.md | AGENTS.md | REVIEW.md | .claude/**/*.md
+             | .github/copilot-instructions.md | .github/instructions/**/*.instructions.md
   index    = tracked files + their parent directories (one Set)
   for each file, each line:
     path tokens    -> rules above; dead or ambiguous      (WS1)
@@ -314,8 +316,15 @@ existing ignored file failing, not only a missing one.
 2026-10-23: `REVIEW.md` joined the set (`review-md.spec.md`, barwise-f4v).
 The Claude Code Review service reads it as instructions and it cites
 paths the same way, so the filter grew by one name rather than the
-spec waiting for a general definition. `.github/copilot-instructions.md`
-is the remaining instruction file the gate does not read (barwise-yi6).
+spec waiting for a general definition.
+
+2026-10-24: Copilot's instruction files joined the set (barwise-yi6):
+`.github/copilot-instructions.md` and the path-specific
+`.github/instructions/**/*.instructions.md`. The Copilot reviewer reads
+them as instructions and they cite paths the same way. Reading them
+surfaced a false positive -- the bare URI scheme `orm-model://` parsed
+as an unrooted directory -- so a token matching `^[a-z][\w+.-]*://` is
+no longer a path candidate.
 
 ## Risks and testing
 

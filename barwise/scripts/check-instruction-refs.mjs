@@ -4,8 +4,9 @@
  * resolve (docs/specs/instruction-reference-check.spec.md, WS1).
  *
  * An instruction file -- CLAUDE.md, AGENTS.md or REVIEW.md at any depth,
- * any .md under .claude/ -- is code that runs in an agent's head, and a path it
- * cites is a copy of a fact the repository owns. The 2026-10-04 prompt
+ * any .md under .claude/, and Copilot's .github/copilot-instructions.md and
+ * .github/instructions/**\/*.instructions.md -- is code that runs in an
+ * agent's head, and a path it cites is a copy of a fact the repository owns. The 2026-10-04 prompt
  * audit found 26 such copies stale by hand, among them
  * `node scripts/beads-crud.mjs` at five sites where it does not resolve
  * from the directory the text says to run it from (barwise-52b). A sweep
@@ -51,16 +52,20 @@ const EXT = /\.(mjs|cjs|ts|tsx|js|json|md|yaml|yml|sh|py|toml|txt)$/;
 function isInstructionFile(f) {
   // REVIEW.md is read by the Claude Code Review service -- the root file,
   // and a nested one once the default branch is protected -- and cites
-  // paths the same way. .github/copilot-instructions.md is read as
-  // instructions by the Copilot reviewer, and cites paths too.
+  // paths the same way. .github/copilot-instructions.md and the
+  // path-specific .github/instructions/**/*.instructions.md are read as
+  // instructions by the Copilot reviewer, and cite paths too.
   return /(^|\/)(CLAUDE|AGENTS|REVIEW)\.md$/.test(f)
-    || f === ".github/copilot-instructions.md"
+    || /^\.github\/(copilot-instructions\.md|instructions\/(.+\/)?[^/]+\.instructions\.md)$/.test(f)
     || (f.startsWith(".claude/") && f.endsWith(".md"));
 }
 
 /** The candidate path a backticked token names, or null. Spec: Resolution rules. */
 function candidate(raw) {
   if (/\s|[*<>{}$|]/.test(raw) || /^(https?:|[@~/-])/.test(raw)) return null;
+  // A URI scheme (`orm-model://`) names a protocol, not a location; its
+  // trailing slash would otherwise read as an unrooted directory.
+  if (/^[a-z][\w+.-]*:\/\//.test(raw)) return null;
   const t = raw.replace(/:\d+(-\d+)?$/, "");
   if (/^[\w.-]+\/$/.test(t)) return null; // a bare directory name: a kind, not a location
   if (/^\.[\w-]+(\.[\w-]+)?$/.test(t)) return null; // a bare file-type name

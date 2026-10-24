@@ -23,7 +23,7 @@ The barwise tools can return very large output. Follow these rules:
 - `export_model` and `generate_diagram` write large artifacts to a file
   and return a path. Reference the path; do not paste raw DDL, OpenAPI,
   or SVG into a reply.
-- Do not read the `orm-model://{path}` resource for a non-trivial model.
+- Do not read the `orm-model://` resource for a non-trivial model.
 
 The authoritative, single-source guidance lives in
 `barwise/packages/mcp/src/prompts/guidance/guidance.ts` and is delivered
