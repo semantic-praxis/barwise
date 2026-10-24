@@ -51,17 +51,17 @@ const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !==
 
 /**
  * The CLAUDE.md block, as package name to the names it lists. A row is
- * the block's first line (`name (none)`) or a line that starts with a
- * connector (`|---`, `+---`, and the like) followed by `name (a, b)`,
- * for any name: which names are packages is the manifests' answer, not a
- * prefix rule here. Every other line is drawing or a wrapped comment, so
- * a comment such as `bundles (esbuild)` is never read as a row, while a
- * connector line that does not parse is refused rather than skipped.
+ * any line where a package name stands directly before a parenthesized
+ * list -- `@barwise/x (a, b)`, `(no internal deps)` for none -- wherever
+ * the drawing puts it. A package name is one a manifest carries, or any
+ * scoped `@` name, so a package drawn before its manifest exists is still
+ * compared. Every other word before a parenthesis is prose: a wrapped
+ * comment such as `bundles (esbuild)` is not a row. This reads the
+ * picture by its content, not its layout, because each layout rule tried
+ * (a fixed connector, then any leading connector) was broken by another
+ * correct or misdrawn picture.
  */
-const CONNECTOR = /^\s*[|+`\\]-{2,}\s*/;
-const ROW = /^([@\w][\w@/.-]*)\s+\((?:([^)]*)\))?/;
-
-function graphLines(claudeMd) {
+function graphLines(claudeMd, isPackage) {
   const lines = claudeMd.split("\n");
   const heading = lines.findIndex((l) => /^##\s+Dependency Graph\s*$/.test(l));
   if (heading === -1) throw new Error('CLAUDE.md has no "## Dependency Graph" heading');
@@ -75,23 +75,20 @@ function graphLines(claudeMd) {
     throw new Error("the Dependency Graph section has no fenced block");
   }
   const out = [];
-  const body = lines.slice(open + 1, close);
-  const first = body.findIndex((l) => l.trim() !== "");
-  for (const [i, line] of body.entries()) {
-    const connector = CONNECTOR.exec(line);
-    if (i !== first && !connector) continue;
-    const m = ROW.exec(connector ? line.slice(connector[0].length) : line.trim());
-    if (!m) throw new Error(`cannot parse the graph row "${line.trim()}"`);
+  for (const line of lines.slice(open + 1, close)) {
+    const hit = [...line.matchAll(/([@\w][\w@/.-]*)\s+\(/g)].find((m) => isPackage(m[1]));
+    if (!hit) continue;
+    const list = /^\(([^)]*)\)/.exec(line.slice(hit.index + hit[0].length - 1));
     // A list wrapped onto the next line would otherwise lose its tail.
-    if (m[2] === undefined) {
+    if (!list) {
       throw new Error(
         `cannot parse the graph row "${line.trim()}": its list must close on the line`,
       );
     }
-    const deps = m[2].trim() === "no internal deps"
+    const deps = list[1].trim() === "no internal deps"
       ? []
-      : m[2].split(",").map((x) => x.trim()).filter(Boolean);
-    out.push({ name: m[1], deps });
+      : list[1].split(",").map((x) => x.trim()).filter(Boolean);
+    out.push({ name: hit[1], deps });
   }
   if (out.length === 0) throw new Error("the Dependency Graph block names no package");
   return out;
@@ -113,7 +110,6 @@ try {
   if (!shape) {
     throw new Error(`${intendedPath} does not export a map of package to package list`);
   }
-  drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"));
   const pkgs = join(root, "barwise", "packages");
   manifests = readdirSync(pkgs, { withFileTypes: true })
     .filter((e) => e.isDirectory())
@@ -144,6 +140,8 @@ try {
   const names = manifests.map((m) => m.json.name);
   const clash = repeated(names);
   if (clash.length > 0) throw new Error(`two package manifests are named ${clash.join(", ")}`);
+  const isPackage = (n) => names.includes(n) || n.startsWith("@");
+  drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"), isPackage);
 } catch (err) {
   console.error(`check:architecture: cannot answer -- ${err.message}`);
   process.exit(2);
@@ -164,9 +162,11 @@ for (const { name, deps } of drawnLines) {
     problems.push(`CLAUDE.md lists ${pkg} twice`);
     continue;
   }
-  for (const d of repeated(deps)) problems.push(`CLAUDE.md lists ${pkg} -> ${d} twice`);
-  // Either vocabulary inside the list: `core` or `@barwise/core`.
-  drawn.set(pkg, deps.map((x) => dirOf.get(x) ?? x));
+  // Either vocabulary inside the list (`core` or `@barwise/core`), mapped
+  // before the duplicate check so one edge spelled both ways is caught.
+  const targets = deps.map((x) => dirOf.get(x) ?? x);
+  for (const d of repeated(targets)) problems.push(`CLAUDE.md lists ${pkg} -> ${d} twice`);
+  drawn.set(pkg, targets);
 }
 for (const [p, ds] of Object.entries(intended)) {
   for (const d of repeated(ds)) problems.push(`INTENDED lists ${p} -> ${d} twice`);
