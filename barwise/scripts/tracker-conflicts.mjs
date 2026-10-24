@@ -23,15 +23,23 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { MalformedInput, parseTracker, resolveIssues } from "./lib/beads-merge.mjs";
+import { MalformedInput, resolveTracker } from "./lib/beads-merge.mjs";
 import { commentAction, commentBody, TRACKER, verdict } from "./lib/tracker-conflicts.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 
-/** A git runner over a work tree; tests pass their own temp repository. */
+/**
+ * A git runner over a work tree; tests pass their own temp repository.
+ * GIT_DIR and its kin are dropped so the cwd decides the repository: run
+ * from a hook in a linked worktree, they would point every call at the
+ * outer checkout.
+ */
 export function gitIn(cwd) {
+  const env = { ...process.env };
+  for (const k of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"]) delete env[k];
   return (args, { allow = [0] } = {}) => {
-    const r = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    const r = spawnSync("git", args, { cwd, env, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    if (r.error) throw new Error(`git could not run: ${r.error.message}`);
     if (!allow.includes(r.status)) {
       throw new Error(
         `git ${args[0]} exited ${r.status}: ${(r.stderr || "").trim().split("\n")[0]}`,
@@ -83,10 +91,10 @@ export function classify(git, mainRef, head) {
   if (conflicted.length !== 1 || conflicted[0] !== TRACKER) return verdict(conflicted);
 
   try {
-    const { reported } = resolveIssues(
-      parseTracker(trackerAt(git, baseList[0]), "base"),
-      parseTracker(trackerAt(git, mainRef), "current"),
-      parseTracker(trackerAt(git, head), "other"),
+    const { reported } = resolveTracker(
+      trackerAt(git, baseList[0]),
+      trackerAt(git, mainRef),
+      trackerAt(git, head),
     );
     return verdict(conflicted, { reported });
   } catch (err) {
@@ -98,15 +106,25 @@ export function classify(git, mainRef, head) {
 /**
  * Check every open PR into main and post or edit its comment. `github` is
  * { listPulls(), listComments(n), post(n, body), edit(id, body) }.
+ *
+ * An unchecked PR is either undecidable (criss-cross history, a head that
+ * moved while the run read it) or unreadable (a fetch or API failure).
+ * Only "nothing could be read" is exit 2: an undecidable PR is an answer,
+ * and one that stays undecidable must not turn every run red.
  */
 export async function run({ git, github, mainRef = "origin/main", log = () => {} }) {
-  const why = refusal(git);
-  if (why) return { exit: 2, refused: why, checked: [], unchecked: [] };
-  const mainSha = git(["rev-parse", "--verify", `${mainRef}^{commit}`]).stdout.trim();
-
-  let pulls;
+  let mainSha;
   try {
-    pulls = (await github.listPulls()).filter((p) => p.base?.ref === "main");
+    const why = refusal(git);
+    if (why) return { exit: 2, refused: why, checked: [], unchecked: [] };
+    mainSha = git(["rev-parse", "--verify", `${mainRef}^{commit}`]).stdout.trim();
+  } catch (err) {
+    return { exit: 2, refused: err.message, checked: [], unchecked: [] };
+  }
+
+  let all;
+  try {
+    all = await github.listPulls();
   } catch (err) {
     return {
       exit: 2,
@@ -115,33 +133,78 @@ export async function run({ git, github, mainRef = "origin/main", log = () => {}
       unchecked: [],
     };
   }
+  const valid = all.filter((p) =>
+    Number.isInteger(p.number) && p.number > 0 && SHA.test(p.head?.sha ?? "")
+  );
+  const pulls = valid.filter((p) => p.base?.ref === "main");
+  const elsewhere = valid.filter((p) => p.base?.ref !== "main");
+
+  // One fetch for every head; per-PR fetches only if it fails, so one
+  // missing ref costs that PR alone.
+  const refOf = (n) => `refs/barwise-tracker-conflicts/${n}`;
+  const refspecs = pulls.map((p) => `+refs/pull/${p.number}/head:${refOf(p.number)}`);
+  let batched = false;
+  if (refspecs.length > 0) {
+    try {
+      git(["fetch", "--quiet", "--no-tags", "origin", ...refspecs]);
+      batched = true;
+    } catch {
+      // fall through to per-PR fetches
+    }
+  }
 
   const checked = [];
   const unchecked = [];
+  const act = async (n, v) => {
+    const comments = await github.listComments(n);
+    const action = commentAction(v, comments);
+    const body = action.action === "none" ? undefined : commentBody(v, action.state, mainSha);
+    if (action.action === "post") await github.post(n, body);
+    // An identical body is not rewritten: a title edit rescans every PR.
+    if (action.action === "edit" && action.previous !== body) {
+      await github.edit(action.commentId, body);
+    }
+    return action.action;
+  };
+
   for (const pr of pulls) {
     const n = pr.number;
     try {
-      if (!Number.isInteger(n) || n <= 0) throw new Error("not a pull request number");
-      if (!SHA.test(pr.head?.sha ?? "")) throw new Error("head is not a commit sha");
-      const ref = `refs/barwise-tracker-conflicts/${n}`;
-      git(["fetch", "--quiet", "--no-tags", "origin", `+refs/pull/${n}/head:${ref}`]);
-      const v = classify(git, mainSha, ref);
-      if (v.unchecked) {
-        unchecked.push({ number: n, reason: v.unchecked });
+      if (!batched) {
+        git(["fetch", "--quiet", "--no-tags", "origin", `+refs/pull/${n}/head:${refOf(n)}`]);
+      }
+      // Classify the commit the API listed, or nothing: GitHub updates
+      // refs/pull/<n>/head asynchronously after a push, and the next run
+      // (this push's own synchronize) sees the new head.
+      const fetched = git(["rev-parse", "--verify", `${refOf(n)}^{commit}`]).stdout.trim();
+      if (fetched !== pr.head.sha) {
+        unchecked.push({ number: n, reason: "the head moved during this run", undecidable: true });
         continue;
       }
-      const act = commentAction(v, await github.listComments(n));
-      if (act.action === "post") await github.post(n, commentBody(v, act.state, mainSha));
-      if (act.action === "edit") {
-        await github.edit(act.commentId, commentBody(v, act.state, mainSha));
+      const v = classify(git, mainSha, pr.head.sha);
+      if (v.unchecked) {
+        unchecked.push({ number: n, reason: v.unchecked, undecidable: true });
+        continue;
       }
-      checked.push({ number: n, verdict: v.verdict, action: act.action });
-      log(`#${n}: ${v.verdict}, ${act.action}`);
+      const action = await act(n, v);
+      checked.push({ number: n, verdict: v.verdict, action });
+      log(`#${n}: ${v.verdict}, ${action}`);
     } catch (err) {
       unchecked.push({ number: n, reason: err.message });
     }
   }
-  const exit = pulls.length > 0 && checked.length === 0 ? 2 : 0;
+  // A PR retargeted away from main keeps no open comment saying it
+  // conflicts with main.
+  for (const pr of elsewhere) {
+    try {
+      const action = await act(pr.number, { verdict: "elsewhere" });
+      if (action !== "none") checked.push({ number: pr.number, verdict: "elsewhere", action });
+    } catch (err) {
+      unchecked.push({ number: pr.number, reason: err.message });
+    }
+  }
+  const unreadable = unchecked.filter((u) => !u.undecidable).length;
+  const exit = pulls.length > 0 && checked.length === 0 && unreadable > 0 ? 2 : 0;
   return { exit, checked, unchecked };
 }
 
@@ -182,13 +245,19 @@ function restClient({ token, repo, api = "https://api.github.com" }) {
 
 async function main() {
   const { GITHUB_TOKEN: token, GITHUB_REPOSITORY: repo, GITHUB_API_URL: api } = process.env;
+  let top;
+  try {
+    top = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+  } catch (err) {
+    console.error(`tracker-conflicts: could not answer: not in a git work tree (${err.message})`);
+    return 2;
+  }
   if (!token || !/^[\w.-]+\/[\w.-]+$/.test(repo ?? "")) {
     console.error(
       "tracker-conflicts: GITHUB_TOKEN and GITHUB_REPOSITORY (owner/repo) are required.",
     );
     return 2;
   }
-  const top = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
   const result = await run({
     git: gitIn(top),
     github: restClient({ token, repo, api }),
@@ -213,5 +282,8 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = await main();
+  process.exitCode = await main().catch((err) => {
+    console.error(`tracker-conflicts: could not answer: ${err.message}`);
+    return 2;
+  });
 }

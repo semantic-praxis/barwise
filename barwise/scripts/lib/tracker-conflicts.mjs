@@ -9,7 +9,7 @@
  * SAFE_ID and a kind from REPORT_KINDS; a malformed file as a side and a
  * line number.
  */
-import { REPORT_KINDS } from "./beads-merge.mjs";
+import { INPUT_LABELS, REPORT_KINDS } from "./beads-merge.mjs";
 
 export const TRACKER = ".beads/issues.jsonl";
 export const BOT = "github-actions[bot]";
@@ -24,8 +24,12 @@ const COMMENTING = new Set(["resolves", "needs-person", "malformed"]);
 /** An id printed in a comment: nothing that could be markdown, a mention or a marker. */
 const SAFE_ID = /^[A-Za-z0-9._-]+$/;
 
-/** resolveTracker(base, main, pr) labels its inputs base, current and other. */
-const SIDE = { base: "the merge base", current: "main", other: "this PR" };
+/** The script calls resolveTracker(base, main, pr), so current is main and other is the PR. */
+const SIDE = {
+  [INPUT_LABELS.base]: "the merge base",
+  [INPUT_LABELS.current]: "main",
+  [INPUT_LABELS.other]: "this PR",
+};
 
 /**
  * The verdict for one PR (the spec's table). `tracker` is what step 2
@@ -59,10 +63,12 @@ export function commentAction(v, comments) {
   const open = comments.filter((c) => episodeState(c) === "open").at(-1);
   if (COMMENTING.has(v.verdict)) {
     return open
-      ? { action: "edit", commentId: open.id, state: "open" }
+      ? { action: "edit", commentId: open.id, previous: open.body, state: "open" }
       : { action: "post", state: "open" };
   }
-  return open ? { action: "edit", commentId: open.id, state: "closed" } : { action: "none" };
+  return open
+    ? { action: "edit", commentId: open.id, previous: open.body, state: "closed" }
+    : { action: "none" };
 }
 
 const MERGE_STEPS = [
@@ -91,7 +97,7 @@ export function commentBody(v, state, mainSha) {
       "This PR conflicts with `main` only on `.beads/issues.jsonl`. A local merge resolves everything except these issues, which both sides changed in ways the driver will not decide:",
       "",
       ...shown.map((r) => `- \`${r.id}\`: ${r.kind}`),
-      ...(hidden > 0 ? [`- and ${hidden} more with ids this note does not print`] : []),
+      ...(hidden > 0 ? [`- and ${hidden} more this note does not name`] : []),
       "",
       MERGE_STEPS,
       "",
@@ -105,6 +111,8 @@ export function commentBody(v, state, mainSha) {
     );
   } else if (v.verdict === "clean") {
     lines.push("Resolved: this PR no longer conflicts with `main`.");
+  } else if (v.verdict === "elsewhere") {
+    lines.push("This PR no longer targets `main`, so this note no longer applies.");
   } else {
     lines.push(
       "This PR now conflicts with `main` on other files as well, so it needs a hand merge; the tracker alone is no longer the obstacle.",

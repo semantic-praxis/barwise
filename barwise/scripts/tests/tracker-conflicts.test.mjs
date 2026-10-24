@@ -74,6 +74,7 @@ test("a new episode posts, an open comment is edited, and clean or other only cl
     assert.deepEqual(commentAction({ verdict: v }, [bot(1, "closed"), bot(2, "open")]), {
       action: "edit",
       commentId: 2,
+      previous: bot(2, "open").body,
       state: "open",
     });
   }
@@ -83,6 +84,7 @@ test("a new episode posts, an open comment is edited, and clean or other only cl
     assert.deepEqual(commentAction({ verdict: v }, [bot(2, "open")]), {
       action: "edit",
       commentId: 2,
+      previous: bot(2, "open").body,
       state: "closed",
     });
   }
@@ -114,7 +116,7 @@ test("a comment quotes nothing a pull request controls", () => {
     SHA,
   );
   assert.match(body, /- `barwise-ok1`: field-conflict/);
-  assert.match(body, /and 2 more with ids this note does not print/);
+  assert.match(body, /and 2 more this note does not name/);
   assert.ok(!body.includes("@someone") && !body.includes("http://e"), body);
   assert.equal(body.match(/<!-- barwise:tracker-conflict/g).length, 1, "one marker, ours");
   assert.ok(body.startsWith(marker("open")));
@@ -239,6 +241,7 @@ test("a tracker-only conflict the driver resolves gets one comment, edited on th
   const again = await run({ git: gitIn(o.scanClone()), github: gh });
   assert.deepEqual(again.checked, [{ number: 1, verdict: "resolves", action: "edit" }]);
   assert.equal(gh.posted.length, 1, "no second comment");
+  assert.equal(gh.edited.length, 0, "an identical body is not rewritten");
 });
 
 test("a real tracker disagreement names the ids and their kinds", async () => {
@@ -331,6 +334,7 @@ test("a PR with two merge bases is recorded as unchecked, not guessed", async ()
     "more than one merge base with main (criss-cross history)",
   ]]);
   assert.equal(gh.posted.length, 0);
+  assert.equal(r.exit, 0, "a PR that stays undecidable must not turn every run red");
 });
 
 test("a PR into another branch is not checked", async () => {
@@ -350,4 +354,54 @@ test("a clone with the driver configured refuses with exit 2", async () => {
   const r = await run({ git: gitIn(scan), github: fakeGithub(o.pulls) });
   assert.equal(r.exit, 2);
   assert.match(r.refused, /merge\.beads\.\* config/);
+});
+
+test("a head that moved since the API listed it is left for the next run", async () => {
+  const o = origin(jsonl(issue("a")));
+  o.pr(10, { [TRACKER]: jsonl(issue("a"), issue("b")) });
+  o.main({ [TRACKER]: jsonl(issue("a"), issue("c")) });
+  const stale = [{ ...o.pulls[0], head: { sha: o.baseSha } }];
+  const gh = fakeGithub(stale);
+  const r = await run({ git: gitIn(o.scanClone()), github: gh });
+  assert.deepEqual(r.unchecked.map((u) => u.reason), ["the head moved during this run"]);
+  assert.equal(r.exit, 0, "undecidable is an answer, not a failure to read");
+  assert.equal(gh.posted.length, 0);
+});
+
+test("a PR retargeted away from main has its open comment closed", async () => {
+  const o = origin(jsonl(issue("a")));
+  o.pr(11, { [TRACKER]: jsonl(issue("a"), issue("b")) });
+  const gh = fakeGithub(o.pulls.map((p) => ({ ...p, base: { ref: "feature" } })), {
+    11: [bot(7, "open")],
+  });
+  const r = await run({ git: gitIn(o.scanClone()), github: gh });
+  assert.deepEqual(r.checked, [{ number: 11, verdict: "elsewhere", action: "edit" }]);
+  assert.ok(gh.comments[11][0].body.startsWith(marker("closed")));
+  assert.match(gh.comments[11][0].body, /no longer targets `main`/);
+});
+
+test("an inherited GIT_DIR does not redirect the scan", async () => {
+  const o = origin(jsonl(issue("a")));
+  o.pr(12, { [TRACKER]: jsonl(issue("a"), issue("b")) });
+  o.main({ [TRACKER]: jsonl(issue("a"), issue("c")) });
+  const saved = process.env.GIT_DIR;
+  process.env.GIT_DIR = join(o.root, "no-such-repo");
+  try {
+    const r = await run({ git: gitIn(o.scanClone()), github: fakeGithub(o.pulls) });
+    assert.deepEqual(r.checked, [{ number: 12, verdict: "resolves", action: "post" }]);
+  } finally {
+    if (saved === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = saved;
+  }
+});
+
+test("git that cannot run is exit 2, not a crash", async () => {
+  const r = await run({
+    git: () => {
+      throw new Error("git could not run: spawn git ENOENT");
+    },
+    github: fakeGithub([]),
+  });
+  assert.equal(r.exit, 2);
+  assert.match(r.refused, /git could not run/);
 });

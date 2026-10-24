@@ -17,6 +17,9 @@
 import { isDeepStrictEqual as eq } from "node:util";
 import { blocksIn, blocksOut, canonicalLine } from "./beads-jsonl.mjs";
 
+/** The labels resolveTracker gives its three inputs, as MalformedInput carries them. */
+export const INPUT_LABELS = Object.freeze({ base: "base", current: "current", other: "other" });
+
 /** What a reported issue is, without the PR data its reason quotes. */
 export const REPORT_KINDS = Object.freeze(["collision", "deleted-vs-edited", "field-conflict"]);
 
@@ -177,6 +180,7 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
   // data (the tracker-conflicts workflow's comment) can name the case
   // without printing `reason`, which quotes field names and values.
   const report = (id, kind, reason, candidates) => {
+    if (!REPORT_KINDS.includes(kind)) throw new Error(`unknown report kind: ${kind}`);
     reported.push({ id, kind, reason });
     entries.push({ conflict: { id, reason, ...candidates } });
   };
@@ -275,9 +279,9 @@ function conflictBlock(id, reason, current, other) {
  */
 export function resolveTracker(baseText, curText, othText) {
   const { entries, reported } = resolveIssues(
-    parseTracker(baseText, "base"),
-    parseTracker(curText, "current"),
-    parseTracker(othText, "other"),
+    parseTracker(baseText, INPUT_LABELS.base),
+    parseTracker(curText, INPUT_LABELS.current),
+    parseTracker(othText, INPUT_LABELS.other),
   );
 
   const edgesOf = (o) => o?.dependencies || [];
