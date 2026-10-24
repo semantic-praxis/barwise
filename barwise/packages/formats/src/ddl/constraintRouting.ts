@@ -123,7 +123,12 @@ export function routeConstraints(
       ];
       if (problems.length > 0) {
         spill(inView, problems.join(", and "), table);
-      } else {
+      } else if (
+        // Columns that are the whole primary key are unique already: an
+        // external identifier keys its table so (external-preferred-identifier.spec.md),
+        // and the internal branch skips the same case.
+        !isWholePrimaryKey({ table, columns: resolved.map((r) => r.column) }, schema)
+      ) {
         const columnList = resolved.map((r) => r.column).join(", ");
         route("unique", `UNIQUE (${columnList})`, table, inView);
       }

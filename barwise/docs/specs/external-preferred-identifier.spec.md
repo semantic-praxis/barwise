@@ -1,6 +1,6 @@
 # An external uniqueness can be an entity's preferred identifier
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented (core and every reader); WS2 (NORMA and Ossie) not yet
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -211,14 +211,14 @@ makes this list checkable rather than remembered.
 | `RelationalMapper` phases 0 and 1                                        | identifying binary or reference mode          | composite key from the far roles, settled in identification order                                                                                                                                               |
 | `formats/src/ddl/constraintRouting.ts` `routeAcross`                     | routes every external uniqueness              | skips the identifying one when it is the whole primary key                                                                                                                                                      |
 | `completenessWarnings`                                                   | refuses external with an error                | accepts the shape; names the failed rule otherwise                                                                                                                                                              |
-| `populationRenderer`                                                     | identifying fact type                         | provisional: renders an instance by its components' values; ground in WS1                                                                                                                                       |
+| `populationRenderer`                                                     | identifying fact type                         | joins the component populations on the entity (grounded in WS1)                                                                                                                                                 |
 | `query/evaluate.ts` anchors and `query/types.ts`                         | one `factType` and its roles                  | `factTypes` added for every identifier (Open decision 4)                                                                                                                                                        |
 | `query/format.ts`                                                        | prints `factType`                             | prints `factTypes`                                                                                                                                                                                              |
 | `elementDiff` `preferredIdentifierLabel`                                 | labels by fact type and role position         | an external identifier is labelled by its components, each fact type and far-role position, sorted by that content as the internal label sorts its roles, so neither listing order nor ids register as a change |
 | `ModelMerge` reference following                                         | uniqueness over the same roles                | also follows an external uniqueness over the same roles                                                                                                                                                         |
 | `llm/ModelContext.ts`                                                    | hides identifying fact types                  | hides only an internal identifier's: an external scheme's components are not implied by the reference mode, so they stay in the context                                                                         |
 | `llm/DraftModelParser.ts`                                                | `kept.factType.name` in a warning             | reads the internal arm: the parser stores 2.0-style flags, which are internal                                                                                                                                   |
-| `vscode` `ModelTreeProvider`                                             | `byConstraint` keys                           | provisional: marks the external constraint where the tree draws it; ground in WS1                                                                                                                               |
+| `vscode` `ModelTreeProvider`                                             | `byConstraint` keys                           | unchanged: grounded in WS1, see Implementation notes                                                                                                                                                            |
 | `NormaXmlWriter` `collectPreferredIdentifiers`                           | internal identifier                           | WS1 skips an external one; WS2 writes it                                                                                                                                                                        |
 | `norma/populationGraph.ts` `findIdentifyingSeat`                         | binary seat                                   | unchanged in WS1 (no binary, so it synthesizes as for any unseated entity); WS2 grounds whether NORMA needs more                                                                                                |
 | `NormaToOrmMapper.mapPreferredIdentifiers`                               | stores internal refs only                     | stores an external ref, and the `IsPreferred` fallback reads external (WS2)                                                                                                                                     |
@@ -315,6 +315,24 @@ several relationships as the preferred identifier, the writer derives
 Ossie importer's barwise-alg warning and the NORMA mapper's barwise-alg
 comment go. `ossie-ontology-format.spec.md`'s note that composite
 identifiers are kept unnamed is updated in the same PR.
+
+## Implementation notes (WS1)
+
+- **The vscode tree needed no change.** Its provisional row grounded as
+  `unchanged`: the tree draws an external constraint under each fact type
+  it spans (`constraintsTouchingAny`) and badges it from `byConstraint`,
+  which already holds the external identifier.
+- **The population renderer** builds an externally identified entity's
+  example by joining its component populations on the near-role value,
+  starting from the first component's first instance; an entity no
+  component population fully describes gets no example.
+- **The DDL router's new check is broader than the identifier case.** It
+  skips any external uniqueness whose columns are exactly the table's
+  primary key, which is implied whatever names it, as the internal branch
+  already did.
+- **Acceptance measured.** `barwise validate` and `barwise export --format
+  ddl` over all 117 tracked `.orm.yaml` files, before (the change stashed)
+  and after: byte-identical, 13,995 lines.
 
 ## API and migration impact
 

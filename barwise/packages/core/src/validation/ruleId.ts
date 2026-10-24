@@ -218,13 +218,20 @@ const RULE_DESCRIPTORS = {
       dangling: (otName: string, constraintId: string): string =>
         `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, and the model has no constraint with that id.`,
       notUniqueness: (otName: string, constraintId: string, kind: string): string =>
-        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, but its kind is ${kind}; a preferred identifier is an internal uniqueness constraint${
-          kind === "external_uniqueness"
-            ? ", and an external uniqueness is not yet read as one"
-            : ""
-        }.`,
+        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, but its kind is ${kind}; a preferred identifier is a uniqueness constraint, internal or external.`,
       notThisEntity: (otName: string, constraintId: string): string =>
         `Entity type "${otName}" names uniqueness constraint "${constraintId}" as its preferred identifier, but that constraint does not identify "${otName}".`,
+      // One per shape rule an external uniqueness must meet to identify an
+      // entity (external-preferred-identifier.spec.md), so the message
+      // says which one failed.
+      externalNoCommonObject: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but its roles do not join on one object type: each role must be in its own fact type, with one object type playing one other role in every one of them.`,
+      externalOtherEntity: (otName: string, constraintId: string, joined: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but that constraint identifies "${joined}".`,
+      externalNotBinary: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but a fact type it spans is not binary; each component of a reference scheme is a binary between "${otName}" and what identifies it.`,
+      externalNearNotUnique: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but a role "${otName}" plays in one of its fact types has no uniqueness of its own, so one "${otName}" could have several values of that component.`,
     },
   },
   [RULE_ID.acrossFactTypesUnknownRole]: {

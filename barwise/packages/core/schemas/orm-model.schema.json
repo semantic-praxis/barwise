@@ -171,7 +171,7 @@
         "preferred_identifier": {
           "type": "string",
           "minLength": 1,
-          "description": "An entity type's preferred identifier: the id of the uniqueness constraint that identifies it."
+          "description": "An entity type's preferred identifier: the id of the uniqueness constraint that identifies it, internal (one fact type) or external (a reference scheme over several binaries the entity plays in)."
         }
       },
       "if": {

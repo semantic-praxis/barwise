@@ -27,6 +27,8 @@
 import type { FactType } from "../model/FactType.js";
 import {
   identificationOrder,
+  identifyingFactTypes,
+  type IdentifyingUniqueness,
   type PreferredIdentifiers,
   preferredIdentifiers,
   preferredIdentifyingBinary,
@@ -109,6 +111,27 @@ export class RelationalMapper {
       // fact type over value types alone absorbs nothing -- because a
       // table with no key at all is worse than a redundant column.
       const absorbing = settleable && this.absorbsAKey(objectifiedByType.get(ot.id), model);
+      // An external identifier keys the table on its far roles, which phase
+      // 1 settles once every entity among them has its own key. Like an
+      // absorbing objectification, it takes no phase-0 column, and with
+      // the preferred identifier the authority, no reference-mode column
+      // either (external-preferred-identifier.spec.md, Open decision 2).
+      // An objectification it shares the entity with wins, as it wins over
+      // an identifying subtype fact below.
+      const external = settleable && !absorbing
+        ? externalIdentifier(identifiers, ot.id)
+        : undefined;
+      if (external) {
+        for (const ft of identifyingFactTypes(external)) identifyingFactTypeIds.add(ft.id);
+        settling.set(ot.id, {
+          name: toSnake(ot.name),
+          columns: [],
+          primaryKey: { columnNames: [] },
+          foreignKeys: [],
+          sourceElementId: ot.id,
+        });
+        continue;
+      }
 
       // The preferred identifying binary IS the identification; a
       // reference mode is shorthand for one. Where a model states both,
@@ -170,6 +193,11 @@ export class RelationalMapper {
         // barwise-965: the subtype arm's shared key starts from the
         // subtype's own key, and dual identification was the only way for
         // that key to be composite by the time it ran.
+        continue;
+      }
+      const external = settleable ? externalIdentifier(identifiers, entityId) : undefined;
+      if (external) {
+        this.settleExternalKey(external, model, settling, strategy);
         continue;
       }
       const sf = identifyingSubtypeFacts.get(entityId);
@@ -647,6 +675,54 @@ export class RelationalMapper {
    * key this pushes names a key that will not move under it, which is
    * the whole point of the phase split (barwise-963).
    */
+  /**
+   * Key an externally identified entity's table on its components' far
+   * roles: a value player's column, typed as an identifying value is, or
+   * a foreign key to an entity player's key, which the settlement order
+   * has already fixed. Each column carries its far role, as the columns an
+   * objectification absorbs carry theirs, so the DDL router finds the
+   * identifier's columns by role.
+   */
+  private settleExternalKey(
+    at: Extract<IdentifyingUniqueness, { kind: "external"; }>,
+    model: OrmModel,
+    tables: Map<string, SettlingTable>,
+    strategy: PreferredIdentifierStrategy | undefined,
+  ): void {
+    const table = tables.get(at.entityId);
+    if (!table) return;
+    const keyColumns: string[] = [];
+    for (const { factType, farRole } of at.components) {
+      const player = model.getObjectType(farRole.playerId);
+      if (player?.kind === "value") {
+        keyColumns.push(pushColumn(table.columns, {
+          name: toSnake(player.name),
+          ...keyTypeOf(player.dataType, strategy),
+          nullable: false,
+          sourceRoleId: farRole.id,
+        }, `${toSnake(farRole.name)}_${toSnake(player.name)}`));
+        continue;
+      }
+      const target = player && tables.get(player.id);
+      if (!target) continue;
+      const cols = this.appendForeignKeyColumns(
+        table.columns,
+        target,
+        false,
+        farRole.id,
+        (pkColName) => `${toSnake(farRole.name)}_${pkColName}`,
+      );
+      keyColumns.push(...cols);
+      table.foreignKeys.push({
+        columnNames: cols,
+        referencedTable: target.name,
+        referencedColumns: [...target.primaryKey.columnNames],
+        sourceConstraintId: factType.id,
+      });
+    }
+    table.primaryKey = { columnNames: keyColumns };
+  }
+
   private settleObjectifiedKey(
     oft: ObjectifiedFactType,
     model: OrmModel,
@@ -765,6 +841,15 @@ interface MutableTable {
 
 /** The same table during phase 1, where the key is still being decided. */
 type SettlingTable = Omit<MutableTable, "primaryKey"> & { primaryKey: PrimaryKey; };
+
+/** The entity's identifier when it is external. */
+function externalIdentifier(
+  identifiers: PreferredIdentifiers,
+  entityId: string,
+): Extract<IdentifyingUniqueness, { kind: "external"; }> | undefined {
+  const at = identifiers.byEntity.get(entityId);
+  return at?.kind === "external" ? at : undefined;
+}
 
 function freezeTable(t: MutableTable): Table {
   return {
