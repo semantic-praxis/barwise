@@ -5,10 +5,15 @@
  * and prints DDL or JSON to stdout.
  */
 
-import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
+import { getExporter } from "@barwise/core";
+import { RelationalMapper } from "@barwise/core/mapping";
+import { registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
 import { loadModel } from "../workspace/io.js";
 import { writeOutput } from "../workspace/io.js";
+import { reportConstraintSpecs } from "./export.js";
+
+registerStandardFormats();
 
 export function registerSchemaCommand(program: Command): void {
   program
@@ -25,11 +30,11 @@ export function registerSchemaCommand(program: Command): void {
 
       try {
         const model = loadModel(file);
-        const mapper = new RelationalMapper();
-        const schema = mapper.map(model);
 
         let output: string;
+        let report: (() => void) | undefined;
         if (opts.format === "json") {
+          const schema = new RelationalMapper().map(model);
           output = JSON.stringify(
             {
               tables: schema.tables.map((t) => ({
@@ -47,10 +52,20 @@ export function registerSchemaCommand(program: Command): void {
             2,
           );
         } else {
-          output = renderDdl(schema);
+          // The DDL `export --format ddl --no-annotate --no-examples`
+          // writes, so the two commands give one answer for one model, and
+          // what the format could not express is reported, not dropped
+          // (schema-ddl-routing.spec.md).
+          const result = getExporter("ddl")!.export(model, {
+            annotate: false,
+            includeExamples: false,
+          });
+          output = result.text;
+          report = () => reportConstraintSpecs(result, "ddl");
         }
 
         writeOutput(output, opts.output);
+        report?.();
       } catch (err) {
         process.stderr.write(`Error: ${(err as Error).message}\n`);
         process.exitCode = 1;

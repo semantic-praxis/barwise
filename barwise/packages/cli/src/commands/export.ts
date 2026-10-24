@@ -121,9 +121,10 @@ function exportOpts(opts: ExportOptions) {
 /**
  * Name on stderr the constraints the format reported it could not
  * express. Beside the artifact, not in it: stdout may be a pipeline's
- * input.
+ * input. Exported for `barwise schema`, which renders the same DDL and
+ * reports it the same way (schema-ddl-routing.spec.md).
  */
-function reportConstraintSpecs(
+export function reportConstraintSpecs(
   result: ReturnType<ExportFormatAdapter["export"]>,
   format: string,
   domain?: string,

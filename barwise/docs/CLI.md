@@ -84,7 +84,11 @@ turn, each under a `== context ==` header (or as an array in JSON).
 
 ### schema
 
-Generate a relational schema from the ORM model.
+Generate a relational schema from the ORM model. Deprecated: use `export
+--format ddl`. Its DDL is exactly what `barwise export --format ddl
+--no-annotate --no-examples` prints, and the constraints DDL could not
+express are reported on stderr the same way; `--output` writes the file and
+no lineage manifest.
 
 ```sh
 barwise schema university.orm.yaml

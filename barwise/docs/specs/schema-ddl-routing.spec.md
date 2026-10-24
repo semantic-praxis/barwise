@@ -1,6 +1,6 @@
 # The deprecated schema surfaces render DDL through the DDL exporter
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- WS1
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -128,6 +128,17 @@ Acceptance:
   model, which is the one-answer claim checked directly;
 - JSON output byte-identical before and after over every tracked model;
 - `schema --output` writes no lineage manifest.
+
+## Implementation notes
+
+- **Acceptance measured.** `barwise schema` stdout equals `barwise export
+  --format ddl --no-annotate --no-examples` stdout on all 119 tracked
+  `.orm.yaml` files, and `--format json` output is byte-identical before
+  and after (616 KB over the same files).
+- **The surfaces delegate.** The CLI calls the registered exporter and the
+  export command's `reportConstraintSpecs`, now exported; the MCP tool
+  calls `executeExportModel`. Neither keeps a copy of the exporter options
+  or the report wiring.
 
 ## Open decisions
 

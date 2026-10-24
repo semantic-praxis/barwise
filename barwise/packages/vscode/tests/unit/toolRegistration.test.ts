@@ -197,6 +197,18 @@ describe("barwise_export_model carries the constraint report", () => {
     "",
   ].join("\n");
 
+  it("barwise_generate_schema carries the same report (barwise-zk4)", async () => {
+    registerAll();
+    const tool = state.tools.get("barwise_generate_schema")!;
+    const result = (await tool.invoke({ input: { source: ring, format: "ddl" } }, {})) as {
+      content: { value: string; }[];
+    };
+    const text = result.content[0]!.value;
+    const report = text.indexOf("1 constraint(s) the ddl format could not express:");
+    expect(report).toBeGreaterThan(text.indexOf("CREATE TABLE person_is_parent_of_person"));
+    expect(text.slice(report)).toContain("- No Person is parent of that same Person.");
+  });
+
   it("puts the report after the artifact", async () => {
     registerAll();
     const tool = state.tools.get("barwise_export_model")!;
