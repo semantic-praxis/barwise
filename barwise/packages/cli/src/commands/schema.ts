@@ -7,11 +7,11 @@
 
 import { getExporter } from "@barwise/core";
 import { RelationalMapper } from "@barwise/core/mapping";
-import { registerStandardFormats } from "@barwise/formats";
+import { PLAIN_DDL_OPTIONS, registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
+import { reportConstraintSpecs } from "../workspace/constraintReport.js";
 import { loadModel } from "../workspace/io.js";
 import { writeOutput } from "../workspace/io.js";
-import { reportConstraintSpecs } from "./export.js";
 
 registerStandardFormats();
 
@@ -25,7 +25,8 @@ export function registerSchemaCommand(program: Command): void {
     .action(async (file: string, opts: { format: string; output?: string; }) => {
       // Print deprecation notice to stderr.
       process.stderr.write(
-        "Note: 'barwise schema' is deprecated. Use 'barwise export --format ddl' instead.\n\n",
+        "Note: 'barwise schema' is deprecated. Use 'barwise export --format ddl "
+          + "--no-annotate --no-examples' for the same output.\n\n",
       );
 
       try {
@@ -56,10 +57,7 @@ export function registerSchemaCommand(program: Command): void {
           // writes, so the two commands give one answer for one model, and
           // what the format could not express is reported, not dropped
           // (schema-ddl-routing.spec.md).
-          const result = getExporter("ddl")!.export(model, {
-            annotate: false,
-            includeExamples: false,
-          });
+          const result = getExporter("ddl")!.export(model, PLAIN_DDL_OPTIONS);
           output = result.text;
           report = () => reportConstraintSpecs(result, "ddl");
         }

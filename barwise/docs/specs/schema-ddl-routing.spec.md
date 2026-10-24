@@ -8,6 +8,10 @@ Tracking: barwise-zk4
 Plan-reviewed: cde74e04 (code-review, pr-review)
 Touches: barwise/packages/cli/src/commands/schema.ts,
 barwise/packages/cli/src/commands/export.ts,
++barwise/packages/cli/src/workspace/constraintReport.ts,
+barwise/packages/formats/src/ddl/DdlExportFormat.ts,
+barwise/packages/formats/src/index.ts,
+barwise/docs/MCP.md,
 barwise/packages/cli/tests/commands/schema.test.ts,
 barwise/packages/mcp/src/tools/schema.ts,
 barwise/packages/mcp/tests/tools/schema.test.ts,
@@ -135,10 +139,23 @@ Acceptance:
   --format ddl --no-annotate --no-examples` stdout on all 119 tracked
   `.orm.yaml` files, and `--format json` output is byte-identical before
   and after (616 KB over the same files).
-- **The surfaces delegate.** The CLI calls the registered exporter and the
-  export command's `reportConstraintSpecs`, now exported; the MCP tool
-  calls `executeExportModel`. Neither keeps a copy of the exporter options
-  or the report wiring.
+- **The surfaces delegate.** The CLI calls the registered exporter and
+  `reportConstraintSpecs`, moved from `export.ts` to
+  `cli/src/workspace/constraintReport.ts` so neither command imports the
+  other; the MCP tool calls `executeExportModel`. Both take their exporter
+  options from one constant, `PLAIN_DDL_OPTIONS` in `@barwise/formats`.
+  (Code review found the first cut importing `export.ts` from `schema.ts`
+  and spelling the options out on each surface.)
+- **The MCP tool resolves the source before delegating**, so a missing
+  file or a project manifest throws for both formats, as it always did:
+  `executeExportModel` returns errors as text and accepts a project
+  manifest with a `domain` this tool has no parameter for.
+- **Two review findings stand as designed.** The JSON format stays
+  unbounded inline, as it was, while DDL is bounded through export_model;
+  and a bounded DDL spills to an `export-ddl-*` file beside the source.
+  Both follow from delegating to export_model, which this spec chose.
+- **The deprecation notice now names the equivalent flags**, since plain
+  `export --format ddl` adds annotations and INSERTs.
 
 ## Open decisions
 

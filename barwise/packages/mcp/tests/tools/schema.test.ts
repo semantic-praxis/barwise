@@ -82,3 +82,12 @@ model:
     expect(executeSchema(uniqueEmail, "ddl").content[0]!.text).toContain("UNIQUE (email)");
   });
 });
+
+describe("generate_schema fails the same way for both formats", () => {
+  it("throws for a missing file whichever format is asked", () => {
+    // The DDL path delegates to export_model, which returns errors as
+    // text; resolving first keeps the thrown error the SDK reports.
+    expect(() => executeSchema("does/not/exist.orm.yaml", "ddl")).toThrow();
+    expect(() => executeSchema("does/not/exist.orm.yaml", "json")).toThrow();
+  });
+});

@@ -3,6 +3,7 @@
  */
 
 import { RelationalMapper } from "@barwise/core/mapping";
+import { PLAIN_DDL_OPTIONS } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveSource, type SourceInput } from "../workspace/resolve.js";
@@ -36,8 +37,12 @@ export function executeSchema(
   source: SourceInput,
   format: "ddl" | "json" = "ddl",
 ): { content: Array<{ type: "text"; text: string; }>; } {
+  // Resolved here for both formats, so a missing file or a project
+  // manifest fails the same way whichever format was asked for: thrown,
+  // which the SDK reports as an error, as it always was.
+  const model = resolveSource(source);
   if (format === "json") {
-    const schema = new RelationalMapper().map(resolveSource(source));
+    const schema = new RelationalMapper().map(model);
     return {
       content: [
         { type: "text" as const, text: JSON.stringify(schema, null, 2) },
@@ -48,5 +53,5 @@ export function executeSchema(
   // What export_model returns for DDL, by calling it: one DDL text per
   // model, bounded the same way, with the report block when the format
   // could not express a constraint (schema-ddl-routing.spec.md).
-  return executeExportModel(source, "ddl", { annotate: false, includeExamples: false });
+  return executeExportModel(source, "ddl", { ...PLAIN_DDL_OPTIONS });
 }
