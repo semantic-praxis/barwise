@@ -1,6 +1,6 @@
 # Apache Ossie ontology import and export
 
-Status: In progress -- WS1 (import) implemented; WS2 (export) grounded, not started
+Status: Implemented -- WS1 (import) and WS2 (export and round trip)
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -408,6 +408,13 @@ absolute IRI (a scheme, a colon, no whitespace or `<>"{}|\^` characters),
 which still refuses a relative or space-bearing one. `ossie` joins the
 editor's `barwise_export_model` enum, which the WS1 drift test then holds.
 Depends on WS1.
+
+**Implementation note (WS2).** The schema test runs ajv in strict mode
+with one rule off, `strictRequired`: the pinned `ontology.json` writes
+`required` inside an `anyOf` for properties its parent declares, valid JSON
+Schema that ajv's strict mode refuses as a style matter. The rule is about
+how the schema is written, not the document under test, so turning it off
+loses no check on the export.
 
 ## API and migration impact
 

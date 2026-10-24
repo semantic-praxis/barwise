@@ -105,10 +105,10 @@ describe("Standard format descriptors", () => {
   });
 
   describe("ossieFormat", () => {
-    it("is import-only until the exporter lands (WS2)", () => {
+    it("has both importer and exporter", () => {
       expect(ossieFormat.name).toBe("ossie");
       expect(ossieFormat.importer).toBeDefined();
-      expect(ossieFormat.exporter).toBeUndefined();
+      expect(ossieFormat.exporter).toBeDefined();
     });
   });
 
@@ -190,8 +190,8 @@ describe("registerStandardFormats", () => {
 
     // 5 formats (ddl, openapi, sql, norma, ossie) have importers.
     expect(importers).toHaveLength(5);
-    // 4 formats (ddl, openapi, avro, norma) have exporters.
-    expect(exporters).toHaveLength(4);
+    // 5 formats (ddl, openapi, avro, norma, ossie) have exporters.
+    expect(exporters).toHaveLength(5);
     expect(importers.map((f) => f.name).sort()).toEqual([
       "ddl",
       "norma",
@@ -199,7 +199,13 @@ describe("registerStandardFormats", () => {
       "ossie",
       "sql",
     ]);
-    expect(exporters.map((f) => f.name).sort()).toEqual(["avro", "ddl", "norma", "openapi"]);
+    expect(exporters.map((f) => f.name).sort()).toEqual([
+      "avro",
+      "ddl",
+      "norma",
+      "openapi",
+      "ossie",
+    ]);
   });
 
   it("is idempotent -- safe to call multiple times", () => {

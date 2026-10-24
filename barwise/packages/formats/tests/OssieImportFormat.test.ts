@@ -168,7 +168,7 @@ ontology:
 `);
     expect(factType(model, "Person.ancestor_of").derivation).toEqual({
       kind: "derived",
-      expression: "Person.parent_of(descendant)\nPerson.ancestor_of.parent_of(descendant)",
+      expression: "Person.parent_of(descendant)\n\nPerson.ancestor_of.parent_of(descendant)",
     });
   });
 
@@ -733,6 +733,31 @@ ontology:
       /multiplicity must be ManyToOne or OneToOne/,
     ),
   );
+});
+
+describe("Ossie import: what the export could not split back", () => {
+  it("names a derived_by item holding a blank line, and a description line the export would misread", () => {
+    const text =
+      HEADER.replace("name: Test", "name: T\ndescription: |\n  Flights.\n  requires: none")
+      + `ontology:
+  - concept: Person
+    type: EntityType
+    identify_by: [ nr ]
+    relationships:
+      - { name: nr, roles: [ { concept: Integer } ], multiplicity: OneToOne, verbalizes: [ "{Person} has {Integer}" ] }
+      - name: old
+        derived_by:
+          - |
+            EXISTS (SELECT 1
+
+              WHERE Person.age > 90)
+        verbalizes: [ "{Person} is old" ]
+`;
+    expect(new OssieImportFormat().parse(text).warnings).toEqual([
+      "Person.old: a derived_by expression holds a blank line, where the export splits items; it will be written back as more than one.",
+      'description: a line begins "requires:", which the export would read as an ontology requires.',
+    ]);
+  });
 });
 
 describe("Ossie import: refusals and warnings", () => {

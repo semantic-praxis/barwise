@@ -30,6 +30,8 @@ src/
   index.ts                       Public API
   registration.ts                The 6 descriptors + registerStandardFormats()
   naming.ts                      Name helpers shared by the adapters (snakeCase)
+  constraintSpec.ts              The ConstraintSpec payload for a constraint a
+                                 format cannot express (DDL router, Ossie writer)
   ddl/DdlImportFormat.ts         SQL DDL -> ORM
   ddl/DdlExportFormat.ts         ORM -> SQL DDL (wraps renderDdl; applies the
                                  dialect constraint routing as a text pass)
@@ -57,10 +59,12 @@ src/
   ossie/mapOssieToOrm.ts         OssieDocument -> ORM model + warnings
   ossie/requiresShapes.ts        The requires expressions read as constraints
   ossie/OssieImportFormat.ts     The importer adapter
+  ossie/writeOssie.ts            ORM model -> Ossie document + loss report
+  ossie/OssieExportFormat.ts     The exporter adapter (YAML, loss comment block)
 tests/
   helpers/ModelBuilder.ts  Fluent model builder (test-only)
   fixtures/*.orm           NORMA XML fixtures
-  fixtures/ossie/          The pinned Apache Ossie example (Apache-2.0 header kept)
+  fixtures/ossie/          The pinned Apache Ossie example and schemas (README: source, license)
   *.test.ts                Mirrors src/
 ```
 
@@ -76,9 +80,9 @@ Lint is run from the repo root: `npm run lint`.
 ## Key Conventions
 
 - Importers follow the `ImportFormat` interface; exporters follow
-  `ExportFormatAdapter`. The export descriptors are thin shells: the
-  rendering capability stays in core and the descriptor calls back into
-  it.
+  `ExportFormatAdapter`. An export descriptor is a thin shell when core
+  has the renderer (DDL, OpenAPI, Avro call back into it); a format core
+  has no renderer for keeps its writer here, as NORMA and Ossie do.
 - Format registration uses `registerStandardFormats()`, called at tool
   startup alongside `registerDbtFormats()` and `registerCodeFormats()`.
 

@@ -96,6 +96,7 @@ export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapR
   const model = new OrmModel({ name: modelName ?? doc.name, ...(note ? { note } : {}) });
 
   reportDropped(doc, ontologyRequires, warnings);
+  reportUnsplittable(doc, warnings);
 
   // Object types first: relationships name concepts declared further down.
   for (const c of doc.ontology) addConcept(model, c, resolved, warnings);
@@ -538,7 +539,7 @@ function addRelationship(
     ...(note ? { note } : {}),
     ...(r.derived_by && r.derived_by.length > 0
       ? {
-        derivation: { kind: "derived" as const, expression: r.derived_by.join("\n") },
+        derivation: { kind: "derived" as const, expression: joinDerivation(r.derived_by) },
       }
       : {}),
   });
@@ -622,7 +623,7 @@ function multiplicityConstraints(
  */
 function addSubtypes(model: OrmModel, c: OssieConcept): void {
   const rule = c.derived_by && c.derived_by.length > 0
-    ? { kind: "derived" as const, expression: c.derived_by.join("\n") }
+    ? { kind: "derived" as const, expression: joinDerivation(c.derived_by) }
     : undefined;
   supertypes(c).forEach((s, i) => {
     model.addSubtypeFact({
@@ -686,4 +687,48 @@ function notes(requires: readonly string[], derivedBy: readonly string[]): strin
     ...requires.map((e) => `${REQUIRES_NOTE_PREFIX}${oneLine(e)}`),
     ...derivedBy.map((e) => `${DERIVED_BY_NOTE_PREFIX}${oneLine(e)}`),
   ].join("\n");
+}
+
+/**
+ * A `derived_by` list as one derivation text: the items joined by a blank
+ * line, which the exporter splits at. A blank line, not a line end, so one
+ * expression that spans lines stays one item on the way back.
+ */
+export const DERIVATION_ITEM_SEPARATOR = "\n\n";
+
+function joinDerivation(items: readonly string[]): string {
+  return items.join(DERIVATION_ITEM_SEPARATOR);
+}
+
+/**
+ * What the export could not split back as it was written, named now: a
+ * `derived_by` item holding a blank line (it would come back as two), and
+ * a description line beginning `requires: ` (it would come back as an
+ * ontology requires, since the model note holds both).
+ */
+function reportUnsplittable(doc: OssieDocument, warnings: string[]): void {
+  const blank = /\n\s*\n/;
+  const owners: [string, readonly string[] | undefined][] = doc.ontology.flatMap((c) => [
+    [c.concept, c.derived_by] as [string, readonly string[] | undefined],
+    ...(c.relationships ?? []).map((r) =>
+      [ossieFactTypeName(c.concept, r.name), r.derived_by] as [
+        string,
+        readonly string[] | undefined,
+      ]
+    ),
+  ]);
+  for (const [owner, items] of owners) {
+    if ((items ?? []).some((e) => blank.test(e))) {
+      warnings.push(
+        `${owner}: a derived_by expression holds a blank line, where the export splits items; `
+          + `it will be written back as more than one.`,
+      );
+    }
+  }
+  if (doc.description?.split("\n").some((line) => line.startsWith(REQUIRES_NOTE_PREFIX))) {
+    warnings.push(
+      `description: a line begins "${REQUIRES_NOTE_PREFIX.trim()}", which the export would read as `
+        + `an ontology requires.`,
+    );
+  }
 }

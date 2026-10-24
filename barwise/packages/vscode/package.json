@@ -559,9 +559,10 @@
                 "openapi",
                 "dbt",
                 "avro",
-                "norma"
+                "norma",
+                "ossie"
               ],
-              "description": "Export format: 'ddl' for SQL DDL, 'openapi' for OpenAPI 3.x, 'dbt' for dbt model files, 'avro' for Avro schemas, 'norma' for NORMA .orm XML"
+              "description": "Export format: 'ddl' for SQL DDL, 'openapi' for OpenAPI 3.x, 'dbt' for dbt model files, 'avro' for Avro schemas, 'norma' for NORMA .orm XML, 'ossie' for an Apache Ossie ontology document (YAML)"
             },
             "annotate": {
               "type": "boolean",
