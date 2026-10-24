@@ -10,7 +10,10 @@ barwise/packages/formats/src/registration.ts,
 barwise/packages/formats/src/index.ts,
 barwise/packages/formats/tests/,
 barwise/packages/formats/CLAUDE.md,
-barwise/packages/formats/package.json
+barwise/packages/formats/package.json,
+barwise/packages/cli/tests/importerIds.test.ts,
+barwise/packages/vscode/package.json,
+barwise/docs/CLI.md
 
 barwise reads and writes Apache Ossie ontology documents through one
 `ossie` format descriptor in `@barwise/formats`, mapping each Ossie
@@ -65,50 +68,95 @@ already depends on.
 
 In scope:
 
-- When `barwise import ossie <file>` (or `import_model` with
-  `format: ossie`) reads an Ossie ontology document at version
-  `0.2.0.dev0`, the system shall produce a model in which:
+- When `barwise import model <file> --format ossie` (or `import_model`
+  with `format: ossie`, or the editor's `#barwiseImportModel`) reads an
+  Ossie ontology document at version `0.2.0.dev0`, the system shall
+  produce a model in which:
   - each `EntityType` concept is an entity object type, and each
-    `ValueType` concept a value type whose data type is the built-in it
-    extends, directly or through other value types (`String` to `text`,
-    `Integer` to `integer`, `Decimal` to `decimal`, `Float` to `float`,
-    `Boolean` to `boolean`, `Date` to `date`, `DateTime` to `datetime`);
-  - each relationship is a fact type whose first role is played by the
-    concept it is declared under and whose further roles are its `roles`,
-    in order, with role names kept;
-  - each `verbalizes` pattern is a reading, `{Concept}` and
-    `{Concept:role}` placeholders becoming role positions;
+    `ValueType` concept a value type whose data type is the built-in at
+    the root of its `extends` chain (`String` to `text`, `Integer` to
+    `integer`, `Decimal` to `decimal`, `Float` to `float`, `Boolean` to
+    `boolean`, `Date` to `date`, `DateTime` to `datetime`);
+  - a built-in a role names without declaring it (`concept: String`) is
+    one value type of that name and data type, made on first use; the
+    exporter writes such a value type back as the built-in, not as a
+    declared concept;
+  - an entity type's reference mode, which core requires, is the name of
+    its single identifying relationship, else `<snake_name>_id` (the NORMA
+    importer's rule, through the same `snakeCase`);
+  - each relationship is a fact type named `Concept.relationship` -- what
+    Ossie's own expressions call it, and unique where a bare relationship
+    name is not (`code` and `name` each recur across the example's
+    concepts) -- whose first role is played by the concept it is declared
+    under and whose further roles are its `roles`, in order, each named by
+    its Ossie role name, else its player;
+  - each `verbalizes` pattern is a reading, `{Concept:role}` and
+    `{Concept}` placeholders becoming role positions (`{Concept}` for a
+    named role when no other role has that player), the text otherwise kept
+    as written (Open decision 4 for the hyphen);
   - `multiplicity: ManyToOne` is an internal uniqueness over all roles
     but the last, `OneToOne` an internal uniqueness on each role of a
     binary, and no multiplicity a uniqueness spanning every role
-    (relationships have set semantics: no link repeats);
-  - `extends` between entity types is a subtype fact per supertype;
-  - `identify_by` is the entity's preferred identifier: the uniqueness on
-    the identifier's role for one relationship, an external uniqueness
-    over the identifiers' roles for several;
+    (relationships have set semantics: no link repeats). A unary's
+    spanning uniqueness is its one role, which the exporter omits again as
+    implied; `OneToOne` off a binary, or `ManyToOne` on a unary, is read
+    as no multiplicity, with a warning;
+  - `extends` between entity types is a subtype fact per supertype, the
+    first identifying the subtype unless it names its own `identify_by`;
+    `Any`, which every entity implicitly extends, adds nothing;
+  - `identify_by` naming one relationship is the entity's preferred
+    identifier: the uniqueness on that relationship's far role, added with
+    a warning when the multiplicity did not state it. Naming several, it is
+    an external uniqueness over their far roles, kept but not named as the
+    preferred identifier, with a warning: core reads only an internal
+    uniqueness as one (barwise-alg), and the NORMA importer treats the same
+    shape the same way;
   - `description` is the element's definition;
   - a `derived_by` list on a relationship is the fact type's derivation
-    rule, and on a concept the defining rule of its subtype fact, carried
-    as informal text (the expressions joined, one per line);
-  - a `requires` expression of one of two recognized shapes is a value
-    constraint: an enumeration (`X == 'A' OR X == 'B' ...`) and a range
-    (`X >= lo`, `X <= hi`, strict or not, alone or as a pair). Any other
-    `requires` expression is kept in the element's note and named in a
+    rule, and on an entity with a supertype the defining rule of each of
+    its subtype facts, carried as text (the expressions joined, one per
+    line) of kind `derived` -- Ossie has no semiderived notion, so the
+    exporter names a semiderived fact type in its warnings. On an entity
+    with no supertype, or a value type, it is kept in the note with a
+    warning;
+  - three `requires` shapes are constraints. On a value type, an
+    enumeration (`X == 'A' OR X == 'B' ...`) or bounds (`X >= lo`,
+    `X < hi`, `lo <= X`, either operand order, strict or not, at most one
+    per side) become one value constraint. On an entity type, a bare
+    `Entity.rel` naming one of its relationships is a mandatory first role
+    on `rel`. The items of a `requires` list all hold, while a barwise
+    value constraint's values and ranges are alternatives, so an enumeration
+    is carried only alone: with a second enumeration or a bound beside it,
+    the first enumeration is the constraint and the rest go to the note.
+    Any other expression is kept in the element's note and named in a
     warning.
 - When the document's `version` is not `0.2.0.dev0`, the importer shall
   refuse it, naming the version it read and the one it supports.
-- When an ontology carries an `iri`, a `prefixes` map, an ontology-level
-  `requires`, a value type that extends another user value type, or a
-  deprecated embedded `ontology_mappings`, the importer shall name each in
-  `warnings` and keep what barwise can hold (the data type from the chain's
-  root, for the value type).
+- When a document is malformed in a way the mapping depends on -- a concept
+  declared twice or redeclaring a built-in, a relationship name repeated on
+  one concept, two roles with one name, a placeholder naming no role, a
+  role or supertype that is not declared, an `extends` cycle -- the
+  importer shall refuse it with an `OssieImportError` naming the place.
+  An empty or null `description` is read as absent.
+- When an ontology carries an `iri`, a `prefixes` map, an `ai_context`,
+  an ontology-level `requires`, a value type that extends another user
+  value type (naming any `requires` on the chain that the flattening does
+  not carry), an `identify_by` on a value type, or a deprecated embedded
+  `ontology_mappings`, the importer shall name each in `warnings` and keep
+  what barwise can hold.
+- When an importer creates an element, it shall take the id from
+  `generateId()` (`importer-role-ids.spec.md`, R1), and
+  `cli/tests/importerIds.test.ts` shall run it over a fixture that
+  reaches every id path. Elements are found again by name, and a re-import
+  diffs by content, which diff falls back to when ids differ.
 - When a model is exported with `--format ossie`, the system shall write an
   ontology document that `ontology/ontology.json` at the pinned commit
   accepts, inverting each mapping above, and shall list in
-  `constraintSpecs` every constraint it cannot express (mandatory, ring,
-  frequency, exclusion, exclusive-or, subset, equality, value comparison,
-  cardinality, the join kinds, and any uniqueness other than the shapes a
-  multiplicity states).
+  `constraintSpecs` every constraint it cannot express (ring, frequency,
+  exclusion, exclusive-or, subset, equality, value comparison, cardinality,
+  the join kinds, a mandatory role other than a first role, an external
+  uniqueness that is not an entity's identifier, and any internal
+  uniqueness other than the shapes a multiplicity or an identifier states).
 - When `examples/flights.ontology.yaml` at the pinned commit is imported
   and the result exported, the second document shall equal the first in
   every construct the import did not warn about.
@@ -120,21 +168,26 @@ Out of scope:
   barwise's relational mapper is the natural home for that binding, and it
   is barwise-pf2.3's question (logical schema to model), not this one.
 - **Parsing Ossie's expression language.** `derived_by` and `requires` are
-  carried as text, with only the two `requires` shapes above recognized.
+  carried as text, with only the three `requires` shapes above recognized.
   A formal expression language is barwise-pf2.2.
 - **IRIs and prefixes as model fields.** barwise has no field for them;
   barwise-rqb (custom attributes) is where they would go.
+- **Hyphen binding in verbalization** (`has average- departure {Delay}`),
+  which barwise's verbalizer does not implement for any source:
+  barwise-iiw (Open decision 4).
 
 ## Inventory
 
-| Area                                            | Current state                            | Verdict                                       |
-| ----------------------------------------------- | ---------------------------------------- | --------------------------------------------- |
-| `formats/src/ossie/` (new)                      | none                                     | parser, mapper, writer, `requires` recognizer |
-| `formats/src/registration.ts`                   | five descriptors                         | adds `ossieFormat`, importer and exporter     |
-| `formats/tests/fixtures/ossie/` (new)           | none                                     | the pinned `flights.ontology.yaml` and schema |
-| core `ImportResult.warnings`, `constraintSpecs` | exist; NORMA returns no warnings         | used as is                                    |
-| core metamodel, serializer, schema              | carries every barwise target named above | untouched                                     |
-| surfaces (CLI, MCP, VS Code)                    | reach every registered format            | untouched; the capability matrix row holds    |
+| Area                                            | Current state                      | Verdict                                       |
+| ----------------------------------------------- | ---------------------------------- | --------------------------------------------- |
+| `formats/src/ossie/` (new)                      | none                               | parser, mapper, writer, `requires` recognizer |
+| `cli/tests/importerIds.test.ts`                 | a fixture per registered importer  | adds an Ossie fixture (R3)                    |
+| `vscode/package.json` `barwise_import_model`    | a hand-listed `format` enum        | adds `ossie`; a drift test against registry   |
+| `formats/src/registration.ts`                   | five descriptors                   | adds `ossieFormat`, importer and exporter     |
+| `formats/tests/fixtures/ossie/` (new)           | none                               | the pinned `flights.ontology.yaml` and schema |
+| core `ImportResult.warnings`, `constraintSpecs` | exist; NORMA returns no warnings   | used as is                                    |
+| core metamodel, serializer, schema              | carries every target above but one | untouched; external preferred id: barwise-alg |
+| surfaces (CLI, MCP)                             | reach every registered format      | untouched; the capability matrix row holds    |
 
 Nothing in `@barwise/core` changes. The capability matrix's
 "export, import" row already reads "none" for divergence, and a registered
@@ -154,9 +207,12 @@ registration.ts: ossieFormat { name: "ossie", extension: "yaml",
                                importer, exporter }
 ```
 
-Element ids on import derive from Ossie names (`derivedId` over the
-concept and relationship names), so one document always imports to the same
-ids -- the determinism rule, and what lets a re-import diff by id.
+Element ids come from `generateId()`, as every importer's do; elements are
+found again by name. `writeOssie` is a renderer living in `@barwise/formats`
+rather than a thin shell over core, as the NORMA writer already is: the
+package convention that export descriptors call back into core describes
+the DDL, OpenAPI and Avro shells, and WS2 amends formats `CLAUDE.md` to say
+a format with no core renderer keeps its writer here.
 
 ## Alternatives considered
 
@@ -165,11 +221,17 @@ ids -- the determinism rule, and what lets a re-import diff by id.
   language barwise-pf2.2 owns; dropping them silently is the failure this
   spec exists to avoid. The two recognized shapes cover the example's
   enumerations and ranges, and the rest is kept as a note and reported.
-- **Export barwise constraints as `requires` expressions** (a mandatory
-  role as `EXISTS(...)`). It would write expressions in a language barwise
-  does not parse, so an Ossie consumer could not tell a faithful rendering
-  from a guess, and a re-import could not read them back. `constraintSpecs`
-  already carries a verbalization and pseudocode for every such constraint.
+- **Export every barwise constraint as a `requires` expression.** Beyond
+  the three recognized shapes, which the exporter does write (a mandatory
+  first role as `Entity.rel`), it would write expressions in a language
+  barwise does not parse, so an Ossie consumer could not tell a faithful
+  rendering from a guess, and a re-import could not read them back.
+  `constraintSpecs` already carries a verbalization and pseudocode for
+  every such constraint.
+- **Derive ids from Ossie names**, so a re-import matches by id. It breaks
+  `importer-role-ids.spec.md` R1, which rejected a sanctioned exception to
+  `generateId()` outright; diff's content fallback already matches a
+  re-import.
 - **A new `@barwise/ossie` connector package.** The connector packages
   exist to own I/O (`@barwise/dbt`'s subprocess, `@barwise/code-analysis`'s
   LSP sessions). Ossie is a text format with no I/O of its own, which is
@@ -180,9 +242,12 @@ ids -- the determinism rule, and what lets a re-import diff by id.
 ### 1. Import
 
 `OssieTypes`, `parseOssie`, `mapOssieToOrm`, `requiresShapes`, and
-`OssieImportFormat`, registered on `ossieFormat` with the importer only.
-Tests: each mapping in Scope against a small document; the version refusal;
-every warning named; and the pinned `flights.ontology.yaml` imported, its
+`OssieImportFormat`, registered on `ossieFormat` with the importer only;
+`ossie` added to the editor tool's `format` enum with a drift test against
+the registry; an Ossie fixture in `importerIds.test.ts`; the format named
+where docs list the formats package's descriptors. Tests: each mapping in
+Scope against a small document; the version refusal and each malformed
+shape; every warning named; and the pinned `flights.ontology.yaml` imported, its
 model validating with no errors, and its warnings listed in the test so a
 change to what is carried is a visible diff. The fixture keeps its Apache
 license header, which is what redistributing it requires.
@@ -227,6 +292,17 @@ the round trip in Scope, construct by construct. Depends on WS1.
    barwise's validation warns about). **Recommend emitting it**: it is
    what the Ossie document states, and leaving it out would make a valid
    Ossie relationship import as a validation warning.
+
+4. **Ossie's hyphen binding.** The example writes `has average- departure
+   {Delay}`: in ORM tooling the hyphen binds the adjective to the role
+   player when a constraint is verbalized. barwise's verbalizer implements
+   no hyphen binding for any source. Options: keep the reading as written
+   and warn per reading (verbalization shows the stray hyphen until barwise
+   binds it, and the round trip is exact); strip the hyphen (clean output,
+   the export loses it); implement hyphen binding in core's verbalizer (a
+   core change this spec rules out). **Recommend keeping it and warning**,
+   with hyphen binding in core filed as barwise-iiw, since NORMA readings use
+   the same convention.
 
 ## Risks and testing
 
