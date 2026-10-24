@@ -185,7 +185,7 @@ describe("MCP server (in-memory transport)", () => {
   it("reads orm-model://{path}", async () => {
     const r = await client.readResource({ uri: `orm-model://${simple}` });
     const text = r.contents[0]?.text as string;
-    expect(JSON.parse(text)._name).toBe("Simple Test");
+    expect(JSON.parse(text).model.name).toBe("Simple Test");
   });
 
   it("reads reasoning-trail://{path}", async () => {
