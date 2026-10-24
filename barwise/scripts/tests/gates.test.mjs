@@ -5230,6 +5230,8 @@ function archPlanted(dir, rel, edit) {
 }
 
 const CLAUDE_LLM = "@barwise/llm             (core)";
+const MCP_ROW =
+  "  |--- @barwise/mcp             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn)";
 const CORE_PKG = "barwise/packages/core/package.json";
 const INTENDED_CJS = "barwise/scripts/lib/intended.cjs";
 
@@ -5294,6 +5296,13 @@ const ARCH_DISAGREEMENTS = [
     `  |--- ${CLAUDE_LLM}\n`,
     `  |--- ${CLAUDE_LLM}\n\n@barwise/planned            (core, ghost)\n`,
     /CLAUDE\.md lists @barwise\/planned, INTENDED does not/,
+  ],
+  // A row for a package with no manifest yet, unscoped, is still compared.
+  [
+    "CLAUDE.md",
+    `  |--- ${CLAUDE_LLM}\n`,
+    `  |--- ${CLAUDE_LLM}\n  |--- barwise-jetbrains (core, mcp)\n`,
+    /CLAUDE\.md lists barwise-jetbrains, INTENDED does not/,
   ],
   // One edge spelled in both vocabularies is still a duplicate.
   [
@@ -5377,8 +5386,10 @@ test("check:architecture passes the real graph and catches each planted disagree
     assert.match(twice.stderr, /CLAUDE\.md lists llm twice/);
     assert.doesNotMatch(twice.stderr, /llm -> /);
     // None of these is a disagreement: a wrapped comment under the last
-    // row, npm names inside a list, a nested connector, a rule line, and
-    // prose with a parenthesis ahead of the package name.
+    // row, npm names inside a list, a nested connector, a rule line, a
+    // directory name as the row name, no space before the list, and
+    // package names in comment prose -- mid-line, at the start of a
+    // continuation, or in a parenthetical that wraps.
     const vscodeRow =
       "  |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)";
     for (
@@ -5390,7 +5401,19 @@ test("check:architecture passes the real graph and catches each planted disagree
           ),
         (x) => x.replace(CLAUDE_LLM, "@barwise/llm             (@barwise/core)"),
         (x) => x.replace(`  |--- ${CLAUDE_LLM}`, `  |     |--- ${CLAUDE_LLM}`),
-        (x) => x.replace(`  |--- ${CLAUDE_LLM}`, `  |--- lane (llm): ${CLAUDE_LLM}`),
+        (x) => x.replace("|--- barwise-vscode  ", "|--- vscode          "),
+        (x) => x.replace(CLAUDE_LLM, "@barwise/llm(core)"),
+        (x) =>
+          x.replace(
+            "(diagram)  -- React renderer over the",
+            "(diagram)  -- renders with @xyflow/react (MIT) over the",
+          ),
+        (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   embedded by barwise-vscode (in-process)`),
+        (x) =>
+          x.replace(
+            "(core)  -- connector package: registers",
+            "(core)  -- unlike @barwise/formats (which\n  |   is pure) registers",
+          ),
         (x) =>
           x.replace(
             `  |--- ${CLAUDE_LLM}\n`,
@@ -5469,6 +5492,11 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
         (s) => s.replace(CLAUDE_LLM, "@barwise/llm             (core,\n  |   diagram)"),
       ),
       /cannot parse the graph row "\|--- @barwise\/llm\s+\(core,": its list must close/,
+    );
+    // A connector with a list but no name is a misdrawn row, not prose.
+    refused(
+      archPlanted(dir, "CLAUDE.md", (s) => s.replace(`  |--- ${CLAUDE_LLM}`, "  |---   (core)")),
+      /cannot parse the graph row "\|---   \(core\)"/,
     );
     const shapeFault = /does not export a map of package to package list/;
     for (const bad of [`"core": [[]]`, `"core": "none"`]) {

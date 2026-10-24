@@ -50,17 +50,22 @@ const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !== i))];
 
 /**
- * The CLAUDE.md block, as package name to the names it lists. A row is
- * any line where a package name stands directly before a parenthesized
- * list -- `@barwise/x (a, b)`, `(no internal deps)` for none -- wherever
- * the drawing puts it. A package name is one a manifest carries, or any
- * scoped `@` name, so a package drawn before its manifest exists is still
- * compared. Every other word before a parenthesis is prose: a wrapped
- * comment such as `bundles (esbuild)` is not a row. This reads the
- * picture by its content, not its layout, because each layout rule tried
- * (a fixed connector, then any leading connector) was broken by another
- * correct or misdrawn picture.
+ * The CLAUDE.md block, as package name to the names it lists. Each line is
+ * read by its FIRST token after the drawing characters (spaces, `|`, `+`,
+ * `^`, a backtick, a connector's dashes): `name (a, b)`, with
+ * `(no internal deps)` for none. That token is a row when a connector
+ * precedes it, when it opens the block, or when it is a package name -- a
+ * manifest's name, or any scoped `@` name -- so a root drawn
+ * at column 0 or a package not yet built is still compared. A name later
+ * in a line is prose (`renders with @xyflow/react (MIT)`), and so is a
+ * wrapped comment that opens with an ordinary word (`bundles (esbuild)`).
+ * Two rules were tried and dropped: a fixed `|---` connector skipped a
+ * nested or column-0 row, and any package name anywhere on a line read
+ * comment prose as second listings.
  */
+const LEAD = /^[\s|+^`\\]*(-{2,}\s*)?/;
+const ROW = /^([@\w](?:[\w@/.-]*\w)?)\s*\((?:([^)]*)\))?/;
+
 function graphLines(claudeMd, isPackage) {
   const lines = claudeMd.split("\n");
   const heading = lines.findIndex((l) => /^##\s+Dependency Graph\s*$/.test(l));
@@ -75,20 +80,32 @@ function graphLines(claudeMd, isPackage) {
     throw new Error("the Dependency Graph section has no fenced block");
   }
   const out = [];
-  for (const line of lines.slice(open + 1, close)) {
-    const hit = [...line.matchAll(/([@\w][\w@/.-]*)\s+\(/g)].find((m) => isPackage(m[1]));
-    if (!hit) continue;
-    const list = /^\(([^)]*)\)/.exec(line.slice(hit.index + hit[0].length - 1));
+  const body = lines.slice(open + 1, close);
+  const first = body.findIndex((l) => l.trim() !== "");
+  for (const [i, line] of body.entries()) {
+    const lead = LEAD.exec(line);
+    const connector = lead[1] !== undefined;
+    const rest = line.slice(lead[0].length);
+    const m = ROW.exec(rest);
+    if (!m) {
+      // A connector line with a list but no name before it is a misdrawn
+      // row: refuse, rather than report the package as missing.
+      if (connector && rest.includes("(")) {
+        throw new Error(`cannot parse the graph row "${line.trim()}"`);
+      }
+      continue;
+    }
+    if (!connector && i !== first && !isPackage(m[1])) continue;
     // A list wrapped onto the next line would otherwise lose its tail.
-    if (!list) {
+    if (m[2] === undefined) {
       throw new Error(
         `cannot parse the graph row "${line.trim()}": its list must close on the line`,
       );
     }
-    const deps = list[1].trim() === "no internal deps"
+    const deps = m[2].trim() === "no internal deps"
       ? []
-      : list[1].split(",").map((x) => x.trim()).filter(Boolean);
-    out.push({ name: hit[1], deps });
+      : m[2].split(",").map((x) => x.trim()).filter(Boolean);
+    out.push({ name: m[1], deps });
   }
   if (out.length === 0) throw new Error("the Dependency Graph block names no package");
   return out;
@@ -154,7 +171,8 @@ const dirOf = new Map(manifests.map((m) => [m.json.name, m.dir]));
 const problems = [];
 const drawn = new Map();
 for (const { name, deps } of drawnLines) {
-  // An unknown name stays as written, so it is reported, not dropped.
+  // A directory name is its own key; an unknown name stays as written, so
+  // it is reported, not dropped.
   const pkg = dirOf.get(name) ?? name;
   // The first listing stands; merging the second in would invent edge
   // disagreements beside the real one.
