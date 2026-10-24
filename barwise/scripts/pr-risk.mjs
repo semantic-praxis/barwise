@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * The risk tier of a diff, and every checklist heading it triggers.
+ * The risk tier of a diff, every checklist heading it triggers, and
+ * REVIEW.md's failure modes routed by the same paths
+ * (docs/specs/review-routing.spec.md).
  *
  * WS3 of docs/specs/tiered-pr-review.spec.md (barwise-1038). Reads
  * `review-tiers.json` through `lib/review-tiers.mjs` -- the same parser
@@ -49,7 +51,14 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-import { classify, isTrivial, TABLE, tierRows, trivialGlobs } from "./lib/review-tiers.mjs";
+import {
+  classify,
+  failureModeRows,
+  isTrivial,
+  TABLE,
+  tierRows,
+  trivialGlobs,
+} from "./lib/review-tiers.mjs";
 
 // `lib/tracked.mjs` resolves the repository root AT IMPORT, and exits 2
 // when git cannot answer. That is right for a gate that always needs the
@@ -240,9 +249,10 @@ function checkPaths(paths) {
   }
 }
 
-let rows, trivial;
+let rows, modes, trivial;
 try {
   rows = tierRows(opt("--table", TABLE));
+  modes = failureModeRows(opt("--table", TABLE));
   trivial = trivialGlobs(opt("--table", TABLE));
 } catch (err) {
   refuse(err.message, err.cause?.message);
@@ -265,28 +275,70 @@ checkPaths(paths);
 // reads one and a person reading the output may want both.
 const result = { ...classify(paths, rows), trivial: isTrivial(changes, trivial) };
 
+// REVIEW.md's failure modes are ROUTED, never filtered: REVIEW.md tells
+// every reviewer to run all of them, so the path-triggered ones come
+// first with their files and every other one follows (review-routing
+// spec, WS2). They do not change the tier, which stays the checklist
+// rows' answer that the Copilot workflow reads.
+const routed = classify(paths, modes).matched;
+const failureModesBeyondReach = modes
+  .filter((m) => !routed.some((r) => r.heading === m.heading))
+  .map((m) => ({ heading: m.heading, tier: m.tier, why: m.why }));
+
 if (process.argv.includes("--json")) {
-  console.log(JSON.stringify({ ...result, fileCount: changes.length }, null, 2));
+  console.log(
+    JSON.stringify(
+      { ...result, failureModes: routed, failureModesBeyondReach, fileCount: changes.length },
+      null,
+      2,
+    ),
+  );
   process.exit(0);
 }
 
-const width = Math.max(...result.matched.map((r) => r.tier.length), 0);
-console.log(
-  `pr-risk: ${result.tier}${result.trivial ? ", trivial" : ""}`
-    + `  (${changes.length} changed file${changes.length === 1 ? "" : "s"})`,
-);
-console.log();
-for (const row of result.matched.sort((a, b) => a.tier.localeCompare(b.tier))) {
+/** One routed row and the files that triggered it. */
+function printRow(row, width) {
   console.log(`  ${row.tier.padEnd(width)}  ${row.heading}`);
   const shown = row.files.slice(0, 3).join(", ");
   const more = row.files.length > 3 ? ` (+${row.files.length - 3} more)` : "";
   console.log(`  ${" ".repeat(width)}  ${shown}${more}`);
 }
+
+// The list a reviewer works from comes first; the tier, which the
+// workflow reads from --json, comes last (review-routing spec, WS1).
+const width = Math.max(...[...result.matched, ...routed].map((r) => r.tier.length), 0);
+console.log("Checklist groups to run (checklist.md), with the files that trigger them:");
+if (result.matched.length === 0) console.log("  none triggered by path");
+for (const row of result.matched.sort((a, b) => a.tier.localeCompare(b.tier))) printRow(row, width);
 if (result.beyondReach.length > 0) {
   console.log();
-  console.log(
-    `  ${result.beyondReach.length} checklist groups are not path-derivable, so a`,
-  );
-  console.log("  routine tier does NOT mean the checklist is satisfied:");
-  for (const row of result.beyondReach) console.log(`    - ${row.heading}`);
+  console.log(`Checklist groups no path can detect -- run these on every PR too:`);
+  for (const row of result.beyondReach) console.log(`  - ${row.heading}`);
+}
+if (modes.length > 0) {
+  console.log();
+  console.log("REVIEW.md failure modes -- run all of them; these first, for these files:");
+  if (routed.length === 0) console.log("  none triggered by path");
+  // No tier column: a failure mode's tier never changes the verdict, and
+  // "high-risk" beside a mode above a "routine" verdict reads as a
+  // contradiction.
+  for (const row of routed) printRow({ ...row, tier: "" }, 0);
+  const untriggered = failureModesBeyondReach.filter((m) => m.tier !== "not-path-derivable");
+  const pathless = failureModesBeyondReach.filter((m) => m.tier === "not-path-derivable");
+  if (untriggered.length > 0) {
+    console.log("  not triggered by the paths in this diff -- still run:");
+    for (const m of untriggered) console.log(`  - ${m.heading}`);
+  }
+  if (pathless.length > 0) {
+    console.log("  no path can detect -- run on every PR:");
+    for (const m of pathless) console.log(`  - ${m.heading}`);
+  }
+}
+console.log();
+console.log(
+  `pr-risk: ${result.tier}${result.trivial ? ", trivial" : ""}`
+    + `  (${changes.length} changed file${changes.length === 1 ? "" : "s"})`,
+);
+if (result.tier === "routine" && result.beyondReach.length > 0) {
+  console.log("  A routine tier does NOT mean the checklist is satisfied: see the groups above.");
 }

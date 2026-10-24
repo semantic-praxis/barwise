@@ -3202,19 +3202,40 @@ const VALID_TRIVIAL = { globs: [".beads/issues.jsonl"], why: "fixture" };
  * tracked-file list makes the fixture globs live (the gate fails a glob
  * that matches nothing), and `tracked` replaces it for the dead-glob cases.
  */
-function tierFixture(dir, headings, rows, tracked = ["x/a.ts", ".beads/issues.jsonl"]) {
+function tierFixture(
+  dir,
+  headings,
+  rows,
+  tracked = ["x/a.ts", ".beads/issues.jsonl"],
+  { titles = ["F"], modes = ["F"], modeGlobs = ["x/"], noModes = false } = {},
+) {
   writeFileSync(join(dir, "tracked.txt"), tracked.join("\n"));
   const md = ["# Checklist", "", ...headings.flatMap((h) => [`## ${h}`, "", "- item", ""])];
   writeFileSync(join(dir, "checklist.md"), md.join("\n"));
+  // REVIEW.md's shape: numbered items with a bold lead under "Always check".
+  const review = [
+    "# Review",
+    "",
+    "## Always check: fixture",
+    "",
+    ...titles.map((t, i) => `${i + 1}. **${t}.** Body.`),
+    "",
+    "## After",
+    "",
+  ];
+  writeFileSync(join(dir, "REVIEW.md"), review.join("\n"));
+  const row = (r) =>
+    r.tier === "not-path-derivable"
+      ? { heading: r.heading, tier: r.tier, why: "fixture" }
+      : { heading: r.heading, tier: r.tier ?? "routine", globs: ["x/"], why: "fixture" };
   writeFileSync(
     join(dir, "review-tiers.json"),
     JSON.stringify({
       trivial: VALID_TRIVIAL,
-      rows: rows.map((r) =>
-        r.tier === "not-path-derivable"
-          ? { heading: r.heading, tier: r.tier, why: "fixture" }
-          : { heading: r.heading, tier: r.tier ?? "routine", globs: ["x/"], why: "fixture" }
-      ),
+      rows: rows.map(row),
+      ...(noModes
+        ? {}
+        : { failureModes: modes.map((heading) => ({ ...row({ heading }), globs: modeGlobs })) }),
     }),
   );
   return [
@@ -3222,10 +3243,119 @@ function tierFixture(dir, headings, rows, tracked = ["x/a.ts", ".beads/issues.js
     join(dir, "checklist.md"),
     "--table",
     join(dir, "review-tiers.json"),
+    "--review",
+    join(dir, "REVIEW.md"),
     "--tracked",
     join(dir, "tracked.txt"),
   ];
 }
+
+/**
+ * REVIEW.md's failure modes and the table's failureModes rows agree both
+ * ways, and an unreadable or empty REVIEW.md is "cannot answer"
+ * (review-routing.spec.md, WS2).
+ */
+test("check-review-tiers fails both ways on REVIEW.md failure modes, and refuses an unreadable list", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    let args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, {
+      titles: ["F", "G"],
+      modes: ["F"],
+    });
+    let run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, "a REVIEW.md title with no row");
+    assert.match(run.stderr, /no failureModes row for REVIEW\.md failure mode: G/);
+
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, {
+      titles: ["F"],
+      modes: ["F", "Gone"],
+    });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, "a row with no REVIEW.md title");
+    assert.match(run.stderr, /failureModes row names a mode REVIEW\.md no longer has: Gone/);
+
+    args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    assert.equal(
+      gate("check-review-tiers.mjs", dir, ...args).status,
+      0,
+      "the agreeing fixture passes",
+    );
+    rmSync(join(dir, "REVIEW.md"));
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, "REVIEW.md missing");
+    assert.match(run.stderr, /cannot read REVIEW\.md/);
+
+    writeFileSync(
+      join(dir, "REVIEW.md"),
+      "# Review\n\n## Always check: none\n\nNo items.\n\n## After\n\n1. **Not this.** x\n",
+    );
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2, "an empty Always check list");
+    assert.match(run.stderr, /'Always check' list .* has no items/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an Always check item without a one-line bold title is refused, not skipped", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }]);
+    writeFileSync(
+      join(dir, "REVIEW.md"),
+      "# Review\n\n## Always check: x\n\n1. **F.** Body.\n2. Retry storms, not bold.\n",
+    );
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /1 'Always check' item\(s\) .* have no one-line bold title/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("pr-risk refuses a table with no failureModes rather than routing none", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { noModes: true });
+    const table = args[args.indexOf("--table") + 1];
+    const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["x/a.ts"]), "--table", table);
+    assert.equal(run.status, 2, run.stdout);
+    assert.match(run.stderr, /declares no failureModes/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers checks failureModes rows as it checks the checklist rows", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    // A dead failure-mode glob, distinct from the row globs.
+    let args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { modeGlobs: ["nowhere/"] });
+    let run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /glob matches no tracked file: F: nowhere\//);
+    // A mode declared twice.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, {
+      titles: ["F"],
+      modes: ["F", "F"],
+    });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /failure mode declared by more than one row: F/);
+    // A malformed mode row is refused by the same validator.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { modeGlobs: ["*.ts"] });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /failure mode 0 \(F\): pattern "\*\.ts"/);
+    // A table with no failureModes block at all.
+    args = tierFixture(dir, ["A"], [{ heading: "A" }], undefined, { noModes: true });
+    run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /declares no failureModes/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("check-review-tiers fails on a row glob that matches no tracked file", () => {
   // barwise-fs0: a row named a path that did not exist and routed nothing
@@ -3257,6 +3387,7 @@ test("check-review-tiers REFUSES a --tracked flag with no value rather than read
   const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
   try {
     const args = tierFixture(dir, ["A"], [{ heading: "A" }], ["x/a"]).slice(0, -1);
+    // --tracked is last, so dropping its value leaves the flag bare.
     const run = gate("check-review-tiers.mjs", dir, ...args);
     assert.equal(run.status, 2, `a flag with no value answers nothing: ${run.stdout}${run.stderr}`);
     assert.match(`${run.stdout}${run.stderr}`, /--tracked needs a value/);
@@ -3536,7 +3667,7 @@ test("pr-risk classifies a real file list and exits 0 for either tier", () => {
   try {
     const routine = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/docs/specs/a.spec.md"]));
     assert.equal(routine.status, 0, `${routine.stdout}${routine.stderr}`);
-    assert.match(routine.stdout, /^pr-risk: routine/);
+    assert.match(routine.stdout, /^pr-risk: routine/m);
 
     const risky = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/packages/core/src/a.ts"]));
     assert.equal(
@@ -3544,7 +3675,7 @@ test("pr-risk classifies a real file list and exits 0 for either tier", () => {
       0,
       "high-risk is an ANSWER, not a failure -- the gate contract lets such a PR merge on a clean review",
     );
-    assert.match(risky.stdout, /^pr-risk: high-risk/);
+    assert.match(risky.stdout, /^pr-risk: high-risk/m);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -3556,8 +3687,71 @@ test("pr-risk names the triggering heading and the file that triggered it", () =
     const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/packages/core/src/model.ts"]));
     assert.match(run.stdout, /@barwise\/core` changed/);
     assert.match(run.stdout, /barwise\/packages\/core\/src\/model\.ts/);
-    // And the caveat WS4 depends on.
-    assert.match(run.stdout, /routine tier does NOT mean the checklist is satisfied/);
+    // The groups no path can see are listed on every run, under their own
+    // heading (review-routing WS1), so a routine tier never reads as a
+    // satisfied checklist; and for a routine tier the caveat WS4 depends
+    // on is still printed.
+    assert.match(run.stdout, /Checklist groups no path can detect -- run these on every PR too/);
+    const routine = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/docs/specs/a.spec.md"]));
+    assert.match(routine.stdout, /routine tier does NOT mean the checklist is satisfied/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The routing a reviewer works from (review-routing.spec.md): the groups
+ * and REVIEW.md failure modes first, the tier last; every failure mode
+ * printed, the path-triggered ones first with their files; and the
+ * failure modes never change the tier or the exit status.
+ */
+test("pr-risk leads with the routing and prints every REVIEW.md failure mode", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
+  try {
+    const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/scripts/x.mjs"]));
+    assert.equal(run.status, 0);
+    const out = run.stdout;
+    const at = (re) => out.search(re);
+    assert.ok(at(/^Checklist groups to run/m) === 0, "the groups come first");
+    assert.ok(at(/^REVIEW\.md failure modes -- run all of them/m) > 0);
+    assert.ok(at(/^pr-risk: high-risk/m) > at(/^REVIEW\.md failure modes/m), "the tier comes last");
+    const triggered = out.indexOf("A gate answers without seeing its input");
+    const rest = out.indexOf("not triggered by the paths in this diff -- still run:");
+    assert.ok(triggered > 0 && rest > triggered, "the triggered mode is listed before the rest");
+    for (
+      const title of ["Input dropped at a boundary", "A restated fact went stale", "ORM shape"]
+    ) {
+      assert.ok(out.indexOf(title) > rest, `${title} is still listed, after the triggered ones`);
+    }
+    // The mode no path can ever detect has its own heading, apart from the
+    // ones this diff's paths happened not to trigger.
+    const pathless = out.indexOf("no path can detect -- run on every PR:");
+    assert.ok(pathless > rest && out.indexOf("A restated fact went stale") > pathless);
+    assert.ok(out.indexOf("ORM shape") < pathless, "a path-routed mode is not listed as pathless");
+    const json = JSON.parse(
+      gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/scripts/x.mjs"]), "--json").stdout,
+    );
+    assert.deepEqual(json.failureModes.map((m) => m.heading).sort(), [
+      "A gate answers without seeing its input",
+      "A test that cannot fail",
+      "PR description claims",
+    ]);
+    assert.equal(json.failureModes.length + json.failureModesBeyondReach.length, 8);
+    // A failure mode alone never makes a diff high-risk: a formats file
+    // triggers the high-risk "Boundary text" mode and no high-risk
+    // checklist row, and the tier stays routine.
+    const ddl = JSON.parse(
+      gate(
+        "pr-risk.mjs",
+        dir,
+        ...fileList(dir, ["barwise/packages/formats/src/ddl/a.ts"]),
+        "--json",
+      ).stdout,
+    );
+    assert.ok(
+      ddl.failureModes.some((m) => m.heading === "Boundary text" && m.tier === "high-risk"),
+    );
+    assert.equal(ddl.tier, "routine", "failure modes route; they do not change the tier");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -3659,6 +3853,13 @@ test("check-review-tiers REFUSES a table whose pattern the language does not def
       const run = gate("check-review-tiers.mjs", dir, ...args);
       assert.equal(run.status, 2, `${glob} is valid JSON and an invalid pattern`);
       assert.match(`${run.stdout}${run.stderr}`, /cannot answer/);
+      // The pattern's own fault, not any refusal: the table also lacks a
+      // failureModes block, which the gate refuses too, so the exit code
+      // alone would pass with pattern validation deleted (round-1 review).
+      assert.ok(
+        `${run.stdout}${run.stderr}`.includes(`pattern ${JSON.stringify(glob)}`),
+        `${glob}: refused for its pattern`,
+      );
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });

@@ -92,13 +92,6 @@
         "ada2a89b"
       ],
       "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is `scripts/mutation-baseline.mjs --classify`, a classifier that splits surviving mutants by whether the suite is the thing that should have caught them, plus a scheduled run. That file does not exist, no package.json script or workflow mentions a ratchet, and no Stryker checker is installed -- verified, not assumed. The commit below is barwise-998 fixing four defects in `scripts/mutate.mjs`, which this spec NAMES as an input the ratchet will drive rather than as something it implements: a signal-killed child that read as CAUGHT, a throw in the restore that read as UNCAUGHT, an unpinned restore-hash branch, and a spec sentence claiming a gate that does not exist. If anything, it makes this spec's own restore discipline cheaper to meet, since a killed run now refuses instead of reporting a result. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when WS1 ships and the Status says so. Re-read 2026-10-23 (barwise-qs8): the nine newer commits are orm-format-3 core work (4a38f022, 13ed02fb, 77935e65, bd883874) and script and audit fixes (755fb56d, 93e88611, 76f1fc73, 206b0c84, b9c960a2); scripts/mutation-baseline.mjs does not exist, so the verdict holds. ada2a89b (plan-scope-check WS2) adds an npm script to barwise/package.json, which this spec cites as context: not its subject."
-    },
-    "review-routing.spec.md": {
-      "status": "Draft -- no workstream implemented",
-      "commits": [
-        "ef46a883"
-      ],
-      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here is the barwise-fs0 fix: check-review-tiers.mjs gained a dead-glob check and review-tiers.json two corrected globs. This spec plans pr-risk routing output and a failureModes block, neither of which that commit builds. Remove this row when WS1 ships and the Status says so."
     }
   }
 }
