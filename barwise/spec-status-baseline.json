@@ -11,9 +11,9 @@
     "beads-merge-driver.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
-        "0736ca0c"
+        "ada2a89b"
       ],
-      "note": "Reviewed 2026-10-24: 0736ca0c adds the check:spec-touches script to barwise/package.json, which this spec cites as context for its own npm script, not as its subject; nothing of the merge driver shipped. A Touches: header on this spec would remove the inference (plan-scope-check.spec.md)."
+      "note": "Reviewed 2026-10-24: ada2a89b adds the check:spec-touches script to barwise/package.json, which this spec cites as context for its own npm script, not as its subject; nothing of the merge driver shipped. A Touches: header on this spec would remove the inference (plan-scope-check.spec.md)."
     },
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams\nopen -- design only, no implementation in this PR)",
