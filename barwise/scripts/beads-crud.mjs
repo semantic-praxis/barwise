@@ -28,8 +28,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { MAX_TRIES, mintId } from "./lib/beads-ids.mjs";
+import { blocksDepCount, canonicalLine, recomputeCounts } from "./lib/beads-jsonl.mjs";
 
-const BLOCKS_TYPE = "blocks";
 const STATUS = new Set([
   "open",
   "in_progress",
@@ -56,16 +56,6 @@ function gitRoot() {
 
 function issuesPath() {
   return join(gitRoot(), ".beads", "issues.jsonl");
-}
-
-// Mirrors check-beads.sh's go_compact(): reproduce cmd/bd/export.go's
-// json.Marshal output so every write passes the canonical-form check.
-function canonicalLine(obj) {
-  const json = JSON.stringify(obj)
-    .replace(/&/g, "\\u0026")
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e");
-  return json;
 }
 
 function readAll() {
@@ -115,34 +105,6 @@ function parseArgs(argv) {
     }
   }
   return { positional, flags };
-}
-
-function blocksDepCount(id, records) {
-  const self = records.find((r) => r.obj.id === id);
-  const dependencyCount = self
-    ? (self.obj.dependencies || []).filter((d) => d.type === BLOCKS_TYPE).length
-    : 0;
-  let dependentCount = 0;
-  for (const r of records) {
-    for (const d of r.obj.dependencies || []) {
-      if (d.type === BLOCKS_TYPE && d.depends_on_id === id) dependentCount++;
-    }
-  }
-  return { dependencyCount, dependentCount };
-}
-
-// Recompute dependency_count/dependent_count for `id` and for every
-// issue referenced by its dependency edges (a dependent_count change
-// on the other side of an edge we just added/removed).
-function recomputeCounts(records, ids) {
-  const touched = new Set(ids);
-  for (const r of records) {
-    if (touched.has(r.obj.id)) {
-      const { dependencyCount, dependentCount } = blocksDepCount(r.obj.id, records);
-      r.obj.dependency_count = dependencyCount;
-      r.obj.dependent_count = dependentCount;
-    }
-  }
 }
 
 /**
@@ -240,7 +202,7 @@ function cmdCreate(flags) {
   if (dependencies.length > 0) obj.dependencies = dependencies;
 
   records.push({ obj });
-  recomputeCounts(records, [id, ...dependencies.map((d) => d.depends_on_id)]);
+  recomputeCounts(records.map((r) => r.obj), [id, ...dependencies.map((d) => d.depends_on_id)]);
   writeAll(path, records);
   console.log(id);
 }
@@ -367,7 +329,7 @@ function cmdUpdate(positional, flags) {
   }
 
   r.obj.updated_at = now();
-  recomputeCounts(records, touchedIds);
+  recomputeCounts(records.map((r) => r.obj), touchedIds);
   writeAll(path, records);
   console.log(id);
 }
@@ -391,7 +353,7 @@ function cmdDelete(positional, flags) {
   if (!id) fail("delete requires <id>");
   const { path, records } = readAll();
   findOrFail(records, id);
-  const { dependentCount } = blocksDepCount(id, records);
+  const { dependentCount } = blocksDepCount(id, records.map((r) => r.obj));
   if (dependentCount > 0 && !flags.force) {
     fail(`${id} has ${dependentCount} blocks-dependent issue(s); pass --force to delete anyway`);
   }
@@ -403,7 +365,7 @@ function cmdDelete(positional, flags) {
       else delete r.obj.dependencies;
     }
   }
-  recomputeCounts(kept, kept.map((r) => r.obj.id));
+  recomputeCounts(kept.map((r) => r.obj), kept.map((r) => r.obj.id));
   writeAll(path, kept);
   console.log(id);
 }

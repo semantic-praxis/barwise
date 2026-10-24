@@ -15,27 +15,50 @@ pointer (spec: `docs/specs/steward-skill.spec.md`).
 The issue tracker is a git-native JSONL file; a merge conflict there
 is data to reconstruct, not hunks to pick.
 
-- Never commit merge markers, and never resolve by keeping one side
-  wholesale -- both sides usually added different issues. Take the
-  union of issues by id; for an id both sides changed, keep the line
-  with the later `updated_at`.
-- Two sessions can allocate the same new id concurrently
-  (`docs/specs/beads-issue-crud-scripts.spec.md`); that surfaces as a
-  duplicate-id error. Re-file the newer issue under a fresh id with
-  `node barwise/scripts/beads-crud.mjs create` and delete the colliding line
-  with `... delete`.
-- The union above is only safe when both sides mean the same issue by
-  the id. Before keeping the later `updated_at`, compare the titles: an
-  id whose title differs across the sides is a collision, not an edit,
-  and "later wins" deletes one issue on each side without a conflict
-  marker to show it. PR #486 lost main's barwise-981 and its own
-  barwise-982 exactly this way, pushed the result, and had to restore
-  and re-file. Keep main's line, re-file the branch's issue under a
-  fresh id, and rewrite the branch's references to it.
+- **A local merge resolves it for you.** `npm run prepare` installs a
+  merge driver (`scripts/beads-merge-driver.mjs`,
+  `docs/specs/beads-merge-driver.spec.md`) into the clone's git
+  directory, and `.gitattributes` routes the tracker to it. So
+  `git merge origin/main` on a branch whose PR GitHub shows as
+  conflicted on the tracker completes without hand work, unless the
+  two sides changed the same field of one issue differently (below). GitHub runs
+  no custom driver, which is why the PR page still says conflicted
+  until that merge is pushed. If the session-start hook warned that the
+  driver is not installed, run `npm run prepare` from `barwise/`
+  first.
+- **What the driver decides.** It merges three-way, per issue and then
+  per field: a field only one side changed takes that side's value,
+  `updated_at` and `closed_at` take the later value, and an issue one side deleted and
+  the other left alone stays deleted. It does NOT keep "the line with
+  the later `updated_at`" wholesale: that rule lost concurrent edits to
+  different fields, such as a closure on main and a later note on a
+  branch.
+- **What it reports instead of deciding**, each as a conflict block
+  naming the id, with the reason on stderr:
+  - the same id with a different `created_at` on the two sides -- a
+    collision, two issues minted one id (barwise-984). Titles are not
+    the test, because titles are edited. Keep main's line, re-file the
+    branch's issue under a fresh id with
+    `node barwise/scripts/beads-crud.mjs create`, and rewrite the
+    branch's references to it. PR #486 lost main's barwise-981 and its
+    own barwise-982 by treating a collision as an edit.
+  - an issue deleted on one side and edited on the other: decide
+    whether the deletion or the edit stands.
+  - a field both sides changed to different values: each candidate
+    line already carries every field the driver merged, so keep the
+    candidate with the value you want, or edit it.
+- If the driver itself fails (a malformed line, a crash), the file
+  holds git's ordinary line-merge markers instead; resolve by hand as
+  above, by issue id.
+- Never commit merge markers -- the validator rejects them -- and never
+  resolve by keeping one side wholesale.
 - Write lines only through `scripts/beads-crud.mjs` -- canonical form
   (compact JSON, `&<>` escaped) is what the validator enforces.
 - Gate: `npm run check:beads -- --strict` must pass before the
-  resolution is committed. CI runs it on every PR.
+  resolution is committed. The pre-commit and pre-merge-commit hooks
+  run it on the staged file, which catches what no per-issue rule can
+  see: a dependency on an issue the other side deleted. CI runs it on
+  every PR, and is the only check on a rebase.
 
 ## 2. Generated files: regenerate, never hand-edit
 

@@ -39,6 +39,8 @@ export interface OrmModelConfig {
   readonly note?: string;
 }
 
+const quoted = (text: string): string => JSON.stringify(text);
+
 /**
  * Whether a fact type holds any of these roles: the one touch test behind
  * `constraintsTouchingAny`, `constraintsTouchingNone` and
@@ -47,6 +49,38 @@ export interface OrmModelConfig {
  */
 function holdsAny(ft: FactType, roleIds: readonly string[]): boolean {
   return roleIds.some((rid) => ft.hasRole(rid));
+}
+
+/** The five kinds an `OrmModel` stores in a map keyed by id. */
+export type IdKeyedKind =
+  | "object type"
+  | "fact type"
+  | "subtype fact"
+  | "objectification"
+  | "population";
+
+/**
+ * An `add*` was given an id its store already holds.
+ *
+ * Each store is a `Map` keyed by id, and `set` overwrites without a word,
+ * so before this check a second element under a held id silently replaced
+ * the first: an objectification evicted another in a merge, and a file
+ * stating two fact types under one id loaded as one (model invariants,
+ * WS3). The model cannot represent two elements under one id, so it
+ * refuses rather than reports, whatever `skipPlayerValidation` says: that
+ * option skips checks on what an element references, and this is a check
+ * on the store itself. Both readers turn it into a `DeserializationError`.
+ */
+export class DuplicateIdError extends Error {
+  constructor(
+    readonly id: string,
+    readonly kind: IdKeyedKind,
+    held: string,
+    adding: string,
+  ) {
+    super(`Id ${JSON.stringify(id)} is held by ${held}, so ${adding} cannot be added.`);
+    this.name = "DuplicateIdError";
+  }
 }
 
 /**
@@ -126,10 +160,45 @@ export class OrmModel {
   }
 
   /**
+   * Throw `DuplicateIdError` when the store already holds the id a config
+   * states. A config with no id gets a fresh one, which nothing holds.
+   * `describe` reads both the held element and the config, so the message
+   * names the two the same way.
+   */
+  private refuseHeldId<E, C extends { readonly id?: string; }>(
+    store: ReadonlyMap<string, E>,
+    config: C,
+    kind: IdKeyedKind,
+    describe: (element: E | C) => string,
+  ): void {
+    const held = config.id === undefined ? undefined : store.get(config.id);
+    if (held !== undefined) {
+      throw new DuplicateIdError(config.id!, kind, describe(held), describe(config));
+    }
+  }
+
+  /** An object type by name where the model holds it, else by its id. */
+  private objectTypeLabel(id: string): string {
+    return quoted(this._objectTypes.get(id)?.name ?? id);
+  }
+
+  /** A fact type by name where the model holds it, else by its id. */
+  private factTypeLabel(id: string): string {
+    return quoted(this._factTypes.get(id)?.name ?? id);
+  }
+
+  /**
    * Add an object type to the model.
+   * @throws DuplicateIdError if an object type with the same id already exists.
    * @throws If an object type with the same name already exists.
    */
   addObjectType(config: ObjectTypeConfig): ObjectType {
+    this.refuseHeldId(
+      this._objectTypes,
+      config,
+      "object type",
+      (e) => `object type ${quoted(e.name)}`,
+    );
     const existing = this.getObjectTypeByName(config.name);
     if (existing) {
       throw new Error(
@@ -454,12 +523,14 @@ export class OrmModel {
    *   all role player IDs exist in the model.  Used when deserializing
    *   merge fragments that reference types from a base model.
    * @throws If any role references a nonexistent object type (unless skipPlayerValidation).
+   * @throws DuplicateIdError if a fact type with the same id already exists.
    * @throws If a fact type with the same name already exists.
    */
   addFactType(
     config: FactTypeConfig,
     options?: { skipPlayerValidation?: boolean; },
   ): FactType {
+    this.refuseHeldId(this._factTypes, config, "fact type", (e) => `fact type ${quoted(e.name)}`);
     const existing = this.getFactTypeByName(config.name);
     if (existing) {
       throw new Error(
@@ -546,51 +617,68 @@ export class OrmModel {
    *   subtype/supertype IDs exist. Used for merge fragments.
    * @throws If subtype or supertype entity types don't exist (unless skipPlayerValidation).
    * @throws If either referenced object type is not an entity type (unless skipPlayerValidation).
+   * @throws DuplicateIdError if a subtype fact with the same id already exists.
    * @throws If a duplicate subtype relationship already exists.
    */
   addSubtypeFact(
     config: SubtypeFactConfig,
     options?: { skipPlayerValidation?: boolean; },
   ): SubtypeFact {
-    if (!options?.skipPlayerValidation) {
-      const subtype = this._objectTypes.get(config.subtypeId);
-      if (!subtype) {
-        throw new Error(
-          `Subtype entity type id "${config.subtypeId}" does not exist in the model.`,
-        );
-      }
-      if (subtype.kind !== "entity") {
-        throw new Error(
-          `Subtype "${subtype.name}" must be an entity type, not a ${subtype.kind} type.`,
-        );
-      }
-
-      const supertype = this._objectTypes.get(config.supertypeId);
-      if (!supertype) {
-        throw new Error(
-          `Supertype entity type id "${config.supertypeId}" does not exist in the model.`,
-        );
-      }
-      if (supertype.kind !== "entity") {
-        throw new Error(
-          `Supertype "${supertype.name}" must be an entity type, not a ${supertype.kind} type.`,
-        );
-      }
-
-      // Check for duplicate subtype relationship.
-      const pair = subtypePairKey(config);
-      for (const existing of this._subtypeFacts.values()) {
-        if (subtypePairKey(existing) === pair) {
-          throw new Error(
-            `Subtype relationship from "${subtype.name}" to "${supertype.name}" already exists.`,
-          );
-        }
-      }
-    }
+    this.refuseHeldId(
+      this._subtypeFacts,
+      config,
+      "subtype fact",
+      (e) =>
+        `subtype fact ${this.objectTypeLabel(e.subtypeId)} -> ${
+          this.objectTypeLabel(e.supertypeId)
+        }`,
+    );
+    const refusal = this.subtypeFactRefusal(config, options);
+    if (refusal !== undefined) throw new Error(refusal);
 
     const sf = new SubtypeFact(config);
     this._subtypeFacts.set(sf.id, sf);
     return sf;
+  }
+
+  /**
+   * Whether `addSubtypeFact` would accept this pair with every check on,
+   * including the one `SubtypeFact`'s constructor makes (the two ends
+   * differ). Merge asks it before adding, so its pre-check and the store
+   * read one predicate rather than two copies of it.
+   */
+  canAddSubtypeFact(config: Pick<SubtypeFactConfig, "subtypeId" | "supertypeId">): boolean {
+    return config.subtypeId !== config.supertypeId
+      && this.subtypeFactRefusal(config) === undefined;
+  }
+
+  /** Why `addSubtypeFact` refuses this pair, or nothing. */
+  private subtypeFactRefusal(
+    config: Pick<SubtypeFactConfig, "subtypeId" | "supertypeId">,
+    options?: { skipPlayerValidation?: boolean; },
+  ): string | undefined {
+    if (options?.skipPlayerValidation) return undefined;
+    const subtype = this._objectTypes.get(config.subtypeId);
+    if (!subtype) {
+      return `Subtype entity type id "${config.subtypeId}" does not exist in the model.`;
+    }
+    if (subtype.kind !== "entity") {
+      return `Subtype "${subtype.name}" must be an entity type, not a ${subtype.kind} type.`;
+    }
+    const supertype = this._objectTypes.get(config.supertypeId);
+    if (!supertype) {
+      return `Supertype entity type id "${config.supertypeId}" does not exist in the model.`;
+    }
+    if (supertype.kind !== "entity") {
+      return `Supertype "${supertype.name}" must be an entity type, not a ${supertype.kind} type.`;
+    }
+    const pair = subtypePairKey(config);
+    for (const existing of this._subtypeFacts.values()) {
+      if (subtypePairKey(existing) === pair) {
+        return `Subtype relationship from "${subtype.name}" to "${supertype.name}" already exists.`;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -664,58 +752,72 @@ export class OrmModel {
    *   `addSubtypeFact`.
    * @throws If the referenced fact type does not exist (unless skipPlayerValidation).
    * @throws If the referenced object type does not exist or is not an entity (unless skipPlayerValidation).
+   * @throws DuplicateIdError if an objectification with the same id already exists.
    * @throws If the fact type is already objectified.
    */
   addObjectifiedFactType(
     config: ObjectifiedFactTypeConfig,
     options?: { skipPlayerValidation?: boolean; },
   ): ObjectifiedFactType {
+    this.refuseHeldId(
+      this._objectifiedFactTypes,
+      config,
+      "objectification",
+      (e) => `objectification of ${this.factTypeLabel(e.factTypeId)}`,
+    );
+    const refusal = this.objectificationRefusal(config, options);
+    if (refusal !== undefined) throw new Error(refusal);
+
+    const oft = new ObjectifiedFactType(config);
+    this._objectifiedFactTypes.set(oft.id, oft);
+    return oft;
+  }
+
+  /**
+   * Whether `addObjectifiedFactType` would accept this pair with every
+   * check on, including the one `ObjectifiedFactType`'s constructor makes
+   * (the two ids differ). Merge asks it before adding, as for subtype facts.
+   */
+  canAddObjectifiedFactType(
+    config: Pick<ObjectifiedFactTypeConfig, "factTypeId" | "objectTypeId">,
+  ): boolean {
+    return config.factTypeId !== config.objectTypeId
+      && this.objectificationRefusal(config) === undefined;
+  }
+
+  /** Why `addObjectifiedFactType` refuses this pair, or nothing. */
+  private objectificationRefusal(
+    config: Pick<ObjectifiedFactTypeConfig, "factTypeId" | "objectTypeId">,
+    options?: { skipPlayerValidation?: boolean; },
+  ): string | undefined {
     const factType = this._factTypes.get(config.factTypeId);
     const objectType = this._objectTypes.get(config.objectTypeId);
-
     if (!options?.skipPlayerValidation) {
-      if (!factType) {
-        throw new Error(
-          `Fact type id "${config.factTypeId}" does not exist in the model.`,
-        );
-      }
+      if (!factType) return `Fact type id "${config.factTypeId}" does not exist in the model.`;
       if (!objectType) {
-        throw new Error(
-          `Object type id "${config.objectTypeId}" does not exist in the model.`,
-        );
+        return `Object type id "${config.objectTypeId}" does not exist in the model.`;
       }
       if (objectType.kind !== "entity") {
-        throw new Error(
-          `Object type "${objectType.name}" must be an entity type, not a ${objectType.kind} type.`,
-        );
+        return `Object type "${objectType.name}" must be an entity type, not a ${objectType.kind} type.`;
       }
     }
-
     // Duplicate objectification is a property of THIS model's own
     // records, not of what they reference, so it is checked either way.
     // The names fall back to the ids because a skipped load may not have
     // the elements to name.
     for (const existing of this._objectifiedFactTypes.values()) {
       if (existing.factTypeId === config.factTypeId) {
-        throw new Error(
-          `Fact type "${factType?.name ?? config.factTypeId}" is already objectified.`,
-        );
+        return `Fact type "${factType?.name ?? config.factTypeId}" is already objectified.`;
       }
     }
-
     for (const existing of this._objectifiedFactTypes.values()) {
       if (existing.objectTypeId === config.objectTypeId) {
-        throw new Error(
-          `Object type "${
-            objectType?.name ?? config.objectTypeId
-          }" is already used as an objectification.`,
-        );
+        return `Object type "${
+          objectType?.name ?? config.objectTypeId
+        }" is already used as an objectification.`;
       }
     }
-
-    const oft = new ObjectifiedFactType(config);
-    this._objectifiedFactTypes.set(oft.id, oft);
-    return oft;
+    return undefined;
   }
 
   /** Remove an objectified fact type from the model. */
@@ -777,12 +879,19 @@ export class OrmModel {
    * @param options.skipPlayerValidation - When true, skip the check that
    *   the referenced fact type exists. Used for lenient loads, as on
    *   `addFactType` and `addSubtypeFact`.
+   * @throws DuplicateIdError if a population with the same id already exists.
    * @throws If the referenced fact type does not exist (unless skipPlayerValidation).
    */
   addPopulation(
     config: PopulationConfig,
     options?: { skipPlayerValidation?: boolean; },
   ): Population {
+    this.refuseHeldId(
+      this._populations,
+      config,
+      "population",
+      (e) => `population of fact type ${this.factTypeLabel(e.factTypeId)}`,
+    );
     if (!options?.skipPlayerValidation && !this._factTypes.get(config.factTypeId)) {
       throw new Error(
         `Fact type id "${config.factTypeId}" does not exist in the model.`,

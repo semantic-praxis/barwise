@@ -1,20 +1,6 @@
 {
   "$comment": "Specs whose Status claims no implementation while commits have landed on the source files they name. Each row needs a note saying why the header is still right, or what it should say instead. Ratcheted by `npm run audit:specs -- --check` (scripts/audit-spec-status.mjs).",
   "specs": {
-    "architecture-index.spec.md": {
-      "status": "Draft -- no workstream implemented",
-      "commits": [
-        "ef46a883"
-      ],
-      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here is the barwise-fs0 fix to review-tiers.json (two dead globs corrected, a dead-glob check added); this spec plans a new review-tiers row for ADR changes, which that commit does not add. Remove this row when WS1 ships and the Status says so."
-    },
-    "beads-merge-driver.spec.md": {
-      "status": "Draft -- no workstream implemented",
-      "commits": [
-        "ada2a89b"
-      ],
-      "note": "Reviewed 2026-10-24: ada2a89b adds the check:spec-touches script to barwise/package.json, which this spec cites as context for its own npm script, not as its subject; nothing of the merge driver shipped. A Touches: header on this spec would remove the inference (plan-scope-check.spec.md)."
-    },
     "conformance-property.spec.md": {
       "status": "Accepted (all decisions resolved 2026-08-25; both workstreams\nopen -- design only, no implementation in this PR)",
       "commits": [
@@ -39,9 +25,9 @@
     "constraint-notes.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
-        "c610194f"
+        "6ad692fa"
       ],
-      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here, c610194f, is a review fix inside model-invariants workstream 1 (barwise-b2s): it adds describeConstraintPlace and describeRepeatedConstraintIds to core/src/model/Constraint.ts, which this spec names because its workstream 1 adds an optional note to ConstraintBase there. No note field exists. Remove this row when WS1 ships and the Status says so."
+      "note": "Genuinely unimplemented, and the header is right. 6ad692fa (#720, model-invariants WS1, squash-merged from the review fix c610194f that this row first named) adds describeConstraintPlace and describeRepeatedConstraintIds to core/src/model/Constraint.ts, which this spec names because its workstream 1 adds an optional note to ConstraintBase there. No note field exists. Remove this row when WS1 ships and the Status says so."
     },
     "functional-design-quality.spec.md": {
       "status": "Draft -- the five open decisions resolved in review 2026-09-09\n(see Decisions); no workstream implemented",
@@ -63,6 +49,11 @@
     "mutation-ratchet.spec.md": {
       "status": "Draft -- no workstream implemented. All five open decisions\nresolved 2026-09-10; the workstreams below reflect them.",
       "commits": [
+        "e5cd6d54",
+        "1b79c783",
+        "ada2a89b",
+        "8f79ab84",
+        "caa646a3",
         "4a38f022",
         "13ed02fb",
         "77935e65",
@@ -95,17 +86,17 @@
         "bc93f06b",
         "33ea339c",
         "b6324fd1",
-        "ec9ae742",
-        "ada2a89b"
+        "ec9ae742"
       ],
-      "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is `scripts/mutation-baseline.mjs --classify`, a classifier that splits surviving mutants by whether the suite is the thing that should have caught them, plus a scheduled run. That file does not exist, no package.json script or workflow mentions a ratchet, and no Stryker checker is installed -- verified, not assumed. The commit below is barwise-998 fixing four defects in `scripts/mutate.mjs`, which this spec NAMES as an input the ratchet will drive rather than as something it implements: a signal-killed child that read as CAUGHT, a throw in the restore that read as UNCAUGHT, an unpinned restore-hash branch, and a spec sentence claiming a gate that does not exist. If anything, it makes this spec's own restore discipline cheaper to meet, since a killed run now refuses instead of reporting a result. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when WS1 ships and the Status says so. Re-read 2026-10-23 (barwise-qs8): the nine newer commits are orm-format-3 core work (4a38f022, 13ed02fb, 77935e65, bd883874) and script and audit fixes (755fb56d, 93e88611, 76f1fc73, 206b0c84, b9c960a2); scripts/mutation-baseline.mjs does not exist, so the verdict holds. ada2a89b (plan-scope-check WS2) adds an npm script to barwise/package.json, which this spec cites as context: not its subject."
+      "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is `scripts/mutation-baseline.mjs --classify`, a classifier that splits surviving mutants by whether the suite is the thing that should have caught them, plus a scheduled run. That file does not exist, no package.json script or workflow mentions a ratchet, and no Stryker checker is installed -- verified, not assumed. The commit below is barwise-998 fixing four defects in `scripts/mutate.mjs`, which this spec NAMES as an input the ratchet will drive rather than as something it implements: a signal-killed child that read as CAUGHT, a throw in the restore that read as UNCAUGHT, an unpinned restore-hash branch, and a spec sentence claiming a gate that does not exist. If anything, it makes this spec's own restore discipline cheaper to meet, since a killed run now refuses instead of reporting a result. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when WS1 ships and the Status says so. Re-read 2026-10-23 (barwise-qs8): the nine newer commits are orm-format-3 core work (4a38f022, 13ed02fb, 77935e65, bd883874) and script and audit fixes (755fb56d, 93e88611, 76f1fc73, 206b0c84, b9c960a2); scripts/mutation-baseline.mjs does not exist, so the verdict holds. ada2a89b (plan-scope-check WS2) adds an npm script to barwise/package.json, which this spec cites as context: not its subject. Re-read 2026-10-24: caa646a3 (the #712 review fixes) touches scripts/tests/expected-counts.json and 1b79c783 (architecture-index WS1) adds an npm script to barwise/package.json; both are cited here as context. scripts/mutation-baseline.mjs still does not exist, so the verdict holds. Re-read 2026-10-24 (barwise-nto): 8f79ab84, the tracker merge driver, adds its installer to `prepare` in barwise/package.json, which this spec cites as context, not its subject; scripts/mutation-baseline.mjs still does not exist, so the verdict holds. e5cd6d54 is the merge of main into the barwise-nto branch, which brings no change of its own to the files this spec names."
     },
     "subject-areas.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
-        "88c8d466"
+        "1c9e6351",
+        "6ad692fa"
       ],
-      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here, 88c8d466, is a review fix inside model-invariants workstream 1 (barwise-b2s): it adds OrmModel.constraintsSharingAnId. This spec names core/src/model/OrmModel.ts because its own workstream 1 adds subject-area declarations there; none is built. Remove this row when WS1 ships and the Status says so."
+      "note": "Genuinely unimplemented, and the header is right. 6ad692fa (#720, model-invariants WS1, squash-merged from 88c8d466, which this row first named) adds OrmModel.constraintsSharingAnId, and 1c9e6351 (#730, model-invariants WS3) makes the store refuse an id it already holds; both touch core/src/model/OrmModel.ts, which this spec names because its own workstream 1 adds subject-area declarations there. None is built. Remove this row when WS1 ships and the Status says so."
     }
   }
 }

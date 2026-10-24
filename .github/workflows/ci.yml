@@ -144,6 +144,13 @@ jobs:
       # (docs/specs/instruction-reference-check.spec.md).
       - run: npm run check:instruction-refs
 
+      # The package graph has one authority, INTENDED in scripts/lib/intended.cjs;
+      # the root CLAUDE.md graph and each package.json runtime dependencies must
+      # agree with it. No docs-only guard: the CLAUDE.md graph is Markdown, and
+      # a guard would skip the very change that makes it drift
+      # (docs/specs/architecture-index.spec.md, WS1).
+      - run: npm run check:architecture
+
       # Fast, source-only static gates next (none need the build), so a lint
       # or architecture violation fails in seconds rather than after the
       # build and test suite.

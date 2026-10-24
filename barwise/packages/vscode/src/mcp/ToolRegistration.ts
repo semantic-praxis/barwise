@@ -74,6 +74,7 @@ interface SchemaInput {
 interface DiffInput {
   base?: string;
   incoming: string;
+  matching?: "id-first" | "content";
 }
 
 interface DiagramInput {
@@ -365,7 +366,7 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
   register<DiffInput>(
     context,
     "barwise_diff_models",
-    (i) => toToolResult(executeDiff(resolveSourceParam(i.base), i.incoming)),
+    (i) => toToolResult(executeDiff(resolveSourceParam(i.base), i.incoming, i.matching)),
     "Comparing Barwise models...",
   );
   register<DiagramInput>(

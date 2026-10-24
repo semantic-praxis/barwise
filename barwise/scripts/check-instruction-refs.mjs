@@ -33,6 +33,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isInstructionFile } from "./lib/instruction-files.mjs";
 import { REPO_ROOT, trackedFiles } from "./lib/tracked.mjs";
 
 /**
@@ -48,17 +49,6 @@ const ALLOWLIST = JSON.parse(
 
 const ROOTED = /^(barwise|\.claude|\.github|\.beads)\//;
 const EXT = /\.(mjs|cjs|ts|tsx|js|json|md|yaml|yml|sh|py|toml|txt)$/;
-
-function isInstructionFile(f) {
-  // REVIEW.md is read by the Claude Code Review service -- the root file,
-  // and a nested one once the default branch is protected -- and cites
-  // paths the same way. .github/copilot-instructions.md and the
-  // path-specific .github/instructions/**/*.instructions.md are read as
-  // instructions by the Copilot reviewer, and cite paths too.
-  return /(^|\/)(CLAUDE|AGENTS|REVIEW)\.md$/.test(f)
-    || /^\.github\/(copilot-instructions\.md|instructions\/(.+\/)?[^/]+\.instructions\.md)$/.test(f)
-    || (f.startsWith(".claude/") && f.endsWith(".md"));
-}
 
 /** The candidate path a backticked token names, or null. Spec: Resolution rules. */
 function candidate(raw) {

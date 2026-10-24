@@ -139,3 +139,45 @@ describe("barwise diff", () => {
     expect(result.exitCode).toBe(1);
   });
 });
+
+describe("barwise diff --matching", () => {
+  // Two samples that numbered their object types in their own order
+  // (barwise-uy7).
+  const dir = join(testOutput, "diff-matching");
+  const write = (name: string, text: string) => {
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, name);
+    writeFileSync(path, text);
+    return path;
+  };
+  const a = () =>
+    write(
+      "a.orm.yaml",
+      'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Dog, kind: value }\n    - { id: ot1, name: Cat, kind: value }\n',
+    );
+  const b = () =>
+    write(
+      "b.orm.yaml",
+      'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Cat, kind: value }\n    - { id: ot1, name: Dog, kind: value }\n',
+    );
+
+  it("pairs by id by default", async () => {
+    const result = await runCli(["diff", a(), b()]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("2 change(s) detected");
+  });
+
+  it("pairs by name with --matching content", async () => {
+    const result = await runCli(["diff", a(), b(), "--matching", "content"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("No changes");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("refuses a mode it does not know", async () => {
+    const result = await runCli(["diff", a(), b(), "--matching", "bogus"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("--matching must be id-first or content");
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

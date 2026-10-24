@@ -13,7 +13,7 @@ Regrounding below. WS1 step 1 (`ObjectType` as a sealed union) shipped
 2026-09-08; the remaining element kinds, `ModelBuilder` and `OrmModel`
 are not implemented.
 Created: 2026-09-06
-Last-updated: 2026-09-09
+Last-updated: 2026-10-24
 Tracking: barwise-924 (this review), barwise-973 (WS1), barwise-x4z (the wider
 functional/type analysis this partly answers), barwise-e8m (the
 functional-core commitment), barwise-923 (the hashModel bug the same
@@ -573,6 +573,26 @@ choice is now load-bearing rather than merely preferable. The two
 cycle checks are `identificationOrder` and the subtype walk, both
 already pure functions over a model in `model/identification.ts`, so
 the builder calls them rather than reimplementing them.
+
+**The builder also refuses repeated ids** (amended 2026-10-24, by
+`model-invariants.spec.md` WS4). `build()` refuses two elements of one
+kind under one id and two constraints under one id, as diagnostics in the
+same pass as the rest:
+
+- **Element ids.** Today `OrmModel.add*` throws `DuplicateIdError` for
+  the five id-keyed kinds (model invariants WS3), and both readers turn it
+  into a `DeserializationError`. Under the builder that throw becomes a
+  diagnostic, so a file holding two repeats reports both rather than the
+  first.
+- **Constraint ids.** `structural/duplicate-constraint-id` and
+  `structural/duplicate-subtype-fact`, which model invariants WS1 added to
+  `structuralWellFormedness`, are two more of the `structural/duplicate-*`
+  rules this workstream moves into the builder, under their existing ids.
+  That makes 14 referential rules where this section says 12. Their shared
+  helpers (`groupRepeats`, `subtypePairKey`,
+  `describeConstraintRepeat`) move with them; the 3.0 loader's pre-build
+  refusal of a repeated constraint id becomes one of the builder's
+  diagnostics instead of a separate check.
 
 ### 2. One field table per element kind
 
