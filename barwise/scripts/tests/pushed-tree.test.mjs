@@ -29,6 +29,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { ciLocalLibs } from "./ci-local-files.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HOOK = resolve(SCRIPTS, "..", ".husky", "pre-push");
@@ -72,7 +73,7 @@ function commitRepo({ deps } = {}) {
       + 'process.exitCode = existsSync("dist/marker") ? 0 : 1;\n',
   );
   writeFileSync(join(root, "scripts", "ci-local.mjs"), readFileSync(join(SCRIPTS, "ci-local.mjs")));
-  for (const lib of ["ci-gates.mjs", "changed-class.mjs"]) {
+  for (const lib of ciLocalLibs(SCRIPTS)) {
     writeFileSync(join(root, "scripts", "lib", lib), readFileSync(join(SCRIPTS, "lib", lib)));
   }
   writeFileSync(join(dir, ".gitignore"), "node_modules/\n");

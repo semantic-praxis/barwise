@@ -128,13 +128,21 @@ test("a deletion against an edit is reported, either way round", () => {
   const base = jsonl(issue("x"));
   const edited = jsonl(issue("x", { notes: "n", updated_at: T1 }));
   const a = resolveTracker(base, "", edited);
-  assert.deepEqual(a.reported, [{ id: "x", reason: "deleted on current, edited on other" }]);
+  assert.deepEqual(a.reported, [{
+    id: "x",
+    kind: "deleted-vs-edited",
+    reason: "deleted on current, edited on other",
+  }]);
   assert.match(
     a.text,
     /^<<<<<<< current: x[^\n]*\n=======\n\{[^\n]*"notes":"n"[^\n]*\n>>>>>>> other: x$/m,
   );
   const b = resolveTracker(base, edited, "");
-  assert.deepEqual(b.reported, [{ id: "x", reason: "deleted on other, edited on current" }]);
+  assert.deepEqual(b.reported, [{
+    id: "x",
+    kind: "deleted-vs-edited",
+    reason: "deleted on other, edited on current",
+  }]);
 });
 
 test("a closure on one side and a later note on the other are both kept", () => {
@@ -158,7 +166,11 @@ test("a field both sides changed differently is reported, and each candidate kee
     jsonl(issue("x", { priority: 1, status: "closed", updated_at: T1 })),
     jsonl(issue("x", { priority: 3, notes: "n", updated_at: T2 })),
   );
-  assert.deepEqual(r.reported, [{ id: "x", reason: "both sides changed priority" }]);
+  assert.deepEqual(r.reported, [{
+    id: "x",
+    kind: "field-conflict",
+    reason: "both sides changed priority",
+  }]);
   const candidates = issuesIn(r.text);
   assert.equal(candidates.length, 2);
   assert.deepEqual(candidates.map((c) => c.priority), [1, 3]);
@@ -261,6 +273,7 @@ test("a timestamp cleared on one side and set on the other is reported, never pi
   for (const [cur, oth] of [[cleared, moved], [moved, cleared]]) {
     assert.deepEqual(resolveTracker(base, cur, oth).reported, [{
       id: "x",
+      kind: "field-conflict",
       reason: "both sides changed closed_at",
     }]);
   }

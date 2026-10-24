@@ -28,6 +28,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { classify } from "../lib/changed-class.mjs";
 import { ciSteps, shouldRun, WORKFLOW } from "../lib/ci-gates.mjs";
+import { ciLocalLibs } from "./ci-local-files.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -137,7 +138,9 @@ function sandbox() {
   const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
   mkdirSync(join(dir, "barwise", "scripts", "lib"), { recursive: true });
   mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
-  for (const f of ["ci-local.mjs", "lib/ci-gates.mjs", "lib/changed-class.mjs"]) {
+  for (
+    const f of ["ci-local.mjs", ...ciLocalLibs(SCRIPTS).map((f) => `lib/${f}`)]
+  ) {
     cpSync(join(SCRIPTS, f), join(dir, "barwise", "scripts", f));
   }
   cpSync(WORKFLOW, join(dir, ".github", "workflows", "ci.yml"));
@@ -232,7 +235,9 @@ test("ci:local names the gates it skipped even when a gate it ran failed", () =>
   try {
     mkdirSync(join(dir, "barwise", "scripts", "lib"), { recursive: true });
     mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
-    for (const f of ["ci-local.mjs", "lib/ci-gates.mjs", "lib/changed-class.mjs"]) {
+    for (
+      const f of ["ci-local.mjs", ...ciLocalLibs(SCRIPTS).map((f) => `lib/${f}`)]
+    ) {
       cpSync(join(SCRIPTS, f), join(dir, "barwise", "scripts", f));
     }
     writeFileSync(

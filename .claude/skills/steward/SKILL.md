@@ -23,7 +23,10 @@ is data to reconstruct, not hunks to pick.
   conflicted on the tracker completes without hand work, unless the
   two sides changed the same field of one issue differently (below). GitHub runs
   no custom driver, which is why the PR page still says conflicted
-  until that merge is pushed. If the session-start hook warned that the
+  until that merge is pushed. The tracker-conflicts workflow comments
+  on such a PR, saying whether the merge resolves it or which issues need
+  a person (`docs/specs/tracker-conflict-comment.spec.md`); that comment
+  is the cue to merge main. If the session-start hook warned that the
   driver is not installed, run `npm run prepare` from `barwise/`
   first.
 - **What the driver decides.** It merges three-way, per issue and then

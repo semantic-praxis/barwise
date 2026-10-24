@@ -46,6 +46,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { ciLocalLibs } from "./ci-local-files.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -1973,7 +1974,7 @@ function tempCiRepo() {
   // `lib/changed-class.mjs` likewise: the change classification ci.yml's
   // detect step runs, which ci-local imports to apply the same `if:`s.
   mkdirSync(join(root, "scripts", "lib"), { recursive: true });
-  for (const lib of ["ci-gates.mjs", "changed-class.mjs"]) {
+  for (const lib of ciLocalLibs(SCRIPTS)) {
     writeFileSync(join(root, "scripts", "lib", lib), readFileSync(join(SCRIPTS, "lib", lib)));
   }
   return {
