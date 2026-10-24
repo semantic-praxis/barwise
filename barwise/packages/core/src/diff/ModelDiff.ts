@@ -31,13 +31,16 @@ import {
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
-import type { ConstraintMatching } from "./elementDiff.js";
-export type { ConstraintMatching } from "./elementDiff.js";
+import type { ElementMatching } from "./identity.js";
+export type { ElementMatching } from "./identity.js";
 
 /** Options for {@link diffModels}. */
 export interface DiffOptions {
-  /** How constraints are paired; see {@link ConstraintMatching}. Default `"id-first"`. */
-  readonly constraintMatching?: ConstraintMatching;
+  /**
+   * Whether the two models' ids say which elements are the same; see
+   * {@link ElementMatching}. Default `"id-first"`.
+   */
+  readonly matching?: ElementMatching;
 }
 
 export {
@@ -79,19 +82,27 @@ export function diffModels(
   incoming: OrmModel,
   options: DiffOptions = {},
 ): ModelDiffResult {
-  const pairing = constraintPairing(
-    existing,
-    incoming,
-    options.constraintMatching ?? "id-first",
-  );
+  const pairing = constraintPairing(existing, incoming, options.matching ?? "id-first");
+  const { identity } = pairing;
   const deltas: ModelDelta[] = [];
 
   // --- Object types ---
-  const existingOts = new Map(existing.objectTypes.map((ot) => [ot.name, ot]));
-  const incomingOts = new Map(incoming.objectTypes.map((ot) => [ot.name, ot]));
-
-  for (const [name, ot] of existingOts) {
-    const match = incomingOts.get(name);
+  // Paired by id first, then name (`DiffIdentity`). A paired delta is
+  // labelled with the existing model's name; a rename is its `name` change.
+  for (const { existing: ot, incoming: match } of identity.objectTypes) {
+    if (!ot) {
+      deltas.push({
+        kind: "added",
+        elementType: "object_type",
+        name: match.name,
+        incoming: match,
+        changes: [],
+        changeDescriptions: [],
+        breakingLevel: classifyBreakingLevel("added", [], "object_type"),
+      });
+      continue;
+    }
+    const name = ot.name;
     if (!match) {
       deltas.push({
         kind: "removed",
@@ -103,7 +114,7 @@ export function diffModels(
         breakingLevel: classifyBreakingLevel("removed", [], "object_type"),
       });
     } else {
-      const changes = diffObjectType(ot, match, existing, incoming);
+      const changes = diffObjectType(ot, match, existing, incoming, identity);
       const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
       deltas.push({
         kind,
@@ -118,27 +129,22 @@ export function diffModels(
     }
   }
 
-  for (const [name, ot] of incomingOts) {
-    if (!existingOts.has(name)) {
-      deltas.push({
-        kind: "added",
-        elementType: "object_type",
-        name,
-        incoming: ot,
-        changes: [],
-        changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("added", [], "object_type"),
-      });
-    }
-  }
-
   // --- Fact types ---
   const holders = { existing: roleHolders(existing), incoming: roleHolders(incoming) };
-  const existingFts = new Map(existing.factTypes.map((ft) => [ft.name, ft]));
-  const incomingFts = new Map(incoming.factTypes.map((ft) => [ft.name, ft]));
-
-  for (const [name, ft] of existingFts) {
-    const match = incomingFts.get(name);
+  for (const { existing: ft, incoming: match } of identity.factTypes) {
+    if (!ft) {
+      deltas.push({
+        kind: "added",
+        elementType: "fact_type",
+        name: match.name,
+        incoming: match,
+        changes: [],
+        changeDescriptions: [],
+        breakingLevel: classifyBreakingLevel("added", [], "fact_type"),
+      });
+      continue;
+    }
+    const name = ft.name;
     if (!match) {
       deltas.push({
         kind: "removed",
@@ -161,20 +167,6 @@ export function diffModels(
         changes,
         changeDescriptions: changes.map(describeChange),
         breakingLevel: classifyBreakingLevel(kind, changes, "fact_type"),
-      });
-    }
-  }
-
-  for (const [name, ft] of incomingFts) {
-    if (!existingFts.has(name)) {
-      deltas.push({
-        kind: "added",
-        elementType: "fact_type",
-        name,
-        incoming: ft,
-        changes: [],
-        changeDescriptions: [],
-        breakingLevel: classifyBreakingLevel("added", [], "fact_type"),
       });
     }
   }
@@ -310,8 +302,10 @@ export function diffModels(
   // same here). The delta's label may name an id no reader recognises,
   // which is the cost, and an error they must resolve is worth more
   // than a silent loss.
-  const sfKey = (sf: SubtypeFact, model: OrmModel, other: OrmModel): string =>
-    `${playerName(model, sf.subtypeId, other)}\u0000${playerName(model, sf.supertypeId, other)}`;
+  const sfKey = (sf: SubtypeFact, model: OrmModel, _other: OrmModel): string =>
+    `${identity.objectTypeKey(model, sf.subtypeId)}\u0000${
+      identity.objectTypeKey(model, sf.supertypeId)
+    }`;
   const sfRefs = (sf: SubtypeFact, model: OrmModel, other: OrmModel) => ({
     subtype: { id: sf.subtypeId, name: playerName(model, sf.subtypeId, other) },
     supertype: { id: sf.supertypeId, name: playerName(model, sf.supertypeId, other) },
@@ -375,9 +369,9 @@ export function diffModels(
   //
   // The unresolvable pair is REPORTED here for the reason it is
   // reported above, and the correction is the same one.
-  const oftKey = (oft: ObjectifiedFactType, model: OrmModel, other: OrmModel): string =>
-    `${playerName(model, oft.objectTypeId, other)}\u0000${
-      factTypeName(model, oft.factTypeId, other)
+  const oftKey = (oft: ObjectifiedFactType, model: OrmModel, _other: OrmModel): string =>
+    `${identity.objectTypeKey(model, oft.objectTypeId)}\u0000${
+      identity.factTypeKey(model, oft.factTypeId)
     }`;
   const oftRefs = (oft: ObjectifiedFactType, model: OrmModel, other: OrmModel) => ({
     objectType: { id: oft.objectTypeId, name: playerName(model, oft.objectTypeId, other) },
@@ -464,8 +458,8 @@ export function diffModels(
   // type keys every tuple against an empty role list.
   const popFactType = (pop: Population, model: OrmModel, other: OrmModel) =>
     model.getFactType(pop.factTypeId) ?? other.getFactType(pop.factTypeId);
-  const popGroup = (pop: Population, model: OrmModel, other: OrmModel): string =>
-    `${factTypeName(model, pop.factTypeId, other)}\u0000${pop.sample ? "sample" : "significant"}`;
+  const popGroup = (pop: Population, model: OrmModel, _other: OrmModel): string =>
+    `${identity.factTypeKey(model, pop.factTypeId)}\u0000${pop.sample ? "sample" : "significant"}`;
   const popRef = (pop: Population, model: OrmModel, other: OrmModel) => ({
     factType: { id: pop.factTypeId, name: factTypeName(model, pop.factTypeId, other) },
     sample: pop.sample,
@@ -580,11 +574,7 @@ export function diffModels(
   }
 
   const hasChanges = deltas.some((d) => d.kind !== "unchanged");
-  const synonymCandidates = detectSynonymCandidates(
-    deltas,
-    existing,
-    incoming,
-  );
+  const synonymCandidates = detectSynonymCandidates(deltas, existing, incoming, identity);
   return { deltas, hasChanges, synonymCandidates };
 }
 

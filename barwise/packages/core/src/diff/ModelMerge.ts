@@ -33,6 +33,7 @@ import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
 import { subtypePairKey, toSubtypeFactConfig } from "../model/SubtypeFact.js";
+import { groupRepeats } from "../util/groupRepeats.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
@@ -64,6 +65,7 @@ export function mergeModels(
   deltas: readonly ModelDelta[],
   accepted: ReadonlySet<number>,
 ): OrmModel {
+  refuseNameClashes(deltas, accepted);
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
@@ -747,6 +749,50 @@ function remapPopulationRoles(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Refuse a merge that would give two object types, or two fact types, one
+ * name, before anything is built.
+ *
+ * The diff pairs a shared id as one element (model invariants, decision
+ * 1), so an accepted addition cannot collide with an id the merge keeps;
+ * what is left is a NAME clash: two elements that exchanged names under
+ * kept ids, with one rename accepted and the other not. Which one should
+ * win is not the merge's call, so it names both and stops, and
+ * `mergeAndValidate` reports it as `merge-error`. Before, `addObjectType`
+ * threw a bare "already exists" halfway through the build, naming one.
+ *
+ * Content-mode deltas are never merged (their callers compare LLM
+ * samples), so nothing here guards an id the content pass left unpaired.
+ */
+function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
+  const kept = deltas.flatMap((d, i) => {
+    if (d.elementType !== "object_type" && d.elementType !== "fact_type") return [];
+    const isAccepted = accepted.has(i);
+    const side = d.kind === "unchanged"
+      ? d.existing
+      : d.kind === "added"
+      ? (isAccepted ? d.incoming : undefined)
+      : d.kind === "removed"
+      ? (isAccepted ? undefined : d.existing)
+      : (isAccepted ? d.incoming : d.existing);
+    return side ? [{ kind: d.elementType, side, from: d.existing?.name }] : [];
+  });
+  const clashes = [...groupRepeats(kept, (k) => `${k.kind} ${k.side.name}`).values()];
+  if (clashes.length === 0) return;
+  const label = (k: (typeof kept)[number]) =>
+    k.from !== undefined && k.from !== k.side.name
+      ? `${k.side.id} (renamed from ${JSON.stringify(k.from)})`
+      : k.side.id;
+  const lines = clashes.map((group) =>
+    `${group[0]!.kind.replace("_", " ")} ${JSON.stringify(group[0]!.side.name)}: `
+    + group.map(label).join(", ")
+  );
+  throw new Error(
+    `two elements would take one name: ${lines.join("; ")}. `
+      + "Decide the changes that share a name together.",
+  );
+}
 
 /**
  * Add a fact type to the merged model, remapping role player ids
