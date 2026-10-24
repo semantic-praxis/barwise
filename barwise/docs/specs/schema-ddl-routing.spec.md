@@ -72,7 +72,10 @@ In scope:
 - The editor's `barwise_generate_schema` tool wraps `executeSchema`, and
   its `toToolResult` joins the two blocks into one text part, the report
   after the DDL, as it does for `barwise_export_model`
-  (`export-constraint-specs.spec.md`); a vscode test pins it.
+  (`export-constraint-specs.spec.md`); a vscode test pins it. For a model
+  large enough to be bounded, that text is the preview and the file path,
+  as `barwise_export_model` already returns; the bound is the MCP layer's
+  and this spec does not change it.
 - When either runs with the JSON format, its output shall not change.
 - Each surface test asserts the specific ring verbalization or the specific
   clause it is about, and is watched red with its surface change reverted.
