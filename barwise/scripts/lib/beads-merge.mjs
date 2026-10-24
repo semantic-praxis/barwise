@@ -5,17 +5,29 @@
  * I/O around it.
  *
  * "current" is the side git writes the result into (%A) and "other" the
- * side being merged in (%B). In a rebase git swaps them; every rule here
- * is symmetric, so the swap changes only the order of output lines.
+ * side being merged in (%B). In a rebase git swaps them. Every rule here
+ * is symmetric, so the swap decides nothing: it changes the order of
+ * output lines and, within an issue merged field by field, the order of
+ * its keys (current's first), never a value.
  *
  * What this module will not decide, it reports: the caller writes a
  * conflict block for each reported id, which check-beads.sh rejects, so a
  * careless `git add` cannot commit a guess.
  */
+import { isDeepStrictEqual as eq } from "node:util";
 import { canonicalLine, recomputeCounts } from "./beads-jsonl.mjs";
 
 /** Fields beads-crud derives from `dependencies`; recomputed, never compared. */
 export const DERIVED = new Set(["dependency_count", "dependent_count"]);
+
+/**
+ * When an event happened, set by whichever side recorded it. Both sides
+ * stamping one is agreement that it happened, so the later value is kept
+ * rather than reported: `updated_at` on every edit, and `closed_at` when
+ * main and a branch both close an issue, which the steward's follow-up
+ * closures make routine.
+ */
+const EVENT_TIMESTAMPS = new Set(["updated_at", "closed_at"]);
 
 /** An input line that is not an issue; the driver hands the file to git's line merge. */
 export class MalformedInput extends Error {
@@ -55,22 +67,6 @@ export function parseTracker(text, label) {
     issues.push({ obj, raw });
   }
   return issues;
-}
-
-/** JSON with object keys sorted, so key order never reads as an edit. */
-function stable(value) {
-  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
-  if (value !== null && typeof value === "object") {
-    const keys = Object.keys(value).sort();
-    return `{${keys.map((k) => `${JSON.stringify(k)}:${stable(value[k])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-/** Field values equal as JSON; `undefined` is an absent key and equals only itself. */
-function eq(a, b) {
-  if (a === undefined || b === undefined) return a === b;
-  return stable(a) === stable(b);
 }
 
 /**
@@ -118,7 +114,7 @@ function mergeFields(base, cur, oth) {
       cv = ov = c; // agreement, or only current changed it
     } else if (eq(c, b)) {
       cv = ov = o; // only other changed it
-    } else if (k === "updated_at" && c !== undefined && o !== undefined) {
+    } else if (EVENT_TIMESTAMPS.has(k) && c !== undefined && o !== undefined) {
       cv = ov = laterTimestamp(c, o);
     } else {
       cv = c;
@@ -134,7 +130,10 @@ function mergeFields(base, cur, oth) {
 /**
  * Resolve three versions of the tracker. Returns the result's entries in
  * output order -- `{ obj, sources }` for a resolved issue, or `{ conflict }`
- * for a reported one -- and the reported ids with their reasons.
+ * for a reported one -- and the reported ids with their reasons. A
+ * conflict carries either the two sides' raw lines and parsed objects
+ * (`current`/`other`, empty for an absent side) or, for a field
+ * conflict, the two field-merged candidates (`asCurrent`/`asOther`).
  */
 export function resolveIssues(baseIssues, curIssues, othIssues) {
   const base = new Map(baseIssues.map((x) => [x.obj.id, x]));
@@ -145,10 +144,16 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
 
   const entries = [];
   const reported = [];
-  const report = (id, reason, current, other) => {
+  const report = (id, reason, candidates) => {
     reported.push({ id, reason });
-    entries.push({ conflict: { id, reason, current, other } });
+    entries.push({ conflict: { id, reason, ...candidates } });
   };
+  const sides = (c, o) => ({
+    current: c?.raw ?? "",
+    other: o?.raw ?? "",
+    currentObj: c && structuredClone(c.obj),
+    otherObj: o && structuredClone(o.obj),
+  });
 
   for (const id of ids) {
     const b = base.get(id);
@@ -162,8 +167,7 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
       report(
         id,
         `id collision: created_at ${c.obj.created_at} on current, ${o.obj.created_at} on other`,
-        c.raw,
-        o.raw,
+        sides(c, o),
       );
       continue;
     }
@@ -187,11 +191,11 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
       }
       // Rule 4: deleted on one side, changed on the other.
       if (!c) {
-        report(id, "deleted on current, edited on other", "", o.raw);
+        report(id, "deleted on current, edited on other", sides(c, o));
         continue;
       }
       if (!o) {
-        report(id, "deleted on other, edited on current", c.raw, "");
+        report(id, "deleted on other, edited on current", sides(c, o));
         continue;
       }
     } else if (!c || !o) {
@@ -204,15 +208,10 @@ export function resolveIssues(baseIssues, curIssues, othIssues) {
     if (merged.conflicts.length === 0) {
       entries.push({ obj: merged.asCurrent, sources });
     } else {
-      entries.push({
-        conflict: {
-          id,
-          reason: `both sides changed ${merged.conflicts.join(", ")}`,
-          asCurrent: merged.asCurrent,
-          asOther: merged.asOther,
-        },
+      report(id, `both sides changed ${merged.conflicts.join(", ")}`, {
+        asCurrent: merged.asCurrent,
+        asOther: merged.asOther,
       });
-      reported.push({ id, reason: `both sides changed ${merged.conflicts.join(", ")}` });
     }
   }
   return { entries, reported };
@@ -236,10 +235,14 @@ function conflictBlock(id, reason, current, other) {
 
 /**
  * The merged file's text and what was reported. Counts are recomputed over
- * the result; for a field conflict, each candidate is counted against the
- * other issues as resolved, with current's candidates standing in for
- * conflicted ones (a person resolving the block may leave a count stale,
- * which check-beads.sh does not check and the next beads-crud write fixes).
+ * the result, which for a reported issue means a guess: it is counted as
+ * kept, in current's version where current has one. Leaving it out instead
+ * rewrote the counts of issues neither side touched (an untouched issue
+ * blocked by one that is deleted on one side and edited on the other lost
+ * its dependent_count). A field conflict's candidates are each counted
+ * against that same view. A person who resolves a block the other way can
+ * leave a count stale; check-beads.sh does not check counts, and
+ * beads-crud recomputes them on its next write to the issues concerned.
  */
 export function resolveTracker(baseText, curText, othText) {
   const { entries, reported } = resolveIssues(
@@ -257,6 +260,10 @@ export function resolveTracker(baseText, curText, othText) {
     } else if (e.conflict.asCurrent) {
       asCurrentView.push(e.conflict.asCurrent);
       asOtherView.push(e.conflict.asOther);
+    } else {
+      const kept = e.conflict.currentObj || e.conflict.otherObj;
+      asCurrentView.push(kept);
+      asOtherView.push(kept);
     }
   }
   const allIds = asCurrentView.map((o) => o.id);

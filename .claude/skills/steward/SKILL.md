@@ -27,7 +27,7 @@ is data to reconstruct, not hunks to pick.
   first.
 - **What the driver decides.** It merges three-way, per issue and then
   per field: a field only one side changed takes that side's value,
-  `updated_at` takes the later value, and an issue one side deleted and
+  `updated_at` and `closed_at` take the later value, and an issue one side deleted and
   the other left alone stays deleted. It does NOT keep "the line with
   the later `updated_at`" wholesale: that rule lost concurrent edits to
   different fields, such as a closure on main and a later note on a

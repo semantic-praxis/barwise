@@ -18,4 +18,20 @@ case "${status}" in
 esac
 echo "beads merge driver: exit ${status}; falling back to git's line merge for ${4:-.beads/issues.jsonl}." >&2
 git merge-file -L current -L base -L other "$2" "$1" "$3"
+if [ "$?" -gt 127 ]; then
+  # merge-file itself failed (it exits negative, read as 255) and may have
+  # written nothing. Mark the whole file, so the current side can never be
+  # left alone and unmarked.
+  tmp="$2.barwise-merge.$"
+  {
+    echo "<<<<<<< current"
+    cat "$2"
+    echo "======="
+    cat "$3"
+    echo ">>>>>>> other"
+  } >"${tmp}" 2>/dev/null
+  mv "${tmp}" "$2"
+fi
+# 1 even when the line merge came out clean: the driver did not decide this
+# merge, so git should stop for a person to look.
 exit 1

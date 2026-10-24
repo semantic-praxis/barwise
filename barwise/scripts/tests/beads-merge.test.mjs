@@ -7,6 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -20,7 +21,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { DRIVER_NAME } from "../install-merge-driver.mjs";
+import { DRIVER_VERSION } from "../beads-merge-driver.mjs";
+import { DRIVER_NAME, FILES } from "../install-merge-driver.mjs";
 import { canonicalLine } from "../lib/beads-jsonl.mjs";
 import { MalformedInput, resolveTracker } from "../lib/beads-merge.mjs";
 
@@ -244,6 +246,62 @@ test("a rebase, which swaps the sides, yields the same lines in another order", 
   assert.notEqual(merge.text, rebase.text);
 });
 
+test("both sides closing one issue is agreement, and the later closed_at stands", () => {
+  const r = resolveTracker(
+    jsonl(issue("x")),
+    jsonl(issue("x", { status: "closed", closed_at: T1, updated_at: T1 })),
+    jsonl(issue("x", { status: "closed", closed_at: T2, updated_at: T2 })),
+  );
+  assert.deepEqual(r.reported, []);
+  assert.equal(find(r.text, "x").closed_at, T2);
+});
+
+test("a reported issue still counts for the issues it blocks", () => {
+  // x is untouched on both sides; y blocks x, and is edited on one side
+  // and deleted on the other. Counting the result without y rewrote x.
+  const x = issue("x", { dependent_count: 1 });
+  const y = issue("y", { dependencies: [blocks("y", "x")], dependency_count: 1 });
+  const base = jsonl(x, y);
+  const r = resolveTracker(base, jsonl(x, { ...y, notes: "n", updated_at: T1 }), jsonl(x));
+  assert.deepEqual(r.reported.map((e) => e.id), ["y"]);
+  assert.equal(r.text.split("\n")[0], canonicalLine(x), "x comes through byte for byte");
+});
+
+test("the lines the driver writes are the canonical form check-beads enforces", () => {
+  // canonicalLine (JavaScript) and check-beads.sh's go_compact (Python) are
+  // two spellings of one format; this is the drift test that holds them.
+  const dir = mkdtempSync(join(tmpdir(), "beads-canonical-"));
+  try {
+    const file = join(dir, "issues.jsonl");
+    writeFileSync(file, jsonl(issue("t-1", { title: "a & b <c> d\u00e9 \u2028 e" })));
+    const r = beadsCheck(file);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /0 error\(s\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the installed files carry the version their hash is recorded under", () => {
+  // The installer replaces an equal version and keeps a higher one, so a
+  // change to an installed file under an unchanged version would be undone
+  // by the next `prepare` from any older checkout, in every worktree.
+  const hash = createHash("sha256");
+  for (const [to, from] of FILES) {
+    hash.update(`${to}\0`).update(readFileSync(join(SCRIPTS, from))).update("\0");
+  }
+  const recorded = JSON.parse(
+    readFileSync(join(SCRIPTS, "tests", "merge-driver-versions.json"), "utf8"),
+  );
+  assert.equal(
+    recorded.versions[String(DRIVER_VERSION)],
+    hash.digest("hex"),
+    `the installed driver files changed: bump DRIVER_VERSION past ${DRIVER_VERSION} in `
+      + "beads-merge-driver.mjs and record the new hash under the new version in "
+      + "tests/merge-driver-versions.json. Never change an existing version's hash.",
+  );
+});
+
 // --- real merges, in throwaway repositories ---------------------------------
 
 const roots = [];
@@ -367,6 +425,36 @@ test("installing twice leaves one registration, its wrapper on disk, and never d
     "# sentinel\n",
     "an equal version is replaced",
   );
+});
+
+test("outside a git repository the installer says so and lets prepare go on", () => {
+  const dir = mkdtempSync(join(tmpdir(), "beads-nogit-"));
+  roots.push(dir);
+  const r = spawnSync("node", [join(SCRIPTS, "install-merge-driver.mjs")], {
+    cwd: dir,
+    encoding: "utf8",
+    env: cleanEnv({ GIT_CEILING_DIRECTORIES: dirname(dir) }),
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /not inside a git repository; nothing installed/);
+});
+
+test("when git's line merge itself fails, the wrapper still marks the whole file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "beads-wrapper-"));
+  roots.push(dir);
+  const [base, cur, oth] = ["base", "cur", "oth"].map((n) => join(dir, n));
+  writeFileSync(base, jsonl(issue("a")));
+  writeFileSync(cur, jsonl(issue("a"), issue("b")));
+  mkdirSync(oth); // unreadable as a file: the driver throws, and so does merge-file
+  const r = spawnSync("sh", [join(SCRIPTS, "beads-merge-driver.sh"), base, cur, oth], {
+    encoding: "utf8",
+    env: cleanEnv(),
+  });
+  assert.equal(r.status, 1);
+  const text = readFileSync(cur, "utf8");
+  assert.match(text, /^<<<<<<< current\n/);
+  assert.ok(text.includes('"id":"b"'), "the current side is kept inside the block");
+  assert.match(text, /^>>>>>>> other$/m);
 });
 
 test("two branches that each added an issue merge cleanly, with no driver in the work tree", () => {

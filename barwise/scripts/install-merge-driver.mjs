@@ -19,8 +19,10 @@
  * higher installed DRIVER_VERSION is kept. Equal versions are replaced, so
  * a fix that forgets the bump still installs.
  *
- * Exit 0 installed or kept; 2 when there is no git repository to install
- * into (pass/fail/could-not-answer, docs/specs/gate-refusal-contract.spec.md).
+ * Exit 0 installed or kept, and also when there is no git repository (an
+ * unpacked archive, an export): like husky beside it in `prepare`, it says
+ * so and lets the install go on, because a driver is no reason to fail one.
+ * Exit 1 when git is there and installing fails.
  */
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -36,7 +38,7 @@ export const DRIVER_COMMAND =
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** Installed path -> source path, relative to the install dir and scripts/. */
-const FILES = [
+export const FILES = [
   ["driver.sh", "beads-merge-driver.sh"],
   ["beads-merge-driver.mjs", "beads-merge-driver.mjs"],
   ["lib/beads-merge.mjs", "lib/beads-merge.mjs"],
@@ -62,7 +64,7 @@ function main() {
     common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   } catch {
     console.error("install-merge-driver: not inside a git repository; nothing installed.");
-    return 2;
+    return 0;
   }
   const dir = join(common, INSTALL_DIR);
   const installed = installedVersion(dir);

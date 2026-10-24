@@ -1,0 +1,6 @@
+{
+  "$comment": "The hash of the files install-merge-driver.mjs copies into the git common directory, per DRIVER_VERSION (beads-merge-driver.mjs). The installer replaces an equal version and keeps a higher one, so a changed file under an old version would be overwritten by an older checkout's prepare in every worktree. beads-merge.test.mjs fails until a change to those files comes with a new version and its hash here. Add a row; never edit an existing one. Spec: docs/specs/beads-merge-driver.spec.md.",
+  "versions": {
+    "1": "aaacfb0b9747624d5a03d8b815d9441262f8d4cb712f50a46c1123a64e7c2bc7"
+  }
+}
