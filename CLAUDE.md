@@ -597,6 +597,17 @@ to read it, `update <id>` to claim it, `close <id>` when it is done.
 highest number plus one. The counter read a tracker that is stale on
 every branch behind main, and two open branches minted the same id at
 least five times (barwise-w1u). Older numeric ids keep working.
+
+A conflict on the tracker is resolved by a merge driver, not by hand:
+`npm run prepare` installs `scripts/beads-merge-driver.mjs` into the
+clone's git directory, and a local `git merge` then merges the file per
+issue and per field, writing conflict markers only for what it cannot
+decide (steward skill, section 1;
+`docs/specs/beads-merge-driver.spec.md`). Before it, the
+`.gitattributes` line named a driver nothing registered, git fell back
+to a line merge without a word, and PR #704 resolved six conflicts by
+hand in three days.
+
 There is no `remember` subcommand -- persistent project knowledge goes
 in this file, as a convention with the reason attached, not a
 MEMORY.md.

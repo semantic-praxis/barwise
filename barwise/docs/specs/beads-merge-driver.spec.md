@@ -1,9 +1,9 @@
 # A merge driver for the tracker, registered where the repository is set up
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-24 -- the single workstream
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
 Tracking: barwise-nto
 
 ## Principle

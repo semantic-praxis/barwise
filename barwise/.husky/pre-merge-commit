@@ -1,0 +1,18 @@
+# Git runs this hook, and not pre-commit, for the commit a clean merge makes
+# (a conflicted merge concluded with `git commit` runs pre-commit instead).
+# Without it, a merged tracker reached history with no validation until CI
+# (docs/specs/beads-merge-driver.spec.md).
+
+# Same pin as pre-commit, for the same reason (barwise-hud).
+if [ -n "${GIT_DIR-}" ]; then
+  GIT_WORK_TREE=$(pwd)
+  export GIT_WORK_TREE
+fi
+
+cd barwise || exit 1
+
+if ! sh scripts/hooks/check-staged-tracker.sh; then
+  echo "pre-merge-commit: tracker validation failed; the merge is still in progress." >&2
+  echo "  Fix .beads/issues.jsonl, stage it, and run 'git commit'." >&2
+  exit 1
+fi

@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -352,8 +353,12 @@ test("both hooks see the worktree's root when run from a linked worktree", () =>
   const tree = join(dir, "linked");
   try {
     const main = join(dir, "main");
-    mkdirSync(join(main, "barwise"), { recursive: true });
+    mkdirSync(join(main, "barwise", "scripts", "hooks"), { recursive: true });
     writeFileSync(join(main, "barwise", "x"), "x\n");
+    // pre-commit's first step is the shared tracker check, which every real
+    // tree carries beside the hook.
+    const tracker = join("scripts", "hooks", "check-staged-tracker.sh");
+    copyFileSync(join(SCRIPTS, "hooks", "check-staged-tracker.sh"), join(main, "barwise", tracker));
     const git = (...a) =>
       execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...a], {
         cwd: main,

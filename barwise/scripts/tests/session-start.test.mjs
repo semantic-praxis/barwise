@@ -59,7 +59,7 @@ function exe(path, body) {
  * "absent" (no nvm.sh at all). `preinstalled` puts the pinned node in
  * place before the hook runs, as a resumed container has it.
  */
-function fixture({ nvm = "ok", preinstalled = false } = {}) {
+function fixture({ nvm = "ok", preinstalled = false, driver = "installed" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "session-start-"));
   roots.push(root);
   const project = join(root, "project");
@@ -80,10 +80,17 @@ function fixture({ nvm = "ok", preinstalled = false } = {}) {
   exe(join(stubs, "node"), `echo v22.0.0`);
   exe(join(stubs, "npm"), `echo "npm $* node=$(node --version)" >>"${calls}"`);
   exe(join(stubs, "shellcheck"), "exit 0");
+  // The tracker merge driver as prepare leaves it: "installed" is config and
+  // wrapper, "unregistered" is neither, "wrapper-missing" is config only.
+  const gitCommon = join(root, "git-common");
+  if (driver === "installed") exe(join(gitCommon, "barwise-merge", "driver.sh"), "exit 0");
+  const driverConfig = driver === "unregistered" ? "" : "echo 'sh driver.sh %O %A %B %P'";
   exe(
     join(stubs, "git"),
     `case "$*" in
   *"config --get core.hooksPath"*) echo barwise/.husky/_ ;;
+  *"config --get merge.beads.driver"*) ${driverConfig || "exit 1"} ;;
+  *"rev-parse --path-format=absolute --git-common-dir"*) echo "${gitCommon}" ;;
   *"rev-parse --is-shallow-repository"*) echo false ;;
 esac`,
   );
@@ -141,6 +148,7 @@ test("installs the pinned Node with nvm, installs with npm install on it, and pe
     `env file lacks the Node bin export: ${r.env}`,
   );
   assert.doesNotMatch(r.stderr, /not v26/);
+  assert.doesNotMatch(r.stderr, /merge driver NOT installed/);
 });
 
 test("a resumed container with the pin present does not reinstall it", () => {
@@ -179,4 +187,12 @@ test("firing again (resume) does not append duplicate PATH exports", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readFileSync(fx.envFile, "utf8"), first, "env file grew on the second fire");
   assert.equal(r.env.length, 2, `expected the Node and ~/.local/bin exports once each: ${r.env}`);
+});
+
+test("warns when the tracker merge driver is unregistered, or registered with no wrapper on disk", () => {
+  for (const driver of ["unregistered", "wrapper-missing"]) {
+    const r = runHook(fixture({ driver }));
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stderr, /tracker merge driver NOT installed/, driver);
+  }
 });
