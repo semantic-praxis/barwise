@@ -9,7 +9,10 @@
 export function isInstructionFile(f) {
   // REVIEW.md is read by the Claude Code Review service -- the root file,
   // and a nested one once the default branch is protected -- and cites
-  // paths the same way.
+  // paths the same way. .github/copilot-instructions.md and the
+  // path-specific .github/instructions/**/*.instructions.md are read as
+  // instructions by the Copilot reviewer, and cite paths too.
   return /(^|\/)(CLAUDE|AGENTS|REVIEW)\.md$/.test(f)
+    || /^\.github\/(copilot-instructions\.md|instructions\/(.+\/)?[^/]+\.instructions\.md)$/.test(f)
     || (f.startsWith(".claude/") && f.endsWith(".md"));
 }

@@ -14,6 +14,7 @@
 
 import { OrmYamlSerializer } from "@barwise/core";
 import { annotateOrmYaml } from "@barwise/core/annotation";
+import type { ElementMatching } from "@barwise/core/diff";
 import {
   AnthropicLlmClient,
   buildExistingModelContext,
@@ -74,7 +75,7 @@ interface SchemaInput {
 interface DiffInput {
   base?: string;
   incoming: string;
-  matching?: "id-first" | "content";
+  matching?: ElementMatching;
 }
 
 interface DiagramInput {
