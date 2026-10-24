@@ -159,3 +159,23 @@ test("a rename under a fresh id is satisfied by the CLI's own synonym candidate"
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("an added fact type takes an id no fact type holds, even after a removal", () => {
+  // Counting fact types reused an id once a removal shrank the list, so the
+  // file held two fact types under one id and diff read the addition as a
+  // change to the earlier one (three S1 findings in the 2026-10-24 run).
+  const first = applyChange(doc, {
+    kind: "add_fact_type",
+    name: "Encounter has Payer",
+    between: ["Encounter", "Payer"],
+  }).doc;
+  const shrunk = structuredClone(first);
+  shrunk.model.fact_types.splice(0, 1);
+  const second = applyChange(shrunk, {
+    kind: "add_fact_type",
+    name: "Payer has Encounter",
+    between: ["Payer", "Encounter"],
+  }).doc;
+  const ids = second.model.fact_types.map((f) => f.id);
+  assert.equal(new Set(ids).size, ids.length);
+});
