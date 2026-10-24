@@ -8,6 +8,25 @@
  * copy root CLAUDE.md forbids. Pure: the caller supplies `exists`, so the
  * same reader serves the working tree and a historical `--at` tree.
  */
+import { matchesPattern } from "./review-tiers.mjs";
+
+/**
+ * The specs the audit and check:spec-touches read: tracked specs,
+ * archived ones excepted. An archived spec is a frozen record, and a gate
+ * failing on its header would ask someone to rewrite history.
+ */
+export function inSpecCorpus(f) {
+  return f.startsWith("barwise/docs/specs/") && f.endsWith(".spec.md") && !f.includes("/archive/");
+}
+
+/**
+ * The tracked paths a `Touches:` entry stands for: itself, or for a
+ * pattern (review-tiers' language: `*` is one whole segment, `x/` a
+ * directory), every tracked path it matches.
+ */
+export function entryPaths(path, files) {
+  return path.includes("*") ? files.filter((f) => matchesPattern(f, path)) : [path];
+}
 
 /** Extensions the audit treats as code. Markdown and the like are not. */
 export const CODE = /\.(ts|tsx|mjs|cjs|js|json|ya?ml|py|sh)$/;
@@ -82,7 +101,9 @@ export function touches(text) {
   if (value === undefined) return undefined;
   return value.split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
     const mark = s[0] === "+" || s[0] === "-" ? s[0] : "";
-    return { path: mark ? s.slice(1) : s, mark };
+    // Trimmed after the mark, so `+ path` is `path`, not " path", which
+    // would skip the gate (marked) and match nothing in the audit.
+    return { path: (mark ? s.slice(1) : s).trim(), mark };
   });
 }
 

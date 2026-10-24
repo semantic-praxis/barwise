@@ -21,8 +21,8 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { matchesPattern } from "./lib/review-tiers.mjs";
-import { touches } from "./lib/spec-reader.mjs";
+import { matchesPattern, patternFault } from "./lib/review-tiers.mjs";
+import { inSpecCorpus, touches } from "./lib/spec-reader.mjs";
 
 /** `--flag value`; a flag with no value refuses rather than falling back. */
 function opt(flag) {
@@ -33,6 +33,8 @@ function opt(flag) {
   return value;
 }
 
+// Every input is read inside the refusal: an unreadable spec is "could
+// not answer" (exit 2), never a crash that exits 1 like a real finding.
 let tracked, specs;
 try {
   const list = opt("--tracked");
@@ -42,47 +44,61 @@ try {
   const lib = list ? null : await import("./lib/tracked.mjs");
   tracked = list ? readFileSync(list, "utf8").split("\n").filter(Boolean) : lib.trackedFiles();
   if (tracked.length === 0) throw new Error("the tracked-file list is empty");
-  specs = dir
-    ? readdirSync(dir).filter((f) => f.endsWith(".spec.md")).map((f) => ({
-      id: f,
-      path: join(dir, f),
-    }))
-    : tracked
-      .filter((f) => f.startsWith("barwise/docs/specs/") && f.endsWith(".spec.md"))
-      .map((f) => ({ id: f, path: join(lib.REPO_ROOT, f) }));
+  const paths = dir
+    ? readdirSync(dir).filter((f) => f.endsWith(".spec.md")).map((f) => [f, join(dir, f)])
+    : tracked.filter(inSpecCorpus).map((f) => [f, join(lib.REPO_ROOT, f)]);
+  specs = paths.map(([id, path]) => ({ id, entries: touches(readFileSync(path, "utf8")) }));
 } catch (err) {
   console.error(`check:spec-touches: cannot answer -- ${err.message}`);
+  if (err.cause) console.error(`  cause: ${err.cause.message}`);
   process.exit(2);
 }
 
+const files = new Set(tracked);
 const dirs = new Set();
 for (const f of tracked) {
   const parts = f.split("/");
   for (let i = 1; i < parts.length; i++) dirs.add(`${parts.slice(0, i).join("/")}/`);
 }
-const resolves = (p) =>
-  p.includes("*")
-    ? tracked.some((f) => matchesPattern(f, p))
-    : p.endsWith("/")
-    ? dirs.has(p)
-    : tracked.includes(p);
+/**
+ * Patterns are review-tiers' language, the one the audit expands them
+ * with: `*` is a whole segment, so `scripts/*.mjs` is a fault, not a
+ * glob that this gate and git would read differently.
+ */
+function problem(path) {
+  if (path.includes("*")) {
+    const fault = patternFault(path);
+    if (fault) return fault;
+    return tracked.some((f) => matchesPattern(f, path)) ? null : "matches nothing tracked";
+  }
+  if (path.endsWith("/")) return dirs.has(path) ? null : "names no tracked directory";
+  return files.has(path) ? null : "names nothing tracked";
+}
 
 const dead = [];
 let declaring = 0;
 for (const spec of specs) {
-  const entries = touches(readFileSync(spec.path, "utf8"));
-  if (entries === undefined) continue;
+  if (spec.entries === undefined) continue;
   declaring += 1;
-  for (const e of entries) {
-    if (e.mark === "" && !resolves(e.path)) dead.push(`${spec.id}: ${e.path}`);
+  for (const e of spec.entries) {
+    if (e.path === "") {
+      dead.push(`${spec.id}: an empty entry`);
+      continue;
+    }
+    const why = e.mark === ""
+      ? problem(e.path)
+      : e.path.includes("*")
+      ? patternFault(e.path)
+      : null;
+    if (why) dead.push(`${spec.id}: ${e.mark}${e.path} -- ${why}`);
   }
 }
 
 if (dead.length > 0) {
   console.error(
     `check:spec-touches: FAIL -- ${dead.length} Touches: entr${
-      dead.length === 1 ? "y names" : "ies name"
-    } nothing tracked:`,
+      dead.length === 1 ? "y does" : "ies do"
+    } not resolve:`,
   );
   for (const d of dead) console.error(`  ${d}`);
   console.error(

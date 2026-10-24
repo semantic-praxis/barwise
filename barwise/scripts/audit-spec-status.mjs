@@ -49,7 +49,16 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
-import { CODE, header, HUB, isWiring, namedPaths, touches } from "./lib/spec-reader.mjs";
+import {
+  CODE,
+  entryPaths,
+  header,
+  HUB,
+  inSpecCorpus,
+  isWiring,
+  namedPaths,
+  touches,
+} from "./lib/spec-reader.mjs";
 import {
   noteUntrackedInput,
   refuseUntrackedInput,
@@ -149,21 +158,26 @@ function exists(path) {
   }
 }
 
-/** Every tracked spec path, in the working tree or at `--at`. */
-function specFiles() {
-  const files = AT === undefined
+/** Every tracked path, in the working tree or at `--at`; read once. */
+let listing;
+function allFiles() {
+  listing ??= AT === undefined
     ? trackedFiles()
     : git("ls-tree", "-r", "--name-only", AT).split("\n");
-  return files.filter(IN_CORPUS);
+  return listing;
+}
+
+/** Every tracked spec path, in the working tree or at `--at`. */
+function specFiles() {
+  return allFiles().filter(IN_CORPUS);
 }
 
 /**
  * What this audit reads: specs, archived ones excepted. One rule for the
- * corpus and for the untracked files it reports or refuses.
+ * corpus and for the untracked files it reports or refuses, shared with
+ * check:spec-touches through the reader.
  */
-function IN_CORPUS(f) {
-  return f.startsWith(SPEC_DIR) && f.endsWith(".spec.md") && !f.includes("/archive/");
-}
+const IN_CORPUS = inSpecCorpus;
 
 const readSpec = (file) =>
   AT === undefined ? readFileSync(resolve(REPO_ROOT, file), "utf8") : git("show", `${AT}:${file}`);
@@ -177,25 +191,26 @@ function unseenCommits(found, recorded = []) {
   return found.filter((c) => !recorded.some((r) => c.startsWith(r) || r.startsWith(c)));
 }
 
-/** Specs claiming nothing is built, with the commits that say otherwise. */
 /**
  * The paths whose commits say a spec was implemented. A `Touches:` header
  * is the spec's own declaration and replaces inference: a path cited as
  * context (`ci.yml`, a gate's test) is no longer read as the subject
  * (plan-scope-check.spec.md). From it the audit drops shared wiring,
- * non-code entries and barrels, as it always has for inferred paths, and
- * reads a glob entry as a git glob pathspec. Without the header, the
- * paths the spec names, as before.
+ * non-code files and barrels, as it always has for inferred paths. A
+ * directory entry stays (git log takes a directory), and a pattern is
+ * expanded against the tracked files by the same matcher
+ * check:spec-touches validates it with, so the two read one language.
+ * Without the header, the paths the spec names, as before.
  */
 function subjectPaths(text) {
   const declared = touches(text);
   if (declared === undefined) return namedPaths(text, exists);
   return declared
-    .map((e) => e.path)
-    .filter((p) => !isWiring(p) && CODE.test(p) && !HUB.test(p))
-    .map((p) => (p.includes("*") ? `:(glob)${p}` : p));
+    .flatMap((e) => entryPaths(e.path, allFiles()))
+    .filter((p) => !isWiring(p) && (p.endsWith("/") || (CODE.test(p) && !HUB.test(p))));
 }
 
+/** Specs claiming nothing is built, with the commits that say otherwise. */
 function findings() {
   const found = [];
   const head = AT ?? "HEAD";

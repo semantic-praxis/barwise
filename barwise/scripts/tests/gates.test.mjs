@@ -4778,13 +4778,6 @@ test("check-instruction-refs refuses an empty listing rather than reporting OK",
 });
 
 /**
- * audit-spec-status: a verdict covers the commits it was written against
- * (barwise-qs8). A refresh once added nine commits to a row under a note
- * describing older ones, and --check passed. --check now reports commits a
- * verdict never recorded, without failing on them, and --write reopens the
- * note so the refresh cannot stand in for a re-read.
- */
-/**
  * A spec's Touches: header replaces inference (plan-scope-check.spec.md,
  * WS2): a path cited only as context no longer makes an unrelated edit
  * read as implementation, and shared wiring listed in Touches: is
@@ -4838,11 +4831,43 @@ test("audit-spec-status reads Touches: instead of every cited path, and ignores 
     writeFileSync(join(dir, "barwise", "src", "a.ts"), "1\n");
     g("commit", "-qam", "implementation");
     assert.match(run().stderr, /NEW: declared\.spec\.md/, "a declared subject still counts");
+    // Touches: that omits ci.yml altogether (the spec's WS2 case): the
+    // body still cites it, and an edit to it is not this spec's subject.
+    writeFileSync(
+      join(specs, "omits.spec.md"),
+      `# O\n\nStatus: Draft -- no workstream implemented\nTouches: barwise/src/b.ts\n\n## Body\n\n${body}`,
+    );
+    writeFileSync(join(dir, "barwise", "src", "b.ts"), "0\n");
+    g("add", "-A");
+    g("commit", "-qm", "omits");
+    writeFileSync(join(dir, ".github", "workflows", "ci.yml"), "2\n");
+    g("commit", "-qam", "ci again");
+    assert.doesNotMatch(run().stderr, /omits\.spec\.md/);
+    // A directory entry is a subject: the audit used to drop it with the
+    // non-code entries, which left a directory-only plan unaudited.
+    mkdirSync(join(dir, "barwise", "lib"), { recursive: true });
+    writeFileSync(join(dir, "barwise", "lib", "c.ts"), "0\n");
+    writeFileSync(
+      join(specs, "dir.spec.md"),
+      "# R\n\nStatus: Draft -- no workstream implemented\nTouches: barwise/lib/\n\n## Body\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "dir spec");
+    writeFileSync(join(dir, "barwise", "lib", "c.ts"), "1\n");
+    g("commit", "-qam", "lib");
+    assert.match(run().stderr, /NEW: dir\.spec\.md/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
+/**
+ * audit-spec-status: a verdict covers the commits it was written against
+ * (barwise-qs8). A refresh once added nine commits to a row under a note
+ * describing older ones, and --check passed. --check now reports commits a
+ * verdict never recorded, without failing on them, and --write reopens the
+ * note so the refresh cannot stand in for a re-read.
+ */
 test("audit-spec-status reports commits a verdict never covered, and --write reopens the note", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-specaudit-"));
   const g = (...args) =>
