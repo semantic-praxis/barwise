@@ -95,8 +95,10 @@ In scope:
     under and whose further roles are its `roles`, in order, each named by
     its Ossie role name, else its player;
   - each `verbalizes` pattern is a reading, `{Concept:role}` and
-    `{Concept}` placeholders becoming role positions (`{Concept}` for a
-    named role when no other role has that player), the text otherwise kept
+    `{Concept}` placeholders becoming role positions (`{Concept}` names the role whose name is that concept -- the first
+    role, or one with no role name -- else the only role that concept
+    plays; a placeholder matching none, or a pattern that names one role
+    twice and so leaves another out, is refused), the text otherwise kept
     as written (Open decision 4 for the hyphen);
   - `multiplicity: ManyToOne` is an internal uniqueness over all roles
     but the last, `OneToOne` an internal uniqueness on each role of a
