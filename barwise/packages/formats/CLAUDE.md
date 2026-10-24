@@ -32,6 +32,8 @@ src/
   naming.ts                      Name helpers shared by the adapters (snakeCase)
   constraintSpec.ts              The ConstraintSpec payload for a constraint a
                                  format cannot express (DDL router, Ossie writer)
+  constraintReport.ts            The text the export surfaces show for a result's
+                                 constraintSpecs (CLI stderr, MCP block)
   ddl/DdlImportFormat.ts         SQL DDL -> ORM
   ddl/DdlExportFormat.ts         ORM -> SQL DDL (wraps renderDdl; applies the
                                  dialect constraint routing as a text pass)

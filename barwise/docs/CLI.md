@@ -129,6 +129,14 @@ Options:
 - `--strict` -- fail on validation errors
 - `--no-examples` -- exclude population example data
 
+When the format reports constraints it could not express (today `ddl`,
+which spills them per dialect, and `ossie`), `export` writes them to
+stderr after the artifact: a heading with the count and format, then one
+line per distinct verbalization, with `(xN)` when the same rule was
+spilled more than once. Stdout and the exit code are unchanged, so
+`barwise export ... | psql` still receives only the artifact. A project
+export reports each domain as it is written, naming the domain.
+
 Given a `.orm-project.yaml` manifest, `export` exports each domain (or
 the one named with `--domain`). A project's
 `settings.preferred_identifier_strategy` (`integer` or `uuid`) types

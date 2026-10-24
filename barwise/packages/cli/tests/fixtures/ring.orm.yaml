@@ -1,0 +1,31 @@
+orm_version: "1.0"
+
+model:
+  name: "Ring Test"
+  domain_context: "testing"
+
+  object_types:
+    - id: "ot-person"
+      name: "Person"
+      kind: "entity"
+      reference_mode: "person_id"
+
+  fact_types:
+    - id: "ft-person-is-parent-of-person"
+      name: "Person is parent of Person"
+      roles:
+        - id: "r-parent"
+          player: "ot-person"
+          role_name: "is parent of"
+        - id: "r-child"
+          player: "ot-person"
+          role_name: "is child of"
+      readings:
+        - "{0} is parent of {1}"
+      constraints:
+        - type: "internal_uniqueness"
+          roles: ["r-parent", "r-child"]
+        - type: "ring"
+          role_1: "r-parent"
+          role_2: "r-child"
+          ring_type: "irreflexive"

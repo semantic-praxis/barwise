@@ -174,3 +174,38 @@ describe("barwise_diff_models passes matching through", () => {
     expect(tool?.inputSchema?.properties?.matching?.enum).toEqual([...ELEMENT_MATCHINGS]);
   });
 });
+
+describe("barwise_export_model carries the constraint report", () => {
+  // The editor tool joins the MCP blocks into one text part, so the report
+  // reaches the model only if that join keeps the second block (barwise-wc0).
+  const ring = [
+    'orm_version: "1.0"',
+    "model:",
+    "  name: Ring",
+    "  object_types:",
+    "    - { id: ot-person, name: Person, kind: entity, reference_mode: person_id }",
+    "  fact_types:",
+    "    - id: ft-parent",
+    "      name: Person is parent of Person",
+    "      roles:",
+    "        - { id: r-parent, player: ot-person, role_name: is parent of }",
+    "        - { id: r-child, player: ot-person, role_name: is child of }",
+    '      readings: ["{0} is parent of {1}"]',
+    "      constraints:",
+    "        - { type: internal_uniqueness, roles: [r-parent, r-child] }",
+    "        - { type: ring, role_1: r-parent, role_2: r-child, ring_type: irreflexive }",
+    "",
+  ].join("\n");
+
+  it("puts the report after the artifact", async () => {
+    registerAll();
+    const tool = state.tools.get("barwise_export_model")!;
+    const result = (await tool.invoke({ input: { source: ring, format: "ddl" } }, {})) as {
+      content: { value: string; }[];
+    };
+    const text = result.content[0]!.value;
+    const report = text.indexOf("1 constraint(s) the ddl format could not express:");
+    expect(report).toBeGreaterThan(text.indexOf("CREATE TABLE person_is_parent_of_person"));
+    expect(text.slice(report)).toContain("- No Person is parent of that same Person.");
+  });
+});
