@@ -40,7 +40,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { currentSection, renderSection } from "./lib/architecture-section.mjs";
+import { ADR_DIR, currentSection, isAdr, renderSection } from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
 import { uncommittedPaths } from "./lib/changed-class.mjs";
 import { isInstructionFile } from "./lib/instruction-files.mjs";
@@ -60,7 +60,6 @@ const RUNTIME = ["dependencies", "peerDependencies", "optionalDependencies"];
  * current forms; a number such as "ADR 0001" is neither, which is why the
  * dated records that still use numbers need no exemption.
  */
-const ADR_DIR = "barwise/docs/adr/";
 // One line break may sit between `ADR` and the name -- dprint reflows prose,
 // and a reference split at the wrap would otherwise never be read -- with a
 // quote or comment marker (`>`, `*`, `#`, `//`) after it, but not a blank
@@ -68,7 +67,6 @@ const ADR_DIR = "barwise/docs/adr/";
 const ADR_REF =
   /\bADR[ \t]*(?:\r?\n[ \t]*(?:[>*#]|\/\/)?[ \t]*)?`([a-z0-9][a-z0-9-]*)`|docs\/adr\/([a-z0-9][a-z0-9-]*)\.md/g;
 const SCOPES = ["architecture", "process"];
-const isAdr = (f) => f.startsWith(ADR_DIR) && f.endsWith(".md") && !f.endsWith("/README.md");
 /**
  * The files whose ADR references are read: a named set, not "everything
  * but". Instruction files, the docs (specs included) and package files act

@@ -13,10 +13,19 @@ export const BEGIN =
   "<!-- BEGIN regen:architecture -- generated; edit the ADRs or INTENDED, then run npm run regen:architecture -->";
 export const END = "<!-- END regen:architecture -->";
 
+export const ADR_DIR = "barwise/docs/adr/";
+/**
+ * An ADR, by repo-relative path. One predicate for check:architecture and
+ * the regenerator, which both list ADRs from git ls-files: a writer that
+ * read the directory instead would index an untracked ADR the check skips,
+ * and the check would then report a section no regen run can make current.
+ */
+export const isAdr = (f) => f.startsWith(ADR_DIR) && f.endsWith(".md") && !f.endsWith("/README.md");
+
 /**
  * The section, markers included. `adrs` is [{ f, text }] with `f` the path
- * relative to the repo root, in path order (both callers list a sorted
- * directory: readdir sorted, and git ls-files); `intended` is the INTENDED
+ * relative to the repo root, in path order (both callers read git ls-files,
+ * which sorts); `intended` is the INTENDED
  * map.
  */
 export function renderSection(adrs, intended) {

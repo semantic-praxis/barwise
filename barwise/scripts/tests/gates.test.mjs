@@ -5747,7 +5747,7 @@ function stageAdr(dir, name, text) {
   stage(
     dir,
     "barwise/docs/ARCHITECTURE.md",
-    before.replace(currentSection(before), renderSection(adrs, intended)),
+    before.replace(currentSection(before), () => renderSection(adrs, intended)),
   );
 }
 
@@ -5987,6 +5987,20 @@ test("check:architecture fails a stale generated section, and regen:architecture
       encoding: "utf8",
     });
     assert.match(again.stdout, /already current/);
+    // An ADR on disk but untracked is one the check does not list, so the
+    // regenerator must not index it either: otherwise the check reads
+    // "stale" and no regen run can make it current.
+    writeFileSync(join(dir, "barwise", "docs", "adr", "draft.md"), ADR_OK);
+    const untracked = spawnSync(process.execPath, [
+      join(SCRIPTS, "regen-architecture.mjs"),
+      "--root",
+      dir,
+    ], {
+      encoding: "utf8",
+    });
+    assert.match(untracked.stdout, /already current/);
+    const still = runArch(dir);
+    assert.equal(still.status, 0, still.stdout + still.stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
