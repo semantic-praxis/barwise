@@ -4788,7 +4788,13 @@ function refsRepo({ allow = [], files = {} } = {}) {
     execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q");
   mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
-  for (const f of ["check-instruction-refs.mjs", join("lib", "tracked.mjs")]) {
+  for (
+    const f of [
+      "check-instruction-refs.mjs",
+      join("lib", "tracked.mjs"),
+      join("lib", "instruction-files.mjs"),
+    ]
+  ) {
     writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
   }
   writeFileSync(
@@ -4964,7 +4970,13 @@ test("check-instruction-refs refuses an empty listing rather than reporting OK",
   try {
     execFileSync("git", ["init", "-q"], { cwd: dir });
     mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
-    for (const f of ["check-instruction-refs.mjs", join("lib", "tracked.mjs")]) {
+    for (
+      const f of [
+        "check-instruction-refs.mjs",
+        join("lib", "tracked.mjs"),
+        join("lib", "instruction-files.mjs"),
+      ]
+    ) {
       writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
     }
     writeFileSync(join(dir, "scripts", "instruction-refs-allowlist.json"), '{"rows":[]}');
@@ -5197,6 +5209,9 @@ function architectureRepo() {
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
   copy("barwise/scripts/lib/intended.cjs");
+  for (const adr of readdirSync(join(REPO, "barwise", "docs", "adr"))) {
+    copy(`barwise/docs/adr/${adr}`);
+  }
   let manifests = 0;
   for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
     const rel = `barwise/packages/${pkg}/package.json`;
@@ -5665,6 +5680,222 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
       runArch(dir, [ARCH_CMD[1], "--root"]),
       /--root needs a value/,
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- check:architecture, WS2: ADR shape and references ---
+
+const ADR_OK = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n\n"
+  + "## Context\n\nWhy.\n\n## Decision\n\nThe rule.\n\n## Consequences\n\nWhat follows.\n";
+
+test("check:architecture checks each ADR's shape", () => {
+  const { dir } = architectureRepo();
+  try {
+    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    const ADR = "barwise/docs/adr/a-concern.md";
+    for (
+      const [edit, why] of [
+        [(s) => s.replace("Scope: process\n", ""), /a-concern\.md: no Scope: line/],
+        [
+          (s) => s.replace("Scope: process", "Scope: policy"),
+          /a-concern\.md: Scope: policy is not one of architecture, process/,
+        ],
+        [(s) => s.replace("Date: 2026-10-24\n", ""), /a-concern\.md: no Date: line/],
+        [(s) => s.replace("## Decision", "## The rule"), /a-concern\.md: no "## Decision" section/],
+        // A field in the body is not the ADR's own.
+        [
+          (s) => s.replace("Scope: process\n", "").replace("Why.", "Scope: process"),
+          /no Scope: line/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, ADR, edit);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, why);
+    }
+    // A README in the directory is not an ADR.
+    stage(dir, "barwise/docs/adr/README.md", "# ADRs\n\nAn index.\n");
+    const readme = runArch(dir);
+    assert.equal(readme.status, 0, readme.stdout + readme.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture resolves each ADR reference in the files that act on it", () => {
+  const { dir } = architectureRepo();
+  try {
+    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    // Live references in both forms, from each kind of citing file.
+    stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`.\n");
+    stage(dir, "barwise/packages/core/src/x.ts", "// docs/adr/a-concern.md\n");
+    // A spec may cite an ADR it plans as a `+` Touches: entry.
+    stage(
+      dir,
+      "barwise/docs/specs/p.spec.md",
+      "# P\n\nStatus: Draft\nTouches: +barwise/docs/adr/planned.md\n\n## Body\n\nADR `planned`.\n",
+    );
+    // History is not read: the tracker, an archived spec, a dated record,
+    // and a number, which is not a form at all.
+    stage(dir, ".beads/issues.jsonl", '{"d":"ADR `gone`"}\n');
+    stage(dir, "barwise/docs/specs/archive/old.spec.md", "# O\n\nADR `gone`\n");
+    stage(dir, "barwise/docs/review-2026-08-27.md", "docs/adr/gone.md\n");
+    stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`. ADR 0001 too.\n");
+    execFileSync("git", ["commit", "-qm", "refs"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    for (
+      const [file, edit, why] of [
+        [
+          "barwise/packages/core/CLAUDE.md",
+          (s) => s.replace("ADR `a-concern`", "ADR `a-concrn`"),
+          /packages\/core\/CLAUDE\.md:1: names ADR a-concrn, and barwise\/docs\/adr\/a-concrn\.md does not exist/,
+        ],
+        [
+          "barwise/packages/core/src/x.ts",
+          (s) => s.replace("a-concern.md", "moved.md"),
+          /core\/src\/x\.ts:1: names ADR moved/,
+        ],
+        // The `+` entry is the spec's own: without it the planned name is dead.
+        [
+          "barwise/docs/specs/p.spec.md",
+          (s) => s.replace("+barwise/docs/adr/planned.md", "+barwise/x.ts"),
+          /p\.spec\.md:8: names ADR planned/,
+        ],
+        // An ADR may cite another, and a retired one is dead there too.
+        [
+          "barwise/docs/adr/a-concern.md",
+          (s) => s.replace("The rule.", "See ADR `retired`."),
+          /a-concern\.md:\d+: names ADR retired/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, file, edit);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, why);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture reads wrapped, retiring and doc references, and skips a deleted file", () => {
+  const { dir } = architectureRepo();
+  try {
+    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    // A spec retiring an ADR names it in its own `-` Touches: entry.
+    stage(
+      dir,
+      "barwise/docs/specs/r.spec.md",
+      "# R\n\nStatus: Draft\nTouches: -barwise/docs/adr/retiring.md\n\n## Body\n\nRetires ADR `retiring`.\n",
+    );
+    // An undated doc and an evals file act on decisions too.
+    stage(dir, "barwise/docs/guide.md", "See ADR\n`a-concern`.\n");
+    // Not references: a word ending in ADR, a blank line between, and
+    // package history (an eval run, a dated file).
+    stage(dir, "barwise/docs/notes.md", "MADR `gone`. See the ADR\n\n`gone` too.\n");
+    stage(dir, "barwise/packages/core/eval-runs/r.json", '"docs/adr/gone.md"\n');
+    stage(dir, "barwise/packages/core/evals/2026-01-01.yaml", "# docs/adr/gone.md\n");
+    stage(dir, "barwise/packages/core/evals/suite.yaml", "# docs/adr/a-concern.md\n");
+    stage(dir, "barwise/packages/core/src/y.ts", "// See ADR\n// `a-concern`\n");
+    execFileSync("git", ["commit", "-qm", "refs"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    for (
+      const [file, edit, why] of [
+        // A reference split by a reflow is still read, at its first line.
+        [
+          "barwise/docs/guide.md",
+          (s) => s.replace("`a-concern`", "`a-concrn`"),
+          /guide\.md:1: names ADR a-concrn/,
+        ],
+        [
+          "barwise/packages/core/src/y.ts",
+          (s) => s.replace("a-concern", "gone"),
+          /core\/src\/y\.ts:1: names ADR gone/,
+        ],
+        [
+          "barwise/packages/core/evals/suite.yaml",
+          (s) => s.replace("a-concern", "gone"),
+          /evals\/suite\.yaml:1: names ADR gone/,
+        ],
+        [
+          "barwise/docs/specs/r.spec.md",
+          (s) => s.replace("-barwise/docs/adr/retiring.md", "-barwise/x.ts"),
+          /r\.spec\.md:8: names ADR retiring/,
+        ],
+        [
+          "barwise/docs/adr/a-concern.md",
+          (s) => s.replace("2026-10-24", "<YYYY-MM-DD>"),
+          /a-concern\.md: Date: <YYYY-MM-DD> is not YYYY-MM-DD/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, file, edit);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, why);
+    }
+    // A graph disagreement and an ADR problem are both reported in one run.
+    const both = archPlanted(
+      dir,
+      "barwise/docs/guide.md",
+      (s) => s.replace("`a-concern`", "`nope`"),
+    );
+    assert.equal(both.status, 1);
+    const path = join(dir, "CLAUDE.md");
+    const before = readFileSync(path, "utf8");
+    writeFileSync(path, before.replace(CLAUDE_LLM, "@barwise/llm             (core, diagram)"));
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR `nope`.\n");
+    const r = runArch(dir);
+    writeFileSync(path, before);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`a-concern`.\n");
+    assert.equal(r.status, 1, r.stderr);
+    assert.match(r.stderr, /draws llm -> diagram/);
+    assert.match(r.stderr, /guide\.md:1: names ADR nope/);
+    // An ADR written but not yet staged is not in the tree CI checks: a
+    // reference to it fails, and the run names the file as unchecked.
+    writeFileSync(join(dir, "barwise/docs/adr/unstaged.md"), ADR_OK);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`unstaged`.\n");
+    const unstaged = runArch(dir);
+    assert.equal(unstaged.status, 1, unstaged.stdout + unstaged.stderr);
+    assert.match(unstaged.stdout, /unchecked \(untracked\): barwise\/docs\/adr\/unstaged\.md/);
+    assert.match(unstaged.stderr, /guide\.md:1: names ADR unstaged/);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`a-concern`.\n");
+    rmSync(join(dir, "barwise/docs/adr/unstaged.md"));
+    // A tracked file deleted from disk is one being removed: it is skipped,
+    // and the references it leaves dead are reported, not a refusal.
+    rmSync(join(dir, "barwise/docs/adr/a-concern.md"));
+    const gone = runArch(dir);
+    assert.equal(gone.status, 1, gone.stdout + gone.stderr);
+    assert.match(gone.stderr, /guide\.md:1: names ADR a-concern/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture passes the real tree from any working directory", () => {
+  // No --root: the list and the files read must be one tree, whatever the cwd.
+  for (const cwd of [REPO, tmpdir()]) {
+    const r = spawnSync(process.execPath, [join(SCRIPTS, "check-architecture.mjs")], {
+      cwd,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 0, `${cwd}: ${r.stdout}${r.stderr}`);
+  }
+});
+
+test("check:architecture cannot answer with no ADR to check", () => {
+  const { dir } = architectureRepo();
+  try {
+    execFileSync("git", ["rm", "-rq", "barwise/docs/adr"], { cwd: dir });
+    const r = runArch(dir);
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /cannot answer -- no ADR under/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -1,6 +1,6 @@
 # Metamodel evolution policy
 
-Status: Accepted
+Scope: architecture
 Date: 2026-10-17
 Tracking: barwise-5t9 (+ children), docs/NORMA_VS_ORM_YAML.md,
 docs/specs/norma-export.spec.md

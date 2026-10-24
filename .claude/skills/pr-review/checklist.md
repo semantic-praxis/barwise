@@ -335,6 +335,20 @@ now holds, guards, or learns that they did not have to.
   and carried as fact until re-measured. Authority:
   `spec-writer/sensemaking.md`, Forward sections and Tripwires.
 
+## When an ADR changed
+
+- The PR body says what the decision was, what it is now, and why: an
+  ADR is edited in place, so the PR is the only record of the change,
+  and `git log -p` on the file leads a later reader there. Authority:
+  `docs/specs/architecture-index.spec.md`, "History lives in git and
+  the PR".
+- No spec restates the decision; a spec that settled it points to the
+  ADR from its resolved heading. Two statements of one rule drift.
+  Authority: the same spec, "An ADR and its spec divide the work".
+- `Date:` moved if the decision changed. A script cannot tell a changed
+  decision from a reflow, so this is the reviewer's call. Authority:
+  the same spec, "The format".
+
 ## When Python was touched
 
 - Every execution is `uv run --frozen [--only-group <g>]` from a cwd
