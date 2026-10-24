@@ -389,6 +389,14 @@
             "incoming": {
               "type": "string",
               "description": "Inline YAML for the incoming (changed) model"
+            },
+            "matching": {
+              "type": "string",
+              "enum": [
+                "id-first",
+                "content"
+              ],
+              "description": "How elements pair. 'id-first' (default): a shared id is the same element. 'content': ids say nothing; for two models whose ids are unrelated but may coincide."
             }
           },
           "required": [

@@ -114,3 +114,23 @@ model:
     expect(JSON.parse(result.content[0]!.text).hasChanges).toBe(true);
   });
 });
+
+describe("diff_models matching", () => {
+  // Two samples that numbered their object types in their own order, so
+  // `ot0` is Dog in one and Cat in the other (barwise-uy7).
+  const a =
+    'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Dog, kind: value }\n    - { id: ot1, name: Cat, kind: value }\n';
+  const b =
+    'orm_version: "3.0"\nmodel:\n  name: S\n  object_types:\n    - { id: ot0, name: Cat, kind: value }\n    - { id: ot1, name: Dog, kind: value }\n';
+  const changed = (matching?: "id-first" | "content") =>
+    JSON.parse(executeDiff(a, b, matching).content[0]!.text).deltas.length;
+
+  it("pairs by id by default, so the swap reads as two renames", () => {
+    expect(changed()).toBe(2);
+    expect(changed("id-first")).toBe(2);
+  });
+
+  it("pairs by name under content matching, so nothing changed", () => {
+    expect(changed("content")).toBe(0);
+  });
+});

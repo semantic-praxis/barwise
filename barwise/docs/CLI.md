@@ -167,6 +167,13 @@ Options:
 
 - `--format <text|json>` -- output format (default: text)
 - `--no-synonyms` -- hide synonym/rename candidates
+- `--matching <id-first|content>` -- how elements pair (default:
+  id-first). Under id-first a shared id is the same element, so a
+  rename that keeps the id is one change. Under content, ids say
+  nothing and elements pair by name and content: use it for two models
+  whose ids are unrelated but may coincide, such as two extractions
+  numbered from one counter. `barwise merge` has no such option; see
+  the capability matrix in the root `CLAUDE.md`.
 
 With `--format json`, each delta carries `changes` (what changed, as
 data) beside `changeDescriptions` (the same, as sentences). The shape is

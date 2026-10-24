@@ -144,6 +144,13 @@ jobs:
       # (docs/specs/instruction-reference-check.spec.md).
       - run: npm run check:instruction-refs
 
+      # The package graph has one authority, INTENDED in scripts/lib/intended.cjs;
+      # the root CLAUDE.md graph and each package.json runtime dependencies must
+      # agree with it. No docs-only guard: the CLAUDE.md graph is Markdown, and
+      # a guard would skip the very change that makes it drift
+      # (docs/specs/architecture-index.spec.md, WS1).
+      - run: npm run check:architecture
+
       # Fast, source-only static gates next (none need the build), so a lint
       # or architecture violation fails in seconds rather than after the
       # build and test suite.
@@ -165,13 +172,18 @@ jobs:
       - run: npm run check:parity
 
       # review-tiers.json is a declared copy of the trigger headings in
-      # .claude/skills/pr-review/checklist.md. This fails BOTH ways: a new
+      # .claude/skills/pr-review/checklist.md and of REVIEW.md's "Always
+      # check" titles. This fails BOTH ways for each: a new
       # heading with no row is a trigger the classifier would silently
       # never fire on, and a row naming a deleted heading is a tier
       # decision applying to nothing. Exit 2 when either input cannot be
       # read, because "every row is stale" is what an unreadable checklist
       # would otherwise look like.
       - run: npm run check:review-tiers
+      # A spec's Touches: header is its declared plan. An unmarked entry
+      # that names nothing tracked is a plan that rotted, the way a
+      # review-tiers glob routed nothing for five weeks (barwise-fs0).
+      - run: npm run check:spec-touches
 
       # A NUL byte makes git classify a source file as binary: no diff, no
       # blame, no review, and a patch taken from it loses changes silently.

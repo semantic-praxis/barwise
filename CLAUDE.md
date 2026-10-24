@@ -178,6 +178,15 @@ working in a package:
   |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)
 ```
 
+This block is a rendering for readers. The authority is `INTENDED` in
+`barwise/scripts/lib/intended.cjs`, the map dependency-cruiser enforces;
+`npm run check:architecture` fails when this block, or a package's
+runtime `dependencies`, disagrees with it, so change both in one commit.
+Draw it to the grammar in `barwise/scripts/check-architecture.mjs`
+(`GRAMMAR`): a line outside it is refused by name, and the refusal
+prints the grammar. It exists because a drawing with no syntax
+separating rows from comments was misread five different ways.
+
 The one thing outside that graph is `barwise/optimizer/`: the DSPy
 prompt-optimization lane. It is Python, it is dev-time only, and it
 depends on the workspace **as a subprocess** (`barwise prompt schema`,
@@ -241,6 +250,7 @@ it is qualified by `barwise.enableMcpServer`, which defaults on.
 | multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass                                                                                                        |
 | thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row                                                                                     |
 | reference inference (`--infer-references`)            | yes | no  | no      | deliberate: a warehouse-import option, no use elsewhere yet                                                                                       |
+| content-only matching on diff (`--matching content`)  | yes | yes | yes     | none on diff (VS Code as a language-model tool); merge stays id-first on every surface, since its id lookups assume a shared id is one element    |
 
 Every remaining gap is marked deliberate, which is the point: an
 unmarked gap is a bug.
@@ -326,6 +336,18 @@ exit code, or poll a condition the waiter cannot satisfy (the log file's
 last line, a sentinel the command writes on exit). The general shape is
 the one the gates follow: an instrument that can report the state it was
 asked about, rather than one that looks identical whether or not it can.
+
+**A gate's status read through a pipe is the pipe's.** `npm run
+test:scripts | tail -2; echo $?` printed 0 with a test failing, and
+`mutate.mjs ... | tail -1` printed 0 while mutate had refused
+(barwise-40a, after barwise-906 had already named the trap). So every
+node process a Bash command starts directly records its exit code, and
+a hook names the non-zero ones after each call: "These processes exited
+non-zero, and the command still reported 0" means a status was hidden
+or handled, and is the cue to re-read it
+(`docs/specs/masked-exit-report.spec.md`). To change `NODE_OPTIONS` for
+one command, append to it (`NODE_OPTIONS="$NODE_OPTIONS ..."`):
+replacing it unloads the recorder for that process.
 
 `npm run build`, `test`, and `lint` fan out via Turborepo in dependency
 order; per-package runs use `npx vitest run` / `npx tsc --noEmit` from

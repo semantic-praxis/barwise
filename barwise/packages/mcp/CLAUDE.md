@@ -11,8 +11,10 @@ per-tool integration work.
 This package may depend on any internal package except
 `barwise-vscode`, `@barwise/cli`, and `@barwise/promptlab`; the MCP
 SDK and `zod` are the externals. It has ZERO dependencies on VS Code.
-The authoritative internal list is the root CLAUDE.md dependency
-graph (and this package's `package.json`).
+The authoritative internal list is `INTENDED` in
+`barwise/scripts/lib/intended.cjs`; the root CLAUDE.md graph and this
+package's `package.json` are checked against it
+(`npm run check:architecture`).
 
 ## Package Layout
 

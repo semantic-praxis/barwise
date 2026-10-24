@@ -7,26 +7,37 @@
     "not-path-derivable": "The checklist trigger is semantic, not path-shaped. The classifier CANNOT detect it, and saying so is the point: these stay with the deep review, and a row exists so the completeness gate still accounts for the heading."
   },
   "trivial": {
-    "globs": [".beads/issues.jsonl"],
+    "globs": [
+      ".beads/issues.jsonl"
+    ],
     "why": "A pull request is trivial only if EVERY change is an EDIT (files API status modified) to one of these paths, and a trivial PR gets no Copilot review (.github/workflows/copilot-review.yml). Measured over the 60 merged PRs #466..#532 (first-parent merges ending at 2f231119): 11 (18%) changed only .beads/issues.jsonl, every one of them as an edit, and nothing else was plausibly trivial. The exact file, not .beads/: that directory also holds tracked, executable git hooks, which no measurement covered. Documentation is deliberately NOT here: PR #532 was docs-and-tracker only and a Copilot review found five real defects in it, the worst a spec diagram describing an implementation that no longer existed. The command that reproduces the count is in docs/specs/tiered-pr-review.spec.md, WS1. Widen this list only with the same kind of evidence, because a wrong entry is a defect nobody looks at."
   },
   "rows": [
     {
       "heading": "Every PR",
       "tier": "always",
-      "globs": ["**"],
+      "globs": [
+        "**"
+      ],
       "why": "the group with no trigger -- spec named, tracking issue open, numbers carry commands, session review present"
     },
     {
       "heading": "When a surface changed (CLI, MCP, VS Code)",
       "tier": "high-risk",
-      "globs": ["barwise/packages/cli/", "barwise/packages/mcp/", "barwise/packages/vscode/"],
+      "globs": [
+        "barwise/packages/cli/",
+        "barwise/packages/mcp/",
+        "barwise/packages/vscode/"
+      ],
       "why": "external harm: these are what ships to users, and the capability matrix goes stale silently"
     },
     {
       "heading": "When `@barwise/core` changed",
       "tier": "high-risk",
-      "globs": ["barwise/packages/core/src/", "barwise/packages/core/package.json"],
+      "globs": [
+        "barwise/packages/core/src/",
+        "barwise/packages/core/package.json"
+      ],
       "why": "rework: eleven downstream packages absorb a bad decision here (root CLAUDE.md). src/ and the exports map, not the whole package -- a change to core's own tests is the tests row, and measured over the last 40 merged PRs the wider glob made 4 of 13 core triggers reach nothing under src/ (tests, core's CLAUDE.md, mutation configs). The package.json half has fired 0 times in that window and is reasoning rather than measurement"
     },
     {
@@ -47,31 +58,57 @@
     {
       "heading": "When generated output changed",
       "tier": "routine",
-      "globs": ["barwise/examples/output/", "barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts"],
+      "globs": [
+        "barwise/examples/output/",
+        "barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts"
+      ],
       "why": "drift tests already fail when output disagrees with its regenerator"
     },
     {
       "heading": "When tests changed",
       "tier": "routine",
-      "globs": ["barwise/packages/*/tests/", "barwise/scripts/tests/"],
+      "globs": [
+        "barwise/packages/*/tests/",
+        "barwise/scripts/tests/"
+      ],
       "why": "coverage thresholds and the mutation pass carry weakening; the deep review still runs its failure-mode checks"
     },
     {
       "heading": "When a check, gate, hook, or script was added or changed",
       "tier": "high-risk",
-      "globs": ["barwise/scripts/", "barwise/.husky/", ".github/workflows/", ".claude/hooks/"],
+      "globs": [
+        "barwise/scripts/",
+        "barwise/.husky/",
+        ".github/workflows/",
+        ".claude/hooks/"
+      ],
       "why": "this is the verification apparatus itself; a gate that stops answering is the failure this repo keeps finding (barwise-906, six occurrences)"
     },
     {
       "heading": "When a spec was added or revised",
       "tier": "routine",
-      "globs": ["barwise/docs/specs/"],
+      "globs": [
+        "barwise/docs/specs/"
+      ],
       "why": "audit:specs guards the Status claim; the rest is judgment the deep review applies"
+    },
+    {
+      "heading": "When an ADR changed",
+      "tier": "high-risk",
+      "globs": [
+        "barwise/docs/adr/"
+      ],
+      "why": "a changed decision is rework for everything that follows it, and only review can tell a changed decision from a reflow"
     },
     {
       "heading": "When Python was touched",
       "tier": "routine",
-      "globs": ["barwise/optimizer/", "barwise/pyproject.toml", "barwise/uv.lock", ".python-version"],
+      "globs": [
+        "barwise/optimizer/",
+        "barwise/pyproject.toml",
+        "barwise/uv.lock",
+        ".python-version"
+      ],
       "why": "dev-time only and never a runtime dependency (root CLAUDE.md); check:python-uv holds the lockfile discipline"
     },
     {
@@ -92,8 +129,106 @@
     {
       "heading": "When a dependency was added",
       "tier": "high-risk",
-      "globs": ["barwise/package-lock.json", "barwise/uv.lock"],
+      "globs": [
+        "barwise/package-lock.json",
+        "barwise/uv.lock"
+      ],
       "why": "external harm, supply-chain shaped. The LOCKFILES, not the manifests: a dependency change is always written into the lock by npm install or uv lock, and CI rejects a lock that disagrees with its manifest -- while a manifest edit on its own is almost always an npm script. Measured (WS3): over the last 20 merged PRs the manifest globs fired 5 times and 4 were npm script additions with no lockfile change; over 40, 7 of 8. Still makes every dependabot PR blocking, roughly five a week."
+    }
+  ],
+  "failureModes": [
+    {
+      "heading": "Input dropped at a boundary",
+      "tier": "high-risk",
+      "globs": [
+        "barwise/packages/formats/src/",
+        "barwise/packages/dbt/src/",
+        "barwise/packages/code-analysis/src/",
+        "barwise/packages/core/src/import/",
+        "barwise/packages/core/src/export/",
+        "barwise/packages/core/src/serialization/",
+        "barwise/packages/core/src/mapping/",
+        "barwise/packages/core/src/format/",
+        "barwise/packages/cli/src/commands/",
+        "barwise/packages/llm/src/parse/",
+        "barwise/packages/core/src/lineage/",
+        "barwise/packages/cli/src/workspace/",
+        "barwise/packages/mcp/src/tools/"
+      ],
+      "why": "importers, exporters, loaders, serializers, mappers, the LLM output parser, the lineage manifest and argument parsing: the sites of REVIEW.md failure mode 1's cited defects (c3e8bd75, b0f408dc, aaf5837c, barwise-tn4)"
+    },
+    {
+      "heading": "A gate answers without seeing its input",
+      "tier": "high-risk",
+      "globs": [
+        "barwise/scripts/",
+        "barwise/.husky/",
+        ".github/workflows/",
+        ".claude/hooks/"
+      ],
+      "why": "the gates, hooks, workflows and scripts themselves, the same paths as the checklist's gate row (REVIEW.md failure mode 2)"
+    },
+    {
+      "heading": "A test that cannot fail",
+      "tier": "always",
+      "globs": [
+        "**"
+      ],
+      "why": "changed tests fire on 21 of the last 40 PRs (barwise/scripts/tests/, packages/*/tests/, optimizer/tests/, trial/tests/), more than half, so by review-routing WS2's rule it is always rather than routed (REVIEW.md failure mode 3)"
+    },
+    {
+      "heading": "Wired in one place, not its siblings",
+      "tier": "high-risk",
+      "globs": [
+        "barwise/packages/cli/src/bundle-entry.ts",
+        "barwise/packages/mcp/src/bundle-entry.ts",
+        "barwise/packages/vscode/src/mcp/",
+        "barwise/packages/cli/src/commands/",
+        "barwise/packages/mcp/src/tools/",
+        "barwise/packages/formats/src/registration.ts",
+        "barwise/packages/dbt/src/registration.ts",
+        "barwise/packages/code-analysis/src/formats/registration.ts",
+        "barwise/package.json"
+      ],
+      "why": "bundle entries, surface commands and tools, format registrations, and npm scripts, each of which has siblings (REVIEW.md failure mode 4)"
+    },
+    {
+      "heading": "A restated fact went stale",
+      "tier": "not-path-derivable",
+      "why": "a message, doc or tool description naming a fact can live in any file (REVIEW.md failure mode 5)"
+    },
+    {
+      "heading": "Boundary text",
+      "tier": "high-risk",
+      "globs": [
+        "barwise/packages/core/src/sql/",
+        "barwise/packages/formats/src/sql/",
+        "barwise/packages/formats/src/ddl/",
+        "barwise/packages/dbt/src/sql/"
+      ],
+      "why": "SQL and identifier handling (REVIEW.md failure mode 6)"
+    },
+    {
+      "heading": "ORM shape",
+      "tier": "high-risk",
+      "globs": [
+        "barwise/packages/core/src/model/",
+        "barwise/packages/core/src/validation/",
+        "barwise/packages/core/src/mapping/",
+        "barwise/packages/core/src/verbalization/",
+        "barwise/packages/formats/src/ddl/",
+        "barwise/packages/formats/src/openapi/",
+        "barwise/packages/dbt/src/dbtMapping/"
+      ],
+      "why": "the model and every place that walks roles or builds ids: the sites of REVIEW.md failure mode 7's cited defects (bb9b4660 in mapping, 35ee5c4a in the importers and dbtMapping)"
+    },
+    {
+      "heading": "PR description claims",
+      "tier": "always",
+      "globs": [
+        "**"
+      ],
+      "why": "every PR has a description whose claims must match the code (REVIEW.md failure mode 8)"
     }
   ]
 }

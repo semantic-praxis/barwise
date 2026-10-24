@@ -378,10 +378,11 @@ CREATE TABLE Department (
 
 Compare two ORM models and return structural deltas.
 
-| Parameter  | Type   | Required | Description                                               |
-| ---------- | ------ | -------- | --------------------------------------------------------- |
-| `base`     | string | yes      | File path or inline YAML for the base (original) model    |
-| `incoming` | string | yes      | File path or inline YAML for the incoming (changed) model |
+| Parameter  | Type   | Required | Description                                                     |
+| ---------- | ------ | -------- | --------------------------------------------------------------- |
+| `base`     | string | yes      | File path or inline YAML for the base (original) model          |
+| `incoming` | string | yes      | File path or inline YAML for the incoming (changed) model       |
+| `matching` | string | no       | `id-first` (default) or `content`; as `barwise diff --matching` |
 
 **Returns** JSON:
 
@@ -420,11 +421,15 @@ Compare two ORM models and return structural deltas.
 by `change` (`definition`, `aliases`, `dataTypeChanged`, `readings`,
 `constraintsAdded`, and so on), usually with the `from` and `to`
 values. `constraintsModified` is the exception: it carries
-`constraints: [{ from, to }]`, one pair per constraint. Within a fact type
-matched by name, a constraint whose id occurs once in each model is paired
-by id, so an edit that
-keeps the id is one `constraintsModified` entry; the rest are paired by
-content, so a model with fresh ids still matches its base.
+`constraints: [{ from, to }]`, one pair per constraint. Object types and
+fact types pair by id where both models hold it, then by name, so a rename
+that keeps the id is one `modified` delta with a `name` change. Within a
+paired fact type, a constraint whose id occurs once in each model is paired
+by id, so an edit that keeps the id is one `constraintsModified` entry; the
+rest are paired by content, so a model with fresh ids still matches its
+base. A merge that would leave two object types or two fact types with one
+name, such as a swap of two names with only one rename accepted, is
+refused with a `merge-error` that names both.
 `changeDescriptions` is the same list rendered as sentences.
 Both are empty for an added or removed element. `barwise diff --format
 json` emits the same shape.

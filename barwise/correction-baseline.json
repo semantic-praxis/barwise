@@ -505,6 +505,12 @@
       "caught_by": "not-a-correction",
       "note": "A risks-and-testing statement about proving totality in both directions."
     },
+    "model-invariants::05153abfcf05": {
+      "spec": "model-invariants.spec.md",
+      "excerpt": "- accidental shared ids pair unrelated elements. two models built apart can share positional ids (ot0, promptlab's deterministic ids). every comparison of indep",
+      "caught_by": "not-a-correction",
+      "note": "A Risks bullet naming a hazard of the design (positional ids shared by unrelated models), not a record of something the draft got wrong."
+    },
     "model-lint::a2ee0bc18c2f": {
       "spec": "model-lint.spec.md",
       "excerpt": "- the referencemode short-circuit was wrong and was dropped. the metamodel requires a referencemode on every entity type (ormmodel.addobjecttype throws without ",

@@ -3,7 +3,6 @@ export { type ChangeDescription, describeChange, type RoleSummary } from "./chan
 export {
   type BreakingLevel,
   type ConstraintDelta,
-  type ConstraintMatching,
   type DefinitionDelta,
   type DeltaJson,
   type DeltaKind,
@@ -13,6 +12,7 @@ export {
   type DiffOptions,
   ELEMENT_TYPES,
   elementLabel,
+  type ElementMatching,
   elementName,
   type ElementRef,
   type ElementType,

@@ -1,13 +1,16 @@
 import { parse, stringify } from "yaml";
 import {
   type Constraint,
+  describeConstraintRepeat,
+  describeConstraintRepeats,
   type ExternalConstraint,
   isExternalConstraint,
   isInternalConstraint,
   placementOf,
 } from "../model/Constraint.js";
 import { type PlacedFlags, storePreferredFlags } from "../model/identification.js";
-import { OrmModel } from "../model/OrmModel.js";
+import { DuplicateIdError, OrmModel } from "../model/OrmModel.js";
+import { groupRepeats } from "../util/groupRepeats.js";
 import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
@@ -172,6 +175,10 @@ export class OrmYamlSerializer {
    * them; every other caller wants only the model (orm-format-3 WS4b-iii).
    */
   migrate(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
+    return refusingHeldIds(() => this.read(yaml, options));
+  }
+
+  private read(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
     const raw = parse(yaml) as unknown;
     const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
@@ -264,22 +271,39 @@ export class OrmYamlSerializer {
     }
 
     // Every constraint id is stated (the schema requires it) and is
-    // model-wide: another element, another file, a diff or a merge names a
-    // constraint by it, so two constraints sharing one is refused, naming it.
-    const seen = new Set<string>();
-    const claim = (c: { id?: string; }) => {
-      if (c.id === undefined) return;
-      if (seen.has(c.id)) {
-        throw new DeserializationError(
-          `Two constraints share the id "${c.id}"; a constraint id names one constraint.`,
-        );
-      }
-      seen.add(c.id);
-    };
+    // model-wide, so a 3.0 file holding a repeat is refused, lenient or
+    // not, before anything is added. Read from what the file states, not
+    // from the built model: two fact types sharing an id collapse into one
+    // in the id-keyed store, and the dropped one's constraints would go
+    // with it unreported. The lenient refusal is load-bearing: `barwise
+    // migrate` re-reads its own 3.0 output leniently to refuse writing a
+    // file a strict load would reject. A 2.0 file and a model built in code
+    // are reported by `structural/duplicate-constraint-id` instead, which
+    // asks the same `groupRepeats` of the built model. Holders whose fact
+    // types also share an id never reach it: the store refuses the second
+    // fact type (`DuplicateIdError`, model-invariants WS3).
+    const factTypes = (doc.model.fact_types ?? []).map((ftDoc) => deserializeFactType(ftDoc));
+    const modelConstraints = (doc.model.constraints ?? []).map((cDoc) =>
+      deserializeConstraint(cDoc)
+    );
+    const stated = [
+      ...factTypes.flatMap(({ config, constraints }) =>
+        constraints.map((c) => [c, config.name] as const)
+      ),
+      ...modelConstraints.map((c) => [c, undefined] as const),
+    ];
+    const repeats = [...groupRepeats(stated, ([c]) => c.id)];
+    if (repeats.length > 0) {
+      const named = describeConstraintRepeats(
+        repeats.map(([id, holders]) => describeConstraintRepeat(id, holders)),
+      );
+      throw new DeserializationError(
+        `Constraint ids are held by more than one constraint: ${named}. `
+          + "A constraint id names one constraint.",
+      );
+    }
 
-    for (const ftDoc of doc.model.fact_types ?? []) {
-      const { config, constraints } = deserializeFactType(ftDoc);
-      constraints.forEach(claim);
+    for (const { config, constraints } of factTypes) {
       model.addFactType(
         { ...config, constraints: constraints.filter(isInternalConstraint) },
         { skipPlayerValidation: options?.lenient },
@@ -293,9 +317,7 @@ export class OrmYamlSerializer {
       );
     }
 
-    for (const cDoc of doc.model.constraints ?? []) {
-      const c = deserializeConstraint(cDoc);
-      claim(c);
+    for (const c of modelConstraints) {
       if (isExternalConstraint(c)) model.addConstraint(c);
     }
 
@@ -466,7 +488,24 @@ function isPlacedKind(c: unknown, where: "internal" | "external"): c is { type: 
  *   no entity is dropped; two naming one entity resolve as that rule says.
  */
 export function readDocument20(doc: OrmYamlDocument, options?: { lenient?: boolean; }): OrmModel {
-  return readLegacy(doc, options).model;
+  return refusingHeldIds(() => readLegacy(doc, options).model);
+}
+
+/**
+ * Run a reader, reporting a file that states two elements of one kind
+ * under one id as a `DeserializationError`. The model refuses the second
+ * (`DuplicateIdError`), lenient or not, since it has nowhere to hold it,
+ * and a reader reports a file it cannot load as a `DeserializationError`,
+ * which is what every caller catches. Both entry points go through here:
+ * `migrate` (so `deserialize`) and the exported 2.0 reader.
+ */
+function refusingHeldIds<T>(read: () => T): T {
+  try {
+    return read();
+  } catch (err) {
+    if (err instanceof DuplicateIdError) throw new DeserializationError(err.message);
+    throw err;
+  }
 }
 
 /** `readDocument20`, with what step 4 made of the file's flags. */

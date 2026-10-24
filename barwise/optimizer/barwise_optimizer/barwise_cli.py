@@ -72,7 +72,11 @@ _STALE_MARKERS = ("unknown command", "unknown option")
 
 def _run(args: list[str]) -> str:
     cmd = resolve_cli() + args
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    # This seam reads the CLI's status itself, so the session's exit
+    # recorder must not report a non-zero exit as a hidden failure
+    # (docs/specs/masked-exit-report.spec.md, the declared opt-out).
+    env = {k: v for k, v in os.environ.items() if k != "BARWISE_EXIT_DIR"}
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
     if proc.returncode != 0:
         stderr = proc.stderr.strip()
         if any(marker in stderr.lower() for marker in _STALE_MARKERS):

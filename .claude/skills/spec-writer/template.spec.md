@@ -13,6 +13,16 @@ was built while commits have touched the source it names (barwise-910). -->
 Created: <YYYY-MM-DD>
 Last-updated: <YYYY-MM-DD>
 Tracking: barwise-<id> (or: REPO_REVIEW-<YYYY-MM-DD>.md finding #<n>)
+Touches: <repo-rooted paths this plan changes, comma-separated; +path for
+a file it creates, -path for one it deletes, a trailing / for a directory>
+
+<!-- Touches: is the plan's machine-read file list. audit:specs reads it
+instead of inferring a subject from every backticked path (so a path
+cited as context, like ci.yml, no longer counts), and check:spec-touches
+fails on an unmarked entry that names nothing tracked. Shared wiring
+(ci.yml, the package.json files, scripts/tests/, the root CLAUDE.md)
+belongs here when the plan changes it; the audit ignores it.
+docs/specs/plan-scope-check.spec.md. -->
 
 ## Principle
 

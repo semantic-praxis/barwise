@@ -50,6 +50,16 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mergeBaselineRows, mergeSummary, readExistingRows } from "./lib/baseline-merge.mjs";
 import {
+  CODE,
+  entryPaths,
+  header,
+  HUB,
+  inSpecCorpus,
+  isWiring,
+  namedPaths,
+  touches,
+} from "./lib/spec-reader.mjs";
+import {
   noteUntrackedInput,
   refuseUntrackedInput,
   REPO_ROOT,
@@ -94,18 +104,8 @@ const BASELINE = resolve(REPO_ROOT, "barwise/spec-status-baseline.json");
 const CLAIMS_NOTHING_BUILT =
   /^\s*(draft|proposed|design only)\b|\bno (implementation|workstreams? implemented)\b/i;
 
-const CODE = /\.(ts|tsx|mjs|cjs|js|json|ya?ml|py|sh)$/;
-
 /** A Status that claims some workstreams landed and others did not. */
 const TERMINAL = /^\s*(implemented|complete|shipped)\b/i;
-
-/**
- * A package barrel is touched by every change to its package, so a spec
- * naming one fires on work that has nothing to do with it. Measured:
- * `core/src/index.ts` alone accounted for every false signal in the
- * prototype sweep. Excluding barrels is what keeps this a signal.
- */
-const HUB = /(^|\/)(index|registration)\.ts$/;
 
 function git(...args) {
   return execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8" }).trim();
@@ -158,64 +158,29 @@ function exists(path) {
   }
 }
 
-/** Every tracked spec path, in the working tree or at `--at`. */
-function specFiles() {
-  const files = AT === undefined
+/** Every tracked path, in the working tree or at `--at`; read once. */
+let listing;
+function allFiles() {
+  listing ??= AT === undefined
     ? trackedFiles()
     : git("ls-tree", "-r", "--name-only", AT).split("\n");
-  return files.filter(IN_CORPUS);
+  return listing;
+}
+
+/** Every tracked spec path, in the working tree or at `--at`. */
+function specFiles() {
+  return allFiles().filter(IN_CORPUS);
 }
 
 /**
  * What this audit reads: specs, archived ones excepted. One rule for the
- * corpus and for the untracked files it reports or refuses.
+ * corpus and for the untracked files it reports or refuses, shared with
+ * check:spec-touches through the reader.
  */
-function IN_CORPUS(f) {
-  return f.startsWith(SPEC_DIR) && f.endsWith(".spec.md") && !f.includes("/archive/");
-}
+const IN_CORPUS = inSpecCorpus;
 
 const readSpec = (file) =>
   AT === undefined ? readFileSync(resolve(REPO_ROOT, file), "utf8") : git("show", `${AT}:${file}`);
-
-/**
- * Repo paths a spec names in backticks. Specs write them relative to
- * `barwise/`, to `barwise/packages/`, or from the repo root, so each
- * candidate is tried against all three and kept only if git knows it.
- */
-function namedPaths(text) {
-  const out = new Set();
-  for (const m of text.matchAll(/`([^`\s]+\/[^`\s]+)`/g)) {
-    const raw = m[1].replace(/[.,;:)]+$/, "");
-    if (!CODE.test(raw) || HUB.test(raw)) continue;
-    for (const cand of [raw, `barwise/${raw}`, `barwise/packages/${raw}`]) {
-      if (exists(cand)) {
-        out.add(cand);
-        break;
-      }
-    }
-  }
-  return [...out];
-}
-
-/**
- * A header value, which may run over several lines. `Tracking:` usually
- * does -- it mixes issue ids, sibling specs and review documents across
- * a paragraph -- and reading only its first line silently loses the ids
- * on the rest. That is not hypothetical: it dropped `norma-export`'s
- * three issues and one of `mandatory-existence-witness`'s two, which
- * moved both specs into the wrong survey class. A value ends at the next
- * header field or the first blank line.
- */
-function header(text, field) {
-  const m = new RegExp(
-    // `$` is NOT the terminator: under the `m` flag it matches at every
-    // line end, so the lookahead fires immediately and the value is
-    // truncated to its first line. `(?![\\s\\S])` is end of input.
-    `^${field}:[ \\t]*([\\s\\S]*?)(?=\\n[A-Z][A-Za-z-]*:[ \\t]|\\n[ \\t]*\\n|(?![\\s\\S]))`,
-    "m",
-  ).exec(text);
-  return m ? m[1].trim() : undefined;
-}
 
 /**
  * Commits in `found` that `recorded` does not contain. By prefix, because
@@ -224,6 +189,27 @@ function header(text, field) {
  */
 function unseenCommits(found, recorded = []) {
   return found.filter((c) => !recorded.some((r) => c.startsWith(r) || r.startsWith(c)));
+}
+
+/**
+ * The paths whose commits say a spec was implemented. A `Touches:` header
+ * is the spec's own declaration and replaces inference: a path cited as
+ * context (`ci.yml`, a gate's test) is no longer read as the subject
+ * (plan-scope-check.spec.md). From it the audit drops shared wiring,
+ * non-code files and barrels, as it always has for inferred paths. A
+ * directory or pattern entry is expanded to the tracked files it covers,
+ * and those are filtered the same way, by the same matcher
+ * check:spec-touches validates it with, so the two read one language.
+ * Without the header, the paths the spec names, as before.
+ */
+function subjectPaths(text) {
+  const declared = touches(text);
+  // An empty header is check:spec-touches' finding; here it falls back to
+  // inference rather than leaving the spec with no subject at all.
+  if (declared === undefined || declared.length === 0) return namedPaths(text, exists);
+  return declared
+    .flatMap((e) => entryPaths(e.path, allFiles()))
+    .filter((p) => !isWiring(p) && CODE.test(p) && !HUB.test(p));
 }
 
 /** Specs claiming nothing is built, with the commits that say otherwise. */
@@ -235,7 +221,7 @@ function findings() {
     const status = header(text, "Status");
     if (status === undefined || !CLAIMS_NOTHING_BUILT.test(status)) continue;
 
-    const paths = namedPaths(text);
+    const paths = subjectPaths(text);
     if (paths.length === 0) continue;
     const specCommit = git("log", "-1", "--format=%H", head, "--", file);
     if (!specCommit) continue; // never committed; nothing to be stale against
