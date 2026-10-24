@@ -55,7 +55,7 @@ function candidate(raw) {
   if (/\s|[*<>{}$|]/.test(raw) || /^(https?:|[@~/-])/.test(raw)) return null;
   // A URI scheme (`orm-model://`) names a protocol, not a location; its
   // trailing slash would otherwise read as an unrooted directory.
-  if (/^[a-z][\w+.-]*:\/\//.test(raw)) return null;
+  if (/^[a-z][\w+.-]*:\/\//i.test(raw)) return null;
   const t = raw.replace(/:\d+(-\d+)?$/, "");
   if (/^[\w.-]+\/$/.test(t)) return null; // a bare directory name: a kind, not a location
   if (/^\.[\w-]+(\.[\w-]+)?$/.test(t)) return null; // a bare file-type name

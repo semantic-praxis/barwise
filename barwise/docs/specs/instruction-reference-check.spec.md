@@ -4,7 +4,7 @@ Status: Implemented -- workstream 1 (see Implementation notes); workstream 2
 not started
 
 Created: 2026-10-08
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
 Tracking: barwise-52b
 
 ## Principle
@@ -115,7 +115,7 @@ Out of scope:
 ## Resolution rules
 
 A backticked token is a path candidate if it has no whitespace or glob
-or placeholder characters (`* < > { } $ |`), is not a URL or a bare URI scheme (`orm-model://`), a scoped
+or placeholder characters (`* < > { } $ |`), is not a URL or a token that opens with a URI scheme (`orm-model://`, matched in any case), a scoped
 package (`@x/y`) or a slash command (`/code-review`), and either starts
 with `barwise/`, `.claude/`, `.github/` or `.beads/` (rooted), starts
 with `./` or `../` (relative), or contains `/` and ends in a known file
