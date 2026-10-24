@@ -1,6 +1,6 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstream 1 implemented 2026-10-24 (one package graph); 2-5 not yet
+Status: Workstreams 1-2 implemented 2026-10-24 (one package graph; the ADR convention and its checks); 3-5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-24
@@ -11,10 +11,10 @@ barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
 barwise/packages/cli/CLAUDE.md, barwise/packages/core/CLAUDE.md,
 barwise/packages/mcp/CLAUDE.md, barwise/docs/adr/metamodel-evolution-policy.md,
 barwise/docs/adr/constraint-coverage-policy.md,
-+barwise/docs/adr/package-graph-authority.md, barwise/packages/llm/CLAUDE.md,
+barwise/docs/adr/package-graph-authority.md, barwise/packages/llm/CLAUDE.md,
 barwise/packages/promptlab/CLAUDE.md, barwise/packages/promptlab/evals/suite.yaml,
 +barwise/scripts/regen-architecture.mjs, barwise/scripts/check-architecture.mjs,
-barwise/review-tiers.json, +.claude/skills/spec-writer/template.adr.md,
+barwise/review-tiers.json, .claude/skills/spec-writer/template.adr.md,
 .claude/skills/pr-review/checklist.md, barwise/scripts/tests/,
 barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md
 
@@ -259,8 +259,8 @@ resolved). The
 root `CLAUDE.md` block renders it and is checked against it. It states a policy ("may import") and
 is the one copy CI enforces through `npm run depcruise`. Runtime
 `dependencies` must stay within it, and WS1 checks that they do;
-`devDependencies` may reach further for tests (anchor 4). WS2 records this decision as
-`package-graph-authority.md`, and this heading then points to it.
+`devDependencies` may reach further for tests (anchor 4). The decision is recorded in ADR
+`package-graph-authority`.
 
 ## Alternatives considered
 
