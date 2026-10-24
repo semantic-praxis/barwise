@@ -1,6 +1,7 @@
 /**
  * Tests for the diff_models tool.
  */
+import { ELEMENT_MATCHINGS } from "@barwise/core/diff";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -139,11 +140,15 @@ describe("diff_models handler", () => {
   // From the retroactive review of #735: the tests called executeDiff
   // directly, so dropping `matching` in the registered handler went unseen.
   it("passes matching through to the diff", async () => {
+    let definition: {
+      inputSchema: Record<string, { safeParse: (v: unknown) => { success: boolean; }; }>;
+    } | undefined;
     let handler:
       | ((args: Record<string, unknown>) => Promise<{ content: { text: string; }[]; }>)
       | undefined;
     const server = {
-      registerTool: (_name: string, _definition: unknown, h: typeof handler) => {
+      registerTool: (_name: string, d: typeof definition, h: typeof handler) => {
+        definition = d;
         handler = h;
       },
     };
@@ -157,5 +162,11 @@ describe("diff_models handler", () => {
         .length;
     expect(await deltas()).toBe(2);
     expect(await deltas("content")).toBe(0);
+    // The handler is called directly above, so the schema a client's
+    // arguments meet is asserted on its own.
+    const matching = definition!.inputSchema.matching!;
+    expect([...ELEMENT_MATCHINGS, undefined].map((m) => matching.safeParse(m).success))
+      .toEqual([true, true, true]);
+    expect(matching.safeParse("fuzzy").success).toBe(false);
   });
 });

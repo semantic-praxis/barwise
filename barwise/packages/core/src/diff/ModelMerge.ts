@@ -264,9 +264,11 @@ export function mergeModels(
   // accepted removal) leaves of the constraint what still holds without it,
   // as `removeSubtypeFact` does; one neither model held is carried through
   // for validation to report.
-  // Each source subtype fact the merge placed, to the id it took there.
-  // Filled by phase 4; read by phase 4b, which runs after it.
+  // Each source subtype fact the merge placed, to the id it took there,
+  // and each one the decision left out. Filled by phase 4; read by phase
+  // 4b, which runs after it.
   const mergedIdOf = new Map<SubtypeFact, string>();
+  const decidedOut = new Set<SubtypeFact>();
   const overMergedSubtypeFacts = (
     chosen: ExternalConstraint,
     fromIncoming: boolean,
@@ -291,10 +293,16 @@ export function mergeModels(
       // took (its own, or one `mergedId` derived): with two over one pair
       // carried (barwise-m9b), the first by pair would retarget a
       // constraint naming the second.
+      // One the decision left out is left out: the fact holding its pair
+      // is at most a sibling repeat, and pointing at it named that sibling
+      // twice (from the pr-review of #740). The pair fallback is for a fact
+      // kept but refused as a repeat the merge itself would create.
       const placedAs = mergedIdOf.get(source);
       const same = placedAs === undefined ? undefined : merged.getSubtypeFact(placedAs);
       const kept = same && subtypePairKey(same) === pair
         ? same
+        : decidedOut.has(source)
+        ? undefined
         : merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
       ids.push(kept?.id ?? LEFT_OUT);
     }
@@ -340,6 +348,15 @@ export function mergeModels(
     .map((d, i) => [d, i] as const)
     .filter(([d]) => d.elementType === "subtype_fact") as [SubtypeFactDelta, number][];
 
+  // The other side of each paired delta: a repeat from one model may sit
+  // beside the fact the diff paired with its sibling from the other.
+  const partner = new Map<SubtypeFact, SubtypeFact>();
+  for (const [d] of sfDeltas) {
+    if (d.existing && d.incoming) {
+      partner.set(d.existing, d.incoming);
+      partner.set(d.incoming, d.existing);
+    }
+  }
   // Which source fact each merged subtype fact came from, so a repeated
   // pair is carried only beside its own sibling.
   const placedFrom = new Map<string, SubtypeFact>();
@@ -350,21 +367,16 @@ export function mergeModels(
     // from the side not placed (an existing constraint naming the existing
     // fact, whose incoming modification was accepted) still finds it.
     const mate = partner.get(fact);
-    if (mate !== undefined && !mergedIdOf.has(mate)) mergedIdOf.set(mate, id);
+    if (mate !== undefined) mergedIdOf.set(mate, id);
   };
-  // The other side of each paired delta: a repeat from one model may sit
-  // beside the fact the diff paired with its sibling from the other.
-  const partner = new Map<SubtypeFact, SubtypeFact>();
-  for (const [d] of sfDeltas) {
-    if (d.existing && d.incoming) {
-      partner.set(d.existing, d.incoming);
-      partner.set(d.incoming, d.existing);
-    }
-  }
   for (const [delta, idx] of sfDeltas) {
     const isAccepted = accepted.has(idx);
     const chosen = keptSide(delta, isAccepted);
-    if (!chosen) continue;
+    if (!chosen) {
+      // An accepted removal or a rejected addition: one side, left out.
+      decidedOut.add((delta.existing ?? delta.incoming)!);
+      continue;
+    }
     const source = chosen === delta.incoming ? incoming : existing;
     // The chosen element may come from the INCOMING model, whose object
     // type ids are not the merged model's: an element matched by name
@@ -782,9 +794,10 @@ function remapPopulationRoles(
  * left to the installed generator, so merging the same two models twice
  * gave those elements different ids, against the rule that core is
  * deterministic (barwise-yg5). Derived from what the merge already has,
- * it is the same every time. The attempt number walks past a derived id
- * the inputs already hold, which is what re-merging an earlier merge's
- * output meets: that output carries attempt 1's id.
+ * it is the same every time. The attempt number walks past every id the
+ * merged store already holds: a third element preferring the same id, and
+ * an element that kept a derived id from an earlier merge whose output is
+ * being merged again.
  */
 function mergedId(
   kind: "subtype-fact" | "objectification" | "population",
