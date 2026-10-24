@@ -262,6 +262,20 @@ export function resolvePreferredIdentifier(
 }
 
 /**
+ * The entity an external uniqueness identifies, if it has the reference
+ * scheme shape: for a reader that holds the constraint and asks whom it
+ * could name (an importer reading a flag, a writer inferring a scheme the
+ * model does not store), rather than checking a stored reference.
+ */
+export function externallyIdentifiedEntity(
+  model: OrmModel,
+  c: ExternalUniquenessConstraint,
+): string | undefined {
+  const joined = inferExternalUniquenessJoin(c.roleIds, model)?.commonObjectId;
+  return joined !== undefined && externalIdentifies(model, c, joined).ok ? joined : undefined;
+}
+
+/**
  * Whether an external uniqueness identifies `entityId`: ORM's reference
  * scheme shape (external-preferred-identifier.spec.md).
  * `inferExternalUniquenessJoin` finds the object the constraint joins on

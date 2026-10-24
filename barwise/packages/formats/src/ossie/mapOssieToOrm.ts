@@ -638,10 +638,12 @@ function addSubtypes(model: OrmModel, c: OssieConcept): void {
 
 /**
  * The entity's preferred identifier: the uniqueness on the far role of one
- * identifying relationship. Several identifying relationships make an
- * external uniqueness over their far roles, kept but not named as the
- * preferred identifier: core reads only an internal uniqueness as one
- * (barwise-alg), and the NORMA importer treats the same shape the same way.
+ * identifying relationship, or, for several, an external uniqueness over
+ * their far roles (external-preferred-identifier.spec.md). identify_by
+ * states each component is single-valued, so a relationship whose
+ * multiplicity left the entity's role without its own uniqueness gains
+ * one, with a warning, as the far role does in the single case: without
+ * it the stored identifier would not identify the entity.
  * checkEntity has held each to a binary the entity itself declares.
  */
 function addIdentifier(model: OrmModel, c: OssieConcept, warnings: string[]): void {
@@ -667,11 +669,22 @@ function addIdentifier(model: OrmModel, c: OssieConcept, warnings: string[]): vo
     model.setPreferredIdentifier(conceptId(model, c.concept), id);
     return;
   }
-  model.addConstraint({ type: "external_uniqueness", id: generateId(), roleIds: farRoles });
-  warnings.push(
-    `${c.concept}: identify_by [${names.join(", ")}] is kept as an external uniqueness; barwise `
-      + `cannot yet name one as a preferred identifier (barwise-alg).`,
-  );
+  for (const [i, ft] of facts.entries()) {
+    const near = ft.roles[0]!.id;
+    const held = ft.internalConstraints.some((k) =>
+      k.type === "internal_uniqueness" && k.roleIds.length === 1 && k.roleIds[0] === near
+      && (k.modality ?? "alethic") === "alethic"
+    );
+    if (held) continue;
+    ft.addConstraint({ type: "internal_uniqueness", id: generateId(), roleIds: [near] });
+    warnings.push(
+      `${c.concept}: identify_by [${names.join(", ")}] implies each ${c.concept} has at most `
+        + `one ${names[i]}; added that uniqueness, which the multiplicity did not state.`,
+    );
+  }
+  const id = generateId();
+  model.addConstraint({ type: "external_uniqueness", id, roleIds: farRoles });
+  model.setPreferredIdentifier(conceptId(model, c.concept), id);
 }
 
 /** The mandatory first roles an entity's `requires` states. */

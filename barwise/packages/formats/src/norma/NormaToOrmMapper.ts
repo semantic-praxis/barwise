@@ -10,7 +10,13 @@
  * We do not embed or redistribute any NORMA source code or XSD schemas.
  * These mappings are derived from publicly documented format information.
  */
-import { OrmModel, placePreferredFlags } from "@barwise/core";
+import {
+  externalIdentifies,
+  externallyIdentifiedEntity,
+  isExternalUniqueness,
+  OrmModel,
+  placePreferredFlags,
+} from "@barwise/core";
 import { runConstraintPasses } from "./mapping/constraintPasses.js";
 import {
   collectExclusiveOrPairs,
@@ -43,13 +49,13 @@ export { NormaMappingError };
  */
 /**
  * Each entity's preferred identifier (orm-format-3 WS4b): NORMA's own
- * `PreferredIdentifier` reference where it names an internal uniqueness
- * the mapping kept, by the id it kept. An entity without one is placed
- * from the uniquenesses NORMA marks `IsPreferred`, by the rule a 2.0
- * file's flag is read with, so a file written without the reference still
- * names its identifiers. A reference to an external uniqueness identifies
- * through a join, which the model does not read yet (barwise-alg), and is
- * not stored.
+ * `PreferredIdentifier` reference where it names a uniqueness the mapping
+ * kept, by the id it kept: an internal one, or an external one core reads
+ * as identifying the entity (external-preferred-identifier.spec.md). An
+ * entity without one is placed from the uniquenesses NORMA marks
+ * `IsPreferred`: an internal one by the rule a 2.0 file's flag is read
+ * with, an external one when core reads it as identifying an entity, so a
+ * file written without the reference still names its identifiers.
  */
 function mapPreferredIdentifiers(ctx: NormaMappingContext): void {
   const { doc, model, objectTypeIdMap, constraintById } = ctx;
@@ -58,7 +64,9 @@ function mapPreferredIdentifiers(ctx: NormaMappingContext): void {
     const ref = et.preferredIdentifier;
     if (entityId === undefined || ref === undefined) continue;
     const c = model.getConstraint(ref);
-    if (c?.type === "internal_uniqueness" && model.getObjectType(entityId)?.kind === "entity") {
+    if (model.getObjectType(entityId)?.kind !== "entity") continue;
+    if (c?.type === "internal_uniqueness") model.setPreferredIdentifier(entityId, ref);
+    else if (c && isExternalUniqueness(c) && externalIdentifies(model, c, entityId).ok) {
       model.setPreferredIdentifier(entityId, ref);
     }
   }
@@ -69,6 +77,13 @@ function mapPreferredIdentifiers(ctx: NormaMappingContext): void {
   for (const [entityId, at] of placePreferredFlags(model, flagged).byEntity) {
     if (model.preferredIdentifierOf(entityId) === undefined && at.constraint.id !== undefined) {
       model.setPreferredIdentifier(entityId, at.constraint.id);
+    }
+  }
+  for (const c of model.constraints) {
+    if (!isExternalUniqueness(c) || c.id === undefined || !flagged(c)) continue;
+    const joined = externallyIdentifiedEntity(model, c);
+    if (joined !== undefined && model.preferredIdentifierOf(joined) === undefined) {
+      model.setPreferredIdentifier(joined, c.id);
     }
   }
 }

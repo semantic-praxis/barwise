@@ -1,6 +1,6 @@
 # An external uniqueness can be an entity's preferred identifier
 
-Status: WS1 implemented (core and every reader); WS2 (NORMA and Ossie) not yet
+Status: Implemented -- WS1 (core and every reader) and WS2 (NORMA and Ossie)
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -160,9 +160,9 @@ In scope:
   `PreferredIdentifier`, the importer shall store it when the resolver
   accepts it, as the internal fallback does.
 - When an entity's stored identifier is external, the NORMA exporter shall
-  write `PreferredIdentifier` and `IsPreferred` for it, and write no
-  `_ReferenceMode` for that entity: NORMA reads a reference mode as the
-  entity's identifier, so writing both states two.
+  write `PreferredIdentifier` and `IsPreferred` for it, and keep writing
+  the entity's `_ReferenceMode`, as NORMA itself does beside an external
+  identifier (corrected in WS2; see its implementation notes).
 - When an Ossie concept's `identify_by` names two relationships or more,
   the Ossie importer shall store the external uniqueness it creates as
   the concept's preferred identifier, and drop its barwise-alg warning.
@@ -349,6 +349,28 @@ identifiers are kept unnamed is updated in the same PR.
 - **Acceptance measured.** `barwise validate` and `barwise export --format
   ddl` over all 117 tracked `.orm.yaml` files, before (the change stashed)
   and after: byte-identical, 13,995 lines.
+
+## Implementation notes (WS2)
+
+- **Correction: the NORMA exporter keeps writing the reference mode.** The
+  Scope bullet said an externally identified entity should write no
+  `_ReferenceMode`, on the reading that NORMA takes a reference mode as
+  the identifier. NORMA's own `employeeProject.orm` fixture refutes it:
+  Employee carries `_ReferenceMode="Id"` and an external uniqueness marked
+  `PreferredIdentifierFor` Employee. Dropping the attribute lost "Id" on
+  the round trip, which the existing NORMA round-trip test caught, so the
+  attribute is written as before and the Scope bullet stands corrected.
+- **That fixture is the importer's real case.** It marks the identifier on
+  the constraint only, so it is read through the `IsPreferred` path, and
+  Employee now imports with its external identifier where it imported
+  with none.
+- **The Ossie writer's inference** asks core
+  (`externallyIdentifiedEntity`, then `externalIdentifies`) instead of its
+  own `compositeIdentifier`, which is gone.
+- **Measured.** Ossie and NORMA export over all 117 tracked `.orm.yaml`
+  files, with WS2 stashed and applied: byte-identical. No tracked model
+  holds an external uniqueness the old shape check and core's disagree
+  on.
 
 ## API and migration impact
 
