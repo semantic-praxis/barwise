@@ -50,23 +50,34 @@ const isMap = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !== i))];
 
 /**
- * The CLAUDE.md block, as package name to the names it lists. Each line is
- * read by its FIRST token after the drawing characters (spaces, `|`, `+`,
- * `^`, a backtick, a connector's dashes): `name (a, b)`, with
- * `(no internal deps)` for none. That token is a row when a connector
- * precedes it, when it opens the block, or when it is a package name -- a
- * manifest's name, or any scoped `@` name -- so a root drawn
- * at column 0 or a package not yet built is still compared. A name later
- * in a line is prose (`renders with @xyflow/react (MIT)`), and so is a
- * wrapped comment that opens with an ordinary word (`bundles (esbuild)`).
- * Two rules were tried and dropped: a fixed `|---` connector skipped a
- * nested or column-0 row, and any package name anywhere on a line read
- * comment prose as second listings.
+ * The CLAUDE.md block, as package name to the names it lists, read by a
+ * declared grammar. Every line is exactly one of:
+ *
+ *   root          the first line:       `name (no internal deps)`
+ *   row           `|--- name (a, b)`, optionally followed by `  -- comment`
+ *   drawing       only `|`, `^` and spaces
+ *   continuation  indented text, after an optional `|`, opening with a word
+ *                 or `-- ` -- never read
+ *
+ * and anything else is refused (exit 2) with the line named. Five
+ * heuristics for telling hand-drawn rows from prose were tried first, and
+ * each misread a realistic edit -- a nested connector skipped, a comment
+ * that opened with a package name read as a second listing, a legend read
+ * as a package -- because the drawing had no syntax that separated the
+ * two. A grammar gives it one: the reader of a refusal learns the rule
+ * from the message, where a heuristic fails as a wrong answer.
  */
-const LEAD = /^[\s|+^`\\]*(-{2,}\s*)?/;
-const ROW = /^([@\w](?:[\w@/.-]*\w)?)\s*\((?:([^)]*)\))?/;
+const ROOT = /^(\S+)\s+\(([^)]*)\)\s*$/;
+const ROW = /^\s*\|---\s+(\S+)\s+\(([^)]*)\)(?:\s+--\s.*)?\s*$/;
+const DRAWING = /^[\s|^]*$/;
+// Its text opens with a word or a `-- ` comment marker, never with a drawing
+// character, so a misdrawn connector (`+---`, `|----`, a nested `|  |---`,
+// box-drawing characters) is refused rather than taken for prose.
+const CONTINUATION = /^\s*\|?\s{2,}(?:[^\s|+`\\\-\u2500-\u257f]|-- )/;
+const GRAMMAR =
+  "a row (`|--- name (a, b)  -- comment`), a drawing line (`|`, `^`) or an indented comment";
 
-function graphLines(claudeMd, isPackage) {
+function graphLines(claudeMd) {
   const lines = claudeMd.split("\n");
   const heading = lines.findIndex((l) => /^##\s+Dependency Graph\s*$/.test(l));
   if (heading === -1) throw new Error('CLAUDE.md has no "## Dependency Graph" heading');
@@ -82,30 +93,28 @@ function graphLines(claudeMd, isPackage) {
   const out = [];
   const body = lines.slice(open + 1, close);
   const first = body.findIndex((l) => l.trim() !== "");
+  const listed = (name, list) => ({
+    name,
+    deps: list.trim() === "no internal deps"
+      ? []
+      : list.split(",").map((x) => x.trim()).filter(Boolean),
+  });
   for (const [i, line] of body.entries()) {
-    const lead = LEAD.exec(line);
-    const connector = lead[1] !== undefined;
-    const rest = line.slice(lead[0].length);
-    const m = ROW.exec(rest);
-    if (!m) {
-      // A connector line with a list but no name before it is a misdrawn
-      // row: refuse, rather than report the package as missing.
-      if (connector && rest.includes("(")) {
-        throw new Error(`cannot parse the graph row "${line.trim()}"`);
+    if (i === first) {
+      const m = ROOT.exec(line);
+      if (!m) {
+        throw new Error(
+          `the graph block must open with its root row (\`name (no internal deps)\`), not "${line.trim()}"`,
+        );
       }
+      out.push(listed(m[1], m[2]));
       continue;
     }
-    if (!connector && i !== first && !isPackage(m[1])) continue;
-    // A list wrapped onto the next line would otherwise lose its tail.
-    if (m[2] === undefined) {
-      throw new Error(
-        `cannot parse the graph row "${line.trim()}": its list must close on the line`,
-      );
+    const m = ROW.exec(line);
+    if (m) out.push(listed(m[1], m[2]));
+    else if (!DRAWING.test(line) && !CONTINUATION.test(line)) {
+      throw new Error(`the graph block line "${line.trim()}" is not ${GRAMMAR}`);
     }
-    const deps = m[2].trim() === "no internal deps"
-      ? []
-      : m[2].split(",").map((x) => x.trim()).filter(Boolean);
-    out.push({ name: m[1], deps });
   }
   if (out.length === 0) throw new Error("the Dependency Graph block names no package");
   return out;
@@ -157,8 +166,7 @@ try {
   const names = manifests.map((m) => m.json.name);
   const clash = repeated(names);
   if (clash.length > 0) throw new Error(`two package manifests are named ${clash.join(", ")}`);
-  const isPackage = (n) => names.includes(n) || n.startsWith("@");
-  drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"), isPackage);
+  drawnLines = graphLines(readFileSync(join(root, "CLAUDE.md"), "utf8"));
 } catch (err) {
   console.error(`check:architecture: cannot answer -- ${err.message}`);
   process.exit(2);

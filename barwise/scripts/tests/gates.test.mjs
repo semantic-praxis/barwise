@@ -5277,27 +5277,7 @@ const ARCH_DISAGREEMENTS = [
     /CLAUDE\.md lists @barwise\/ghost, INTENDED does not/,
   ],
   [INTENDED_CJS, `"learn": ["core"],`, "", /packages\/learn: not in INTENDED/],
-  // A row is read wherever the drawing puts it, so a misdrawn connector or
-  // a second root at column 0 is still compared.
-  [
-    "CLAUDE.md",
-    `  |--- ${CLAUDE_LLM}`,
-    "  |---- @barwise/planned      (core)",
-    /CLAUDE\.md lists @barwise\/planned, INTENDED does not/,
-  ],
-  [
-    "CLAUDE.md",
-    `  |--- ${CLAUDE_LLM}`,
-    "  +--- @barwise/llm             (core, diagram)",
-    /CLAUDE\.md draws llm -> diagram, INTENDED does not/,
-  ],
-  [
-    "CLAUDE.md",
-    `  |--- ${CLAUDE_LLM}\n`,
-    `  |--- ${CLAUDE_LLM}\n\n@barwise/planned            (core, ghost)\n`,
-    /CLAUDE\.md lists @barwise\/planned, INTENDED does not/,
-  ],
-  // A row for a package with no manifest yet, unscoped, is still compared.
+  // A row for a package with no manifest yet is still compared.
   [
     "CLAUDE.md",
     `  |--- ${CLAUDE_LLM}\n`,
@@ -5385,11 +5365,9 @@ test("check:architecture passes the real graph and catches each planted disagree
     assert.equal(twice.status, 1, twice.stderr);
     assert.match(twice.stderr, /CLAUDE\.md lists llm twice/);
     assert.doesNotMatch(twice.stderr, /llm -> /);
-    // None of these is a disagreement: a wrapped comment under the last
-    // row, npm names inside a list, a nested connector, a rule line, a
-    // directory name as the row name, no space before the list, and
-    // package names in comment prose -- mid-line, at the start of a
-    // continuation, or in a parenthetical that wraps.
+    // None of these is a disagreement: comment prose, wherever it wraps and
+    // whatever package names it mentions, npm names inside a list, a
+    // directory name as the row name, and bare `|` drawing lines.
     const vscodeRow =
       "  |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)";
     for (
@@ -5400,24 +5378,21 @@ test("check:architecture passes the real graph and catches each planted disagree
             `${vscodeRow}  -- the editor;\n                                 bundles (esbuild) everything`,
           ),
         (x) => x.replace(CLAUDE_LLM, "@barwise/llm             (@barwise/core)"),
-        (x) => x.replace(`  |--- ${CLAUDE_LLM}`, `  |     |--- ${CLAUDE_LLM}`),
         (x) => x.replace("|--- barwise-vscode  ", "|--- vscode          "),
-        (x) => x.replace(CLAUDE_LLM, "@barwise/llm(core)"),
+        (x) => x.replace(`  |--- ${CLAUDE_LLM}\n`, `  |\n  |--- ${CLAUDE_LLM}\n  |\n`),
         (x) =>
           x.replace(
             "(diagram)  -- React renderer over the",
             "(diagram)  -- renders with @xyflow/react (MIT) over the",
           ),
         (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   embedded by barwise-vscode (in-process)`),
+        (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   barwise-vscode (and CLI) embed it`),
+        (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   @xyflow/react (MIT) is not used here`),
+        (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |        -- providers (Anthropic, OpenAI)`),
         (x) =>
           x.replace(
             "(core)  -- connector package: registers",
             "(core)  -- unlike @barwise/formats (which\n  |   is pure) registers",
-          ),
-        (x) =>
-          x.replace(
-            `  |--- ${CLAUDE_LLM}\n`,
-            `  |---------- connectors ----------\n  |--- ${CLAUDE_LLM}\n`,
           ),
       ]
     ) {
@@ -5485,18 +5460,47 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
       ),
       /the Dependency Graph block names no package/,
     );
+    // Every line outside the grammar is refused by name: a wrapped list,
+    // a misdrawn or nested connector, a second root, a legend above the
+    // root, box-drawing characters, a row with no space before its list.
+    const LLM_ROW = `  |--- ${CLAUDE_LLM}`;
+    const ROOT_ROW = "@barwise/core               (no internal deps)";
+    for (
+      const [from, to, line] of [
+        [
+          CLAUDE_LLM,
+          "@barwise/llm             (core,\n  |   diagram)",
+          /\|--- @barwise\/llm\s+\(core,/,
+        ],
+        [LLM_ROW, "  |---   (core)", /\|---   \(core\)/],
+        [LLM_ROW, "  |---- @barwise/llm      (core)", /\|---- @barwise\/llm/],
+        [LLM_ROW, "  +--- @barwise/llm      (core)", /\+--- @barwise\/llm/],
+        [LLM_ROW, `  |     |--- ${CLAUDE_LLM}`, /\|     \|--- @barwise\/llm/],
+        [LLM_ROW, "  \u251c\u2500\u2500 @barwise/llm (core)", /\u251c\u2500\u2500 @barwise\/llm/],
+        [LLM_ROW, "  |--- @barwise/llm(core)", /\|--- @barwise\/llm\(core\)/],
+        [LLM_ROW, `${LLM_ROW} extra`, /\(core\) extra/],
+        [LLM_ROW, "  |---------- connectors ----------", /\|---------- connectors/],
+        [LLM_ROW, `${LLM_ROW}\n\n@barwise/planned            (core)`, /@barwise\/planned/],
+      ]
+    ) {
+      const r = archPlanted(dir, "CLAUDE.md", (s) => s.replace(from, to));
+      refused(r, /the graph block line ".*" is not a row/);
+      assert.match(r.stderr, line);
+    }
     refused(
       archPlanted(
         dir,
         "CLAUDE.md",
-        (s) => s.replace(CLAUDE_LLM, "@barwise/llm             (core,\n  |   diagram)"),
+        (s) => s.replace(ROOT_ROW, `Legend: an arrow (^) points at a dependency\n${ROOT_ROW}`),
       ),
-      /cannot parse the graph row "\|--- @barwise\/llm\s+\(core,": its list must close/,
+      /the graph block must open with its root row .*not "Legend/,
     );
-    // A connector with a list but no name is a misdrawn row, not prose.
+    // A legend shaped like a root row (`Legend (x)`) is taken for the root,
+    // and the real root line is then refused: exit 2 either way, never
+    // compared.
     refused(
-      archPlanted(dir, "CLAUDE.md", (s) => s.replace(`  |--- ${CLAUDE_LLM}`, "  |---   (core)")),
-      /cannot parse the graph row "\|---   \(core\)"/,
+      archPlanted(dir, "CLAUDE.md", (s) => s.replace(ROOT_ROW, `Legend (arrows)\n${ROOT_ROW}`)),
+      /the graph block line "@barwise\/core\s+\(no internal deps\)" is not a row/,
     );
     const shapeFault = /does not export a map of package to package list/;
     for (const bad of [`"core": [[]]`, `"core": "none"`]) {
