@@ -51,9 +51,10 @@ const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !==
 
 /**
  * The CLAUDE.md block, as package name to the dependency directory names
- * it lists. A package line is `@barwise/x (a, b)` or `|--- @barwise/x
- * (a, b)  -- comment`; continuation lines of a comment begin with `|`
- * and spaces, so they never start with a package name.
+ * it lists. A package line is `name (a, b)` or `|--- name (a, b)  --
+ * comment`, for any name: which names are packages is the manifests'
+ * answer, not a prefix rule here. Continuation lines of a comment begin
+ * with `|` and spaces, so they never start with a name.
  */
 function graphLines(claudeMd) {
   const lines = claudeMd.split("\n");
@@ -70,8 +71,16 @@ function graphLines(claudeMd) {
   }
   const out = [];
   for (const line of lines.slice(open + 1, close)) {
-    const m = /^\s*(?:\|---\s+)?(@barwise\/[\w-]+|barwise-[\w-]+)\s+\(([^)]*)\)/.exec(line);
-    if (!m) continue;
+    const start = /^\s*(?:\|---\s+)?([@\w][\w@/.-]*)\s+\(/.exec(line);
+    if (!start) continue;
+    const m = /^\s*(?:\|---\s+)?([@\w][\w@/.-]*)\s+\(([^)]*)\)/.exec(line);
+    // A list wrapped onto the next line would otherwise be skipped and
+    // reported as a package the picture does not draw.
+    if (!m) {
+      throw new Error(
+        `cannot parse the graph line "${line.trim()}": its list must close on the line`,
+      );
+    }
     const deps = m[2].trim() === "no internal deps"
       ? []
       : m[2].split(",").map((s) => s.trim()).filter(Boolean);
@@ -121,6 +130,11 @@ try {
       return { dir, json };
     });
   if (manifests.length === 0) throw new Error(`no package.json under ${pkgs}`);
+  // Two manifests with one name would map it to whichever was read last,
+  // and every message after that would blame the wrong directory.
+  const names = manifests.map((m) => m.json.name);
+  const clash = repeated(names);
+  if (clash.length > 0) throw new Error(`two package manifests are named ${clash.join(", ")}`);
 } catch (err) {
   console.error(`check:architecture: cannot answer -- ${err.message}`);
   process.exit(2);
@@ -135,7 +149,12 @@ const drawn = new Map();
 for (const { name, deps } of drawnLines) {
   // An unknown name stays as written, so it is reported, not dropped.
   const pkg = dirOf.get(name) ?? name;
-  if (drawn.has(pkg)) problems.push(`CLAUDE.md lists ${pkg} twice`);
+  // The first listing stands; merging the second in would invent edge
+  // disagreements beside the real one.
+  if (drawn.has(pkg)) {
+    problems.push(`CLAUDE.md lists ${pkg} twice`);
+    continue;
+  }
   for (const d of repeated(deps)) problems.push(`CLAUDE.md lists ${pkg} -> ${d} twice`);
   drawn.set(pkg, deps);
 }

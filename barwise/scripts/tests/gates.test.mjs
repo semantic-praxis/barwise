@@ -5325,13 +5325,26 @@ test("check:architecture passes the real graph and catches each planted disagree
     assert.match(clean.stdout, new RegExp(`and ${manifests} package manifests agree`));
     for (const [file, old, replacement, why] of ARCH_DISAGREEMENTS) {
       const r = mutate(dir, ["--file", file, "--old", old, "--new", replacement, ...ARCH]);
+      // mutate passes the child's output through, so its own result says
+      // both that the check failed and which disagreement it named.
       assert.equal(r.status, 0, `${file}: expected CAUGHT:\n${r.stdout}${r.stderr}`);
-      // mutate restores the file, so plant it again by hand to read WHICH
-      // disagreement was reported, not merely that one was.
-      const red = archPlanted(dir, file, (s) => s.replace(old, replacement));
-      assert.equal(red.status, 1, red.stderr);
-      assert.match(red.stderr, why);
+      assert.match(r.stdout, /CAUGHT -- the command failed \(exit 1\)/, `${file}: not exit 1`);
+      assert.match(r.stderr, why);
     }
+    // A package listed twice keeps its first listing: the second invents
+    // no edge disagreement beside the real one.
+    const twice = archPlanted(
+      dir,
+      "CLAUDE.md",
+      (s) =>
+        s.replace(
+          `  |--- ${CLAUDE_LLM}\n`,
+          `  |--- ${CLAUDE_LLM}\n  |--- @barwise/llm (core, dbt)\n`,
+        ),
+    );
+    assert.equal(twice.status, 1, twice.stderr);
+    assert.match(twice.stderr, /CLAUDE\.md lists llm twice/);
+    assert.doesNotMatch(twice.stderr, /llm -> /);
     // A package removed from packages/ while the map and picture keep it.
     rmSync(join(dir, "barwise", "packages", "learn"), { recursive: true });
     const gone = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
@@ -5384,10 +5397,55 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
       ),
       core,
     );
+    // The graph block names no package, or wraps a list onto a second line.
     refused(
-      archPlanted(dir, INTENDED_CJS, (s) => s.replace(`"core": []`, `"core": [[]]`)),
-      /does not export a map of package to package list/,
+      archPlanted(
+        dir,
+        "CLAUDE.md",
+        (s) => s.replace(/(## Dependency Graph\n\n```\n)[\s\S]*?(\n```\n)/, "$1nothing here$2"),
+      ),
+      /the Dependency Graph block names no package/,
     );
+    refused(
+      archPlanted(
+        dir,
+        "CLAUDE.md",
+        (s) => s.replace(CLAUDE_LLM, "@barwise/llm             (core,\n  |   diagram)"),
+      ),
+      /cannot parse the graph line "\|--- @barwise\/llm\s+\(core,"/,
+    );
+    const shapeFault = /does not export a map of package to package list/;
+    for (const bad of [`"core": [[]]`, `"core": "none"`]) {
+      refused(archPlanted(dir, INTENDED_CJS, (s) => s.replace(`"core": []`, bad)), shapeFault);
+    }
+    refused(archPlanted(dir, INTENDED_CJS, () => "module.exports = {};\n"), shapeFault);
+    // Two manifests with one name: the name maps to neither directory.
+    const copyDir = join(dir, "barwise", "packages", "core-old");
+    mkdirSync(copyDir);
+    writeFileSync(join(copyDir, "package.json"), readFileSync(join(dir, CORE_PKG), "utf8"));
+    refused(
+      spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" }),
+      /two package manifests are named @barwise\/core/,
+    );
+    rmSync(copyDir, { recursive: true });
+    // A directory with no manifest is not a package, and no manifest at
+    // all is nothing to compare.
+    mkdirSync(join(dir, "barwise", "packages", "stray-build"));
+    const stray = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+    assert.equal(stray.status, 0, stray.stdout + stray.stderr);
+    const empty = mkdtempSync(join(tmpdir(), "barwise-arch-empty-"));
+    try {
+      mkdirSync(join(empty, "barwise", "scripts", "lib"), { recursive: true });
+      mkdirSync(join(empty, "barwise", "packages", "core"), { recursive: true });
+      writeFileSync(join(empty, "CLAUDE.md"), readFileSync(join(dir, "CLAUDE.md")));
+      writeFileSync(join(empty, INTENDED_CJS), readFileSync(join(dir, INTENDED_CJS)));
+      refused(
+        spawnSync(ARCH[1], [ARCH[2], "--root", empty], { encoding: "utf8" }),
+        /no package\.json under/,
+      );
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
     refused(
       spawnSync(ARCH[1], [ARCH[2], "--root"], { cwd: dir, encoding: "utf8" }),
       /--root needs a value/,
