@@ -607,6 +607,23 @@ function writeConstraint(
         operator: valueComparisonOperatorToNorma[c.operator],
         roleRefs: [toNormaId(c.roleId1), toNormaId(c.roleId2)],
       };
+    case "join_ring": {
+      // A ring whose one role sequence carries the path, as NORMA's
+      // RingConstraintType (SetConstraintWithJoinType) states it. Not listed
+      // in any fact's InternalConstraints; the importer's ring pass reads it.
+      const roleRefs = joinOperandRoleRefs(c.operand);
+      const joinPath = writeJoinPath(c.operand, derivedNormaId(id, "_jp0"));
+      if (!roleRefs || !joinPath) return undefined;
+      return {
+        type: "ring",
+        id,
+        name: "",
+        ...modality,
+        ringType: c.ringType,
+        roleRefs,
+        joinPath,
+      };
+    }
     case "join_equality":
     case "join_exclusion": {
       const roleSequences: string[][] = [];

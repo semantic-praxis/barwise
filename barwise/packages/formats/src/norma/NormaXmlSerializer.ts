@@ -567,7 +567,7 @@ function buildRing(c: Extract<NormaConstraint, { type: "ring"; }>): XmlNode {
     [`${ATTR}Name`]: c.name,
     ...(c.modality === "deontic" ? { [`${ATTR}Modality`]: "Deontic" } : {}),
     [`${ATTR}Type`]: ringTypeToNorma(c.ringType),
-    "orm:RoleSequence": roleSequence(c.roleRefs),
+    "orm:RoleSequence": joinableRoleSequence(c.roleRefs, c.joinPath),
   };
 }
 

@@ -1945,7 +1945,9 @@ describe("NormaToOrmMapper", () => {
         expect(model.constraintsTouching(ft.id).some((c) => c.type === "equality")).toBe(false);
       });
 
-      it("drops a ring constraint that resolves to fewer than two roles in the fact type", () => {
+      it("drops a ring with no join path that resolves to fewer than two roles in the fact type", () => {
+        // A ring that carries a join path is read from the path instead
+        // (NormaJoinRing.test.ts); this one has none, so it stays dropped.
         const rc: NormaConstraint = {
           type: "ring",
           id: "_rc1",

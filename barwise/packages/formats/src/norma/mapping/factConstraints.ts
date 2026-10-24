@@ -366,10 +366,18 @@ function decodeSequenceOperands(
   return operands;
 }
 
+/**
+ * A flat ring, from a fact type that lists it. A ring whose sequence carries
+ * a `JoinRule`, readable or not, is never read here: its two roles can
+ * both belong to one fact type (a grandparent self-join projects the child
+ * and parent roles of the one parenthood fact type), and the flat ring over
+ * them says something else. `mapJoinRing` reads it, once, in the ring pass.
+ */
 function mapRingConstraint(
   nc: NormaRingConstraint,
   factRoleIds: Set<string>,
 ): Constraint | undefined {
+  if (nc.joinPath || nc.unreadableJoin) return undefined;
   const relevantRoles = nc.roleRefs.filter((r) => factRoleIds.has(r));
   if (relevantRoles.length < 2) return undefined;
   return {
@@ -378,4 +386,28 @@ function mapRingConstraint(
     roleId2: relevantRoles[1]!,
     ringType: nc.ringType,
   };
+}
+
+/**
+ * A ring over its join path, wherever the file lists it. A path one hop
+ * long projecting both of its ends is the plain ring spelled the long way,
+ * so it maps to `ring` (`join-ring-constraint.spec.md`, Open decision 3);
+ * any other decodable path to a `join_ring`, a malformed projection
+ * included, so validation can report it rather than the import hiding it.
+ * A path outside the grammar maps to nothing.
+ */
+export function mapJoinRing(
+  nc: NormaRingConstraint,
+  joinDecoder: NormaJoinDecoder,
+): Constraint | undefined {
+  if (!nc.joinPath) return undefined;
+  const operand = joinDecoder.decodeOperand(nc.roleRefs, nc.joinPath);
+  if (!operand) return undefined;
+  const [from, to] = operand.projection;
+  const step = operand.path.steps[0];
+  if (operand.path.steps.length === 1 && step && operand.projection.length === 2 && from !== to) {
+    const [roleId1, roleId2] = from === 0 ? [step.entry, step.exit] : [step.exit, step.entry];
+    return { type: "ring", roleId1, roleId2, ringType: nc.ringType };
+  }
+  return { type: "join_ring", operand, ringType: nc.ringType };
 }

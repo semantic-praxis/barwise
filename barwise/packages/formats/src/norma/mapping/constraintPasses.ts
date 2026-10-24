@@ -7,7 +7,7 @@
  * in any fact's InternalConstraints. Each pass finds the unprocessed
  * constraints of one family and attaches them to the owning fact type.
  */
-import { type Constraint, type FactType, isExternalConstraint } from "@barwise/core";
+import { type Constraint, type FactType, isExternalConstraint, roleIdsOf } from "@barwise/core";
 import type { NormaConstraint } from "../NormaXmlTypes.js";
 import type { NormaMappingContext } from "./context.js";
 import {
@@ -16,6 +16,7 @@ import {
   holdsSame,
   mapEqualityConstraint,
   mapExclusionConstraint,
+  mapJoinRing,
   mapSubsetConstraint,
   mapValueComparisonConstraint,
   withModality,
@@ -286,8 +287,24 @@ function addUnlessHeld(
  */
 function addRingConstraints(ctx: NormaMappingContext): void {
   const { doc, model, processedRefs } = ctx;
+  const joinDecoder = createJoinDecoder(ctx);
   for (const nc of doc.constraints) {
     if (nc.type !== "ring") continue;
+
+    // Over a join path, mapped here and only here, whether or not a fact
+    // lists it: phase 1 leaves such a ring alone, so one listed under two
+    // fact types maps once, and a one-hop ring listed under a fact type
+    // other than its hop's still lands on its hop's. The fact type passed
+    // is the first hop's, which `addUnlessHeld` uses only for a plain ring.
+    if (nc.joinPath || nc.unreadableJoin) {
+      const mapped = nc.joinPath && mapJoinRing(nc, joinDecoder);
+      if (!mapped) continue;
+      const firstRole = roleIdsOf(mapped)[0];
+      const ft = model.factTypes.find((f) => firstRole !== undefined && f.hasRole(firstRole));
+      if (ft) addUnlessHeld(ctx, ft, nc, mapped);
+      continue;
+    }
+
     if (processedRefs.has(nc.id)) continue;
     if (nc.roleRefs.length < 2) continue;
 
