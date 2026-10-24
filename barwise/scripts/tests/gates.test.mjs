@@ -5784,6 +5784,79 @@ test("check:architecture resolves each ADR reference in the files that act on it
   }
 });
 
+test("check:architecture reads wrapped, retiring and doc references, and skips a deleted file", () => {
+  const { dir } = architectureRepo();
+  try {
+    stage(dir, "barwise/docs/adr/a-concern.md", ADR_OK);
+    // A spec retiring an ADR names it in its own `-` Touches: entry.
+    stage(
+      dir,
+      "barwise/docs/specs/r.spec.md",
+      "# R\n\nStatus: Draft\nTouches: -barwise/docs/adr/retiring.md\n\n## Body\n\nRetires ADR `retiring`.\n",
+    );
+    // An undated doc and an evals file act on decisions too.
+    stage(dir, "barwise/docs/guide.md", "See ADR\n`a-concern`.\n");
+    stage(dir, "barwise/packages/core/evals/suite.yaml", "# docs/adr/a-concern.md\n");
+    execFileSync("git", ["commit", "-qm", "refs"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    for (
+      const [file, edit, why] of [
+        // A reference split by a reflow is still read, at its first line.
+        [
+          "barwise/docs/guide.md",
+          (s) => s.replace("`a-concern`", "`a-concrn`"),
+          /guide\.md:1: names ADR a-concrn/,
+        ],
+        [
+          "barwise/packages/core/evals/suite.yaml",
+          (s) => s.replace("a-concern", "gone"),
+          /evals\/suite\.yaml:1: names ADR gone/,
+        ],
+        [
+          "barwise/docs/specs/r.spec.md",
+          (s) => s.replace("-barwise/docs/adr/retiring.md", "-barwise/x.ts"),
+          /r\.spec\.md:8: names ADR retiring/,
+        ],
+        [
+          "barwise/docs/adr/a-concern.md",
+          (s) => s.replace("2026-10-24", "<YYYY-MM-DD>"),
+          /a-concern\.md: Date: <YYYY-MM-DD> is not YYYY-MM-DD/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, file, edit);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, why);
+    }
+    // A graph disagreement and an ADR problem are both reported in one run.
+    const both = archPlanted(
+      dir,
+      "barwise/docs/guide.md",
+      (s) => s.replace("`a-concern`", "`nope`"),
+    );
+    assert.equal(both.status, 1);
+    const path = join(dir, "CLAUDE.md");
+    const before = readFileSync(path, "utf8");
+    writeFileSync(path, before.replace(CLAUDE_LLM, "@barwise/llm             (core, diagram)"));
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR `nope`.\n");
+    const r = runArch(dir);
+    writeFileSync(path, before);
+    writeFileSync(join(dir, "barwise/docs/guide.md"), "See ADR\n`a-concern`.\n");
+    assert.equal(r.status, 1, r.stderr);
+    assert.match(r.stderr, /draws llm -> diagram/);
+    assert.match(r.stderr, /guide\.md:1: names ADR nope/);
+    // A tracked file deleted from disk is one being removed: it is skipped,
+    // and the references it leaves dead are reported, not a refusal.
+    rmSync(join(dir, "barwise/docs/adr/a-concern.md"));
+    const gone = runArch(dir);
+    assert.equal(gone.status, 1, gone.stdout + gone.stderr);
+    assert.match(gone.stderr, /guide\.md:1: names ADR a-concern/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check:architecture cannot answer with no ADR to check", () => {
   const { dir } = architectureRepo();
   try {

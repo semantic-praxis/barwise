@@ -183,10 +183,11 @@ In scope:
 - `INTENDED` shall move to its own module, `scripts/lib/intended.cjs`,
   which `.dependency-cruiser.cjs`, `arch-triage.mjs` and
   `check-architecture.mjs` all require; no script keeps a copy.
-- When an instruction file, a live spec, an ADR or package source names
-  an ADR as ADR `<name>` or `docs/adr/<name>.md`, and no such ADR exists
-  and none is planned as a `+` entry in the citing spec's `Touches:`, the
-  check shall fail (exit 1) naming the file and line.
+- When an instruction file, an undated document under `barwise/docs/`
+  (specs and ADRs included, archives excluded) or a package file names an
+  ADR as ADR `<name>` or `docs/adr/<name>.md`, and no such ADR exists and
+  the citing spec's `Touches:` does not plan it as a `+` or `-` entry,
+  the check shall fail (exit 1) naming the file and line.
 - When a package's internal runtime `dependencies` include a package
   `INTENDED` does not allow it, the check shall fail (exit 1).
 - When the check cannot read the ADR directory, `INTENDED`, or either
@@ -301,10 +302,15 @@ edge and sees red through `mutate.mjs`.
   were rewritten, and archived specs and dated records (such as
   `reference-rubric-audit-2026-08-27.md`) were left as they are.
 - Add the reference check to `check-architecture.mjs`. It reads a named
-  set, not "everything except": instruction files, specs outside
-  `docs/specs/archive/`, `docs/adr/`, and `barwise/packages/*/src/`. That
-  leaves out the tracker, eval runs and payloads, dated records and
-  archives, all of which are history. It resolves the two current forms,
+  set, not "everything except": instruction files, undated documents
+  under `barwise/docs/` (specs and ADRs included, archives excluded), and
+  every file under `barwise/packages/`. That leaves out the tracker, eval
+  runs and payloads, dated records and archives, all of which are history.
+  (Implementation note, 2026-10-24: the set first drafted here -- specs,
+  ADRs and `packages/*/src/` only -- missed current documents that cite
+  ADRs today, such as `promptlab/evals/suite.yaml` and the book reading
+  guides, so a rename would have left them dead. A `-` entry is also
+  allowed, so a spec may name the ADR its own PR retires.) It resolves the two current forms,
   ADR `<name>` and `docs/adr/<name>.md`, to an existing ADR or to a `+`
   entry in the citing spec's `Touches:` (an ADR a Draft spec plans). A
   number such as "ADR 0001" is not a form it reads, so historical
