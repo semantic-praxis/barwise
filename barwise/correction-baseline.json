@@ -433,6 +433,12 @@
       "caught_by": "execution",
       "note": "Running the first port of the gate over the real corpus reported 21 ambiguous CLAUDE.md references the prototype had passed; the missing repo-root step was found by that run, not by reading the spec."
     },
+    "join-ring-constraint::5d8a1c48056a": {
+      "spec": "join-ring-constraint.spec.md",
+      "excerpt": "- verbalization does not share the flat ring's sentence builder. the draft planned to refactor verbalizering to take its predicate as an argument. that builder ",
+      "caught_by": "execution",
+      "note": "Reading the flat ring golden while writing the join ring sentences: the shared builder forms negatives as \"does not \" + a predicate that already starts with its verb, pinned as correct. Filed as barwise-gzk; the join ring words its sentences separately."
+    },
     "key-reference-tables::ecfcf44f880e": {
       "spec": "key-reference-tables.spec.md",
       "excerpt": "1. when an unannotated table's key column carries exactly one foreign key, that foreign key is a shared-key foreign key and it meets both conditions below (two ",

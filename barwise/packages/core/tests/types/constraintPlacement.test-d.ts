@@ -39,6 +39,7 @@ describe("constraint placement types", () => {
       | "join_subset"
       | "join_equality"
       | "join_exclusion"
+      | "join_ring"
     >();
   });
 

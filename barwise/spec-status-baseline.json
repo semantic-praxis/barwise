@@ -25,9 +25,17 @@
     "constraint-notes.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
+        "31ec97ad",
         "6ad692fa"
       ],
-      "note": "Genuinely unimplemented, and the header is right. 6ad692fa (#720, model-invariants WS1, squash-merged from the review fix c610194f that this row first named) adds describeConstraintPlace and describeRepeatedConstraintIds to core/src/model/Constraint.ts, which this spec names because its workstream 1 adds an optional note to ConstraintBase there. No note field exists. Remove this row when WS1 ships and the Status says so."
+      "note": "Genuinely unimplemented, and the header is right. 6ad692fa (#720, model-invariants WS1, squash-merged from the review fix c610194f that this row first named) adds describeConstraintPlace and describeRepeatedConstraintIds to core/src/model/Constraint.ts, which this spec names because its workstream 1 adds an optional note to ConstraintBase there. No note field exists. Remove this row when WS1 ships and the Status says so. Re-read 2026-10-24: 31ec97ad (join-ring-constraint WS1) adds the join_ring kind to Constraint.ts, its serde, schema branch, diff key and merge remap, and its byte-layout and type-record test rows; ConstraintBase still has no note field, so the verdict holds."
+    },
+    "eval-difficulty-calibration.spec.md": {
+      "status": "Draft for review (design only -- no transcript authored in this\nPR)",
+      "commits": [
+        "31ec97ad"
+      ],
+      "note": "Genuinely unimplemented, and the header is right: no calibrated transcript has been authored. 31ec97ad (join-ring-constraint WS1) touched CounterexampleGenerator.ts, which this spec names as context, to stop three generators emitting counterexamples that satisfy their own constraint under a one-value domain; it builds nothing this spec plans. Remove this row when a workstream ships and the Status says so."
     },
     "functional-design-quality.spec.md": {
       "status": "Draft -- the five open decisions resolved in review 2026-09-09\n(see Decisions); no workstream implemented",
@@ -39,12 +47,20 @@
     "model-issues-tab.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
+        "cf26a7b5",
         "2ee84147",
         "43dfe061",
         "5ea121ef",
         "592dac69"
       ],
-      "note": "Genuinely unimplemented, and the header is right: no part of the Issues tab exists yet. The commit is dbt-key-type-fidelity WS3 (barwise-1057), which changed ExportAnnotationCollector -- one of the finding sources this spec names -- so that a data-type TODO fires only on a real fallback and a description TODO only on a missing definition. The tab will read those findings; it has not been built. Remove this row when a workstream ships and the Status says so. Re-read 2026-10-23 (barwise-qs8): 2ee84147 (orm-format-3 moves the llm constraint readers), 43dfe061 (the merge_models description fix) and 5ea121ef (barwise_split_model for the chat participant) touch files this spec names; core has no fix-proposal or span-edit planner and the extension no Issues view, so the verdict holds."
+      "note": "Genuinely unimplemented, and the header is right: no part of the Issues tab exists yet. The commit is dbt-key-type-fidelity WS3 (barwise-1057), which changed ExportAnnotationCollector -- one of the finding sources this spec names -- so that a data-type TODO fires only on a real fallback and a description TODO only on a missing definition. The tab will read those findings; it has not been built. Remove this row when a workstream ships and the Status says so. Re-read 2026-10-23 (barwise-qs8): 2ee84147 (orm-format-3 moves the llm constraint readers), 43dfe061 (the merge_models description fix) and 5ea121ef (barwise_split_model for the chat participant) touch files this spec names; core has no fix-proposal or span-edit planner and the extension no Issues view, so the verdict holds. Re-read 2026-10-24: cf26a7b5 (#740, findings from the retroactive pr-review) touched CLAUDE.md, the diff index exports and toolRegistration.test.ts, which this spec names; it adds no Issues view and no finding source, so the verdict holds."
+    },
+    "model-open-questions.spec.md": {
+      "status": "Draft -- no workstream implemented",
+      "commits": [
+        "31ec97ad"
+      ],
+      "note": "Genuinely unimplemented, and the header is right: no open-question field or tool exists. 31ec97ad (join-ring-constraint WS1) added a join_ring branch to orm-model.schema.json, which this spec names because its own workstream extends the schema; ToolRegistration.ts matched only by the 740 merge, which changed the diff tool input type. Neither builds anything this spec plans. Remove this row when a workstream ships and the Status says so."
     },
     "mutation-ratchet.spec.md": {
       "status": "Draft -- no workstream implemented. All five open decisions\nresolved 2026-09-10; the workstreams below reflect them.",
@@ -93,10 +109,11 @@
     "subject-areas.spec.md": {
       "status": "Draft -- no workstream implemented",
       "commits": [
+        "31ec97ad",
         "1c9e6351",
         "6ad692fa"
       ],
-      "note": "Genuinely unimplemented, and the header is right. 6ad692fa (#720, model-invariants WS1, squash-merged from 88c8d466, which this row first named) adds OrmModel.constraintsSharingAnId, and 1c9e6351 (#730, model-invariants WS3) makes the store refuse an id it already holds; both touch core/src/model/OrmModel.ts, which this spec names because its own workstream 1 adds subject-area declarations there. None is built. Remove this row when WS1 ships and the Status says so."
+      "note": "Genuinely unimplemented, and the header is right. 6ad692fa (#720, model-invariants WS1, squash-merged from 88c8d466, which this row first named) adds OrmModel.constraintsSharingAnId, and 1c9e6351 (#730, model-invariants WS3) makes the store refuse an id it already holds; both touch core/src/model/OrmModel.ts, which this spec names because its own workstream 1 adds subject-area declarations there. None is built. Remove this row when WS1 ships and the Status says so. Re-read 2026-10-24: 31ec97ad (join-ring-constraint WS1) touched orm-model.schema.json, ModelMerge.ts and referenceDiagnostics.ts for a new constraint kind; no subject-area declaration exists, so the verdict holds."
     }
   }
 }
