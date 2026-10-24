@@ -137,7 +137,7 @@ function mapByType(
     case "equality":
       return mapEqualityConstraint(nc, joinDecoder);
     case "ring":
-      return mapRingConstraint(nc, factRoleIds);
+      return mapRingConstraint(nc, factRoleIds, joinDecoder);
     case "value_comparison":
       return mapValueComparisonConstraint(nc, factRoleIds);
     default:
@@ -366,10 +366,34 @@ function decodeSequenceOperands(
   return operands;
 }
 
-function mapRingConstraint(
+/**
+ * A ring, flat or over its join path. A sequence carrying a `JoinRule` is
+ * never read as a flat ring: its two roles can both belong to one fact type
+ * (a grandparent self-join projects the child and parent roles of the one
+ * parenthood fact type) and the flat ring over them says something else.
+ * A path one hop long is the plain ring spelled the long way, so it maps
+ * to `ring`; a path outside the grammar maps to nothing, as before.
+ * `factRoleIds` is undefined for a ring no fact type lists.
+ */
+export function mapRingConstraint(
   nc: NormaRingConstraint,
-  factRoleIds: Set<string>,
+  factRoleIds: Set<string> | undefined,
+  joinDecoder?: NormaJoinDecoder,
 ): Constraint | undefined {
+  if (nc.unreadableJoin) return undefined;
+  if (nc.joinPath) {
+    const operand = joinDecoder?.decodeOperand(nc.roleRefs, nc.joinPath);
+    if (!operand) return undefined;
+    const [from, to] = operand.projection;
+    const step = operand.path.steps[0];
+    if (operand.path.steps.length === 1 && step && from !== to) {
+      const [roleId1, roleId2] = from === 0 ? [step.entry, step.exit] : [step.exit, step.entry];
+      if (factRoleIds && (!factRoleIds.has(roleId1) || !factRoleIds.has(roleId2))) return undefined;
+      return { type: "ring", roleId1, roleId2, ringType: nc.ringType };
+    }
+    return { type: "join_ring", operand, ringType: nc.ringType };
+  }
+  if (!factRoleIds) return undefined;
   const relevantRoles = nc.roleRefs.filter((r) => factRoleIds.has(r));
   if (relevantRoles.length < 2) return undefined;
   return {

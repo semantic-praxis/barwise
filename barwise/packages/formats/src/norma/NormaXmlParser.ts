@@ -841,6 +841,9 @@ function parseConstraints(
   for (const rc of asArray(constraints["RingConstraint"])) {
     const roleSeq = firstRoleSequence(rc);
     const ringTypeStr = attr(rc, "Type") ?? attr(rc, "RingType") ?? "";
+    const joinPath = roleSeq ? parseJoinRule(roleSeq) : undefined;
+    const unreadableJoin = !joinPath && roleSeq !== undefined
+      && child(roleSeq, "JoinRule") !== undefined;
     result.push({
       type: "ring",
       id: asNormaId(attr(rc, "id") ?? ""),
@@ -848,6 +851,8 @@ function parseConstraints(
       ...(attr(rc, "Modality") === "Deontic" ? { modality: "deontic" as const } : {}),
       ringType: normalizeRingType(ringTypeStr),
       roleRefs: roleSeq ? parseRoleSequenceRefs(roleSeq) : [],
+      ...(joinPath ? { joinPath } : {}),
+      ...(unreadableJoin ? { unreadableJoin: true as const } : {}),
     });
   }
 
