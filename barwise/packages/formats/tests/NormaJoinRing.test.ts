@@ -59,8 +59,53 @@ const UNREADABLE = `<orm:JoinRule>
           </orm:JoinPath>
         </orm:JoinRule>`;
 
-/** A Person, the parenthood fact type, and one irreflexive ring. */
-function document(joinRule: string, listed: boolean): string {
+/** Child then liking: a path over two fact types. */
+const CHILD_THEN_LIKES = `<orm:JoinRule>
+          <orm:JoinPath id="_JP1">
+            <orm:PathComponents>
+              <orm:RolePath id="_RP1">
+                <orm:RootObjectType ref="_P" />
+                <orm:PathedRoles>
+                  <orm:PathedRole id="_PR1" ref="_R1" />
+                  <orm:PathedRole id="_PR2" ref="_R2" Purpose="SameFactType" />
+                  <orm:PathedRole id="_PR3" ref="_R3" Purpose="PostInnerJoin" />
+                  <orm:PathedRole id="_PR4" ref="_R4" Purpose="SameFactType" />
+                </orm:PathedRoles>
+              </orm:RolePath>
+            </orm:PathComponents>
+          </orm:JoinPath>
+        </orm:JoinRule>`;
+
+/** One hop whose projection names one column only: malformed for a ring. */
+const ONE_COLUMN = `<orm:JoinRule>
+          <orm:JoinPath id="_JP1">
+            <orm:PathComponents>
+              <orm:RolePath id="_RP1">
+                <orm:RootObjectType ref="_P" />
+                <orm:PathedRoles>
+                  <orm:PathedRole id="_PR1" ref="_R1" />
+                  <orm:PathedRole id="_PR2" ref="_R2" Purpose="SameFactType" />
+                </orm:PathedRoles>
+              </orm:RolePath>
+            </orm:PathComponents>
+            <orm:JoinPathProjections>
+              <orm:JoinPathProjection id="_JPP1">
+                <orm:ConstraintRoleProjection id="_CRP1" ref="_R2">
+                  <orm:ProjectedFromPathedRole ref="_PR2" />
+                </orm:ConstraintRoleProjection>
+              </orm:JoinPathProjection>
+            </orm:JoinPathProjections>
+          </orm:JoinPath>
+        </orm:JoinRule>`;
+
+const listing = (fact: string, listedIn: readonly string[]) =>
+  listedIn.includes(fact)
+    ? `<orm:InternalConstraints><orm:RingConstraint ref="_RC1" /></orm:InternalConstraints>`
+    : "";
+
+/** A Person, parenthood (_F1) and liking (_F2), and one irreflexive ring. */
+function document(joinRule: string, listed: boolean | readonly string[]): string {
+  const listedIn = listed === true ? ["_F1"] : listed === false ? [] : listed;
   return `<?xml version="1.0" encoding="utf-8"?>
 <ormRoot:ORM2 xmlns:orm="http://schemas.neumont.edu/ORM/2006-04/ORMCore" xmlns:ormRoot="http://schemas.neumont.edu/ORM/2006-04/ORMRoot">
   <orm:ORMModel id="_M1" Name="Family">
@@ -69,6 +114,8 @@ function document(joinRule: string, listed: boolean): string {
         <orm:PlayedRoles>
           <orm:Role ref="_R1" />
           <orm:Role ref="_R2" />
+          <orm:Role ref="_R3" />
+          <orm:Role ref="_R4" />
         </orm:PlayedRoles>
       </orm:EntityType>
     </orm:Objects>
@@ -95,11 +142,31 @@ function document(joinRule: string, listed: boolean): string {
             </orm:RoleSequence>
           </orm:ReadingOrder>
         </orm:ReadingOrders>
-        ${
-    listed
-      ? `<orm:InternalConstraints><orm:RingConstraint ref="_RC1" /></orm:InternalConstraints>`
-      : ""
-  }
+        ${listing("_F1", listedIn)}
+      </orm:Fact>
+      <orm:Fact id="_F2" _Name="PersonLikesPerson">
+        <orm:FactRoles>
+          <orm:Role id="_R3" _IsMandatory="false" _Multiplicity="ZeroToMany" Name="">
+            <orm:RolePlayer ref="_P" />
+          </orm:Role>
+          <orm:Role id="_R4" _IsMandatory="false" _Multiplicity="ZeroToMany" Name="">
+            <orm:RolePlayer ref="_P" />
+          </orm:Role>
+        </orm:FactRoles>
+        <orm:ReadingOrders>
+          <orm:ReadingOrder id="_RO2">
+            <orm:Readings>
+              <orm:Reading id="_RD2">
+                <orm:Data>{0} likes {1}</orm:Data>
+              </orm:Reading>
+            </orm:Readings>
+            <orm:RoleSequence>
+              <orm:Role ref="_R3" />
+              <orm:Role ref="_R4" />
+            </orm:RoleSequence>
+          </orm:ReadingOrder>
+        </orm:ReadingOrders>
+        ${listing("_F2", listedIn)}
       </orm:Fact>
     </orm:Facts>
     <orm:Constraints>
@@ -143,6 +210,24 @@ describe("a NORMA ring over a join path", () => {
       });
     });
   }
+
+  // From the review of WS2: each of these reproduced against its first draft.
+  it("maps a one-hop ring listed under another fact type onto its hop's fact type", () => {
+    const model = importNormaXml(document(PARENT, ["_F2"]));
+    expect(model.getFactType("_F1")?.internalConstraints.filter((c) => c.type === "ring"))
+      .toHaveLength(1);
+    expect(rings(model)).toHaveLength(1);
+  });
+
+  it("maps a join ring that two fact types list once", () => {
+    const found = rings(importNormaXml(document(CHILD_THEN_LIKES, ["_F1", "_F2"])));
+    expect(found.map((c) => c.type)).toEqual(["join_ring"]);
+  });
+
+  it("keeps a one-column projection as a join_ring, for validation to report", () => {
+    const found = rings(importNormaXml(document(ONE_COLUMN, true)));
+    expect(found).toMatchObject([{ type: "join_ring", operand: { projection: [1] } }]);
+  });
 
   it("round-trips a join_ring through NORMA export", () => {
     const model = importNormaXml(document(GRANDPARENT, true));

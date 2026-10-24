@@ -433,7 +433,7 @@
       "caught_by": "execution",
       "note": "Running the first port of the gate over the real corpus reported 21 ambiguous CLAUDE.md references the prototype had passed; the missing repo-root step was found by that run, not by reading the spec."
     },
-    "join-ring-constraint::3baff9f51ff5": {
+    "join-ring-constraint::4aa634cf98aa": {
       "spec": "join-ring-constraint.spec.md",
       "excerpt": "- the precondition was settled from norma's schema, not an authored file. no file norma wrote with a join ring was at hand. norma's orm2core.xsd defines ringcon",
       "caught_by": "provenance",

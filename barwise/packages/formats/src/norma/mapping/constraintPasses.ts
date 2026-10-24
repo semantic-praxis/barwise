@@ -16,7 +16,7 @@ import {
   holdsSame,
   mapEqualityConstraint,
   mapExclusionConstraint,
-  mapRingConstraint,
+  mapJoinRing,
   mapSubsetConstraint,
   mapValueComparisonConstraint,
   withModality,
@@ -290,21 +290,23 @@ function addRingConstraints(ctx: NormaMappingContext): void {
   const joinDecoder = createJoinDecoder(ctx);
   for (const nc of doc.constraints) {
     if (nc.type !== "ring") continue;
-    if (processedRefs.has(nc.id)) continue;
-    if (nc.roleRefs.length < 2) continue;
 
-    // Over a join path: no one fact type need hold its roles. A one-hop
-    // path maps to a plain ring of the hop's fact type; a longer one to a
-    // join_ring in the model (`mapRingConstraint`).
-    if (nc.unreadableJoin) continue;
-    if (nc.joinPath) {
-      const mapped = mapRingConstraint(nc, undefined, joinDecoder);
+    // Over a join path, mapped here and only here, whether or not a fact
+    // lists it: phase 1 leaves such a ring alone, so one listed under two
+    // fact types maps once, and a one-hop ring listed under a fact type
+    // other than its hop's still lands on its hop's. The fact type passed
+    // is the first hop's, which `addUnlessHeld` uses only for a plain ring.
+    if (nc.joinPath || nc.unreadableJoin) {
+      const mapped = nc.joinPath && mapJoinRing(nc, joinDecoder);
       if (!mapped) continue;
-      const owner = model.factTypes.find((f) => roleIdsOf(mapped).every((r) => f.hasRole(r)))
-        ?? model.factTypes.find((f) => roleIdsOf(mapped).some((r) => f.hasRole(r)));
-      if (owner) addUnlessHeld(ctx, owner, nc, mapped);
+      const firstRole = roleIdsOf(mapped)[0];
+      const ft = model.factTypes.find((f) => firstRole !== undefined && f.hasRole(firstRole));
+      if (ft) addUnlessHeld(ctx, ft, nc, mapped);
       continue;
     }
+
+    if (processedRefs.has(nc.id)) continue;
+    if (nc.roleRefs.length < 2) continue;
 
     const ft = model.factTypes.find((f) => nc.roleRefs.every((roleRef) => f.hasRole(roleRef)));
     if (!ft) continue;

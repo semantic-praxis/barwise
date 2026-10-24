@@ -619,7 +619,7 @@ function writeConstraint(
         id,
         name: "",
         ...modality,
-        ringType: c.ringType as NormaRingType,
+        ringType: c.ringType,
         roleRefs,
         joinPath,
       };

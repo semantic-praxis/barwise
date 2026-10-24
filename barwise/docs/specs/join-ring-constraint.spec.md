@@ -338,8 +338,10 @@ What WS2 found.
 - **NORMA lists a ring under its fact type, so the misread lived in phase
   1.** `collectProcessedRefs` marks every ref a fact's InternalConstraints
   lists, so the ring pass the draft named never saw a listed ring;
-  `mapRingConstraint` read it per fact type. Both paths now decode a
-  `JoinRule`.
+  `mapRingConstraint` read it per fact type. A ring carrying a `JoinRule`
+  is now mapped by the ring pass alone, listed or not: mapping it in both
+  places imported a ring two fact types list twice, and lost a one-hop ring
+  listed under a fact type other than its hop's (both found in review).
 - **An unreadable `JoinRule` is not "no join".** `parseJoinRule` returns
   nothing for a path it cannot read, which made the ring look flat and
   imported the flat ring again. The parser now records that a rule was
