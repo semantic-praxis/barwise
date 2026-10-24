@@ -1,6 +1,31 @@
-
 # Merged by barwise/scripts/beads-merge-driver.mjs, which `npm run prepare`
 # installs into the clone's git directory as the driver named `beads`
 # (docs/specs/beads-merge-driver.spec.md). Without it git falls back to a
 # line merge silently.
 .beads/issues.jsonl merge=beads
+
+# Generated and recorded paths: the one list of files nobody reviews line
+# by line (docs/specs/plan-scope-check.spec.md, Open decision 2). Three
+# readers: `npm run plan-scope` leaves them out of a PR's size, REVIEW.md
+# points the review service here, and GitHub collapses them in PR diffs.
+# A drift test (barwise/scripts/tests/generated-marks.test.mjs) fails when
+# a regen:* script's output is not marked here. barwise/trial/ fixtures are
+# deliberately absent: a reviewer may need to read them (owner, 2026-10-24).
+
+# Regenerated output: review the generator, not this.
+barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts linguist-generated=true
+barwise/examples/output/** linguist-generated=true
+barwise/docs/tutorial/** linguist-generated=true
+barwise/packages/cli/tests/characterization/golden/** linguist-generated=true
+barwise/packages/diagram-ui/tests/golden/goldens/** linguist-generated=true
+barwise/packages/promptlab/evals/*.reference.orm.yaml linguist-generated=true
+
+# Recorded data: written by a run or a tool, not by hand.
+barwise/eval-runs/** linguist-generated=true
+barwise/eval-payloads/** linguist-generated=true
+# A README there explains the record; a person wrote it.
+barwise/eval-payloads/**/README.md -linguist-generated
+barwise/trial-baseline.json linguist-generated=true
+barwise/package-lock.json linguist-generated=true
+barwise/uv.lock linguist-generated=true
+.beads/issues.jsonl linguist-generated=true

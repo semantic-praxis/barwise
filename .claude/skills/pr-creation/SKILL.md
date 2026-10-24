@@ -30,7 +30,12 @@ least once:
 
 - **The spec exists and its header says what this PR ships.**
   Spec-before-code is the convention (`spec-writer` skill). A PR is
-  one workstream of a spec and names which. Update the spec's
+  one workstream of a spec and names which. Run `npm run plan-scope --
+  --base origin/<your base branch>`: it lists every changed file the spec
+  does not plan, and the reading guide accounts for each one -- planned
+  late, or out of scope and why. It reports and never gates; a long list
+  is a question for the body, not a failure
+  (`docs/specs/plan-scope-check.spec.md`). Update the spec's
   `Status` in the commit that lands the workstream: `audit:specs
   --check` catches only a spec claiming _no_ implementation, so a
   partial claim decays unwatched (barwise-912). Record what the spec
