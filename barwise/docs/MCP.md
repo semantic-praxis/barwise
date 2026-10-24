@@ -378,10 +378,11 @@ CREATE TABLE Department (
 
 Compare two ORM models and return structural deltas.
 
-| Parameter  | Type   | Required | Description                                               |
-| ---------- | ------ | -------- | --------------------------------------------------------- |
-| `base`     | string | yes      | File path or inline YAML for the base (original) model    |
-| `incoming` | string | yes      | File path or inline YAML for the incoming (changed) model |
+| Parameter  | Type   | Required | Description                                                     |
+| ---------- | ------ | -------- | --------------------------------------------------------------- |
+| `base`     | string | yes      | File path or inline YAML for the base (original) model          |
+| `incoming` | string | yes      | File path or inline YAML for the incoming (changed) model       |
+| `matching` | string | no       | `id-first` (default) or `content`; as `barwise diff --matching` |
 
 **Returns** JSON:
 

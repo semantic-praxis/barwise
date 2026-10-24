@@ -2,8 +2,9 @@
  * diff_models tool: computes the diff between two ORM models.
  */
 
-import { deltaToJson, diffModels } from "@barwise/core/diff";
+import { deltaToJson, diffModels, type ElementMatching } from "@barwise/core/diff";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 import { resolveSource, type SourceInput } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
@@ -17,10 +18,16 @@ export function registerDiffTool(server: McpServer): void {
       inputSchema: {
         base: sourceInputSchema("File path or inline YAML for the base model"),
         incoming: sourceInputSchema("File path or inline YAML for the incoming model"),
+        matching: z.enum(["id-first", "content"]).optional().describe(
+          "How elements pair. 'id-first' (default): a shared id is the same element, "
+            + "so a rename that keeps the id is one change. 'content': ids say nothing; "
+            + "use it for two models whose ids are unrelated but may coincide, such as "
+            + "two independent extractions numbered from one counter.",
+        ),
       },
     },
-    async ({ base, incoming }) => {
-      return executeDiff(base, incoming);
+    async ({ base, incoming, matching }) => {
+      return executeDiff(base, incoming, matching);
     },
   );
 }
@@ -28,10 +35,11 @@ export function registerDiffTool(server: McpServer): void {
 export function executeDiff(
   base: SourceInput,
   incoming: SourceInput,
+  matching?: ElementMatching,
 ): { content: Array<{ type: "text"; text: string; }>; } {
   const baseModel = resolveSource(base);
   const incomingModel = resolveSource(incoming);
-  const diff = diffModels(baseModel, incomingModel);
+  const diff = diffModels(baseModel, incomingModel, { matching });
 
   const result = {
     hasChanges: diff.hasChanges,
