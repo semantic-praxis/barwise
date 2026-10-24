@@ -51,8 +51,10 @@ const EXT = /\.(mjs|cjs|ts|tsx|js|json|md|yaml|yml|sh|py|toml|txt)$/;
 function isInstructionFile(f) {
   // REVIEW.md is read by the Claude Code Review service -- the root file,
   // and a nested one once the default branch is protected -- and cites
-  // paths the same way.
+  // paths the same way. .github/copilot-instructions.md is read as
+  // instructions by the Copilot reviewer, and cites paths too.
   return /(^|\/)(CLAUDE|AGENTS|REVIEW)\.md$/.test(f)
+    || f === ".github/copilot-instructions.md"
     || (f.startsWith(".claude/") && f.endsWith(".md"));
 }
 

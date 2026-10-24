@@ -4890,6 +4890,12 @@ for (
       { "REVIEW.md": "Apply `barwise/docs/gone.md`.\n" },
       /\sREVIEW\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
     ],
+    [
+      // The Copilot reviewer reads it as instructions (barwise-yi6).
+      "a dead path in .github/copilot-instructions.md",
+      { ".github/copilot-instructions.md": "Apply `barwise/docs/gone.md`.\n" },
+      /\.github\/copilot-instructions\.md:1: `barwise\/docs\/gone\.md` -- no tracked file/,
+    ],
   ]
 ) {
   test(`check-instruction-refs fails ${name}`, () => {
