@@ -1,11 +1,11 @@
 # Model invariants: what the store refuses, what validation reports, and what operations promise
 
-Status: Draft -- no workstream implemented; decisions resolved by the owner
-2026-10-23 (decision 1 revised the same day after review); workstreams 2
-and 4 provisional
+Status: Workstreams 1 and 2 implemented 2026-10-24; workstream 3 not
+started, 4 provisional; decisions resolved by the owner 2026-10-23
+(decision 1 revised the same day after review)
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
 Tracking: barwise-mtl (this spec); barwise-b2s (duplicate constraint ids,
 workstream 1); barwise-ue5 (merge drops a kept element, workstream 2);
 barwise-1l0 (a duplicate id replaces an element, workstream 3); barwise-973
@@ -181,9 +181,9 @@ rename case that loses data is never drawn.
 
 ## Target architecture
 
-The diff and merge half is workstream 2's starting sketch, not its settled
-design (provisional: not yet grounded); the store and validation half is
-settled.
+Both halves are settled. The diff and merge half is as built in workstream
+2, whose implementation notes record where it departs from the first
+sketch.
 
 ```ts
 // diff: one question, asked once -- are the two models' ids related?
@@ -198,12 +198,16 @@ interface DiffOptions {
 // `name` is the existing model's spelling, so a reviewer reads which
 // element is being renamed, and the change says to what.
 
-// Identity is resolved once, before any element is compared.
+// Identity is resolved once, before any element is compared
+// (diff/identity.ts).
 interface DiffIdentity {
-  /** The same string for both sides of a pair, by id or by name:
-   *  `pair:<existing id>`; an unpaired element's is `<side>:<id>`. */
-  objectTypeKey(side: "existing" | "incoming", id: string): string;
-  factTypeKey(side: "existing" | "incoming", id: string): string;
+  readonly objectTypes: readonly Paired<ObjectType>[];
+  readonly factTypes: readonly Paired<FactType>[];
+  /** The same string for both sides of a pair, by id or by name; an
+   *  unpaired element keys by its side and id. `model` is the model the
+   *  id was read in; an id it does not define is read in the other. */
+  objectTypeKey(model: OrmModel, id: string): string;
+  factTypeKey(model: OrmModel, id: string): string;
 }
 // Every comparison of a reference reads these keys; playerName and
 // factTypeName stay for labels only. Two places used to answer "is this the
@@ -212,10 +216,10 @@ interface DiffIdentity {
 
 // merge: under id-first an added object type or fact type cannot share an
 // id with an existing one (it would have paired), so what is left is a
-// NAME clash -- a rename accepted onto a name another element keeps -- and
-// content-mode ids. Both are found before anything is built and refused as
-// the merge-error diagnostic mergeAndValidate already returns, naming both
-// elements. No error class: every caller reads that diagnostic, and a
+// NAME clash -- a rename accepted onto a name another element keeps. It is
+// found before anything is built and refused as the merge-error diagnostic
+// mergeAndValidate already returns, naming both elements. Content-mode
+// deltas are never merged, so they need no guard. No error class: every caller reads that diagnostic, and a
 // class's fields would stop at its catch.
 // Objectifications (settled, workstream 3): id: undefined when held, as subtype facts and
 // populations already are; nothing references an objectification's id.
@@ -294,6 +298,29 @@ Acceptance:
   they still do.
 - Both ids registered in `ruleId.ts`.
 
+Implemented 2026-10-24 (`validation/rules/structural.ts`,
+`tests/validation/duplicateIds.test.ts`). A constraint is named by its
+`type` as the file spells it and by where it lives (`mandatory in fact type
+"A runs"`), or, stored on the model, by the role or subtype-fact ids it
+names (`exclusion over roles r1, r2`), since no label table covers all
+sixteen kinds and two of one kind can share the id. What a repeat is is
+stated once, in `util/groupRepeats.ts`: the 3.0 loader asks it of the
+constraints the file states, before building (checking the built model
+instead lost a holder whose fact type shared an id with another, which a
+test now pins), `OrmModel.constraintsSharingAnId` asks it of the built model
+for the rule, and the subtype rule asks it over `subtypePairKey`, which
+`addSubtypeFact` and merge's pre-checks share. Both refusals print one
+description, `describeConstraintRepeat` in `model/Constraint.ts`. The 3.0 refusal stays under a lenient
+load: `barwise migrate` re-reads its own output leniently to refuse writing
+a file a strict load would reject. A merge is refused when the merged model
+holds a repeated constraint id even if the base already held it, because
+the merge writes 3.0 and the 3.0 loader would refuse the result. The
+diagnostic's element is the shared id, so an editor that maps ids to YAML
+nodes places it on one holder; the message names all of them. Each
+rule's tests were seen failing with the rule removed (5 and 2 tests). Over
+the tracked corpus, 89 of 116 models load leniently and neither rule fires
+on any of them.
+
 Not independent of merge, and the dependency is wanted. Merge's pre-write
 check runs `structuralWellFormedness` (`getStructuralErrors`,
 `ModelMerge.ts:964-977`), and an added fact type keeps its own
@@ -301,7 +328,7 @@ constraints' ids (`:773`). So a merge that would write two constraints with
 one id, which today writes a file the 3.0 loader then refuses to read back
 (`claim`), is refused before it writes. A test pins that case.
 
-### 2. Diff and merge treat a shared id as one element (barwise-ue5) (provisional: not yet grounded)
+### 2. Diff and merge treat a shared id as one element (barwise-ue5)
 
 The rule is decided (decision 1); how the code applies it is not. Diff and
 merge decide "is this the same element" in many places, most of them by
@@ -389,6 +416,58 @@ Acceptance, fixed now because it states the rule rather than the design:
   reported has both of its sides in the result. Content alone is not the
   test: a valid model may already hold two populations with identical
   tuples. It fails on main first; main is the mutant.
+
+Implemented 2026-10-24. What the grounding read found, against the
+checklist above:
+
+- **One pairing, read everywhere.** `diffIdentity` (`diff/identity.ts`)
+  pairs object types and fact types by id, then by name among the rest,
+  and hands out a key per element. Every nested comparison the checklist
+  names now reads those keys: role players, subtype fact ends,
+  objectifications, population fact types, a constraint's home fact type
+  (`roleKeys`), the preferred identifier, and synonym detection's player
+  check. `playerName` and `factTypeName` remain for labels. The key falls
+  back to the other model for an id the reading model does not define,
+  which keeps the lenient-fragment behaviour (barwise-957).
+- **The kinds with no name pair through the keys, not by id.** A subtype
+  fact, objectification or population keys by the identity keys of what it
+  relates, so a rename under them is no change and their own ids still do
+  not decide pairing. The sample-flag question stays as it was: no
+  identity change, nothing for the owner.
+- **Merge's resolvers did not need changing.** Under id-first an incoming
+  id that pairs by name is, by construction, one the existing model lacks,
+  so "the merged model holds this id" can only mean the right element.
+  The hazard the checklist names is a content-mode one, and content-mode
+  deltas are never merged: their only callers (`sampleAgreement`,
+  `TranscriptProcessor`'s alternative framing) compare LLM samples. The
+  law below exercises the resolvers over renamed pairs.
+- **The clash.** `refuseNameClashes` (`ModelMerge.ts`) computes the name
+  each object type and fact type ends with before anything is built and
+  throws, naming every holder; `mergeAndValidate` turns it into
+  `merge-error`. It also covers an accepted addition taking the name a
+  rejected rename keeps, which is not a swap. Which side each delta keeps
+  is one helper, `keptSide`, shared with the subtype-fact and population
+  phases, so the pre-check cannot drift from what they build.
+
+  One case reaches the surfaces' default policy (accept additions and
+  modifications, reject removals): A renamed to B while the old B is
+  deleted. The rename is accepted, the removal rejected, and two object
+  types would be named B, so `barwise merge`, the MCP merge tool and
+  transcript import now refuse it, naming both and why each is there.
+  Under name pairing the same input merged cleanly by keeping A and
+  dropping the rename without a word; a refusal is the honest form of
+  that, and the message says what to change.
+- **Options and labels** as listed: `matching` replaces
+  `constraintMatching` (llm's `UNRELATED_IDS_DIFF`), a `name` change rated
+  `safe`, the delta labelled with the existing name.
+- **Not changed:** definitions still match by term, and `operandKey` still
+  keys join operands by raw root id. A rename leaves a definition's term
+  and a join's root id untouched, so neither reads a rename as a change.
+
+Tests: `tests/diff/sharedId.test.ts` (the probe, the fact type case, the
+swap refusal, content mode) and `tests/laws/renamedPair.law.test.ts`
+(one modification per rename; any subset merges with every element kept
+by id or refuses a name clash). Both laws fail against main's `src`.
 
 ### 3. The store refuses an id it already holds (barwise-1l0)
 

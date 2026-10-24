@@ -1,6 +1,8 @@
 import { parse, stringify } from "yaml";
 import {
   type Constraint,
+  describeConstraintRepeat,
+  describeConstraintRepeats,
   type ExternalConstraint,
   isExternalConstraint,
   isInternalConstraint,
@@ -8,6 +10,7 @@ import {
 } from "../model/Constraint.js";
 import { type PlacedFlags, storePreferredFlags } from "../model/identification.js";
 import { OrmModel } from "../model/OrmModel.js";
+import { groupRepeats } from "../util/groupRepeats.js";
 import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
@@ -264,22 +267,39 @@ export class OrmYamlSerializer {
     }
 
     // Every constraint id is stated (the schema requires it) and is
-    // model-wide: another element, another file, a diff or a merge names a
-    // constraint by it, so two constraints sharing one is refused, naming it.
-    const seen = new Set<string>();
-    const claim = (c: { id?: string; }) => {
-      if (c.id === undefined) return;
-      if (seen.has(c.id)) {
-        throw new DeserializationError(
-          `Two constraints share the id "${c.id}"; a constraint id names one constraint.`,
-        );
-      }
-      seen.add(c.id);
-    };
+    // model-wide, so a 3.0 file holding a repeat is refused, lenient or
+    // not, before anything is added. Read from what the file states, not
+    // from the built model: two fact types sharing an id collapse into one
+    // in the id-keyed store, and the dropped one's constraints would go
+    // with it unreported. The lenient refusal is load-bearing: `barwise
+    // migrate` re-reads its own 3.0 output leniently to refuse writing a
+    // file a strict load would reject. A 2.0 file and a model built in code
+    // are reported by `structural/duplicate-constraint-id` instead, which
+    // asks the same `groupRepeats` of the built model -- except where the
+    // holders' fact types also share an id, which collapses them before any
+    // rule runs; refusing that is model-invariants workstream 3 (barwise-1l0).
+    const factTypes = (doc.model.fact_types ?? []).map((ftDoc) => deserializeFactType(ftDoc));
+    const modelConstraints = (doc.model.constraints ?? []).map((cDoc) =>
+      deserializeConstraint(cDoc)
+    );
+    const stated = [
+      ...factTypes.flatMap(({ config, constraints }) =>
+        constraints.map((c) => [c, config.name] as const)
+      ),
+      ...modelConstraints.map((c) => [c, undefined] as const),
+    ];
+    const repeats = [...groupRepeats(stated, ([c]) => c.id)];
+    if (repeats.length > 0) {
+      const named = describeConstraintRepeats(
+        repeats.map(([id, holders]) => describeConstraintRepeat(id, holders)),
+      );
+      throw new DeserializationError(
+        `Constraint ids are held by more than one constraint: ${named}. `
+          + "A constraint id names one constraint.",
+      );
+    }
 
-    for (const ftDoc of doc.model.fact_types ?? []) {
-      const { config, constraints } = deserializeFactType(ftDoc);
-      constraints.forEach(claim);
+    for (const { config, constraints } of factTypes) {
       model.addFactType(
         { ...config, constraints: constraints.filter(isInternalConstraint) },
         { skipPlayerValidation: options?.lenient },
@@ -293,9 +313,7 @@ export class OrmYamlSerializer {
       );
     }
 
-    for (const cDoc of doc.model.constraints ?? []) {
-      const c = deserializeConstraint(cDoc);
-      claim(c);
+    for (const c of modelConstraints) {
       if (isExternalConstraint(c)) model.addConstraint(c);
     }
 

@@ -1,10 +1,10 @@
 /**
- * Independent LLM samples are compared with content-only constraint
+ * Independent LLM samples are compared with content-only element
  * matching (orm-format-3, Open decision 4 as revised; barwise-18n). Their
  * ids are unrelated by construction. Under the default random generator
  * they never coincide, but under a deterministic one (tests, promptlab's
  * withDeterministicIds) they do by mint order, and id-first matching would
- * then pair two different constraints; core's
+ * then pair two different elements; core's
  * `constraintMatching.test.ts` shows content-only never does. This pins
  * that both sample comparisons ask for it: the medoid fold and its
  * per-sample diffs, and an alternative framing's diff against the primary.
@@ -41,13 +41,13 @@ const body = `
   "inferred_constraints": []`;
 const json = `{ ${body}, "ambiguities": [] }`;
 
-describe("sample comparisons pair constraints by content only", () => {
+describe("sample comparisons pair elements by content only", () => {
   it("in the medoid fold and each sample's diff against it", () => {
     calls.length = 0;
     const model = () => parseExtractionFromJson(json, "sample").model;
     computeSampleAgreement([model(), model(), model()]);
     expect(calls.length).toBeGreaterThan(0);
-    for (const args of calls) expect(args[2]).toEqual({ constraintMatching: "content" });
+    for (const args of calls) expect(args[2]).toEqual({ matching: "content" });
   });
 
   it("in an alternative framing's diff against the primary", async () => {
@@ -67,6 +67,6 @@ describe("sample comparisons pair constraints by content only", () => {
     );
     expect(result.alternatives).toHaveLength(1);
     expect(calls).toHaveLength(1);
-    expect(calls[0]![2]).toEqual({ constraintMatching: "content" });
+    expect(calls[0]![2]).toEqual({ matching: "content" });
   });
 });

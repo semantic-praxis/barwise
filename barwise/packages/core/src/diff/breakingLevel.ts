@@ -39,6 +39,9 @@ const CHANGE_LEVEL = {
   context: "safe",
   readings: "safe",
   roleName: "safe",
+  // A rename under a kept id (model-invariants): naming, like roleName,
+  // though a generated table or column follows it.
+  name: "safe",
 
   // The shape a consumer binds to.
   kind: "breaking",
