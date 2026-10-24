@@ -50,7 +50,9 @@ least once:
   --noEmit` (root `CLAUDE.md`, the stale-`dist` trap).
 - **`pr-review/checklist.md` has been run against your own diff**, as
   a reviewer would run it, and what it found is fixed rather than
-  promised.
+  promised. Start from `npm run pr:risk -- --base origin/<your base branch>`: it lists
+  the groups and REVIEW.md failure modes the diff triggers, with the
+  files, so the selection is not made by hand.
 - **The author-side review lanes have run**: `/code-review` on your own
   diff, and `/security-review` when the diff meets a trigger listed in the
   root `REVIEW.md`, which owns that list and which lane runs when.

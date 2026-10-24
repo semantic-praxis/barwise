@@ -1,10 +1,12 @@
 # Review routing: start every review from the list of what applies to the diff
 
-Status: Draft -- no workstream implemented
+Status: Workstreams 1-2 implemented 2026-10-24 (pr-risk leads with the routing;
+REVIEW.md's failure modes routed and gated both ways); 3 not yet
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
 Tracking: barwise-6mf
+Plan-reviewed: 45f824a9 (code-review, pr-review)
 Touches: barwise/scripts/pr-risk.mjs, barwise/scripts/lib/review-tiers.mjs,
 barwise/review-tiers.json, barwise/scripts/check-review-tiers.mjs,
 barwise/scripts/tests/gates.test.mjs, .github/workflows/ci.yml,
@@ -200,7 +202,7 @@ eight stale rows from a file it never opened.
 ### 1. Put the existing output in front of reviewers
 
 No new data. Change `pr-review` section 3 from "Say which groups
-applied" to "Run `npm run pr:risk -- --base origin/main` on the head;
+applied" to "Run `npm run pr:risk -- --base origin/<the PR's base>` on the head;
 the groups it lists, and every group it lists as not path-derivable, are
 the ones you run; say which ran." Add the same line to `pr-creation`'s
 readiness list for the author's own pass. Reorder `pr-risk`'s text
@@ -208,8 +210,9 @@ output to lead with the groups to run and their files, with the tier
 line after them, since a reviewer reads the list and the workflow reads
 the JSON.
 
-Acceptance: a `pr-review` run on any open PR quotes the routing in its
-Read line; `gates.test.mjs` cases for `pr-risk`'s text output are
+Acceptance: a `pr-review` run on any open PR says under Cleared and Not
+checked which of the routed groups and failure modes ran (section 5's
+Read line stays the reading guide); `gates.test.mjs` cases for `pr-risk`'s text output are
 updated and still pass.
 
 ### 2. Route REVIEW.md's failure modes (after #712 merges)

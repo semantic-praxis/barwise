@@ -172,7 +172,8 @@ jobs:
       - run: npm run check:parity
 
       # review-tiers.json is a declared copy of the trigger headings in
-      # .claude/skills/pr-review/checklist.md. This fails BOTH ways: a new
+      # .claude/skills/pr-review/checklist.md and of REVIEW.md's "Always
+      # check" titles. This fails BOTH ways for each: a new
       # heading with no row is a trigger the classifier would silently
       # never fire on, and a row naming a deleted heading is a tier
       # decision applying to nothing. Exit 2 when either input cannot be
