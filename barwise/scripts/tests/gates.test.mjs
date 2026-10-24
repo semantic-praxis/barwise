@@ -4778,6 +4778,112 @@ test("check-instruction-refs refuses an empty listing rather than reporting OK",
 });
 
 /**
+ * A spec's Touches: header replaces inference (plan-scope-check.spec.md,
+ * WS2): a path cited only as context no longer makes an unrelated edit
+ * read as implementation, and shared wiring listed in Touches: is
+ * ignored by the audit. The control is the same spec without the header,
+ * which does trip on the same edit.
+ */
+test("audit-spec-status reads Touches: instead of every cited path, and ignores wiring", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-touches-audit-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  const run = () =>
+    spawnSync(process.execPath, [join(SCRIPTS, "audit-spec-status.mjs"), "--check"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+  const specs = join(dir, "barwise", "docs", "specs");
+  try {
+    g("init", "-q");
+    g("config", "user.email", "test@example.com");
+    g("config", "user.name", "test");
+    mkdirSync(join(dir, "barwise", "src"), { recursive: true });
+    mkdirSync(join(dir, ".github", "workflows"), { recursive: true });
+    mkdirSync(specs, { recursive: true });
+    mkdirSync(join(dir, ".beads"), { recursive: true });
+    writeFileSync(join(dir, ".beads", "issues.jsonl"), "");
+    writeFileSync(join(dir, "barwise", "src", "a.ts"), "0\n");
+    writeFileSync(join(dir, ".github", "workflows", "ci.yml"), "0\n");
+    writeFileSync(join(dir, "barwise", "spec-status-baseline.json"), '{"specs":{}}\n');
+    const body = "Builds `barwise/src/a.ts`; CI runs it from `.github/workflows/ci.yml`.\n";
+    writeFileSync(
+      join(specs, "declared.spec.md"),
+      `# D\n\nStatus: Draft -- no workstream implemented\nTouches: barwise/src/a.ts, .github/workflows/ci.yml\n\n## Body\n\n${body}`,
+    );
+    writeFileSync(
+      join(specs, "inferred.spec.md"),
+      `# I\n\nStatus: Draft -- no workstream implemented\n\n## Body\n\n${body}`,
+    );
+    g("add", "-A");
+    g("commit", "-qm", "specs");
+    writeFileSync(join(dir, ".github", "workflows", "ci.yml"), "1\n");
+    g("commit", "-qam", "ci");
+    const r = run();
+    assert.equal(r.status, 1, "the inferred spec reads ci.yml as its subject");
+    assert.match(r.stderr, /NEW: inferred\.spec\.md/);
+    assert.doesNotMatch(
+      r.stderr,
+      /declared\.spec\.md/,
+      "Touches: lists ci.yml as wiring, which the audit ignores",
+    );
+    writeFileSync(join(dir, "barwise", "src", "a.ts"), "1\n");
+    g("commit", "-qam", "implementation");
+    assert.match(run().stderr, /NEW: declared\.spec\.md/, "a declared subject still counts");
+    // Touches: that omits ci.yml altogether (the spec's WS2 case): the
+    // body still cites it, and an edit to it is not this spec's subject.
+    writeFileSync(
+      join(specs, "omits.spec.md"),
+      `# O\n\nStatus: Draft -- no workstream implemented\nTouches: barwise/src/b.ts\n\n## Body\n\n${body}`,
+    );
+    writeFileSync(join(dir, "barwise", "src", "b.ts"), "0\n");
+    g("add", "-A");
+    g("commit", "-qm", "omits");
+    writeFileSync(join(dir, ".github", "workflows", "ci.yml"), "2\n");
+    g("commit", "-qam", "ci again");
+    assert.doesNotMatch(run().stderr, /omits\.spec\.md/);
+    // A directory entry is a subject: the audit used to drop it with the
+    // non-code entries, which left a directory-only plan unaudited.
+    mkdirSync(join(dir, "barwise", "lib"), { recursive: true });
+    writeFileSync(join(dir, "barwise", "lib", "c.ts"), "0\n");
+    writeFileSync(
+      join(specs, "dir.spec.md"),
+      "# R\n\nStatus: Draft -- no workstream implemented\nTouches: barwise/lib/\n\n## Body\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "dir spec");
+    writeFileSync(join(dir, "barwise", "lib", "c.ts"), "1\n");
+    g("commit", "-qam", "lib");
+    assert.match(run().stderr, /NEW: dir\.spec\.md/);
+    // Declared entries pass the audit's filters too: Markdown, a barrel,
+    // and wiring under a declared directory are never a spec's subject.
+    mkdirSync(join(dir, "barwise", "tool", "tests"), { recursive: true });
+    for (const p of ["README.md", "index.ts", "tests/t.mjs", "real.ts"]) {
+      writeFileSync(join(dir, "barwise", "tool", p), "0\n");
+    }
+    mkdirSync(join(dir, "barwise", "scripts", "tests"), { recursive: true });
+    writeFileSync(join(dir, "barwise", "scripts", "tests", "w.mjs"), "0\n");
+    writeFileSync(
+      join(specs, "filtered.spec.md"),
+      "# F\n\nStatus: Draft -- no workstream implemented\n"
+        + "Touches: barwise/tool/README.md, barwise/tool/index.ts, barwise/scripts/\n\n## Body\n",
+    );
+    g("add", "-A");
+    g("commit", "-qm", "filtered spec");
+    for (
+      const p of ["barwise/tool/README.md", "barwise/tool/index.ts", "barwise/scripts/tests/w.mjs"]
+    ) {
+      writeFileSync(join(dir, p), "1\n");
+    }
+    g("commit", "-qam", "markdown, a barrel, wiring");
+    assert.doesNotMatch(run().stderr, /filtered\.spec\.md/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
  * audit-spec-status: a verdict covers the commits it was written against
  * (barwise-qs8). A refresh once added nine commits to a row under a note
  * describing older ones, and --check passed. --check now reports commits a

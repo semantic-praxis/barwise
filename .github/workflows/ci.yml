@@ -172,6 +172,10 @@ jobs:
       # read, because "every row is stale" is what an unreadable checklist
       # would otherwise look like.
       - run: npm run check:review-tiers
+      # A spec's Touches: header is its declared plan. An unmarked entry
+      # that names nothing tracked is a plan that rotted, the way a
+      # review-tiers glob routed nothing for five weeks (barwise-fs0).
+      - run: npm run check:spec-touches
 
       # A NUL byte makes git classify a source file as binary: no diff, no
       # blame, no review, and a patch taken from it loses changes silently.
