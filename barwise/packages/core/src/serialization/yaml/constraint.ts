@@ -36,7 +36,8 @@ type OrmYamlConstraintBody =
   | { type: "cardinality"; role: string; min: number; max: number | "unbounded"; }
   | { type: "join_subset"; subset: OrmYamlJoinOperand; superset: OrmYamlJoinOperand; }
   | { type: "join_equality"; operands: OrmYamlJoinOperand[]; }
-  | { type: "join_exclusion"; operands: OrmYamlJoinOperand[]; };
+  | { type: "join_exclusion"; operands: OrmYamlJoinOperand[]; }
+  | { type: "join_ring"; operand: OrmYamlJoinOperand; ring_type: RingType; };
 
 /**
  * The operand of an exclusion, a disjunctive mandatory or an exclusive-or
@@ -130,6 +131,13 @@ export function serializeConstraint(c: Constraint): OrmYamlConstraint {
       break;
     case "join_exclusion":
       result = { type: "join_exclusion", operands: c.operands.map(serializeJoinOperand) };
+      break;
+    case "join_ring":
+      result = {
+        type: "join_ring",
+        operand: serializeJoinOperand(c.operand),
+        ring_type: c.ringType,
+      };
       break;
   }
   // Add constraint ID if present
@@ -226,6 +234,13 @@ export function deserializeConstraint(c: OrmYamlConstraint): Constraint {
       break;
     case "join_exclusion":
       result = { type: "join_exclusion", operands: c.operands.map(deserializeJoinOperand) };
+      break;
+    case "join_ring":
+      result = {
+        type: "join_ring",
+        operand: deserializeJoinOperand(c.operand),
+        ringType: c.ring_type,
+      };
       break;
   }
 

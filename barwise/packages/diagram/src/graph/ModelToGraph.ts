@@ -40,6 +40,7 @@ const NOT_DRAWN: Record<Exclude<Constraint["type"], ConstraintKind>, string> = {
   join_subset: "not drawn: join-path glyphs are not wired yet; verbalization carries it",
   join_equality: "not drawn: join-path glyphs are not wired yet; verbalization carries it",
   join_exclusion: "not drawn: join-path glyphs are not wired yet; verbalization carries it",
+  join_ring: "not drawn: join-path glyphs are not wired yet; verbalization carries it",
 };
 
 /** Map core RingType values to short diagram labels. */

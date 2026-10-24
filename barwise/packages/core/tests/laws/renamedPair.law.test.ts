@@ -108,6 +108,13 @@ const arbRenamedPair: fc.Arbitrary<RenamedPair> = arbModelPlan().map(withConstra
  * preferred identifier. Floors sit about a fifth below, so a generator
  * change that starves a shape fails here rather than leaving the laws
  * passing over pairs that never had it.
+ *
+ * Re-measured the same day when `join_ring` joined the constraint kinds
+ * (join-ring-constraint WS1): the five shapes the plan draws directly did
+ * not move; a preferred identifier fell from 22 to 14, because whether one
+ * is placed depends on the constraint draws (a drawn uniqueness flagged
+ * preferred both counts and blocks the placed one), and adding a kind
+ * reshuffles every one of those draws. Its floor follows the rule above.
  */
 const FLOORS = {
   renamed: 200,
@@ -115,7 +122,7 @@ const FLOORS = {
   populations: 140,
   subtypeFacts: 75,
   objectifications: 55,
-  preferredIdentifiers: 15,
+  preferredIdentifiers: 11,
 };
 
 const ids = (items: readonly { readonly id: string; }[]) => items.map((e) => e.id).sort();

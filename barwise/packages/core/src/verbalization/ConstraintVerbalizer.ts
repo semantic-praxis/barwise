@@ -22,6 +22,7 @@ import {
   verbalizeFrequency,
   verbalizeJoinEquality,
   verbalizeJoinExclusion,
+  verbalizeJoinRing,
   verbalizeJoinSubset,
   verbalizeRing,
   verbalizeSubset,
@@ -48,6 +49,7 @@ const KIND_NAME: Record<Constraint["type"], string> = {
   join_subset: "join subset",
   join_equality: "join equality",
   join_exclusion: "join exclusion",
+  join_ring: "join ring",
 };
 
 /**
@@ -318,6 +320,8 @@ export class ConstraintVerbalizer {
         return verbalizeJoinEquality(constraint.operands, id, model);
       case "join_exclusion":
         return verbalizeJoinExclusion(constraint.operands, id, model);
+      case "join_ring":
+        return verbalizeJoinRing(constraint.operand, constraint.ringType, id, model);
     }
   }
 }

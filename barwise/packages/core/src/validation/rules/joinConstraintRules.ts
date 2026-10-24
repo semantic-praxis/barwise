@@ -1,8 +1,10 @@
 import {
   isJoinEquality,
   isJoinExclusion,
+  isJoinRing,
   isJoinSubset,
   type JoinOperand,
+  type JoinRingConstraint,
 } from "../../model/Constraint.js";
 import type { ModelGraph } from "../../model/graph.js";
 import type { OrmModel } from "../../model/OrmModel.js";
@@ -37,9 +39,13 @@ export function joinConstraintRules(model: OrmModel, graph: ModelGraph): Diagnos
   const diagnostics: Diagnostic[] = [];
 
   for (const c of model.constraints) {
-    if (!isJoinSubset(c) && !isJoinEquality(c) && !isJoinExclusion(c)) continue;
+    if (!isJoinSubset(c) && !isJoinEquality(c) && !isJoinExclusion(c) && !isJoinRing(c)) {
+      continue;
+    }
     const at = { id: constraintElementId(c), span: constraintSpan(model, c) };
-    if (isJoinSubset(c)) {
+    if (isJoinRing(c)) {
+      checkRing(c, at, graph, diagnostics);
+    } else if (isJoinSubset(c)) {
       checkOperands([c.subset, c.superset], at, graph, diagnostics);
     } else {
       if (c.operands.length < 2) {
@@ -58,6 +64,45 @@ export function joinConstraintRules(model: OrmModel, graph: ModelGraph): Diagnos
   }
 
   return diagnostics;
+}
+
+/**
+ * A join ring's one operand: well-formed as any operand is, then exactly
+ * two columns played by one object type, which is what makes the projected
+ * pairs a relation of that type to itself. A one-hop path within one fact
+ * type is the plain `ring` spelled the long way, so two files could state
+ * one constraint two ways that diff never pairs; a warning names it, and a
+ * path of two or more hops is never this case, even a self-join whose
+ * projected roles share a fact type.
+ */
+function checkRing(
+  c: JoinRingConstraint,
+  at: At,
+  graph: ModelGraph,
+  diagnostics: Diagnostic[],
+): void {
+  const columns = checkOperand(c.operand, at, graph, diagnostics);
+  if (!columns) return;
+  const [from, to] = c.operand.projection;
+  // One node named twice relates each object only to itself, whatever the
+  // path: every pair is (x, x), so it is malformed rather than a ring.
+  if (columns.length !== 2 || from === to) {
+    diagnostics.push(
+      report(RULE_ID.joinRingArity, "default", at.id, at.span, c.operand.projection.join(", ")),
+    );
+    return;
+  }
+  if (columns[0] !== columns[1]) {
+    // Returns: a ring over two types is not a plain ring either, so the
+    // one-hop advice below would name another malformed constraint.
+    diagnostics.push(report(RULE_ID.joinRingDifferentPlayers, "default", at.id, at.span));
+    return;
+  }
+  // A well-formed hop is within one fact type by construction, so one
+  // hop projecting both of its ends is exactly what a plain ring states.
+  if (c.operand.path.steps.length === 1) {
+    diagnostics.push(report(RULE_ID.joinRingSingleFactType, "default", at.id, at.span));
+  }
 }
 
 /**

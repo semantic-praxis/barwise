@@ -58,6 +58,7 @@ const RULE_BY_TYPE = {
   join_subset: null,
   join_equality: null,
   join_exclusion: null,
+  join_ring: null,
 } as const satisfies Record<Constraint["type"], string | null>;
 
 /** The rule a counterexample of this kind must trip, or null if none is generated. */
@@ -142,6 +143,7 @@ const RULES_FROM_KIND = {
   join_subset: [RULE_ID.joinSubsetViolation],
   join_equality: [RULE_ID.joinEqualityViolation],
   join_exclusion: [RULE_ID.joinExclusionViolation],
+  join_ring: [RULE_ID.joinRingViolation],
 } as const satisfies Record<Constraint["type"], readonly string[]>;
 
 /** Exposed so the law can check it against `RULE_BY_TYPE`. */
