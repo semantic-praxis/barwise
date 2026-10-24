@@ -1,6 +1,6 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4-5 not yet
+Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24); 5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-24
@@ -17,7 +17,8 @@ barwise/scripts/regen-architecture.mjs, barwise/scripts/lib/architecture-section
 .claude/skills/steward/SKILL.md, barwise/scripts/check-architecture.mjs,
 barwise/review-tiers.json, .claude/skills/spec-writer/template.adr.md,
 .claude/skills/pr-review/checklist.md, barwise/scripts/tests/,
-barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md
+barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md,
++barwise/docs/adr/determinism-in-core.md
 
 In one sentence: each architecture or process decision lives in one ADR
 named for its concern and edited in place; the PR that changes an ADR
@@ -356,6 +357,8 @@ serves the writer and the check.
 
 One PR per ADR, each reviewed with `/code-review` and `/pr-review`
 before merge (Open decision 2). Each PR adds its files to this spec's `Touches:`.
+The owner chose the first on 2026-10-24: `determinism-in-core.md`.
+Landed so far: `determinism-in-core.md`.
 Candidates, with every place each is stated today, so WS5 can replace
 all of them with a link:
 
@@ -412,7 +415,8 @@ link. Keep inline what an agent needs before it knows which ADR to open
    each candidate is decided, written and reviewed in its own PR.
 3. **The scope values.** Recommend `architecture` and `process`.
 4. **How far `CLAUDE.md` shrinks (WS5).** Recommend rule-plus-link for
-   every convention with an ADR.
+   every convention with an ADR. **Timing resolved 2026-10-24 by the
+   owner: after a group of WS4 ADRs has landed, not one rule per ADR.**
 
 5. **What checks references to an ADR by name.** **Resolved 2026-10-23
    by the owner:** `check:architecture` resolves them (WS2).
