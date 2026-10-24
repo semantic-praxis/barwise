@@ -33,11 +33,13 @@ barwise/packages/formats/tests/
 
 A ring constraint can only say how a fact type relates an object type to
 itself. ORM 2 also lets it say that of a relation reached along a join
-path -- "no Person is an ancestor of themselves" over
-`Person is child of Person` joined twice -- and NORMA stores that as a
+path -- "no Person is their own grandparent", over `Person is child of
+Person` joined to itself -- and NORMA stores that as a
 ring whose role sequence carries a `JoinRule`. Barwise has no place to
 put one, and its NORMA importer drops such a ring without a word or, worse,
-keeps two of its roles as a flat ring that says something else. This spec
+keeps two of its roles as a flat ring that says something else: the
+grandparent ring's two projected roles both belong to the one parenthood
+fact type, so it imports as "no Person is their own parent". This spec
 adds `join_ring`: the `JoinOperand` the set-comparison join kinds already
 use, projected to two columns, plus a `RingType`. It is the follow-on the
 role-path spec named and left with "the identical shape"
@@ -95,7 +97,10 @@ In scope:
 - When the operand's path is one hop whose two projected roles lie in one
   fact type, the system shall warn `constraint/join-ring-single-fact-type`,
   naming `ring` as the plain spelling of the same constraint (Open
-  decision 3).
+  decision 3). A path of two or more hops is never this case, even when
+  both projected roles belong to one fact type, as in a self-join; and
+  the NORMA importer tells a join ring from a flat one by the presence of
+  a `JoinRule`, never by where the roles lie.
 - When a significant population yields projected pairs that break the
   ring type's properties, the system shall report
   `population/join-ring-violation`, through the same `PROPERTY_CHECKS`
@@ -180,14 +185,14 @@ export function ringFindings(
 ```yaml
 # .orm.yaml 3.0, under model.constraints
 - type: join_ring
-  id: no-self-ancestry
-  ring_type: acyclic
+  id: no-own-grandparent
+  ring_type: irreflexive
   operand:
     path:
       root: person
       steps:
         - { entry: r-child, exit: r-parent }
-        - { entry: r-child-2, exit: r-parent-2 }
+        - { entry: r-child, exit: r-parent }
     projection: [0, 2]
 ```
 
@@ -225,6 +230,13 @@ single-fact-type warning, and a diff and merge case. The flat ring's
 goldens and population tests pass unmodified.
 
 ### 2. NORMA import and export
+
+Precondition, verified first: no fixture in the repository holds a ring
+whose role sequence carries a `JoinRule`, so this workstream starts from
+a NORMA-authored file that does (the grandparent ring is enough) and
+checks that `parseJoinRule`, which today reads the set-comparison
+sequences, reads the ring's unchanged. If NORMA writes the ring's path
+some other way, this section is revised before code.
 
 The parser reads a ring's `JoinRule`; the mapper decodes it with the
 existing join decoder and produces `join_ring`; the writer and serializer
