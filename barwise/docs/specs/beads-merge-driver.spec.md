@@ -190,16 +190,21 @@ In scope:
   time and quoted, so a clone that is moved, or whose path has a space,
   keeps working (checked with a probe in a linked worktree under a
   directory named `my dir`). Running it again shall replace all three.
-- When the installed copy was installed from a commit the current
-  checkout does not contain, `prepare` shall keep it, leave the config
-  alone, and say so. The copy is shared by every worktree of the clone,
-  so without this a `prepare` run from an older branch would change how
-  every later merge in the clone resolves. The copy records its commit;
-  a copy with no record, or one naming a commit the clone lacks, is
-  replaced. (Changed in implementation: the first version compared a
-  hand-bumped `DRIVER_VERSION`, which held only while every change
-  remembered the bump, and whose guard against a rewritten version could
-  not work until main carried a record of shipped versions.)
+- When the installed copy records a driver commit (the last commit that
+  changed the installed files) that a branch still carries and that the
+  current checkout's driver commit does not descend from, `prepare`
+  shall keep it, leave the config alone, and say so. The copy is shared
+  by every worktree of the clone, so without this a `prepare` run from
+  an older branch would change how every later merge in the clone
+  resolves. Keying on the driver's own last commit means a branch that
+  never touched the driver agrees with main; requiring a branch to carry
+  the recorded commit means an amend or a rebase, which leaves it on no
+  branch, cannot pin the copy for good. A copy with no record is
+  replaced, and the record is removed before a reinstall and written
+  after it, so an interrupted copy has none. (Changed in
+  implementation: the first version compared a hand-bumped
+  `DRIVER_VERSION`, which held only while every change remembered the
+  bump.)
 - When the session-start hook runs `prepare`, it shall also read back
   `merge.beads.driver` and check that the installed wrapper exists,
   and warn if either is missing, the way it already warns about
@@ -369,9 +374,9 @@ Acceptance:
   non-zero exit.
 - When `npm run prepare` runs twice, `git config --get
   merge.beads.driver` shall print one value, and the wrapper it names
-  shall exist. When `prepare` runs from a checkout that does not
-  contain the installed copy's commit, it shall leave the copy and the
-  config in place; from one that does, it shall replace them.
+  shall exist. A sibling branch's driver change shall be kept against
+  a checkout that lacks it; a branch that never touched the driver, and
+  an amended driver commit, shall not pin the copy.
 - When the clone sits under a directory whose name contains a space,
   and when the merge runs in a linked worktree, the driver shall run.
 

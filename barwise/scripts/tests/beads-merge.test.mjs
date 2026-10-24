@@ -439,6 +439,86 @@ test("the installed copy is replaced only from a checkout that contains the comm
   assert.notEqual(readFileSync(join(installed, "driver.sh"), "utf8"), "# newer copy\n");
 });
 
+/**
+ * A repository that tracks its own copy of the installer and the driver at
+ * barwise/scripts, as a real clone does, so the installer keys on the
+ * driver's own history there rather than falling back to HEAD.
+ */
+function driverRepo() {
+  const r = repo(jsonl(issue("a")));
+  const scripts = join(r.dir, "barwise", "scripts");
+  mkdirSync(join(scripts, "lib"), { recursive: true });
+  for (
+    const f of [
+      "install-merge-driver.mjs",
+      "beads-merge-driver.mjs",
+      "beads-merge-driver.sh",
+      "lib/beads-merge.mjs",
+      "lib/beads-jsonl.mjs",
+    ]
+  ) {
+    writeFileSync(join(scripts, f), readFileSync(join(SCRIPTS, f)));
+  }
+  r.git("add", "-A");
+  r.git("commit", "-qm", "driver");
+  const install = () => r.run("node", [join(scripts, "install-merge-driver.mjs")]);
+  const record = () => readFileSync(join(r.dir, ".git", "barwise-merge", "commit"), "utf8").trim();
+  const touchDriver = (msg) => {
+    writeFileSync(
+      join(scripts, "lib", "beads-merge.mjs"),
+      `// ${msg}\n${readFileSync(join(SCRIPTS, "lib", "beads-merge.mjs"), "utf8")}`,
+    );
+    r.git("commit", "-qam", msg);
+  };
+  return { ...r, install, record, touchDriver };
+}
+
+test("a branch that never touched the driver does not pin the copy against main", () => {
+  const r = driverRepo();
+  const driverOnMain = r.git("rev-parse", "HEAD");
+  r.git("checkout", "-qb", "feature");
+  r.write(jsonl(issue("a"), issue("b")));
+  r.commit("unrelated");
+  assert.equal(r.install().status, 0);
+  assert.equal(r.record(), driverOnMain, "keyed on the driver's last commit, not HEAD");
+  r.git("checkout", "-q", "main");
+  const back = r.install();
+  assert.doesNotMatch(back.stderr, /keeping/);
+});
+
+test("an amended driver commit does not pin the copy it replaced", () => {
+  const r = driverRepo();
+  r.touchDriver("first draft");
+  assert.equal(r.install().status, 0);
+  const drafted = r.record();
+  writeFileSync(join(r.dir, "barwise", "scripts", "lib", "beads-merge.mjs"), "// amended\n");
+  r.git("commit", "-q", "--amend", "-a", "--no-edit");
+  const after = r.install();
+  assert.doesNotMatch(after.stderr, /keeping/, "the drafted commit is on no branch any more");
+  assert.notEqual(r.record(), drafted);
+  assert.equal(
+    readFileSync(join(r.dir, ".git", "barwise-merge", "lib", "beads-merge.mjs"), "utf8"),
+    "// amended\n",
+  );
+});
+
+test("a sibling branch's driver change is kept against a checkout that lacks it", () => {
+  const r = driverRepo();
+  r.git("checkout", "-qb", "driver-change");
+  r.touchDriver("sibling change");
+  assert.equal(r.install().status, 0);
+  r.git("checkout", "-q", "main");
+  const kept = r.install();
+  assert.match(
+    kept.stderr,
+    /keeping the installed tracker merge driver \(installed from [0-9a-f]{8}, carried by refs\/heads\/driver-change/,
+  );
+  assert.match(
+    readFileSync(join(r.dir, ".git", "barwise-merge", "lib", "beads-merge.mjs"), "utf8"),
+    /^\/\/ sibling change/,
+  );
+});
+
 test("outside a git repository the installer says so and lets prepare go on", () => {
   const dir = mkdtempSync(join(tmpdir(), "beads-nogit-"));
   roots.push(dir);

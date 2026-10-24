@@ -16,11 +16,15 @@
  *
  * The copy is shared by every worktree of the clone, so a `prepare` run
  * from an older branch must not change how every later merge resolves. The
- * copy records the commit it was installed from, and is replaced only from
- * a checkout that contains that commit. A hand-bumped version number did
- * this first; it held only while every change remembered the bump, and its
- * guard against a rewritten version could not work until main carried a
- * record of shipped versions. Ancestry needs neither.
+ * copy records the last commit that changed the driver's files, and is
+ * kept only when a branch still carries that commit and this checkout's
+ * driver does not descend from it -- a sibling with a driver change this
+ * one lacks, or an older branch. Keyed on the driver's own last commit,
+ * so a branch that never touched the driver agrees with main; and
+ * reachability matters because an amend or a rebase leaves the recorded
+ * commit on no branch at all, which must not pin the copy for good.
+ * A hand-bumped version number did this first; it held only while every
+ * change remembered the bump.
  *
  * Exit 0 installed or kept, and also when there is no git repository (an
  * unpacked archive, an export): like husky beside it in `prepare`, it says
@@ -28,7 +32,7 @@
  * Exit 1 when git is there and installing fails.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -60,18 +64,46 @@ function readOr(path, fallback) {
 }
 
 /**
- * Why the installed copy must stay, or undefined to replace it. Kept only
- * when it came from a commit this checkout does not contain: an older
- * branch, or a sibling with a driver change this one lacks. A copy with no
- * record, or one whose commit this clone no longer has, is replaced.
+ * The last commit that changed the driver's files here, or HEAD when they
+ * are not tracked by this repository (nothing finer to key on).
  */
-function keepReason(installed, head) {
-  if (!installed || !head || installed === head) return undefined;
-  const r = spawnSync("git", ["merge-base", "--is-ancestor", installed, head], { stdio: "ignore" });
-  if (r.status !== 1) return undefined; // 0: contained; anything else: unknown commit
-  return `installed from ${installed.slice(0, 8)}, which this checkout (${
-    head.slice(0, 8)
-  }) does not contain`;
+function driverCommit() {
+  const paths = FILES.map(([, from]) => join(HERE, from));
+  try {
+    const last = git(["log", "-1", "--format=%H", "--", ...paths]);
+    if (last) return last;
+  } catch {
+    // Paths outside this repository: fall through to HEAD.
+  }
+  try {
+    return git(["rev-parse", "--verify", "--quiet", "HEAD"]);
+  } catch {
+    return ""; // no commit yet
+  }
+}
+
+/**
+ * Why the installed copy must stay, or undefined to replace it. A copy
+ * with no record, from this same driver commit, from an ancestor of it,
+ * from a commit this clone does not have, or from one no ref carries any
+ * more (amended, rebased) is replaced.
+ */
+function keepReason(installed, current) {
+  if (!installed || !current || installed === current) return undefined;
+  const r = spawnSync("git", ["merge-base", "--is-ancestor", installed, current], {
+    stdio: "ignore",
+  });
+  if (r.status !== 1) return undefined; // 0: an ancestor; otherwise not a commit here
+  let carried = "";
+  try {
+    carried = git(["for-each-ref", "--count=1", "--format=%(refname)", "--contains", installed]);
+  } catch {
+    return undefined;
+  }
+  if (!carried) return undefined;
+  return `installed from ${
+    installed.slice(0, 8)
+  }, carried by ${carried}, which this checkout's driver (${current.slice(0, 8)}) does not contain`;
 }
 
 function main() {
@@ -83,13 +115,8 @@ function main() {
     return 0;
   }
   const dir = join(common, INSTALL_DIR);
-  let head = "";
-  try {
-    head = git(["rev-parse", "--verify", "--quiet", "HEAD"]);
-  } catch {
-    // No commit yet: nothing to compare, so install.
-  }
-  const reason = keepReason(readOr(join(dir, "commit"), ""), head);
+  const current = driverCommit();
+  const reason = keepReason(readOr(join(dir, "commit"), ""), current);
   if (reason) {
     console.error(
       `install-merge-driver: keeping the installed tracker merge driver (${reason}). `
@@ -99,12 +126,14 @@ function main() {
     // could name a wrapper the kept copy does not have.
     return 0;
   }
+  // The record goes first and comes back last, so an interrupted copy has
+  // none and is replaced next time rather than kept under the old one.
+  rmSync(join(dir, "commit"), { force: true });
   for (const [to, from] of FILES) {
     mkdirSync(dirname(join(dir, to)), { recursive: true });
     copyFileSync(join(HERE, from), join(dir, to));
   }
-  // Last, so an interrupted copy has no record and is replaced next time.
-  writeFileSync(join(dir, "commit"), `${head}\n`);
+  writeFileSync(join(dir, "commit"), `${current}\n`);
   git([
     "config",
     `merge.${DRIVER_NAME}.name`,

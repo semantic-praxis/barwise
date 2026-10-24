@@ -20,7 +20,8 @@ is data to reconstruct, not hunks to pick.
   `docs/specs/beads-merge-driver.spec.md`) into the clone's git
   directory, and `.gitattributes` routes the tracker to it. So
   `git merge origin/main` on a branch whose PR GitHub shows as
-  conflicted on the tracker completes without hand work. GitHub runs
+  conflicted on the tracker completes without hand work, unless the
+  two sides changed the same field of one issue differently (below). GitHub runs
   no custom driver, which is why the PR page still says conflicted
   until that merge is pushed. If the session-start hook warned that the
   driver is not installed, run `npm run prepare` from `barwise/`
