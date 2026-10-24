@@ -36,6 +36,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -4984,17 +4985,19 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
 // --- check:architecture: the package graph's copies agree with INTENDED ---
 
 /**
- * A committed copy of the three inputs check:architecture reads, from
- * this repo's real files, so the test proves the real graph passes before
- * each mutation proves a planted disagreement is seen.
+ * A committed copy of every input check:architecture reads, from this
+ * repo's real files -- all the package manifests, not a sample -- so the
+ * test proves the real graph passes before each mutation proves a planted
+ * disagreement is seen.
  */
 function architectureRepo() {
   const dir = tempRepo();
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
   copy("barwise/scripts/lib/intended.cjs");
-  for (const pkg of ["core", "llm", "promptlab", "vscode"]) {
-    copy(`barwise/packages/${pkg}/package.json`);
+  for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
+    const rel = `barwise/packages/${pkg}/package.json`;
+    if (existsSync(join(REPO, rel))) copy(rel);
   }
   execFileSync("git", ["commit", "-qm", "inputs"], { cwd: dir });
   return dir;
@@ -5002,11 +5005,26 @@ function architectureRepo() {
 
 const ARCH = ["--", process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
 
+/** Run check:architecture in `dir` with one file edited, then restore it. */
+function archPlanted(dir, rel, edit) {
+  const path = join(dir, rel);
+  const before = readFileSync(path, "utf8");
+  const after = edit(before);
+  assert.notEqual(after, before, `${rel}: the edit did not apply`);
+  writeFileSync(path, after);
+  try {
+    return spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+  } finally {
+    writeFileSync(path, before);
+  }
+}
+
 test("check:architecture passes the real graph and catches each planted disagreement", () => {
   const dir = architectureRepo();
   try {
     const clean = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
     assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+    assert.match(clean.stdout, /12 package manifests/);
     for (
       const [file, old, replacement, why] of [
         // An extra edge in the picture: llm drawn as depending on diagram.
@@ -5023,40 +5041,84 @@ test("check:architecture passes the real graph and catches each planted disagree
           `"promptlab": ["core", "llm"]`,
           /CLAUDE\.md draws promptlab -> learn/,
         ],
-        // A runtime dependency the map does not allow.
+        // A runtime dependency the map does not allow, and a peer one.
         [
           "barwise/packages/core/package.json",
           `"dependencies": {`,
           `"dependencies": {\n    "@barwise/llm": "*",`,
-          /packages\/core: depends on @barwise\/llm, INTENDED does not allow it/,
+          /packages\/core: dependencies has @barwise\/llm, INTENDED does not allow it/,
+        ],
+        [
+          "barwise/packages/core/package.json",
+          `"dependencies": {`,
+          `"peerDependencies": { "@barwise/llm": "*" },\n  "dependencies": {`,
+          /packages\/core: peerDependencies has @barwise\/llm/,
+        ],
+        // A misspelled target, in the map and the picture alike: they agree
+        // with each other, and depcruise would drop the edge silently.
+        [
+          "barwise/scripts/lib/intended.cjs",
+          `"learn": ["core"],`,
+          `"learn": ["cor"],`,
+          /INTENDED has learn -> cor, and cor is not a key/,
         ],
       ]
     ) {
       const r = mutate(dir, ["--file", file, "--old", old, "--new", replacement, ...ARCH]);
       assert.equal(r.status, 0, `${file}: expected CAUGHT:\n${r.stdout}${r.stderr}`);
-      // mutate restores the file, so rerun the planted state by hand to
-      // read WHICH disagreement was reported, not merely that one was.
-      const path = join(dir, file);
-      const before = readFileSync(path, "utf8");
-      writeFileSync(path, before.replace(old, replacement));
-      const red = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
-      writeFileSync(path, before);
+      // mutate restores the file, so plant it again by hand to read WHICH
+      // disagreement was reported, not merely that one was.
+      const red = archPlanted(dir, file, (s) => s.replace(old, replacement));
       assert.equal(red.status, 1, red.stderr);
       assert.match(red.stderr, why);
     }
+    // A package removed from packages/ while the map and picture keep it.
+    rmSync(join(dir, "barwise", "packages", "learn"), { recursive: true });
+    const gone = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
+    assert.equal(gone.status, 1, gone.stderr);
+    assert.match(gone.stderr, /INTENDED has learn, which is not a package under packages\//);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("check:architecture cannot answer when the graph block is gone", () => {
+test("check:architecture cannot answer when an input is unreadable or empty", () => {
   const dir = architectureRepo();
+  const refused = (r, why) => {
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, why);
+  };
   try {
-    const path = join(dir, "CLAUDE.md");
-    writeFileSync(path, readFileSync(path, "utf8").replace("## Dependency Graph", "## Packages"));
-    const r = spawnSync(ARCH[1], ARCH.slice(2), { cwd: dir, encoding: "utf8" });
-    assert.equal(r.status, 2, r.stderr);
-    assert.match(r.stderr, /cannot answer -- CLAUDE\.md has no "## Dependency Graph" heading/);
+    refused(
+      archPlanted(dir, "CLAUDE.md", (s) => s.replace("## Dependency Graph", "## Packages")),
+      /cannot answer -- CLAUDE\.md has no "## Dependency Graph" heading/,
+    );
+    // The section keeps its heading and loses its block: it must refuse,
+    // not read a later section's fence as the graph.
+    refused(
+      archPlanted(
+        dir,
+        "CLAUDE.md",
+        (s) => s.replace(/(## Dependency Graph\n\n)```\n[\s\S]*?\n```\n/, "$1"),
+      ),
+      /the Dependency Graph section has no fenced block/,
+    );
+    refused(
+      archPlanted(dir, "barwise/packages/core/package.json", (s) => s.replace("{", "{,")),
+      /cannot answer -- \S*packages\/core\/package\.json: /,
+    );
+    refused(
+      archPlanted(
+        dir,
+        "barwise/scripts/lib/intended.cjs",
+        (s) => s.replace(`"core": []`, `"core": [[]]`),
+      ),
+      /does not export a map of package to package list/,
+    );
+    refused(
+      spawnSync(ARCH[1], [ARCH[2], "--root"], { cwd: dir, encoding: "utf8" }),
+      /--root needs a value/,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

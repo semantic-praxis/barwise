@@ -2,8 +2,8 @@
 // docs/specs/archive/architecture-analysis.spec.md.
 //
 // This config IS the reflexion model: the intended one-way dependency
-// graph from the root CLAUDE.md, encoded as machine-checkable rules and
-// diffed against the actual import graph on every CI run. It owns the
+// graph (INTENDED, scripts/lib/intended.cjs, the authority), encoded as
+// machine-checkable rules and diffed against the actual import graph on every CI run. It owns the
 // orthogonality pillar -- direction (S-ORTH-1..3) and acyclicity
 // (S-ORTH-4, which replaces the former madge check).
 //

@@ -13,8 +13,8 @@
  *     check would let a removed package linger in the picture.
  *   - each package's runtime `dependencies` in package.json. An internal
  *     dependency `INTENDED` does not allow is a layering decision taken in
- *     the manifest, where depcruise never looks. `devDependencies` are not
- *     compared: `@barwise/llm` lists `@barwise/diagram` there for its
+ *     the manifest, where depcruise never looks (peer and optional
+ *     dependencies count too). `devDependencies` are not compared: `@barwise/llm` lists `@barwise/diagram` there for its
  *     tests, which ship nothing.
  *
  * Exit 0 all agree, 1 an edge or dependency disagrees (each named), 2 an
@@ -49,8 +49,12 @@ function graphEdges(claudeMd) {
   const lines = claudeMd.split("\n");
   const heading = lines.findIndex((l) => /^##\s+Dependency Graph\s*$/.test(l));
   if (heading === -1) throw new Error('CLAUDE.md has no "## Dependency Graph" heading');
+  // The closing fence must lie inside this section: a section that lost
+  // its block then refuses, rather than reading a later section's block.
+  const next = lines.findIndex((l, i) => i > heading && l.startsWith("## "));
+  const end = next === -1 ? lines.length : next;
   const open = lines.findIndex((l, i) => i > heading && l.startsWith("```"));
-  const close = lines.findIndex((l, i) => i > open && l.startsWith("```"));
+  const close = lines.findIndex((l, i) => i > open && i < end && l.startsWith("```"));
   if (open === -1 || close === -1) {
     throw new Error("the Dependency Graph section has no fenced block");
   }
@@ -70,14 +74,26 @@ function graphEdges(claudeMd) {
   return { edges, twice };
 }
 
-const root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
+/**
+ * Runtime dependency fields: each is installed and resolved when the
+ * package runs, so a layering edge in any of them is one depcruise cannot
+ * see. `devDependencies` alone is left out (see the header).
+ */
+const RUNTIME = ["dependencies", "peerDependencies", "optionalDependencies"];
 
 let intended, graph, manifests;
 try {
+  // Inside the refusal: a bare `--root` throws, and that is "could not
+  // answer", not the exit 1 a real disagreement uses.
+  const root = resolve(
+    opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."),
+  );
   const intendedPath = join(root, "barwise", "scripts", "lib", "intended.cjs");
   intended = createRequire(import.meta.url)(intendedPath);
   const shape = intended && typeof intended === "object"
-    && Object.values(intended).every((v) => Array.isArray(v));
+    && Object.values(intended).every(
+      (v) => Array.isArray(v) && v.every((d) => typeof d === "string"),
+    );
   if (!shape || Object.keys(intended).length === 0) {
     throw new Error(`${intendedPath} does not export a map of package to package list`);
   }
@@ -88,7 +104,13 @@ try {
     .map((e) => [e.name, join(pkgs, e.name, "package.json")])
     // A directory without a manifest (a stray build folder) is not a package.
     .filter(([, p]) => existsSync(p))
-    .map(([dir, p]) => ({ dir, json: JSON.parse(readFileSync(p, "utf8")) }));
+    .map(([dir, p]) => {
+      try {
+        return { dir, json: JSON.parse(readFileSync(p, "utf8")) };
+      } catch (err) {
+        throw new Error(`${p}: ${err.message}`);
+      }
+    });
   if (manifests.length === 0) throw new Error(`no package.json under ${pkgs}`);
 } catch (err) {
   console.error(`check:architecture: cannot answer -- ${err.message}`);
@@ -111,6 +133,17 @@ for (const p of Object.keys(intended)) {
 for (const p of graph.edges.keys()) {
   if (!(p in intended)) problems.push(`CLAUDE.md lists ${p}, INTENDED does not`);
 }
+// INTENDED and the picture agreeing is not enough: a deleted or misspelled
+// package would pass in both. Every key is a package with a manifest, and
+// every target is a key -- depcruise's group would silently drop a
+// misspelled one.
+const dirs = new Set(manifests.map((m) => m.dir));
+for (const [p, ds] of Object.entries(intended)) {
+  if (!dirs.has(p)) problems.push(`INTENDED has ${p}, which is not a package under packages/`);
+  for (const d of ds) {
+    if (!(d in intended)) problems.push(`INTENDED has ${p} -> ${d}, and ${d} is not a key`);
+  }
+}
 
 for (const { dir, json } of manifests) {
   if (internal(json.name ?? "") !== dir) {
@@ -120,10 +153,12 @@ for (const { dir, json } of manifests) {
     problems.push(`packages/${dir}: not in INTENDED`);
     continue;
   }
-  for (const dep of Object.keys(json.dependencies ?? {})) {
-    const target = internal(dep);
-    if (target !== null && !intended[dir].includes(target)) {
-      problems.push(`packages/${dir}: depends on ${dep}, INTENDED does not allow it`);
+  for (const field of RUNTIME) {
+    for (const dep of Object.keys(json[field] ?? {})) {
+      const target = internal(dep);
+      if (target !== null && !intended[dir].includes(target)) {
+        problems.push(`packages/${dir}: ${field} has ${dep}, INTENDED does not allow it`);
+      }
     }
   }
 }

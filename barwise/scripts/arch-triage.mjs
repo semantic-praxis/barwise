@@ -11,8 +11,9 @@
 //      size, and which files in different packages change together
 //      (temporal coupling, an orthogonality smell)?
 //
-// No dependencies: the gate tool (dependency-cruiser) is decided in
-// WS4. This snapshot stays self-contained on purpose.
+// No npm dependencies: the gate tool (dependency-cruiser) is decided in
+// WS4. The one local require is the package graph itself
+// (lib/intended.cjs), so this snapshot cannot drift from the gate.
 //
 // Usage: node barwise/scripts/arch-triage.mjs [--base <ref>]
 //
