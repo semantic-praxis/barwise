@@ -802,3 +802,40 @@ export function isInternalConstraint(c: Constraint): c is InternalConstraint {
 export function isExternalConstraint(c: Constraint): c is ExternalConstraint {
   return PLACEMENT[c.type] === "external";
 }
+
+/**
+ * A constraint as a reader finds it in the file, for a message that must
+ * tell two constraints sharing an id apart: its kind as the file spells it,
+ * and the fact type it lives in, or for one stored on the model the role
+ * or subtype-fact ids it names. Built only from what the constraint states,
+ * never from what its references resolve to, so a dangling role cannot
+ * hide the repeat. The one description the 3.0 loader's refusal and
+ * `structural/duplicate-constraint-id` both print.
+ */
+export function describeConstraintPlace(c: Constraint, factTypeName: string | undefined): string {
+  if (factTypeName !== undefined) return `${c.type} in fact type ${JSON.stringify(factTypeName)}`;
+  if (isOverSubtypes(c)) {
+    const facts = subtypeFactIdsOf(c);
+    return facts.length > 0
+      ? `${c.type} over subtype facts ${facts.join(", ")}`
+      : `${c.type} over no subtype facts`;
+  }
+  const roles = roleIdsOf(c);
+  return roles.length > 0 ? `${c.type} over roles ${roles.join(", ")}` : `${c.type} over no roles`;
+}
+
+/**
+ * Every repeated constraint id, each with its holders described, at most
+ * `limit` of them and a count of the rest, for a one-line message.
+ */
+export function describeRepeatedConstraintIds(
+  repeats: Iterable<readonly [string, readonly string[]]>,
+  limit = 5,
+): string {
+  const all = [...repeats];
+  const shown = all.slice(0, limit).map(([id, places]) =>
+    `${JSON.stringify(id)} (${places.join("; ")})`
+  );
+  const rest = all.length - shown.length;
+  return shown.join(", ") + (rest > 0 ? `, and ${rest} more` : "");
+}

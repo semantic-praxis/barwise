@@ -122,7 +122,7 @@ describe("a 3.0 document that misplaces a constraint", () => {
       doc.model.fact_types[1].constraints[0].id = "u-cid";
     });
     expect(read).toThrow(
-      'Two constraints share the id "u-cid" (internal_uniqueness in fact type "Customer has CustomerId"; '
+      'More than one constraint holds the id "u-cid" (internal_uniqueness in fact type "Customer has CustomerId"; '
         + 'internal_uniqueness in fact type "Customer has Name"); a constraint id names one constraint.',
     );
   });

@@ -1,11 +1,5 @@
-import {
-  type Constraint,
-  isOverSubtypes,
-  roleIdsOf,
-  subtypeFactIdsOf,
-} from "../../model/Constraint.js";
+import { describeConstraintPlace } from "../../model/Constraint.js";
 import { isScopedView } from "../../model/DiagramLayout.js";
-import type { FactType } from "../../model/FactType.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
@@ -95,27 +89,9 @@ function checkDuplicateConstraintIds(model: OrmModel): Diagnostic[] {
       "default",
       id,
       id,
-      holders.map(([c, ft]) => describeHolder(c, ft)).join("; "),
+      holders.map(([c, ft]) => describeConstraintPlace(c, ft?.name)).join("; "),
     )
   );
-}
-
-/**
- * A constraint as a reader can find it in the file, from what it states
- * and never from what its references resolve to, so a dangling role cannot
- * hide the duplicate. One stored on the model is told apart by the ids it
- * names, since two of one kind can share the id.
- */
-function describeHolder(c: Constraint, ft: FactType | undefined): string {
-  if (ft) return `${c.type} in fact type "${ft.name}"`;
-  if (isOverSubtypes(c)) {
-    const facts = subtypeFactIdsOf(c);
-    return facts.length > 0
-      ? `${c.type} over subtype facts ${facts.join(", ")}`
-      : `${c.type} over no subtype facts`;
-  }
-  const roles = roleIdsOf(c);
-  return roles.length > 0 ? `${c.type} over roles ${roles.join(", ")}` : `${c.type} over no roles`;
 }
 
 /**

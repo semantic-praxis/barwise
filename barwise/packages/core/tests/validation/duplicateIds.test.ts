@@ -118,7 +118,7 @@ model:
   it("is refused at load in a 3.0 file, before any rule runs", () => {
     const yaml = serializer.serialize(twoFactTypes("c", "c"));
     expect(() => serializer.deserialize(yaml)).toThrow(
-      'Two constraints share the id "c"',
+      'More than one constraint holds the id "c"',
     );
   });
 
@@ -133,7 +133,7 @@ ${body}`;
   it("is refused under a lenient 3.0 load too, which barwise migrate relies on", () => {
     const yaml = serializer.serialize(twoFactTypes("c", "c"));
     expect(() => serializer.deserialize(yaml, { lenient: true })).toThrow(
-      'Two constraints share the id "c"',
+      'More than one constraint holds the id "c"',
     );
   });
 
@@ -155,7 +155,7 @@ ${body}`;
       constraints:
         - { id: c, type: mandatory, role: r2 }
 `);
-    expect(() => serializer.deserialize(yaml)).toThrow('Two constraints share the id "c"');
+    expect(() => serializer.deserialize(yaml)).toThrow('More than one constraint holds the id "c"');
   });
 
   it("names every repeated id and its holders when it refuses", () => {
@@ -163,9 +163,9 @@ ${body}`;
     model.addConstraint({ type: "exclusion", id: "d", roleIds: ["r1", "r2"] });
     model.addConstraint({ type: "exclusion", id: "d", roleIds: ["r2", "r1"] });
     expect(() => serializer.deserialize(serializer.serialize(model))).toThrow(
-      'Two constraints share the id "c" (mandatory in fact type "A runs"; '
-        + 'mandatory in fact type "A walks"), and "d" (exclusion in the model\'s constraints; '
-        + "exclusion in the model's constraints); a constraint id names one constraint.",
+      'More than one constraint holds the id "c" (mandatory in fact type "A runs"; '
+        + 'mandatory in fact type "A walks"), "d" (exclusion over roles r1, r2; '
+        + "exclusion over roles r2, r1); a constraint id names one constraint.",
     );
   });
 
@@ -184,7 +184,7 @@ ${body}`;
       constraints:
         - { id: c, type: mandatory, role: r2 }
 `);
-    expect(() => serializer.deserialize(yaml)).toThrow('Two constraints share the id "c"');
+    expect(() => serializer.deserialize(yaml)).toThrow('More than one constraint holds the id "c"');
   });
 
   it("names a constraint over subtypes by its subtype facts", () => {
