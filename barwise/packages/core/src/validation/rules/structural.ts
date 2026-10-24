@@ -108,7 +108,12 @@ function checkDuplicateConstraintIds(model: OrmModel): Diagnostic[] {
  */
 function describeHolder(c: Constraint, ft: FactType | undefined): string {
   if (ft) return `${c.type} in fact type "${ft.name}"`;
-  if (isOverSubtypes(c)) return `${c.type} over subtype facts ${subtypeFactIdsOf(c).join(", ")}`;
+  if (isOverSubtypes(c)) {
+    const facts = subtypeFactIdsOf(c);
+    return facts.length > 0
+      ? `${c.type} over subtype facts ${facts.join(", ")}`
+      : `${c.type} over no subtype facts`;
+  }
   const roles = roleIdsOf(c);
   return roles.length > 0 ? `${c.type} over roles ${roles.join(", ")}` : `${c.type} over no roles`;
 }

@@ -90,7 +90,6 @@ export function subtypePairKey(
  * annotation makes the next field added to `SubtypeFactConfig` a
  * compile error here until it is listed.
  */
-
 export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
   const config: Complete<SubtypeFactConfig> = {
     id: sf.id,

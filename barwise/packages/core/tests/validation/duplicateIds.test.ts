@@ -158,6 +158,17 @@ ${body}`;
     expect(() => serializer.deserialize(yaml)).toThrow('Two constraints share the id "c"');
   });
 
+  it("names every repeated id and its holders when it refuses", () => {
+    const model = twoFactTypes("c", "c");
+    model.addConstraint({ type: "exclusion", id: "d", roleIds: ["r1", "r2"] });
+    model.addConstraint({ type: "exclusion", id: "d", roleIds: ["r2", "r1"] });
+    expect(() => serializer.deserialize(serializer.serialize(model))).toThrow(
+      'Two constraints share the id "c" (mandatory in fact type "A runs"; '
+        + 'mandatory in fact type "A walks"), and "d" (exclusion in the model\'s constraints; '
+        + "exclusion in the model's constraints); a constraint id names one constraint.",
+    );
+  });
+
   it("is the error a strict 3.0 load reports when a role also dangles", () => {
     const yaml = threeZero(`  fact_types:
     - id: f1

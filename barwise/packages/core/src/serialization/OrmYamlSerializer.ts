@@ -273,16 +273,28 @@ export class OrmYamlSerializer {
     // migrate` re-reads its own 3.0 output leniently to refuse writing a
     // file a strict load would reject. A 2.0 file and a model built in code
     // are reported by `structural/duplicate-constraint-id` instead, which
-    // asks the same `groupRepeats` of the built model.
-    const factTypes = (doc.model.fact_types ?? []).map(deserializeFactType);
-    const modelConstraints = (doc.model.constraints ?? []).map(deserializeConstraint);
-    const [repeated] = groupRepeats(
-      [...factTypes.flatMap((ft) => ft.constraints), ...modelConstraints],
-      (c) => c.id,
-    ).keys();
-    if (repeated !== undefined) {
+    // asks the same `groupRepeats` of the built model -- except where the
+    // holders' fact types also share an id, which collapses them before any
+    // rule runs; refusing that is model-invariants workstream 3 (barwise-1l0).
+    const factTypes = (doc.model.fact_types ?? []).map((ftDoc) => deserializeFactType(ftDoc));
+    const modelConstraints = (doc.model.constraints ?? []).map((cDoc) =>
+      deserializeConstraint(cDoc)
+    );
+    const stated = [
+      ...factTypes.flatMap(({ config, constraints }) =>
+        constraints.map((c) => ({ c, where: `fact type "${config.name}"` }))
+      ),
+      ...modelConstraints.map((c) => ({ c, where: "the model's constraints" })),
+    ];
+    const repeats = [...groupRepeats(stated, ({ c }) => c.id)];
+    if (repeats.length > 0) {
+      const named = repeats.map(([id, holders]) =>
+        `"${id}" (${holders.map(({ c, where }) => `${c.type} in ${where}`).join("; ")})`
+      );
       throw new DeserializationError(
-        `Two constraints share the id "${repeated}"; a constraint id names one constraint.`,
+        `Two constraints share the id ${
+          named.join(", and ")
+        }; a constraint id names one constraint.`,
       );
     }
 
