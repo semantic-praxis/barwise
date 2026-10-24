@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-24
 Last-updated: 2026-10-24
 Tracking: barwise-alg
+Plan-reviewed: 2e3c189e (code-review, pr-review)
 Touches: barwise/packages/core/src/model/identification.ts,
 barwise/packages/core/src/mapping/RelationalMapper.ts,
 barwise/packages/core/src/validation/rules/completenessWarnings.ts,
