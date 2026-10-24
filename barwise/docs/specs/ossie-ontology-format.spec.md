@@ -72,6 +72,9 @@ In scope:
   with `format: ossie`, or the editor's `#barwiseImportModel`) reads an
   Ossie ontology document at version `0.2.0.dev0`, the system shall
   produce a model in which:
+  - the ontology's `name` is the model's name unless the caller names the
+    model (the CLI's `--name`, which defaults to the file name), and its
+    `description` is the model's note;
   - each `EntityType` concept is an entity object type, and each
     `ValueType` concept a value type whose data type is the built-in at
     the root of its `extends` chain (`String` to `text`, `Integer` to
@@ -126,15 +129,17 @@ In scope:
     `Entity.rel` naming one of its relationships is a mandatory first role
     on `rel`. The items of a `requires` list all hold, while a barwise
     value constraint's values and ranges are alternatives, so an enumeration
-    is carried only alone: with a second enumeration or a bound beside it,
-    the first enumeration is the constraint and the rest go to the note.
+    is never combined with another item: the first enumeration item is the
+    constraint, and a second enumeration, or a bound beside an enumeration,
+    goes to the note.
     Any other expression is kept in the element's note and named in a
     warning.
 - When the document's `version` is not `0.2.0.dev0`, the importer shall
   refuse it, naming the version it read and the one it supports.
 - When a document is malformed in a way the mapping depends on -- a concept
   declared twice or redeclaring a built-in, a relationship name repeated on
-  one concept, two roles with one name, a placeholder naming no role, a
+  one concept, two roles with one name, an empty `verbalizes`, a placeholder naming no
+  role, a pattern leaving a role out, a
   role or supertype that is not declared, an `extends` cycle -- the
   importer shall refuse it with an `OssieImportError` naming the place.
   An empty or null `description` is read as absent.
@@ -147,7 +152,8 @@ In scope:
 - When an importer creates an element, it shall take the id from
   `generateId()` (`importer-role-ids.spec.md`, R1), and
   `cli/tests/importerIds.test.ts` shall run it over a fixture that
-  reaches every id path. Elements are found again by name, and a re-import
+  reaches every id path -- which means the test's id collector also reads
+  subtype-fact ids, which it does not today, for every importer. Elements are found again by name, and a re-import
   diffs by content, which diff falls back to when ids differ.
 - When a model is exported with `--format ossie`, the system shall write an
   ontology document that `ontology/ontology.json` at the pinned commit
@@ -157,9 +163,19 @@ In scope:
   the join kinds, a mandatory role other than a first role, an external
   uniqueness that is not an entity's identifier, and any internal
   uniqueness other than the shapes a multiplicity or an identifier states).
+  An entity's `identify_by` is its preferred identifier's relationship,
+  or, for an entity with none, the relationships of an external uniqueness
+  whose every role is the far role of a binary declared under that entity
+  (the import's composite shape). Every other loss -- a semiderived rule,
+  a data type with no Ossie built-in, a value type with no data type, a
+  note, a reference mode no fact type carries -- is named in the export's
+  loss report (Open decision 5).
 - When `examples/flights.ontology.yaml` at the pinned commit is imported
   and the result exported, the second document shall equal the first in
-  every construct the import did not warn about.
+  every construct the import did not warn about, compared by meaning: a
+  recognized `requires` as the constraint it reads as (`1 <= X` and
+  `X >= 1` are one bound) and a placeholder as the role it names, since the
+  import keeps neither spelling. Everything else compares as written.
 
 Out of scope:
 
@@ -182,7 +198,7 @@ Out of scope:
 | ----------------------------------------------- | ---------------------------------- | --------------------------------------------- |
 | `formats/src/ossie/` (new)                      | none                               | parser, mapper, writer, `requires` recognizer |
 | `cli/tests/importerIds.test.ts`                 | a fixture per registered importer  | adds an Ossie fixture (R3)                    |
-| `vscode/package.json` `barwise_import_model`    | a hand-listed `format` enum        | adds `ossie`; a drift test against registry   |
+| `vscode/package.json` tool `format` enums       | hand-listed, import and export     | `ossie` added; drift tests vs the registry    |
 | `formats/src/registration.ts`                   | five descriptors                   | adds `ossieFormat`, importer and exporter     |
 | `formats/tests/fixtures/ossie/` (new)           | none                               | the pinned `flights.ontology.yaml` and schema |
 | core `ImportResult.warnings`, `constraintSpecs` | exist; NORMA returns no warnings   | used as is                                    |
@@ -200,15 +216,15 @@ format reaches all three surfaces through the registry, so it stays true.
   OssieTypes.ts        the document shape, as the pinned schema states it
   parseOssie.ts        YAML text -> OssieDocument (version check)
   mapOssieToOrm.ts     OssieDocument -> OrmModel + warnings
-  requiresShapes.ts    the two recognized requires shapes <-> value constraints
+  requiresShapes.ts    the three recognized requires shapes <-> constraints
   writeOssie.ts        OrmModel -> OssieDocument + constraintSpecs
   OssieImportFormat.ts / OssieExportFormat.ts   the two adapters
 registration.ts: ossieFormat { name: "ossie", extension: "yaml",
                                importer, exporter }
 ```
 
-Element ids come from `generateId()`, as every importer's do; elements are
-found again by name. `writeOssie` is a renderer living in `@barwise/formats`
+Element ids come from `generateId()`, as every importer's do except NORMA's,
+which keeps the source file's ids; elements are found again by name. `writeOssie` is a renderer living in `@barwise/formats`
 rather than a thin shell over core, as the NORMA writer already is: the
 package convention that export descriptors call back into core describes
 the DDL, OpenAPI and Avro shells, and WS2 amends formats `CLAUDE.md` to say
@@ -219,8 +235,9 @@ a format with no core renderer keeps its writer here.
 - **Map every `requires` expression to a value constraint, or drop the
   ones that do not fit.** Mapping all of them needs the expression
   language barwise-pf2.2 owns; dropping them silently is the failure this
-  spec exists to avoid. The two recognized shapes cover the example's
-  enumerations and ranges, and the rest is kept as a note and reported.
+  spec exists to avoid. The three recognized shapes cover the example's
+  enumerations, ranges and mandatory roles, and the rest is kept as a note
+  and reported.
 - **Export every barwise constraint as a `requires` expression.** Beyond
   the three recognized shapes, which the exporter does write (a mandatory
   first role as `Entity.rel`), it would write expressions in a language
@@ -229,8 +246,8 @@ a format with no core renderer keeps its writer here.
   `constraintSpecs` already carries a verbalization and pseudocode for
   every such constraint.
 - **Derive ids from Ossie names**, so a re-import matches by id. It breaks
-  `importer-role-ids.spec.md` R1, which rejected a sanctioned exception to
-  `generateId()` outright; diff's content fallback already matches a
+  `importer-role-ids.spec.md` R1, whose Alternatives considered rejected a
+  sanctioned exception to `generateId()` outright; diff's content fallback already matches a
   re-import.
 - **A new `@barwise/ossie` connector package.** The connector packages
   exist to own I/O (`@barwise/dbt`'s subprocess, `@barwise/code-analysis`'s
@@ -243,8 +260,8 @@ a format with no core renderer keeps its writer here.
 
 `OssieTypes`, `parseOssie`, `mapOssieToOrm`, `requiresShapes`, and
 `OssieImportFormat`, registered on `ossieFormat` with the importer only;
-`ossie` added to the editor tool's `format` enum with a drift test against
-the registry; an Ossie fixture in `importerIds.test.ts`; the format named
+`ossie` added to the editor's `barwise_import_model` `format` enum, with a
+drift test holding that enum and `barwise_export_model`'s to the registry; an Ossie fixture in `importerIds.test.ts`; the format named
 where docs list the formats package's descriptors. Tests: each mapping in
 Scope against a small document; the version refusal and each malformed
 shape; every warning named; and the pinned `flights.ontology.yaml` imported, its
@@ -257,8 +274,14 @@ license header, which is what redistributing it requires.
 `writeOssie` and `OssieExportFormat`, added to `ossieFormat`. Tests: each
 inverse mapping; every unexpressible constraint kind in `constraintSpecs`;
 the exported flights document accepted by the pinned `ontology.json`
-(validated in the test with `ajv`, which the workspace already locks for
-`@barwise/core`; WS2 adds it to `@barwise/formats` as a devDependency); and
+(validated in the test with `ajv`'s draft 2020-12 build, `ajv/dist/2020`,
+which the workspace already locks for `@barwise/core`; WS2 adds it to
+`@barwise/formats` as a devDependency). The schema's two remote `$ref`s
+name `core-spec/ossie-schema.json` on Ossie's moving `main`, so that file is
+vendored too, from the pinned commit, and registered under the URL the
+`$ref` names: no network, and no drift from the pin. `ossie` joins the
+editor's `barwise_export_model` enum, which the WS1 drift test then holds;
+and
 the round trip in Scope, construct by construct. Depends on WS1.
 
 ## API and migration impact
@@ -287,9 +310,11 @@ the round trip in Scope, construct by construct. Depends on WS1.
 3. **Implied spanning uniqueness.** A relationship with no multiplicity
    has set semantics, so its links never repeat: a uniqueness spanning
    every role. Options: emit that uniqueness on import (validation then
-   has nothing to report, and export omits it again as implied); or emit
-   nothing (the model carries a fact type with no uniqueness, which
-   barwise's validation warns about). **Recommend emitting it**: it is
+   reports what it reports for any many-to-many fact type -- the
+   `spanningAllRoles` note, info on a binary and a warning from a ternary
+   up -- and export omits it again as implied); or emit nothing (the model
+   carries a fact type with no uniqueness, which validation reports as
+   missing). **Recommend emitting it**: it is
    what the Ossie document states, and leaving it out would make a valid
    Ossie relationship import as a validation warning.
 
@@ -303,6 +328,18 @@ the round trip in Scope, construct by construct. Depends on WS1.
    core change this spec rules out). **Recommend keeping it and warning**,
    with hyphen binding in core filed as barwise-iiw, since NORMA readings use
    the same convention.
+
+5. **Where export reports a loss that is not a constraint.**
+   `ExportResult` carries `constraintSpecs` for constraints and
+   `annotations` shaped for tables (`tableName`, `columnName`); a
+   semiderived rule, an unmapped data type or a dropped note has no field.
+   Options: a comment block at the top of the written document listing each
+   loss (`# barwise: <element>: <what was not written>`), which needs no
+   core change and is seen by whoever opens the file, though the CLI and
+   MCP summaries do not show it; or an optional `warnings` field on
+   `ExportResult`, which every surface could print, but is a core interface
+   change this spec rules out. **Recommend the comment block**, and the
+   core field when a second format needs the same channel.
 
 ## Risks and testing
 
