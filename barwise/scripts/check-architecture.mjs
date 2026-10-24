@@ -59,28 +59,35 @@ const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !==
  * and each misread a realistic edit -- a nested connector skipped, a
  * comment that opened with a package name read as a second listing, a
  * legend read as a package -- because the drawing had no syntax that
- * separated the two. A grammar gives it one, and the thing it must never
- * do is read a misdrawn row as prose. So comment text opens with a letter
- * or `(`, never a symbol (`'---`, `@x`, box-drawing), and is refused when
- * it has a row's shape (`name (a, b)`): that is a row that lost its
- * connector.
+ * separated the two. The grammar gives it one, and the thing it must never
+ * do is read a misdrawn row as prose. So comment text is placed, not
+ * guessed: it may only continue a root or row that carries `-- comment`
+ * (or the comment line before it), which is where the real block wraps.
+ * It opens with a letter or `-- ` and does not have a whole row's shape
+ * (`name (a, b)` and nothing after), so a row that lost its connector
+ * right after a commented row is refused too.
  */
 const NAME = String.raw`[@\w](?:[\w@/.-]*\w)?`;
 const LIST = String.raw`\(([\w@/.\-, ]*)\)`;
-const COMMENT = String.raw`(?:\s+--\s.*)?\s*$`;
+// Captured, so a row can say whether a comment opened after it.
+const COMMENT = String.raw`(\s+--\s.*)?\s*$`;
 const ROOT = new RegExp(String.raw`^(${NAME})\s+${LIST}${COMMENT}`);
 // At most two spaces in: a connector indented further is a nested child,
 // which the grammar does not draw.
 const ROW = new RegExp(String.raw`^\s{0,2}\|---\s+(${NAME})\s+${LIST}${COMMENT}`);
 const DRAWING = /^[\s|^]*$/;
-const CONTINUATION = /^\s*\|?\s{2,}([A-Za-z(].*|-- .*)$/;
-const ROW_SHAPED = new RegExp(String.raw`^${NAME}\s+\([^)]*\)${COMMENT}`);
+const CONTINUATION = /^\s*\|?\s{2,}([A-Za-z].*|-- .*)$/;
+const ROW_SHAPED = new RegExp(String.raw`^${NAME}\s*\([^)]*\)${COMMENT}`);
 const GRAMMAR = "the root line (`name (no internal deps)`); rows (`|--- name (a, b)`, at most"
-  + " two spaces in), either with an optional `  -- comment`; drawing lines (`|`, `^`); and"
-  + " indented comment text opening with a letter, `(` or `-- `, never shaped like a row";
+  + " two spaces in; names and lists of letters, digits and @ / . - _ ,); either may end with"
+  + " `  -- comment`, and only then may the next lines continue it -- indented two or more"
+  + " spaces after an optional `|`, opening with a letter or `-- `, never a whole row's shape;"
+  + " and drawing lines of `|` and `^`";
 
 function graphLines(claudeMd) {
-  const lines = claudeMd.split("\n");
+  // CRLF too: `.` stops at `\r`, so a Windows checkout would refuse every
+  // comment line of a correct block.
+  const lines = claudeMd.split(/\r?\n/);
   const heading = lines.findIndex((l) => /^##\s+Dependency Graph\s*$/.test(l));
   if (heading === -1) throw new Error('CLAUDE.md has no "## Dependency Graph" heading');
   // The closing fence must lie inside this section: a section that lost
@@ -101,6 +108,8 @@ function graphLines(claudeMd) {
       ? []
       : list.split(",").map((x) => x.trim()).filter(Boolean),
   });
+  // Whether the line before opened or continued a comment.
+  let commenting = false;
   for (const [i, line] of body.entries()) {
     if (i === first) {
       const m = ROOT.exec(line);
@@ -110,15 +119,19 @@ function graphLines(claudeMd) {
         );
       }
       out.push(listed(m[1], m[2]));
+      commenting = m[3] !== undefined;
       continue;
     }
     const m = ROW.exec(line);
     if (m) {
       out.push(listed(m[1], m[2]));
+      commenting = m[3] !== undefined;
       continue;
     }
     const text = CONTINUATION.exec(line)?.[1];
-    if (DRAWING.test(line) || (text !== undefined && !ROW_SHAPED.test(text))) continue;
+    if (commenting && text !== undefined && !ROW_SHAPED.test(text)) continue;
+    commenting = false;
+    if (DRAWING.test(line)) continue;
     throw new Error(
       `the graph block line "${line.trim()}" is not one the grammar allows: ${GRAMMAR}`,
     );

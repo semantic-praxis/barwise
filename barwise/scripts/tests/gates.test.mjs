@@ -5386,10 +5386,21 @@ test("check:architecture passes the real graph and catches each planted disagree
             "(diagram)  -- React renderer over the",
             "(diagram)  -- renders with @xyflow/react (MIT) over the",
           ),
-        (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   embedded by barwise-vscode (in-process)`),
-        (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |   barwise-vscode (and CLI) embed it`),
+        (x) =>
+          x.replace(
+            MCP_ROW,
+            `${MCP_ROW}  -- the server;\n  |   embedded by barwise-vscode (in-process)`,
+          ),
+        (x) =>
+          x.replace(MCP_ROW, `${MCP_ROW}  -- the server;\n  |   barwise-vscode (and CLI) embed it`),
         (x) => x.replace(ROOT_ROW, `${ROOT_ROW}  -- the kernel`),
-        (x) => x.replace(MCP_ROW, `${MCP_ROW}\n  |        -- providers (Anthropic, OpenAI)`),
+        (x) =>
+          x.replace(
+            MCP_ROW,
+            `${MCP_ROW}  -- the server\n  |        -- providers (Anthropic, OpenAI)`,
+          ),
+        // A CRLF checkout of the real block.
+        (x) => x.replace(/\n/g, "\r\n"),
         (x) =>
           x.replace(
             "(core)  -- connector package: registers",
@@ -5481,6 +5492,22 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
         [LLM_ROW, `${LLM_ROW} extra`, /\(core\) extra/],
         [LLM_ROW, "  |---------- connectors ----------", /\|---------- connectors/],
         [LLM_ROW, `${LLM_ROW}\n\n@barwise/planned            (core)`, /@barwise\/planned/],
+        // Comment text only continues a row that opened a comment: under a
+        // row without one it is a wrapped list or a lost connector.
+        [LLM_ROW, `${LLM_ROW}\n  |                              (mcp)`, /\(mcp\)/],
+        [LLM_ROW, `${LLM_ROW}\n  |   barwise-planned       (core)  (planned)`, /barwise-planned/],
+        [LLM_ROW, `${LLM_ROW}\n  |   planned(core)`, /planned\(core\)/],
+        [LLM_ROW, `${LLM_ROW}\n  |   a stray note`, /a stray note/],
+        // Under a commented row, a whole row's shape is still not prose.
+        [
+          MCP_ROW,
+          `${MCP_ROW}  -- the server\n  |   barwise-planned (core)`,
+          /\|   barwise-planned/,
+        ],
+        [MCP_ROW, `${MCP_ROW}  -- the server\n  |   (core, llm)`, /\|   \(core, llm\)/],
+        [MCP_ROW, `${MCP_ROW}  -- the server\n  |   planned(core)`, /\|   planned\(core\)/],
+        // A drawing line ends the comment: text after it continues nothing.
+        [MCP_ROW, `${MCP_ROW}  -- the server\n  |\n  |   a stray note`, /a stray note/],
         // A row that lost its connector, in any spelling, is not prose.
         [LLM_ROW, `${LLM_ROW}\n  |   @barwise/planned   (core)`, /\|   @barwise\/planned/],
         [LLM_ROW, `${LLM_ROW}\n  @barwise/planned   (core)`, /"@barwise\/planned/],
