@@ -94,8 +94,21 @@ alongside this file.
    missing, so return to grounding (step 1) or move the undecided item
    into Open decisions -- do not polish through it. The review runs
    in-conversation; commit the fixes, never the review.
-8. **Clear the gate, then land.** Run the pre-push gate below, land the
-   spec for review, then implement in separate PRs. Before implementing
+8. **Clear the gate, review the plan, then implement.** Run the pre-push
+   gate below and commit the spec. Before any implementation commit, run
+   `/code-review` and `/pr-review` on the spec at that commit and act on
+   what they find; then add `Plan-reviewed: <commit> (code-review,
+   pr-review)` to its header, naming the head the reviews read, and
+   commit that line on its own. A plan edited after the review needs
+   the review again: the line vouches for the spec's body as it stood at
+   that commit. `npm run check:plan-review` (a CI gate on pull requests)
+   fails a PR that names the spec and changes a path in its `Touches:`
+   while the spec is new in the PR or its Status at the base claims
+   nothing is built, unless the line names a commit that precedes every
+   such change and whose body matches the plan the implementation
+   started from (`docs/specs/plan-scope-check.spec.md`).
+   The spec may land alone or with its first workstream; either way the
+   review commit comes first. Before implementing
    each workstream, ground it again and verify or correct the
    conclusions drafted ahead of time; revise the spec if the scope
    differs from the brief. Re-ground the claims that promise _no_ work

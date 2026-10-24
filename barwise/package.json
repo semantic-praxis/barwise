@@ -19,6 +19,7 @@
     "check:parity": "node scripts/check-parity.mjs",
     "check:review-tiers": "node scripts/check-review-tiers.mjs",
     "check:spec-touches": "node scripts/check-spec-touches.mjs",
+    "check:plan-review": "node scripts/check-plan-review.mjs",
     "pr:risk": "node scripts/pr-risk.mjs",
     "plan-scope": "node scripts/plan-scope.mjs",
     "check:no-nul": "node scripts/check-no-nul.mjs",

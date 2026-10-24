@@ -10,11 +10,13 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  CLAIMS_NOTHING_BUILT,
   entryPaths,
   header,
   inSpecCorpus,
   isWiring,
   namedPaths,
+  specBody,
   touches,
 } from "../lib/spec-reader.mjs";
 
@@ -36,6 +38,35 @@ test("header reads the header block only, across wrapped lines", () => {
   ].join("\n");
   assert.equal(header(text, "Tracking"), "barwise-1, barwise-2,\nbarwise-3");
   assert.equal(header(text, "Touches"), undefined, "a field in the body is not the spec's own");
+});
+
+test("specBody is everything but the header block, so header edits leave it alone", () => {
+  const spec = (head) => `# Title\n\n${head}\n\n## Plan\n\nThe plan.\n`;
+  const before = spec("Status: Draft\nTracking: barwise-1");
+  const after = spec(
+    "Status: Workstream 1 implemented\nTracking: barwise-1\n"
+      + "Plan-reviewed: abc1234 (code-review, pr-review)",
+  );
+  assert.equal(specBody(before), specBody(after));
+  assert.equal(specBody(before), "# Title\n## Plan\n\nThe plan.\n");
+  assert.notEqual(specBody(before), specBody(before.replace("The plan.", "Another plan.")));
+  assert.notEqual(specBody(before), specBody(before.replace("# Title", "# Retitled")));
+});
+
+test("CLAIMS_NOTHING_BUILT matches the claim wherever it sits, and not a partial one", () => {
+  for (
+    const s of [
+      "Draft",
+      "Proposed (for review)",
+      "Accepted; design only, no implementation in this PR",
+      "Draft -- no workstream implemented",
+    ]
+  ) {
+    assert.ok(CLAIMS_NOTHING_BUILT.test(s), s);
+  }
+  for (const s of ["Workstreams 1-2 implemented; 3-6 not yet", "Implemented 2026-10-23"]) {
+    assert.ok(!CLAIMS_NOTHING_BUILT.test(s), s);
+  }
 });
 
 test("touches parses entries and their marks", () => {

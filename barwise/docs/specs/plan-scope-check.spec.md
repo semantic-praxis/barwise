@@ -1,9 +1,10 @@
 # Report how a pull request's diff compares with the plan its spec wrote down, and how big it is
 
-Status: Workstreams 1-5 implemented 2026-10-24 (plan.md deleted; the shared
+Status: Workstreams 1-6 implemented 2026-10-24 (plan.md deleted; the shared
 spec reader, Touches: read by audit:specs, check:spec-touches; the
-plan-scope report; generated marks in .gitattributes; the skill wiring);
-6 not yet
+plan-scope report; generated marks in .gitattributes; the skill wiring;
+check:plan-review and the plan-review rule in spec-writer, pr-creation and
+the template)
 
 Created: 2026-10-23
 Last-updated: 2026-10-24
@@ -100,10 +101,10 @@ In scope:
   exit 1 naming the spec and the entry.
 - When a PR names a spec (the spec file is in its diff, or its file name
   is in a commit message on the branch) and changes a path in that spec's
-  `Touches:` while the spec's Status at the merge base claims nothing is
-  built, and the spec has no `Plan-reviewed:`
-  line naming an ancestor of the first such change that contains the
-  spec, `check:plan-review` shall exit 1 naming the spec.
+  `Touches:` (at the merge base or at HEAD) while the spec is new or its
+  Status at the merge base claims nothing is built (or is missing), and the
+  spec has no `Plan-reviewed:` line naming a proper ancestor of every such
+  change that contains the spec, `check:plan-review` shall exit 1 naming the spec.
 - When either check cannot read git or a spec, it shall exit 2.
 
 Out of scope: blocking a merge on size or scope (see the resolved question
@@ -289,11 +290,13 @@ Plan-reviewed: <commit> (code-review, pr-review)
   `template.spec.md` tells authors to update Status in the commit that
   lands a workstream, so a head-side reading would exempt every compliant
   first-workstream PR.
-- **What it requires.** A `Plan-reviewed:` line naming a commit that is an
-  ancestor of the diff's first change to a `Touches:` entry, and at which
-  the
-  spec's body -- everything but the header block -- is identical to the
-  body at that first change. A review of an earlier draft does not cover
+- **What it requires.** A `Plan-reviewed:` line naming a commit that is a
+  proper ancestor of every branch commit changing a `Touches:` entry --
+  a side line merged in included, not only the first in topological
+  order -- and at which the spec's body -- everything but the header block -- is identical to the
+  body where each line of implementation began (the first change, and the
+  start of any side line merged in), in its parent (WS6 says why not the
+  first change itself). A review of an earlier draft does not cover
   a plan rewritten afterwards; this PR is the example, where the owner's
   decisions were written after the first `/code-review` round, so only a
   review of the head that carries them counts.
@@ -437,7 +440,7 @@ exclusion list, and then reports inflated sizes until this lands.
 A non-blocking CI step that prints the report to the job summary is
 deferred until the report has been used on real PRs.
 
-### 6. The plan-review rule and `check:plan-review` (provisional: not yet grounded)
+### 6. The plan-review rule and `check:plan-review` (implemented 2026-10-24)
 
 The owner's rule, written where authors and agents read it, and checked:
 
@@ -454,10 +457,36 @@ The owner's rule, written where authors and agents read it, and checked:
   lacks the spec, the passing order, and git failing (exit 2), each seen
   red first through `mutate.mjs`.
 
-Not grounded: how many open specs would fail on day one. The rule applies
-to implementation after it lands, so a spec whose Status already claims
-work is built is out of its reach; the count of Draft specs with
-implementation in flight is the first thing to measure.
+Grounded 2026-10-24 on `4c28e58d` (origin/main):
+
+- **Day one: no open spec fails.** Ten specs' Status claims nothing is
+  built, and none of them declares `Touches:`, so none is in reach. The
+  four specs that declare it (architecture-index, masked-exit-report,
+  review-routing, this one) all claim some work built already.
+- **Over history: 2 of 408.** Run over every first-parent merge since
+  2026-07-01 (`--base M^1 --head M^2`, each spec's header as of that
+  PR), two would have exited 1: #714 and #715, which edited ADRs that
+  `architecture-index.spec.md` lists in `Touches:` before it carried a
+  `Plan-reviewed:` line. The four PRs that implemented a spec carrying
+  one (#721, #723, #724, #728) pass.
+- **Reach is the open question, not strictness.** Of those 408 merges,
+  146 named a spec that was new or claimed nothing built and changed
+  something outside `barwise/docs/` and `.beads/`; 140 of the 146 named
+  only specs with no `Touches:`, which the rule cannot see. `Touches:`
+  is optional, so a spec without it is outside the rule entirely. Until
+  `spec-writer` makes it required for new specs, or a check refuses a
+  new spec without it, the gate covers what authors opt into.
+- **The body is compared at the first change's parent.** Read literally,
+  "the body at that first change" includes that commit's own edits.
+  Measured on #721: its first implementation commit also amended the
+  spec, so the literal reading failed it, while the same amendment one
+  commit later would have passed, since later edits are never compared.
+  The parent -- the plan as implementation began -- is the reading under
+  which the two agree.
+- **Merge commits, not squash.** The named commit must stay an ancestor,
+  which holds because PRs here merge with a merge commit. Rebasing a
+  branch after its plan review rewrites the named commit, and the line
+  must then be re-pointed at the reviewed head's new id.
 
 ## Open decisions (for review)
 

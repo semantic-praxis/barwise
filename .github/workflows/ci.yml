@@ -184,6 +184,22 @@ jobs:
       # that names nothing tracked is a plan that rotted, the way a
       # review-tiers glob routed nothing for five weeks (barwise-fs0).
       - run: npm run check:spec-touches
+      # A spec's plan is reviewed (/code-review, /pr-review) before its
+      # implementation is committed, recorded as `Plan-reviewed: <commit>`
+      # in its header (plan-scope-check.spec.md, WS6). Wired like
+      # check:tracker-closes, for the same reason: the question is about
+      # what a pull request adds over its base, and a push to main has no
+      # base to compare against, so pull requests only, with the base
+      # commit passed in; ci-local runs it against
+      # `git merge-base origin/main HEAD`. No docs-only guard: a
+      # workstream whose Touches: is all skills and Markdown is
+      # implementation the rule covers. It reads ancestry, which the
+      # `fetch-depth: 0` checkout above makes answerable; a shallow clone
+      # refuses (exit 2).
+      - run: npm run check:plan-review
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
 
       # A NUL byte makes git classify a source file as binary: no diff, no
       # blame, no review, and a patch taken from it loses changes silently.

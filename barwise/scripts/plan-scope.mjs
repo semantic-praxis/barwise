@@ -37,8 +37,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { opt } from "./lib/args.mjs";
 import { generatedPaths } from "./lib/generated.mjs";
+import { parseNameStatus } from "./lib/name-status.mjs";
 import { matchesPattern } from "./lib/review-tiers.mjs";
-import { inSpecCorpus, namedPaths, touches } from "./lib/spec-reader.mjs";
+import { inSpecCorpus, namedPaths, namedSpecs, touches } from "./lib/spec-reader.mjs";
 
 const SPEC_DIR = "barwise/docs/specs/";
 /** An ad hoc plan file: plan.md or PLAN.md by name, anywhere but the specs directory. */
@@ -54,13 +55,11 @@ try {
 
   // Changed files with their status, and lines per file, since the branch
   // left the base. Renames off, so a move is its two paths.
-  const status = lines(git("diff", "--name-status", "-z", "--no-renames", `${base}...HEAD`));
-  const changed = [];
-  const added = new Set();
-  for (let i = 0; i + 1 < status.length; i += 2) {
-    changed.push(status[i + 1]);
-    if (status[i] === "A") added.add(status[i + 1]);
-  }
+  const status = parseNameStatus(
+    git("diff", "--name-status", "-z", "--no-renames", `${base}...HEAD`),
+  );
+  const changed = status.map((r) => r.path);
+  const added = new Set(status.filter((r) => r.letter === "A").map((r) => r.path));
   const lineCount = new Map();
   for (const rec of lines(git("diff", "--numstat", "-z", "--no-renames", `${base}...HEAD`))) {
     const [a, d, path] = rec.split("\t");
@@ -98,12 +97,12 @@ try {
   // Only specs on disk: one the branch deletes, archives or renames away
   // (staged or not) is a change to a plan, not a plan to read.
   const onDisk = (f) => existsSync(join(root, f));
-  const specs = new Set(changed.filter((f) => inSpecCorpus(f) && onDisk(f)));
-  const messages = git("log", "--format=%B", `${base}..HEAD`);
-  for (const m of messages.matchAll(/([\w.-]+\.spec\.md)/g)) {
-    const f = SPEC_DIR + m[1];
-    if (tracked.has(f) && inSpecCorpus(f) && onDisk(f)) specs.add(f);
-  }
+  // The rule check:plan-review shares (lib/spec-reader.mjs).
+  const specs = new Set(namedSpecs(
+    changed,
+    [...tracked].filter((f) => inSpecCorpus(f) && onDisk(f)),
+    git("log", "--format=%B", `${base}..HEAD`),
+  ));
 
   // Each spec's plan: its Touches: entries, or the paths its text names.
   const dirs = new Set();
