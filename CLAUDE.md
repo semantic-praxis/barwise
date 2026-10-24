@@ -170,9 +170,9 @@ working in a package:
   |                                        evaluator, miss-card emission) and
   |                                        the tutorial renderer
   |--- @barwise/promptlab       (core, llm, learn)  -- deterministic prompt
-  |                                                    evaluation: eval suite, scorer,
-  |                                                    runner, score history (the DSPy
-  |                                                    optimizer lane's metric)
+  |                                        evaluation: eval suite, scorer,
+  |                                        runner, score history (the DSPy
+  |                                        optimizer lane's metric)
   |--- @barwise/cli             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn, promptlab)
   |--- @barwise/mcp             (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, learn)
   |--- barwise-vscode           (core, diagram, diagram-ui, llm, code-analysis, dbt, formats, mcp)

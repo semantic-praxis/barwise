@@ -58,31 +58,30 @@ const repeated = (list) => [...new Set(list.filter((x, i) => list.indexOf(x) !==
  * and each misread a realistic edit -- a nested connector skipped, a
  * comment that opened with a package name read as a second listing, a
  * legend read as a package -- and a shape test on comment text then failed
- * both ways (a lost row with a trailing note passed; `registry (x)`
- * prose was refused). Position settles it: a comment line starts in the
- * exact column where its row's comment text starts, as every wrap in the
- * real block is drawn, so a row that lost its connector sits at the
- * wrong column and is refused whatever its text says.
+ * both ways (a lost row with a trailing note passed; `registry (x)` prose
+ * was refused). Position settles it: a comment line's text starts right of
+ * the column where its row's list opens. That column does not move when a
+ * dependency is added, so the wraps under a row survive the commonest
+ * edit, and a row that lost its connector starts at the row-name column,
+ * left of it, and is refused whatever its text says. (An exact-column
+ * rule was tried and refused the untouched wraps whenever a list grew.)
  */
 const NAME = String.raw`[@\w](?:[\w@/.-]*\w)?`;
 const LIST = String.raw`\(([\w@/.\-, ]*)\)`;
-// Captured, so the comment's column can be read off the row.
 const COMMENT = String.raw`(\s+--\s.*)?\s*$`;
-const ROOT = new RegExp(String.raw`^(${NAME})\s+${LIST}${COMMENT}`);
+// The `d` flag gives the list's column; group 3 says whether a comment opened.
+const ROOT = new RegExp(String.raw`^(${NAME})\s+${LIST}${COMMENT}`, "d");
 // At most two spaces in: a connector indented further is a nested child,
 // which the grammar does not draw.
-const ROW = new RegExp(String.raw`^\s{0,2}\|---\s+(${NAME})\s+${LIST}${COMMENT}`);
+const ROW = new RegExp(String.raw`^\s{0,2}\|---\s+(${NAME})\s+${LIST}${COMMENT}`, "d");
 const DRAWING = /^[\s|^]*$/;
 const GRAMMAR = "the root line (`name (no internal deps)`); rows (`|--- name (a, b)`, at most"
   + " two spaces in, package names separated by commas); either may end with ` -- comment`,"
-  + " and the comment may wrap onto lines whose text starts in the column its first word"
-  + " starts in, after an optional `|`; and drawing lines of `|` and `^`";
+  + " and the comment may wrap onto the lines below it, whose text starts right of the"
+  + " column where that row's list opens; and drawing lines of `|` and `^`";
 
-/** The column a row's comment text starts in, or null when it has none. */
-function commentColumn(line, group) {
-  if (group === undefined) return null;
-  return line.length - group.length + /^\s+--\s+/.exec(group)[0].length;
-}
+/** What a root or row match leaves open: its name and list column, if it has a comment. */
+const opened = (m) => (m[3] === undefined ? null : { name: m[1], at: m.indices[2][0] - 1 });
 
 function graphLines(claudeMd) {
   // CRLF too: `.` stops at `\r`, so a Windows checkout would refuse every
@@ -108,8 +107,8 @@ function graphLines(claudeMd) {
       ? []
       : list.split(",").map((x) => x.trim()).filter(Boolean),
   });
-  // The column the open comment wraps at, or null when none is open.
-  let wrap = null;
+  // The comment the previous line opened or continued, or null.
+  let comment = null;
   for (const [i, line] of body.entries()) {
     if (i === first) {
       const m = ROOT.exec(line);
@@ -119,22 +118,26 @@ function graphLines(claudeMd) {
         );
       }
       out.push(listed(m[1], m[2]));
-      wrap = commentColumn(line, m[3]);
+      comment = opened(m);
       continue;
     }
     const m = ROW.exec(line);
     if (m) {
       out.push(listed(m[1], m[2]));
-      wrap = commentColumn(line, m[3]);
+      comment = opened(m);
       continue;
     }
-    const indent = /^(\s*\|?\s+)\S/.exec(line)?.[1].length;
-    // A null wrap never equals an indent, so no comment is open then.
-    if (indent === wrap) continue;
-    wrap = null;
+    // Text starts after the drawing characters, so a wrap may sit beside `^`.
+    const indent = /^[\s|^]*/.exec(line)[0].length;
+    if (comment !== null && indent < line.length && indent > comment.at) continue;
+    const under = comment === null
+      ? ""
+      : `; a comment line under ${comment.name} must start right of column ${comment.at}`
+        + `, and this one starts at ${indent}`;
+    comment = null;
     if (DRAWING.test(line)) continue;
     throw new Error(
-      `the graph block line "${line.trim()}" is not one the grammar allows: ${GRAMMAR}`,
+      `the graph block line "${line.trimEnd()}" is not one the grammar allows${under}: ${GRAMMAR}`,
     );
   }
   if (out.length === 0) throw new Error("the Dependency Graph block names no package");

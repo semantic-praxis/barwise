@@ -5245,6 +5245,14 @@ const INTENDED_CJS = "barwise/scripts/lib/intended.cjs";
 /** Each planted disagreement: file, anchor, replacement, the line it must report. */
 const ARCH_DISAGREEMENTS = [
   // Both directions of an edge disagreement.
+  // A dependency added to a commented row: its untouched wraps still read
+  // as its comment, so the new edge is compared, not refused.
+  [
+    "CLAUDE.md",
+    "@barwise/dbt             (core)",
+    "@barwise/dbt             (core, llm)",
+    /CLAUDE\.md draws dbt -> llm, INTENDED does not/,
+  ],
   [
     "CLAUDE.md",
     CLAUDE_LLM,
@@ -5404,6 +5412,23 @@ test("check:architecture passes the real graph and catches each planted disagree
             ),
           ),
         (x) => x.replace(ROOT_ROW, `${ROOT_ROW}  -- the kernel`),
+        // A wrapped root comment beside the arrow, a wrap with no `|` under
+        // the last row, and a `--` wrap under the row's own `--`.
+        (x) =>
+          x.replace(
+            `${ROOT_ROW}\n  ^\n`,
+            `${ROOT_ROW}  -- the kernel;\n  ^${" ".repeat(ROOT_ROW.length + 2)}depends inward\n`,
+          ),
+        (x) =>
+          x.replace(
+            vscodeRow,
+            `${vscodeRow}  -- the editor;\n${" ".repeat(vscodeRow.length + 5)}bundles everything`,
+          ),
+        (x) =>
+          x.replace(
+            MCP_ROW,
+            `${MCP_ROW}  -- the server\n  |${" ".repeat(MCP_ROW.length - 1)}-- in-process`,
+          ),
         (x) => x.replace(/\n/g, "\r\n"),
         (x) =>
           x
@@ -5517,10 +5542,29 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
         ],
         [
           MCP_ROW,
-          `${commented(MCP_ROW, "the server")}\n  |${" ".repeat(MCP_ROW.length + 3)}off by one`,
-          /off by one/,
+          `${commented(MCP_ROW, "the server")}\n  |${
+            " ".repeat(MCP_ROW.indexOf("(") - 3)
+          }at the list column`,
+          /at the list column/,
+        ],
+        [
+          MCP_ROW,
+          `${MCP_ROW}  -- the server\n  |   lost (core)`,
+          new RegExp(
+            `under @barwise/mcp must start right of column ${
+              MCP_ROW.indexOf("(")
+            }, and this one starts at 6`,
+          ),
         ],
         // A drawing line ends the comment: text after it continues nothing.
+        // ... even one padded with trailing spaces past the list column.
+        [
+          MCP_ROW,
+          `${commented(MCP_ROW, "the server")}\n  |${" ".repeat(MCP_ROW.length)}\n  |${
+            " ".repeat(MCP_ROW.length + 2)
+          }after padding`,
+          /after padding/,
+        ],
         [
           MCP_ROW,
           `${commented(MCP_ROW, "the server")}\n  |\n  |${
@@ -5531,7 +5575,7 @@ test("check:architecture cannot answer when an input is unreadable or misshapen"
         [MCP_ROW, `${MCP_ROW}  -- the server\n  |\n  |   a stray note`, /a stray note/],
         // A row that lost its connector, in any spelling, is not prose.
         [LLM_ROW, `${LLM_ROW}\n  |   @barwise/planned   (core)`, /\|   @barwise\/planned/],
-        [LLM_ROW, `${LLM_ROW}\n  @barwise/planned   (core)`, /"@barwise\/planned/],
+        [LLM_ROW, `${LLM_ROW}\n  @barwise/planned   (core)`, /"  @barwise\/planned/],
         [LLM_ROW, `${LLM_ROW}\n  |   barwise-planned (core)`, /\|   barwise-planned/],
         [LLM_ROW, `${LLM_ROW}\n  |   @xyflow/react (MIT) is not used here`, /@xyflow\/react/],
         [LLM_ROW, "  '--- @barwise/llm   (core)", /'--- @barwise\/llm/],
