@@ -28,8 +28,13 @@ export interface ValueShapes {
   readonly contradictory: readonly string[];
 }
 
+/** A relationship name the mandatory shape reads; the writer holds names to it. */
+export const IDENT_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const IDENT = String.raw`[A-Za-z_][A-Za-z0-9_]*`;
 const NUMBER = String.raw`-?\d+(?:\.\d+)?`;
+/** Where the reader splits an enumeration; the writer refuses a value it would split. */
+export const ENUMERATION_SEPARATOR = /\s+OR\s+/;
+const NUMBER_ONLY = new RegExp(`^${NUMBER}$`);
 const QUOTED = String.raw`'((?:[^']|'')*)'`;
 
 function escape(text: string): string {
@@ -100,7 +105,7 @@ function empty(
 
 /** `X == 'A' OR X == 'B'` to `["A", "B"]`, or undefined for any other shape. */
 function enumeration(item: string, member: RegExp): string[] | undefined {
-  const parts = item.split(/\s+OR\s+/);
+  const parts = item.split(ENUMERATION_SEPARATOR);
   const out: string[] = [];
   for (const part of parts) {
     const m = member.exec(part);
@@ -157,4 +162,33 @@ function narrow(
 export function readMandatoryShape(concept: string, item: string): string | undefined {
   const m = new RegExp(String.raw`^\s*${escape(concept)}\.(${IDENT})\s*$`).exec(item);
   return m?.[1];
+}
+
+// ---------------------------------------------------------------------------
+// The inverses, for the writer. Each refuses (returns undefined) a value the
+// reader above would not read back as the same constraint, so a write is
+// either faithful or a reported loss.
+// ---------------------------------------------------------------------------
+
+/** `X == 'A' OR X == 'B'`, or undefined when a value would split or nothing is listed. */
+export function writeEnumeration(concept: string, values: readonly string[]): string | undefined {
+  if (values.length === 0 || values.some((v) => ENUMERATION_SEPARATOR.test(v))) return undefined;
+  return values.map((v) => `${concept} == '${v.replace(/'/g, "''")}'`).join(" OR ");
+}
+
+/** A range's bound items (`X >= lo`, `X < hi`), or undefined when a bound is not a number. */
+export function writeBounds(
+  concept: string,
+  range: { min?: string; max?: string; minInclusive?: boolean; maxInclusive?: boolean; },
+): string[] | undefined {
+  const items: string[] = [];
+  if (range.min !== undefined) {
+    if (!NUMBER_ONLY.test(range.min)) return undefined;
+    items.push(`${concept} ${range.minInclusive === false ? ">" : ">="} ${range.min}`);
+  }
+  if (range.max !== undefined) {
+    if (!NUMBER_ONLY.test(range.max)) return undefined;
+    items.push(`${concept} ${range.maxInclusive === false ? "<" : "<="} ${range.max}`);
+  }
+  return items.length > 0 ? items : undefined;
 }

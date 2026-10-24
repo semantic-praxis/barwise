@@ -1,6 +1,6 @@
 # Apache Ossie ontology import and export
 
-Status: In progress -- WS1 (import) implemented; WS2 (export) provisional, not started
+Status: Implemented -- WS1 (import) and WS2 (export and round trip)
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -8,6 +8,8 @@ Tracking: barwise-pf2.1
 Plan-reviewed: 9a7009d1 (code-review, pr-review)
 Touches: +barwise/packages/formats/src/ossie/,
 barwise/packages/formats/src/registration.ts,
++barwise/packages/formats/src/constraintSpec.ts,
+barwise/packages/formats/src/ddl/constraintRouting.ts,
 barwise/packages/formats/src/index.ts,
 barwise/packages/formats/tests/,
 barwise/packages/formats/CLAUDE.md,
@@ -165,19 +167,15 @@ In scope:
   diffs by content, which diff falls back to when ids differ.
 - When a model is exported with `--format ossie`, the system shall write an
   ontology document that `ontology/ontology.json` at the pinned commit
-  accepts, inverting each mapping above, and shall list in
-  `constraintSpecs` every constraint it cannot express (ring, frequency,
-  exclusion, exclusive-or, subset, equality, value comparison, cardinality,
-  the join kinds, a mandatory role other than a first role, an external
-  uniqueness that is not an entity's identifier, and any internal
-  uniqueness other than the shapes a multiplicity or an identifier states).
-  An entity's `identify_by` is its preferred identifier's relationship,
-  or, for an entity with none, the relationships of an external uniqueness
-  whose every role is the far role of a binary declared under that entity
-  (the import's composite shape). Every other loss -- a semiderived rule,
-  a data type with no Ossie built-in, a value type with no data type, a
-  note, a reference mode no fact type carries -- is named in the export's
-  loss report (Open decision 5).
+  accepts and the importer reads back without refusal, inverting each
+  mapping above by the rules WS2 states, and shall name every construct it
+  cannot write in the document's loss report (Open decision 5): every
+  constraint it cannot express (ring, frequency, exclusion, exclusive-or,
+  subset, equality, value comparison, cardinality, disjunctive mandatory,
+  the join kinds, a mandatory role other than a first role, and any
+  uniqueness other than the shapes a multiplicity or an identifier states),
+  each also a `constraintSpecs` entry where the shared builder can describe
+  it, and every other loss WS2 lists.
 - When `examples/flights.ontology.yaml` at the pinned commit is imported
   and the result exported, the second document shall equal the first in
   every construct the import did not warn about, compared by meaning: a
@@ -279,39 +277,147 @@ license header, which is what redistributing it requires.
 
 ### 2. Export and the round trip
 
-**Provisional: not yet grounded.** Drafted before WS1 was built, and the
-plan review of WS1 raised these for WS2 to settle when it is grounded:
-`constraintSpecs` reaches no surface today (nothing in the CLI, MCP or
-editor reads it), so an unexpressible constraint needs the loss report as
-well (Open decision 5); the pinned schema's `"format": "iri"`, which ajv's
-strict mode refuses unless the format is declared; a value constraint that
-is a disjunction (values and a range, two ranges, a role-level one), which
-Ossie's all-hold `requires` items cannot state; role order, since barwise
-does not put the declaring concept first (a fact type is declared under the
-entity whose role makes it expressible, and a reference fact type under its
-referent); how a value type named like a built-in is recognized as one (no
-definition, no constraint, the built-in's data type); the per-kind
-`ConstraintSpec` builder, which today is private to the DDL router and
-would be shared rather than copied; a `derived_by` expression that itself
-spans lines, which the one-per-line join cannot split back; and the
-`<snake_name>_id` reference mode the importer makes for a composite
-identifier, which the exporter must not report as a loss. The model note holds
-the ontology description and its `requires` lines together, which the
-exporter must tell apart when a description itself has a `requires:` line. Populations and
-objectification join the loss report.
+Grounded 2026-10-24, after WS1 merged, and revised after its plan review.
+`writeOssie` (model to document) and `OssieExportFormat`, added to
+`ossieFormat`, which then has both directions. Each rule below is stated so
+a test can fix its output.
 
-`writeOssie` and `OssieExportFormat`, added to `ossieFormat`. Tests: each
-inverse mapping; every unexpressible constraint kind in `constraintSpecs`;
-the exported flights document accepted by the pinned `ontology.json`
-(validated in the test with `ajv`'s draft 2020-12 build, `ajv/dist/2020`,
-which the workspace already locks for `@barwise/core`; WS2 adds it to
-`@barwise/formats` as a devDependency). The schema's two remote `$ref`s
-name `core-spec/ossie-schema.json` on Ossie's moving `main`, so that file is
-vendored too, from the pinned commit, and registered under the URL the
-`$ref` names: no network, and no drift from the pin. `ossie` joins the
-editor's `barwise_export_model` enum, which the WS1 drift test then holds;
-and
-the round trip in Scope, construct by construct. Depends on WS1.
+- **Role order and the declaring concept, by precedence; the first rule
+  that applies decides.** An Ossie relationship is declared under the
+  concept playing its first role, and barwise puts no concept first.
+  1. A fact type named `X.rel` -- `X` the text before the first `.` -- where
+     `X` plays one of its roles: that role first (the first such role in
+     barwise order, when `X` plays several), the others in their barwise
+     order. This is the importer's own
+     record of where the relationship was declared, so an imported
+     document comes back where it was.
+  2. A binary that holds an entity's preferred identifier: the identified
+     entity's role first.
+  3. A binary with a single-role uniqueness on exactly one of its roles:
+     that role first, so the relationship reads as `ManyToOne`.
+  4. A fact type of three roles or more with one uniqueness over all roles
+     but one: that role last, the others in their barwise order.
+  5. Otherwise the barwise order.
+     Then, if the first role is played by a built-in (below), the first role
+     whose player is declared moves to the front, keeping rule 4's last role
+     last; a fact type all of whose roles are built-ins is a loss. Readings follow the order, since a template names roles by position:
+     `{0}` becomes `{Concept}`, and a later role `{Player:name}` when it is
+     named (below) or `{Player}` when it is not. A reading with brace text
+     that is not a role position has the braces written as parentheses, so
+     the importer's placeholder grammar does not read it as one, and that is
+     a loss.
+- **What is written from constraints, after ordering.** `ManyToOne` for a
+  uniqueness over exactly every role but the last; `OneToOne` for a binary
+  with a single-role uniqueness on each role; nothing for a uniqueness
+  spanning every role, or a unary's, which are implied. `identify_by` names
+  a relationship when the entity's preferred identifier is a single-role
+  uniqueness on role 2 of a binary declared under that entity; an entity with no preferred identifier gets `identify_by` over the
+  relationships of an external uniqueness whose every role is role 2 of a
+  binary declared under it whose role 2 the entity itself does not play
+  (the importer's composite shape; it refuses a ring binary there). Any other preferred
+  identifier -- on an n-ary fact type, on an objectification, on a binary
+  declared elsewhere -- is a loss, not an `identify_by` the importer would
+  refuse. A mandatory first role is a bare `Entity.rel` in the entity's `requires`
+  when the declaring concept is an entity type; the importer reads that
+  shape only there, so on a value type it is a loss. A value constraint of values only, none containing what the importer
+  splits an enumeration at (its `\s+OR\s+`, shared from `requiresShapes`
+  rather than restated), is one enumeration item, each `'` doubled; one whose single range
+  has numeric bounds (the importer's number shape) is its bound items;
+  every other value constraint -- values and ranges, several ranges, a
+  non-numeric bound, a role's -- is a loss. Every other uniqueness, and
+  every other constraint kind (disjunctive mandatory and constraints over
+  subtypes included), is a loss.
+- **Names, held to what the importer reads back.** A fact type named
+  `X.rel` declared under `X` is written as `rel`; any other name as its
+  words joined by `_`. A relationship or role name keeps only letters,
+  digits and `_` (each other character becomes `_`, and a leading digit
+  gets a `_` before it), so `Entity.rel` and placeholders parse; a name
+  repeated under one concept gets a numeric suffix. The first role is never named: Ossie keys it by its concept. A later role
+  is named where Ossie needs it -- its player also plays another role, or
+  its barwise name differs from its player's -- and never by the declaring
+  concept's name or a key another role already has; then
+  `{Player}_{position}`. barwise role names are otherwise not written and
+  not reported: they are verbalization aids the readings carry, and Ossie
+  has no field for them. A concept name with `{`, `}` or `:` (which break
+  placeholders), or an object type named like a built-in or `Any` that is
+  not written as the built-in (below), is renamed -- the characters to
+  `_`, a colliding name with `_` appended -- and the rename is a loss.
+- **Built-ins.** A value type named like a built-in, with that built-in's
+  data type and no definition, value constraint or note, is written as the
+  built-in and not declared. Any other object type with a built-in's name
+  or `Any` is declared under a renamed name, since the importer refuses a
+  concept that redeclares one.
+- **Subtypes.** `extends` lists an entity's supertypes in subtype-fact
+  order. A subtype fact whose `providesIdentification` differs from the
+  importer's rule (the first supertype identifies unless the entity names
+  its own `identify_by`), and supertypes with different defining rules
+  (one `derived_by` per concept), are losses.
+- **Text.** A derivation is written as `derived_by` items split at blank
+  lines; WS2 changes the importer to join a list's items with a blank line
+  (it joins with a line end today), so one multi-line expression stays one
+  item, and a list item that itself holds a blank line is named in an
+  import warning. A note's lines that begin `requires: ` go back to `requires`, after the
+  items written from a value constraint (the importer takes the first
+  enumeration and the first bound on each side as the constraint, so the
+  constraint's own items lead), and `derived_by: ` lines to `derived_by`; the model note's
+  `requires: ` lines go to the ontology's `requires` and the rest is its
+  `description`, and WS2 changes the importer to warn when a description
+  has a line beginning `requires: `, since the export would read it as one.
+- **Data types.** `text`, `integer`, `decimal`, `float`, `boolean`, `date`
+  and `datetime` are their built-ins. The rest are written as one and are a
+  loss: `money` as `Decimal`, `timestamp` as `DateTime`, `auto_counter` as
+  `Integer`, and `time`, `binary`, `uuid` and `other` as `String`; so is a
+  `length` or `scale`, and a value type with no data type (`String`).
+- **Other losses**: a semiderived rule, whose text is still written as
+  `derived_by` (which reads back as fully derived); a stored derivation's
+  storage; a note line that is not one of the
+  two kinds above; a population; an objectification; an object type's aliases, `independent`, default value, cardinality and
+  source context; an identified entity's reference mode where it differs
+  from its identifying relationship's name (the importer reads that name
+  back as the reference mode); and an entity written with no `identify_by`
+  and no supertype that identifies it, whose reference mode is then the
+  only identifier barwise had (the importer's `<snake_name>_id` for an unidentified concept
+  included -- that import already warned, so the round trip excludes it).
+- **The loss report (Open decision 5, now taken).** Every loss is a line
+  `# barwise: <element>: <what was not written>` in a comment block at the
+  top of the document, with the text made one line as the importer's
+  warnings are, so a lost note's line end cannot escape the comment. A
+  constraint loss is also a `constraintSpecs` entry, built by the per-kind
+  builder moved out of the DDL router into a shared
+  `formats/src/constraintSpec.ts` (one copy, both callers) -- for the
+  constraints that builder can describe, those with roles; a value type's
+  own value constraint and a constraint over subtypes have none, and
+  appear in the block only. The block is not optional: nothing in the CLI,
+  MCP or editor reads `constraintSpecs` today, for DDL either
+  (barwise-wc0), so without it an unexpressible constraint would vanish
+  unseen.
+
+Tests: each rule above against a small model (each precedence step, each
+written and lost constraint shape, each rename, each data type); a native
+barwise model -- not one the importer made -- exported and accepted by the
+pinned schema, then re-imported without refusal; every loss kind in the
+block; and the round trip in Scope. The schema test validates with
+`ajv`'s draft 2020-12 build, `ajv/dist/2020`, added to `@barwise/formats`
+as a devDependency (the workspace already locks it for `@barwise/core`).
+The schema's `$ref`s name `core-spec/ossie-schema.json` on Ossie's moving
+`main`, so that file is vendored from the pinned commit and registered
+under the URL the `$ref` names: no network, and no drift from the pin. The
+schema's `"format": "iri"` is not one `ajv-formats` defines, and ajv's
+strict mode refuses an unknown format, so the test declares it: an
+absolute IRI (a scheme, a colon, no whitespace or `<>"{}|\^` characters),
+which still refuses a relative or space-bearing one. `ossie` joins the
+editor's `barwise_export_model` enum, which the WS1 drift test then holds.
+Depends on WS1.
+
+**Implementation note (WS2).** The schema test runs ajv in strict mode
+with one rule off, `strictRequired`: the pinned `ontology.json` writes
+`required` inside an `anyOf` for properties its parent declares, valid JSON
+Schema that ajv's strict mode refuses as a style matter. The rule is about
+how the schema is written, not the document under test, so turning it off
+loses no check on the export. The loss report predicts, construct by construct,
+what the importer reads back; three review rounds each found another
+construct where a prediction diverged, so barwise-5bv tracks verifying the
+report by re-importing the written document instead.
 
 ## API and migration impact
 
@@ -368,7 +474,9 @@ the round trip in Scope, construct by construct. Depends on WS1.
    MCP summaries do not show it; or an optional `warnings` field on
    `ExportResult`, which every surface could print, but is a core interface
    change this spec rules out. **Recommend the comment block**, and the
-   core field when a second format needs the same channel.
+   core field when a second format needs the same channel. Taken when WS2
+   was grounded: the block carries constraint losses too, since nothing
+   reads `constraintSpecs` (barwise-wc0).
 
 ## Risks and testing
 

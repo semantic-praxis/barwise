@@ -115,6 +115,10 @@ Formats:
 - `openapi` -- OpenAPI 3.0 specification
 - `dbt` -- dbt model YAML and SQL files
 - `avro` -- Avro schemas (`.avsc`)
+- `norma` -- NORMA `.orm` XML
+- `ossie` -- an Apache Ossie ontology document (YAML, version
+  `0.2.0.dev0`); a comment block at its top names every construct the
+  document could not carry (`docs/specs/ossie-ontology-format.spec.md`)
 
 Options:
 

@@ -16,6 +16,7 @@ import { NormaExportFormat } from "./norma/NormaExportFormat.js";
 import { NormaImportFormat } from "./norma/NormaImportFormat.js";
 import { OpenApiExportFormat } from "./openapi/OpenApiExportFormat.js";
 import { OpenApiImportFormat } from "./openapi/OpenApiImportFormat.js";
+import { OssieExportFormat } from "./ossie/OssieExportFormat.js";
 import { OssieImportFormat } from "./ossie/OssieImportFormat.js";
 import { SqlImportFormat } from "./sql/SqlImportFormat.js";
 
@@ -61,15 +62,13 @@ export const normaFormat: FormatDescriptor = {
   exporter: new NormaExportFormat(),
 };
 
-/**
- * Apache Ossie ontology format: import only until the exporter lands
- * (`docs/specs/ossie-ontology-format.spec.md`, WS2).
- */
+/** Apache Ossie ontology format: bidirectional (`docs/specs/ossie-ontology-format.spec.md`). */
 export const ossieFormat: FormatDescriptor = {
   name: "ossie",
   description: "Apache Ossie ontology documents (YAML)",
   extension: "yaml",
   importer: new OssieImportFormat(),
+  exporter: new OssieExportFormat(),
 };
 
 /**
