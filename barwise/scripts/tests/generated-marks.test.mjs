@@ -26,7 +26,7 @@ const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "
  * What each regen:* script writes. A script missing here fails the first
  * test, so a new regenerator cannot ship without saying where its output
  * goes -- and then the second test asks for the mark. A regenerator that
- * writes only a section of a hand-written file would be listed in
+ * writes only a section of a hand-written file is listed in
  * SECTION_WRITERS instead: marking the whole file would hide its
  * hand-written body from diffs and from `plan-scope`.
  */
@@ -36,7 +36,9 @@ const REGEN = {
   "regen:builtins": ["barwise/packages/llm/src/prompt/artifacts/builtins.generated.ts"],
   "regen:references": ["barwise/packages/promptlab/evals/*.reference.orm.yaml"],
 };
-const SECTION_WRITERS = {};
+const SECTION_WRITERS = {
+  "regen:architecture": ["barwise/docs/ARCHITECTURE.md"],
+};
 
 /** Tracked files an output entry stands for: a directory, a file, or one `*` in the last segment. */
 function filesOf(output) {
