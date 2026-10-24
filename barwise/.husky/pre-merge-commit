@@ -12,8 +12,10 @@ fi
 cd barwise || exit 1
 
 # Its exit status passes through: 2 is "could not validate", not "invalid".
-sh scripts/hooks/check-staged-tracker.sh
-status=$?
+# husky runs this file with `sh -e`, so the status is caught with `||`;
+# a bare failing command would end the hook before the message below.
+status=0
+sh scripts/hooks/check-staged-tracker.sh || status=$?
 if [ "${status}" -ne 0 ]; then
   echo "pre-merge-commit: the merge is still in progress. Fix or validate .beads/issues.jsonl, stage it, and run 'git commit'." >&2
   exit "${status}"

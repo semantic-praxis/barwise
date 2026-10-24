@@ -254,6 +254,18 @@ test("one instant spelled two ways resolves the same whichever side is current",
   );
 });
 
+test("a timestamp cleared on one side and set on the other is reported, never picked", () => {
+  const base = jsonl(issue("x", { closed_at: T0 }));
+  const cleared = jsonl(issue("x", { closed_at: null, updated_at: T1 }));
+  const moved = jsonl(issue("x", { closed_at: T2, updated_at: T2 }));
+  for (const [cur, oth] of [[cleared, moved], [moved, cleared]]) {
+    assert.deepEqual(resolveTracker(base, cur, oth).reported, [{
+      id: "x",
+      reason: "both sides changed closed_at",
+    }]);
+  }
+});
+
 test("both sides closing one issue is agreement, and the later closed_at stands", () => {
   const r = resolveTracker(
     jsonl(issue("x")),
@@ -350,7 +362,7 @@ function repo(base, { hooks = false } = {}) {
     // what is under test and would take minutes.
     writeFileSync(
       join(hookDir, "pre-merge-commit"),
-      "#!/bin/sh\nexec sh barwise/.husky/pre-merge-commit\n",
+      "#!/bin/sh\nexec sh -e barwise/.husky/pre-merge-commit\n",
       { mode: 0o755 },
     );
     writeFileSync(
@@ -634,11 +646,13 @@ test("a hook that cannot run the validator says so, with exit 2, rather than cal
   }
 });
 
-test("a commit that deletes the tracker is not blocked for want of an index copy", () => {
+test("a commit that deletes the tracker is refused by name, not as an unreadable file", () => {
   const r = repo(jsonl(issue("a")), { hooks: true });
   r.git("rm", "-q", ".beads/issues.jsonl");
   const c = r.run("git", ["commit", "-qm", "drop the tracker"]);
-  assert.equal(c.status, 0, c.stdout + c.stderr);
+  assert.equal(c.status, 1, c.stdout + c.stderr);
+  assert.match(c.stderr, /this commit deletes \.beads\/issues\.jsonl/);
+  assert.doesNotMatch(c.stderr, /could not/);
 });
 
 test("a broken tracker that was staged, then fixed on disk without restaging, is refused", () => {

@@ -79,15 +79,33 @@ function main() {
     return 0;
   }
   // Built beside the live copy and swapped in, so a merge never runs a
-  // half-copied driver and no file from an earlier layout survives.
+  // half-copied driver and no file from an earlier layout survives. The old
+  // copy is moved aside, not deleted, until the new one is in place: the
+  // only moment with no driver is between two renames, and a failed swap
+  // puts the old copy back.
   const dir = join(common, INSTALL_DIR);
   const next = mkdtempSync(join(common, `${INSTALL_DIR}.next-`));
-  for (const [to, from] of FILES) {
-    mkdirSync(dirname(join(next, to)), { recursive: true });
-    copyFileSync(join(HERE, from), join(next, to));
+  const old = `${dir}.old-${process.pid}`;
+  try {
+    for (const [to, from] of FILES) {
+      mkdirSync(dirname(join(next, to)), { recursive: true });
+      copyFileSync(join(HERE, from), join(next, to));
+    }
+    if (existsSync(dir)) renameSync(dir, old);
+    try {
+      renameSync(next, dir);
+    } catch (err) {
+      // A concurrent prepare's copy landed first: it is a whole copy too.
+      if (!existsSync(join(dir, "driver.sh"))) {
+        if (existsSync(old) && !existsSync(dir)) renameSync(old, dir);
+        console.error(`install-merge-driver: could not install into ${dir}: ${err.message}`);
+        return 1;
+      }
+    }
+  } finally {
+    rmSync(next, { recursive: true, force: true });
+    rmSync(old, { recursive: true, force: true });
   }
-  rmSync(dir, { recursive: true, force: true });
-  renameSync(next, dir);
   git([
     "config",
     `merge.${DRIVER_NAME}.name`,
@@ -99,10 +117,6 @@ function main() {
   // which the outer run then refuses as malformed; `binary` takes the
   // bases' common ancestor instead.
   git(["config", `merge.${DRIVER_NAME}.recursive`, "binary"]);
-  if (!existsSync(join(dir, "driver.sh"))) {
-    console.error(`install-merge-driver: ${join(dir, "driver.sh")} is missing after install.`);
-    return 1;
-  }
   return 0;
 }
 

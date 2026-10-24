@@ -20,9 +20,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MalformedInput, resolveTracker } from "./lib/beads-merge.mjs";
 
-export const EXIT_MERGED = 0;
-export const EXIT_MALFORMED = 2;
-export const EXIT_REPORTED = 3;
+const EXIT_MERGED = 0;
+const EXIT_MALFORMED = 2;
+const EXIT_REPORTED = 3;
 
 function main([basePath, curPath, othPath, pathName = ".beads/issues.jsonl"]) {
   if (!basePath || !curPath || !othPath) {

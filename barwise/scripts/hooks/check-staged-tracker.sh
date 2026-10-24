@@ -14,9 +14,15 @@
 # The index copy, not the working-tree file: a broken tracker that was
 # staged and then fixed on disk without restaging would otherwise pass here
 # and be committed broken. Paths from `git diff` are repo-root-relative.
-# --diff-filter=d leaves out a staged deletion, which has no index copy to
-# read and nothing to validate.
-git diff --cached --name-only --diff-filter=d | grep -qx '.beads/issues.jsonl' || exit 0
+# Deleting the tracker deletes every issue. It is almost always a bad
+# resolution or a stray `git rm`, so it is refused by name rather than
+# read as an index copy that is not there.
+if git diff --cached --name-only --diff-filter=D | grep -qx '.beads/issues.jsonl'; then
+  echo "this commit deletes .beads/issues.jsonl, and with it every issue in the tracker." >&2
+  echo "  If that is intended, commit with --no-verify." >&2
+  exit 1
+fi
+git diff --cached --name-only | grep -qx '.beads/issues.jsonl' || exit 0
 
 echo "validating staged .beads/issues.jsonl ..."
 tmp="$(mktemp)"

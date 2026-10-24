@@ -84,12 +84,17 @@ export function sameIssue(a, b) {
   return true;
 }
 
+/** A value the later-timestamp rule may compare; anything else is reported. */
+function isTimestamp(v) {
+  return typeof v === "string" && !Number.isNaN(Date.parse(v));
+}
+
 function laterTimestamp(a, b) {
   const ta = Date.parse(a);
   const tb = Date.parse(b);
   // Equal instants spelled differently fall to the string order, so the
   // answer never depends on which side is current.
-  if (Number.isNaN(ta) || Number.isNaN(tb) || ta === tb) return a >= b ? a : b;
+  if (ta === tb) return a >= b ? a : b;
   return ta > tb ? a : b;
 }
 
@@ -116,7 +121,7 @@ function mergeFields(base, cur, oth) {
       cv = ov = c; // agreement, or only current changed it
     } else if (eq(c, b)) {
       cv = ov = o; // only other changed it
-    } else if (EVENT_TIMESTAMPS.has(k) && c !== undefined && o !== undefined) {
+    } else if (EVENT_TIMESTAMPS.has(k) && isTimestamp(c) && isTimestamp(o)) {
       cv = ov = laterTimestamp(c, o);
     } else {
       cv = c;
