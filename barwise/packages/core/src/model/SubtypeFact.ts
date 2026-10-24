@@ -69,6 +69,19 @@ export class SubtypeFact extends ModelElement {
 }
 
 /**
+ * What makes two subtype facts the same relationship: the subtype and
+ * the supertype they relate. One key, read by `OrmModel.addSubtypeFact`
+ * when it refuses a repeat and by `structural/duplicate-subtype-fact`
+ * when it reports one a lenient load let through, so the store and the
+ * rule cannot disagree about what a repeat is.
+ */
+export function subtypePairKey(
+  sf: { readonly subtypeId: string; readonly supertypeId: string; },
+): string {
+  return `${sf.subtypeId}\u0000${sf.supertypeId}`;
+}
+
+/**
  * Project a SubtypeFact back to the config shape that constructed it,
  * listing every field once -- the `toObjectTypeConfig` convention
  * (barwise-927) applied to the element kinds the merge started carrying

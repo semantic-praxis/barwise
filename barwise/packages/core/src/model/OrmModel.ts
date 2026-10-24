@@ -1,3 +1,4 @@
+import { groupRepeats } from "../util/groupRepeats.js";
 import {
   type Constraint,
   type ExternalConstraint,
@@ -15,7 +16,7 @@ import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./Objectifi
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
 import type { Role } from "./Role.js";
-import { SubtypeFact, type SubtypeFactConfig } from "./SubtypeFact.js";
+import { SubtypeFact, type SubtypeFactConfig, subtypePairKey } from "./SubtypeFact.js";
 
 /**
  * A constraint in a view of fact types: an internal one with the fact type
@@ -293,6 +294,18 @@ export class OrmModel {
   }
 
   /**
+   * Each constraint id more than one constraint holds, with its holders in
+   * `everyConstraint` order. A constraint id is model-wide -- another
+   * element, another file, a diff or a merge names a constraint by it -- so
+   * `structural/duplicate-constraint-id` reports these. The 3.0 loader
+   * asks the same `groupRepeats` of the constraints the file states,
+   * before building, since the id-keyed stores can drop a holder.
+   */
+  constraintsSharingAnId(): ReadonlyMap<string, readonly ConstraintInView[]> {
+    return groupRepeats(this.everyConstraint(), ([c]) => c.id);
+  }
+
+  /**
    * Every constraint in the model, each once: each fact type's own
    * constraints in fact type order, then the constraints across fact types
    * (`constraints`). The whole-model view query and describe both list; a
@@ -565,11 +578,9 @@ export class OrmModel {
       }
 
       // Check for duplicate subtype relationship.
+      const pair = subtypePairKey(config);
       for (const existing of this._subtypeFacts.values()) {
-        if (
-          existing.subtypeId === config.subtypeId
-          && existing.supertypeId === config.supertypeId
-        ) {
+        if (subtypePairKey(existing) === pair) {
           throw new Error(
             `Subtype relationship from "${subtype.name}" to "${supertype.name}" already exists.`,
           );

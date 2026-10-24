@@ -1,7 +1,10 @@
+import { describeConstraintRepeat } from "../../model/Constraint.js";
 import { isScopedView } from "../../model/DiagramLayout.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
 import type { OrmModel } from "../../model/OrmModel.js";
+import { subtypePairKey } from "../../model/SubtypeFact.js";
+import { groupRepeats } from "../../util/groupRepeats.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
 
@@ -16,6 +19,8 @@ import { report, RULE_ID } from "../ruleId.js";
  * - Subtype hierarchy has no cycles.
  * - Objectified fact types objectify entity types.
  * - No duplicate objectification of the same fact type.
+ * - No two constraints share an id.
+ * - No two subtype facts relate the same pair.
  *
  * What is NOT here any more: whether each of those references resolves
  * at all. `graphOf` owns that, so these rules receive a graph in which
@@ -25,9 +30,9 @@ import { report, RULE_ID } from "../ruleId.js";
  * a rule id is a promise to whoever reads validator output.
  *
  * They ship as two exports rather than one, and the split is worth more
- * than it looks. Four of the seven checks read no reference at all: two
+ * than it looks. Seven of the ten checks read no reference at all: two
  * compare names, one counts readings, one walks subtype ids as a graph
- * of ids. Left in the graph-taking export they would be suppressed
+ * of ids, one checks a diagram's ids, and two compare element ids. Left in the graph-taking export they would be suppressed
  * whenever any id in the model dangled -- and `barwise validate` on a
  * file with one bad constraint role would stop reporting that a binary
  * fact type has only one reading, which has nothing to do with the bad
@@ -56,8 +61,62 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkBinaryFactTypeReadings(model));
   diagnostics.push(...checkSubtypeCycles(model));
   diagnostics.push(...checkDiagramReferences(model));
+  diagnostics.push(...checkDuplicateConstraintIds(model));
+  diagnostics.push(...checkDuplicateSubtypeFacts(model));
 
   return diagnostics;
+}
+
+/**
+ * No two constraints may share an id.
+ *
+ * Constraints are arrays, so the model can hold the duplicate, and a
+ * defect the model can hold is validation's to report
+ * (`docs/specs/model-invariants.spec.md`). The 3.0 loader refuses one; a
+ * 2.0 file, a model built in code and a merge do not, and before this rule
+ * a merge wrote a file the 3.0 loader then refused to read back
+ * (barwise-b2s). Both group through `groupRepeats`, so they agree on what
+ * a repeat is. Reported once per id, naming every holder.
+ *
+ * The diagnostic's element is the shared id, and an editor that maps ids
+ * to YAML nodes can place it on only one of the holders; the message names
+ * all of them.
+ */
+function checkDuplicateConstraintIds(model: OrmModel): Diagnostic[] {
+  return [...model.constraintsSharingAnId()].map(([id, holders]) =>
+    report(
+      RULE_ID.duplicateConstraintId,
+      "default",
+      id,
+      describeConstraintRepeat(id, holders.map(([c, ft]) => [c, ft?.name] as const)),
+    )
+  );
+}
+
+/**
+ * No two subtype facts may relate the same subtype to the same supertype.
+ *
+ * `OrmModel.addSubtypeFact` refuses the pair except under a lenient load,
+ * so a lenient load can hold two such subtype facts under different ids,
+ * and nothing reported them. Two that also share an id collapse in the
+ * id-keyed store before any rule runs; refusing that is workstream 3 of
+ * the spec. Reported once per pair, naming every id, as the constraint
+ * rule reports once per id. Names fall back to the id, so a dangling end
+ * still lets the duplicate be seen.
+ */
+function checkDuplicateSubtypeFacts(model: OrmModel): Diagnostic[] {
+  const nameOf = (id: string) => model.getObjectType(id)?.name ?? id;
+  return [...groupRepeats(model.subtypeFacts, subtypePairKey).values()]
+    .map((list) =>
+      report(
+        RULE_ID.duplicateSubtypeFact,
+        "default",
+        list[1]!.id,
+        list.map((sf) => `"${sf.id}"`).join(", "),
+        nameOf(list[0]!.subtypeId),
+        nameOf(list[0]!.supertypeId),
+      )
+    );
 }
 
 /**

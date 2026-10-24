@@ -107,11 +107,13 @@ export const RULE_ID = {
   danglingRoleReference: "structural/dangling-role-reference",
   diagramDanglingReference: "structural/diagram-dangling-reference",
   diagramEmptyView: "structural/diagram-empty-view",
+  duplicateConstraintId: "structural/duplicate-constraint-id",
   duplicateFactTypeName: "structural/duplicate-fact-type-name",
   duplicateObjectTypeName: "structural/duplicate-object-type-name",
   duplicateObjectification: "structural/duplicate-objectification",
   duplicateObjectificationTarget: "structural/duplicate-objectification-target",
   duplicateRoleId: "structural/duplicate-role-id",
+  duplicateSubtypeFact: "structural/duplicate-subtype-fact",
   objectifiedDanglingFactType: "structural/objectified-dangling-fact-type",
   objectifiedDanglingObjectType: "structural/objectified-dangling-object-type",
   objectifiedNotEntity: "structural/objectified-not-entity",
@@ -837,6 +839,29 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (diagramName: string): string =>
         `Diagram "${diagramName}" lists no elements, so it draws an empty canvas.`,
+    },
+  },
+  [RULE_ID.duplicateConstraintId]: {
+    severity: "error",
+    description:
+      "Two constraints share an id, so any reference to that id (a preferred identifier, a diff, a merge, another file) names one of them arbitrarily.",
+    messages: {
+      // The repeat is described by `describeConstraintRepeat`, which the
+      // 3.0 loader's refusal prints too, from what each constraint states
+      // rather than what its roles resolve to, so a dangling role cannot
+      // hide it (model-invariants, workstream 1).
+      default: (repeat: string): string =>
+        `Constraint id ${repeat} is held by more than one constraint. `
+        + `A constraint id names one constraint.`,
+    },
+  },
+  [RULE_ID.duplicateSubtypeFact]: {
+    severity: "error",
+    description:
+      "Two subtype facts relate the same subtype to the same supertype, so the relationship is stated twice under two ids.",
+    messages: {
+      default: (ids: string, subtype: string, supertype: string): string =>
+        `Subtype facts ${ids} each make "${subtype}" a subtype of "${supertype}"; a subtype relationship is stated once.`,
     },
   },
   [RULE_ID.duplicateFactTypeName]: {

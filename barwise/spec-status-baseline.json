@@ -36,6 +36,13 @@
       ],
       "note": "Genuinely unimplemented, and the header is right. Both workstreams are property-based testing (an extraction-response arbitrary, then parser totality over generated responses) and nothing of the sort exists: fast-check is a dev dependency of core and diagram (05f0b50d, 2026-09-07), for laws over a generated OrmModel, which is not the extraction-response arbitrary this spec plans; nothing in llm or promptlab generates extraction responses. The four commits below are unrelated work on files it names -- a dependabot bump, suite 2.5.0, the assertNever sweep, and the npm-audit gate. Remove this row when workstream 1 ships and the Status says so. Caught only after the gate's pattern was fixed to see the claim mid-line; it had escaped on position alone (barwise-912 class-C pass). Re-read 2026-10-23 (barwise-qs8): 4a38f022 and eb7522cf are orm-format-3 core and test changes to files this spec names, not either workstream; the verdict holds."
     },
+    "constraint-notes.spec.md": {
+      "status": "Draft -- no workstream implemented",
+      "commits": [
+        "c610194f"
+      ],
+      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here, c610194f, is a review fix inside model-invariants workstream 1 (barwise-b2s): it adds describeConstraintPlace and describeRepeatedConstraintIds to core/src/model/Constraint.ts, which this spec names because its workstream 1 adds an optional note to ConstraintBase there. No note field exists. Remove this row when WS1 ships and the Status says so."
+    },
     "functional-design-quality.spec.md": {
       "status": "Draft -- the five open decisions resolved in review 2026-09-09\n(see Decisions); no workstream implemented",
       "commits": [
@@ -92,6 +99,13 @@
         "ada2a89b"
       ],
       "note": "Genuinely unimplemented, and the header is right: this spec's deliverable is `scripts/mutation-baseline.mjs --classify`, a classifier that splits surviving mutants by whether the suite is the thing that should have caught them, plus a scheduled run. That file does not exist, no package.json script or workflow mentions a ratchet, and no Stryker checker is installed -- verified, not assumed. The commit below is barwise-998 fixing four defects in `scripts/mutate.mjs`, which this spec NAMES as an input the ratchet will drive rather than as something it implements: a signal-killed child that read as CAUGHT, a throw in the restore that read as UNCAUGHT, an unpinned restore-hash branch, and a spec sentence claiming a gate that does not exist. If anything, it makes this spec's own restore discipline cheaper to meet, since a killed run now refuses instead of reporting a result. This is the proxy false positive the gate's own header describes -- a spec naming a file that unrelated work touches. Remove this row when WS1 ships and the Status says so. Re-read 2026-10-23 (barwise-qs8): the nine newer commits are orm-format-3 core work (4a38f022, 13ed02fb, 77935e65, bd883874) and script and audit fixes (755fb56d, 93e88611, 76f1fc73, 206b0c84, b9c960a2); scripts/mutation-baseline.mjs does not exist, so the verdict holds. ada2a89b (plan-scope-check WS2) adds an npm script to barwise/package.json, which this spec cites as context: not its subject."
+    },
+    "subject-areas.spec.md": {
+      "status": "Draft -- no workstream implemented",
+      "commits": [
+        "88c8d466"
+      ],
+      "note": "Genuinely unimplemented, and the header is right. The commit that put this row here, 88c8d466, is a review fix inside model-invariants workstream 1 (barwise-b2s): it adds OrmModel.constraintsSharingAnId. This spec names core/src/model/OrmModel.ts because its own workstream 1 adds subject-area declarations there; none is built. Remove this row when WS1 ships and the Status says so."
     }
   }
 }

@@ -32,7 +32,7 @@ import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
-import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
+import { subtypePairKey, toSubtypeFactConfig } from "../model/SubtypeFact.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
@@ -279,9 +279,8 @@ export function mergeModels(
       const supertypeId = inIncoming
         ? resolveObjectTypeId(merged, source.supertypeId, incomingIdToMergedId)
         : source.supertypeId;
-      const kept = merged.subtypeFacts.find((sf) =>
-        sf.subtypeId === subtypeId && sf.supertypeId === supertypeId
-      );
+      const pair = subtypePairKey({ subtypeId, supertypeId });
+      const kept = merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
       ids.push(kept?.id ?? LEFT_OUT);
     }
     return withoutSubtypeFacts(
@@ -577,9 +576,8 @@ function addableSubtypeFact(merged: OrmModel, subtypeId: string, supertypeId: st
   if (subtypeId === supertypeId) return false;
   if (merged.getObjectType(subtypeId)?.kind !== "entity") return false;
   if (merged.getObjectType(supertypeId)?.kind !== "entity") return false;
-  return !merged.subtypeFacts.some(
-    (sf) => sf.subtypeId === subtypeId && sf.supertypeId === supertypeId,
-  );
+  const pair = subtypePairKey({ subtypeId, supertypeId });
+  return !merged.subtypeFacts.some((sf) => subtypePairKey(sf) === pair);
 }
 
 /**

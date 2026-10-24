@@ -1,11 +1,11 @@
 # Model invariants: what the store refuses, what validation reports, and what operations promise
 
-Status: Draft -- no workstream implemented; decisions resolved by the owner
-2026-10-23 (decision 1 revised the same day after review); workstreams 2
-and 4 provisional
+Status: Workstream 1 implemented 2026-10-24; workstreams 2 and 3 not
+started, 2 and 4 provisional; decisions resolved by the owner 2026-10-23
+(decision 1 revised the same day after review)
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
 Tracking: barwise-mtl (this spec); barwise-b2s (duplicate constraint ids,
 workstream 1); barwise-ue5 (merge drops a kept element, workstream 2);
 barwise-1l0 (a duplicate id replaces an element, workstream 3); barwise-973
@@ -293,6 +293,29 @@ Acceptance:
   is right, since a refusal there is the stronger answer; a test pins that
   they still do.
 - Both ids registered in `ruleId.ts`.
+
+Implemented 2026-10-24 (`validation/rules/structural.ts`,
+`tests/validation/duplicateIds.test.ts`). A constraint is named by its
+`type` as the file spells it and by where it lives (`mandatory in fact type
+"A runs"`), or, stored on the model, by the role or subtype-fact ids it
+names (`exclusion over roles r1, r2`), since no label table covers all
+sixteen kinds and two of one kind can share the id. What a repeat is is
+stated once, in `util/groupRepeats.ts`: the 3.0 loader asks it of the
+constraints the file states, before building (checking the built model
+instead lost a holder whose fact type shared an id with another, which a
+test now pins), `OrmModel.constraintsSharingAnId` asks it of the built model
+for the rule, and the subtype rule asks it over `subtypePairKey`, which
+`addSubtypeFact` and merge's pre-checks share. Both refusals print one
+description, `describeConstraintRepeat` in `model/Constraint.ts`. The 3.0 refusal stays under a lenient
+load: `barwise migrate` re-reads its own output leniently to refuse writing
+a file a strict load would reject. A merge is refused when the merged model
+holds a repeated constraint id even if the base already held it, because
+the merge writes 3.0 and the 3.0 loader would refuse the result. The
+diagnostic's element is the shared id, so an editor that maps ids to YAML
+nodes places it on one holder; the message names all of them. Each
+rule's tests were seen failing with the rule removed (5 and 2 tests). Over
+the tracked corpus, 89 of 116 models load leniently and neither rule fires
+on any of them.
 
 Not independent of merge, and the dependency is wanted. Merge's pre-write
 check runs `structuralWellFormedness` (`getStructuralErrors`,
