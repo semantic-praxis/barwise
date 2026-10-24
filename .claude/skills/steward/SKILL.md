@@ -71,7 +71,8 @@ output, golden files) is fixed by rerunning its regenerator on the
 merged source, not by editing the output. The failing drift test's
 message names its regenerator; the full list is the `regen:*` scripts
 in `barwise/package.json` (`regen:builtins`, `regen:examples`,
-`regen:tutorial`, `regen:references`), plus `UPDATE_GOLDEN=1` for the
+`regen:tutorial`, `regen:references`, and `regen:architecture` for the
+generated first section of `ARCHITECTURE.md`), plus `UPDATE_GOLDEN=1` for the
 golden tests that document it.
 
 ## 3. The duplication ratchet can fire on your own fix
