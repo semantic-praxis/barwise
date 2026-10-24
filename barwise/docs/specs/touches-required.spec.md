@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-24
 Last-updated: 2026-10-24
 Tracking: barwise-ef0
+Plan-reviewed: 2c8cd78f (code-review, pr-review)
 Touches: barwise/scripts/check-spec-touches.mjs, barwise/scripts/check-plan-review.mjs,
 +barwise/scripts/lib/pr-base.mjs, barwise/scripts/tests/spec-reader.test.mjs,
 barwise/scripts/tests/expected-counts.json, .github/workflows/ci.yml,
