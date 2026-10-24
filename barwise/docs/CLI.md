@@ -115,6 +115,10 @@ Formats:
 - `openapi` -- OpenAPI 3.0 specification
 - `dbt` -- dbt model YAML and SQL files
 - `avro` -- Avro schemas (`.avsc`)
+- `norma` -- NORMA `.orm` XML
+- `ossie` -- an Apache Ossie ontology document (YAML, version
+  `0.2.0.dev0`); a comment block at its top names every construct the
+  document could not carry (`docs/specs/ossie-ontology-format.spec.md`)
 
 Options:
 
@@ -381,11 +385,15 @@ Import an ORM model from a text-based interop format.
 ```sh
 barwise import model schema.sql --format ddl
 barwise import model api.yaml --format openapi --output model.orm.yaml
+barwise import model flights.ontology.yaml --format ossie
 ```
 
 Options:
 
-- `--format <ddl|openapi|norma>` -- source format (required)
+- `--format <ddl|openapi|norma|ossie>` -- source format (required).
+  `ossie` reads an Apache Ossie ontology document at version
+  `0.2.0.dev0` and refuses any other version; each construct it cannot
+  carry is a warning (`docs/specs/ossie-ontology-format.spec.md`)
 - `--output <file>` -- write .orm.yaml to file instead of stdout
 - `--name <name>` -- model name (defaults to filename)
 - `--infer-references` -- read a column with no declared foreign key

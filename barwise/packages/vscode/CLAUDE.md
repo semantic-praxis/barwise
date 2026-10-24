@@ -157,7 +157,7 @@ Test fixtures live in `tests/fixtures/` (`.orm.yaml` files).
 | Upstream  | `@barwise/dbt`                 | `registerDbtFormats` for dbt project import/export                                 |
 | Upstream  | `@barwise/diagram`             | Diagram layout/session for the webview                                             |
 | Upstream  | `@barwise/diagram-ui`          | React diagram renderer used by the webview app                                     |
-| Upstream  | `@barwise/formats`             | `registerStandardFormats` for DDL/OpenAPI/Avro/NORMA/SQL interop                   |
+| Upstream  | `@barwise/formats`             | `registerStandardFormats` for DDL/OpenAPI/Avro/NORMA/SQL/Ossie interop             |
 | Upstream  | `@barwise/llm`                 | `processTranscript`, `reviewModel`, `LlmClient` interface, extraction types        |
 | Upstream  | `@barwise/mcp`                 | `createServer` for MCP stdio server; `execute*` functions for Language Model Tools |
 | External  | `vscode`                       | Editor API (provided at runtime, not bundled)                                      |
