@@ -578,8 +578,9 @@ export class OrmModel {
       }
 
       // Check for duplicate subtype relationship.
+      const pair = subtypePairKey(config);
       for (const existing of this._subtypeFacts.values()) {
-        if (subtypePairKey(existing) === subtypePairKey(config)) {
+        if (subtypePairKey(existing) === pair) {
           throw new Error(
             `Subtype relationship from "${subtype.name}" to "${supertype.name}" already exists.`,
           );

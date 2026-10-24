@@ -300,9 +300,13 @@ Implemented 2026-10-24 (`validation/rules/structural.ts`,
 "A runs"`), or, stored on the model, by the role or subtype-fact ids it
 names (`exclusion over roles r1, r2`), since no label table covers all
 sixteen kinds and two of one kind can share the id. What a repeat is is
-stated once: `OrmModel.constraintsSharingAnId`, which the 3.0 loader now
-refuses on in place of its own `claim`, and `subtypePairKey`, which
-`addSubtypeFact` and the rule share. The 3.0 refusal stays under a lenient
+stated once, in `util/groupRepeats.ts`: the 3.0 loader asks it of the
+constraints the file states, before building (checking the built model
+instead lost a holder whose fact type shared an id with another, which a
+test now pins), `OrmModel.constraintsSharingAnId` asks it of the built model
+for the rule, and the subtype rule asks it over `subtypePairKey`, which
+`addSubtypeFact` and merge's pre-checks share. Both refusals print one
+description, `describeConstraintRepeat` in `model/Constraint.ts`. The 3.0 refusal stays under a lenient
 load: `barwise migrate` re-reads its own output leniently to refuse writing
 a file a strict load would reject. A merge is refused when the merged model
 holds a repeated constraint id even if the base already held it, because
