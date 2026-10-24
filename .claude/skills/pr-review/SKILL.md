@@ -136,7 +136,15 @@ first-class checks, run on every PR, not incidental coverage:
   fired on the case that prompted it.
 
 Then run `checklist.md`: the barwise invariants CI cannot check,
-grouped by what the diff touches. Say which groups applied.
+grouped by what the diff touches. Do not pick the groups by hand: run
+`npm run pr:risk -- --base origin/main` on the head. The checklist groups
+it lists, every group it lists as not path-derivable, and every REVIEW.md
+failure mode it prints (the path-triggered ones first, the rest after,
+all of them run) are the ones you run; quote that routing in the Read
+line and say which ran. A group skipped because nobody noticed the diff
+touched a script reads exactly like one that did not apply, which is
+the decision the routing takes off the reviewer
+(`docs/specs/review-routing.spec.md`).
 
 Finish with one more pass over the diff holding the list of what you
 have found, looking only for what is not on it. The first pass tends

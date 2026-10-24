@@ -78,18 +78,48 @@ export function checklistHeadings(file = CHECKLIST) {
  * why the gate refuses rather than the classifier shrugging.
  */
 export function tierRows(file = TABLE) {
-  let parsed;
-  try {
-    parsed = JSON.parse(readFileSync(file, "utf8"));
-  } catch (cause) {
-    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
-  }
-  const rows = parsed?.rows;
+  const rows = readTable(file)?.rows;
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error(`${file} declares no rows -- this is not the tier table`);
   }
+  return validateRows(rows, "row");
+}
+
+/**
+ * The table's `failureModes` rows: one per REVIEW.md "Always check" item,
+ * keyed by its title (docs/specs/review-routing.spec.md, WS2). Same shape
+ * and the same validator as the checklist rows, so there is one row rule
+ * and one pattern language. `optional` is for pr-risk, which reads
+ * fixture tables that carry no block; the gate never passes it, so a real
+ * table without the block fails there, both ways against REVIEW.md.
+ */
+export function failureModeRows(file = TABLE, { optional = false } = {}) {
+  const modes = readTable(file)?.failureModes;
+  if (modes === undefined && optional) return [];
+  if (!Array.isArray(modes) || modes.length === 0) {
+    throw new Error(
+      `${file} declares no failureModes -- REVIEW.md's failure modes have no routing`,
+    );
+  }
+  return validateRows(modes, "failure mode");
+}
+
+function readTable(file) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch (cause) {
+    throw new Error(`cannot read or parse the tier table at ${file}`, { cause });
+  }
+}
+
+/**
+ * Each row checked for shape and pattern language, for both arrays. A
+ * `not-path-derivable` row carries no globs by design; any other tier
+ * without globs is an error rather than a silently unmatchable row.
+ */
+function validateRows(rows, kind) {
   for (const [i, row] of rows.entries()) {
-    const at = `row ${i} (${row?.heading ?? "no heading"})`;
+    const at = `${kind} ${i} (${row?.heading ?? "no heading"})`;
     if (typeof row?.heading !== "string" || row.heading.length === 0) {
       throw new Error(`${at}: heading must be a non-empty string`);
     }
@@ -117,6 +147,38 @@ export function tierRows(file = TABLE) {
     }
   }
   return rows;
+}
+
+/** `barwise/scripts/lib` -> the repo root -> REVIEW.md. */
+export const REVIEW = resolve(SCRIPTS, "../../REVIEW.md");
+
+/**
+ * The titles of REVIEW.md's "Always check" items: the bold lead of each
+ * numbered item under the first `## ` heading that starts with "Always
+ * check", trailing period stripped (`1. **Input dropped at a boundary.**`
+ * -> `Input dropped at a boundary`). The heading's date range can change
+ * without breaking it. Throws on a missing heading or no items, as
+ * checklistHeadings does, so the gate refuses rather than calling eight
+ * rows stale from a file it never read.
+ */
+export function reviewFailureModes(file = REVIEW) {
+  let md;
+  try {
+    md = readFileSync(file, "utf8");
+  } catch (cause) {
+    throw new Error(`cannot read REVIEW.md at ${file}`, { cause });
+  }
+  const lines = md.split("\n");
+  const start = lines.findIndex((l) => /^## Always check\b/.test(l));
+  if (start === -1) throw new Error(`no '## Always check' heading in ${file}`);
+  const titles = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith("## ")) break;
+    const m = /^\d+\. \*\*(.+?)\*\*/.exec(line);
+    if (m) titles.push(m[1].replace(/\.$/, ""));
+  }
+  if (titles.length === 0) throw new Error(`the 'Always check' list in ${file} has no items`);
+  return titles;
 }
 
 /**

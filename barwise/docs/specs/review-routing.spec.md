@@ -1,10 +1,12 @@
 # Review routing: start every review from the list of what applies to the diff
 
-Status: Draft -- no workstream implemented
+Status: Workstreams 1-2 implemented 2026-10-24 (pr-risk leads with the routing;
+REVIEW.md's failure modes routed and gated both ways); 3 not yet
 
 Created: 2026-10-23
-Last-updated: 2026-10-23
+Last-updated: 2026-10-24
 Tracking: barwise-6mf
+Plan-reviewed: 45f824a9 (code-review, pr-review)
 Touches: barwise/scripts/pr-risk.mjs, barwise/scripts/lib/review-tiers.mjs,
 barwise/review-tiers.json, barwise/scripts/check-review-tiers.mjs,
 barwise/scripts/tests/gates.test.mjs, .github/workflows/ci.yml,
