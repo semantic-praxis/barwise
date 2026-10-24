@@ -286,7 +286,6 @@ function populationKeys(model: OrmModel): string[] {
     .sort();
 }
 
-/** Merge with every non-unchanged delta accepted. */
 /**
  * Merge is deterministic: the same two models and the same accepted set
  * give the same model, ids included. Where the merged store already held
@@ -321,6 +320,7 @@ describe("law: merging twice gives the same model", () => {
   });
 });
 
+/** Merge with every non-unchanged delta accepted. */
 function mergeAll(existing: OrmModel, incoming: OrmModel): OrmModel {
   const { deltas } = diffModels(existing, incoming);
   const accepted = new Set(
