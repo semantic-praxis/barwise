@@ -14,17 +14,11 @@
  * exit, and an unmarked %A is a silent loss of the other side's issues.
  *
  * Installed by install-merge-driver.mjs into the git common directory, so
- * it runs on branches that predate it. The installer never replaces a
- * higher DRIVER_VERSION and does replace an equal one, so a change to any
- * installed file needs a new version: tests/merge-driver-versions.json
- * records each version's file hash, and beads-merge.test.mjs fails until
- * the bump and the new hash are both there.
+ * it runs on branches that predate it.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MalformedInput, resolveTracker } from "./lib/beads-merge.mjs";
-
-export const DRIVER_VERSION = 1;
 
 export const EXIT_MERGED = 0;
 export const EXIT_MALFORMED = 2;

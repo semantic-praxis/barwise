@@ -43,15 +43,24 @@ export function blocksDepCount(id, issues) {
 /**
  * Recompute dependency_count/dependent_count for each issue in `ids`
  * (a dependent_count changes on the far side of an edge just added or
- * removed, so callers pass both ends).
+ * removed, so callers pass both ends). One pass over the edges, then one
+ * over the issues: the merge driver passes every id, and asking
+ * blocksDepCount per id made that a scan per issue.
  */
 export function recomputeCounts(issues, ids) {
   const touched = new Set(ids);
+  const dependents = new Map();
+  for (const o of issues) {
+    for (const d of o.dependencies || []) {
+      if (d.type === BLOCKS_TYPE) {
+        dependents.set(d.depends_on_id, (dependents.get(d.depends_on_id) ?? 0) + 1);
+      }
+    }
+  }
   for (const o of issues) {
     if (touched.has(o.id)) {
-      const { dependencyCount, dependentCount } = blocksDepCount(o.id, issues);
-      o.dependency_count = dependencyCount;
-      o.dependent_count = dependentCount;
+      o.dependency_count = (o.dependencies || []).filter((d) => d.type === BLOCKS_TYPE).length;
+      o.dependent_count = dependents.get(o.id) ?? 0;
     }
   }
 }

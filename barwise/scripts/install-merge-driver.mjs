@@ -15,25 +15,25 @@
  * worktree all work.
  *
  * The copy is shared by every worktree of the clone, so a `prepare` run
- * from an older branch must not change how every later merge resolves: a
- * higher installed DRIVER_VERSION is kept. Equal versions are replaced, so
- * a fix that forgets the bump still installs.
+ * from an older branch must not change how every later merge resolves. The
+ * copy records the commit it was installed from, and is replaced only from
+ * a checkout that contains that commit. A hand-bumped version number did
+ * this first; it held only while every change remembered the bump, and its
+ * guard against a rewritten version could not work until main carried a
+ * record of shipped versions. Ancestry needs neither.
  *
  * Exit 0 installed or kept, and also when there is no git repository (an
  * unpacked archive, an export): like husky beside it in `prepare`, it says
  * so and lets the install go on, because a driver is no reason to fail one.
  * Exit 1 when git is there and installing fails.
  */
-import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { execFileSync, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { DRIVER_VERSION } from "./beads-merge-driver.mjs";
 
 export const DRIVER_NAME = "beads";
 export const INSTALL_DIR = "barwise-merge";
-export const RECURSIVE = "binary";
 export const DRIVER_COMMAND =
   `sh "$(git rev-parse --git-common-dir)/${INSTALL_DIR}/driver.sh" %O %A %B %P`;
 
@@ -47,29 +47,31 @@ export const FILES = [
   ["lib/beads-jsonl.mjs", "lib/beads-jsonl.mjs"],
 ];
 
-/**
- * What one DRIVER_VERSION means: the installed files and the config that
- * runs them. tests/merge-driver-versions.json records it per version.
- */
-export function driverHash() {
-  const hash = createHash("sha256");
-  for (const [to, from] of FILES) {
-    hash.update(`${to}\0`).update(readFileSync(join(HERE, from))).update("\0");
-  }
-  return hash.update(`${DRIVER_COMMAND}\0${RECURSIVE}\0`).digest("hex");
-}
-
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
-function installedVersion(dir) {
+function readOr(path, fallback) {
   try {
-    const v = Number(readFileSync(join(dir, "version"), "utf8").trim());
-    return Number.isInteger(v) ? v : 0;
+    return readFileSync(path, "utf8").trim();
   } catch {
-    return 0;
+    return fallback;
   }
+}
+
+/**
+ * Why the installed copy must stay, or undefined to replace it. Kept only
+ * when it came from a commit this checkout does not contain: an older
+ * branch, or a sibling with a driver change this one lacks. A copy with no
+ * record, or one whose commit this clone no longer has, is replaced.
+ */
+function keepReason(installed, head) {
+  if (!installed || !head || installed === head) return undefined;
+  const r = spawnSync("git", ["merge-base", "--is-ancestor", installed, head], { stdio: "ignore" });
+  if (r.status !== 1) return undefined; // 0: contained; anything else: unknown commit
+  return `installed from ${installed.slice(0, 8)}, which this checkout (${
+    head.slice(0, 8)
+  }) does not contain`;
 }
 
 function main() {
@@ -81,22 +83,28 @@ function main() {
     return 0;
   }
   const dir = join(common, INSTALL_DIR);
-  const installed = installedVersion(dir);
-  if (installed > DRIVER_VERSION) {
+  let head = "";
+  try {
+    head = git(["rev-parse", "--verify", "--quiet", "HEAD"]);
+  } catch {
+    // No commit yet: nothing to compare, so install.
+  }
+  const reason = keepReason(readOr(join(dir, "commit"), ""), head);
+  if (reason) {
     console.error(
-      `install-merge-driver: keeping the installed tracker merge driver (version ${installed}); `
-        + `this checkout carries version ${DRIVER_VERSION}.`,
+      `install-merge-driver: keeping the installed tracker merge driver (${reason}). `
+        + "Run `npm run prepare` from a branch that contains it to replace it.",
     );
     // The config belongs to the files it runs: this checkout's command
-    // could name a wrapper the newer copy does not have.
+    // could name a wrapper the kept copy does not have.
     return 0;
   }
   for (const [to, from] of FILES) {
     mkdirSync(dirname(join(dir, to)), { recursive: true });
     copyFileSync(join(HERE, from), join(dir, to));
   }
-  // Last, so an interrupted copy reads as version 0 and is replaced.
-  writeFileSync(join(dir, "version"), `${DRIVER_VERSION}\n`);
+  // Last, so an interrupted copy has no record and is replaced next time.
+  writeFileSync(join(dir, "commit"), `${head}\n`);
   git([
     "config",
     `merge.${DRIVER_NAME}.name`,
@@ -107,7 +115,7 @@ function main() {
   // Running this driver there would put conflict blocks into that base,
   // which the outer run then refuses as malformed; `binary` takes the
   // bases' common ancestor instead.
-  git(["config", `merge.${DRIVER_NAME}.recursive`, RECURSIVE]);
+  git(["config", `merge.${DRIVER_NAME}.recursive`, "binary"]);
   if (!existsSync(join(dir, "driver.sh"))) {
     console.error(`install-merge-driver: ${join(dir, "driver.sh")} is missing after install.`);
     return 1;

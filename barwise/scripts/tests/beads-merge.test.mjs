@@ -20,8 +20,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { DRIVER_VERSION } from "../beads-merge-driver.mjs";
-import { DRIVER_NAME, driverHash } from "../install-merge-driver.mjs";
+import { DRIVER_NAME } from "../install-merge-driver.mjs";
 import { canonicalLine } from "../lib/beads-jsonl.mjs";
 import { MalformedInput, resolveTracker } from "../lib/beads-merge.mjs";
 
@@ -291,43 +290,6 @@ test("the lines the driver writes are the canonical form check-beads enforces", 
   }
 });
 
-test("the installed files carry the version their hash is recorded under", (t) => {
-  // The installer replaces an equal version and keeps a higher one, so a
-  // change to an installed file under an unchanged version would be undone
-  // by the next `prepare` from any older checkout, in every worktree.
-  const versionsFile = join(SCRIPTS, "tests", "merge-driver-versions.json");
-  const recorded = JSON.parse(readFileSync(versionsFile, "utf8"));
-  assert.equal(
-    recorded.versions[String(DRIVER_VERSION)],
-    driverHash(),
-    `the installed driver files changed: bump DRIVER_VERSION past ${DRIVER_VERSION} in `
-      + "beads-merge-driver.mjs and record the new hash under the new version in "
-      + "tests/merge-driver-versions.json. Never change an existing version's hash.",
-  );
-  // A shipped version's row is history: rewriting it in place, instead of
-  // adding a version, would pass the check above and still be overwritten
-  // by an older checkout's `prepare`. main is the record of what shipped.
-  const onMain = spawnSync("git", [
-    "show",
-    "origin/main:barwise/scripts/tests/merge-driver-versions.json",
-  ], {
-    cwd: REPO,
-    encoding: "utf8",
-    env: cleanEnv(),
-  });
-  if (onMain.status !== 0) {
-    t.diagnostic("origin/main has no merge-driver-versions.json; shipped rows not compared");
-    return;
-  }
-  for (const [version, sha] of Object.entries(JSON.parse(onMain.stdout).versions)) {
-    assert.equal(
-      recorded.versions[version],
-      sha,
-      `version ${version}'s recorded hash changed; add a new version instead`,
-    );
-  }
-});
-
 // --- real merges, in throwaway repositories ---------------------------------
 
 const roots = [];
@@ -429,7 +391,7 @@ test(".gitattributes routes the tracker to the driver name the installer registe
   assert.equal(/^\.beads\/issues\.jsonl\s+merge=(\S+)/m.exec(attrs)?.[1], DRIVER_NAME);
 });
 
-test("installing twice leaves one registration, its wrapper on disk, and never downgrades", () => {
+test("installing twice leaves one registration and its wrapper on disk", () => {
   const r = repo(jsonl(issue("a")));
   const again = r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
   assert.equal(again.status, 0, again.stderr);
@@ -437,26 +399,44 @@ test("installing twice leaves one registration, its wrapper on disk, and never d
   assert.equal(r.git("config", "--get", "merge.beads.recursive"), "binary");
   const installed = join(r.dir, ".git", "barwise-merge");
   assert.ok(existsSync(join(installed, "driver.sh")));
+  assert.equal(readFileSync(join(installed, "commit"), "utf8").trim(), r.git("rev-parse", "HEAD"));
+});
 
-  writeFileSync(join(installed, "driver.sh"), "# sentinel\n");
-  writeFileSync(join(installed, "version"), "999\n");
+test("the installed copy is replaced only from a checkout that contains the commit it came from", () => {
+  // The copy is shared by every worktree of the clone, so an older branch's
+  // `prepare` must not put back older rules -- and no number has to be
+  // remembered for that to hold.
+  const r = repo(jsonl(issue("a")));
+  const installed = join(r.dir, ".git", "barwise-merge");
+  const install = () => r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
+  const older = r.git("rev-parse", "HEAD");
+  r.write(jsonl(issue("a"), issue("b")));
+  r.commit("newer");
+  const newer = r.git("rev-parse", "HEAD");
+
+  // From a descendant of the installed commit: replaced.
+  writeFileSync(join(installed, "driver.sh"), "# stale\n");
+  assert.equal(install().status, 0);
+  assert.notEqual(readFileSync(join(installed, "driver.sh"), "utf8"), "# stale\n");
+  assert.equal(readFileSync(join(installed, "commit"), "utf8").trim(), newer);
+
+  // From an older checkout: kept, with the config that runs it.
+  writeFileSync(join(installed, "driver.sh"), "# newer copy\n");
   r.git("config", "merge.beads.driver", "sh newer-driver.sh %O %A %B %P");
-  const kept = r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
-  assert.match(kept.stderr, /keeping the installed tracker merge driver \(version 999\)/);
-  assert.equal(readFileSync(join(installed, "driver.sh"), "utf8"), "# sentinel\n");
-  assert.equal(
-    r.git("config", "--get", "merge.beads.driver"),
-    "sh newer-driver.sh %O %A %B %P",
-    "the newer copy keeps the config that runs it",
+  r.git("checkout", "-q", older);
+  const kept = install();
+  assert.equal(kept.status, 0, kept.stderr);
+  assert.match(
+    kept.stderr,
+    new RegExp(`keeping the installed tracker merge driver \\(installed from ${newer.slice(0, 8)}`),
   );
+  assert.equal(readFileSync(join(installed, "driver.sh"), "utf8"), "# newer copy\n");
+  assert.equal(r.git("config", "--get", "merge.beads.driver"), "sh newer-driver.sh %O %A %B %P");
 
-  writeFileSync(join(installed, "version"), "1\n");
-  r.run("node", [join(SCRIPTS, "install-merge-driver.mjs")]);
-  assert.notEqual(
-    readFileSync(join(installed, "driver.sh"), "utf8"),
-    "# sentinel\n",
-    "an equal version is replaced",
-  );
+  // A record naming a commit this clone does not have is no reason to keep.
+  writeFileSync(join(installed, "commit"), `${"0".repeat(40)}\n`);
+  assert.equal(install().status, 0);
+  assert.notEqual(readFileSync(join(installed, "driver.sh"), "utf8"), "# newer copy\n");
 });
 
 test("outside a git repository the installer says so and lets prepare go on", () => {
