@@ -238,10 +238,9 @@ describe("the merge survives states the model refuses", () => {
   });
 
   it("keeps both subtype facts distinct when a rename collides their ids", () => {
-    // Both models name their subtype fact `sf-1`. The merged model keys
-    // by id in a Map, and `set` overwrites without complaint, so
-    // reusing the id where one is already present is a silent loss
-    // rather than an error.
+    // Both models name their subtype fact `sf-1`. Reusing an id the merged
+    // model already holds is refused (`DuplicateIdError`), which would lose
+    // the whole merge, so the merge takes a derived id for the second.
     const existing = withSupertype("Employee");
     const incoming = withSupertype("Staff");
     const { deltas } = diffModels(existing, incoming);

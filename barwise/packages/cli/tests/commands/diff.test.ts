@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { runCli } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -150,6 +150,8 @@ describe("barwise diff --matching", () => {
     writeFileSync(path, text);
     return path;
   };
+  // Cleaned up once, after all three, so a failing assertion leaves nothing.
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
   const a = () =>
     write(
       "a.orm.yaml",
@@ -171,13 +173,11 @@ describe("barwise diff --matching", () => {
     const result = await runCli(["diff", a(), b(), "--matching", "content"]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("No changes");
-    rmSync(dir, { recursive: true, force: true });
   });
 
   it("refuses a mode it does not know", async () => {
     const result = await runCli(["diff", a(), b(), "--matching", "bogus"]);
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("--matching must be id-first or content");
-    rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -8,6 +8,7 @@ import {
   deltaLabel,
   deltaToJson,
   diffModels,
+  ELEMENT_MATCHINGS,
   type ModelDelta,
   type SynonymCandidate,
 } from "@barwise/core/diff";
@@ -35,14 +36,16 @@ export function registerDiffCommand(program: Command): void {
         opts: { format: string; synonyms: boolean; matching: string; },
       ) => {
         try {
-          if (opts.matching !== "id-first" && opts.matching !== "content") {
+          const matching = ELEMENT_MATCHINGS.find((m) => m === opts.matching);
+          if (matching === undefined) {
             throw new Error(
-              `--matching must be id-first or content, not ${JSON.stringify(opts.matching)}.`,
+              `--matching must be ${ELEMENT_MATCHINGS.join(" or ")}, `
+                + `not ${JSON.stringify(opts.matching)}.`,
             );
           }
           const baseModel = loadModel(base);
           const incomingModel = loadModel(incoming);
-          const diff = diffModels(baseModel, incomingModel, { matching: opts.matching });
+          const diff = diffModels(baseModel, incomingModel, { matching });
 
           if (opts.format === "json") {
             process.stdout.write(

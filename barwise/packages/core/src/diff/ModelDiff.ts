@@ -32,7 +32,7 @@ import {
 import { detectSynonymCandidates } from "./synonyms.js";
 
 import type { ElementMatching } from "./identity.js";
-export type { ElementMatching } from "./identity.js";
+export { ELEMENT_MATCHINGS, type ElementMatching } from "./identity.js";
 
 /** Options for {@link diffModels}. */
 export interface DiffOptions {
