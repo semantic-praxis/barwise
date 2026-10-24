@@ -1,6 +1,6 @@
 # Tell a pull request when only the tracker stands between it and main
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-24 -- the single workstream
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -151,13 +151,27 @@ In scope:
 - When a run checks a PR, the workflow shall assign it a verdict by the
   table above and act on the comment rules.
 - When a PR's base is not `main`, the workflow shall skip it. When it
-  has more than one merge base with main, the workflow shall record it
-  as unchecked.
+  has an open comment, the workflow shall close it, saying the PR no
+  longer targets main.
+- When `refs/pull/<n>/head` lags the commit the API listed (GitHub
+  updates it asynchronously), the workflow shall fetch that commit by
+  its sha and classify it. When the commit cannot be fetched at all, the
+  workflow shall record the PR as unchecked. Like a criss-cross PR, it is
+  undecidable rather than unreadable, and does not count toward exit 2.
+- When one side deleted the tracker, the workflow shall treat the PR as
+  needing a hand merge: git runs no merge driver for a modify/delete
+  conflict.
+- When a PR is closed and has an open comment, the workflow shall close
+  that comment.
+- When an open comment's new body equals its current one, the workflow
+  shall not rewrite it.
+- When a PR into main has more than one merge base with main, the
+  workflow shall record it as unchecked.
 - When fetching or classifying one PR fails, the workflow shall record
   that PR as unchecked, with the reason, in the job summary and as a
   warning annotation, and go on to the rest.
-- When the PR list cannot be read, or at least one PR was to be checked
-  and none could be, the script shall exit 2, "could not answer"
+- When the PR list cannot be read, or there are open PRs into main and
+  every one of them was unreadable, the script shall exit 2, "could not answer"
   (`gate-refusal-contract.spec.md`). When there are no open PRs into
   main, it shall exit 0. One unreadable PR does not turn every later run
   red, which would teach readers to ignore the color.

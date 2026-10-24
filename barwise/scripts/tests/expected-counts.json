@@ -6,12 +6,15 @@
     "beads-ids.test.mjs": 3,
     "beads-merge.test.mjs": 41,
     "ci-conditions.test.mjs": 13,
-    "gates.test.mjs": 229,
+    "gates.test.mjs": 230,
+    "generated-marks.test.mjs": 3,
     "masked-exit.test.mjs": 28,
     "measure-comparison.test.mjs": 31,
+    "plan-scope.test.mjs": 8,
     "pushed-tree.test.mjs": 12,
     "python-uv-guard.test.mjs": 32,
     "session-start.test.mjs": 7,
-    "spec-reader.test.mjs": 14
+    "spec-reader.test.mjs": 14,
+    "tracker-conflicts.test.mjs": 20
   }
 }
