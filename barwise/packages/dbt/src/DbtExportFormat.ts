@@ -65,7 +65,7 @@ export class DbtExportFormat implements ExportFormatAdapter {
     // Where the model files and schema.yml go. The editor writes into an
     // existing project under models/staging, where a top-level
     // models/schema.yml is the file most likely to exist already.
-    const modelsDir = (options?.modelsDir as string | undefined) ?? "models";
+    const modelsDir = resolveModelsDir(options?.modelsDir);
 
     // Render dbt project.
     const dbtProject = renderDbt(schema, {
@@ -137,6 +137,25 @@ export class DbtExportFormat implements ExportFormatAdapter {
       annotations,
     };
   }
+}
+
+/**
+ * The `modelsDir` option as a relative path of plain segments. Anything
+ * else is refused rather than written: an empty, absolute, or `..` path
+ * would place files outside the project the caller writes into.
+ */
+function resolveModelsDir(value: unknown): string {
+  if (value === undefined) return "models";
+  const segments = typeof value === "string" ? value.split("/").filter((s) => s !== "") : [];
+  if (
+    typeof value !== "string" || value.startsWith("/") || segments.length === 0
+    || segments.some((s) => s === "." || s === "..")
+  ) {
+    throw new Error(
+      `modelsDir must be a relative path inside the project, got ${JSON.stringify(value)}`,
+    );
+  }
+  return segments.join("/");
 }
 
 /**

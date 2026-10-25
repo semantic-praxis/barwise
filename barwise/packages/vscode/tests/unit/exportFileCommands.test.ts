@@ -119,7 +119,14 @@ describe("Barwise: Export, As Avro Schemas", () => {
     await run(new ExportAvroCommand());
     expect(state.written).toEqual(expectedFiles("avro", { namespace: "com.school" }, "/out"));
     expect([...state.written.values()].join("\n")).toMatch(/\[(TODO|NOTE)\(barwise\):/);
-    expect(state.infos).toEqual([`Exported ${state.written.size} file(s) to out/`]);
+    // The exporter's review notes are counted in the message, as dbt's always were.
+    const notes = getExporter("avro")!.export(model(), { namespace: "com.school" }).annotations!;
+    const todos = notes.filter((a) => a.severity === "todo").length;
+    expect(state.infos).toEqual([
+      `Exported ${state.written.size} file(s) to out/ (${todos} TODO(s), ${
+        notes.length - todos
+      } NOTE(s) annotated)`,
+    ]);
   });
 });
 
@@ -151,7 +158,10 @@ describe("when the registered exporter refuses or reports", () => {
 
   async function withHelper(exportWith: () => unknown) {
     vi.resetModules();
-    vi.doMock("../../src/export/registeredExport.js", () => ({ exportWith }));
+    vi.doMock("../../src/export/registeredExport.js", async (actual) => ({
+      ...(await actual<object>()),
+      exportWith,
+    }));
     const avro = await import("../../src/commands/ExportAvroCommand.js");
     const dbt = await import("../../src/commands/ExportDbtCommand.js");
     vi.doUnmock("../../src/export/registeredExport.js");
@@ -173,7 +183,7 @@ describe("when the registered exporter refuses or reports", () => {
     await run(commands.dbt);
     expect(state.warnings).toEqual([
       "Exported 0 file(s) to out/. 1 constraint(s) the avro format could not express.",
-      "Exported 0 file(s) to models/staging/. 1 constraint(s) the dbt format could not express.",
+      "Exported 0 file(s) to out/. 1 constraint(s) the dbt format could not express.",
     ]);
   });
 });

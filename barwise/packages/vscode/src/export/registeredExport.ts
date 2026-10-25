@@ -14,6 +14,11 @@ import { registerStandardFormats } from "@barwise/formats";
 registerStandardFormats();
 registerDbtFormats();
 
+/** How a format is named to the user; the registry id where none is set. */
+export function formatLabel(format: string): string {
+  return ({ ddl: "DDL", avro: "Avro", dbt: "dbt" } as Record<string, string>)[format] ?? format;
+}
+
 export type RegisteredExport =
   | { readonly ok: true; readonly result: ExportResult; }
   | { readonly ok: false; readonly reason: string; };
@@ -25,13 +30,17 @@ export function exportWith(
   options?: ExportOptions,
 ): RegisteredExport {
   const exporter = getExporter(format);
-  if (!exporter) return { ok: false, reason: `The ${format} exporter is not registered.` };
+  if (!exporter) {
+    return { ok: false, reason: `The ${formatLabel(format)} exporter is not registered.` };
+  }
   try {
     return { ok: true, result: exporter.export(model, options) };
   } catch (err) {
     return {
       ok: false,
-      reason: `${format} export failed: ${err instanceof Error ? err.message : String(err)}`,
+      reason: `${formatLabel(format)} export failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
     };
   }
 }

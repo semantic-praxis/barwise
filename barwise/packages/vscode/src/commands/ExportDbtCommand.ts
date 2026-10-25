@@ -10,7 +10,7 @@ import { OrmYamlSerializer } from "@barwise/core";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { exportWith } from "../export/registeredExport.js";
-import { reportExport } from "./exportReport.js";
+import { reportExport, writeExportFiles } from "./exportReport.js";
 
 const serializer = new OrmYamlSerializer();
 
@@ -77,13 +77,7 @@ export class ExportDbtCommand {
     const files = result.files ?? [];
 
     // Step 4: Write every file at the exporter's path.
-    for (const file of files) {
-      const uri = vscode.Uri.joinPath(dbtRoot, file.name);
-      await vscode.workspace.fs.createDirectory(
-        vscode.Uri.joinPath(dbtRoot, path.posix.dirname(file.name)),
-      );
-      await vscode.workspace.fs.writeFile(uri, Buffer.from(file.content, "utf-8"));
-    }
+    await writeExportFiles(dbtRoot, files);
 
     // Step 5: Open the schema.yml.
     const schemaFile = files.find((f) => path.posix.basename(f.name) === "schema.yml");
@@ -94,14 +88,11 @@ export class ExportDbtCommand {
       await vscode.window.showTextDocument(doc);
     }
 
-    // Step 6: Report.
-    const annotations = result.annotations ?? [];
-    const todos = annotations.filter((a) => a.severity === "todo").length;
-    const notes = annotations.filter((a) => a.severity === "note").length;
-    let summary = `Exported ${files.length} file(s) to ${PALETTE_DBT_OPTIONS.modelsDir}/`;
-    if (todos > 0 || notes > 0) {
-      summary += ` (${todos} TODO(s), ${notes} NOTE(s) annotated)`;
-    }
-    reportExport(result, "dbt", summary);
+    // Step 6: Report, naming the project the files went into.
+    reportExport(
+      result,
+      "dbt",
+      `Exported ${files.length} file(s) to ${path.basename(dbtRoot.fsPath)}/`,
+    );
   }
 }

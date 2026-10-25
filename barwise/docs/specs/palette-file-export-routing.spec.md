@@ -188,8 +188,23 @@ discriminates because the command writes every result file, so dropping
   "=== <summary> ===" above the report, so DDL's channel line reads
   "=== Exported DDL to <file> ===" where it read "=== Export: <file> ===";
   the DDL test that pins one report per export moved with it.
-- **The dbt command creates each file's directory** before writing, since
-  the exporter's paths are nested; the Avro exporter's are flat.
+- **Code review moved more into the shared tail.** `exportReport.ts` also
+  writes the files (`writeExportFiles`, one `createDirectory` per folder)
+  and appends the result's TODO and NOTE counts to every summary, so the
+  Avro export reports the review notes it now carries, and DDL messages
+  gain the counts of the notes its file already held ("Exported DDL to
+  ring.sql (7 TODO(s), 1 NOTE(s) annotated)"). This revises Scope's "DDL's
+  messages are unchanged". The dbt summary names the project folder,
+  since the files are wherever the exporter puts them.
+- **`modelsDir` is validated.** An empty, absolute or `..` path, or a
+  non-string, is refused, since the CLI and the palette both join it under
+  a project folder; extra slashes are normalized. Refusals name the format
+  by its display label ("DDL export failed").
+- **Two review findings stand.** The Avro namespace is not sanitized for
+  file names that are not valid Avro names; the old command did the same,
+  and a fix changes registered full names, so it is barwise-1c2. The
+  dbt text output heads `schema.yml` without its folder, as it did before;
+  heading it would change the default text for every caller.
 
 ## Open decisions
 

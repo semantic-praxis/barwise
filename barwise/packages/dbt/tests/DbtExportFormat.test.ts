@@ -254,6 +254,18 @@ describe("DbtExportFormat", () => {
         "seeds/student_enrolls_course.csv",
       ]);
     });
+
+    it("refuses a modelsDir that would leave the project", () => {
+      const model = buildEnrollmentModelWithIncompleteInstance();
+      for (const modelsDir of ["", "/abs", "../up", "models/../..", 5]) {
+        expect(() => dbtFormat.export(model, { modelsDir }), String(modelsDir)).toThrow(
+          /modelsDir must be a relative path/,
+        );
+      }
+      // Extra slashes are not a different directory.
+      const names = dbtFormat.export(model, { modelsDir: "models/staging/" }).files!;
+      expect(names.some((f) => f.name === "models/staging/schema.yml")).toBe(true);
+    });
   });
 });
 

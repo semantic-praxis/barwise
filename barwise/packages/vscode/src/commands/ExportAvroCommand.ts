@@ -9,7 +9,7 @@ import { OrmYamlSerializer } from "@barwise/core";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { exportWith } from "../export/registeredExport.js";
-import { reportExport } from "./exportReport.js";
+import { reportExport, writeExportFiles } from "./exportReport.js";
 
 const serializer = new OrmYamlSerializer();
 
@@ -62,12 +62,7 @@ export class ExportAvroCommand {
     const outputDir = folders[0]!;
 
     // Step 4: Write each file at the exporter's path.
-    for (const file of files) {
-      await vscode.workspace.fs.writeFile(
-        vscode.Uri.joinPath(outputDir, file.name),
-        Buffer.from(file.content, "utf-8"),
-      );
-    }
+    await writeExportFiles(outputDir, files);
 
     // Step 5: Open the first schema file if any were written.
     if (files.length > 0) {
