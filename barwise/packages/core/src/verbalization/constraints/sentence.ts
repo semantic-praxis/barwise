@@ -191,6 +191,7 @@ export function quantifiedReading(
   parts: readonly ReadingPart[],
   own: number,
   others = "some ",
+  player: (index: number) => VerbalizationSegment = (index) => rolePlayer(model, factType, index),
 ): VerbalizationSegment[] {
   const segments: VerbalizationSegment[] = [];
   const named = new Set<number>([own]);
@@ -201,7 +202,7 @@ export function quantifiedReading(
       segments.push(
         kwSeg(named.has(part.index) ? "that " : others),
         ...leadSegs(part.lead),
-        rolePlayer(model, factType, part.index),
+        player(part.index),
       );
       named.add(part.index);
       return;
@@ -234,13 +235,36 @@ export function forEachReading(
 ): VerbalizationSegment[] {
   // The constructor refuses a fact type with no reading.
   const parts = splitReading(factType.readings[0]!.template).parts;
+  const ownPart = parts.find((p) => p.kind === "role" && p.index === own);
+  const player = numberedPlayers(model, factType);
   return [
     kwSeg("For each "),
-    rolePlayer(model, factType, own),
+    ...leadSegs(ownPart?.kind === "role" ? ownPart.lead : ""),
+    player(own),
     textSeg(", "),
-    ...quantifiedReading(model, factType, parts, own, others),
+    ...quantifiedReading(model, factType, parts, own, others, player),
     textSeg("."),
   ];
+}
+
+/**
+ * Each role's player as a reference, numbered by role position when
+ * another role of the fact type has the same player ("Person1",
+ * "Person2", as the ring sentence writes them): without the numbers,
+ * "For each Person, at most one Person reports to that Person" reads as
+ * one person reporting to themself.
+ */
+function numberedPlayers(
+  model: OrmModel,
+  factType: FactType,
+): (index: number) => VerbalizationSegment {
+  return (index) => {
+    const role = factType.roles[index]!;
+    const shared = factType.roles.some((r, i) => i !== index && r.playerId === role.playerId);
+    if (!shared) return rolePlayer(model, factType, index);
+    const name = model.getObjectType(role.playerId)?.name ?? role.name;
+    return refSeg(`${name}${index + 1}`, role.playerId);
+  };
 }
 
 /** A lead as the segment that goes before its player's name, or none. */

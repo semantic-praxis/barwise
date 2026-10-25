@@ -128,13 +128,13 @@ describe("constraint sentences place a lead after the quantifier", () => {
     // Only "{1} is sale- price of {0}" exists, and the uniqueness is on
     // role 0: the sentence is written from that reading as given
     // (binary-reverse-reading-verbalization.spec.md), and "sale price of"
-    // stays bound to Listing, after "that", by the same rule as every
-    // other lead.
+    // stays bound to Listing, in the head and after "that", by the same
+    // rule as every other lead.
     const { model, ft } = listing(["{1} is sale- price of {0}"], [
       { type: "internal_uniqueness", roleIds: ["rl"] },
     ]);
     expect(texts(model, ft)).toEqual([
-      "For each Listing, at most one Currency is that sale price of Listing.",
+      "For each sale price of Listing, at most one Currency is that sale price of Listing.",
     ]);
   });
 

@@ -9,6 +9,7 @@ Plan-reviewed: a18ab1ec (code-review, pr-review)
 Touches: barwise/packages/core/src/verbalization/constraints/sentence.ts,
 barwise/packages/core/src/verbalization/constraints/phase1.ts,
 +barwise/packages/core/tests/verbalization/reverseReading.test.ts,
+barwise/packages/core/tests/verbalization/naryMandatory.test.ts,
 barwise/packages/core/tests/model/readingHyphenBinding.test.ts
 
 When a binary fact type's mandatory or uniqueness constraint sits on a
@@ -105,9 +106,28 @@ the monorepo passes; the corpus effect is recorded here.
 
 ## Implementation notes
 
-- As planned. The corpus measurement on the implementation matches the
-  prototype's: the same 125 sentences change, and the barwise-vscode
-  suite also passes (133 tests).
+- Implementation review changed three things the plan did not name:
+  - When two roles of the fact type have the same player, the "For each"
+    frame numbers them by role position, as the ring sentence does:
+    "For each Bid2, at most one Bid1 responds to that Bid2." Without the
+    numbers, "that Bid" reads as the Bid just named, which is a different,
+    reflexive fact.
+  - The constrained role's hyphen-bound lead also goes in the head ("For
+    each draft Agreement, ... that draft Agreement"), as the opening form
+    writes "Each new Customer". This applies to the n-ary sentence too,
+    and one n-ary expectation changes with it.
+  - The binary uniqueness and mandatory builders are now one function,
+    differing only in their two quantifiers.
+- The corpus effect is unchanged at 125 sentences in 6 files. Four of them
+  read differently from the plan: the two "Bid responds to Bid" rows now
+  carry the numbers, and the two "has child SimpleItem" rows carry the lead
+  in the head. Every suite passes, barwise-vscode included (133 tests).
+- Declined: a reading that opens with text before its first placeholder
+  ("the {0} is placed by {1}") gives "the some Order". The n-ary sentence
+  has always done this, and an article belongs in a hyphen-bound lead.
+- Filed: the forward sentence drops reading text outside its two
+  placeholders (barwise-m1c). That predates this change, but now the two
+  directions can differ.
 
 ## Open decisions
 

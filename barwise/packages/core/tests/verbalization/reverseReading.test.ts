@@ -44,7 +44,7 @@ describe("a binary constraint on the role no reading names first", () => {
 
   it("keeps a lead after the quantifier and after 'that'", () => {
     expect(placed(["{0} is placed by first- {1}"], { type: "mandatory", roleId: "rc" })).toEqual([
-      "For each Customer, some Order is placed by that first Customer.",
+      "For each first Customer, some Order is placed by that first Customer.",
     ]);
     expect(
       placed(["online- {0} is placed by {1}"], { type: "internal_uniqueness", roleIds: ["rc"] }),
@@ -55,6 +55,30 @@ describe("a binary constraint on the role no reading names first", () => {
   it("names a repeated placeholder with 'that' after its first mention", () => {
     expect(placed(["{0} is placed by {1} for {0}"], { type: "mandatory", roleId: "rc" })).toEqual([
       "For each Customer, some Order is placed by that Customer for that Order.",
+    ]);
+  });
+
+  it("numbers the players when both roles have the same one", () => {
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "p", name: "Person", kind: "entity", referenceMode: "id" });
+    const ft = model.addFactType({
+      id: "ft",
+      name: "Person reports to Person",
+      roles: [
+        { id: "r1", name: "reports to", playerId: "p" },
+        { id: "r2", name: "is reported to by", playerId: "p" },
+      ],
+      readings: ["{0} reports to {1}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["r2"] }],
+    });
+    expect(new ConstraintVerbalizer().verbalizeAll(ft.id, model).map((v) => v.text)).toEqual([
+      "For each Person2, at most one Person1 reports to that Person2.",
+    ]);
+  });
+
+  it("lowercases the frame under a deontic modality", () => {
+    expect(placed(only, { type: "mandatory", roleId: "rc", modality: "deontic" })).toEqual([
+      "It is obligatory that for each Customer, some Order is placed by that Customer.",
     ]);
   });
 
