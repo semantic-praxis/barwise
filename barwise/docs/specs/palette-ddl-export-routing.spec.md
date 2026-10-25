@@ -1,6 +1,6 @@
 # The editor's palette DDL export goes through the format registry
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- WS1
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -107,6 +107,18 @@ ratchet. Acceptance:
 
 The first two are watched red with the command change reverted. The third
 holds by construction and is pinned against a future second copy.
+
+## Implementation notes
+
+- **Acceptance measured.** `tests/unit/exportDdlCommand.test.ts`: the
+  ring model writes the spill comment, the channel receives its
+  verbalization, and the warning is the report heading; the unique-email
+  model writes `UNIQUE (email)`; the palette file equals the diagram
+  tab DDL. With the command reverted, four of its five tests fail (the
+  parse-error test covers unchanged behaviour and passes either way).
+- **One channel per session.** The report channel is created on first
+  use and reused, rather than once per export as the import commands do,
+  so repeated exports do not add an Output entry each run.
 
 ## Open decisions
 

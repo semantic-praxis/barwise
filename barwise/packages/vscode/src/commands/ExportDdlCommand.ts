@@ -1,16 +1,22 @@
 /**
  * Export As DDL command.
  *
- * Takes the active .orm.yaml, maps it to a relational schema,
- * renders CREATE TABLE DDL statements, and writes to a .sql file.
+ * Takes the active .orm.yaml, renders it through the registered `ddl`
+ * exporter (the same call the diagram's DDL tab makes, via
+ * `exportDdl`), writes the result to a .sql file, and reports any
+ * constraint the DDL could not express.
  */
 import { OrmYamlSerializer } from "@barwise/core";
-import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
+import { formatConstraintReport } from "@barwise/formats";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { exportDdl } from "../export/ddlExport.js";
 
 const serializer = new OrmYamlSerializer();
-const mapper = new RelationalMapper();
+
+// One channel for the session, created on first use: a channel per export
+// would leave a new entry in the Output dropdown every run.
+let reportChannel: vscode.OutputChannel | undefined;
 
 export class ExportDdlCommand {
   async execute(): Promise<void> {
@@ -34,9 +40,13 @@ export class ExportDdlCommand {
       return;
     }
 
-    // Step 2: Map and render DDL.
-    const schema = mapper.map(model);
-    const ddl = renderDdl(schema);
+    // Step 2: Render through the registered exporter.
+    const exported = exportDdl(model);
+    if (!exported.ok) {
+      vscode.window.showErrorMessage(exported.reason);
+      return;
+    }
+    const { result } = exported;
 
     // Step 3: Pick output location.
     const baseName = path.basename(
@@ -59,15 +69,26 @@ export class ExportDdlCommand {
     // Step 4: Write and open.
     await vscode.workspace.fs.writeFile(
       outputUri,
-      Buffer.from(ddl, "utf-8"),
+      Buffer.from(result.text, "utf-8"),
     );
 
     const doc = await vscode.workspace.openTextDocument(outputUri);
     await vscode.window.showTextDocument(doc);
 
-    const tableCount = schema.tables.length;
-    vscode.window.showInformationMessage(
-      `Exported ${tableCount} CREATE TABLE statement(s) to ${path.basename(outputUri.fsPath)}`,
-    );
+    // Step 5: Report what the DDL could not express, or confirm the write.
+    const fileName = path.basename(outputUri.fsPath);
+    const report = formatConstraintReport(result.constraintSpecs, "ddl");
+    if (!report) {
+      vscode.window.showInformationMessage(`Exported DDL to ${fileName}`);
+      return;
+    }
+    reportChannel ??= vscode.window.createOutputChannel("Barwise DDL Export");
+    reportChannel.appendLine(`=== Export: ${fileName} ===`);
+    reportChannel.appendLine(report);
+    // The warning is the report's own heading, so the two cannot state
+    // different counts.
+    const heading = report.split("\n", 1)[0]!;
+    const choice = await vscode.window.showWarningMessage(heading, "Show report");
+    if (choice === "Show report") reportChannel.show(true);
   }
 }

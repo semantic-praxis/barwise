@@ -7,13 +7,9 @@
  * ships it alongside the graph. Pure module: no `vscode` import, so it
  * is unit-testable outside the extension host.
  */
-import { getExporter, type OrmModel, OrmYamlSerializer } from "@barwise/core";
+import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { isStatement, Verbalizer } from "@barwise/core/verbalization";
-import { registerStandardFormats } from "@barwise/formats";
-
-// The DDL exporter registers through the FormatDescriptor registry;
-// registration is idempotent across the extension's entry points.
-registerStandardFormats();
+import { exportDdl } from "../export/ddlExport.js";
 
 /** One fact type's sample population, ready to render as a table. */
 export interface PopulationTable {
@@ -62,13 +58,8 @@ function buildYaml(model: OrmModel): string {
 }
 
 function buildDdl(model: OrmModel): string {
-  try {
-    const exporter = getExporter("ddl");
-    if (!exporter) return "-- DDL exporter is not registered.";
-    return exporter.export(model).text;
-  } catch (err) {
-    return `-- DDL export failed: ${(err as Error).message}`;
-  }
+  const exported = exportDdl(model);
+  return exported.ok ? exported.result.text : `-- ${exported.reason}`;
 }
 
 function buildPopulations(model: OrmModel): readonly PopulationTable[] {
