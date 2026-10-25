@@ -372,7 +372,7 @@ describe("ConstraintVerbalizer", () => {
       });
 
       const v = verbalizer.verbalizeAll(ft.id, model);
-      expect(v[0]!.text).toBe("Each Employee must: Employee works on Employee in Employee.");
+      expect(v[0]!.text).toBe("Each Employee works on some Project in some Department.");
     });
 
     it("says a mandatory constraint is malformed when it names a role the fact type does not have", () => {
