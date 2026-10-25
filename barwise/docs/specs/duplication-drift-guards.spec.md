@@ -72,6 +72,8 @@ extraction is a design change each time. Checking first also converts
 every later share into a safe refactor -- the check is the test that
 the share preserved behavior.
 
+Recorded as `docs/adr/must-agree-copies.md`.
+
 ## Scope
 
 In scope:
