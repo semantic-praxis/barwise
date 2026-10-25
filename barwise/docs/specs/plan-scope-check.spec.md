@@ -476,7 +476,8 @@ Grounded 2026-10-24 on `4c28e58d` (origin/main):
   is optional, so a spec without it is outside the rule entirely. Until
   `spec-writer` makes it required for new specs, or a check refuses a
   new spec without it, the gate covers what authors opt into.
-- **The body is compared at the first change's parent.** Read literally,
+- **The body is compared at the first change's parent** (kept by the
+  owner, 2026-10-24). Read literally,
   "the body at that first change" includes that commit's own edits.
   Measured on #721: its first implementation commit also amended the
   spec, so the literal reading failed it, while the same amendment one

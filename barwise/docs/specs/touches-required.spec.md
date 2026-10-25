@@ -324,6 +324,11 @@ no others.
 
 ## Open decisions (for review)
 
+**All four resolved 2026-10-24 by the owner, each as recommended:** (1)
+`check:spec-touches` carries the rule; (2) a rename to a new file name
+reads as new; (3) no escape; (4) pushes to main are checked, with the
+before-SHA as base.
+
 1. **Carrier.** (a) `check:spec-touches` (recommended): it runs on every
    event and owns the entry rules; it gains a base, a diff and a shallow
    refusal. (b) `check:plan-review`: has the base and diff, but needs a
