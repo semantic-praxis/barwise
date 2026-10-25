@@ -5,7 +5,7 @@
  */
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import { type ReadingPart, splitReading } from "../../model/ReadingOrder.js";
+import { leadOf, splitReading, textOf } from "../../model/ReadingOrder.js";
 import type { Role } from "../../model/Role.js";
 import { textSeg, type VerbalizationSegment } from "../Verbalization.js";
 
@@ -60,14 +60,23 @@ export function resolveCommonPlayer(
 /**
  * A binary reading's predicate between a subject and an object role, and
  * the words hyphen-bound to each role's player (reading-hyphen-binding.spec.md).
- * A sentence builder places each lead immediately before its own player's
- * name, after any quantifier or determiner: "Each Listing has at most one
- * sale Currency".
+ * `subject` and `object` put a player's reference after its lead, so every
+ * sentence builder places a lead the same way: immediately before the
+ * name, after any quantifier or determiner the builder writes first ("Each
+ * Listing has at most one sale Currency").
  */
 export interface Predicate {
   readonly text: string;
-  readonly subjectLead: string;
-  readonly objectLead: string;
+  readonly subject: (name: VerbalizationSegment) => VerbalizationSegment[];
+  readonly object: (name: VerbalizationSegment) => VerbalizationSegment[];
+}
+
+function predicate(text: string, subjectLead = "", objectLead = ""): Predicate {
+  return {
+    text,
+    subject: (name) => [...leadSegs(subjectLead), name],
+    object: (name) => [...leadSegs(objectLead), name],
+  };
 }
 
 /**
@@ -84,16 +93,11 @@ export function extractPredicate(
   objectIdx: number,
 ): Predicate {
   for (const reading of factType.readings) {
-    const roles = splitReading(reading.template).parts;
-    const s = roles.findIndex((p) => p.kind === "role" && p.index === subjectIdx);
-    const o = roles.findIndex((p) => p.kind === "role" && p.index === objectIdx);
+    const parts = splitReading(reading.template).parts;
+    const s = parts.findIndex((p) => p.kind === "role" && p.index === subjectIdx);
+    const o = parts.findIndex((p) => p.kind === "role" && p.index === objectIdx);
     if (s >= 0 && o > s) {
-      const between = roles.slice(s + 1, o).map((p) => p.kind === "text" ? p.text : "").join("");
-      return {
-        text: between.trim(),
-        subjectLead: leadOf(roles[s]!),
-        objectLead: leadOf(roles[o]!),
-      };
+      return predicate(textOf(parts.slice(s + 1, o)).trim(), leadOf(parts[s]), leadOf(parts[o]));
     }
   }
 
@@ -103,21 +107,15 @@ export function extractPredicate(
     const placeholders = parts.flatMap((p, i) => p.kind === "role" ? [i] : []);
     if (placeholders.length >= 2) {
       const [a, b] = placeholders as [number, number];
-      const text = parts.slice(a + 1, b).map((p) => p.kind === "text" ? p.text : "").join("");
-      return {
-        text: `${text.trim()} ${leadOf(parts[b]!)}`.trim(),
-        subjectLead: "",
-        objectLead: "",
-      };
+      return predicate(`${textOf(parts.slice(a + 1, b)).trim()} ${leadOf(parts[b])}`.trim());
     }
   }
 
-  return { text: "...", subjectLead: "", objectLead: "" };
+  return UNKNOWN_PREDICATE;
 }
 
-function leadOf(part: ReadingPart): string {
-  return part.kind === "role" ? part.lead : "";
-}
+/** The predicate of a reading barwise cannot read one from. */
+export const UNKNOWN_PREDICATE: Predicate = predicate("...");
 
 /** A lead as the segment that goes before its player's name, or none. */
 export function leadSegs(lead: string): VerbalizationSegment[] {

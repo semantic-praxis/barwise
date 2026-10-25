@@ -34,8 +34,15 @@ describe("splitReading", () => {
     expect(leads("{0} has big- red- {1}")).toEqual([[0, ""], [1, "big red"]]);
   });
 
-  it("binds a hyphen written flush against the placeholder", () => {
-    expect(leads("{0} has sale-{1}")).toEqual([[0, ""], [1, "sale"]]);
+  it("leaves a hyphen flush against the placeholder as a prefix compound", () => {
+    // "non-Smoker", not "non Smoker": binding needs whitespace after the hyphen.
+    expect(leads("{0} is a non-{1}")).toEqual([[0, ""], [1, ""]]);
+    expect(splitReading("{0} is a non-{1}").unbound).toBe(false);
+    expect(expandReading("{0} is a non-{1}", ["Person", "Smoker"])).toBe("Person is a non-Smoker");
+  });
+
+  it("binds a word in any script", () => {
+    expect(leads("{0} has café- {1}")).toEqual([[0, ""], [1, "café"]]);
   });
 
   it("leaves a hyphen inside a word, or a dash standing alone, as text", () => {
@@ -48,8 +55,13 @@ describe("splitReading", () => {
   it("reports a hyphen that binds nothing", () => {
     expect(splitReading("{0} smiles- ").unbound).toBe(true);
     expect(splitReading("{0} smiles-").unbound).toBe(true);
-    // The trailing form, which barwise does not bind.
+    // The trailing form, which barwise does not bind, also inside a lead.
     expect(splitReading("{0} -word {1}").unbound).toBe(true);
+    expect(splitReading("{0} has sale- -x {1}").unbound).toBe(true);
+  });
+
+  it("reads a minus sign as text, not as the trailing form", () => {
+    expect(splitReading("{0} has balance -5 below {1}").unbound).toBe(false);
   });
 
   it("binds each placeholder's own stretch only", () => {

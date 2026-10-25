@@ -170,7 +170,6 @@ export {
   type SplitReading,
   splitReading,
   validateReadingTemplate,
-  withLead,
 } from "./model/ReadingOrder.js";
 export { Role, type RoleConfig } from "./model/Role.js";
 export { SemanticConflict, type SemanticConflictConfig } from "./model/SemanticConflict.js";

@@ -1,6 +1,7 @@
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { splitReading } from "../model/ReadingOrder.js";
+import { leadSegs } from "./constraints/sentence.js";
 import {
   buildVerbalization,
   refSeg,
@@ -68,7 +69,7 @@ function parseReadingTemplate(
       segments.push(textSeg(part.text));
       continue;
     }
-    if (part.lead) segments.push(textSeg(part.lead + " "));
+    segments.push(...leadSegs(part.lead));
     const role = factType.roles[part.index];
     if (role) {
       const objectType = model.getObjectType(role.playerId);

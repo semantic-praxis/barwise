@@ -5,7 +5,7 @@
 import type { RingType } from "../../model/Constraint.js";
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import { expandReading, type ReadingPart, splitReading } from "../../model/ReadingOrder.js";
+import { expandReading, leadOf, splitReading, textOf } from "../../model/ReadingOrder.js";
 import type { JoinOperand, RolePath } from "../../model/RolePath.js";
 import { assertNever } from "../../util/assertNever.js";
 import {
@@ -16,7 +16,13 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate, leadSegs, localRole, resolveCommonPlayer } from "./sentence.js";
+import {
+  extractPredicate,
+  leadSegs,
+  localRole,
+  resolveCommonPlayer,
+  UNKNOWN_PREDICATE,
+} from "./sentence.js";
 
 export function verbalizeDisjunctiveMandatory(
   roleIds: readonly string[],
@@ -223,7 +229,7 @@ export function verbalizeRing(
 
   const predicate = factType.arity === 2
     ? extractPredicate(factType, 0, 1)
-    : { text: "...", subjectLead: "", objectLead: "" };
+    : UNKNOWN_PREDICATE;
   // "{subject} [does not] {predicate} [determiner] {object}", each lead
   // before the name in its own role slot (reading-hyphen-binding.spec.md).
   const clause = (
@@ -231,11 +237,9 @@ export function verbalizeRing(
     object: VerbalizationSegment,
     options: { readonly negated?: boolean; readonly determiner?: string; } = {},
   ): VerbalizationSegment[] => [
-    ...leadSegs(predicate.subjectLead),
-    subject,
+    ...predicate.subject(subject),
     textSeg(` ${options.negated ? "does not " : ""}${predicate.text} ${options.determiner ?? ""}`),
-    ...leadSegs(predicate.objectLead),
-    object,
+    ...predicate.object(object),
   ];
 
   switch (ringType) {
@@ -364,8 +368,7 @@ export function verbalizeFrequency(
 
   const segments: VerbalizationSegment[] = [
     kwSeg("Each "),
-    ...leadSegs(predicate.subjectLead),
-    refSeg(subjectName, subjectRole.playerId),
+    ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
     textSeg(" " + predicate.text + " "),
   ];
 
@@ -377,8 +380,7 @@ export function verbalizeFrequency(
     segments.push(kwSeg(`at least ${min} and at most ${max} `));
   }
 
-  segments.push(...leadSegs(predicate.objectLead));
-  segments.push(refSeg(objectName, objectRole.playerId));
+  segments.push(...predicate.object(refSeg(objectName, objectRole.playerId)));
   segments.push(textSeg("."));
 
   return buildVerbalization(factType.id, "constraint", segments);
@@ -505,15 +507,12 @@ export function cardinalityQuantifier(min: number, max: number | "unbounded"): s
 function unaryPredicate(factType: FactType): { readonly text: string; readonly lead: string; } {
   const parts = splitReading(factType.readings[0]?.template ?? "").parts;
   const at = parts.findIndex((p) => p.kind === "role" && p.index === 0);
-  const opener = parts[at];
-  const lead = opener?.kind === "role" ? opener.lead : "";
-  const textOf = (from: readonly ReadingPart[]) =>
-    from.map((p) => p.kind === "text" ? p.text : "").join("").trim();
+  const lead = leadOf(parts[at]);
   if (at >= 0) {
-    const after = textOf(parts.slice(at + 1));
+    const after = textOf(parts.slice(at + 1)).trim();
     if (after) return { text: after, lead };
   }
-  return { text: textOf(parts) || factType.name, lead };
+  return { text: textOf(parts).trim() || factType.name, lead };
 }
 
 /**

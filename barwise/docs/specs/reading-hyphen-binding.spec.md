@@ -78,17 +78,19 @@ In scope:
   and the text before it no longer contains them; plus whether any hyphen in
   the template was left unbound.
 - **The binding rule.** A _binding hyphen_ is a hyphen that directly
-  follows a letter or digit and is followed by whitespace, directly by a
-  placeholder, or by the end of the template (`sale- {1}`, `sale-{1}`,
-  `smiles-`). In the text between the previous
+  follows a letter or digit (in any script) and is followed by whitespace
+  (`sale- {1}`). A hyphen flush against a placeholder (`non-{1}`) is a
+  prefix compound and stays as written; one at the end of the template
+  (`smiles-`) is reported as unbound. In the text between the previous
   placeholder (or the start) and placeholder `{n}`, the first token ending in
   a binding hyphen begins the lead, which runs to `{n}`. The lead drops every
   binding hyphen in it and collapses its whitespace to single spaces; it is
   printed before the player's name with one space.
 - **Unbound hyphens.** A binding hyphen the rule does not consume (one with
   no placeholder after it in the same stretch, `"{0} smiles- "`), and a
-  hyphen that directly follows whitespace and precedes a letter or digit
-  (the trailing form, `"{0} -word"`), are reported as unbound. A hyphen
+  hyphen that directly follows whitespace and precedes a letter (the
+  trailing form, `"{0} -word"`, wherever it appears, a lead included), are
+  reported as unbound. A minus sign before a number (`balance -5`) is text. A hyphen
   inside a word (`co-owner`) or a dash standing alone (`reports to - {1}`)
   is ordinary text, neither bound nor reported.
 - **The placement rule**, for every constraint shape: a lead goes
@@ -156,7 +158,9 @@ One PR. Acceptance:
   - `"{0} has sale- {1}"`: text `" has "`, lead `"sale"` on `{1}`;
   - `"{0} has average-  departure {1}"`: lead `"average departure"`;
   - `"{0} has big- red- {1}"`: lead `"big red"`;
-  - `"{0} has sale-{1}"`: lead `"sale"`;
+  - `"{0} is a non-{1}"`: no lead, nothing unbound ("non-Smoker");
+  - `"{0} has café- {1}"`: lead `"café"`;
+  - `"{0} has balance -5 below {1}"`: nothing unbound;
   - `"{0} is co-owner of {1}"`, `"{0} reports to - {1}"`: no lead, nothing
     unbound;
   - `"{0} smiles- "`, `"{0} -word {1}"`: no lead, an unbound hyphen;
@@ -199,6 +203,15 @@ Each behavioural test is watched red with its change reverted.
 - **Lead text rather than a new segment kind.** The lead is a text segment
   before the player reference, so the structured verbalization (and every
   surface that renders it) needs no new segment type.
+- **Code review tightened the rule.** A hyphen flush against a
+  placeholder no longer binds (it read "non-Smoker" as "non Smoker"); a word
+  is a letter or digit in any script; the trailing form needs a letter after
+  the hyphen, so a minus sign is text, and it is reported inside a lead too.
+  The patterns are built from one character class, the corpus test imports
+  the parser's own `containsBindingHyphen` rather than a copy, and it fails
+  when a model that uses the notation stops loading. `Predicate` places its
+  own leads (`subject`, `object`), so a new sentence builder cannot drop
+  one by writing only the predicate text.
 - **The fallback** joins its text and the second placeholder's lead with
   single spaces ("has child at most one GroupItem"), since the text between
   two placeholders ends in whitespace.

@@ -107,18 +107,32 @@ export interface SplitReading {
 }
 
 /**
- * A binding hyphen: one that directly follows a letter or digit and is
- * followed by whitespace or by the end of the stretch of text it is in --
- * the next placeholder, or the end of the template
- * (reading-hyphen-binding.spec.md).
+ * A binding hyphen: one that directly follows a letter or digit (any
+ * script) and is followed by whitespace (reading-hyphen-binding.spec.md).
+ * A hyphen written flush against the next placeholder is a prefix compound
+ * ("is a non-{1}" reads "non-Smoker") and binds nothing. Every pattern
+ * below is built from `WORD_END`, so they agree on what a word is.
  */
-const BINDING_HYPHEN = /([A-Za-z0-9])-(?=\s|$)/g;
-/** The same test, without the global flag's lastIndex state. */
-const HAS_BINDING_HYPHEN = /[A-Za-z0-9]-(?=\s|$)/;
+const WORD_END = String.raw`[\p{L}\p{N}]`;
+const BINDING_HYPHEN = new RegExp(String.raw`(?<=${WORD_END})-(?=\s)`, "gu");
 /** The first token of a stretch that ends in a binding hyphen. */
-const BINDING_TOKEN = /(^|\s)(\S*[A-Za-z0-9])-(?=\s|$)/;
-/** The trailing form ("{0} -word"), which barwise does not bind. */
-const TRAILING_HYPHEN = /(^|\s)-[A-Za-z0-9]/;
+const BINDING_TOKEN = new RegExp(String.raw`(^|\s)(\S*${WORD_END})-(?=\s)`, "u");
+/** A hyphen that would bind if anything followed it: whitespace or the end. */
+const DANGLING = new RegExp(String.raw`${WORD_END}-(?=\s|$)`, "u");
+/**
+ * The trailing form ("{0} -word"), which barwise does not bind. A letter
+ * must follow, so a minus sign ("balance -5") is ordinary text.
+ */
+const TRAILING_HYPHEN = new RegExp(String.raw`(^|\s)-\p{L}`, "u");
+
+/**
+ * Whether text still holds a binding hyphen, or one that would bind if a
+ * word followed it: what a rendered reading must never contain. Exported
+ * for the corpus test, so the check and the parser share one definition.
+ */
+export function containsBindingHyphen(text: string): boolean {
+  return DANGLING.test(text);
+}
 
 /**
  * Split a reading template into text and role parts, applying ORM's hyphen
@@ -135,26 +149,34 @@ export function splitReading(template: string): SplitReading {
   for (let i = 0; i < pieces.length; i += 2) {
     const stretch = pieces[i]!;
     const index = pieces[i + 1];
+    if (TRAILING_HYPHEN.test(stretch)) unbound = true;
     if (index === undefined) {
-      // The text after the last placeholder: a binding hyphen here binds
-      // nothing.
-      if (HAS_BINDING_HYPHEN.test(stretch)) unbound = true;
-      if (TRAILING_HYPHEN.test(stretch)) unbound = true;
+      // The text after the last placeholder: a hyphen here binds nothing.
+      if (DANGLING.test(stretch)) unbound = true;
       if (stretch) parts.push({ kind: "text", text: stretch });
       continue;
     }
     const token = BINDING_TOKEN.exec(stretch);
     const start = token ? token.index + token[1]!.length : stretch.length;
     const text = stretch.slice(0, start);
-    const lead = stretch.slice(start).replace(BINDING_HYPHEN, "$1").replace(/\s+/g, " ").trim();
-    if (TRAILING_HYPHEN.test(text)) unbound = true;
+    const lead = stretch.slice(start).replace(BINDING_HYPHEN, "").replace(/\s+/g, " ").trim();
     if (text) parts.push({ kind: "text", text });
     parts.push({ kind: "role", index: Number(index), lead });
   }
   return { parts, unbound };
 }
 
+/** A role part's lead, or "" for a text part. */
+export function leadOf(part: ReadingPart | undefined): string {
+  return part?.kind === "role" ? part.lead : "";
+}
+
+/** The text of some parts, with their placeholders and leads left out. */
+export function textOf(parts: readonly ReadingPart[]): string {
+  return parts.map((p) => p.kind === "text" ? p.text : "").join("");
+}
+
 /** A player's phrase in a reading: its lead, if any, then its name. */
-export function withLead(lead: string, name: string): string {
+function withLead(lead: string, name: string): string {
   return lead ? `${lead} ${name}` : name;
 }
