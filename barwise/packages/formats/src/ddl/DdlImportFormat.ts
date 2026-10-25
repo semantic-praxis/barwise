@@ -37,7 +37,7 @@ import {
   subtypeConstraintsFromFlags,
   type ValueConstraintDef,
 } from "@barwise/core";
-import { parseSqlDataType } from "@barwise/core/sql";
+import { parseSqlDataType, parseValuePredicate } from "@barwise/core/sql";
 import {
   type ColumnAnnotation,
   columnKey,
@@ -57,7 +57,6 @@ import {
   QUALIFIED,
   unquote,
 } from "./sqlIdentifiers.js";
-import { parseValuePredicate } from "./valuePredicate.js";
 
 /**
  * A parsed CREATE TABLE statement.

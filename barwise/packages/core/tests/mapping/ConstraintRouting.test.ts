@@ -4,14 +4,29 @@
  * constraint type, and CHECK predicate rendering. All pure -- no python,
  * no filesystem.
  */
-import { type Constraint, isInternalConstraint, type OrmModel } from "@barwise/core";
-import { RelationalMapper } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
-import { routeConstraints } from "../src/ddl/constraintRouting.js";
-import { resolveDialectProfile } from "../src/ddl/dialectCapabilities.js";
-import { ModelBuilder } from "./helpers/ModelBuilder.js";
+import { routeConstraints } from "../../src/mapping/constraintRouting.js";
+import { DIALECT_PROFILES, resolveDialectProfile } from "../../src/mapping/dialectCapabilities.js";
+import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
+import { type Constraint, isInternalConstraint } from "../../src/model/Constraint.js";
+import type { OrmModel } from "../../src/model/OrmModel.js";
+import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 const postgres = resolveDialectProfile("postgres");
+
+describe("dialect capability profiles", () => {
+  it("covers every dialect the SQL cascade knows", () => {
+    expect(Object.keys(DIALECT_PROFILES).sort()).toEqual([
+      "ansi",
+      "bigquery",
+      "databricks",
+      "mysql",
+      "postgres",
+      "redshift",
+      "snowflake",
+    ]);
+  });
+});
 
 /** Person manages Person plus a Person has Score value fact type. */
 function baseModel(): OrmModel {

@@ -221,10 +221,10 @@
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
       "detail": "ConceptualDataTypeName restated as record in packages/formats/src/norma/NormaXmlWriter.ts"
     },
-    "union:46780e616ca9": {
+    "union:eb9adc7183dd": {
       "status": "accepted-benign",
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
-      "detail": "SqlDialect restated as record in packages/formats/src/ddl/dialectCapabilities.ts"
+      "detail": "SqlDialect restated as record in packages/core/src/mapping/dialectCapabilities.ts"
     },
     "union:68fdcce7dcbf": {
       "status": "accepted-benign",
@@ -249,7 +249,7 @@
     "literal:7daecf42cb3e": {
       "status": "accepted-benign",
       "note": "doc-comment example: both comments cite the same n-ary fact type (barwise-kgh) to explain the mapping and the routing; repetition is not a decision that must agree",
-      "detail": "\"Encounter has Diagnosis at DiagnosisRank\" in packages/core/src/mapping/RelationalMapper.ts, packages/formats/src/ddl/constraintRouting.ts"
+      "detail": "\"Encounter has Diagnosis at DiagnosisRank\" in packages/core/src/mapping/RelationalMapper.ts, packages/core/src/mapping/constraintRouting.ts"
     },
     "union:efe33cd8a63e": {
       "status": "accepted-benign",

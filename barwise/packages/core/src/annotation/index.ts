@@ -1,4 +1,5 @@
 // Annotation helpers, ORM YAML annotator, export annotation collector.
+export { buildConstraintSpec } from "./constraintSpec.js";
 export { collectExportAnnotations, type ExportAnnotation } from "./ExportAnnotationCollector.js";
 export {
   collectAnnotationMap,

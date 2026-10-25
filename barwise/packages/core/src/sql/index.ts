@@ -13,3 +13,4 @@ export type {
   SqlDialect,
   SqlPatternContext,
 } from "./types.js";
+export { parseValuePredicate, renderValuePredicate } from "./valuePredicate.js";

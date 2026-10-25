@@ -11,14 +11,12 @@ import {
   OrmYamlSerializer,
   setIdGenerator,
 } from "@barwise/core";
-import { RelationalMapper } from "@barwise/core/mapping";
+import { RelationalMapper, resolveDialectProfile, routeConstraints } from "@barwise/core/mapping";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse, stringify } from "yaml";
-import { routeConstraints } from "../src/ddl/constraintRouting.js";
-import { resolveDialectProfile } from "../src/ddl/dialectCapabilities.js";
 import { asNormaId } from "../src/norma/normaId.js";
 import { mapNormaToOrm } from "../src/norma/NormaToOrmMapper.js";
 import { parseNormaXml } from "../src/norma/NormaXmlParser.js";

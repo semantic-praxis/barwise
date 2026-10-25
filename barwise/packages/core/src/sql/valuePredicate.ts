@@ -8,7 +8,7 @@
  * no CHECK at all, and every value constraint the export wrote came back
  * as a bare value type (ddl-round-trip-fixed-point.spec.md, R2).
  */
-import type { ValueConstraintDef, ValueRange } from "@barwise/core";
+import type { ValueConstraintDef, ValueRange } from "../model/ObjectType.js";
 
 export function renderValuePredicate(
   column: string,

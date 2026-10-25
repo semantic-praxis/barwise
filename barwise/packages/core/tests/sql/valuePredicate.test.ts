@@ -5,9 +5,9 @@
  * round trip: every case goes out through `renderValuePredicate` and must
  * come back unchanged through `parseValuePredicate`.
  */
-import type { ValueConstraintDef } from "@barwise/core";
 import { describe, expect, it } from "vitest";
-import { parseValuePredicate, renderValuePredicate } from "../src/ddl/valuePredicate.js";
+import type { ValueConstraintDef } from "../../src/model/ObjectType.js";
+import { parseValuePredicate, renderValuePredicate } from "../../src/sql/valuePredicate.js";
 
 const cases: [string, ValueConstraintDef][] = [
   ["strings", { values: ["scheduled", "checked-in", "no-show"] }],

@@ -1,5 +1,17 @@
 // Mapping: relational mapper, schema, and format renderers.
 export { renderPopulationAsSql } from "../export/populationRenderer.js";
+export {
+  type ConstraintRouting,
+  routeConstraints,
+  type RoutedClause,
+  type SpilledConstraint,
+  unreportedConstraintSpecs,
+} from "./constraintRouting.js";
+export {
+  type ConstraintChannel,
+  type DialectCapabilityProfile,
+  resolveDialectProfile,
+} from "./dialectCapabilities.js";
 export { RelationalMapper, type RelationalMapperOptions } from "./RelationalMapper.js";
 export type {
   Column,
