@@ -3,7 +3,7 @@
 Status: Implemented -- single workstream, landed with this spec
 
 Created: 2026-09-25
-Last-updated: 2026-09-25
+Last-updated: 2026-10-25
 Tracking: barwise-1059
 
 The session-start hook installs and selects the Node version in `.nvmrc`
@@ -67,6 +67,8 @@ session that cannot start. The same applies here: a `nodejs.org` outage
 should not cost a whole session. The warning is the refusal half of the
 gate contract (`docs/specs/gate-refusal-contract.spec.md`): it never
 reports the pin as satisfied when it is not.
+
+Recorded as `docs/adr/pinned-runtimes.md`.
 
 ## Alternatives considered
 
