@@ -504,8 +504,8 @@ function entityBinaryUniqueColumns(
     columns: hit.columns,
   });
 
-  if (ownTableColumns(roleId, ft, schema)) return "realized";
   const own = findColumns(roleId, schema);
+  if (own && inPlayerTable(own, roleId, ft)) return "realized";
   if (own) return found(own);
   const absorbed = findColumns(partner.id, schema);
   if (absorbed && absorbed.table.sourceElementId === partner.playerId) return found(absorbed);
@@ -516,20 +516,13 @@ function entityBinaryUniqueColumns(
 }
 
 /**
- * The role's columns, when they sit in its own player's table: where the
+ * Whether a role's columns sit in its own player's table: where the
  * mapping stores a fact it realizes as a column of the player. Both the
  * one-to-one uniqueness rule and the mandatory rule read it, so they
  * agree on where a role's fact lives.
  */
-function ownTableColumns(
-  roleId: string,
-  ft: FactType,
-  schema: RelationalSchema,
-): { table: Table; columns: string[]; } | undefined {
-  const found = findColumns(roleId, schema);
-  return found && found.table.sourceElementId === ft.getRoleById(roleId)?.playerId
-    ? found
-    : undefined;
+function inPlayerTable(found: { table: Table; }, roleId: string, ft: FactType): boolean {
+  return found.table.sourceElementId === ft.getRoleById(roleId)?.playerId;
 }
 
 /**
@@ -545,26 +538,28 @@ function mandatoryGap(
   model: OrmModel,
   schema: RelationalSchema,
 ): { reason: string; table?: string; } | undefined {
-  const own = ownTableColumns(roleId, ft, schema);
-  if (own) {
-    const nullable = own.columns.some((n) => own.table.columns.find((c) => c.name === n)?.nullable);
+  const found = findColumns(roleId, schema);
+  if (found && inPlayerTable(found, roleId, ft)) {
+    const nullable = found.table.columns.some((c) => c.sourceRoleId === roleId && c.nullable);
     if (!nullable) return undefined;
     return {
       reason: ft.arity === 1
         ? "a unary fact maps to a nullable flag, which no column constraint makes true"
         : "the role's column is nullable",
-      table: own.table.name,
+      table: found.table.name,
     };
   }
   const playerId = ft.getRoleById(roleId)?.playerId;
   if (model.getObjectType(playerId ?? "")?.kind === "value") {
-    return { reason: "a value type has no table in which to require the role" };
+    return {
+      reason: "a value type has no table in which to require the role",
+      table: found?.table.name,
+    };
   }
-  const elsewhere = findColumns(roleId, schema);
   const playerTable = schema.tables.find((t) => t.sourceElementId === playerId);
   return {
     reason: "each instance must appear in another table, which no column can require",
-    table: elsewhere?.table.name ?? playerTable?.name,
+    table: found?.table.name ?? playerTable?.name,
   };
 }
 

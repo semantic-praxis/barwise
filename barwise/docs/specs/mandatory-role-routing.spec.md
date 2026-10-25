@@ -97,6 +97,21 @@ and a value-role mandatory spill with their own reasons;
 `unreportedConstraintSpecs` reports an unenforced mandatory; the corpus
 effect is recorded here.
 
+## Implementation notes
+
+- Implementation review: a value-role spill now names the table holding
+  the role's columns rather than leaving it to the fact type's lookup.
+  For an entity-value binary, which the corpus does not include, the two
+  give the same table. Tests now pin the player-table placement (a role
+  with no column), the reason in every shape, and the nullable-column arm
+  over a hand-edited schema; the mapper never writes that shape today. The
+  role's columns are looked up once and shared with the one-to-one rule
+  through a predicate.
+- Declined: having the mapper record which constraint each column
+  realizes, so the router would read that instead of deriving it. Open
+  decision 1 of `one-to-one-entity-uniqueness.spec.md` weighed this
+  already; one more consumer does not change that trade-off.
+
 ## Open decisions
 
 1. **Where the spill sits.** (a) The table holding the role's columns,

@@ -34,7 +34,7 @@ reported: Avro has no keys or references at all (a primary key is a
 `relationships` test when `generateRelationshipTests` is false. Gaps that rule has today are
 tracked: constraints over subtypes (barwise-lwy) and key uniqueness in
 formats without keys (barwise-lqj). A mandatory role the mapping does
-not enforce is reported with the reason for its shape.
+not enforce is reported too; DDL comments it with the reason for its shape.
 
 ### DDL (SQL)
 
