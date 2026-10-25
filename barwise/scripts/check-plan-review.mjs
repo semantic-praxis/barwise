@@ -52,8 +52,8 @@
  * covered spec was not (named), 2 git or a spec could not be read, or the
  * clone is shallow -- ancestry in a truncated history is not an answer.
  */
-import { execFileSync } from "node:child_process";
 import { opt } from "./lib/args.mjs";
+import { gitAt } from "./lib/git-run.mjs";
 import { parseNameStatus } from "./lib/name-status.mjs";
 import {
   CLAIMS_NOTHING_BUILT,
@@ -72,49 +72,26 @@ function refuse(message) {
   process.exit(2);
 }
 
-/** git at the repository root, or a refusal naming the command. */
-function git(args) {
-  try {
-    return execFileSync("git", args, {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      maxBuffer: 64 * 1024 * 1024,
-    });
-  } catch (err) {
-    const why = err.stderr?.toString().trim().split("\n")[0] || err.message.split("\n")[0];
-    return refuse(`\`git ${args.join(" ")}\` failed: ${why}`);
-  }
-}
-
 /**
- * Whether git says yes (exit 0) or no (exit 1) to a question; anything
- * else refuses. 128 is git failing -- a missing object, a corrupt history
- * -- and read as "no" it would blame the author for what git could not see.
+ * A reading from lib/git-run.mjs, or a refusal naming the command. The
+ * readings are shared with check:spec-touches, so the two gates read git's
+ * failures alike: `answers` throws on 128 rather than reading it as "no",
+ * which would blame the author for what git could not see.
  */
-function gitAnswers(args) {
+const g = gitAt(REPO_ROOT);
+const refusing = (read) => (arg) => {
   try {
-    execFileSync("git", args, { cwd: REPO_ROOT, stdio: "ignore" });
-    return true;
+    return read(arg);
   } catch (err) {
-    if (err.status === 1) return false;
-    return refuse(`\`git ${args.join(" ")}\` exited ${err.status ?? err.signal}`);
+    return refuse(err.message);
   }
-}
-
+};
+/** git at the repository root, or a refusal naming the command. */
+const git = refusing(g.run);
+/** Whether git says yes (exit 0) or no (exit 1); anything else refuses. */
+const gitAnswers = refusing(g.answers);
 /** The full id of the commit `sha` abbreviates, or undefined when there is none. */
-function resolveCommit(sha) {
-  try {
-    return execFileSync("git", ["rev-parse", "--verify", "--quiet", `${sha}^{commit}`], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch (err) {
-    if (err.status === 1) return undefined;
-    return refuse(`\`git rev-parse --verify ${sha}\` exited ${err.status ?? err.signal}`);
-  }
-}
+const resolveCommit = refusing(g.commit);
 
 /**
  * Whether `rev` holds `path`, from a listing rather than an exit status:

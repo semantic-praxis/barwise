@@ -183,6 +183,12 @@ jobs:
       # A spec's Touches: header is its declared plan. An unmarked entry
       # that names nothing tracked is a plan that rotted, the way a
       # review-tiers glob routed nothing for five weeks (barwise-fs0).
+      # A spec new since a fixed cutoff commit must also declare a tracked
+      # path, or it is outside check:plan-review entirely
+      # (touches-required.spec.md). The cutoff is fixed, so no base is
+      # passed and a spec that reaches main by any route is checked on
+      # every later run; it needs the cutoff commit, which the
+      # `fetch-depth: 0` checkout provides (exit 2 without it).
       - run: npm run check:spec-touches
       # A spec's plan is reviewed (/code-review, /pr-review) before its
       # implementation is committed, recorded as `Plan-reviewed: <commit>`
