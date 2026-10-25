@@ -142,13 +142,15 @@ export class DbtExportFormat implements ExportFormatAdapter {
 /**
  * The `modelsDir` option as a relative path of plain segments. Anything
  * else is refused rather than written: an empty, absolute, or `..` path
- * would place files outside the project the caller writes into.
+ * would place files outside the project the caller writes into, and so
+ * would a backslash or a drive letter once a Windows path join reads it.
  */
 function resolveModelsDir(value: unknown): string {
   if (value === undefined) return "models";
   const segments = typeof value === "string" ? value.split("/").filter((s) => s !== "") : [];
   if (
-    typeof value !== "string" || value.startsWith("/") || segments.length === 0
+    typeof value !== "string" || value.startsWith("/") || /[\\:]/.test(value)
+    || segments.length === 0
     || segments.some((s) => s === "." || s === "..")
   ) {
     throw new Error(

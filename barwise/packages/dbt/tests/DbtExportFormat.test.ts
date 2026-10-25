@@ -257,7 +257,7 @@ describe("DbtExportFormat", () => {
 
     it("refuses a modelsDir that would leave the project", () => {
       const model = buildEnrollmentModelWithIncompleteInstance();
-      for (const modelsDir of ["", "/abs", "../up", "models/../..", 5]) {
+      for (const modelsDir of ["", "/abs", "../up", "models/../..", "..\\evil", "C:/x", 5]) {
         expect(() => dbtFormat.export(model, { modelsDir }), String(modelsDir)).toThrow(
           /modelsDir must be a relative path/,
         );
