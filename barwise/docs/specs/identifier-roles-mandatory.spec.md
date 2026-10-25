@@ -7,6 +7,8 @@ Last-updated: 2026-10-25
 Tracking: barwise-i77
 Plan-reviewed: f742cb71 (code-review, pr-review)
 Touches: barwise/packages/core/src/model/identification.ts,
+barwise/packages/core/src/index.ts,
+barwise/packages/core/tests/validation/ValidationEngine.test.ts,
 barwise/packages/core/src/validation/ruleId.ts,
 barwise/packages/core/src/validation/rules/completenessWarnings.ts,
 barwise/packages/core/tests/validation/completenessWarnings.test.ts
