@@ -62,6 +62,10 @@ export class DbtExportFormat implements ExportFormatAdapter {
     const sourceName = (options?.sourceName as string | undefined) ?? "raw";
     const generateRelationshipTests = (options?.generateRelationshipTests as boolean | undefined)
       ?? true;
+    // Where the model files and schema.yml go. The editor writes into an
+    // existing project under models/staging, where a top-level
+    // models/schema.yml is the file most likely to exist already.
+    const modelsDir = (options?.modelsDir as string | undefined) ?? "models";
 
     // Render dbt project.
     const dbtProject = renderDbt(schema, {
@@ -85,14 +89,14 @@ export class DbtExportFormat implements ExportFormatAdapter {
     // Add model SQL files.
     for (const modelFile of dbtProject.models) {
       files.push({
-        name: `models/${modelFile.name}.sql`,
+        name: `${modelsDir}/${modelFile.name}.sql`,
         content: modelFile.sql,
       });
     }
 
     // Add schema.yml.
     files.push({
-      name: "models/schema.yml",
+      name: `${modelsDir}/schema.yml`,
       content: schemaYaml,
     });
 
@@ -119,7 +123,7 @@ export class DbtExportFormat implements ExportFormatAdapter {
 
     // Add model files.
     for (const modelFile of dbtProject.models) {
-      sections.push(`# models/${modelFile.name}.sql\n${modelFile.sql}`);
+      sections.push(`# ${modelsDir}/${modelFile.name}.sql\n${modelFile.sql}`);
     }
 
     const text = sections.join("\n\n---\n\n");

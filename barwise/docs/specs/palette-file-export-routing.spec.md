@@ -1,6 +1,6 @@
 # The editor's palette Avro and dbt exports go through the format registry
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- WS1
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -174,6 +174,22 @@ file check holds on today's command too, since today's layout and contents
 are what decisions 2 and 3 keep; it pins them, and its seeds clause
 discriminates because the command writes every result file, so dropping
 `includeExamples: false` writes seeds and fails it.
+
+## Implementation notes
+
+- **Acceptance measured.** `tests/unit/exportFileCommands.test.ts` and
+  `dbt/tests/DbtExportFormat.test.ts`. Watched red, one mutation each: the
+  Avro command reverted to main (the file check and both helper checks
+  fail), `includeExamples: false` removed (the dbt seeds clause fails),
+  the dbt report call replaced by a plain message (the report check
+  fails), the Avro refusal guard removed (the refusal check fails), and
+  `modelsDir` ignored in the exporter (its check fails).
+- **The summary is the channel heading too.** `reportExport` writes
+  "=== <summary> ===" above the report, so DDL's channel line reads
+  "=== Exported DDL to <file> ===" where it read "=== Export: <file> ===";
+  the DDL test that pins one report per export moved with it.
+- **The dbt command creates each file's directory** before writing, since
+  the exporter's paths are nested; the Avro exporter's are flat.
 
 ## Open decisions
 

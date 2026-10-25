@@ -238,6 +238,22 @@ describe("DbtExportFormat", () => {
         expect(file.name).toMatch(/^models\//);
       }
     });
+
+    it("writes the model files and schema.yml under modelsDir, and only those", () => {
+      // The editor's palette asks for models/staging (palette-file-export-routing.spec.md).
+      const model = buildEnrollmentModelWithIncompleteInstance();
+      const names = dbtFormat
+        .export(model, { modelsDir: "models/staging" })
+        .files!.map((f) => f.name)
+        .sort();
+      expect(names).toEqual([
+        "models/staging/course.sql",
+        "models/staging/schema.yml",
+        "models/staging/student.sql",
+        "models/staging/student_enrolls_course.sql",
+        "seeds/student_enrolls_course.csv",
+      ]);
+    });
   });
 });
 

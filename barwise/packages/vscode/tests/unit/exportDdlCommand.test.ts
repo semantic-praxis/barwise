@@ -157,7 +157,7 @@ describe("Barwise: Export, As DDL", () => {
   });
 
   it("writes what the diagram's DDL tab shows for the same model", async () => {
-    // Both come from exportDdl; pinned against a future second copy.
+    // Both come from exportWith("ddl"); pinned against a future second copy.
     await run(ring, "/work/ring.orm.yaml");
     const model = new OrmYamlSerializer().deserialize(ring);
     expect(state.written).toBe(buildTabPanels(model).ddl);
@@ -166,8 +166,8 @@ describe("Barwise: Export, As DDL", () => {
   it("keeps only the latest export's report in the channel", async () => {
     await run(ring, "/work/ring.orm.yaml");
     await run(ring, "/work/again.orm.yaml");
-    expect(state.channel.filter((line) => line.startsWith("=== Export"))).toEqual([
-      "=== Export: again.sql ===",
+    expect(state.channel.filter((line) => line.startsWith("=== Exported"))).toEqual([
+      "=== Exported DDL to again.sql ===",
     ]);
   });
 
@@ -181,8 +181,8 @@ describe("Barwise: Export, As DDL", () => {
 describe("Barwise: Export, As DDL, when the exporter refuses", () => {
   it("shows the refusal and writes no file", async () => {
     vi.resetModules();
-    vi.doMock("../../src/export/ddlExport.js", () => ({
-      exportDdl: () => ({ ok: false, reason: "DDL export failed: boom" }),
+    vi.doMock("../../src/export/registeredExport.js", () => ({
+      exportWith: () => ({ ok: false, reason: "DDL export failed: boom" }),
     }));
     const { ExportDdlCommand: Refusing } = await import("../../src/commands/ExportDdlCommand.js");
     state.written = undefined;
@@ -190,6 +190,6 @@ describe("Barwise: Export, As DDL, when the exporter refuses", () => {
     await run(ring, "/work/ring.orm.yaml", new Refusing());
     expect(state.errors).toEqual(["DDL export failed: boom"]);
     expect(state.written).toBeUndefined();
-    vi.doUnmock("../../src/export/ddlExport.js");
+    vi.doUnmock("../../src/export/registeredExport.js");
   });
 });
