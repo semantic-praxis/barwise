@@ -397,7 +397,7 @@ file, the system shall send the resolved candidate once and print the review it 
 ## Open decisions (for review)
 
 - **Does `--artifacts` belong on `barwise import transcript` and
-  `barwise review`?** RESOLVED 2026-08-26: option 2. Three options.
+  `barwise review`?** RESOLVED 2026-08-26: option 2 (recorded as `docs/adr/production-prompt-resolution.md`). Three options.
 
   1. _Widen production._ Add the flag to both commands, as barwise-855
      item 2 proposes for review. Honest about what an author needs, and
