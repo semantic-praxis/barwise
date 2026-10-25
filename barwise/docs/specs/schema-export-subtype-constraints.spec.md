@@ -7,7 +7,11 @@ Last-updated: 2026-10-25
 Tracking: barwise-lwy
 Touches: barwise/packages/core/src/mapping/constraintRouting.ts,
 barwise/packages/core/src/annotation/constraintSpec.ts,
++barwise/packages/core/src/model/subtypeOperands.ts,
+barwise/packages/core/src/model/Constraint.ts,
+barwise/packages/core/src/verbalization/constraints/phase2.ts,
 barwise/packages/formats/src/ossie/writeOssie.ts,
+barwise/docs/specs/ossie-ontology-format.spec.md,
 barwise/packages/core/tests/mapping/ConstraintRouting.test.ts,
 barwise/packages/core/tests/mapping/unreportedConstraintSpecs.test.ts,
 barwise/packages/formats/tests/OssieExportFormat.test.ts,
@@ -49,7 +53,13 @@ the constraint back.
   The counterexample generator returns nothing for them, and the builder
   falls back to "No concrete example available".
 - `writeOssie` lists each one in its loss report but builds no spec,
-  because its guard skips a constraint over subtypes.
+  because its guard skips a constraint over subtypes. The guard's other
+  exclusion, a constraint with no roles, is one the builder already
+  describes.
+- The verbalizer decides which supertype a constraint over subtypes is
+  about (that of the first subtype fact that resolves) and the quantity
+  each kind means (`verbalizeSubtypeConstraint`, `phase2.ts`). The
+  router and the spec builder need the same two decisions.
 - Over every tracked `.orm.yaml`, 14 such constraints in 10 files: 8
   exclusions and 6 exclusive-ors.
 
@@ -57,19 +67,30 @@ the constraint back.
 
 - When the router meets a constraint over subtypes, it shall spill it
   with the reason "a rule over subtypes spans their tables, which no
-  clause can state", at the table of the supertype its subtype facts
-  share.
+  clause can state", at the supertype's table.
 - When `buildConstraintSpec` builds a spec for one, its pseudocode shall
   read "every instance of S is an instance of Q of: A, B", with Q "at most
   one" for an exclusion, "exactly one" for an exclusive-or, and "at least
-  one" for a disjunctive mandatory.
-- When the Ossie exporter loses one, it shall add its spec, as it does
-  for every other lost constraint.
+  one" for a disjunctive mandatory. Pseudocode is written over the model
+  for every kind, never the schema, so it names the types, not the
+  subtype tables.
+- The supertype and the quantity shall be decided once, in
+  `model/subtypeOperands.ts`, and read by the verbalizer, the spec
+  builder and the router. When no subtype fact resolves, the pseudocode
+  says "the supertype", as the verbalization does. `isOverSubtypes`
+  becomes a type guard, so a reader of `subtypeFactIds` needs no cast.
+- When the Ossie exporter loses a constraint, it shall add its spec,
+  with no guard: the builder now describes every constraint.
 - The barwise annotation and the DDL import are unchanged; no non-comment
   line of any DDL changes.
 
 Out of scope: enforcing these rules (an assertion or trigger across
-subtype tables, a dbt test), and NORMA, which writes them natively.
+subtype tables, a dbt test); NORMA, which writes them natively with the
+subtype facts (`NormaXmlWriter`); and a counterexample, which the
+generator does not produce for these, so each spec carries "No concrete
+example available" (barwise-j7j). A model whose subtype facts name
+different supertypes fails validation; its spill names the first
+supertype.
 
 ## Workstreams
 
@@ -78,12 +99,14 @@ subtype tables, a dbt test), and NORMA, which writes them natively.
 The three changes above, one commit, since the router and the Ossie
 writer both need the spec builder to accept the constraint. Acceptance,
 each pinned by a test asserting the exact value: the router spills an
-exclusion and an exclusive-or over subtypes at the supertype's table,
-with the reason, and the spec's pseudocode; `unreportedConstraintSpecs`
-reports one; the Ossie export of a model with one returns its spec beside
-the loss line; `schema-export-constraint-specs.spec.md` and
-`IMPORT_EXPORT.md` stop listing barwise-lwy as a gap; the corpus effect is
-recorded here.
+exclusion over subtypes at the supertype's table, with the reason and the
+pseudocode; the pseudocode of an exclusive-or and of a one-subtype
+disjunctive mandatory; `unreportedConstraintSpecs` reports one; the Ossie
+export of a model with one returns its spec beside the loss line;
+`schema-export-constraint-specs.spec.md`, `IMPORT_EXPORT.md`,
+`ossie-ontology-format.spec.md` and `writeOssie`'s header stop saying it
+goes unreported; Status moves to Implemented in the commit that lands it;
+the corpus effect is recorded here.
 
 ## Open decisions
 
@@ -95,7 +118,7 @@ recorded here.
    already and lacks only the spec, which this change makes buildable;
    leaving it out keeps a guard whose reason is gone. (b) A separate
    change: smaller here, and the guard keeps saying something untrue.
-   Recommend (a).
+   Recommend (a), removing the guard outright.
 
 ## Risks and testing
 
