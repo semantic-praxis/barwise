@@ -4,7 +4,7 @@ Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR conve
 
 Created: 2026-10-23
 Last-updated: 2026-10-25
-Plan-reviewed: 7fe8d49d (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
+Plan-reviewed: 706693e9 (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
 barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
