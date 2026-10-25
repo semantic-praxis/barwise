@@ -6,7 +6,7 @@
     "beads-ids.test.mjs": 3,
     "beads-merge.test.mjs": 41,
     "ci-conditions.test.mjs": 13,
-    "gates.test.mjs": 254,
+    "gates.test.mjs": 270,
     "generated-marks.test.mjs": 4,
     "masked-exit.test.mjs": 28,
     "measure-comparison.test.mjs": 31,

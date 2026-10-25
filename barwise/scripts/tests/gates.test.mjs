@@ -5132,6 +5132,7 @@ function planRepo() {
       "check-plan-review.mjs",
       join("lib", "args.mjs"),
       join("lib", "name-status.mjs"),
+      join("lib", "pr-base.mjs"),
       join("lib", "review-tiers.mjs"),
       join("lib", "spec-reader.mjs"),
       join("lib", "tracked.mjs"),
@@ -5479,6 +5480,358 @@ test("check-plan-review refuses a shallow clone", () => {
     rmSync(shallow, { recursive: true, force: true });
   }
 });
+
+/**
+ * check-spec-touches, the new-spec rule: a change that adds a spec whose
+ * file name did not exist under barwise/docs/specs/ at the merge base
+ * fails unless its `Touches:` names a tracked path
+ * (docs/specs/touches-required.spec.md).
+ *
+ * A sandbox repository with the gate and its libraries copied in. `main`
+ * holds `src/a.ts`, `src/gone.ts`, two specs without `Touches:` (the
+ * existing corpus, exempt) and one in `archive/`; each case builds a
+ * branch, and `BASE_SHA` stands in for the base ci.yml passes.
+ */
+const TOUCHES_SPECS = "barwise/docs/specs";
+
+function touchesRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-touchesreq-"));
+  const g = (...args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+      .trim();
+  g("init", "-q", "-b", "main");
+  g("config", "user.email", "t@example.com");
+  g("config", "user.name", "t");
+  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
+  mkdirSync(join(dir, TOUCHES_SPECS, "archive"), { recursive: true });
+  mkdirSync(join(dir, "src"));
+  for (
+    const f of [
+      "check-spec-touches.mjs",
+      join("lib", "args.mjs"),
+      join("lib", "name-status.mjs"),
+      join("lib", "pr-base.mjs"),
+      join("lib", "review-tiers.mjs"),
+      join("lib", "spec-reader.mjs"),
+      join("lib", "tracked.mjs"),
+    ]
+  ) {
+    writeFileSync(join(dir, "scripts", f), readFileSync(join(SCRIPTS, f)));
+  }
+  /** Write a spec at `rel` under the specs directory; `touches` undefined omits the field. */
+  const spec = (rel, touchesLine) => {
+    mkdirSync(dirname(join(dir, TOUCHES_SPECS, rel)), { recursive: true });
+    writeFileSync(
+      join(dir, TOUCHES_SPECS, rel),
+      "# S\n\nStatus: Draft\n"
+        + (touchesLine === undefined ? "" : `Touches: ${touchesLine}\n`)
+        + "\n## Plan\n\nThe plan.\n",
+    );
+  };
+  const commit = (msg) => {
+    g("add", "-A");
+    g("commit", "-q", "-m", msg);
+    return g("rev-parse", "HEAD");
+  };
+  writeFileSync(join(dir, "src", "a.ts"), "export const a = 0;\n");
+  writeFileSync(join(dir, "src", "gone.ts"), "export const gone = 0;\n");
+  spec("old.spec.md");
+  spec("other.spec.md");
+  spec("archive/arch.spec.md");
+  const base = commit("base");
+  g("checkout", "-q", "-b", "feature");
+  const run = (env = { BASE_SHA: base }, ...args) =>
+    spawnSync(process.execPath, [join(dir, "scripts", "check-spec-touches.mjs"), ...args], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "", ...env },
+    });
+  return {
+    dir,
+    g,
+    spec,
+    commit,
+    base,
+    run,
+    done: () => rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+test("check-spec-touches fails a new spec that declares no Touches:, naming the commit that added it", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md");
+    const added = r.commit("add a spec");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      new RegExp(
+        `barwise/docs/specs/new\\.spec\\.md: new in this change and declares no Touches: \\(added in ${
+          added.slice(0, 7)
+        }`,
+      ),
+    );
+    // CI passes the exact base, so the stale-origin hint stays out.
+    assert.doesNotMatch(out.stderr, /git fetch origin main/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches fails a new spec whose Touches: is only +none", () => {
+  // A + entry is a file the plan creates and may be absent, so the tree
+  // rule passes it; alone, it is a placeholder.
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md", "+none");
+    r.commit("add a spec with a placeholder");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      /new\.spec\.md: new in this change, and no Touches: entry names a tracked path/,
+    );
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches fails a new spec whose only - entry names nothing tracked at the base", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md", "-src/never.ts, +src/b.ts");
+    r.commit("add a spec");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(
+      out.stderr,
+      /new\.spec\.md: new in this change, and no Touches: entry names a tracked path/,
+    );
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches passes a new spec with an unmarked entry, and one with only a - entry tracked at the base", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("unmarked.spec.md", "src/a.ts, +src/b.ts");
+    // The branch deletes src/gone.ts, so only the base can vouch for it.
+    r.spec("deletes.spec.md", "-src/gone.ts");
+    rmSync(join(r.dir, "src", "gone.ts"));
+    r.commit("add two specs, delete gone.ts");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(
+      out.stdout,
+      /2 new spec\(s\) since [0-9a-f]{40} \(merge base [0-9a-f]{8}\), each declaring a tracked path/,
+    );
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches reports an empty Touches: on a new spec once, as the existing finding", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md", "");
+    r.commit("add a spec with an empty Touches:");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /new\.spec\.md: Touches: has no entries/);
+    assert.doesNotMatch(out.stderr, /new in this change/);
+    assert.equal(out.stderr.match(/new\.spec\.md/g).length, 1, out.stderr);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches exempts a spec that existed by name at the base: edited, archived, restored, moved", () => {
+  const r = touchesRepo();
+  try {
+    writeFileSync(
+      join(r.dir, TOUCHES_SPECS, "old.spec.md"),
+      "# S\n\nStatus: Draft\n\n## Plan\n\nEdited.\n",
+    );
+    r.commit("edit an existing spec");
+    r.g("mv", `${TOUCHES_SPECS}/other.spec.md`, `${TOUCHES_SPECS}/archive/other.spec.md`);
+    r.commit("archive one");
+    r.g("mv", `${TOUCHES_SPECS}/archive/arch.spec.md`, `${TOUCHES_SPECS}/arch.spec.md`);
+    r.commit("restore an archived spec");
+    mkdirSync(join(r.dir, TOUCHES_SPECS, "sub"));
+    r.g("mv", `${TOUCHES_SPECS}/old.spec.md`, `${TOUCHES_SPECS}/sub/old.spec.md`);
+    r.commit("move a spec between directories");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /0 new spec\(s\) since/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches leaves an added archived spec, an ADR and a non-spec document alone", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("archive/frozen.spec.md");
+    mkdirSync(join(r.dir, "barwise", "docs", "adr"), { recursive: true });
+    writeFileSync(
+      join(r.dir, "barwise", "docs", "adr", "0001-x.md"),
+      "# ADR\n\nStatus: Accepted\n",
+    );
+    writeFileSync(join(r.dir, TOUCHES_SPECS, "README.md"), "# Specs\n");
+    r.commit("add an archived spec, an ADR and a README");
+    const out = r.run();
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    assert.match(out.stdout, /0 new spec\(s\) since/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches reads a spec renamed to a new file name as new", () => {
+  // Open decision 2: a new name is a new document with its own plan.
+  const r = touchesRepo();
+  try {
+    r.g("mv", `${TOUCHES_SPECS}/old.spec.md`, `${TOUCHES_SPECS}/renamed.spec.md`);
+    r.commit("rename a spec");
+    const out = r.run();
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /renamed\.spec\.md: new in this change and declares no Touches:/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches checks a push to main against its before-SHA, and --head replays one", () => {
+  // ci.yml passes github.event.before on push: a spec pushed straight to
+  // main is new against the commit main pointed at before.
+  const r = touchesRepo();
+  try {
+    r.g("checkout", "-q", "main");
+    r.spec("pushed.spec.md");
+    const pushed = r.commit("a spec pushed straight to main");
+    let out = r.run({ BASE_SHA: r.base });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /pushed\.spec\.md: new in this change and declares no Touches:/);
+    // The next push is read against its own before-SHA, so it passes.
+    writeFileSync(join(r.dir, "src", "a.ts"), "export const a = 1;\n");
+    r.commit("a later push");
+    out = r.run({ BASE_SHA: pushed });
+    assert.equal(out.status, 0, out.stdout + out.stderr);
+    // --head stands in for HEAD: the first push, replayed from a checkout
+    // (feature, still at the base) that does not hold it.
+    r.g("checkout", "-q", "feature");
+    out = r.run({ BASE_SHA: "" }, "--base", r.base, "--head", pushed);
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /pushed\.spec\.md: new in this change/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches falls back to origin/main and says a stale one may name another's commit", () => {
+  const r = touchesRepo();
+  try {
+    r.g("update-ref", "refs/remotes/origin/main", r.base);
+    r.spec("new.spec.md");
+    r.commit("add a spec");
+    const out = r.run({ BASE_SHA: "" });
+    assert.equal(out.status, 1, out.stdout + out.stderr);
+    assert.match(out.stderr, /since origin\/main/);
+    assert.match(out.stderr, /git fetch origin main, and rerun/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches refuses the all-zero before-SHA of a newly created ref", () => {
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md");
+    r.commit("add a spec");
+    const out = r.run({ BASE_SHA: "0".repeat(40) });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /cannot answer -- the base \(BASE_SHA\) is the all-zero SHA/);
+    assert.doesNotMatch(out.stdout, /OK/);
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches refuses a base that does not resolve", () => {
+  // No origin/main in the sandbox, so the default does not resolve either.
+  const r = touchesRepo();
+  try {
+    r.spec("new.spec.md");
+    r.commit("add a spec");
+    for (const env of [{ BASE_SHA: "no-such-ref" }, { BASE_SHA: "" }]) {
+      const out = r.run(env);
+      assert.equal(out.status, 2, out.stdout + out.stderr);
+      assert.match(out.stderr, /cannot answer -- the base .* does not resolve to a commit/);
+      assert.doesNotMatch(out.stdout, /OK/);
+    }
+  } finally {
+    r.done();
+  }
+});
+
+test("check-spec-touches refuses a shallow clone", () => {
+  // A truncated history has no trustworthy merge base, and a spec that
+  // existed below the cut would read as new.
+  const r = touchesRepo();
+  const shallow = mkdtempSync(join(tmpdir(), "barwise-touchesreq-shallow-"));
+  try {
+    r.spec("new.spec.md", "src/a.ts");
+    r.commit("add a spec");
+    execFileSync("git", [
+      "clone",
+      "-q",
+      "--depth",
+      "1",
+      "--branch",
+      "feature",
+      `file://${r.dir}`,
+      shallow,
+    ], { stdio: "ignore" });
+    const out = spawnSync(process.execPath, [join(shallow, "scripts", "check-spec-touches.mjs")], {
+      cwd: shallow,
+      encoding: "utf8",
+      env: { ...process.env, BASE_SHA: "HEAD" },
+    });
+    assert.equal(out.status, 2, out.stdout + out.stderr);
+    assert.match(out.stderr, /shallow clone/);
+  } finally {
+    r.done();
+    rmSync(shallow, { recursive: true, force: true });
+  }
+});
+
+for (const failing of ["merge-base", "diff", "ls-tree"]) {
+  test(`check-spec-touches refuses when \`git ${failing}\` fails`, () => {
+    // A force push whose before-SHA is gone lands here; read as "no new
+    // specs", it would print OK over a change it never saw.
+    const r = touchesRepo();
+    const shim = mkdtempSync(join(tmpdir(), "barwise-touchesreq-git-"));
+    try {
+      r.spec("new.spec.md");
+      r.commit("add a spec");
+      const real = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+      writeFileSync(
+        join(shim, "git"),
+        `#!/bin/sh\n[ "$1" = ${failing} ] && exit 128\nexec "${real}" "$@"\n`,
+      );
+      chmodSync(join(shim, "git"), 0o755);
+      const out = r.run({ BASE_SHA: r.base, PATH: `${shim}:${process.env.PATH}` });
+      assert.equal(out.status, 2, out.stdout + out.stderr);
+      assert.match(out.stderr, new RegExp(`cannot answer -- \`git ${failing} .*\` failed`));
+      assert.doesNotMatch(out.stdout, /OK/);
+    } finally {
+      rmSync(shim, { recursive: true, force: true });
+      r.done();
+    }
+  });
+}
 
 /**
  * check-instruction-refs: every path and `node <path>` an instruction file

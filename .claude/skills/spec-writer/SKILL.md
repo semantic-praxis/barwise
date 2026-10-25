@@ -107,6 +107,9 @@ alongside this file.
    nothing is built, unless the line names a commit that precedes every
    such change and whose body matches the plan the implementation
    started from (`docs/specs/plan-scope-check.spec.md`).
+   `npm run check:spec-touches` fails a change that adds a spec without a
+   `Touches:` entry naming a tracked path; a spec that existed at the
+   merge base is exempt (`docs/specs/touches-required.spec.md`).
    The spec may land alone or with its first workstream; either way the
    review commit comes first. Before implementing
    each workstream, ground it again and verify or correct the
@@ -216,8 +219,9 @@ reverse.
   second, where a wait starts to break a train of thought.
 - **Header block is current** -- `Status`, `Created`, `Last-updated`
   (bumped if this push revises an existing spec), `Tracking`, and
-  `Touches:` for a new spec: the paths the plan changes, `+` for a file it
-  creates and `-` for one it deletes (`template.spec.md`;
+  `Touches:`, required on a new spec, with at least one entry naming a
+  tracked path (`check:spec-touches`): the paths the plan changes, `+` for
+  a file it creates and `-` for one it deletes (`template.spec.md`;
   `check:spec-touches` keeps it live).
 - **Parity check**: if the design introduces a copy that must agree
   with other code -- a parallel implementation, a re-listed union, a

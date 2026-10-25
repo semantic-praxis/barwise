@@ -1,13 +1,18 @@
 # New specs declare `Touches:`, checked by `check:spec-touches`
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-25 (workstream 1: the new-spec rule in
+check:spec-touches, lib/pr-base.mjs shared with check:plan-review, the
+ci.yml BASE_SHA line, and the wording in spec-writer, the template and
+pr-creation; see Implementation notes)
 
 Created: 2026-10-24
-Last-updated: 2026-10-24
+Last-updated: 2026-10-25
 Tracking: barwise-ef0
 Plan-reviewed: d8e49646 (code-review, pr-review; re-pointed after the owner's decisions, which adopt the recommended options)
 Touches: barwise/scripts/check-spec-touches.mjs, barwise/scripts/check-plan-review.mjs,
 +barwise/scripts/lib/pr-base.mjs, barwise/scripts/tests/spec-reader.test.mjs,
+barwise/scripts/tests/gates.test.mjs, barwise/scripts/lib/spec-reader.mjs,
+barwise/scripts/measure-touches-required.mjs,
 barwise/scripts/tests/expected-counts.json, .github/workflows/ci.yml,
 .claude/skills/spec-writer/SKILL.md, .claude/skills/spec-writer/template.spec.md,
 .claude/skills/pr-creation/SKILL.md, barwise/docs/specs/plan-scope-check.spec.md
@@ -321,6 +326,53 @@ Acceptance: the gate as built, replayed with `--base C^1 --head <head>`
 over each commit of the window, flags the 125 PRs that
 `measure:touches-required -- --ref 7ffea343` lists under `flagged`, and
 no others.
+
+## Implementation notes (2026-10-25)
+
+Built as planned, with these departures:
+
+- **The tests are in `gates.test.mjs`, not `spec-reader.test.mjs`.** The
+  new rule needs a git sandbox, and `gates.test.mjs` already holds the
+  `planRepo` one this mirrors (`touchesRepo`). 16 tests: field absent,
+  `+none`, a `-` entry naming nothing tracked at the base, an unmarked
+  entry and a lone tracked `-` entry (passing), an empty `Touches:`
+  (exactly one finding), edit/archive/restore/move between directories
+  (exempt), an added archived spec, ADR and README (exempt), a
+  name-changing rename (new, per Open decision 2), push mode with a
+  before-SHA plus a `--head` replay, the `origin/main` fallback and its
+  stale-base hint, and the refusals: all-zero base, unresolvable base,
+  shallow clone, and `git merge-base`, `git diff`, `git ls-tree`
+  failing. `spec-reader.test.mjs` gains one assertion: under the fixture
+  overrides the OK line says the new rule was not applied.
+- **The satisfying-entry rule is shared.** `newSpecVerdict` in
+  `lib/spec-reader.mjs` is the one predicate; `check-spec-touches.mjs`
+  and `measure-touches-required.mjs` both call it. Left as two copies, the
+  measure, which is this spec's acceptance test, could drift from the
+  gate it checks. It also ignores an empty `-` entry, which the tree rule
+  already reports.
+- **The stale-base hint prints only on the `origin/main` fallback.** CI
+  passes an exact base and cannot misattribute, so there the hint was
+  noise.
+- **`--head` is verified too.** An unresolvable `--head` refuses with
+  exit 2, like an unresolvable base.
+- **`check:plan-review` refuses an all-zero `BASE_SHA` by name.** It used
+  to refuse at `git merge-base` with git's own message; the exit code is 2
+  either way, so the shared module changes only the wording.
+
+Verified on 2026-10-25:
+
+- Every new guard went red under `scripts/mutate.mjs` (15 mutations, all
+  CAUGHT; the first `--head` mutation was UNCAUGHT, because the test
+  replayed from a checkout that also held the spec, and the test now
+  replays from one that does not).
+- Acceptance: the gate replayed with `--base C^1 --head <head>` over the
+  488 first-parent commits to `7ffea343` exited 1 on exactly the 125
+  commits `measure:touches-required -- --ref 7ffea343` lists under
+  `flagged`, with none missed, none extra and no refusals.
+- Today's tree: exit 0, no new spec since `origin/main`. As a push from
+  `7ffea343` to `origin/main` (`014a4602`, 24 first-parent commits), all 8
+  specs added since declare a tracked path, so nothing on main is newly
+  flagged.
 
 ## Open decisions (for review)
 

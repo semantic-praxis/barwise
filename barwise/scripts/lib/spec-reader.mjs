@@ -155,6 +155,27 @@ export function touches(text) {
 }
 
 /**
+ * What the new-spec rule makes of a spec's `Touches:` entries
+ * (docs/specs/touches-required.spec.md): "none" (no field), "empty" (a
+ * field with no entries, which check:spec-touches already reports),
+ * "marked-only" (only `+` entries, or `-` entries naming nothing tracked
+ * at the base), or "satisfies". An unmarked entry satisfies, since the
+ * tree rule holds it to a tracked path; a `-` entry satisfies when
+ * `trackedAtBase(path)` says the base held it. `+` entries alone never
+ * do, or `Touches: +none` would pass. Shared by the gate and
+ * measure-touches-required, whose counts are the gate's acceptance test.
+ */
+export function newSpecVerdict(entries, trackedAtBase) {
+  if (entries === undefined) return "none";
+  if (entries.length === 0) return "empty";
+  const real = entries.some((e) =>
+    e.mark === "" || (e.mark === "-" && e.path !== "" && !e.path.includes("*")
+      && trackedAtBase(e.path))
+  );
+  return real ? "satisfies" : "marked-only";
+}
+
+/**
  * The specs a branch names: each in `corpus` that the branch changes, or
  * whose file name a commit message on it mentions. One rule for the scope
  * report (plan-scope) and the plan-review gate, which the spec says use

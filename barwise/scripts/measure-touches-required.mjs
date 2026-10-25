@@ -33,6 +33,7 @@ import {
   header,
   inSpecCorpus,
   namedSpecs,
+  newSpecVerdict,
   touches,
 } from "./lib/spec-reader.mjs";
 import { REPO_ROOT } from "./lib/tracked.mjs";
@@ -74,13 +75,7 @@ const outsideDocs = (p) => !p.startsWith("barwise/docs/") && !p.startsWith(".bea
 
 /** The rule's verdict on a spec's text at `head`, with `mergeBase` for `-` entries. */
 function verdict(text, mergeBase) {
-  const entries = touches(text);
-  if (entries === undefined) return "none";
-  if (entries.length === 0) return "empty";
-  const ok = entries.some((e) =>
-    e.mark === "" || (e.mark === "-" && !e.path.includes("*") && holds(mergeBase, e.path))
-  );
-  return ok ? "satisfies" : "marked-only";
+  return newSpecVerdict(touches(text), (path) => holds(mergeBase, path));
 }
 
 /** Status letters of `git diff --name-status -z`, renames included when asked. */

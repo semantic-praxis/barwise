@@ -22,7 +22,10 @@ cited as context, like ci.yml, no longer counts), and check:spec-touches
 fails on an unmarked entry that names nothing tracked. Shared wiring
 (ci.yml, the package.json files, scripts/tests/, the root CLAUDE.md)
 belongs here when the plan changes it; the audit ignores it.
-docs/specs/plan-scope-check.spec.md. -->
+docs/specs/plan-scope-check.spec.md. Required on a new spec, with at
+least one unmarked entry or `-` entry: `+` entries alone do not count, so
+a placeholder cannot satisfy it (check:spec-touches;
+docs/specs/touches-required.spec.md). -->
 
 <!-- Plan-reviewed: <commit> (code-review, pr-review)
 

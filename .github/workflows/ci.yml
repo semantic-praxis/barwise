@@ -183,7 +183,16 @@ jobs:
       # A spec's Touches: header is its declared plan. An unmarked entry
       # that names nothing tracked is a plan that rotted, the way a
       # review-tiers glob routed nothing for five weeks (barwise-fs0).
+      # A spec new since the base must also declare a tracked path, or it
+      # is outside check:plan-review entirely; the base is the pull
+      # request's, or on a push to main the commit main pointed at before
+      # it, so a spec pushed straight to main is caught while it is the
+      # newest commit (touches-required.spec.md). It reads history, which
+      # the `fetch-depth: 0` checkout provides; a shallow clone, an
+      # all-zero or unreachable before-SHA refuses (exit 2).
       - run: npm run check:spec-touches
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
       # A spec's plan is reviewed (/code-review, /pr-review) before its
       # implementation is committed, recorded as `Plan-reviewed: <commit>`
       # in its header (plan-scope-check.spec.md, WS6). Wired like
