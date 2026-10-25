@@ -4,7 +4,7 @@ Status: Implemented (all three workstreams; see Implementation notes.
 Extended 2026-08-28 with the `--artifact-version` selector, barwise-882
 -- see the dated section at the end)
 Created: 2026-08-26
-Last-updated: 2026-08-28
+Last-updated: 2026-10-25
 Tracking: barwise-855, item 2 -- this spec answers it differently than
 it was filed, so the issue needs editing rather than implementing (item
 1 has already shipped; see "What grounding corrected"). Precedent:
@@ -133,6 +133,8 @@ shipped artifact at all, at which point the recorded `artifactVersion`
 this design avoids becomes necessary after all. Fault B is therefore
 a decision about how expensive fault C is, and it is stated as one
 in Open decisions.
+
+Recorded as `docs/adr/production-prompt-resolution.md`.
 
 ## Scope
 
