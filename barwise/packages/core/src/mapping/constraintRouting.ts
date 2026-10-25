@@ -16,11 +16,12 @@
  * routing.
  */
 
-import { buildConstraintSpec, findRole } from "../annotation/constraintSpec.js";
+import { buildConstraintSpec } from "../annotation/constraintSpec.js";
 import type { ConstraintSpec } from "../export/types.js";
 import { type Constraint, isOverSubtypes } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
+import { findRole } from "../model/roleLookup.js";
 import { renderValuePredicate } from "../sql/valuePredicate.js";
 import { ConstraintVerbalizer } from "../verbalization/index.js";
 import { DIALECT_PROFILES, type DialectCapabilityProfile } from "./dialectCapabilities.js";
@@ -65,15 +66,27 @@ const NO_CLAUSES: DialectCapabilityProfile = {
  * The constraints a format that renders only `schema` drops: every one
  * the router would spill if the target had neither UNIQUE nor CHECK, by
  * the same rule DDL uses for "realized by the mapping"
- * (schema-export-constraint-specs.spec.md). One spec per spilled
- * constraint; a value type's own value constraint on two columns of one
- * table is one constraint, so one spec.
+ * (schema-export-constraint-specs.spec.md).
+ *
+ * One spec per constraint routed, not per distinct sentence: two
+ * constraints that verbalize alike are both reported, where DDL's
+ * comment pass keeps one per table. A value type's own value constraint
+ * is routed once for each role that constrains a column, so it is
+ * reported once per column, each spec naming its own role -- each column
+ * is a check to implement.
  */
 export function unreportedConstraintSpecs(
   model: OrmModel,
   schema: RelationalSchema,
 ): ConstraintSpec[] {
-  return routeConstraints(model, schema, NO_CLAUSES, "this format").spilled.map((s) => s.spec);
+  const seen = new Set<Constraint>();
+  const specs: ConstraintSpec[] = [];
+  for (const s of routeAll(model, schema, NO_CLAUSES, "this format").spilled) {
+    if (seen.has(s.constraint)) continue;
+    seen.add(s.constraint);
+    specs.push(s.spec);
+  }
+  return specs;
 }
 
 /**
@@ -86,8 +99,27 @@ export function routeConstraints(
   profile: DialectCapabilityProfile,
   dialectName: string,
 ): ConstraintRouting {
+  const { clauses, spilled } = routeAll(model, schema, profile, dialectName);
+  return {
+    clauses: dedupeBy(clauses, (c) => JSON.stringify([c.tableName, c.sql])),
+    spilled: dedupeBy(spilled, (s) => JSON.stringify([s.tableName ?? "", s.spec.verbalization]))
+      .map(({ tableName, reason, spec }) => ({ tableName, reason, spec })),
+  };
+}
+
+/** A spill with the constraint it came from, before any dedupe. */
+interface RoutedSpill extends SpilledConstraint {
+  readonly constraint: Constraint;
+}
+
+function routeAll(
+  model: OrmModel,
+  schema: RelationalSchema,
+  profile: DialectCapabilityProfile,
+  dialectName: string,
+): { clauses: RoutedClause[]; spilled: RoutedSpill[]; } {
   const clauses: RoutedClause[] = [];
-  const spilled: SpilledConstraint[] = [];
+  const spilled: RoutedSpill[] = [];
   const verbalizer = new ConstraintVerbalizer();
 
   const spill = (inView: ConstraintInView, reason: string, tableName?: string): void => {
@@ -95,6 +127,7 @@ export function routeConstraints(
       tableName,
       reason,
       spec: buildConstraintSpec(inView, model, verbalizer),
+      constraint: inView[0],
     });
   };
 
@@ -260,10 +293,7 @@ export function routeConstraints(
     }
   }
 
-  return {
-    clauses: dedupeBy(clauses, (c) => JSON.stringify([c.tableName, c.sql])),
-    spilled: dedupeBy(spilled, (s) => JSON.stringify([s.tableName ?? "", s.spec.verbalization])),
-  };
+  return { clauses, spilled };
 
   function routeValueConstraint(
     c: Extract<Constraint, { type: "value_constraint"; }>,

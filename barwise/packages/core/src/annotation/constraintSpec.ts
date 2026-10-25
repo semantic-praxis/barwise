@@ -13,6 +13,7 @@ import type { ConstraintSpec } from "../export/types.js";
 import { type Constraint, roleIdsOf } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
+import { findRole } from "../model/roleLookup.js";
 import type { ConstraintVerbalizer } from "../verbalization/index.js";
 
 export function buildConstraintSpec(
@@ -151,15 +152,4 @@ function roleLabels(
       return player ? `${player.name}.${role.name}` : role.name;
     })
     .join(", ");
-}
-
-/** A role and the fact type holding it, preferring the given fact type. */
-export function findRole(
-  roleId: string,
-  preferred: FactType | undefined,
-  model: OrmModel,
-): { factType: FactType; role: FactType["roles"][number]; } | undefined {
-  const factType = preferred?.getRoleById(roleId) ? preferred : model.factTypesHolding([roleId])[0];
-  const role = factType?.getRoleById(roleId);
-  return factType && role ? { factType, role } : undefined;
 }

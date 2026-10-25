@@ -90,11 +90,19 @@ describe("unreportedConstraintSpecs", () => {
   it("reports every constraint the schema does not carry, and no mandatory", () => {
     const model = sixKinds();
     const specs = unreportedConstraintSpecs(model, new RelationalMapper().map(model));
-    const pseudocode = specs.map((s) => s.pseudocode).join("\n");
     expect(specs).toHaveLength(6);
     expect(specs.map((s) => s.verbalization).join("\n")).not.toMatch(/at least one/);
-    for (const fragment of ["unique", "<=", "not Person mentors Person(x, x)", "subset"]) {
-      expect(pseudocode).toContain(fragment);
+    // One spec per kind, each recognisable by its own pseudocode.
+    const kinds = [
+      /Person has Email/, // the secondary uniqueness on Email
+      /one of \{1, 2, 3\}/, // the role value constraint on Score
+      /one of \{A, B\}/, // Grade's own value constraint
+      /<=/, // the value comparison
+      /not Person mentors Person\(x, x\)/, // the ring
+      /subset/, // the subset
+    ];
+    for (const kind of kinds) {
+      expect(specs.filter((s) => kind.test(s.pseudocode))).toHaveLength(1);
     }
   });
 
@@ -109,7 +117,37 @@ describe("unreportedConstraintSpecs", () => {
     expect(unreportedConstraintSpecs(model, schema)).toHaveLength(6);
   });
 
-  it("reports a value type's own value constraint once, though it fills two columns", () => {
+  it("reports two constraints that verbalize alike, which DDL's comments keep once", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "person_id" })
+      .withValueType("Score", { dataType: { name: "integer" } })
+      .withBinaryFactType("Person has best Score", {
+        role1: { player: "Person", name: "has best" },
+        role2: { player: "Score", name: "is best of" },
+        uniqueness: "role1",
+      })
+      .withBinaryFactType("Person has worst Score", {
+        role1: { player: "Person", name: "has worst" },
+        role2: { player: "Score", name: "is worst of" },
+        uniqueness: "role1",
+      })
+      .build();
+    for (const name of ["best", "worst"]) {
+      model.getFactTypeByName(`Person has ${name} Score`)!.addConstraint({
+        type: "value_constraint",
+        roleId: `Person has ${name} Score::role2`,
+        values: ["1", "2"],
+      });
+    }
+    const schema = new RelationalMapper().map(model);
+    const specs = unreportedConstraintSpecs(model, schema);
+    expect(specs.map((s) => s.pseudocode).sort()).toEqual([
+      "value of Score.is best of is one of {1, 2}",
+      "value of Score.is worst of is one of {1, 2}",
+    ]);
+  });
+
+  it("reports a value type's own value constraint once per column it fills", () => {
     const model = new ModelBuilder("Test")
       .withEntityType("Shift", { referenceMode: "shift_id" })
       .withValueType("Hour", {
@@ -130,7 +168,10 @@ describe("unreportedConstraintSpecs", () => {
     const schema = new RelationalMapper().map(model);
     const full = routeConstraints(model, schema, resolveDialectProfile("postgres"), "postgres");
     expect(full.clauses).toHaveLength(2);
-    expect(unreportedConstraintSpecs(model, schema)).toHaveLength(1);
+    expect(unreportedConstraintSpecs(model, schema).map((s) => s.pseudocode).sort()).toEqual([
+      "value of Hour.is end of is one of {8, 9}",
+      "value of Hour.is start of is one of {8, 9}",
+    ]);
   });
 
   it("reports nothing for a model whose constraints the schema carries", () => {

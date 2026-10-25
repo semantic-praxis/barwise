@@ -4,7 +4,7 @@
  * clause, an informational clause, or the ConstraintSpec spillway with
  * a SQL comment.
  */
-import { DIALECT_PROFILES, resolveDialectProfile, routeConstraints } from "@barwise/core/mapping";
+import { resolveDialectProfile, routeConstraints } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
@@ -53,18 +53,6 @@ function ringModel() {
 }
 
 describe("dialect capability profiles", () => {
-  it("covers every dialect the SQL cascade knows", () => {
-    expect(Object.keys(DIALECT_PROFILES).sort()).toEqual([
-      "ansi",
-      "bigquery",
-      "databricks",
-      "mysql",
-      "postgres",
-      "redshift",
-      "snowflake",
-    ]);
-  });
-
   it("rejects unknown dialects with the supported list", () => {
     expect(() => resolveDialectProfile("oracle")).toThrow(/Unknown SQL dialect "oracle"/);
     expect(() => resolveDialectProfile("oracle")).toThrow(/postgres/);

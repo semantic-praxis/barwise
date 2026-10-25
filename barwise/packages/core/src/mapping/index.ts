@@ -9,7 +9,6 @@ export {
 } from "./constraintRouting.js";
 export {
   type ConstraintChannel,
-  DIALECT_PROFILES,
   type DialectCapabilityProfile,
   resolveDialectProfile,
 } from "./dialectCapabilities.js";

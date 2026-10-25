@@ -168,6 +168,7 @@
         "barwise/packages/core/src/export/",
         "barwise/packages/core/src/serialization/",
         "barwise/packages/core/src/mapping/",
+        "barwise/packages/core/src/annotation/constraintSpec.ts",
         "barwise/packages/core/src/format/",
         "barwise/packages/cli/src/commands/",
         "barwise/packages/llm/src/parse/",

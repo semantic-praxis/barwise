@@ -10,6 +10,7 @@ Touches: +barwise/packages/core/src/mapping/constraintRouting.ts,
 +barwise/packages/core/src/mapping/dialectCapabilities.ts,
 +barwise/packages/core/src/annotation/constraintSpec.ts,
 +barwise/packages/core/src/sql/valuePredicate.ts,
++barwise/packages/core/src/model/roleLookup.ts,
 barwise/packages/core/src/mapping/index.ts,
 barwise/packages/core/src/annotation/index.ts,
 barwise/packages/core/src/sql/index.ts,
@@ -30,6 +31,7 @@ barwise/packages/formats/tests/OpenApiExportFormat.test.ts,
 barwise/packages/formats/tests/AvroExportFormat.test.ts,
 barwise/packages/dbt/tests/DbtExportFormat.test.ts,
 barwise/audit-baseline.json,
+barwise/review-tiers.json,
 barwise/docs/specs/external-preferred-identifier.spec.md,
 barwise/docs/specs/ossie-ontology-format.spec.md,
 barwise/docs/specs/join-ring-constraint.spec.md,
@@ -93,10 +95,11 @@ already does for `renderDdl`.
   postgres profile's spills and clauses together; 363 specs in all,
   which is what the three formats would report over the corpus (script:
   `routeConstraints` with each profile, per model). That equality is not
-  an invariant: spills dedupe by table and verbalization, clauses by
-  table and SQL, so a value type's own value constraint on two columns
-  of one table is two CHECK clauses but one spill. One spill is the
-  right count for a report, since it is one constraint.
+  an invariant: the router dedupes spills by table and verbalization and
+  clauses by table and SQL, so two constraints that verbalize alike in
+  one table are two clauses but one spill. A report must not merge them,
+  so `unreportedConstraintSpecs` dedupes by constraint instead (see
+  Implementation notes).
 - **The spill reason does not reach the report.** `ConstraintSpec`
   carries only `verbalization`, `pseudocode` and `example`
   (`core/src/export/types.ts`); the reason ("CHECK is not supported by
@@ -157,15 +160,16 @@ DDL, made no worse here, and each is filed:
   `core/src/mapping`, exported from `@barwise/core/mapping`, with
   `unreportedConstraintSpecs(model, schema): ConstraintSpec[]`, which
   routes under a module-level profile with UNIQUE and CHECK absent and
-  returns the spilled specs. The profile is the postgres one with
+  returns one spec per spilled constraint. The profile is the postgres one with
   `unique` and `check` set to `absent` (primary and foreign keys stay
   native, which is what the schema carries); it is not exported, so
-  nothing else restates it. Its own test pins the six-kind report,
-  the one-spec-per-constraint dedupe and the empty result.
+  nothing else restates it. Its own test pins the six-kind report by content,
+  the per-constraint dedupe and the empty result.
 - `buildConstraintSpec` moves to `core/src/annotation/constraintSpec.ts`,
-  exported from `@barwise/core/annotation`. Its `findRole` is rewritten
-  over `OrmModel.factTypesHolding([roleId])` with the preferred fact type
-  first, so core gains no second role-to-fact-type lookup.
+  exported from `@barwise/core/annotation`. `findRole`, which the builder
+  and the router both use, moves to `core/src/model/roleLookup.ts`,
+  internal to core, and resolves through `OrmModel.factTypesHolding`
+  with the preferred fact type first, so it adds no scan of its own.
 - `valuePredicate.ts` moves to `core/src/sql`, exported from
   `@barwise/core/sql`.
 - The four formats files are deleted; `DdlExportFormat`,
@@ -209,6 +213,16 @@ the tracked models are recorded here.
   the router. It also round-trips NORMA files through formats' importer
   and writer, which core cannot import, so it stays in formats and reads
   the router from `@barwise/core/mapping`.
+- WS1, implementation review: the router dedupes spills by table and
+  verbalization, which merged distinct constraints in a report (two role
+  value constraints with the same values) and kept one column's check
+  for a value type's own constraint on two columns. `routeConstraints`
+  keeps that dedupe, so DDL is unchanged; `unreportedConstraintSpecs`
+  reads the undeduped spills and keeps one per constraint, so a value
+  type's own constraint is reported once per column it fills, each spec
+  naming its role. `DIALECT_PROFILES` is no longer exported (its one
+  outside reader was a test, now in core), and the moved `constraintSpec.ts`
+  is routed high-risk again in `review-tiers.json`.
 - WS1, measured: DDL export of every tracked `.orm.yaml` that loads, in
   every dialect, with and without annotations, and Ossie export of each,
   is byte-identical before and after the move, `constraintSpecs`
