@@ -15,8 +15,8 @@ bridges in `@barwise/formats` and `@barwise/dbt`, two scripts
 A bare `python3` brings the ambient interpreter's site-packages, so two
 machines could parse the same SQL with two sqlglot versions and nothing
 would record which. This ADR covers the dependency half: which libraries
-a run gets. Which interpreter it gets is the `.python-version` pin in
-the root `CLAUDE.md`, "Monorepo Commands", and is out of scope here. The
+a run gets. Which interpreter it gets is `docs/adr/pinned-runtimes.md`,
+and is out of scope here. The
 measurements, including that `uv run --frozen` exits 0 when it finds no
 project, and the rejected alternatives are in the two specs above.
 
