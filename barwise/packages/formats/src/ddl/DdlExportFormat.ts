@@ -22,15 +22,18 @@ import {
 } from "@barwise/core";
 import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/annotation";
 import { generateDdlLineage } from "@barwise/core/lineage";
-import { RelationalMapper, renderDdl, renderPopulationAsSql } from "@barwise/core/mapping";
-import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
 import {
   type ConstraintRouting,
+  type DialectCapabilityProfile,
+  RelationalMapper,
+  renderDdl,
+  renderPopulationAsSql,
+  resolveDialectProfile,
   routeConstraints,
   type RoutedClause,
   type SpilledConstraint,
-} from "./constraintRouting.js";
-import { type DialectCapabilityProfile, resolveDialectProfile } from "./dialectCapabilities.js";
+} from "@barwise/core/mapping";
+import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
 
 /**
  * The options that render DDL alone: no annotation comments and no

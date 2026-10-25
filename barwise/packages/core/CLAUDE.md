@@ -21,7 +21,9 @@ src/
   serialization/  YAML round-trip (.orm.yaml, .map.yaml, .orm-project.yaml)
   validation/     Rule-based validation engine and rule sets
   verbalization/  FORML verbalization of fact types and constraints
-  mapping/        Relational mapper (ORM -> tables/columns/keys) and DDL renderer
+  mapping/        Relational mapper (ORM -> tables/columns/keys), DDL renderer,
+                  and constraint routing: what the schema realized, and what a
+                  dialect adds as UNIQUE/CHECK or spills as a ConstraintSpec
   diff/           Model diffing and three-way merge
   index.ts        Root public API: foundational only (model, serialization,
                   validation, format registry, import/export types)

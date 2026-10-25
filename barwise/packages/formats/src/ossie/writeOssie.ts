@@ -25,8 +25,8 @@ import {
   resolvePreferredIdentifier,
   roleIdsOf,
 } from "@barwise/core";
+import { buildConstraintSpec } from "@barwise/core/annotation";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
-import { buildConstraintSpec } from "../constraintSpec.js";
 import { snakeCase } from "../naming.js";
 import {
   DERIVATION_ITEM_SEPARATOR,
