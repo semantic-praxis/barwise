@@ -52,7 +52,8 @@ them (`ossie-ontology-format.spec.md`, Open decision 4).
 
 - Readers that render a template, each substituting `{n}` in the text as
   written: `expandReading` (core root export; called by the fact-type list
-  in `Verbalizer`, query output and phase2's fallback),
+  and objectification sentences in `Verbalizer`, query output and phase2's
+  join-path chains),
   `FactTypeVerbalizer`'s template parser, `extractPredicate` (callers: the
   binary uniqueness and mandatory sentences in phase1, the ring sentences
   and binary frequency in phase2), phase2's `spanningArm` ("some X"),
@@ -75,34 +76,50 @@ In scope:
   where each role part carries its **lead** -- the bound words before it --
   and the text before it no longer contains them; plus whether any hyphen in
   the template was left unbound.
-- **The binding rule.** In the text between the previous placeholder (or
-  the start) and placeholder `{n}`, the first token that ends in a letter or
-  digit followed by a hyphen and then whitespace begins the lead, which runs
-  to `{n}`. The lead drops that hyphen and collapses its whitespace to
-  single spaces; it is printed before the player's name with one space. A
-  hyphen inside a word ("co-owner"), a dash standing alone ("reports to -
-  {1}"), or a hyphen with no placeholder after it in the same stretch binds
-  nothing, and the template then has an unbound hyphen.
-- **The placement rule**, one sentence for every constraint shape: a lead
-  goes immediately before its own player's name, after any quantifier or
+- **The binding rule.** A _binding hyphen_ is a hyphen that directly
+  follows a letter or digit and is followed by whitespace or directly by a
+  placeholder (`sale- {1}`, `sale-{1}`). In the text between the previous
+  placeholder (or the start) and placeholder `{n}`, the first token ending in
+  a binding hyphen begins the lead, which runs to `{n}`. The lead drops every
+  binding hyphen in it and collapses its whitespace to single spaces; it is
+  printed before the player's name with one space.
+- **Unbound hyphens.** A binding hyphen the rule does not consume (one with
+  no placeholder after it in the same stretch, `"{0} smiles- "`), and a
+  hyphen that directly follows whitespace and precedes a letter or digit
+  (the trailing form, `"{0} -word"`), are reported as unbound. A hyphen
+  inside a word (`co-owner`) or a dash standing alone (`reports to - {1}`)
+  is ordinary text, neither bound nor reported.
+- **The placement rule**, for every constraint shape: a lead goes
+  immediately before the name in its own role slot, after any quantifier or
   determiner in front of that name ("at most one sale Currency", "exactly 2
-  sale Currency", "that same child Item", "some sale Currency"). A lead on
-  the subject's placeholder goes before the subject's name.
+  sale Currency", "some sale Currency"). In a ring sentence each clause
+  places the leads by role slot, whichever instance name fills the slot
+  ("No Item has that same child Item"; "If Item1 has child Item2 then Item2
+  does not have child Item1"). A lead on the subject's slot goes before the
+  subject's name.
+- **When no reading has the needed direction**, `extractPredicate` already
+  slices the first reading as written; it then returns that text with its
+  binding hyphens removed and no leads, so the sentence reads as today
+  without the hyphen, and no lead moves onto the wrong noun.
 - Every reader in Observed uses `splitReading`:
   - `expandReading` prints each lead before its name, fixing its callers;
   - `FactTypeVerbalizer` emits the lead as text before the reference;
   - `extractPredicate` returns the predicate and the subject's and object's
     leads, and every caller (phase1 uniqueness and mandatory, phase2 ring
     and frequency) places them by the rule;
-  - `spanningArm` selects a reading whose first role part is the role (after
-    any lead), and puts "some" before the other players' leads;
-  - `unaryPredicate` returns the text after the placeholder, and the
-    cardinality sentence puts the lead before the type name;
+  - `spanningArm` keeps its selection -- a reading whose text before the
+    role's placeholder is empty -- and also accepts one where that text is
+    exactly a lead, which it omits, since the caller prints the shared
+    subject once; it puts "some" before the other players' leads;
+  - `unaryPredicate` returns the text after the placeholder, its fallback
+    strips the lead and binding hyphens, and the cardinality sentence puts
+    the lead before the type name;
   - phase1's non-binary mandatory sentence keeps its substitution and drops
     the binding hyphen, so its text changes only where a lead exists;
   - the diagram's `renderReading` is replaced by core's `expandReading`.
-- The Ossie importer warns only when `splitReading` reports an unbound
-  hyphen, instead of on any `word- `; `ossie-ontology-format.spec.md` Open
+- The Ossie importer warns only when `splitReading`, run on the converted
+  template (after named placeholders become `{n}`), reports an unbound
+  hyphen, instead of on any `word- ` in the raw pattern; `ossie-ontology-format.spec.md` Open
   decision 4 records the change.
 
 Out of scope:
@@ -136,19 +153,26 @@ One PR. Acceptance:
 - `splitReading` unit tests:
   - `"{0} has sale- {1}"`: text `" has "`, lead `"sale"` on `{1}`;
   - `"{0} has average-  departure {1}"`: lead `"average departure"`;
-  - `"{0} is co-owner of {1}"`, `"{0} reports to - {1}"`: no lead, no
-    unbound hyphen for the first, an unbound one for the second;
-  - `"{0} smiles- "`: no lead, an unbound hyphen;
+  - `"{0} has big- red- {1}"`: lead `"big red"`;
+  - `"{0} has sale-{1}"`: lead `"sale"`;
+  - `"{0} is co-owner of {1}"`, `"{0} reports to - {1}"`: no lead, nothing
+    unbound;
+  - `"{0} smiles- "`, `"{0} -word {1}"`: no lead, an unbound hyphen;
   - `"{0} has sold- {1} at {2}"`: a lead on `{1}` only.
 - Sentence tests on a fact type `"{0} has sale- {1}"`: binary uniqueness,
-  mandatory and frequency print the lead after the quantifier; a ring on
-  `"{0} has child- {1}"` prints "that same child Item"; an exclusion arm
-  prints "some sale Currency"; a reading `"sale- {0} is priced in {1}"` is
-  still chosen for its arm.
+  mandatory and frequency print the lead after the quantifier; rings on
+  `"{0} has child- {1}"` print "that same child Item" (irreflexive) and
+  "has child Item2 then Item2 does not have child Item1" (asymmetric); an
+  exclusion arm prints "some sale Currency"; a reading `"sale- {0} is priced
+  in {1}"` is chosen for its arm with the lead omitted, and `"the {0} drives
+  {1}"` is still not chosen; a binary with only `"{1} is sale- price of {0}"`
+  verbalizes a uniqueness on role 0 as today minus the hyphen; a unary
+  `"active- {0}"` cardinality names neither `active-` nor an empty role.
+- Query: `describe` of a hyphen-bound fact type prints "has sale Currency".
 - A standing corpus test, `hyphenBindingCorpus.test.ts`: every tracked model
   under `docs/`, `examples/` and `packages/promptlab/evals/` that uses the
   notation verbalizes with no line containing a letter or digit followed by
-  `- `. It fails if any reader reintroduces the raw hyphen.
+  a hyphen and then whitespace, punctuation, a quote mark or the line end. It fails if any reader reintroduces the raw hyphen.
 - The diagram summary of a hyphen-bound fact type reads "has sale Currency".
 - The Ossie flights import warns about no hyphen; a reading with an unbound
   hyphen still warns.
