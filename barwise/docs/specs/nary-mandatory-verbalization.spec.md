@@ -15,30 +15,34 @@ barwise/packages/cli/tests/characterization/golden/clinic-appointments.verbalize
 The mandatory sentence for a unary, ternary or wider fact type shall read
 as FORML: "Each Appointment is for some Patient with some Doctor on some
 AppointmentDate at some TimeSlot." when a reading starts with the
-constrained role, and "For each Agreement, some Party on behalf of some
-Party signs that Agreement." when none does. Today it writes the
+constrained role, and "For each Agreement, some Customer on behalf of
+some Organization signs that Agreement." when none does. Today it writes the
 constrained role's player into every slot: "Each Appointment must:
 Appointment is for Appointment with Appointment on Appointment at
 Appointment."
 
 ## Principle
 
-Composability. The sentence a single-role mandatory needs is the one
-`spanningArm` (phase2.ts) already writes for each arm of a disjunctive
-mandatory: a reading that opens with the role, its other players
-quantified by "some". A disjunctive mandatory over one role is a plain
-mandatory, so the two shall say it the same way, from one renderer. The
-second form ("For each X, ... that X") is new and lives beside it, so a
-reading that does not open with the role gets a sentence built from the
-reading rather than from the role name.
+Composability. When a reading opens with the constrained role, the
+sentence a single-role mandatory needs is the one `spanningArm`
+(phase2.ts) already writes for each arm of a disjunctive mandatory: the
+rest of that reading, its other players quantified by "some". The two
+shall find that reading and render it with one pair of helpers, so they
+cannot drift. They still differ in two places, both deliberate. The
+mandatory sentence prints the opening placeholder's hyphen-bound lead
+before its subject ("Each sale Listing ..."), where a disjunctive
+mandatory prints one shared subject for several arms and so omits each
+arm's lead. And when no reading opens with the role, the mandatory
+sentence takes a new form built from the reading ("For each X, ... that
+X"), where `spanningArm` keeps its role-name fallback (see Out of scope).
 
 ## Observed today (at 52f23edc)
 
 The non-binary branch of `verbalizeMandatory` (phase1.ts) expands the
 first reading with the constrained player's name for every placeholder,
-and frames it as "Each X must: ...". Over the tracked models
-(`docs`, `examples`, `packages/promptlab/evals`), 12 lines in 6 files
-take this path, every one of them wrong in the same way:
+and frames it as "Each X must: ...". Over every tracked `.orm.yaml`, 17
+lines in 11 files take this path, every one of them wrong in the same
+way:
 
 | File                                                 | Lines |
 | ---------------------------------------------------- | ----- |
@@ -48,16 +52,29 @@ take this path, every one of them wrong in the same way:
 | `examples/auction-project/domains/catalog.orm.yaml`  | 1     |
 | `examples/models/learning-design.orm.yaml`           | 1     |
 | `examples/transcripts/clinic-appointments.orm.yaml`  | 1     |
+| `trial/customers/C02-bank/kernel.orm.yaml`           | 1     |
+| `trial/customers/C05-manufacturer/kernel.orm.yaml`   | 1     |
+| `trial/customers/C06-logistics/kernel.orm.yaml`      | 1     |
+| `trial/findings/barwise-nqd/base.orm.yaml`           | 1     |
+| `trial/findings/barwise-nqd/incoming.orm.yaml`       | 1     |
 
 Two tests pin the current text: `ConstraintVerbalizer.test.ts` ("Each
 Employee must: Employee works on Employee in Employee.") and the CLI
 golden `clinic-appointments.verbalize.txt`, line 27.
 
 `spanningArm`'s fallback, used when no reading opens with the role,
-prints the role's name as the predicate. The auction models' role names
-are NORMA GUIDs (`_5593C6C5-...`), so that fallback is not fit to reuse:
-it would print "Each Agreement _5593C6C5-... some Party". The new
-"For each" form replaces it for the mandatory sentence only.
+prints the role's name as the predicate, then "some Y" for each other
+role. The auction models' role names are NORMA GUIDs (`_5593C6C5-...`,
+barwise-981), so that fallback is not fit to reuse: it would print "Each
+Agreement _5593C6C5-... some Customer some Organization". The new "For
+each" form replaces it for the mandatory sentence only.
+
+Two cases need no handling, because the `FactType` constructor rules
+them out: a fact type with no reading (it throws "must have at least one
+reading", and `readings` has no remover), and a placeholder with no
+role (`validateReadingTemplate` rejects an index at or beyond the role
+count). The new code relies on both rather than carrying branches no
+model can reach.
 
 ## Scope
 
@@ -71,37 +88,34 @@ it would print "Each Agreement _5593C6C5-... some Party". The new
   "For each " + the role's player + ", " + the first reading, with the
   constrained placeholder written as "that " + its lead + its player and
   every other placeholder as "some " + its lead + its player.
-- When a placeholder names an index the fact type has no role for, the
-  verbalizer shall print the placeholder as written (`{3}`), as
-  `spanningArm` does.
-- When the fact type has no reading, the verbalizer shall write "Each X
-  " + the role's name, the fallback `spanningArm` uses today.
 - The binary path, the disjunctive mandatory sentence and every other
   verbalizer keep their output.
 
 Out of scope: `spanningArm`'s role-name fallback for disjunctive
 mandatory, exclusion and exclusive-or arms. It has the same GUID problem
-on NORMA imports, but changing it changes three sentence kinds and is
-filed separately.
+on NORMA imports, but changing it changes three sentence kinds, and its
+root cause is the importer writing role ids as role names, tracked as
+barwise-981. Fixing that at the importer would also make the role-name
+fallback readable; the "For each" form here is better FORML either way.
 
 ## Inventory
 
-| File                      | Change                                                                                                                                                                                                                                                                                                               |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constraints/sentence.ts` | New `quantifiedReading(parts, roleSeg)`: renders reading parts with a caller-supplied segment list per placeholder, applying the flush-placeholder spacing `spanningArm` does today. New `openingRest(factType, index)`: the parts after a reading's opening placeholder, and that placeholder's lead, or undefined. |
-| `constraints/phase2.ts`   | `spanningArm` uses both; its output is unchanged.                                                                                                                                                                                                                                                                    |
-| `constraints/phase1.ts`   | The non-binary branch of `verbalizeMandatory` writes the two forms above.                                                                                                                                                                                                                                            |
-| Tests                     | `naryMandatory.test.ts` (both forms, lead, unknown index, unary, no reading); the existing pin and the CLI golden updated to the new text.                                                                                                                                                                           |
+| File                      | Change                                                                                                                                                                                                                                                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constraints/sentence.ts` | New `quantifiedReading(parts, roleSeg)`: renders reading parts with a caller-supplied segment list per placeholder, applying the flush-placeholder spacing `spanningArm` does today. New `openingReading(factType, index)`: the parts after a reading's opening placeholder, and that placeholder's lead, or undefined. |
+| `constraints/phase2.ts`   | `spanningArm` uses both; its output is unchanged.                                                                                                                                                                                                                                                                       |
+| `constraints/phase1.ts`   | The non-binary branch of `verbalizeMandatory` writes the two forms above.                                                                                                                                                                                                                                               |
+| Tests                     | `naryMandatory.test.ts` (both forms, a lead on the constrained and on another role, a unary, a flush placeholder); the existing pin and the CLI golden updated to the new text.                                                                                                                                         |
 
 ## Workstreams
 
 ### 1. The two forms
 
-One PR. Acceptance: the 12 tracked lines change and nothing else in a
-whole-corpus verbalize diff does; no output line repeats the constrained
-player where the reading names another role; the disjunctive mandatory
-tests pass unchanged, which is the evidence the extraction kept
-`spanningArm`'s output.
+One PR. Acceptance: a verbalize diff over every tracked `.orm.yaml`
+changes exactly the 17 lines above and nothing else; in each changed
+line every placeholder names its own role's player; the disjunctive
+mandatory, exclusion and exclusive-or tests pass unchanged, which is the
+evidence the extraction kept `spanningArm`'s output.
 
 ## Open decisions
 
@@ -126,13 +140,15 @@ tests pass unchanged, which is the evidence the extraction kept
 
 ## Risks and testing
 
-Measured on a prototype of the change: over every tracked model, the
-verbalize output differs in exactly the 12 lines above and nowhere else.
-Four of the six distinct sentences take the "For each" form, because the
-reading opens with another role ("{0} on behalf of {1} signs {2}" for
-"Customer on behalf of Organization signs Agreement"); two open with the
-constrained role.
+Measured on a prototype of the change: over every tracked `.orm.yaml`,
+the verbalize output differs in exactly the 17 lines above and nowhere
+else. They hold 10 distinct sentences. Three take the "For each" form,
+because the reading opens with another role ("{0} on behalf of {1} signs
+{2}" for "Customer on behalf of Organization signs Agreement"): Agreement,
+ConsignmentAsset, BidSubmission. Seven open with the constrained role:
+WonItem, Payment, LearningModule, Appointment, Transaction, WorkOrder,
+CustomsDeclaration.
 
 The extraction from `spanningArm` is the regression risk: the
 disjunctive mandatory, exclusion and exclusive-or tests, and the
-whole-corpus verbalize diff showing only the 12 lines, are the check.
+whole-corpus verbalize diff showing only the 17 lines, are the check.
