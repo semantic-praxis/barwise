@@ -155,6 +155,72 @@ export function touches(text) {
 }
 
 /**
+ * The commit the new-spec rule is judged against
+ * (docs/specs/touches-required.spec.md): a corpus spec whose file name
+ * appears nowhere under barwise/docs/specs/ in this commit's tree is new,
+ * and must declare a `Touches:` entry naming a tracked path. It is the
+ * merge base of the branch that landed the rule, so it is a commit main
+ * already held before that branch existed: it stays reachable however
+ * the branch merges, and every full clone has it.
+ *
+ * Fixed rather than a per-change base, because a moving base exempts
+ * whatever it has already absorbed: a spec pushed straight to main, or
+ * whose push run `cancel-in-progress` cancelled, was existing for the
+ * next push's before-SHA and so exempt forever. Against a fixed commit,
+ * a spec that lands by any route is checked on every later run.
+ */
+export const TOUCHES_REQUIRED_SINCE = "014a46028ea4561c84af0e40263c6154e69af944";
+
+/** The specs directory, which a new spec's own entries may not lean on. */
+export const SPECS_DIR = "barwise/docs/specs/";
+
+/**
+ * The paths a new spec's entry stands for, for the new-spec rule. An
+ * unmarked entry expands against `current` (the tree it is read in), as
+ * the audit expands it: a pattern or `x/` to what it matches, a plain path
+ * to itself, which the tree rule holds to a tracked file. A `-` entry
+ * names a path that may already be gone, so it expands against `known`,
+ * every path tracked at the cutoff, in the current tree, or at any commit
+ * between: the path itself, or the files under it when it is a directory,
+ * spelled with or without the trailing slash. A `-` pattern and a `+`
+ * entry stand for nothing here.
+ */
+export function newSpecEntryPaths(e, current, known) {
+  if (e.path === "" || e.mark === "+") return [];
+  if (e.mark === "") return entryPaths(e.path, current);
+  // Compared literally, so a `-` pattern names no path and counts for
+  // nothing, with no branch of its own.
+  const p = e.path.replace(/\/+$/, "");
+  return known.filter((f) => f === p || f.startsWith(`${p}/`));
+}
+
+/**
+ * What the new-spec rule makes of a spec's `Touches:` entries
+ * (docs/specs/touches-required.spec.md): "none" (no field), "empty" (a
+ * field with no entries, which check:spec-touches already reports),
+ * "marked-only" (no entry that counts), or "satisfies". An entry counts
+ * when it stands for (`newSpecEntryPaths`) at least one path outside
+ * barwise/docs/specs/. `+` entries never do, or `Touches: +none` would
+ * pass. Paths under barwise/docs/specs/ never do: the spec's own path, or
+ * the directory, is tracked as soon as the spec is, so it would satisfy
+ * the rule by naming the plan instead of what the plan changes -- the file
+ * check:plan-review drops from a plan's implementation for the same
+ * reason. Expanded, not compared as text, so `barwise/docs/`, a pattern
+ * matching only the spec, or `-barwise/docs/specs` without its slash
+ * cannot slip through. Shared by the gate and measure-touches-required,
+ * whose counts are the gate's acceptance test.
+ */
+export function newSpecVerdict(entries, current, known) {
+  if (entries === undefined) return "none";
+  if (entries.length === 0) return "empty";
+  const real = entries.some((e) =>
+    // With a slash appended, so the directory's own bare name is inside it.
+    newSpecEntryPaths(e, current, known).some((p) => !`${p}/`.startsWith(SPECS_DIR))
+  );
+  return real ? "satisfies" : "marked-only";
+}
+
+/**
  * The specs a branch names: each in `corpus` that the branch changes, or
  * whose file name a commit message on it mentions. One rule for the scope
  * report (plan-scope) and the plan-review gate, which the spec says use

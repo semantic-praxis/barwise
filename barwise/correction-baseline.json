@@ -811,6 +811,12 @@
       "caught_by": "execution",
       "note": "The WS1 readback read requested_reviewers, which never lists Copilot: empty in the POST response and while Copilot's review ran, measured on #534. The first live run (#534) turned a request that had landed into a red job, and the printed empty list plus the PR's event history (review_requested by github-actions[bot]) showed the request was fine and the readback's source was wrong. The same field fed the 'already requested' check, which could therefore never fire. Caught by running the workflow for real, which the section had named as the only way to settle it; the loud-failure design is what made it visible."
     },
+    "touches-required::2f593fab3497": {
+      "spec": "touches-required.spec.md",
+      "excerpt": "a fixed commit, not each change's base, because a moving base exempts whatever it has already absorbed. judged against a push's before-sha, a spec pushed straig",
+      "caught_by": "reasoning",
+      "note": "The reviewed plan judged new specs against each change's base, and the build followed it (f5ebc3c2). /code-review on that build reasoned through what a moving base absorbs -- cancel-in-progress cancelling a direct push's run, and the next push's before-SHA exempting the spec for good -- with no test or run showing it; the fixed cutoff replaced the base. The replay over 488 commits then confirmed the new design reproduced the 125 flagged commits, but it did not find the flaw."
+    },
     "tracker-quick-wins::ae1c4c3cc7ab": {
       "spec": "tracker-quick-wins.spec.md",
       "excerpt": "- ws2, splitmodel: the fallback was dead, not stale. the draft said to redirect doc.ormversion ?? \"1.0\" to currentormversion. writing the test showed the path c",

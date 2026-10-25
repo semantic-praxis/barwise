@@ -202,6 +202,20 @@ test("check:spec-touches passes resolving, planned-new and planned-deleted entri
     const r = f.run();
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stdout, /1 spec\(s\) declare Touches:, every entry resolves/);
+    // The new-spec rule reads history, which a fixture has none of; the OK
+    // line must not claim it ran (touches-required.spec.md).
+    assert.match(r.stdout, /the new-spec rule was not applied \(fixture overrides\)/);
+  } finally {
+    f.done();
+  }
+});
+
+test("check:spec-touches says a --cutoff given with the fixture overrides was ignored", () => {
+  const f = gateFixture({ "a.spec.md": spec("barwise/x.ts") }, ["barwise/x.ts"]);
+  try {
+    const r = f.run("--cutoff", "HEAD");
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /not applied \(fixture overrides; --cutoff ignored\)/);
   } finally {
     f.done();
   }

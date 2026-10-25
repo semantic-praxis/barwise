@@ -205,14 +205,16 @@ run bash "${CLAUDE_PROJECT_DIR}/barwise/scripts/install-gitleaks.sh" \
 # commits present -- so without this, one of the 32 gates cannot answer and
 # `npm run ci:local` (the pre-push hook) can never be fully green. Deepening
 # once costs a few seconds against a 7 MB pack. `--unshallow` errors on an
-# already-complete clone, hence the guard.
+# already-complete clone, hence the guard. `check:spec-touches` needs its
+# cutoff commit (touches-required.spec.md), which a shallow clone may not
+# hold, so it refuses too when deepening fails.
 # Assigned first rather than substituted inside the `if`: a command
 # substitution in the condition masks its own exit status (SC2312), and with
 # `set -e` a git that fails would otherwise read as "not shallow".
 shallow="$(git -C "${CLAUDE_PROJECT_DIR}" rev-parse --is-shallow-repository || echo unknown)"
 if [[ "${shallow}" == "true" ]]; then
   git -C "${CLAUDE_PROJECT_DIR}" fetch --unshallow --quiet \
-    || echo "session-start: could not unshallow; check:secrets will refuse (exit 2)." >&2
+    || echo "session-start: could not unshallow; check:secrets will refuse (exit 2), and so will check:spec-touches if its cutoff commit is missing." >&2
 fi
 
 # uv drives optimizer/ (the offline DSPy lane); ~/.local/bin survives in
