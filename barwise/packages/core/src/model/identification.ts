@@ -4,6 +4,7 @@ import {
   type InternalUniquenessConstraint,
   isExternalUniqueness,
   isInternalUniqueness,
+  isMandatoryRole,
 } from "./Constraint.js";
 import type { FactType } from "./FactType.js";
 import type { ObjectType, ValueType } from "./ObjectType.js";
@@ -289,6 +290,40 @@ export function isUniqueAlone(factType: FactType, roleId: string): boolean {
     isInternalUniqueness(u) && u.roleIds.length === 1 && u.roleIds[0] === roleId
     && (u.modality ?? "alethic") === "alethic"
   );
+}
+
+/**
+ * Whether a role carries its own alethic mandatory constraint: the other
+ * half of what a reference scheme needs of the roles its entity plays, so
+ * that every instance has its identifier (identifier-roles-mandatory.spec.md).
+ * Alethic for the reason `isUniqueAlone` gives: a deontic mandatory says
+ * each instance ought to have one, which does not make the scheme total.
+ */
+export function isMandatoryAlone(factType: FactType, roleId: string): boolean {
+  return factType.internalConstraints.some((c) =>
+    isMandatoryRole(c) && c.roleId === roleId && (c.modality ?? "alethic") === "alethic"
+  );
+}
+
+/**
+ * The roles an entity plays in its own identifier, with their fact types:
+ * the entity's role in each binary of an external scheme, or, for an
+ * internal one, the role the uniqueness leaves uncovered (the entity-value
+ * binary and every other fact type alike). None when the identifier is the
+ * fact type the entity objectifies: the entity plays no role in it (one
+ * that did would be the cycle `structural/identification-cycle` reports),
+ * so no arm of `identifiedBy` needs restating here.
+ */
+export function identifyingRoles(
+  at: IdentifyingUniqueness,
+): readonly { readonly factType: FactType; readonly role: Role; }[] {
+  if (at.kind === "external") {
+    return at.components.map((c) => ({ factType: c.factType, role: c.nearRole }));
+  }
+  const covered = new Set(at.constraint.roleIds);
+  return at.factType.roles
+    .filter((r) => r.playerId === at.entityId && !covered.has(r.id))
+    .map((role) => ({ factType: at.factType, role }));
 }
 
 /**

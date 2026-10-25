@@ -2,8 +2,12 @@ import {
   IDENTIFICATION_SOURCE_LABEL,
   type IdentificationSource,
   identificationSources,
+  identifyingFactTypes,
+  identifyingRoles,
   isIdentified,
+  isMandatoryAlone,
   type PreferredIdentifierResolution,
+  type PreferredIdentifiers,
   preferredIdentifiers,
   resolvePreferredIdentifier,
 } from "../../model/identification.js";
@@ -24,6 +28,7 @@ import { report, RULE_ID } from "../ruleId.js";
  * - Value types without a declared data type.
  * - Entity types with zero or multiple preferred identifiers.
  * - Object types that declare their identity in more than one way.
+ * - Entity types whose identifier rests on a role that is not mandatory.
  */
 export function completenessWarnings(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -33,8 +38,12 @@ export function completenessWarnings(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkFactTypesWithoutUniqueness(model));
   diagnostics.push(...checkIsolatedObjectTypes(model));
   diagnostics.push(...checkMissingValueTypeDataType(model));
-  diagnostics.push(...checkPreferredIdentifiers(model));
-  diagnostics.push(...checkConflictingIdentification(model));
+  // Resolved once: each identification check reads the same answer, and
+  // resolving it walks every stored reference.
+  const identifiers = preferredIdentifiers(model);
+  diagnostics.push(...checkPreferredIdentifiers(model, identifiers));
+  diagnostics.push(...checkConflictingIdentification(model, identifiers));
+  diagnostics.push(...checkOptionalIdentifierRoles(model, identifiers));
   diagnostics.push(...checkFrequencyWithoutEffect(model));
 
   return diagnostics;
@@ -159,9 +168,11 @@ function checkFactTypesWithoutUniqueness(model: OrmModel): Diagnostic[] {
  * kinds here would charge good modelling, which is the measurement
  * recorded on `identificationSources` itself.
  */
-function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
+function checkPreferredIdentifiers(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const identifiers = preferredIdentifiers(model);
 
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity") continue;
@@ -203,6 +214,51 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
   }
 
   return diagnostics;
+}
+
+/**
+ * An identifier some instances may lack does not identify them: ORM requires
+ * a reference scheme's roles to be mandatory, and nothing checked it
+ * (identifier-roles-mandatory.spec.md). For the entity-value binary and an
+ * external scheme the mapper makes those columns the primary key, so the
+ * schema states the rule the model omits; for the other shapes the scheme
+ * is incomplete all the same, so the rule does not ask what the mapper does.
+ *
+ * Reads `preferredIdentifiers`, so an unresolved reference -- which
+ * `preferred-identifier-invalid` reports -- is not checked here as well.
+ */
+function checkOptionalIdentifierRoles(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers,
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const [entityId, at] of identifiers.byEntity) {
+    const optional = identifyingRoles(at).filter(
+      ({ factType, role }) => !isMandatoryAlone(factType, role.id),
+    );
+    if (optional.length === 0) continue;
+    const ot = model.getObjectType(entityId)!;
+    diagnostics.push(
+      report(
+        RULE_ID.preferredIdentifierOptional,
+        "default",
+        ot.id,
+        ot.name,
+        quotedList(identifyingFactTypes(at).map((ft) => ft.name)),
+        quotedList(optional.map(({ factType }) => factType.name)),
+        optional.length > 1 ? "plural" : "singular",
+      ),
+    );
+  }
+  return diagnostics;
+}
+
+/** `"A"`, `"A" and "B"`, `"A", "B" and "C"`. */
+function quotedList(names: readonly string[]): string {
+  const quoted = names.map((n) => `"${n}"`);
+  return quoted.length < 2
+    ? quoted.join("")
+    : `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)}`;
 }
 
 /** The diagnostic for an external uniqueness that fails a shape rule, if that is the reason. */
@@ -260,9 +316,11 @@ function externalShapeDiagnostic(
  * charging them would have moved six of eight arms' scores for good
  * modelling.
  */
-function checkConflictingIdentification(model: OrmModel): Diagnostic[] {
+function checkConflictingIdentification(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const identifiers = preferredIdentifiers(model);
 
   for (const ot of model.objectTypes) {
     const kinds = new Set<IdentificationSource["kind"]>(
