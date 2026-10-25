@@ -15,7 +15,7 @@ Touches: barwise/scripts/check-spec-touches.mjs, barwise/scripts/check-plan-revi
 barwise/scripts/measure-touches-required.mjs,
 barwise/scripts/tests/spec-reader.test.mjs, barwise/scripts/tests/gates.test.mjs,
 barwise/scripts/tests/expected-counts.json, .github/workflows/ci.yml,
-.claude/hooks/session-start.sh,
+.claude/hooks/session-start.sh, barwise/correction-baseline.json,
 .claude/skills/spec-writer/SKILL.md, .claude/skills/spec-writer/template.spec.md,
 .claude/skills/pr-creation/SKILL.md, barwise/docs/specs/plan-scope-check.spec.md
 
