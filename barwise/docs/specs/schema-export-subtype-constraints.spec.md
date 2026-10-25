@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-lwy
+Plan-reviewed: 40b7fc01 (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/constraintRouting.ts,
 barwise/packages/core/src/annotation/constraintSpec.ts,
 +barwise/packages/core/src/model/subtypeOperands.ts,
