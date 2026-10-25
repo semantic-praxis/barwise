@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-b30
+Plan-reviewed: 58ce7c1e (code-review, pr-review)
 Touches: barwise/packages/vscode/src/commands/ExportAvroCommand.ts,
 barwise/packages/vscode/src/commands/ExportDbtCommand.ts,
 barwise/packages/vscode/src/commands/ExportDdlCommand.ts,
