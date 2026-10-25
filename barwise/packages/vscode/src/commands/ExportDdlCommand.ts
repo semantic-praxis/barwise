@@ -3,20 +3,16 @@
  *
  * Takes the active .orm.yaml, renders it through the registered `ddl`
  * exporter (the same call the diagram's DDL tab makes, via
- * `exportDdl`), writes the result to a .sql file, and reports any
+ * `exportWith`), writes the result to a .sql file, and reports any
  * constraint the DDL could not express.
  */
 import { OrmYamlSerializer } from "@barwise/core";
-import { formatConstraintReport } from "@barwise/formats";
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { exportDdl } from "../export/ddlExport.js";
+import { exportWith } from "../export/registeredExport.js";
+import { reportExport } from "./exportReport.js";
 
 const serializer = new OrmYamlSerializer();
-
-// One channel for the session, created on first use: a channel per export
-// would leave a new entry in the Output dropdown every run.
-let reportChannel: vscode.OutputChannel | undefined;
 
 export class ExportDdlCommand {
   async execute(): Promise<void> {
@@ -41,7 +37,7 @@ export class ExportDdlCommand {
     }
 
     // Step 2: Render through the registered exporter.
-    const exported = exportDdl(model);
+    const exported = exportWith("ddl", model);
     if (!exported.ok) {
       vscode.window.showErrorMessage(exported.reason);
       return;
@@ -75,26 +71,7 @@ export class ExportDdlCommand {
     const doc = await vscode.workspace.openTextDocument(outputUri);
     await vscode.window.showTextDocument(doc);
 
-    // Step 5: Report what the DDL could not express, or confirm the write.
-    const fileName = path.basename(outputUri.fsPath);
-    const report = formatConstraintReport(result.constraintSpecs, "ddl");
-    if (!report) {
-      vscode.window.showInformationMessage(`Exported DDL to ${fileName}`);
-      return;
-    }
-    const channel = reportChannel ??= vscode.window.createOutputChannel("Barwise DDL Export");
-    // This export's report only, so a stale one never reads as current.
-    channel.clear();
-    channel.appendLine(`=== Export: ${fileName} ===`);
-    channel.appendLine(report);
-    // The warning carries the report's own heading, so the two cannot state
-    // different counts. Not awaited: the command (and barwise.export) settles
-    // once the file is written, not when the notification is dismissed.
-    const heading = report.split("\n", 1)[0]!.replace(/:$/, "");
-    void vscode.window
-      .showWarningMessage(`Exported DDL to ${fileName}. ${heading}.`, "Show report")
-      .then((choice) => {
-        if (choice === "Show report") channel.show(true);
-      });
+    // Step 5: Confirm the write, or report what the DDL could not express.
+    reportExport(result, "ddl", `Exported DDL to ${path.basename(outputUri.fsPath)}`);
   }
 }

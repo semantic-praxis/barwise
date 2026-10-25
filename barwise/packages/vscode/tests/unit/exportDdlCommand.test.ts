@@ -136,7 +136,8 @@ describe("Barwise: Export, As DDL", () => {
     expect(report).toContain("No Person is parent of that same Person.");
     // The warning carries the report's heading, so the two state one count.
     expect(state.warnings).toEqual([
-      "Exported DDL to ring.sql. 1 constraint(s) the ddl format could not express.",
+      // The review notes the DDL file carries are counted, as every format's are.
+      "Exported DDL to ring.sql (7 TODO(s), 1 NOTE(s) annotated). 1 constraint(s) the ddl format could not express.",
     ]);
     expect(report).toContain("1 constraint(s) the ddl format could not express:");
     expect(state.infos).toEqual([]);
@@ -153,11 +154,11 @@ describe("Barwise: Export, As DDL", () => {
     await run(uniqueEmail, "/work/shop.orm.yaml");
     expect(state.written).toContain("UNIQUE (email)");
     expect(state.warnings).toEqual([]);
-    expect(state.infos).toEqual(["Exported DDL to shop.sql"]);
+    expect(state.infos).toEqual(["Exported DDL to shop.sql (5 TODO(s), 0 NOTE(s) annotated)"]);
   });
 
   it("writes what the diagram's DDL tab shows for the same model", async () => {
-    // Both come from exportDdl; pinned against a future second copy.
+    // Both come from exportWith("ddl"); pinned against a future second copy.
     await run(ring, "/work/ring.orm.yaml");
     const model = new OrmYamlSerializer().deserialize(ring);
     expect(state.written).toBe(buildTabPanels(model).ddl);
@@ -166,8 +167,8 @@ describe("Barwise: Export, As DDL", () => {
   it("keeps only the latest export's report in the channel", async () => {
     await run(ring, "/work/ring.orm.yaml");
     await run(ring, "/work/again.orm.yaml");
-    expect(state.channel.filter((line) => line.startsWith("=== Export"))).toEqual([
-      "=== Export: again.sql ===",
+    expect(state.channel.filter((line) => line.startsWith("=== Exported"))).toEqual([
+      "=== Exported DDL to again.sql (7 TODO(s), 1 NOTE(s) annotated) ===",
     ]);
   });
 
@@ -181,8 +182,9 @@ describe("Barwise: Export, As DDL", () => {
 describe("Barwise: Export, As DDL, when the exporter refuses", () => {
   it("shows the refusal and writes no file", async () => {
     vi.resetModules();
-    vi.doMock("../../src/export/ddlExport.js", () => ({
-      exportDdl: () => ({ ok: false, reason: "DDL export failed: boom" }),
+    vi.doMock("../../src/export/registeredExport.js", async (actual) => ({
+      ...(await actual<object>()),
+      exportWith: () => ({ ok: false, reason: "DDL export failed: boom" }),
     }));
     const { ExportDdlCommand: Refusing } = await import("../../src/commands/ExportDdlCommand.js");
     state.written = undefined;
@@ -190,6 +192,6 @@ describe("Barwise: Export, As DDL, when the exporter refuses", () => {
     await run(ring, "/work/ring.orm.yaml", new Refusing());
     expect(state.errors).toEqual(["DDL export failed: boom"]);
     expect(state.written).toBeUndefined();
-    vi.doUnmock("../../src/export/ddlExport.js");
+    vi.doUnmock("../../src/export/registeredExport.js");
   });
 });

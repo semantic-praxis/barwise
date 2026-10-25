@@ -29,7 +29,7 @@ const EXPORT_OPTIONS: ExportOption[] = [
   {
     id: "avro",
     label: "As Avro Schemas",
-    description: "Generate .avsc schema files for each table",
+    description: "Generate .avsc schema files for each table, with review notes in their docs",
   },
 ];
 

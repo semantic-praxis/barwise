@@ -1,17 +1,24 @@
 /**
  * Export As dbt Project command.
  *
- * Takes the active .orm.yaml, maps it to a relational schema, renders
- * dbt artifacts (schema.yml + model SQL files), writes them into a
- * target dbt project directory, and runs the export annotator.
+ * Takes the active .orm.yaml, renders it through the registered `dbt`
+ * exporter (what `barwise export --format dbt` writes, under
+ * models/staging and without seeds), and writes its files into a target
+ * dbt project.
  */
 import { OrmYamlSerializer } from "@barwise/core";
-import { annotateDbtExport, RelationalMapper, renderDbt } from "@barwise/core/mapping";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { exportWith } from "../export/registeredExport.js";
+import { reportExport, writeExportFiles } from "./exportReport.js";
 
 const serializer = new OrmYamlSerializer();
-const mapper = new RelationalMapper();
+
+// The palette writes into a project the user already has. models/staging
+// keeps clear of a top-level models/schema.yml, the file such a project
+// most likely has; no seeds, because `dbt seed` would load the model's
+// example population into the user's warehouse.
+const PALETTE_DBT_OPTIONS = { modelsDir: "models/staging", includeExamples: false };
 
 export class ExportDbtCommand {
   async execute(): Promise<void> {
@@ -60,50 +67,32 @@ export class ExportDbtCommand {
       return;
     }
 
-    // Step 3: Map and render.
-    const schema = mapper.map(model);
-    const dbt = renderDbt(schema);
-    const { schemaYaml, annotations } = annotateDbtExport(
-      dbt.schemaYaml,
-      model,
-      schema,
-    );
+    // Step 3: Render through the registered exporter.
+    const exported = exportWith("dbt", model, PALETTE_DBT_OPTIONS);
+    if (!exported.ok) {
+      vscode.window.showErrorMessage(exported.reason);
+      return;
+    }
+    const { result } = exported;
+    const files = result.files ?? [];
 
-    // Step 4: Write schema.yml into models/ directory.
-    const modelsDir = vscode.Uri.joinPath(dbtRoot, "models", "staging");
-    await vscode.workspace.fs.createDirectory(modelsDir);
+    // Step 4: Write every file at the exporter's path.
+    await writeExportFiles(dbtRoot, files);
 
-    const schemaUri = vscode.Uri.joinPath(modelsDir, "schema.yml");
-    await vscode.workspace.fs.writeFile(
-      schemaUri,
-      Buffer.from(schemaYaml, "utf-8"),
-    );
-
-    // Step 5: Write model SQL files.
-    for (const modelFile of dbt.models) {
-      const sqlUri = vscode.Uri.joinPath(
-        modelsDir,
-        `${modelFile.name}.sql`,
+    // Step 5: Open the schema.yml.
+    const schemaFile = files.find((f) => path.posix.basename(f.name) === "schema.yml");
+    if (schemaFile) {
+      const doc = await vscode.workspace.openTextDocument(
+        vscode.Uri.joinPath(dbtRoot, schemaFile.name),
       );
-      await vscode.workspace.fs.writeFile(
-        sqlUri,
-        Buffer.from(modelFile.sql, "utf-8"),
-      );
+      await vscode.window.showTextDocument(doc);
     }
 
-    // Step 6: Open the schema.yml.
-    const doc = await vscode.workspace.openTextDocument(schemaUri);
-    await vscode.window.showTextDocument(doc);
-
-    // Step 7: Report.
-    const todos = annotations.filter((a) => a.severity === "todo").length;
-    const notes = annotations.filter((a) => a.severity === "note").length;
-    let msg = `Exported ${dbt.models.length} model(s) to ${
-      path.relative(dbtRoot.fsPath, modelsDir.fsPath)
-    }/`;
-    if (todos > 0 || notes > 0) {
-      msg += ` (${todos} TODO(s), ${notes} NOTE(s) annotated)`;
-    }
-    vscode.window.showInformationMessage(msg);
+    // Step 6: Report, naming the project the files went into.
+    reportExport(
+      result,
+      "dbt",
+      `Exported ${files.length} file(s) to ${path.basename(dbtRoot.fsPath)}/`,
+    );
   }
 }

@@ -9,7 +9,7 @@
  */
 import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { isStatement, Verbalizer } from "@barwise/core/verbalization";
-import { exportDdl } from "../export/ddlExport.js";
+import { exportWith } from "../export/registeredExport.js";
 
 /** One fact type's sample population, ready to render as a table. */
 export interface PopulationTable {
@@ -58,7 +58,7 @@ function buildYaml(model: OrmModel): string {
 }
 
 function buildDdl(model: OrmModel): string {
-  const exported = exportDdl(model);
+  const exported = exportWith("ddl", model);
   // Every line commented, so a multi-line reason stays valid SQL.
   return exported.ok
     ? exported.result.text
