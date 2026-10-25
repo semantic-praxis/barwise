@@ -28,36 +28,55 @@ rejected alternatives are in the two specs above.
 3. **A plan names what it will touch.** A spec's `Touches:` header
    lists the paths it changes: unmarked for files that must be tracked,
    `+` for files it creates, `-` for files it deletes. A new spec must
-   carry at least one entry that resolves to a path outside
-   `barwise/docs/specs/`.
+   carry at least one unmarked or `-` entry that resolves to a path
+   outside `barwise/docs/specs/`; `+` entries alone do not count.
 4. **Open decisions are the reviewer's to settle.** A spec states each
    one with its options, the trade-off and a recommended default, and
    does not decide it silently (`template.spec.md`, Open decisions).
 
 ## Consequences
 
-- `npm run check:plan-review` (a CI gate on pull requests) fails a PR
-  that changes a `Touches:` path of a spec it names, while the spec is
+- `npm run check:plan-review` (a CI gate on pull requests to main) fails a
+  PR that changes a `Touches:` path of a spec it names, while the spec is
   new or claims nothing is built, unless the `Plan-reviewed:` commit
   precedes every implementing commit and its body matches the plan as
   implementation began.
 - `npm run check:spec-touches` (a CI gate on every event) fails a new
-  spec whose `Touches:` names nothing outside `barwise/docs/specs/`. A
-  spec is new when its file name was absent at the fixed cutoff commit,
-  so a spec that lands by any route is checked.
+  spec unless its `Touches:` has an unmarked or `-` entry that resolves
+  to a path outside `barwise/docs/specs/`; `+` entries alone never
+  count. A spec is new when its file name was absent at the fixed
+  cutoff commit, so a spec that lands by any route is checked.
 - `npm run plan-scope` reports a branch's files outside its named plan
-  and its size among recent PRs. It never fails: size and "outside the
-  plan" are shadows of review cost, and a gate on them would be gamed.
-- Known gaps, each deliberate:
+  and its size among recent PRs. It never fails, and it runs only when
+  an author or reviewer runs it (`pr-creation`, `pr-review`): size and
+  "outside the plan" are shadows of review cost, and a gate on them
+  would be gamed.
+- Decisions 1 and 4 have no gate. They are held by review: the
+  `spec-writer` design gate and `pr-review`.
+- Gaps in what enforces decision 2, each open:
+  - a spec whose Status claims some work is built is not checked, so
+    its second workstream onward is unreviewed by the gate, and the
+    gate fires only where the diff overlaps the declared `Touches:`
+    (barwise-x3l);
+  - the `Plan-reviewed:` line is read at HEAD, so it can be added after
+    the implementation; the review names in it are not checked; and
+    plan edits made after implementation begins are never compared
+    (barwise-wzl);
+  - the gate runs only on pull requests to main, and holds only while
+    PRs merge with a merge commit: a squash or a rebase after review
+    loses the named commit (barwise-z4h).
+- Gaps that are deliberate:
   - specs that existed at the cutoff without `Touches:` are outside
     `check:plan-review` (owner, 2026-10-24: existing specs exempt);
-  - a code change that names no spec is reported by `plan-scope`, not
-    refused (`plan-scope-check.spec.md`, "Should the check fail a
-    build?");
-  - the check proves the reviews were recorded against the plan, not
-    that they were done well;
-  - a squash merge keeps the `Plan-reviewed:` commit on the PR branch,
-    out of main's history, so the line cannot be rechecked after merge.
+  - a code change that names no spec is not refused
+    (`plan-scope-check.spec.md`, "Should the check fail a build?");
+  - the gate ties the review claim to a named commit and body; it cannot
+    show that the reviews were done well.
 - `npm run audit:specs -- --check` can answer differently on a branch
   head than on its merge ref when the branch has merged main
   (barwise-dm0).
+- Specs in progress are edited as their workstreams land, and the gate
+  does not see those edits once Status claims work built (barwise-x3l):
+  `architecture-index.spec.md` was edited this way by the first two
+  ADR PRs, and its `Plan-reviewed:` line was re-pointed to the head
+  their reviews read.
