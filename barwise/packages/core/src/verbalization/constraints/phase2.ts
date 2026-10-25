@@ -23,6 +23,7 @@ import {
   openingReading,
   quantifiedReading,
   resolveCommonPlayer,
+  rolePlayer,
   UNKNOWN_PREDICATE,
 } from "./sentence.js";
 
@@ -627,26 +628,15 @@ function spanningArm(model: OrmModel, roleId: string): VerbalizationSegment[] {
   const role = home?.getRoleById(roleId);
   if (!home || !role) return [textSeg(roleId + " some "), refSeg(roleId, roleId)];
 
-  const playerRef = (index: number): VerbalizationSegment => {
-    const other = home.roles[index];
-    if (!other) return textSeg(`{${index}}`);
-    const name = model.getObjectType(other.playerId)?.name ?? other.name;
-    return refSeg(name, other.playerId);
-  };
-
   // The opening placeholder's lead is omitted because the caller prints
   // the shared subject once (reading-hyphen-binding.spec.md).
-  const opening = openingReading(home, home.roles.indexOf(role));
-  if (opening) {
-    return quantifiedReading(
-      opening.rest,
-      (part) => [textSeg("some "), ...leadSegs(part.lead), playerRef(part.index)],
-    );
-  }
+  const own = home.roles.indexOf(role);
+  const opening = openingReading(home, own);
+  if (opening) return quantifiedReading(model, home, opening.rest, own);
 
   const segments: VerbalizationSegment[] = [textSeg(role.name)];
   home.roles.forEach((other, index) => {
-    if (other !== role) segments.push(textSeg(" some "), playerRef(index));
+    if (other !== role) segments.push(textSeg(" some "), rolePlayer(model, home, index));
   });
   return segments;
 }

@@ -22,6 +22,7 @@ import {
   localRole,
   openingReading,
   quantifiedReading,
+  rolePlayer,
 } from "./sentence.js";
 
 export function verbalizeInternalUniqueness(
@@ -200,42 +201,27 @@ export function verbalizeMandatory(
  */
 function verbalizeNaryMandatory(role: Role, factType: FactType, model: OrmModel): Verbalization {
   const own = factType.roles.indexOf(role);
-  // `validateReadingTemplate` refuses a placeholder with no role, and the
-  // constructor a fact type with no reading, so neither is handled here.
-  const player = (index: number): VerbalizationSegment => {
-    const r = factType.roles[index]!;
-    return refSeg(model.getObjectType(r.playerId)?.name ?? r.name, r.playerId);
-  };
-  const some = (part: { readonly index: number; readonly lead: string; }) => [
-    kwSeg("some "),
-    ...leadSegs(part.lead),
-    player(part.index),
-  ];
+  const subject = rolePlayer(model, factType, own);
 
   const opening = openingReading(factType, own);
   if (opening) {
-    const rest = quantifiedReading(opening.rest, some);
+    const rest = quantifiedReading(model, factType, opening.rest, own);
     return buildVerbalization(factType.id, "constraint", [
       kwSeg("Each "),
       ...leadSegs(opening.lead),
-      player(own),
+      subject,
       ...(rest.length > 0 ? [textSeg(" "), ...rest] : []),
       textSeg("."),
     ]);
   }
 
+  // The constructor refuses a fact type with no reading.
   const parts = splitReading(factType.readings[0]!.template).parts;
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("For each "),
-    player(own),
+    subject,
     textSeg(", "),
-    ...quantifiedReading(
-      parts,
-      (part) =>
-        part.index === own
-          ? [kwSeg("that "), ...leadSegs(part.lead), player(own)]
-          : some(part),
-    ),
+    ...quantifiedReading(model, factType, parts, own),
     textSeg("."),
   ]);
 }

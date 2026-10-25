@@ -7,7 +7,7 @@ import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import { leadOf, type ReadingPart, splitReading, textOf } from "../../model/ReadingOrder.js";
 import type { Role } from "../../model/Role.js";
-import { textSeg, type VerbalizationSegment } from "../Verbalization.js";
+import { kwSeg, refSeg, textSeg, type VerbalizationSegment } from "../Verbalization.js";
 
 /**
  * The role a local-role constraint names, which `ConstraintVerbalizer`
@@ -140,26 +140,52 @@ export function openingReading(
   return undefined;
 }
 
+/** Role `index`'s player as a reference: its object type's name, else the role's. */
+export function rolePlayer(
+  model: OrmModel,
+  factType: FactType,
+  index: number,
+): VerbalizationSegment {
+  // `validateReadingTemplate` refuses a placeholder with no role, so every
+  // index a reading names has one.
+  const role = factType.roles[index]!;
+  return refSeg(model.getObjectType(role.playerId)?.name ?? role.name, role.playerId);
+}
+
 /**
- * Reading parts as segments, each placeholder replaced by what `roleSegs`
- * writes for it ("some Project", "that Agreement"). `validateReadingTemplate`
- * accepts a placeholder written flush against a word ("works on{1}in"), so
- * the space the reading left out is supplied here rather than rendering
- * "works onsome Projectin".
+ * Reading parts as segments, with role `own`'s placeholder written "that
+ * X" -- the sentence has already named X -- and every other placeholder
+ * "some Y", each after its hyphen-bound lead: "works on some Project in
+ * some Department", "some Customer ... signs that Agreement".
+ *
+ * `validateReadingTemplate` accepts a placeholder written flush against a
+ * word ("works on{1}in") or another placeholder, so the space the reading
+ * left out is supplied here rather than rendering "works onsome Projectin".
+ * Whitespace at either end of the reading is dropped, since the caller
+ * writes what goes before and after it.
  */
 export function quantifiedReading(
+  model: OrmModel,
+  factType: FactType,
   parts: readonly ReadingPart[],
-  roleSegs: (part: Extract<ReadingPart, { kind: "role"; }>) => VerbalizationSegment[],
+  own: number,
 ): VerbalizationSegment[] {
   const segments: VerbalizationSegment[] = [];
+  const last = parts.length - 1;
   parts.forEach((part, i) => {
     if (part.kind === "role") {
-      segments.push(...roleSegs(part));
+      if (parts[i - 1]?.kind === "role") segments.push(textSeg(" "));
+      segments.push(
+        kwSeg(part.index === own ? "that " : "some "),
+        ...leadSegs(part.lead),
+        rolePlayer(model, factType, part.index),
+      );
       return;
     }
     let text = i === 0 ? part.text.trimStart() : part.text;
-    if (i > 0 && /^\w/.test(text)) text = " " + text;
-    if (i < parts.length - 1 && text && !/\s$/.test(text)) text += " ";
+    if (i === last) text = text.trimEnd();
+    if (i > 0 && /^[\p{L}\p{N}]/u.test(text)) text = " " + text;
+    if (i < last && text && !/\s$/.test(text)) text += " ";
     if (text) segments.push(textSeg(text));
   });
   return segments;

@@ -10,6 +10,10 @@ import { ConstraintVerbalizer } from "../../src/verbalization/ConstraintVerbaliz
 
 /** Customer on behalf of Organization signs Agreement, with the given readings. */
 function signs(readings: string[], mandatoryRole: "rc" | "ro" | "ra") {
+  return signsVerbalized(readings, mandatoryRole).map((v) => v.text);
+}
+
+function signsVerbalized(readings: string[], mandatoryRole: "rc" | "ro" | "ra") {
   const model = new OrmModel({ name: "Test" });
   model.addObjectType({ id: "c", name: "Customer", kind: "entity", referenceMode: "id" });
   model.addObjectType({ id: "o", name: "Organization", kind: "entity", referenceMode: "id" });
@@ -25,7 +29,7 @@ function signs(readings: string[], mandatoryRole: "rc" | "ro" | "ra") {
     readings,
     constraints: [{ type: "mandatory", roleId: mandatoryRole }],
   });
-  return new ConstraintVerbalizer().verbalizeAll(ft.id, model).map((v) => v.text);
+  return new ConstraintVerbalizer().verbalizeAll(ft.id, model);
 }
 
 describe("mandatory on a non-binary fact type", () => {
@@ -58,9 +62,48 @@ describe("mandatory on a non-binary fact type", () => {
     ]);
   });
 
-  it("supplies the space a flush placeholder leaves out", () => {
+  it("supplies the space a flush placeholder leaves out, before a word in any script", () => {
     expect(signs(["{0} on behalf of{1}signs {2}"], "rc")).toEqual([
       "Each Customer on behalf of some Organization signs some Agreement.",
+    ]);
+    expect(signs(["{0} handelt für{1}über {2}"], "rc")).toEqual([
+      "Each Customer handelt für some Organization über some Agreement.",
+    ]);
+    expect(signs(["{0} signs {2}{1}"], "rc")).toEqual([
+      "Each Customer signs some Agreement some Organization.",
+    ]);
+  });
+
+  it("drops whitespace at the end of the reading before the period", () => {
+    expect(signs(["{0} on behalf of {1} signs {2} "], "ra")).toEqual([
+      "For each Agreement, some Customer on behalf of some Organization signs that Agreement.",
+    ]);
+    expect(signs(["{0} on behalf of {1} signs {2} for good "], "rc")).toEqual([
+      "Each Customer on behalf of some Organization signs some Agreement for good.",
+    ]);
+  });
+
+  it("refers back to the subject with 'that' where its placeholder recurs", () => {
+    expect(signs(["{0} on behalf of {1} signs {2} for {0}"], "rc")).toEqual([
+      "Each Customer on behalf of some Organization signs some Agreement for that Customer.",
+    ]);
+  });
+
+  it("marks the quantifiers as keywords and points each reference at its own player", () => {
+    const [v] = signsVerbalized(["{0} on behalf of {1} signs {2}"], "ra");
+    expect(v?.segments.map((seg) => [seg.kind, seg.text, seg.elementId])).toEqual([
+      ["keyword", "For each ", undefined],
+      ["object_type_ref", "Agreement", "a"],
+      ["text", ", ", undefined],
+      ["keyword", "some ", undefined],
+      ["object_type_ref", "Customer", "c"],
+      ["text", " on behalf of ", undefined],
+      ["keyword", "some ", undefined],
+      ["object_type_ref", "Organization", "o"],
+      ["text", " signs ", undefined],
+      ["keyword", "that ", undefined],
+      ["object_type_ref", "Agreement", "a"],
+      ["text", ".", undefined],
     ]);
   });
 

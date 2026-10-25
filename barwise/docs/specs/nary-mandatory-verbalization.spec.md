@@ -11,7 +11,8 @@ barwise/packages/core/src/verbalization/constraints/phase1.ts,
 barwise/packages/core/src/verbalization/constraints/phase2.ts,
 barwise/packages/core/tests/verbalization/ConstraintVerbalizer.test.ts,
 +barwise/packages/core/tests/verbalization/naryMandatory.test.ts,
-barwise/packages/cli/tests/characterization/golden/clinic-appointments.verbalize.txt
+barwise/packages/cli/tests/characterization/golden/clinic-appointments.verbalize.txt,
+barwise/correction-baseline.json
 
 The mandatory sentence for a unary, ternary or wider fact type shall read
 as FORML: "Each Appointment is for some Patient with some Doctor on some
@@ -117,6 +118,37 @@ changes exactly the 17 lines above and nothing else; in each changed
 line every placeholder names its own role's player; the disjunctive
 mandatory, exclusion and exclusive-or tests pass unchanged, which is the
 evidence the extraction kept `spanningArm`'s output.
+
+## Implementation notes
+
+/code-review of the implementation found four inputs the plan did not
+name, all in the shared renderer, so the fixes reach `spanningArm` too:
+
+- A reading that opens with the role and names it again later ("{0}
+  signs {2} for {0}") wrote the later slot as "some Customer", a
+  different claim. The renderer now writes every occurrence of the
+  sentence's own role as "that X", in both forms.
+- Whitespace at the end of a reading printed before the period ("Each
+  Person breathes ."). The renderer trims the reading's last text.
+- Two placeholders with nothing between them ran together ("some
+  Personsome Topic"), and the flush-placeholder space was added only
+  before an ASCII word. The renderer separates adjacent placeholders and
+  tests for a word with `[\p{L}\p{N}]`, the parser's own definition.
+- The player reference and the "some" segment were written twice, with
+  "some" a keyword in one and plain text in the other. Both callers now
+  take them from `rolePlayer` and `quantifiedReading` in `sentence.ts`,
+  so a disjunctive mandatory, exclusion or exclusive-or arm marks "some"
+  as a keyword, as the binary sentences mark "at most one".
+
+So "`spanningArm`'s output is unchanged" holds for every tracked model
+(the corpus diff is still the 17 lines) and for the existing tests, but
+not for those four kinds of reading, where its text was wrong the same
+way. Two findings were left: a reading that already ends in "that" gets
+"that that X" in the "For each" form, and a noun written into the
+reading before a placeholder stays before the quantifier ("posts some
+Amount to Account some GeneralLedgerAccount", C02-bank). Both follow the
+modeller's reading as written, and guessing at its grammar would be a
+worse failure than repeating it.
 
 ## Open decisions
 
