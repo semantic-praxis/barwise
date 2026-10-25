@@ -24,7 +24,7 @@ Specialty is specialty of Doctor
   Each Doctor has at least one Specialty.
 Appointment is for Patient with Doctor on AppointmentDate at TimeSlot
   For each Appointment combination, at most one Patient and Doctor and AppointmentDate and TimeSlot applies.
-  Each Appointment must: Appointment is for Appointment with Appointment on Appointment at Appointment.
+  Each Appointment is for some Patient with some Doctor on some AppointmentDate at some TimeSlot.
   For each Patient, AppointmentDate and TimeSlot combination, at most one Appointment and Doctor applies.
   For each Doctor, AppointmentDate and TimeSlot combination, at most one Appointment and Patient applies.
 Appointment has VisitReason
