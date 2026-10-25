@@ -72,8 +72,11 @@ mandatory, no frequency. Most are reference-mode uniqueness written from
 - When a reading names the constrained role first, the sentence is
   unchanged ("Each Customer places at least one Order.").
 - When a reading repeats a placeholder, the verbalizer shall write
-  "that Y" after its first mention, in this sentence and the n-ary
-  mandatory's.
+  "that Y" after its first mention, in every sentence `quantifiedReading`
+  writes: this one, both n-ary mandatory sentences, and the arms of a
+  disjunctive mandatory or exclusion over several fact types
+  (`spanningArm`, `phase2.ts`, which changes no line of its own). No
+  tracked model repeats a placeholder.
 
 Out of scope: the ring sentence (direction-symmetric, above); the
 single-role frequency sentence, which reads backwards the same way
