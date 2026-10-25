@@ -1315,8 +1315,9 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
   try {
     writeFileSync(
       join(dir, marker),
-      `import { readFileSync } from "node:fs";\n`
+      `import { readFileSync, writeFileSync } from "node:fs";\n`
         + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
+        + `writeFileSync("probe-running", "");\n`
         + `setTimeout(() => {}, 60_000);\n`,
     );
 
@@ -1340,23 +1341,26 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
 
     const exited = new Promise((res) => child.on("exit", (code) => res(code)));
 
-    // Wait until the mutation is on disk, so the kill lands while the
-    // command runs rather than during setup. A fixed sleep would make
-    // this test time-dependent; the file content is the real signal.
+    // Wait until the mutated run's probe says it is running, so the kill
+    // lands on it. Waiting for the mutation on disk was not enough: mutate
+    // writes the file BEFORE it spawns the run, so on a loaded runner the
+    // kill could land in that gap, match nothing, and let the probe sleep
+    // out its 60 s and exit 0 -- reported UNCAUGHT, exit 1 after 60230 ms
+    // in CI (barwise-rfb). The probe's own file is the real signal; a
+    // fixed sleep would only move the race.
+    const running = join(dir, "probe-running");
     const deadline = Date.now() + 15_000;
-    while (Date.now() < deadline) {
-      if (readFileSync(join(dir, "subject.txt"), "utf8").includes("BAD")) break;
+    while (Date.now() < deadline && !existsSync(running)) {
       await new Promise((res) => setTimeout(res, 25));
     }
-    assert.match(
-      readFileSync(join(dir, "subject.txt"), "utf8"),
-      /BAD/,
-      "the mutation never reached disk, so this test would kill the wrong phase",
-    );
+    assert.ok(existsSync(running), "the mutated run never started, so there is nothing to kill");
 
     // A marker unique to this run, so the kill cannot reach another
-    // test's child or a developer's unrelated process.
-    spawnSync("pkill", ["-TERM", "-f", marker], { stdio: "ignore" });
+    // test's child or a developer's unrelated process. pkill exits 1 when
+    // it matches nothing, which is the race above: a kill that reached
+    // no process is a broken test, not a reading.
+    const kill = spawnSync("pkill", ["-TERM", "-f", marker], { stdio: "ignore" });
+    assert.equal(kill.status, 0, "pkill matched no process, so the kill never landed");
 
     const status = await exited;
 
