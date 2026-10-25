@@ -124,14 +124,18 @@ describe("constraint sentences place a lead after the quantifier", () => {
     expect(texts(model, ft)).toEqual(["Each Listing has exactly 2 sale Currency."]);
   });
 
-  it("falls back to the reading as written, minus the hyphen, when no reading has the needed order", () => {
+  it("keeps every lead on its own noun when no reading has the needed order", () => {
     // Only "{1} is sale- price of {0}" exists, and the uniqueness is on
-    // role 0: the sentence slices that reading as before, so no lead moves
-    // onto the wrong noun.
+    // role 0: the sentence is written from that reading as given
+    // (binary-reverse-reading-verbalization.spec.md), and "sale price of"
+    // stays bound to Listing, in the head and after "that", by the same
+    // rule as every other lead.
     const { model, ft } = listing(["{1} is sale- price of {0}"], [
       { type: "internal_uniqueness", roleIds: ["rl"] },
     ]);
-    expect(texts(model, ft)).toEqual(["Each Listing is sale price of at most one Currency."]);
+    expect(texts(model, ft)).toEqual([
+      "For each sale price of Listing, at most one Currency is that sale price of Listing.",
+    ]);
   });
 
   it("rings place the lead by role slot", () => {
