@@ -547,6 +547,12 @@
       "caught_by": "not-a-correction",
       "note": "Non-goals section distinguishing this from a coverage tool."
     },
+    "nary-mandatory-verbalization::fd4f04469db6": {
+      "spec": "nary-mandatory-verbalization.spec.md",
+      "excerpt": "so \"spanningarm's output is unchanged\" holds for every tracked model (the corpus diff is still the 17 lines) and for the existing tests, but not for those four ",
+      "caught_by": "execution",
+      "note": "/code-review of the implementation ran four reading shapes the plan never named (recurring own placeholder, trailing space, adjacent placeholders, non-ASCII word after a flush placeholder) and confirmed each wrong output; the plan had claimed spanningArm output unchanged without those inputs."
+    },
     "norma-export-view-scope::bf44a5e42542": {
       "spec": "norma-export-view-scope.spec.md",
       "excerpt": "- d1: import norma shapes as elements. (resolved: yes, in this change.) the draft deferred it. self-review showed that deferring it is a regression: the importe",
