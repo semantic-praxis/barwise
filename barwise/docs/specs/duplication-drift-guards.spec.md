@@ -2,7 +2,7 @@
 
 Status: Implemented (all six workstreams; see Implementation notes)
 Created: 2026-08-26
-Last-updated: 2026-08-26
+Last-updated: 2026-10-25
 Tracking: `docs/logic-duplication-audit-2026-08-26.md` (all classes);
 extends the remedy of `docs/specs/artifact-resolution-parity.spec.md`
 (implemented, PR #347) from one instance to the class. Issues:

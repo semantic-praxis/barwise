@@ -189,8 +189,6 @@ Acceptance: when `package.json` and `package-lock.json` disagree on
 files and both values. Verified by reproducing commit `0f8bdaa`'s state
 and observing the check fail, then pass on `ba5c974`.
 
-Recorded as `docs/adr/must-agree-copies.md`.
-
 ### 2. Record the model the provider reports
 
 Independent of the ratchets and the only behavioural change here. The

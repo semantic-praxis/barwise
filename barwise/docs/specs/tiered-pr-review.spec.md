@@ -19,7 +19,7 @@ merges high-risk, 70% of the last 40 -- stands as a description; with no
 gate reading the tier, it is no longer a budget anything fails against.
 
 Created: 2026-09-17
-Last-updated: 2026-10-03
+Last-updated: 2026-10-25
 Tracking: barwise-1036 (WS1, the Copilot review workflow); barwise-1037 (WS2,
 the tier table and its completeness gate); barwise-1038 (WS3, the
 classifier); barwise-1041 (WS4, the blocking gate -- withdrawn); barwise-1040
