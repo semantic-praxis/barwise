@@ -9,6 +9,7 @@ import { clearFormats, formatRegistry, registerFormat } from "@barwise/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { openApiExportFormat } from "../src/openapi/OpenApiExportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
+import { MENTOR_RING_PSEUDOCODE, mentorsModel } from "./helpers/unreportedFixture.js";
 
 describe("OpenApiExportFormat", () => {
   describe("adapter instance", () => {
@@ -275,39 +276,12 @@ describe("OpenApiExportFormat", () => {
  * the ring is, the mandatory the mapping enforces as NOT NULL is not.
  */
 describe("constraints the export does not carry", () => {
-  function mentors(withRing: boolean) {
-    const model = new ModelBuilder("Test")
-      .withEntityType("Person", { referenceMode: "person_id" })
-      .withValueType("Name", { dataType: { name: "text" } })
-      .withBinaryFactType("Person has Name", {
-        role1: { player: "Person", name: "has" },
-        role2: { player: "Name", name: "is of" },
-        uniqueness: "role1",
-        mandatory: "role1",
-      })
-      .withBinaryFactType("Person mentors Person", {
-        role1: { player: "Person", name: "mentors" },
-        role2: { player: "Person", name: "is mentored by" },
-        uniqueness: "role2",
-      })
-      .build();
-    if (withRing) {
-      model.getFactTypeByName("Person mentors Person")!.addConstraint({
-        type: "ring",
-        roleId1: "Person mentors Person::role1",
-        roleId2: "Person mentors Person::role2",
-        ringType: "irreflexive",
-      });
-    }
-    return model;
-  }
-
   it("reports each one as a constraint spec", () => {
-    const specs = openApiExportFormat.export(mentors(true)).constraintSpecs;
-    expect(specs?.map((s) => s.pseudocode)).toEqual(["for all x: not Person mentors Person(x, x)"]);
+    const specs = openApiExportFormat.export(mentorsModel(true)).constraintSpecs;
+    expect(specs?.map((s) => s.pseudocode)).toEqual([MENTOR_RING_PSEUDOCODE]);
   });
 
   it("sets no constraintSpecs when the schema carries them all", () => {
-    expect(openApiExportFormat.export(mentors(false)).constraintSpecs).toBeUndefined();
+    expect(openApiExportFormat.export(mentorsModel(false)).constraintSpecs).toBeUndefined();
   });
 });

@@ -628,7 +628,10 @@ default) is spilled to a file -- `outputPath` if given, otherwise
 `.barwise/mcp-cache/` next to the model -- and the tool returns the
 file path plus a short preview. A single call produces one artifact,
 so exporting a multi-domain project requires `domain`; without it the
-tool returns an error listing the available domains.
+tool returns an error listing the available domains. When the format
+reports constraints it could not express (DDL, OpenAPI, Avro, dbt,
+Ossie), a second content block lists each one with its pseudocode and
+a counterexample.
 
 ---
 

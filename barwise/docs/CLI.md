@@ -137,8 +137,10 @@ When the format reports constraints it could not express (`ddl`, which
 spills them per dialect; `openapi`, `avro` and `dbt`, which carry only
 the relational schema; and `ossie`), `export` writes them to
 stderr after the artifact: a heading with the count and format, then one
-line per distinct verbalization, with `(xN)` when the same rule was
-spilled more than once. Stdout and the exit code are unchanged, so
+line per distinct verbalization, with `(xN)` when N specs share it: a
+value type's own value constraint is reported once per column it
+constrains, and two constraints can read alike, so N can mean N checks
+to implement. Stdout and the exit code are unchanged, so
 `barwise export ... | psql` still receives only the artifact. A project
 export reports each domain as it is written, naming the domain.
 

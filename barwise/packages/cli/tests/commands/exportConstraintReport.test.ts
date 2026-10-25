@@ -48,6 +48,20 @@ describe("export reports what the format could not express", () => {
     expect(r.stdout).not.toContain("could not express");
   });
 
+  it.each(["openapi", "avro", "dbt"])(
+    "reports the ring for %s, which renders only the relational schema",
+    async (format) => {
+      // schema-export-constraint-specs.spec.md: these formats carry no CHECK
+      // at all, so the ring is lost from the artifact as it is from DDL.
+      const r = await runCli(["export", join(dir, "ring.orm.yaml"), "--format", format]);
+      expect(r.exitCode, r.stderr).toBe(0);
+      expect(r.stderr).toBe(
+        `1 constraint(s) the ${format} format could not express:\n  - ${RING}\n`,
+      );
+      expect(r.stdout).not.toContain("could not express");
+    },
+  );
+
   it("reports after writing with --output", async () => {
     const out = join(dir, "out.sql");
     const r = await runCli([

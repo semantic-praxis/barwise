@@ -1,12 +1,14 @@
 /**
  * The ConstraintSpec payload for a constraint an export format cannot
  * express: its verbalization, a per-kind pseudocode predicate, and a
- * counterexample. Shared by every format that spills constraints (the DDL
- * router, the Ossie writer), so the pseudocode is written once.
+ * counterexample. Shared by every format that spills constraints (the
+ * constraint router, the Ossie writer), so the pseudocode is written once.
  *
- * It describes constraints that have roles. A value type's own value
- * constraint is not a `Constraint`, and a constraint over subtypes has no
- * roles to label, so neither is passed here.
+ * It describes constraints that have roles. A constraint over subtypes has
+ * none to label, so it is not passed here. A value type's own value
+ * constraint is not a `Constraint` in the model, but the router builds one
+ * for each role it constrains and passes that, so each column's spec names
+ * its own role.
  */
 import { generateCounterexampleInView } from "../counterexample/index.js";
 import type { ConstraintSpec } from "../export/types.js";
