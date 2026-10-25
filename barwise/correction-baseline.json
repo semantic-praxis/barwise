@@ -343,12 +343,6 @@
       "caught_by": "execution",
       "note": "The Inventory was wrong about the mechanism and right about the count; found on implementing."
     },
-    "gate-refusal-contract::0926e4350604": {
-      "spec": "gate-refusal-contract.spec.md",
-      "excerpt": "status: implemented. ws2's and ws3's designs were both corrected during grounding -- see their sections created: 2026-09-10 last-updated: 2026-09-10 tracking: b",
-      "caught_by": "not-a-correction",
-      "note": "The Status header, which defers (\"see their sections\") and records no specific correction; the WS2 and WS3 records are detected and classified separately. Same verdict as tracker-quick-wins::bf97709c0160, the other Status header in the corpus. Newly visible because the marker was split across a line."
-    },
     "gate-refusal-contract::0b13cccc39d0": {
       "spec": "gate-refusal-contract.spec.md",
       "excerpt": "- should ws3 run in ci at all? (resolved: no.) it protects against a class that changes on the order of months, and the honest run costs about 90 seconds -- 56 ",
@@ -402,6 +396,12 @@
       "excerpt": "- ci-local.mjs was binary. status 0 or fail, so check-shell and check-secrets refusing for want of shellcheck and gitleaks read as \"gates failed\" -- indistingui",
       "caught_by": "execution",
       "note": "Running ci:local in a container without shellcheck or gitleaks is what showed the runner reporting two refusals as failures; the conflation is invisible in the code, which reads correctly, and only the output distinguishes them. The same run also exposed that mutate's CAUGHT readings had been taken against an already-red suite."
+    },
+    "gate-refusal-contract::f7442e4a4ad1": {
+      "spec": "gate-refusal-contract.spec.md",
+      "excerpt": "status: implemented. ws2's and ws3's designs were both corrected during grounding -- see their sections created: 2026-09-10 last-updated: 2026-10-25 tracking: b",
+      "caught_by": "not-a-correction",
+      "note": "The Status header, which defers (\"see their sections\") and records no specific correction; the WS2 and WS3 records are detected and classified separately. Same verdict as tracker-quick-wins::bf97709c0160, the other Status header in the corpus. Newly visible because the marker was split across a line. Re-keyed from 0926e4350604 when the header's Last-updated moved (2026-10-25)."
     },
     "identification-declared-once::42858a310ffb": {
       "spec": "identification-declared-once.spec.md",
