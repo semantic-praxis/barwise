@@ -21,6 +21,19 @@ All export formats share these options:
 Every export runs the validation engine first. In default (non-strict)
 mode, validation diagnostics appear as comments in the output.
 
+The DDL, OpenAPI, Avro, dbt and Ossie exports report the constraints
+they could not carry,
+with a verbalization, a pseudocode predicate and a counterexample for
+each. DDL routes what it can into UNIQUE and CHECK clauses per dialect
+and reports the rest. OpenAPI, Avro and dbt render only the relational
+schema (columns, NOT NULL, primary and foreign keys), so they report
+every constraint DDL would need a UNIQUE or CHECK clause for, or could
+not express at all, by the same rule. Gaps that rule has today are
+tracked: constraints over subtypes (barwise-lwy), mandatory roles the
+mapping does not enforce (barwise-plq), the second uniqueness of a
+one-to-one entity binary (barwise-hjy), and key uniqueness in formats
+without keys (barwise-lqj).
+
 ### DDL (SQL)
 
 **Format name**: `ddl`

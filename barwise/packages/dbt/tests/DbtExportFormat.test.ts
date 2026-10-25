@@ -283,3 +283,46 @@ describe("the project's identifier strategy (identifier-strategy-in-exports.spec
     expect(schemaYml({})).toContain("data_type: TEXT");
   });
 });
+
+/**
+ * The format renders only the relational schema, so the constraints that
+ * schema does not carry are reported (schema-export-constraint-specs.spec.md):
+ * the ring is, the mandatory the mapping enforces as NOT NULL is not.
+ */
+describe("constraints the export does not carry", () => {
+  function mentors(withRing: boolean) {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "person_id" })
+      .withValueType("Name", { dataType: { name: "text" } })
+      .withBinaryFactType("Person has Name", {
+        role1: { player: "Person", name: "has" },
+        role2: { player: "Name", name: "is of" },
+        uniqueness: "role1",
+        mandatory: "role1",
+      })
+      .withBinaryFactType("Person mentors Person", {
+        role1: { player: "Person", name: "mentors" },
+        role2: { player: "Person", name: "is mentored by" },
+        uniqueness: "role2",
+      })
+      .build();
+    if (withRing) {
+      model.getFactTypeByName("Person mentors Person")!.addConstraint({
+        type: "ring",
+        roleId1: "Person mentors Person::role1",
+        roleId2: "Person mentors Person::role2",
+        ringType: "irreflexive",
+      });
+    }
+    return model;
+  }
+
+  it("reports each one as a constraint spec", () => {
+    const specs = new DbtExportFormat().export(mentors(true)).constraintSpecs;
+    expect(specs?.map((s) => s.pseudocode)).toEqual(["for all x: not Person mentors Person(x, x)"]);
+  });
+
+  it("sets no constraintSpecs when the schema carries them all", () => {
+    expect(new DbtExportFormat().export(mentors(false)).constraintSpecs).toBeUndefined();
+  });
+});

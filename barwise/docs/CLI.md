@@ -133,8 +133,9 @@ Options:
 - `--strict` -- fail on validation errors
 - `--no-examples` -- exclude population example data
 
-When the format reports constraints it could not express (today `ddl`,
-which spills them per dialect, and `ossie`), `export` writes them to
+When the format reports constraints it could not express (`ddl`, which
+spills them per dialect; `openapi`, `avro` and `dbt`, which carry only
+the relational schema; and `ossie`), `export` writes them to
 stderr after the artifact: a heading with the count and format, then one
 line per distinct verbalization, with `(xN)` when the same rule was
 spilled more than once. Stdout and the exit code are unchanged, so

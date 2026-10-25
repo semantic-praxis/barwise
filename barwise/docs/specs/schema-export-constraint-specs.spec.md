@@ -1,6 +1,6 @@
 # OpenAPI, Avro and dbt exports report the constraints they drop
 
-Status: Implemented -- WS1
+Status: Implemented
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -227,6 +227,15 @@ the tracked models are recorded here.
   every dialect, with and without annotations, and Ossie export of each,
   is byte-identical before and after the move, `constraintSpecs`
   included (1,428 outputs, compared as one JSON file).
+- WS2: the three adapters set `constraintSpecs` through one core helper,
+  `withConstraintSpecs`, which leaves the field out when the list is
+  empty, so the rule is not restated three times. Measured over the 84
+  tracked models that load: each of OpenAPI, Avro and dbt reports 366
+  specs, in 54 models. That is 3 more than the router-level 363 above,
+  which are the distinct constraints the router's per-table dedupe had
+  merged. Each adapter's test pins the wiring (a ring reported, a
+  NOT NULL mandatory not, no field when nothing drops); content is
+  pinned once, in core.
 
 ## Open decisions
 
