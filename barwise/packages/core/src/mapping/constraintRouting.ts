@@ -25,7 +25,7 @@ import { findRole } from "../model/roleLookup.js";
 import { renderValuePredicate } from "../sql/valuePredicate.js";
 import { ConstraintVerbalizer } from "../verbalization/index.js";
 import { DIALECT_PROFILES, type DialectCapabilityProfile } from "./dialectCapabilities.js";
-import type { RelationalSchema } from "./RelationalSchema.js";
+import type { RelationalSchema, Table } from "./RelationalSchema.js";
 
 /** A constraint clause to inject into a rendered CREATE TABLE. */
 export interface RoutedClause {
@@ -223,12 +223,13 @@ function routeAll(
         break;
 
       case "internal_uniqueness": {
-        // The only uniqueness the mapping does not realize is a
-        // single-role constraint on the value side of an
-        // entity-value binary (a secondary unique column).
-        const col = c.roleIds.length === 1
-          ? valueColumnForUniqueness(c.roleIds[0]!, ft, model, schema)
-          : undefined;
+        // The mapping does not realize a single-role constraint on the
+        // value side of an entity-value binary (a secondary unique
+        // column), nor one on a binary between two entities whose fact it
+        // stored anywhere but the role's own player's table (barwise-hjy),
+        // nor a second key of an n-ary table (barwise-kgh).
+        const single = c.roleIds.length === 1 ? c.roleIds[0]! : undefined;
+        const col = single ? valueColumnForUniqueness(single, ft, model, schema) : undefined;
         // ... unless the mapping realized it as the primary key after
         // all. Since barwise-967 the identifying binary IS the key, so
         // routing its uniqueness would emit
@@ -237,6 +238,10 @@ function routeAll(
         // key already enforces.
         if (col && !isPrimaryKey(col, schema)) {
           route("unique", `UNIQUE (${col.column})`, col.table, inView);
+        }
+        const between = single ? entityBinaryUniqueColumns(single, ft, model, schema) : undefined;
+        if (between && !isWholePrimaryKey(between, schema)) {
+          route("unique", `UNIQUE (${between.columns.join(", ")})`, between.table, inView);
         }
         // An n-ary fact type's table is keyed on one of its uniqueness
         // constraints; any other one is a UNIQUE on the same table
@@ -458,9 +463,56 @@ function isWholePrimaryKey(
 }
 
 /**
+ * The columns a single-role uniqueness on a binary between two entities
+ * needs UNIQUE on, or undefined when the mapping already realizes it
+ * (one-to-one-entity-uniqueness.spec.md, barwise-hjy). The fact is
+ * stored in one of three places:
+ *
+ *   - the role's own columns, in its own player's table: they are
+ *     single-valued, which is the uniqueness itself;
+ *   - the role's own columns, in another table (an associative table, or
+ *     the table of an entity objectifying the fact type): each value may
+ *     appear once;
+ *   - the partner role's columns, in the partner's player's table (a
+ *     one-to-one absorbed on the other side): each value may appear once.
+ */
+function entityBinaryUniqueColumns(
+  roleId: string,
+  ft: FactType,
+  model: OrmModel,
+  schema: RelationalSchema,
+): { table: string; columns: string[]; } | undefined {
+  if (ft.arity !== 2) return undefined;
+  const role = ft.getRoleById(roleId);
+  const partner = ft.roles.find((r) => r.id !== roleId);
+  if (!role || !partner) return undefined;
+  const isEntity = (id: string) => model.getObjectType(id)?.kind === "entity";
+  if (!isEntity(role.playerId) || !isEntity(partner.playerId)) return undefined;
+  // The table itself, so its source element is read from the table the
+  // columns were found in rather than from a second lookup by name.
+  const columnsIn = (id: string) => {
+    for (const table of schema.tables) {
+      const columns = table.columns.filter((cl) => cl.sourceRoleId === id).map((cl) => cl.name);
+      if (columns.length > 0) return { table, columns };
+    }
+    return undefined;
+  };
+  const found = (hit: { table: Table; columns: string[]; }) => ({
+    table: hit.table.name,
+    columns: hit.columns,
+  });
+
+  const own = columnsIn(roleId);
+  if (own) return own.table.sourceElementId === role.playerId ? undefined : found(own);
+  const absorbed = columnsIn(partner.id);
+  return absorbed && absorbed.table.sourceElementId === partner.playerId
+    ? found(absorbed)
+    : undefined;
+}
+
+/**
  * For a single-role uniqueness constraint: the value column it makes
- * unique, when the role is the value side of an entity-value binary
- * (any other uniqueness is realized by the mapping itself).
+ * unique, when the role is the value side of an entity-value binary.
  */
 function valueColumnForUniqueness(
   roleId: string,

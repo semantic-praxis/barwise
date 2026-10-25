@@ -1,6 +1,6 @@
 # A one-to-one between two entities keeps both uniqueness constraints
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -109,6 +109,15 @@ foreign key's columns are a UNIQUE of the table, in both its annotated
 and its inferred branch. Acceptance: exporting each probe shape to DDL
 and importing it gives back a model with both uniqueness constraints;
 the existing DDL import tests pass.
+
+## Implementation notes
+
+- The round-trip test fails on the four absorbed cases (mandatory on one
+  role, with and without annotations) when the importer change is
+  removed, and passes with it; the associative cases already read back
+  through the relationship path.
+- The router resolves the role's columns to their `Table` in one pass, so
+  the source-element check reads the table the columns were found in.
 
 ## Open decisions
 

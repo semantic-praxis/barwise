@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 import { DdlImportFormat } from "../src/ddl/DdlImportFormat.js";
+import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const ddl = new DdlImportFormat();
 const valueType = (model: OrmModel, name: string) => {
@@ -387,5 +388,55 @@ describe("a table keyed on its foreign keys is an objectified relationship", () 
         FOREIGN KEY ("(ambiguous)") REFERENCES finding ("(ambiguous)"));`);
     expect(warnings).toEqual([]);
     expect(model.getFactTypeByName("Scan and Finding scan found")).toBeDefined();
+  });
+});
+
+/**
+ * A one-to-one between two entities keeps both uniqueness constraints
+ * through export and import (one-to-one-entity-uniqueness.spec.md): the
+ * export writes UNIQUE on the column that stores the fact, and the import
+ * reads it back as the uniqueness on the referenced side.
+ */
+describe("a one-to-one between two entities", () => {
+  function places(mandatory: "role1" | "role2" | "both" | undefined) {
+    return new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_nr" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "both",
+        ...(mandatory ? { mandatory } : {}),
+      })
+      .build();
+  }
+
+  it.each(
+    [
+      [undefined, true],
+      [undefined, false],
+      ["role1", true],
+      ["role1", false],
+      ["role2", true],
+      ["role2", false],
+      ["both", true],
+      ["both", false],
+    ] as const,
+  )("keeps both with mandatory %s (annotate %s)", (mandatory, annotate) => {
+    const { text } = new DdlExportFormat().export(places(mandatory), { annotate });
+    const { model } = ddl.parse(text);
+    const customer = model.getObjectTypeByName("Customer")!;
+    const order = model.getObjectTypeByName("Order")!;
+    const between = model.factTypes.find((ft) =>
+      ft.arity === 2
+      && ft.roles.some((r) => r.playerId === customer.id)
+      && ft.roles.some((r) => r.playerId === order.id)
+    );
+    expect(between, text).toBeDefined();
+    const unique = between!.internalConstraints
+      .filter((c) => c.type === "internal_uniqueness" && c.roleIds.length === 1)
+      .map((c) => between!.getRoleById((c as { roleIds: string[]; }).roleIds[0]!)!.playerId)
+      .sort();
+    expect(unique, text).toEqual([customer.id, order.id].sort());
   });
 });

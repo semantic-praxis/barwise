@@ -1145,6 +1145,14 @@ export class DdlImportFormat implements ImportFormat {
   ): Binary | undefined {
     const referencedEntity = model.getObjectType(referencedEntityId);
     if (!referencedEntity) return undefined;
+    // A foreign key whose columns are, by themselves, a UNIQUE of the table:
+    // each referenced row appears at most once, the one-to-one the export
+    // writes for an absorbed binary (one-to-one-entity-uniqueness.spec.md).
+    const fk = table.foreignKeys.find((f) => f.columns.includes(column.name));
+    const farUnique = fk !== undefined
+      && table.uniqueConstraints.some((u) =>
+        u.length === fk.columns.length && fk.columns.every((c) => u.includes(c))
+      );
 
     const annotation = this.columnAnnotation(
       model,
@@ -1163,6 +1171,7 @@ export class DdlImportFormat implements ImportFormat {
       }];
       if (!column.nullable) constraints.push({ type: "mandatory", roleId: rowRoleId });
       const farRoleId = generateId();
+      if (farUnique) constraints.push({ type: "internal_uniqueness", roleIds: [farRoleId] });
       const factType = model.addFactType(
         annotatedFactType(
           annotation,
@@ -1203,6 +1212,7 @@ export class DdlImportFormat implements ImportFormat {
           roleId: role2Id,
         });
       }
+      if (farUnique) constraints.push({ type: "internal_uniqueness", roleIds: [role1Id] });
 
       const factType = model.addFactType({
         name: factTypeName,
