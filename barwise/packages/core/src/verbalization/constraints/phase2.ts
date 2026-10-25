@@ -53,14 +53,6 @@ export function verbalizeDisjunctiveMandatory(
 }
 
 /**
- * A constraint over a supertype's subtypes (orm-format-3, Open decision 2):
- * "Each Person is at most one of: Male, Female." for an exclusion, "at
- * least one of" for a disjunctive mandatory (totality) and "exactly one
- * of" for an exclusive-or (a partition). With one subtype, "Each Person
- * is a Male." The supertype is the first subtype fact's; a subtype fact
- * that resolves to nothing is shown by its id.
- */
-/**
  * How many of its subtypes each kind lets an instance of the supertype be,
  * as the verbalization and the ConstraintSpec pseudocode both say it.
  */
@@ -70,6 +62,14 @@ export const SUBTYPE_QUANTITY = {
   exclusive_or: "exactly one",
 } as const;
 
+/**
+ * A constraint over a supertype's subtypes (orm-format-3, Open decision 2):
+ * "Each Person is at most one of: Male, Female." for an exclusion, "at
+ * least one of" for a disjunctive mandatory (totality) and "exactly one
+ * of" for an exclusive-or (a partition). With one subtype, "Each Person
+ * is a Male." The supertype is the first subtype fact's; a subtype fact
+ * that resolves to nothing is shown by its id.
+ */
 export function verbalizeSubtypeConstraint(
   kind: "exclusion" | "disjunctive_mandatory" | "exclusive_or",
   subtypeFactIds: readonly string[],
