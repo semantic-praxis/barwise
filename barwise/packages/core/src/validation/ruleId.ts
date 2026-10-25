@@ -46,6 +46,7 @@ export const RULE_ID = {
   missingValueTypeDataType: "completeness/missing-value-type-data-type",
   conflictingIdentification: "completeness/conflicting-identification",
   preferredIdentifierInvalid: "completeness/preferred-identifier-invalid",
+  preferredIdentifierOptional: "completeness/preferred-identifier-optional",
   acrossFactTypesUnknownRole: "constraint/across-fact-types-unknown-role",
   cardinalityInvalidRole: "constraint/cardinality-invalid-role",
   cardinalityMaxLessThanMin: "constraint/cardinality-max-less-than-min",
@@ -218,13 +219,40 @@ const RULE_DESCRIPTORS = {
       dangling: (otName: string, constraintId: string): string =>
         `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, and the model has no constraint with that id.`,
       notUniqueness: (otName: string, constraintId: string, kind: string): string =>
-        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, but its kind is ${kind}; a preferred identifier is an internal uniqueness constraint${
-          kind === "external_uniqueness"
-            ? ", and an external uniqueness is not yet read as one"
-            : ""
-        }.`,
+        `Entity type "${otName}" names constraint "${constraintId}" as its preferred identifier, but its kind is ${kind}; a preferred identifier is a uniqueness constraint, internal or external.`,
       notThisEntity: (otName: string, constraintId: string): string =>
         `Entity type "${otName}" names uniqueness constraint "${constraintId}" as its preferred identifier, but that constraint does not identify "${otName}".`,
+      // One per shape rule an external uniqueness must meet to identify an
+      // entity (external-preferred-identifier.spec.md), so the message
+      // says which one failed.
+      externalNoCommonObject: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but its roles do not join on one object type: each role must be in its own fact type, with one object type playing one other role in every one of them.`,
+      externalOtherEntity: (otName: string, constraintId: string, joined: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but that constraint identifies "${joined}".`,
+      externalNotBinary: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but a fact type it spans is not binary; each component of a reference scheme is a binary between "${otName}" and what identifies it.`,
+      externalNearNotUnique: (otName: string, constraintId: string): string =>
+        `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but a role "${otName}" plays in one of its fact types has no uniqueness of its own, so one "${otName}" could have several values of that component.`,
+    },
+  },
+  [RULE_ID.preferredIdentifierOptional]: {
+    severity: "warning",
+    description:
+      "An entity type's preferred identifier rests on a role the entity plays that is not mandatory.",
+    messages: {
+      // The identifier is named by its fact types, not its constraint id:
+      // an importer's ids are UUIDs, which name nothing a modeller can find.
+      default: (
+        otName: string,
+        through: string,
+        optional: string,
+        number: "singular" | "plural",
+      ): string =>
+        `Entity type "${otName}" is identified through ${through}, but its ${
+          number === "plural" ? "roles" : "role"
+        } in ${optional} ${
+          number === "plural" ? "are" : "is"
+        } not declared mandatory, so nothing says every "${otName}" has its identifier. A reference scheme's roles are mandatory; add the mandatory constraint, or identify "${otName}" another way.`,
     },
   },
   [RULE_ID.acrossFactTypesUnknownRole]: {

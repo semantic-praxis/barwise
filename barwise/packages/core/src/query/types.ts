@@ -132,8 +132,13 @@ export interface EntityAnchors {
   readonly referenceMode?: string;
   /** The preferred-identifier uniqueness constraint, if present. */
   readonly preferredIdentifier?: {
-    /** The identifier fact type carrying the preferred uniqueness. */
-    readonly factType: string;
+    /**
+     * The identifier fact type carrying the preferred uniqueness, for an
+     * internal identifier; absent for an external one, which has several.
+     */
+    readonly factType?: string;
+    /** Every fact type the identifier spends: one internal, one per component external. */
+    readonly factTypes: readonly string[];
     /** The object type(s) that identify the entity. */
     readonly identifierTypes: readonly string[];
   };

@@ -14,10 +14,15 @@ import {
   type Constraint,
   type ConstraintInView,
   type ConstraintSpec,
+  externalIdentifies,
   type FactType,
+  type IdentifyingComponent,
   isOverSubtypes,
   type ObjectType,
   type OrmModel,
+  type PreferredIdentifiers,
+  preferredIdentifiers,
+  resolvePreferredIdentifier,
   roleIdsOf,
 } from "@barwise/core";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
@@ -100,13 +105,15 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   const names = conceptNames(model, lose);
   const nameOf = (id: string): string => names.written.get(id)!;
   const isBuiltin = (id: string): boolean => names.builtins.has(id);
+  // Resolved once: role order asks it for every binary.
+  const identifiers = preferredIdentifiers(model);
 
   // Which internal constraints are written, by id; every other is a loss.
   const covered = new Set<string>();
   const written: Written[] = [];
   const usedNames = new Map<string, Set<string>>();
   for (const ft of model.factTypes) {
-    const order = roleOrder(ft, model, isBuiltin);
+    const order = roleOrder(ft, model, isBuiltin, identifiers);
     if (!order) {
       lose(
         `fact type ${ft.name}`,
@@ -136,9 +143,16 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     if (ot.kind !== "entity") continue;
     const pid = model.preferredIdentifierOf(ot.id);
     if (pid !== undefined) {
+      const resolved = resolvePreferredIdentifier(model, ot.id);
       const w = written.find((x) => x.ft.internalConstraints.some((c) => c.id === pid));
       const c = w?.ft.internalConstraints.find((k) => k.id === pid);
-      if (w && c && isSingleIdentifier(w, c, ot.id)) {
+      const rels = resolved.ok && resolved.at.kind === "external"
+        ? componentRelationships(resolved.at.components, written)
+        : undefined;
+      if (rels) {
+        identifyBy.set(ot.id, rels);
+        covered.add(pid);
+      } else if (w && c && isSingleIdentifier(w, c, ot.id)) {
         identifyBy.set(ot.id, [w.name]);
         covered.add(pid);
       } else {
@@ -146,9 +160,16 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       }
       continue;
     }
+    // No stored identifier: an external uniqueness core reads as one is
+    // written as identify_by, as it always was; core's shape check decides,
+    // so one whose components are not single-valued is reported, not
+    // claimed as an identifier (external-preferred-identifier.spec.md).
     for (const ext of model.constraints) {
       if (ext.type !== "external_uniqueness" || covered.has(ext.id!)) continue;
-      const rels = compositeIdentifier(ext.roleIds, ot.id, written);
+      const resolvedExt = externalIdentifies(model, ext, ot.id);
+      const rels = resolvedExt.ok && resolvedExt.at.kind === "external"
+        ? componentRelationships(resolvedExt.at.components, written)
+        : undefined;
       if (rels) {
         identifyBy.set(ot.id, rels);
         covered.add(ext.id!);
@@ -358,6 +379,7 @@ function roleOrder(
   ft: FactType,
   model: OrmModel,
   isBuiltin: (id: string) => boolean,
+  identifiers: PreferredIdentifiers,
 ): number[] | undefined {
   const n = ft.roles.length;
   const all = ft.roles.map((_, i) => i);
@@ -383,8 +405,8 @@ function roleOrder(
   });
   if (xRole >= 0) {
     order = first(xRole);
-  } else if (n === 2 && identifierRole(ft, model) !== undefined) {
-    order = first(1 - identifierRole(ft, model)!);
+  } else if (n === 2 && identifierRole(ft, model, identifiers) !== undefined) {
+    order = first(1 - identifierRole(ft, model, identifiers)!);
   } else if (n === 2 && new Set(singles).size === 1) {
     order = first(singles[0]!);
   } else if (n >= 3) {
@@ -407,13 +429,32 @@ function roleOrder(
   return order;
 }
 
-/** The role index of a binary's far role when it holds an entity's preferred identifier. */
-function identifierRole(ft: FactType, model: OrmModel): number | undefined {
+/**
+ * The role index of a binary's far role when it holds an entity's
+ * preferred identifier: the uniqueness on it, or the role an external
+ * identifier's component names in this fact type.
+ */
+function identifierRole(
+  ft: FactType,
+  model: OrmModel,
+  identifiers: PreferredIdentifiers,
+): number | undefined {
   for (const c of ft.internalConstraints) {
     if (c.type !== "internal_uniqueness" || c.roleIds.length !== 1) continue;
     const far = ft.roles.findIndex((r) => r.id === c.roleIds[0]);
     const near = ft.roles[1 - far];
     if (near && model.preferredIdentifierOf(near.playerId) === c.id) return far;
+  }
+  for (const [far, role] of ft.roles.entries()) {
+    const near = ft.roles[1 - far];
+    if (!near) continue;
+    const at = identifiers.byEntity.get(near.playerId);
+    if (
+      at?.kind === "external"
+      && at.components.some((k) => k.factType === ft && k.farRole === role)
+    ) {
+      return far;
+    }
   }
   return undefined;
 }
@@ -426,25 +467,22 @@ function isSingleIdentifier(w: Written, c: Constraint, entityId: string): boolea
   return near!.playerId === entityId && far!.id === c.roleIds[0] && far!.playerId !== entityId;
 }
 
-/** The relationships of an external uniqueness in the importer's composite shape, or undefined. */
-function compositeIdentifier(
-  roleIds: readonly string[],
-  entityId: string,
+/**
+ * The relationships an external identifier's components are written as,
+ * or undefined when one is not written with the entity's role first,
+ * which identify_by needs to name it.
+ */
+function componentRelationships(
+  components: readonly IdentifyingComponent[],
   written: readonly Written[],
 ): string[] | undefined {
   const rels: string[] = [];
-  for (const roleId of roleIds) {
-    const w = written.find((x) => x.order.length === 2 && x.ft.roles[x.order[1]!]!.id === roleId);
-    if (!w) return undefined;
-    const [near, far] = w.order.map((i) => w.ft.roles[i]!);
-    if (near!.playerId !== entityId || far!.playerId === entityId || rels.includes(w.name)) {
-      return undefined;
-    }
+  for (const { factType, nearRole } of components) {
+    const w = written.find((x) => x.ft === factType);
+    if (!w || w.ft.roles[w.order[0]!] !== nearRole) return undefined;
     rels.push(w.name);
   }
-  // One relationship would read back as a single identifier, not this
-  // external uniqueness.
-  return rels.length >= 2 ? rels : undefined;
+  return rels;
 }
 
 // ---------------------------------------------------------------------------

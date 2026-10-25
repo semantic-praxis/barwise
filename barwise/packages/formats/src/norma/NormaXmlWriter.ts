@@ -254,11 +254,12 @@ function collectPlayedRoles(model: OrmModel): Map<string, NormaId[]> {
 function collectPreferredIdentifiers(
   identifiers: PreferredIdentifiers,
 ): Map<string, string> {
-  return new Map(
-    [...identifiers.byEntity].map((
-      [entityId, at],
-    ) => [entityId, toNormaId(constraintId(at.constraint, onFactType(at.factType)))]),
-  );
+  const ids = new Map<string, string>();
+  for (const [entityId, at] of identifiers.byEntity) {
+    const where = at.kind === "internal" ? onFactType(at.factType) : "across fact types";
+    ids.set(entityId, toNormaId(constraintId(at.constraint, where)));
+  }
+  return ids;
 }
 
 // `ValueType`, not `ObjectType`: the one call site is inside a
@@ -496,7 +497,7 @@ function writeConstraint(
         name: "",
         ...modality,
         isInternal: false,
-        isPreferred: false,
+        isPreferred: c.id !== undefined && preferred.has(c.id),
         roleRefs: c.roleIds.map(toNormaId),
       };
     case "mandatory":

@@ -116,10 +116,10 @@ In scope:
   - `identify_by` naming one relationship is the entity's preferred
     identifier: the uniqueness on that relationship's far role, added with
     a warning when the multiplicity did not state it. Naming several, it is
-    an external uniqueness over their far roles, kept but not named as the
-    preferred identifier, with a warning: core reads only an internal
-    uniqueness as one (barwise-alg), and the NORMA importer treats the same
-    shape the same way;
+    an external uniqueness over their far roles, stored as the preferred
+    identifier, each relationship gaining the uniqueness on the entity's
+    role with a warning when the multiplicity did not state it
+    (`external-preferred-identifier.spec.md`, WS2; barwise-alg);
   - `description` is the element's definition;
   - a `derived_by` list on a relationship is the fact type's derivation
     rule, and on an entity with a supertype the defining rule of each of
@@ -200,16 +200,16 @@ Out of scope:
 
 ## Inventory
 
-| Area                                            | Current state                      | Verdict                                       |
-| ----------------------------------------------- | ---------------------------------- | --------------------------------------------- |
-| `formats/src/ossie/` (new)                      | none                               | parser, mapper, writer, `requires` recognizer |
-| `cli/tests/importerIds.test.ts`                 | a fixture per registered importer  | adds an Ossie fixture (R3)                    |
-| `vscode/package.json` tool `format` enums       | hand-listed, import and export     | `ossie` added; drift tests vs the registry    |
-| `formats/src/registration.ts`                   | five descriptors                   | adds `ossieFormat`, importer and exporter     |
-| `formats/tests/fixtures/ossie/` (new)           | none                               | the pinned `flights.ontology.yaml` and schema |
-| core `ImportResult.warnings`, `constraintSpecs` | exist; NORMA returns no warnings   | used as is                                    |
-| core metamodel, serializer, schema              | carries every target above but one | untouched; external preferred id: barwise-alg |
-| surfaces (CLI, MCP)                             | reach every registered format      | untouched; the capability matrix row holds    |
+| Area                                            | Current state                      | Verdict                                                                         |
+| ----------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------- |
+| `formats/src/ossie/` (new)                      | none                               | parser, mapper, writer, `requires` recognizer                                   |
+| `cli/tests/importerIds.test.ts`                 | a fixture per registered importer  | adds an Ossie fixture (R3)                                                      |
+| `vscode/package.json` tool `format` enums       | hand-listed, import and export     | `ossie` added; drift tests vs the registry                                      |
+| `formats/src/registration.ts`                   | five descriptors                   | adds `ossieFormat`, importer and exporter                                       |
+| `formats/tests/fixtures/ossie/` (new)           | none                               | the pinned `flights.ontology.yaml` and schema                                   |
+| core `ImportResult.warnings`, `constraintSpecs` | exist; NORMA returns no warnings   | used as is                                                                      |
+| core metamodel, serializer, schema              | carries every target above but one | untouched; external preferred id: done, `external-preferred-identifier.spec.md` |
+| surfaces (CLI, MCP)                             | reach every registered format      | untouched; the capability matrix row holds                                      |
 
 Nothing in `@barwise/core` changes. The capability matrix's
 "export, import" row already reads "none" for divergence, and a registered

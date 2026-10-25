@@ -15,6 +15,7 @@ import { registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { reportConstraintSpecs } from "../workspace/constraintReport.js";
 import { resolveDomainModels } from "../workspace/domainModels.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
 import { readManifest, writeManifest } from "../workspace/lineageIo.js";
@@ -71,6 +72,9 @@ export function registerExportCommand(program: Command): void {
 
         if (opts.output) {
           writeExportResult(result, opts.output);
+          // Before the manifest: a manifest failure must not hide what the
+          // artifact already on disk is missing.
+          reportConstraintSpecs(result, opts.format);
 
           // An empty sources list reads as "depends on nothing", so a format
           // that records no lineage is named instead (barwise-ofb, R3).
@@ -97,6 +101,7 @@ export function registerExportCommand(program: Command): void {
         } else {
           process.stdout.write(result.text);
           if (!result.text.endsWith("\n")) process.stdout.write("\n");
+          reportConstraintSpecs(result, opts.format);
         }
       } catch (err) {
         process.stderr.write(`Error: ${(err as Error).message}\n`);
@@ -162,6 +167,7 @@ function exportProject(source: string, exporter: ExportFormatAdapter, opts: Expo
       process.stdout.write(result.text);
       if (!result.text.endsWith("\n")) process.stdout.write("\n");
     }
+    reportConstraintSpecs(result, opts.format, resolved[0]!.context);
     return;
   }
 
@@ -190,6 +196,8 @@ function exportProject(source: string, exporter: ExportFormatAdapter, opts: Expo
       writeFileSync(p, result.text, "utf-8");
       written.push(p);
     }
+    // Printed as each domain completes, so a later failure leaves it shown.
+    reportConstraintSpecs(result, opts.format, context);
   }
 
   if (written.length === 0) {
