@@ -1,25 +1,21 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25); 5 not yet
+Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25); 5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-25
-Plan-reviewed: 9f00cfad (code-review, pr-review; re-pointed after the first two WS4 ADR PRs edited the body)
+Plan-reviewed: b8b970eb (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
 barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
 barwise/packages/cli/CLAUDE.md, barwise/packages/core/CLAUDE.md,
-barwise/packages/mcp/CLAUDE.md, barwise/docs/adr/metamodel-evolution-policy.md,
-barwise/docs/adr/constraint-coverage-policy.md,
-barwise/docs/adr/package-graph-authority.md, barwise/packages/llm/CLAUDE.md,
+barwise/packages/mcp/CLAUDE.md, barwise/docs/adr/, barwise/packages/llm/CLAUDE.md,
 barwise/packages/promptlab/CLAUDE.md, barwise/packages/promptlab/evals/suite.yaml,
 barwise/scripts/regen-architecture.mjs, barwise/scripts/lib/architecture-section.mjs,
 .claude/skills/steward/SKILL.md, barwise/scripts/check-architecture.mjs,
 barwise/review-tiers.json, .claude/skills/spec-writer/template.adr.md,
 .claude/skills/pr-review/checklist.md, barwise/scripts/tests/,
-barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md,
-barwise/docs/adr/determinism-in-core.md,
-barwise/docs/adr/plan-before-code.md
+barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md
 
 In one sentence: each architecture or process decision lives in one ADR
 named for its concern and edited in place; the PR that changes an ADR
@@ -357,10 +353,12 @@ serves the writer and the check.
 ### 4. Backfill ADRs one at a time (provisional: the owner takes each in turn)
 
 One PR per ADR, each reviewed with `/code-review` and `/pr-review`
-before merge (Open decision 2). Each PR adds its files to this spec's `Touches:`.
+before merge (Open decision 2). `Touches:` names `barwise/docs/adr/`, so a new
+ADR needs no entry of its own.
 The owner chose the first on 2026-10-24: `determinism-in-core.md`.
-Landed so far: `determinism-in-core.md`. The owner chose the second
-on 2026-10-25: `plan-before-code.md`.
+The owner chose the second on 2026-10-25: `plan-before-code.md`, and the
+same day asked for the remaining candidates in turn. Status lists the
+ADRs that have landed.
 Candidates, with every place each is stated today, so WS5 can replace
 all of them with a link:
 
@@ -380,7 +378,7 @@ all of them with a link:
 | `credential-handling.md`          | process      | CLAUDE.md conventions; `credential-scanning.spec.md`                                                                                                               |
 | `pinned-runtimes.md`              | process      | CLAUDE.md "Monorepo Commands" (Node and Python pins)                                                                                                               |
 | `plan-before-code.md`             | process      | CLAUDE.md conventions bullet 1 (spec first); `spec-writer` step 8 and design gate; `pr-creation` readiness; `plan-scope-check.spec.md`; `touches-required.spec.md` |
-| `merge-delegation.md`             | process      | CLAUDE.md conventions bullet 3; `steward` skill, section 4b                                                                                                        |
+| `merge-delegation.md`             | process      | CLAUDE.md conventions bullet 3; `steward` skill, section 4b; `pr-review` skill (description, section 6); `REVIEW.md`; `pr-creation` skill; `steward-skill.spec.md` |
 | `review-policy.md`                | process      | `tiered-pr-review.spec.md` "The decision of 2026-09-23"                                                                                                            |
 
 `schema-versioning.md` is the question the list raises: today it is a
