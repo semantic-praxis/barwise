@@ -1,9 +1,9 @@
 # Pinned runtimes
 
 Scope: process
-Date: 2026-09-25
+Date: 2026-08-30
 Tracking: barwise-ubc, barwise-915, barwise-1059, barwise-920, barwise-g32,
-barwise-8hs,
+barwise-8hs, barwise-1045, barwise-921,
 docs/specs/session-node-pin.spec.md,
 docs/specs/deterministic-guards.spec.md
 
@@ -16,11 +16,13 @@ functions it never compiled out of its coverage report, so
 Node version). `uv.lock` branched on `python_full_version`, so
 `uv sync --frozen` installed numpy 2.4.6 locally and 2.5.2 in CI
 (barwise-915). This ADR covers the interpreter half: which Node and which
-Python run the code. Which Python libraries a run gets is the lockfile
-rule in the root `CLAUDE.md` conventions, and is out of scope here. The
-web-session design is in `session-node-pin.spec.md`; the planned check
-that each runtime has one declared authority is workstream 4 of
-`deterministic-guards.spec.md`.
+Python run the code. Which Python libraries a run gets is
+`docs/adr/python-from-the-lockfile.md`, and is out of scope here. The
+rule entered the root `CLAUDE.md` on 2026-08-30; the web-session hook
+that applies decisions 1 and 3 there came on 2026-09-25
+(`session-node-pin.spec.md`). A check that each runtime has one
+declared authority is proposed, not built: workstream 4 of
+`deterministic-guards.spec.md`, still marked provisional.
 
 ## Decision
 
@@ -38,10 +40,12 @@ that each runtime has one declared authority is workstream 4 of
 ## Consequences
 
 - All four workflows (`ci`, `release`, `copilot-review`,
-  `tracker-conflicts`) set Node with `node-version-file: .nvmrc`. The
-  step is unguarded except in `copilot-review`, where it runs under
-  `if: steps.decide.outputs.need == 'true'`, the same guard as the Node
-  work it serves. No workflow names a literal version.
+  `tracker-conflicts`) set Node with `node-version-file: .nvmrc`, and
+  none names a literal version. In `copilot-review` the step runs under
+  `if: steps.decide.outputs.need == 'true'`, inside a job that runs only
+  on `workflow_dispatch` while the request is paused (barwise-ilb). In
+  `ci`, the docs-only classifier (`node scripts/lib/changed-class.mjs`)
+  runs before Node is set up, on the runner image's own Node.
 - In web sessions only (`CLAUDE_CODE_REMOTE=true`), the session-start
   hook installs the `.nvmrc` Node through nvm, reads `node --version`
   back, and on a mismatch warns and installs with `npm ci` so the
@@ -49,25 +53,32 @@ that each runtime has one declared authority is workstream 4 of
   the spec lists. A session that cannot get the pin starts anyway and
   says so, as decided in `session-node-pin.spec.md`, "Should a failed
   Node install stop the session? (resolved: no, and it installs with
-  `npm ci`)". On a developer machine nothing reads `.nvmrc` but `nvm use`.
-- The Python pin is not in effect where Python runs. Every uv call runs
-  in the project at `barwise/`, and uv looks for a version file only up
-  to the project root, so it never reads the repo-root `.python-version`.
-  It selects from `requires-python = ">=3.13"` instead. Measured with uv
-  0.11.32 (`uv python find -v` from `barwise/`); CI's uv 0.12.7 was not
-  measured (barwise-g32).
+  `npm ci`)". On a developer machine no repo tooling checks the Node
+  version; a version manager that reads `.nvmrc` may, and npm warns
+  below the `engines.node` major.
+- The Python pin is only partly in effect. CI's `uv python install`,
+  run in `barwise/`, reads the repo-root `.python-version` and
+  installs 3.13. But uv's selection for `find`, `sync` and `run` looks
+  for a version file only up to the project root at `barwise/`, and
+  falls back to `requires-python = ">=3.13"`. Where nothing installs the
+  pinned minor first -- a developer machine, a web session -- the
+  interpreter floats within the floor (barwise-g32). Measured with uv
+  0.11.32; CI's uv 0.12.7 was not measured.
 - What each decision lacks:
   - 1: `README.md` "Prerequisites" restates the version ("currently
     26.7.0") with nothing checking it (barwise-8hs). Nothing checks
     `.nvmrc` against `engines.node`, which `check:parity` pairs only
     with the lockfile's copy; nothing stops a workflow from naming a
-    literal version; and the runner image is `ubuntu-latest`
-    (barwise-920, `check:pins`);
-  - 2: see the break above. Nothing checks that `uv.lock` stays a
-    single resolution (barwise-g32);
-  - 3: only the web-session hook reads a runtime back. `ci:local`, which
-    the pre-push hook runs, and the pre-commit hook do not check the Node
-    version (barwise-1045). Whether `test:coverage` should refuse on
+    literal version; CI's classifier runs on an unpinned Node; and the
+    runner image is `ubuntu-latest` (barwise-920, a proposed
+    `check:pins`, not built);
+  - 2: see the gap above. Nothing checks that `uv.lock` stays a single
+    resolution (barwise-g32);
+  - 3: no gate checks the running version against the pin; the
+    web-session hook reads Node back, and measurement tools
+    (`measure-comparison.mjs`, `fault-matrix.mjs`) record it.
+    `ci:local`, which the pre-push hook runs, and the pre-commit hook do
+    not check it (barwise-1045). Whether `test:coverage` should refuse on
     another major is left open: `gate-refusal-contract.spec.md`, Open
     decisions, only recommends it. Nothing reads back the Python version
     that ran (barwise-920; barwise-915's close note carries it there).
