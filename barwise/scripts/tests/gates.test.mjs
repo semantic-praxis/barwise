@@ -1325,9 +1325,12 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
     // whether the probe had been reached.
     writeFileSync(
       join(dir, "probe.mjs"),
-      `import { readFileSync, writeFileSync } from "node:fs";\n`
+      `import { readFileSync, renameSync, writeFileSync } from "node:fs";\n`
         + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
-        + `writeFileSync("probe-pid", String(process.pid));\n`
+        // Written whole, then renamed: a half-written file would read as 0,
+        // and process.kill(0) signals the whole process group.
+        + `writeFileSync("probe-pid.tmp", String(process.pid));\n`
+        + `renameSync("probe-pid.tmp", "probe-pid");\n`
         + `setTimeout(() => {}, 60_000);\n`,
     );
 
@@ -1360,6 +1363,7 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
     }
     assert.ok(existsSync(pidFile), "the mutated run never started, so there is nothing to kill");
     probePid = Number(readFileSync(pidFile, "utf8"));
+    assert.ok(Number.isInteger(probePid) && probePid > 0, `not a pid: ${probePid}`);
     process.kill(probePid, "SIGTERM");
 
     const status = await exited;
@@ -1376,13 +1380,17 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
     assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
   } finally {
     // On a failed assertion above, mutate and its probe may still be
-    // running; stop both before removing the directory they work in.
-    for (const pid of [probePid, child?.pid]) {
-      if (pid === undefined) continue;
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {
-        // Already exited.
+    // running; stop both before removing the directory they work in. Only
+    // while mutate runs: once it has exited, so has the probe it waited
+    // on, and either pid may already belong to an unrelated process.
+    if (child && child.exitCode === null && child.signalCode === null) {
+      for (const pid of [probePid, child.pid]) {
+        if (!pid) continue;
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          // Already exited.
+        }
       }
     }
     rmSync(dir, { recursive: true, force: true });
