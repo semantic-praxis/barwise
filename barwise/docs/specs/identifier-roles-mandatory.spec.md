@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-i77
+Plan-reviewed: f742cb71 (code-review, pr-review)
 Touches: barwise/packages/core/src/model/identification.ts,
 barwise/packages/core/src/validation/ruleId.ts,
 barwise/packages/core/src/validation/rules/completenessWarnings.ts,
