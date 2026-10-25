@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-ygy
+Plan-reviewed: 97bab914 (code-review, pr-review)
 Touches: barwise/packages/core/src/verbalization/constraints/sentence.ts,
 barwise/packages/core/src/verbalization/constraints/phase1.ts,
 barwise/packages/core/src/verbalization/constraints/phase2.ts,
