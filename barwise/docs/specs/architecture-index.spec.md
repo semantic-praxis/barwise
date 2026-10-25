@@ -378,7 +378,7 @@ all of them with a link:
 | `credential-handling.md`          | process      | CLAUDE.md conventions; `credential-scanning.spec.md`                                                                                                               |
 | `pinned-runtimes.md`              | process      | CLAUDE.md "Monorepo Commands" (Node and Python pins)                                                                                                               |
 | `plan-before-code.md`             | process      | CLAUDE.md conventions bullet 1 (spec first); `spec-writer` step 8 and design gate; `pr-creation` readiness; `plan-scope-check.spec.md`; `touches-required.spec.md` |
-| `merge-delegation.md`             | process      | CLAUDE.md conventions bullet 3; `steward` skill, section 4b                                                                                                        |
+| `merge-delegation.md`             | process      | CLAUDE.md conventions bullet 3; `steward` skill, section 4b; `pr-review` skill (description, section 6); `REVIEW.md`; `pr-creation` skill; `steward-skill.spec.md` |
 | `review-policy.md`                | process      | `tiered-pr-review.spec.md` "The decision of 2026-09-23"                                                                                                            |
 
 `schema-versioning.md` is the question the list raises: today it is a

@@ -1,8 +1,8 @@
 # Merge delegation
 
 Scope: process
-Date: 2026-10-25
-Tracking: barwise-zdd, barwise-q93, docs/specs/steward-skill.spec.md,
+Date: 2026-10-18
+Tracking: barwise-zdd, barwise-4q0, barwise-raw, docs/specs/steward-skill.spec.md,
 docs/specs/pr-skills.spec.md
 
 ## Context
@@ -45,27 +45,33 @@ run on which changes is a separate decision, owned by the root
 
 ## Consequences
 
-- Nothing mechanical enforces decisions 1 to 3 (barwise-zdd). A merge
-  goes through the GitHub API, outside every repository hook, and the
-  agent hooks in `.claude/settings.json` match only Bash. The `main`
-  ruleset forbids deletion and non-fast-forward pushes and requires no
-  status check and no review, so a session that never loads `steward`
-  can merge, as #679 did.
-- The record decision 2 asks for is not reliably there, and an agent's
-  merge cannot be told from the owner's: of the 15 most recent merged
-  pull requests (#785 to #798), 2 carry a comment naming the merged
-  head, and all 15 show the owner's login as the merger, because a
-  session acts as the owner (barwise-zdd).
-- The SHA pin is the one mechanical part, and it holds only when the
-  agent passes it: GitHub then refuses a merge whose head has moved.
-- The two-review cap in decision 4 answers barwise-q93 for an agent
-  driving its own pull request; REVIEW.md's "Re-reviews must converge"
-  points back to it. A general stopping rule for local review is still
-  open there.
-- Deliberate, as approval policy the owner kept (`review-md.spec.md`,
-  "Does the Claude Code team's own practice change this?"): the agent
-  may merge a pull request of any risk tier, and an open finding blocks
-  a merge by convention, not by branch protection.
+- Nothing mechanical enforces decisions 1, 3 or 4 (barwise-zdd). No
+  hook inspects a merge: the GitHub MCP merge tool matches no hook in
+  `.claude/settings.json`, and `gh pr merge` passes through the Bash
+  hooks, which do not look at merges. A session that never loads
+  `steward` can merge, as #679 did.
+- Decision 2's pin holds only when the agent passes the SHA; GitHub then
+  refuses a merge whose head has moved. Nothing requires the pin or the
+  comment (barwise-zdd).
+- An agent's merge cannot be told from the owner's: a session acts as
+  the owner, so every merge shows the owner's login, and the owner may
+  merge without the comment decision 2 asks of the agent. Whether this
+  rule is followed cannot be measured from the record (barwise-4q0).
+- Whether `main` requires the `ci` check is unsettled: `steward`
+  section 4a says it does, and the rulesets a session can read show only
+  deletion and non-fast-forward rules (barwise-raw). This ADR's
+  condition does not include CI, because neither source states it.
+- The two-review cap in decision 4 governs reviews before a merge. The
+  local `/code-review` loop before a pull request opens still has no
+  stopping rule (barwise-q93).
+- Left to the owner as approval policy, and not decided here
+  (`review-md.spec.md`, the rows marked owner): section 4b sets no risk
+  tier limit, so the agent may merge a pull request of any tier, and an
+  open finding blocks a merge only by convention, because blocking needs
+  branch protection.
 - The condition vouches that the review recommended `merge` on that
   head. It cannot show the review was done well; that is `pr-review`'s
   own discipline.
+- Until architecture-index WS5 replaces them with links, `steward`
+  section 4b, the `pr-review` skill, `REVIEW.md` and `pr-creation`
+  also state parts of this rule (barwise-ubc, WS5).
