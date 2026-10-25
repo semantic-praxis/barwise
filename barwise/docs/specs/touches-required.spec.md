@@ -1,16 +1,15 @@
 # New specs declare `Touches:`, checked by `check:spec-touches`
 
 Status: Implemented 2026-10-25 (workstream 1: the new-spec rule in
-check:spec-touches, lib/pr-base.mjs shared with check:plan-review, the
-ci.yml BASE_SHA line, and the wording in spec-writer, the template and
-pr-creation; see Implementation notes)
+check:spec-touches, judged against a fixed cutoff commit rather than a
+per-change base, and the wording in spec-writer, the template and
+pr-creation; see Implementation notes for where it departs from the plan)
 
 Created: 2026-10-24
 Last-updated: 2026-10-25
 Tracking: barwise-ef0
 Plan-reviewed: d8e49646 (code-review, pr-review; re-pointed after the owner's decisions, which adopt the recommended options)
-Touches: barwise/scripts/check-spec-touches.mjs, barwise/scripts/check-plan-review.mjs,
-+barwise/scripts/lib/pr-base.mjs, barwise/scripts/tests/spec-reader.test.mjs,
+Touches: barwise/scripts/check-spec-touches.mjs, barwise/scripts/tests/spec-reader.test.mjs,
 barwise/scripts/tests/gates.test.mjs, barwise/scripts/lib/spec-reader.mjs,
 barwise/scripts/measure-touches-required.mjs,
 barwise/scripts/tests/expected-counts.json, .github/workflows/ci.yml,
@@ -329,50 +328,108 @@ no others.
 
 ## Implementation notes (2026-10-25)
 
-Built as planned, with these departures:
+The rule is built, but against a fixed cutoff commit instead of the
+per-change base this plan describes. The `/code-review` of the first
+build (`f5ebc3c2`) found that six of its nine findings came from judging
+"new" against a base that moves.
 
+- **"New" is judged against a fixed cutoff, not a base. This departs
+  from the plan.** A corpus spec is new when its file name appears
+  nowhere under `barwise/docs/specs/` (archive included) in the tree of
+  `TOUCHES_REQUIRED_SINCE` in `lib/spec-reader.mjs`. That is `014a4602`,
+  the merge base of the branch that lands the rule. It is a commit main
+  already held before the branch was cut, so it stays reachable however
+  the branch merges, and every full clone has it. The reasons:
+  - **The before-SHA escape.** The planned push check failed in two
+    ways. `concurrency: cancel-in-progress` on main can cancel the run
+    for a direct push. And even when that run went red, the next push's
+    before-SHA already held the spec, so the spec read as existing and
+    was exempt for good: the red was temporary and the exemption
+    permanent. Against a fixed cutoff, a spec that lands by any route is
+    checked on every later run. That honours Open decision 4 ("check
+    pushes to main") more strongly than the before-SHA did.
+  - **A stale `origin/main`.** With nothing to fetch, pre-push can no
+    longer fail on another author's spec.
+  - **Nothing to resolve.** The `BASE_SHA` line for this step in
+    `ci.yml`, `lib/pr-base.mjs`, the stale-base hint and its source-string
+    match, and `--head` are gone. `check-plan-review.mjs` keeps its own
+    base resolution, unchanged: with one user, the shared module had
+    shared only the resolution order. The git wrapper, the shallow
+    refusal, the merge base and the three-dot diff were copied around it.
+
+  A rename to a new file name still reads as new (Open decision 2): a new
+  name is absent at the cutoff.
+- **New-spec text is read from the working tree.** The rule reads the
+  specs and entries the tree rule already read: tracked paths, read from
+  disk. So committed, staged and unstaged edits agree, and an untracked
+  spec is named as unchecked by both rules. The first build read HEAD,
+  so a staged new spec without `Touches:` passed a plain `ci:local`.
+- **Refusals.** The gate exits 2 when the cutoff is not in the clone
+  (the message says when the clone is shallow and names
+  `git fetch --unshallow`), when git fails, or when git lists nothing at
+  the cutoff. A shallow clone that does hold the cutoff is not refused:
+  the rule reads one tree and no history. The tree rule's findings are
+  printed before a refusal, and they make the exit 1: they fail the
+  change whatever the new-spec rule would have said.
+- **Entries under `barwise/docs/specs/` do not count.** That covers a
+  spec's own path and the directory itself. Both are tracked as soon as
+  the spec is, so either one would satisfy the rule by naming the plan
+  instead of what it changes; `check:plan-review` drops a spec's own file
+  from its implementation for the same reason. `newSpecVerdict` in
+  `lib/spec-reader.mjs` is the one predicate. Both the gate and
+  `measure-touches-required.mjs`, this spec's acceptance instrument,
+  call it, so the two cannot drift apart. It also ignores an empty `-`
+  entry, which the tree rule already reports.
 - **The tests are in `gates.test.mjs`, not `spec-reader.test.mjs`.** The
-  new rule needs a git sandbox, and `gates.test.mjs` already holds the
-  `planRepo` one this mirrors (`touchesRepo`). 16 tests: field absent,
-  `+none`, a `-` entry naming nothing tracked at the base, an unmarked
-  entry and a lone tracked `-` entry (passing), an empty `Touches:`
-  (exactly one finding), edit/archive/restore/move between directories
-  (exempt), an added archived spec, ADR and README (exempt), a
-  name-changing rename (new, per Open decision 2), push mode with a
-  before-SHA plus a `--head` replay, the `origin/main` fallback and its
-  stale-base hint, and the refusals: all-zero base, unresolvable base,
-  shallow clone, and `git merge-base`, `git diff`, `git ls-tree`
-  failing. `spec-reader.test.mjs` gains one assertion: under the fixture
-  overrides the OK line says the new rule was not applied.
-- **The satisfying-entry rule is shared.** `newSpecVerdict` in
-  `lib/spec-reader.mjs` is the one predicate; `check-spec-touches.mjs`
-  and `measure-touches-required.mjs` both call it. Left as two copies, the
-  measure, which is this spec's acceptance test, could drift from the
-  gate it checks. It also ignores an empty `-` entry, which the tree rule
-  already reports.
-- **The stale-base hint prints only on the `origin/main` fallback.** CI
-  passes an exact base and cannot misattribute, so there the hint was
-  noise.
-- **`--head` is verified too.** An unresolvable `--head` refuses with
-  exit 2, like an unresolvable base.
-- **`check:plan-review` refuses an all-zero `BASE_SHA` by name.** It used
-  to refuse at `git merge-base` with git's own message; the exit code is 2
-  either way, so the shared module changes only the wording.
+  rule needs a git sandbox, and `touchesRepo` mirrors `planRepo` there.
+  There are 16 tests.
+  - Fail (exit 1):
+    - no `Touches:`;
+    - `+none`;
+    - a `-` entry naming nothing tracked at the cutoff;
+    - an entry naming only the spec's own path, or only the specs
+      directory;
+    - a rename to a new name;
+    - a staged spec, and an unstaged edit that drops `Touches:`;
+    - a spec that reached main without passing, still failing after a
+      later commit.
+  - Pass (exit 0):
+    - an unmarked entry, and a lone `-` entry tracked at the cutoff;
+    - an existing spec edited, archived, restored or moved between
+      directories;
+    - an added archived spec, an ADR, and a non-spec README.
+  - An empty `Touches:`: exactly one finding, the existing one.
+  - Refusals: the cutoff absent (the default constant, and a bogus
+    `--cutoff`), a shallow clone short of the cutoff, `git ls-tree`
+    failing, and git listing nothing.
+  - The tree rule's findings printed before a refusal, with exit 1.
+
+  `spec-reader.test.mjs` gains one assertion: under the fixture
+  overrides, the OK line says the new rule was not applied. Its
+  real-tree test now needs only the cutoff commit, not `origin/main`.
+  `--cutoff <rev>` stands in for the constant in the sandbox and in the
+  replay.
 
 Verified on 2026-10-25:
 
-- Every new guard went red under `scripts/mutate.mjs` (15 mutations, all
-  CAUGHT; the first `--head` mutation was UNCAUGHT, because the test
-  replayed from a checkout that also held the spec, and the test now
-  replays from one that does not).
-- Acceptance: the gate replayed with `--base C^1 --head <head>` over the
-  488 first-parent commits to `7ffea343` exited 1 on exactly the 125
-  commits `measure:touches-required -- --ref 7ffea343` lists under
-  `flagged`, with none missed, none extra and no refusals.
-- Today's tree: exit 0, no new spec since `origin/main`. As a push from
-  `7ffea343` to `origin/main` (`014a4602`, 24 first-parent commits), all 8
-  specs added since declare a tracked path, so nothing on main is newly
-  flagged.
+- **Mutations.** Every new or changed guard went red under
+  `scripts/mutate.mjs`: 14 mutations, all CAUGHT. They include the field
+  absent, `+` alone, `-` at the cutoff, self-reference, exemption by
+  file name, archive counted as existing, the empty field reported once,
+  `--cutoff`, the cutoff-absent and shallow messages, git failing, an
+  empty listing, findings before a refusal, and the constant itself
+  (through the real-tree test).
+- **Acceptance replay.** For each of the 488 first-parent commits C to
+  `7ffea343`, the gate ran in a scratch clone with C's head checked out
+  and `--cutoff C^1`, which matches the old base semantics. It named a
+  new spec on exactly the 125 commits that
+  `measure:touches-required -- --ref 7ffea343` lists under `flagged`:
+  none missed, none extra, no refusals. The tree rule had no findings on
+  any of those trees. The measure's counts are unchanged by the
+  self-reference rule (131 PRs, 151 specs, 8 satisfying, 125 flagged).
+- **Today's tree.** The gate exits 0, with no spec new since the cutoff.
+  With `--cutoff 7ffea343`, the 8 specs added since then all declare a
+  tracked path, so nothing on main is newly flagged.
 
 ## Open decisions (for review)
 

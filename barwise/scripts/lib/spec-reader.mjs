@@ -155,22 +155,46 @@ export function touches(text) {
 }
 
 /**
+ * The commit the new-spec rule is judged against
+ * (docs/specs/touches-required.spec.md): a corpus spec whose file name
+ * appears nowhere under barwise/docs/specs/ in this commit's tree is new,
+ * and must declare a `Touches:` entry naming a tracked path. It is the
+ * merge base of the branch that landed the rule, so it is a commit main
+ * already held before that branch existed: it stays reachable however
+ * the branch merges, and every full clone has it.
+ *
+ * Fixed rather than a per-change base, because a moving base exempts
+ * whatever it has already absorbed: a spec pushed straight to main, or
+ * whose push run `cancel-in-progress` cancelled, was existing for the
+ * next push's before-SHA and so exempt forever. Against a fixed commit,
+ * a spec that lands by any route is checked on every later run.
+ */
+export const TOUCHES_REQUIRED_SINCE = "014a46028ea4561c84af0e40263c6154e69af944";
+
+/** The specs directory, which a new spec's own entries may not lean on. */
+const SPECS_DIR = "barwise/docs/specs/";
+
+/**
  * What the new-spec rule makes of a spec's `Touches:` entries
  * (docs/specs/touches-required.spec.md): "none" (no field), "empty" (a
  * field with no entries, which check:spec-touches already reports),
- * "marked-only" (only `+` entries, or `-` entries naming nothing tracked
- * at the base), or "satisfies". An unmarked entry satisfies, since the
- * tree rule holds it to a tracked path; a `-` entry satisfies when
- * `trackedAtBase(path)` says the base held it. `+` entries alone never
- * do, or `Touches: +none` would pass. Shared by the gate and
- * measure-touches-required, whose counts are the gate's acceptance test.
+ * "marked-only" (no entry that counts), or "satisfies". An unmarked entry
+ * counts, since the tree rule holds it to a tracked path; a `-` entry
+ * counts when `trackedAtCutoff(path)` says the cutoff held it. `+`
+ * entries never do, or `Touches: +none` would pass. Nor does any entry
+ * under barwise/docs/specs/: the spec's own path, or the directory, is
+ * tracked as soon as the spec is, so it would satisfy the rule by naming
+ * the plan instead of what the plan changes -- the file check:plan-review
+ * drops from a plan's implementation for the same reason. Shared by the
+ * gate and measure-touches-required, whose counts are the gate's
+ * acceptance test.
  */
-export function newSpecVerdict(entries, trackedAtBase) {
+export function newSpecVerdict(entries, trackedAtCutoff) {
   if (entries === undefined) return "none";
   if (entries.length === 0) return "empty";
   const real = entries.some((e) =>
-    e.mark === "" || (e.mark === "-" && e.path !== "" && !e.path.includes("*")
-      && trackedAtBase(e.path))
+    e.path !== "" && !e.path.startsWith(SPECS_DIR)
+    && (e.mark === "" || (e.mark === "-" && !e.path.includes("*") && trackedAtCutoff(e.path)))
   );
   return real ? "satisfies" : "marked-only";
 }

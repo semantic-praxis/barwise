@@ -50,7 +50,9 @@ least once:
   spec the PR names that declares `Touches:` and is new in the PR or
   whose Status at the base claims nothing is built.
   `check:spec-touches` fails a PR that adds a spec without a satisfying
-  `Touches:`, so a new spec is always in the rule's reach.
+  `Touches:`, so a new spec always declares the paths the rule compares
+  with the diff; the rule still applies only where those paths overlap
+  what the PR changes.
 - **The tracking issue exists and this PR does not close it.** File
   it with `node barwise/scripts/beads-crud.mjs create` if missing. Closure is
   a tracker-only follow-up after merge (`steward`, section 5); the

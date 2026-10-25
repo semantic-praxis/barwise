@@ -41,8 +41,7 @@
  * named commit and a body a later reader can compare.
  *
  * Base: `--base <ref>`, else $BASE_SHA (ci.yml passes the pull request's
- * base commit), else origin/main -- `lib/pr-base.mjs`, shared with
- * check:spec-touches, which refuses the all-zero SHA. The changed files are the three-dot
+ * base commit), else origin/main. The changed files are the three-dot
  * diff `base...HEAD`, as pr-risk reads them: a two-dot diff counts the
  * base's own new commits as this branch's changes. `--head <rev>` stands
  * in for HEAD, to measure the rule over merged history; nothing in CI
@@ -56,7 +55,6 @@
 import { execFileSync } from "node:child_process";
 import { opt } from "./lib/args.mjs";
 import { parseNameStatus } from "./lib/name-status.mjs";
-import { resolveBase } from "./lib/pr-base.mjs";
 import {
   CLAIMS_NOTHING_BUILT,
   entryPaths,
@@ -127,7 +125,7 @@ const holds = (rev, path) => git(["ls-tree", "-z", "--name-only", rev, "--", pat
 
 let base, head;
 try {
-  ({ base } = resolveBase());
+  base = opt("--base") ?? (process.env.BASE_SHA?.trim() || "origin/main");
   head = opt("--head") ?? "HEAD";
 } catch (err) {
   refuse(err.message);

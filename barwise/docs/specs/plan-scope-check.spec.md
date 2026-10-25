@@ -477,8 +477,9 @@ Grounded 2026-10-24 on `4c28e58d` (origin/main):
   `spec-writer` makes it required for new specs, or a check refuses a
   new spec without it, the gate covers what authors opt into. Closed for
   new specs by `touches-required.spec.md`: `check:spec-touches` now fails
-  a change that adds a spec without a `Touches:` entry naming a tracked
-  path; specs that existed at the merge base stay exempt.
+  a spec without a `Touches:` entry naming a tracked path, unless its
+  file name existed at the rule's cutoff commit, so the specs already
+  written stay exempt.
 - **The body is compared at the first change's parent** (kept by the
   owner, 2026-10-24). Read literally,
   "the body at that first change" includes that commit's own edits.
