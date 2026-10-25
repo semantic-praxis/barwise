@@ -533,3 +533,156 @@ describe("uniqueness on a binary between two entities", () => {
     expect(table.primaryKey.columnNames).toHaveLength(2);
   });
 });
+
+/**
+ * A mandatory role is enforced only by a NOT NULL column for the role in
+ * its own player's table (mandatory-role-routing.spec.md, barwise-plq);
+ * anywhere else it spills.
+ */
+describe("mandatory roles", () => {
+  const spilledIn = (model: OrmModel) => {
+    const schema = new RelationalMapper().map(model);
+    return routeConstraints(model, schema, postgres, "postgres").spilled;
+  };
+  function places(uniqueness: "role2" | "spanning", mandatory: "role1" | "role2") {
+    return new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_nr" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness,
+        mandatory,
+      })
+      .build();
+  }
+
+  it("routes nothing for a role absorbed as a NOT NULL column", () => {
+    expect(spilledIn(places("role2", "role2"))).toEqual([]);
+  });
+
+  it("spills the one side of a one-to-many", () => {
+    const spilled = spilledIn(places("role2", "role1"));
+    expect(spilled.map((s) => s.reason)).toEqual([
+      "each instance must appear in another table, which no column can require",
+    ]);
+    expect(spilled[0]!.spec.verbalization).toMatch(/Each Customer places at least one Order/);
+  });
+
+  it("places the spill at the player's table when the role has no column", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_nr" })
+      .withBinaryFactType("Order is placed by Customer", {
+        role1: { player: "Order", name: "is placed by" },
+        role2: { player: "Customer", name: "places" },
+        uniqueness: "role1",
+        mandatory: "role2",
+      })
+      .build();
+    expect(spilledIn(model).map((s) => [s.tableName, s.reason])).toEqual([
+      ["customer", "each instance must appear in another table, which no column can require"],
+    ]);
+  });
+
+  it("spills a role of a many-to-many", () => {
+    const spilled = spilledIn(places("spanning", "role1"));
+    expect(spilled.map((s) => [s.tableName, s.reason])).toEqual([
+      [
+        "customer_places_order",
+        "each instance must appear in another table, which no column can require",
+      ],
+    ]);
+  });
+
+  it("names a nullable column for the role in its own player's table", () => {
+    const model = places("role2", "role2");
+    const schema = new RelationalMapper().map(model);
+    const ft = model.getFactTypeByName("Customer places Order")!;
+    const column = schema.tables
+      .find((t) => t.name === "order")!
+      .columns.find((c) => c.sourceRoleId === ft.roles[1]!.id)!;
+    Object.assign(column, { nullable: true });
+    expect(
+      routeConstraints(model, schema, postgres, "postgres").spilled.map((s) => [
+        s.tableName,
+        s.reason,
+      ]),
+    ).toEqual([["order", "the role's column is nullable"]]);
+  });
+
+  it("places the spill at the table holding the role's columns, an objectifying entity's included", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Deal", { referenceMode: "deal_id" })
+      .withEntityType("Term", { referenceMode: "term_code" })
+      .withEntityType("Clause", { referenceMode: "clause_id" })
+      .withBinaryFactType("Deal has Term", {
+        role1: { player: "Deal", name: "has" },
+        role2: { player: "Term", name: "is of" },
+        uniqueness: "spanning",
+        mandatory: "role1",
+      })
+      .withObjectifiedFactType("Deal has Term", "Clause")
+      .build();
+    expect(spilledIn(model).map((s) => [s.tableName, s.reason])).toEqual([
+      ["clause", "each instance must appear in another table, which no column can require"],
+    ]);
+  });
+
+  it("names a mandatory unary, whose flag column is nullable", () => {
+    const model = new OrmModel({ name: "Test" });
+    const person = model.addObjectType({
+      name: "Person",
+      kind: "entity",
+      referenceMode: "person_id",
+    });
+    model.addFactType({
+      name: "Person is alive",
+      roles: [{ id: "a", name: "is alive", playerId: person.id }],
+      readings: ["{0} is alive"],
+      constraints: [{ type: "mandatory", roleId: "a" }],
+    });
+    expect(spilledIn(model).map((s) => s.reason)).toEqual([
+      "a unary fact maps to a nullable flag, which no column constraint makes true",
+    ]);
+  });
+
+  it("names a mandatory on the value side of an entity-value binary", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "person_id" })
+      .withValueType("Nickname", { dataType: { name: "text" } })
+      .withBinaryFactType("Person has Nickname", {
+        role1: { player: "Person", name: "has" },
+        role2: { player: "Nickname", name: "is of" },
+        uniqueness: "role1",
+        mandatory: "role2",
+      })
+      .build();
+    expect(spilledIn(model).map((s) => [s.tableName, s.reason])).toEqual([
+      ["person", "a value type has no table in which to require the role"],
+    ]);
+  });
+
+  it("spills a role of an n-ary fact type", () => {
+    const model = new OrmModel({ name: "Test" });
+    const deal = model.addObjectType({ name: "Deal", kind: "entity", referenceMode: "deal_id" });
+    const term = model.addObjectType({ name: "Term", kind: "entity", referenceMode: "term_code" });
+    const party = model.addObjectType({ name: "Party", kind: "entity", referenceMode: "party_id" });
+    model.addFactType({
+      name: "Deal has Term for Party",
+      roles: [
+        { id: "d", name: "has", playerId: deal.id },
+        { id: "t", name: "is had by", playerId: term.id },
+        { id: "p", name: "for", playerId: party.id },
+      ],
+      readings: ["{0} has {1} for {2}"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["d", "t"] },
+        { type: "mandatory", roleId: "d" },
+      ],
+    });
+    expect(spilledIn(model).map((s) => s.reason)).toEqual([
+      "each instance must appear in another table, which no column can require",
+    ]);
+  });
+});

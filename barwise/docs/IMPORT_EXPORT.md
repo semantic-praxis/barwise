@@ -32,10 +32,9 @@ same rule. What each keeps of the schema's keys differs and is not
 reported: Avro has no keys or references at all (a primary key is a
 `doc` line), OpenAPI enforces no key uniqueness, and dbt writes no
 `relationships` test when `generateRelationshipTests` is false. Gaps that rule has today are
-tracked: constraints over subtypes (barwise-lwy), mandatory roles the
-mapping does not enforce (barwise-plq), the second uniqueness of a
-one-to-one entity binary (barwise-hjy), and key uniqueness in formats
-without keys (barwise-lqj).
+tracked: constraints over subtypes (barwise-lwy) and key uniqueness in
+formats without keys (barwise-lqj). A mandatory role the mapping does
+not enforce is reported too; DDL comments it with the reason for its shape.
 
 ### DDL (SQL)
 

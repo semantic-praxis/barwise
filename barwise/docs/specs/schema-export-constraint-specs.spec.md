@@ -146,12 +146,14 @@ DDL, made no worse here, and each is filed:
   mandatory on the other role of a one-to-many binary ("each Customer
   places some Order"), on either role of a many-to-many or associatively
   mapped one-to-one, or on the value role of an entity-value binary is
-  enforced nowhere and reported nowhere.
+  enforced nowhere and reported nowhere. Since fixed: the router spills
+  each one with the reason for its shape (`mandatory-role-routing.spec.md`).
 - **The second uniqueness of a one-to-one entity binary** (barwise-hjy).
   The mapper absorbs it as a foreign key column; "each Customer places at
   most one Order" needs UNIQUE on that column, and the router routes
   UNIQUE only for an entity-value binary's value column, so it is lost
-  without a word.
+  without a word. Since fixed: the router routes it as UNIQUE, and the
+  DDL import reads it back (`one-to-one-entity-uniqueness.spec.md`).
 - **A key's uniqueness where the format has no keys** (barwise-lqj).
   Avro writes a primary key as a `doc` line, OpenAPI as a path
   parameter, and dbt tests only a single-column key with `unique`; a

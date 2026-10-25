@@ -218,9 +218,13 @@ function routeAll(
       continue;
     }
     switch (c.type) {
-      // Realized structurally by the relational mapping.
-      case "mandatory":
+      case "mandatory": {
+        // Realized only by a NOT NULL column for the role in its own
+        // player's table (mandatory-role-routing.spec.md, barwise-plq).
+        const gap = mandatoryGap(c.roleId, ft, model, schema);
+        if (gap) spill(inView, gap.reason, gap.table ?? tableForFactType(ft, model, schema));
         break;
+      }
 
       case "internal_uniqueness": {
         // The mapping does not realize a single-role constraint on the
@@ -501,13 +505,62 @@ function entityBinaryUniqueColumns(
   });
 
   const own = findColumns(roleId, schema);
-  if (own) return own.table.sourceElementId === role.playerId ? "realized" : found(own);
+  if (own && inPlayerTable(own, roleId, ft)) return "realized";
+  if (own) return found(own);
   const absorbed = findColumns(partner.id, schema);
   if (absorbed && absorbed.table.sourceElementId === partner.playerId) return found(absorbed);
   // Neither role's columns are where the three places put them: the
   // mapping stored the fact nowhere this can see, so the caller spills
   // rather than counting it realized.
   return "unlocated";
+}
+
+/**
+ * Whether a role's columns sit in its own player's table: where the
+ * mapping stores a fact it realizes as a column of the player. Both the
+ * one-to-one uniqueness rule and the mandatory rule read it, so they
+ * agree on where a role's fact lives.
+ */
+function inPlayerTable(found: { table: Table; }, roleId: string, ft: FactType): boolean {
+  return found.table.sourceElementId === ft.getRoleById(roleId)?.playerId;
+}
+
+/**
+ * Why the relational mapping does not enforce a mandatory role, and the
+ * table to note it at, or undefined when it does: a NOT NULL column for
+ * the role in its own player's table (mandatory-role-routing.spec.md,
+ * barwise-plq). The reasons name the shape, so the report says what a
+ * reader would have to add.
+ */
+function mandatoryGap(
+  roleId: string,
+  ft: FactType,
+  model: OrmModel,
+  schema: RelationalSchema,
+): { reason: string; table?: string; } | undefined {
+  const found = findColumns(roleId, schema);
+  if (found && inPlayerTable(found, roleId, ft)) {
+    const nullable = found.table.columns.some((c) => c.sourceRoleId === roleId && c.nullable);
+    if (!nullable) return undefined;
+    return {
+      reason: ft.arity === 1
+        ? "a unary fact maps to a nullable flag, which no column constraint makes true"
+        : "the role's column is nullable",
+      table: found.table.name,
+    };
+  }
+  const playerId = ft.getRoleById(roleId)?.playerId;
+  if (model.getObjectType(playerId ?? "")?.kind === "value") {
+    return {
+      reason: "a value type has no table in which to require the role",
+      table: found?.table.name,
+    };
+  }
+  const playerTable = schema.tables.find((t) => t.sourceElementId === playerId);
+  return {
+    reason: "each instance must appear in another table, which no column can require",
+    table: found?.table.name ?? playerTable?.name,
+  };
 }
 
 /**
