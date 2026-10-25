@@ -20,6 +20,8 @@ import {
   extractPredicate,
   leadSegs,
   localRole,
+  openingReading,
+  quantifiedReading,
   resolveCommonPlayer,
   UNKNOWN_PREDICATE,
 } from "./sentence.js";
@@ -632,38 +634,14 @@ function spanningArm(model: OrmModel, roleId: string): VerbalizationSegment[] {
     return refSeg(name, other.playerId);
   };
 
-  // A reading that opens with this role's placeholder: nothing before it
-  // but whitespace, or a hyphen-bound lead, which is omitted because the
-  // caller prints the shared subject once (reading-hyphen-binding.spec.md).
-  const own = home.roles.indexOf(role);
-  const rest = home.readings
-    .map((r) => splitReading(r.template).parts)
-    .map((parts) => {
-      const first = parts.findIndex((p) => p.kind === "role");
-      const opener = parts[first];
-      const before = parts.slice(0, first);
-      const clear = before.every((p) => p.kind === "text" && p.text.trim() === "");
-      return opener?.kind === "role" && opener.index === own && clear
-        ? parts.slice(first + 1)
-        : undefined;
-    })
-    .find((parts) => parts !== undefined);
-  if (rest) {
-    const segments: VerbalizationSegment[] = [];
-    // `validateReadingTemplate` accepts a placeholder written flush
-    // against a word ("works on{1}in"), so the space the reading left out
-    // is supplied here rather than rendering "works onsome Projectin".
-    rest.forEach((part, i) => {
-      if (part.kind === "role") {
-        segments.push(textSeg("some "), ...leadSegs(part.lead), playerRef(part.index));
-        return;
-      }
-      let text = i === 0 ? part.text.trimStart() : part.text;
-      if (i > 0 && /^\w/.test(text)) text = " " + text;
-      if (i < rest.length - 1 && text && !/\s$/.test(text)) text += " ";
-      if (text) segments.push(textSeg(text));
-    });
-    return segments;
+  // The opening placeholder's lead is omitted because the caller prints
+  // the shared subject once (reading-hyphen-binding.spec.md).
+  const opening = openingReading(home, home.roles.indexOf(role));
+  if (opening) {
+    return quantifiedReading(
+      opening.rest,
+      (part) => [textSeg("some "), ...leadSegs(part.lead), playerRef(part.index)],
+    );
   }
 
   const segments: VerbalizationSegment[] = [textSeg(role.name)];

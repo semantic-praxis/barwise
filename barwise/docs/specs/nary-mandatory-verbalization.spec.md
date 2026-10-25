@@ -1,6 +1,6 @@
 # A mandatory role on a non-binary fact type names every player
 
-Status: Draft
+Status: Implemented -- WS1
 
 Created: 2026-10-25
 Last-updated: 2026-10-25

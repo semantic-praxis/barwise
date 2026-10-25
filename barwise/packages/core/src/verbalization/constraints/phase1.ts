@@ -5,7 +5,8 @@
 import type { FactType } from "../../model/FactType.js";
 import type { ValueRange } from "../../model/ObjectType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import { expandReading, splitReading } from "../../model/ReadingOrder.js";
+import { splitReading } from "../../model/ReadingOrder.js";
+import type { Role } from "../../model/Role.js";
 import {
   buildVerbalization,
   kwSeg,
@@ -15,7 +16,13 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate, localRole } from "./sentence.js";
+import {
+  extractPredicate,
+  leadSegs,
+  localRole,
+  openingReading,
+  quantifiedReading,
+} from "./sentence.js";
 
 export function verbalizeInternalUniqueness(
   roleIds: readonly string[],
@@ -181,23 +188,54 @@ export function verbalizeMandatory(
     return verbalizeBinaryMandatory(roleId, factType, model);
   }
 
-  const role = localRole(factType, roleId);
-  const ot = model.getObjectType(role.playerId);
-  const name = ot?.name ?? role.name;
-  const reading = factType.readings[0]?.template ?? "";
-  // Every slot gets the constrained player, as before (barwise-ygy); only
-  // the hyphen binding is applied (reading-hyphen-binding.spec.md).
-  const indices = splitReading(reading).parts.flatMap((p) => p.kind === "role" ? [p.index] : []);
-  const expanded = expandReading(
-    reading,
-    Array.from({ length: Math.max(factType.arity, ...indices.map((i) => i + 1)) }, () => name),
-  );
+  return verbalizeNaryMandatory(localRole(factType, roleId), factType, model);
+}
 
+/**
+ * A mandatory role of a unary, ternary or wider fact type
+ * (nary-mandatory-verbalization.spec.md): "Each Appointment is for some
+ * Patient with some Doctor ..." from a reading that opens with the role,
+ * else "For each Agreement, some Party ... signs that Agreement." from the
+ * first reading. Every other placeholder names its own player.
+ */
+function verbalizeNaryMandatory(role: Role, factType: FactType, model: OrmModel): Verbalization {
+  const own = factType.roles.indexOf(role);
+  // `validateReadingTemplate` refuses a placeholder with no role, and the
+  // constructor a fact type with no reading, so neither is handled here.
+  const player = (index: number): VerbalizationSegment => {
+    const r = factType.roles[index]!;
+    return refSeg(model.getObjectType(r.playerId)?.name ?? r.name, r.playerId);
+  };
+  const some = (part: { readonly index: number; readonly lead: string; }) => [
+    kwSeg("some "),
+    ...leadSegs(part.lead),
+    player(part.index),
+  ];
+
+  const opening = openingReading(factType, own);
+  if (opening) {
+    const rest = quantifiedReading(opening.rest, some);
+    return buildVerbalization(factType.id, "constraint", [
+      kwSeg("Each "),
+      ...leadSegs(opening.lead),
+      player(own),
+      ...(rest.length > 0 ? [textSeg(" "), ...rest] : []),
+      textSeg("."),
+    ]);
+  }
+
+  const parts = splitReading(factType.readings[0]!.template).parts;
   return buildVerbalization(factType.id, "constraint", [
-    kwSeg("Each "),
-    refSeg(name, role.playerId),
-    textSeg(" must: "),
-    textSeg(expanded),
+    kwSeg("For each "),
+    player(own),
+    textSeg(", "),
+    ...quantifiedReading(
+      parts,
+      (part) =>
+        part.index === own
+          ? [kwSeg("that "), ...leadSegs(part.lead), player(own)]
+          : some(part),
+    ),
     textSeg("."),
   ]);
 }
