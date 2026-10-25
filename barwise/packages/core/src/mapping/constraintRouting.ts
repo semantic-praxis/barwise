@@ -16,19 +16,15 @@
  * routing.
  */
 
-import {
-  type Constraint,
-  type ConstraintInView,
-  type ConstraintSpec,
-  type FactType,
-  isOverSubtypes,
-  type OrmModel,
-} from "@barwise/core";
-import type { RelationalSchema } from "@barwise/core/mapping";
-import { ConstraintVerbalizer } from "@barwise/core/verbalization";
-import { buildConstraintSpec, findRole } from "../constraintSpec.js";
-import type { DialectCapabilityProfile } from "./dialectCapabilities.js";
-import { renderValuePredicate } from "./valuePredicate.js";
+import { buildConstraintSpec, findRole } from "../annotation/constraintSpec.js";
+import type { ConstraintSpec } from "../export/types.js";
+import { type Constraint, isOverSubtypes } from "../model/Constraint.js";
+import type { FactType } from "../model/FactType.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
+import { renderValuePredicate } from "../sql/valuePredicate.js";
+import { ConstraintVerbalizer } from "../verbalization/index.js";
+import { DIALECT_PROFILES, type DialectCapabilityProfile } from "./dialectCapabilities.js";
+import type { RelationalSchema } from "./RelationalSchema.js";
 
 /** A constraint clause to inject into a rendered CREATE TABLE. */
 export interface RoutedClause {
@@ -52,6 +48,32 @@ export interface SpilledConstraint {
 export interface ConstraintRouting {
   readonly clauses: readonly RoutedClause[];
   readonly spilled: readonly SpilledConstraint[];
+}
+
+/**
+ * A target with no UNIQUE and no CHECK clause: what a format that renders
+ * only the relational schema (OpenAPI, Avro, dbt) can carry. Keys stay
+ * native because the schema carries them; the router never reads them.
+ */
+const NO_CLAUSES: DialectCapabilityProfile = {
+  ...DIALECT_PROFILES.postgres,
+  unique: "absent",
+  check: "absent",
+};
+
+/**
+ * The constraints a format that renders only `schema` drops: every one
+ * the router would spill if the target had neither UNIQUE nor CHECK, by
+ * the same rule DDL uses for "realized by the mapping"
+ * (schema-export-constraint-specs.spec.md). One spec per spilled
+ * constraint; a value type's own value constraint on two columns of one
+ * table is one constraint, so one spec.
+ */
+export function unreportedConstraintSpecs(
+  model: OrmModel,
+  schema: RelationalSchema,
+): ConstraintSpec[] {
+  return routeConstraints(model, schema, NO_CLAUSES, "this format").spilled.map((s) => s.spec);
 }
 
 /**

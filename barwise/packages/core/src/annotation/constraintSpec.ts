@@ -8,16 +8,12 @@
  * constraint is not a `Constraint`, and a constraint over subtypes has no
  * roles to label, so neither is passed here.
  */
-import {
-  type Constraint,
-  type ConstraintInView,
-  type ConstraintSpec,
-  type FactType,
-  type OrmModel,
-  roleIdsOf,
-} from "@barwise/core";
-import { generateCounterexampleInView } from "@barwise/core/counterexample";
-import type { ConstraintVerbalizer } from "@barwise/core/verbalization";
+import { generateCounterexampleInView } from "../counterexample/index.js";
+import type { ConstraintSpec } from "../export/types.js";
+import { type Constraint, roleIdsOf } from "../model/Constraint.js";
+import type { FactType } from "../model/FactType.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
+import type { ConstraintVerbalizer } from "../verbalization/index.js";
 
 export function buildConstraintSpec(
   inView: ConstraintInView,
@@ -163,13 +159,7 @@ export function findRole(
   preferred: FactType | undefined,
   model: OrmModel,
 ): { factType: FactType; role: FactType["roles"][number]; } | undefined {
-  if (preferred) {
-    const role = preferred.getRoleById(roleId);
-    if (role) return { factType: preferred, role };
-  }
-  for (const ft of model.factTypes) {
-    const role = ft.getRoleById(roleId);
-    if (role) return { factType: ft, role };
-  }
-  return undefined;
+  const factType = preferred?.getRoleById(roleId) ? preferred : model.factTypesHolding([roleId])[0];
+  const role = factType?.getRoleById(roleId);
+  return factType && role ? { factType, role } : undefined;
 }

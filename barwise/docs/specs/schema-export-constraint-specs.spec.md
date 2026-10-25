@@ -1,6 +1,6 @@
 # OpenAPI, Avro and dbt exports report the constraints they drop
 
-Status: Draft
+Status: Implemented -- WS1
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -14,10 +14,6 @@ barwise/packages/core/src/mapping/index.ts,
 barwise/packages/core/src/annotation/index.ts,
 barwise/packages/core/src/sql/index.ts,
 barwise/packages/core/CLAUDE.md,
-barwise/packages/formats/src/constraintSpec.ts,
-barwise/packages/formats/src/ddl/constraintRouting.ts,
-barwise/packages/formats/src/ddl/dialectCapabilities.ts,
-barwise/packages/formats/src/ddl/valuePredicate.ts,
 barwise/packages/formats/src/ddl/DdlExportFormat.ts,
 barwise/packages/formats/src/ddl/DdlImportFormat.ts,
 barwise/packages/formats/src/ossie/writeOssie.ts,
@@ -27,11 +23,8 @@ barwise/packages/formats/CLAUDE.md,
 barwise/packages/dbt/src/DbtExportFormat.ts,
 +barwise/packages/core/tests/mapping/ConstraintRouting.test.ts,
 +barwise/packages/core/tests/mapping/unreportedConstraintSpecs.test.ts,
-+barwise/packages/core/tests/mapping/constraintsAcrossFactTypes.test.ts,
 +barwise/packages/core/tests/sql/valuePredicate.test.ts,
 barwise/packages/formats/tests/DdlDialectExport.test.ts,
-barwise/packages/formats/tests/valuePredicate.test.ts,
-barwise/packages/formats/tests/ConstraintRouting.test.ts,
 barwise/packages/formats/tests/constraintsAcrossFactTypes.test.ts,
 barwise/packages/formats/tests/OpenApiExportFormat.test.ts,
 barwise/packages/formats/tests/AvroExportFormat.test.ts,
@@ -177,10 +170,11 @@ DDL, made no worse here, and each is filed:
   `@barwise/core/sql`.
 - The four formats files are deleted; `DdlExportFormat`,
   `DdlImportFormat` and `writeOssie` import from core.
-- Tests follow the code: `ConstraintRouting`, `constraintsAcrossFactTypes`
-  and `valuePredicate` move to `core/tests` mirroring the new paths, and
-  count toward core's coverage floors. `DdlDialectExport` exercises the
-  DDL descriptor and stays in formats, its imports updated.
+- Tests follow the code: `ConstraintRouting` and `valuePredicate` move to
+  `core/tests` mirroring the new paths, and count toward core's coverage
+  floors. `DdlDialectExport` exercises the DDL descriptor and
+  `constraintsAcrossFactTypes` the NORMA importer, both in formats, so
+  both stay there with their imports updated.
 - The gates that name paths move with them, in the same commit:
   `audit-baseline.json`'s row for the `Record<SqlDialect, ...>` union in
   `dialectCapabilities.ts` is re-keyed to the new path (the detector
@@ -208,6 +202,17 @@ no two verbalizations coincide, reports all six and no mandatory; the
 CLI, MCP and editor reports show them through the existing
 `formatConstraintReport` path with no surface change; the counts over
 the tracked models are recorded here.
+
+## Implementation notes
+
+- WS1: the plan moved `constraintsAcrossFactTypes.test.ts` to core with
+  the router. It also round-trips NORMA files through formats' importer
+  and writer, which core cannot import, so it stays in formats and reads
+  the router from `@barwise/core/mapping`.
+- WS1, measured: DDL export of every tracked `.orm.yaml` that loads, in
+  every dialect, with and without annotations, and Ossie export of each,
+  is byte-identical before and after the move, `constraintSpecs`
+  included (1,428 outputs, compared as one JSON file).
 
 ## Open decisions
 

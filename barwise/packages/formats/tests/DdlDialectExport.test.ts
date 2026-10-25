@@ -4,10 +4,9 @@
  * clause, an informational clause, or the ConstraintSpec spillway with
  * a SQL comment.
  */
+import { DIALECT_PROFILES, resolveDialectProfile, routeConstraints } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
-import { routeConstraints } from "../src/ddl/constraintRouting.js";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
-import { DIALECT_PROFILES, resolveDialectProfile } from "../src/ddl/dialectCapabilities.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
 
 const ddlFormat = new DdlExportFormat();

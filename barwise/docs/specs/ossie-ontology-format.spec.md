@@ -8,8 +8,8 @@ Tracking: barwise-pf2.1
 Plan-reviewed: 9a7009d1 (code-review, pr-review)
 Touches: +barwise/packages/formats/src/ossie/,
 barwise/packages/formats/src/registration.ts,
-+barwise/packages/formats/src/constraintSpec.ts,
-barwise/packages/formats/src/ddl/constraintRouting.ts,
++barwise/packages/core/src/annotation/constraintSpec.ts,
+barwise/packages/core/src/mapping/constraintRouting.ts,
 barwise/packages/formats/src/index.ts,
 barwise/packages/formats/tests/,
 barwise/packages/formats/CLAUDE.md,

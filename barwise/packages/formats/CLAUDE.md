@@ -13,7 +13,10 @@ This package depends on `@barwise/core` for model types, the
 `ImportFormat` / `ExportFormatAdapter` interfaces, the format registry,
 and the capabilities the descriptors wrap: `RelationalMapper`, the
 renderers (`renderDdl`, `renderOpenApi`, `renderAvro`),
-`renderPopulationAsSql`, and the SQL cascade parser (`parseSqlFile`). It
+`renderPopulationAsSql`, the constraint router and dialect profiles
+(`routeConstraints`, `resolveDialectProfile`), the ConstraintSpec builder
+(`buildConstraintSpec`), the CHECK predicate parser (`parseValuePredicate`),
+and the SQL cascade parser (`parseSqlFile`). It
 does NOT depend on any editor or tool package.
 
 Allowed runtime dependencies: `@barwise/core`, `yaml`, `fast-xml-parser`.
@@ -30,17 +33,11 @@ src/
   index.ts                       Public API
   registration.ts                The 6 descriptors + registerStandardFormats()
   naming.ts                      Name helpers shared by the adapters (snakeCase)
-  constraintSpec.ts              The ConstraintSpec payload for a constraint a
-                                 format cannot express (DDL router, Ossie writer)
   constraintReport.ts            The text the export surfaces show for a result's
                                  constraintSpecs (CLI stderr, MCP block)
   ddl/DdlImportFormat.ts         SQL DDL -> ORM
-  ddl/DdlExportFormat.ts         ORM -> SQL DDL (wraps renderDdl; applies the
+  ddl/DdlExportFormat.ts         ORM -> SQL DDL (wraps renderDdl; applies core's
                                  dialect constraint routing as a text pass)
-  ddl/dialectCapabilities.ts     Per-dialect constraint capability profiles
-                                 (native / informational / absent)
-  ddl/constraintRouting.ts       Routes model constraints to UNIQUE/CHECK
-                                 clauses or the ConstraintSpec spillway
   ddl/barwiseAnnotation.ts       The `-- barwise:v1 {json}` line the DDL
                                  export writes and the DDL import reads:
                                  the one owner of that format
