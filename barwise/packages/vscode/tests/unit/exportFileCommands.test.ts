@@ -18,6 +18,7 @@ const state = vi.hoisted(() => ({
   hasProject: true,
   written: new Map<string, string>(),
   warnings: [] as string[],
+  warningChoice: undefined as string | undefined,
   infos: [] as string[],
   errors: [] as string[],
 }));
@@ -36,7 +37,7 @@ vi.mock("vscode", () => ({
     },
     showWarningMessage: async (message: string) => {
       state.warnings.push(message);
-      return undefined;
+      return state.warningChoice;
     },
     showErrorMessage: async (message: string) => {
       state.errors.push(message);
@@ -109,26 +110,32 @@ function expectedFiles(format: string, options: Record<string, unknown>, root: s
 beforeEach(() => {
   state.written.clear();
   state.warnings.length = 0;
+  state.warningChoice = undefined;
+  state.editorPath = "/work/school.orm.yaml";
   state.infos.length = 0;
   state.errors.length = 0;
   state.hasProject = true;
 });
 
 describe("Barwise: Export, As Avro Schemas", () => {
-  it("makes a file name Avro rejects into a valid namespace, and says so (barwise-1c2)", async () => {
+  it("asks before exporting under a repaired namespace, and exports it on Export (barwise-1c2)", async () => {
     state.editorPath = "/work/order-system.orm.yaml";
-    try {
-      await run(new ExportAvroCommand());
-    } finally {
-      state.editorPath = "/work/school.orm.yaml";
-    }
+    state.warningChoice = "Export";
+    await run(new ExportAvroCommand());
     expect(state.errors).toEqual([]);
     expect(state.warnings).toEqual([
       `The file name gives the Avro namespace "com.order-system", which Avro's name rule rejects, `
-      + `so the schemas use "com.order_system". A schema registry that accepted "com.order-system" `
+      + `so the schemas would use "com.order_system". A schema registry that accepted "com.order-system" `
       + "will treat these as new schemas.",
     ]);
     expect(state.written).toEqual(expectedFiles("avro", { namespace: "com.order_system" }, "/out"));
+  });
+
+  it("writes nothing when the repaired namespace is declined", async () => {
+    state.editorPath = "/work/order-system.orm.yaml";
+    await run(new ExportAvroCommand());
+    expect(state.warnings).toHaveLength(1);
+    expect(state.written.size).toBe(0);
   });
 
   it("warns nothing for a file name that is already a valid namespace", async () => {

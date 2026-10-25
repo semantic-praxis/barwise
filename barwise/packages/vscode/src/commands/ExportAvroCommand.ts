@@ -49,11 +49,16 @@ export class ExportAvroCommand {
     const derived = `com.${baseName}`;
     const namespace = toAvroNamespace(derived);
     if (namespace !== derived) {
-      vscode.window.showWarningMessage(
+      // Asked before anything is written: the export can overwrite earlier
+      // .avsc files of the same names under the new namespace.
+      const choice = await vscode.window.showWarningMessage(
         `The file name gives the Avro namespace "${derived}", which Avro's name rule rejects, `
-          + `so the schemas use "${namespace}". A schema registry that accepted "${derived}" `
+          + `so the schemas would use "${namespace}". A schema registry that accepted "${derived}" `
           + "will treat these as new schemas.",
+        { modal: true },
+        "Export",
       );
+      if (choice !== "Export") return;
     }
     const exported = exportWith("avro", model, { namespace });
     if (!exported.ok) {

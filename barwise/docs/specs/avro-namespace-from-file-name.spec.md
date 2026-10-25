@@ -94,6 +94,20 @@ The changes above. Acceptance, each pinned by a test:
   was, and the editor repairs only the namespace it derives, with a
   warning.
 
+- Implementation review:
+  - The warning is now a modal question, asked before the folder dialog,
+    and the export goes ahead only on Export. The files it writes can
+    overwrite earlier ones of the same names under the new namespace.
+  - The repair drops accents first and reads the text by code point. A
+    name stored as "e" plus a combining accent (as macOS stores it) now
+    gives the same namespace as one stored as "é", and an astral
+    character gives one underscore.
+  - `isAvroNamespace` stays internal to `@barwise/formats`.
+  - Declined: sharing the repair with Ossie's private `identifier`.
+    `naming.ts` exists "so one adapter's reason to change a name rule does
+    not reach another", and the two rules answer to different grammars.
+  - Declined: a namespace setting, which stays out of scope.
+
 ## Open decisions
 
 1. **What the exporter does with an invalid namespace.** (a) Write it as

@@ -19,8 +19,10 @@ export function isAvroNamespace(namespace: string): boolean {
  * A valid Avro namespace from free text such as a file name: each segment
  * keeps its letters, digits and underscores, every other character becomes
  * an underscore, and a segment that would start with a digit or be empty
- * gains a leading underscore. A namespace already valid is returned
- * unchanged. Different texts can give one namespace ("order-system" and
+ * gains a leading underscore. Accents are dropped first, and the text is
+ * read by code point, so one file name gives one namespace however the
+ * file system encodes it ("café" stored as "e" plus a combining accent is
+ * still "cafe"). A namespace already valid is returned unchanged. Different texts can give one namespace ("order-system" and
  * "order_system"), so a caller that repairs a name says so.
  */
 export function toAvroNamespace(text: string): string {
@@ -28,7 +30,9 @@ export function toAvroNamespace(text: string): string {
   return text
     .split(".")
     .map((segment) => {
-      const cleaned = segment.replace(/[^A-Za-z0-9_]/g, "_");
+      const cleaned = [...segment.normalize("NFKD").replace(/\p{M}/gu, "")]
+        .map((ch) => /[A-Za-z0-9_]/.test(ch) ? ch : "_")
+        .join("");
       return /^[A-Za-z_]/.test(cleaned) ? cleaned : `_${cleaned}`;
     })
     .join(".");

@@ -35,6 +35,14 @@ describe("Avro namespaces", () => {
     expect(toAvroNamespace("com..x")).toBe("com._.x");
   });
 
+  it("gives one namespace however the file system encodes a name, one underscore per character", () => {
+    // NFC (one code point) and NFD ("e" plus a combining accent).
+    expect(toAvroNamespace("com.caf\u00e9")).toBe("com.cafe");
+    expect(toAvroNamespace("com.cafe\u0301")).toBe("com.cafe");
+    // An astral character is one underscore, not one per surrogate.
+    expect(toAvroNamespace("com.a\u{1F600}b")).toBe("com.a_b");
+  });
+
   it("always builds a namespace the rule accepts", () => {
     // Every string of up to three characters over an alphabet holding each
     // class the rule distinguishes: letter, digit, underscore, dot, hyphen,
