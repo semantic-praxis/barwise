@@ -195,8 +195,9 @@ Out of scope:
 - **IRIs and prefixes as model fields.** barwise has no field for them;
   barwise-rqb (custom attributes) is where they would go.
 - **Hyphen binding in verbalization** (`has average- departure {Delay}`),
-  which barwise's verbalizer does not implement for any source:
-  barwise-iiw (Open decision 4).
+  which barwise's verbalizer did not implement for any source:
+  barwise-iiw (Open decision 4), since implemented in core
+  (`reading-hyphen-binding.spec.md`).
 
 ## Inventory
 
@@ -463,6 +464,10 @@ report by re-importing the written document instead.
    core change this spec rules out). **Recommend keeping it and warning**,
    with hyphen binding in core filed as barwise-iiw, since NORMA readings use
    the same convention.
+
+   _Superseded by `reading-hyphen-binding.spec.md` (barwise-iiw)._ Core's
+   verbalizer now applies hyphen binding to every reading, so the importer
+   keeps the reading as written and warns only when a hyphen binds nothing.
 
 5. **Where export reports a loss that is not a constraint.**
    `ExportResult` carries `constraintSpecs` for constraints and
