@@ -80,18 +80,15 @@ function predicate(text: string, subjectLead = "", objectLead = ""): Predicate {
 }
 
 /**
- * Extract the predicate of a binary fact type from the reading that names
- * the subject role before the object role. When no reading has that
- * order, the first reading's text between its first two placeholders is
- * used as written, as before, with its binding hyphens removed and no
- * leads: a lead there belongs to whichever noun the reading put after it,
- * which is not the sentence's object.
+ * The predicate of a binary fact type from the reading that names the
+ * subject role before the object role, or undefined when no reading has
+ * that order.
  */
-export function extractPredicate(
+export function orderedPredicate(
   factType: FactType,
   subjectIdx: number,
   objectIdx: number,
-): Predicate {
+): Predicate | undefined {
   for (const reading of factType.readings) {
     const parts = splitReading(reading.template).parts;
     const s = parts.findIndex((p) => p.kind === "role" && p.index === subjectIdx);
@@ -100,6 +97,27 @@ export function extractPredicate(
       return predicate(textOf(parts.slice(s + 1, o)).trim(), leadOf(parts[s]), leadOf(parts[o]));
     }
   }
+  return undefined;
+}
+
+/**
+ * Extract the predicate of a binary fact type from the reading that names
+ * the subject role before the object role. When no reading has that
+ * order, the first reading's text between its first two placeholders is
+ * used as written, with its binding hyphens removed and no leads: a lead
+ * there belongs to whichever noun the reading put after it, which is not
+ * the sentence's object. That fallback reads the fact backwards: the ring
+ * sentence is unchanged by reversing it, the mandatory and uniqueness
+ * sentences ask `orderedPredicate` first, and the frequency sentence
+ * still reads backwards (barwise-zx2).
+ */
+export function extractPredicate(
+  factType: FactType,
+  subjectIdx: number,
+  objectIdx: number,
+): Predicate {
+  const ordered = orderedPredicate(factType, subjectIdx, objectIdx);
+  if (ordered) return ordered;
 
   const first = factType.readings[0];
   if (first) {
@@ -155,8 +173,11 @@ export function rolePlayer(
 /**
  * Reading parts as segments, with role `own`'s placeholder written "that
  * X" -- the sentence has already named X -- and every other placeholder
- * "some Y", each after its hyphen-bound lead: "works on some Project in
- * some Department", "some Customer ... signs that Agreement".
+ * "some Y" (or `others`, as "at most one Y"), each after its hyphen-bound
+ * lead: "works on some Project in some Department", "some Customer ...
+ * signs that Agreement". A placeholder a reading repeats is "that Y" after
+ * its first mention, since `validateReadingTemplate` accepts a repeat and
+ * a second quantifier would introduce a second Y.
  *
  * `validateReadingTemplate` accepts a placeholder written flush against a
  * word ("works on{1}in") or another placeholder, so the space the reading
@@ -169,17 +190,20 @@ export function quantifiedReading(
   factType: FactType,
   parts: readonly ReadingPart[],
   own: number,
+  others = "some ",
 ): VerbalizationSegment[] {
   const segments: VerbalizationSegment[] = [];
+  const named = new Set<number>([own]);
   const last = parts.length - 1;
   parts.forEach((part, i) => {
     if (part.kind === "role") {
       if (parts[i - 1]?.kind === "role") segments.push(textSeg(" "));
       segments.push(
-        kwSeg(part.index === own ? "that " : "some "),
+        kwSeg(named.has(part.index) ? "that " : others),
         ...leadSegs(part.lead),
         rolePlayer(model, factType, part.index),
       );
+      named.add(part.index);
       return;
     }
     let text = i === 0 ? part.text.trimStart() : part.text;
@@ -189,6 +213,34 @@ export function quantifiedReading(
     if (text) segments.push(textSeg(text));
   });
   return segments;
+}
+
+/**
+ * "For each X, <the first reading, quantified>." for role `own`'s player
+ * X, with `others` quantifying every other role: the sentence for a role
+ * no reading opens with. A non-binary mandatory writes it
+ * (nary-mandatory-verbalization.spec.md), and so does a binary constraint
+ * on the role no reading names first
+ * (binary-reverse-reading-verbalization.spec.md, barwise-wsl): "For each
+ * Customer, some Order is placed by that Customer." -- the reading as the
+ * modeller wrote it, where slicing its predicate would read it backwards
+ * ("Each Customer is placed by at least one Order").
+ */
+export function forEachReading(
+  model: OrmModel,
+  factType: FactType,
+  own: number,
+  others: string,
+): VerbalizationSegment[] {
+  // The constructor refuses a fact type with no reading.
+  const parts = splitReading(factType.readings[0]!.template).parts;
+  return [
+    kwSeg("For each "),
+    rolePlayer(model, factType, own),
+    textSeg(", "),
+    ...quantifiedReading(model, factType, parts, own, others),
+    textSeg("."),
+  ];
 }
 
 /** A lead as the segment that goes before its player's name, or none. */

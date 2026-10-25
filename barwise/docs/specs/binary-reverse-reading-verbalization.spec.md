@@ -1,6 +1,6 @@
 # A binary constraint on the role no reading names first reads the right way round
 
-Status: Draft -- no workstream implemented
+Status: Implemented
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -102,6 +102,12 @@ the only reading names second; both unchanged when a reverse reading
 exists and for the role the reading names first; a hyphen-bound lead
 after Q and after "that"; a repeated placeholder; every other test in
 the monorepo passes; the corpus effect is recorded here.
+
+## Implementation notes
+
+- As planned. The corpus measurement on the implementation matches the
+  prototype's: the same 125 sentences change, and the barwise-vscode
+  suite also passes (133 tests).
 
 ## Open decisions
 

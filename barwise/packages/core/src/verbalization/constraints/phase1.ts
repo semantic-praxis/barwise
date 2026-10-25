@@ -5,7 +5,6 @@
 import type { FactType } from "../../model/FactType.js";
 import type { ValueRange } from "../../model/ObjectType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import { splitReading } from "../../model/ReadingOrder.js";
 import type { Role } from "../../model/Role.js";
 import {
   buildVerbalization,
@@ -17,10 +16,11 @@ import {
   type VerbalizationSegment,
 } from "../Verbalization.js";
 import {
-  extractPredicate,
+  forEachReading,
   leadSegs,
   localRole,
   openingReading,
+  orderedPredicate,
   quantifiedReading,
   rolePlayer,
 } from "./sentence.js";
@@ -77,11 +77,14 @@ export function verbalizeBinaryUniqueness(
   const subjectName = subjectType?.name ?? subjectRole.name;
   const objectName = objectType?.name ?? objectRole.name;
 
-  const predicate = extractPredicate(
-    factType,
-    constrainedIdx,
-    otherIdx,
-  );
+  const predicate = orderedPredicate(factType, constrainedIdx, otherIdx);
+  if (!predicate) {
+    return buildVerbalization(
+      factType.id,
+      "constraint",
+      forEachReading(model, factType, constrainedIdx, "at most one "),
+    );
+  }
 
   const segments: VerbalizationSegment[] = [
     kwSeg("Each "),
@@ -215,15 +218,11 @@ function verbalizeNaryMandatory(role: Role, factType: FactType, model: OrmModel)
     ]);
   }
 
-  // The constructor refuses a fact type with no reading.
-  const parts = splitReading(factType.readings[0]!.template).parts;
-  return buildVerbalization(factType.id, "constraint", [
-    kwSeg("For each "),
-    subject,
-    textSeg(", "),
-    ...quantifiedReading(model, factType, parts, own),
-    textSeg("."),
-  ]);
+  return buildVerbalization(
+    factType.id,
+    "constraint",
+    forEachReading(model, factType, own, "some "),
+  );
 }
 
 export function verbalizeBinaryMandatory(
@@ -243,11 +242,14 @@ export function verbalizeBinaryMandatory(
   const subjectName = subjectType?.name ?? subjectRole.name;
   const objectName = objectType?.name ?? objectRole.name;
 
-  const predicate = extractPredicate(
-    factType,
-    mandatoryIdx,
-    otherIdx,
-  );
+  const predicate = orderedPredicate(factType, mandatoryIdx, otherIdx);
+  if (!predicate) {
+    return buildVerbalization(
+      factType.id,
+      "constraint",
+      forEachReading(model, factType, mandatoryIdx, "some "),
+    );
+  }
 
   const segments: VerbalizationSegment[] = [
     kwSeg("Each "),
