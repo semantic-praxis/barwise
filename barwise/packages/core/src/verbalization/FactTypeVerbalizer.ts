@@ -1,5 +1,6 @@
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
+import { splitReading } from "../model/ReadingOrder.js";
 import {
   buildVerbalization,
   refSeg,
@@ -53,7 +54,8 @@ export class FactTypeVerbalizer {
  * Parse a reading template into structured segments.
  *
  * Text between placeholders becomes text segments; placeholders become
- * object_type_ref segments that link to the role's player.
+ * object_type_ref segments that link to the role's player, each after the
+ * words hyphen-bound to it (reading-hyphen-binding.spec.md).
  */
 function parseReadingTemplate(
   factType: FactType,
@@ -61,34 +63,21 @@ function parseReadingTemplate(
   model: OrmModel,
 ): VerbalizationSegment[] {
   const segments: VerbalizationSegment[] = [];
-  const placeholderPattern = /\{(\d+)\}/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = placeholderPattern.exec(template)) !== null) {
-    // Text before the placeholder.
-    if (match.index > lastIndex) {
-      segments.push(textSeg(template.slice(lastIndex, match.index)));
+  for (const part of splitReading(template).parts) {
+    if (part.kind === "text") {
+      segments.push(textSeg(part.text));
+      continue;
     }
-
-    const roleIndex = parseInt(match[1]!, 10);
-    const role = factType.roles[roleIndex];
+    if (part.lead) segments.push(textSeg(part.lead + " "));
+    const role = factType.roles[part.index];
     if (role) {
       const objectType = model.getObjectType(role.playerId);
       const name = objectType?.name ?? role.name;
       segments.push(refSeg(name, role.playerId));
     } else {
       // Fallback: leave the placeholder as text.
-      segments.push(textSeg(match[0]!));
+      segments.push(textSeg(`{${part.index}}`));
     }
-
-    lastIndex = match.index + match[0]!.length;
   }
-
-  // Trailing text after the last placeholder.
-  if (lastIndex < template.length) {
-    segments.push(textSeg(template.slice(lastIndex)));
-  }
-
   return segments;
 }

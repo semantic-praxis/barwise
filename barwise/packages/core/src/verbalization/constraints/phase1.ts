@@ -5,6 +5,7 @@
 import type { FactType } from "../../model/FactType.js";
 import type { ValueRange } from "../../model/ObjectType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
+import { expandReading } from "../../model/ReadingOrder.js";
 import {
   buildVerbalization,
   kwSeg,
@@ -14,7 +15,7 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate, localRole } from "./sentence.js";
+import { extractPredicate, leadSegs, localRole } from "./sentence.js";
 
 export function verbalizeInternalUniqueness(
   roleIds: readonly string[],
@@ -76,9 +77,11 @@ export function verbalizeBinaryUniqueness(
 
   const segments: VerbalizationSegment[] = [
     kwSeg("Each "),
+    ...leadSegs(predicate.subjectLead),
     refSeg(subjectName, subjectRole.playerId),
-    textSeg(" " + predicate + " "),
+    textSeg(" " + predicate.text + " "),
     kwSeg("at most one "),
+    ...leadSegs(predicate.objectLead),
     refSeg(objectName, objectRole.playerId),
     textSeg("."),
   ];
@@ -184,7 +187,9 @@ export function verbalizeMandatory(
   const ot = model.getObjectType(role.playerId);
   const name = ot?.name ?? role.name;
   const reading = factType.readings[0]?.template ?? "";
-  const expanded = reading.replace(/\{\d+\}/g, name);
+  // Every slot gets the constrained player, as before (barwise-ygy); only
+  // the hyphen binding is applied (reading-hyphen-binding.spec.md).
+  const expanded = expandReading(reading, Array.from({ length: factType.arity }, () => name));
 
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("Each "),
@@ -220,9 +225,11 @@ export function verbalizeBinaryMandatory(
 
   const segments: VerbalizationSegment[] = [
     kwSeg("Each "),
+    ...leadSegs(predicate.subjectLead),
     refSeg(subjectName, subjectRole.playerId),
-    textSeg(" " + predicate + " "),
+    textSeg(" " + predicate.text + " "),
     kwSeg("at least one "),
+    ...leadSegs(predicate.objectLead),
     refSeg(objectName, objectRole.playerId),
     textSeg("."),
   ];

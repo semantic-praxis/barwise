@@ -163,7 +163,15 @@ export {
   type PopulationConfig,
 } from "./model/Population.js";
 export { type ProductConfig, ProductDependency } from "./model/ProductDependency.js";
-export { expandReading, type ReadingOrder, validateReadingTemplate } from "./model/ReadingOrder.js";
+export {
+  expandReading,
+  type ReadingOrder,
+  type ReadingPart,
+  type SplitReading,
+  splitReading,
+  validateReadingTemplate,
+  withLead,
+} from "./model/ReadingOrder.js";
 export { Role, type RoleConfig } from "./model/Role.js";
 export { SemanticConflict, type SemanticConflictConfig } from "./model/SemanticConflict.js";
 export { SubtypeFact, type SubtypeFactConfig } from "./model/SubtypeFact.js";

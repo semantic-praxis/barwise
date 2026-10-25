@@ -5,7 +5,7 @@
 import type { RingType } from "../../model/Constraint.js";
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import { expandReading } from "../../model/ReadingOrder.js";
+import { expandReading, type ReadingPart, splitReading } from "../../model/ReadingOrder.js";
 import type { JoinOperand, RolePath } from "../../model/RolePath.js";
 import { assertNever } from "../../util/assertNever.js";
 import {
@@ -16,7 +16,7 @@ import {
   type Verbalization,
   type VerbalizationSegment,
 } from "../Verbalization.js";
-import { extractPredicate, localRole, resolveCommonPlayer } from "./sentence.js";
+import { extractPredicate, leadSegs, localRole, resolveCommonPlayer } from "./sentence.js";
 
 export function verbalizeDisjunctiveMandatory(
   roleIds: readonly string[],
@@ -223,15 +223,26 @@ export function verbalizeRing(
 
   const predicate = factType.arity === 2
     ? extractPredicate(factType, 0, 1)
-    : "...";
+    : { text: "...", subjectLead: "", objectLead: "" };
+  // "{subject} [does not] {predicate} [determiner] {object}", each lead
+  // before the name in its own role slot (reading-hyphen-binding.spec.md).
+  const clause = (
+    subject: VerbalizationSegment,
+    object: VerbalizationSegment,
+    options: { readonly negated?: boolean; readonly determiner?: string; } = {},
+  ): VerbalizationSegment[] => [
+    ...leadSegs(predicate.subjectLead),
+    subject,
+    textSeg(` ${options.negated ? "does not " : ""}${predicate.text} ${options.determiner ?? ""}`),
+    ...leadSegs(predicate.objectLead),
+    object,
+  ];
 
   switch (ringType) {
     case "irreflexive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("No "),
-        same,
-        textSeg(" " + predicate + " that same "),
-        same,
+        ...clause(same, same, { determiner: "that same " }),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -239,13 +250,9 @@ export function verbalizeRing(
     case "asymmetric": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" then "),
-        name2,
-        textSeg(" does not " + predicate + " "),
-        name1,
+        ...clause(name2, name1, { negated: true }),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -253,13 +260,9 @@ export function verbalizeRing(
     case "antisymmetric": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" and "),
-        name2,
-        textSeg(" " + predicate + " "),
-        name1,
+        ...clause(name2, name1),
         kwSeg(" then "),
         name1,
         textSeg(" is the same " + typeName + " as "),
@@ -271,13 +274,9 @@ export function verbalizeRing(
     case "symmetric": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" then "),
-        name2,
-        textSeg(" " + predicate + " "),
-        name1,
+        ...clause(name2, name1),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -285,17 +284,11 @@ export function verbalizeRing(
     case "transitive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" and "),
-        name2,
-        textSeg(" " + predicate + " "),
-        name3,
+        ...clause(name2, name3),
         kwSeg(" then "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name3,
+        ...clause(name1, name3),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -303,17 +296,11 @@ export function verbalizeRing(
     case "intransitive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" and "),
-        name2,
-        textSeg(" " + predicate + " "),
-        name3,
+        ...clause(name2, name3),
         kwSeg(" then "),
-        name1,
-        textSeg(" does not " + predicate + " "),
-        name3,
+        ...clause(name1, name3, { negated: true }),
         textSeg("."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -321,9 +308,7 @@ export function verbalizeRing(
     case "acyclic": {
       const segments: VerbalizationSegment[] = [
         kwSeg("No "),
-        same,
-        textSeg(" " + predicate + " that same "),
-        same,
+        ...clause(same, same, { determiner: "that same " }),
         textSeg(", directly or through a chain of such relationships."),
       ];
       return buildVerbalization(factType.id, "constraint", segments);
@@ -331,9 +316,7 @@ export function verbalizeRing(
     case "purely_reflexive": {
       const segments: VerbalizationSegment[] = [
         kwSeg("If "),
-        name1,
-        textSeg(" " + predicate + " "),
-        name2,
+        ...clause(name1, name2),
         kwSeg(" then "),
         name1,
         textSeg(" is the same " + typeName + " as "),
@@ -381,8 +364,9 @@ export function verbalizeFrequency(
 
   const segments: VerbalizationSegment[] = [
     kwSeg("Each "),
+    ...leadSegs(predicate.subjectLead),
     refSeg(subjectName, subjectRole.playerId),
-    textSeg(" " + predicate + " "),
+    textSeg(" " + predicate.text + " "),
   ];
 
   if (max === "unbounded") {
@@ -393,6 +377,7 @@ export function verbalizeFrequency(
     segments.push(kwSeg(`at least ${min} and at most ${max} `));
   }
 
+  segments.push(...leadSegs(predicate.objectLead));
   segments.push(refSeg(objectName, objectRole.playerId));
   segments.push(textSeg("."));
 
@@ -511,15 +496,24 @@ export function cardinalityQuantifier(min: number, max: number | "unbounded"): s
   return `at least ${min} and at most ${max}`;
 }
 
-/** The predicate text of a unary reading ("{0} is active" -> "is active"). */
-function unaryPredicate(factType: FactType): string {
-  const t = factType.readings[0]?.template ?? "";
-  const p = t.indexOf("{0}");
-  if (p >= 0) {
-    const after = t.slice(p + "{0}".length).trim();
-    if (after) return after;
+/**
+ * The predicate text of a unary reading ("{0} is active" -> "is active"),
+ * and the words hyphen-bound to its player ("late- {0} arrives" -> lead
+ * "late"); the fallback text has neither placeholder nor lead
+ * (reading-hyphen-binding.spec.md).
+ */
+function unaryPredicate(factType: FactType): { readonly text: string; readonly lead: string; } {
+  const parts = splitReading(factType.readings[0]?.template ?? "").parts;
+  const at = parts.findIndex((p) => p.kind === "role" && p.index === 0);
+  const opener = parts[at];
+  const lead = opener?.kind === "role" ? opener.lead : "";
+  const textOf = (from: readonly ReadingPart[]) =>
+    from.map((p) => p.kind === "text" ? p.text : "").join("").trim();
+  if (at >= 0) {
+    const after = textOf(parts.slice(at + 1));
+    if (after) return { text: after, lead };
   }
-  return t.replace(/\{\d+\}/g, "").trim() || factType.name;
+  return { text: textOf(parts) || factType.name, lead };
 }
 
 /**
@@ -541,8 +535,9 @@ export function verbalizeCardinality(
   const quantifier = cardinalityQuantifier(min, max);
 
   return buildVerbalization(factType.id, "constraint", [
-    textSeg(`The '${predicate}' role is played by `),
+    textSeg(`The '${predicate.text}' role is played by `),
     kwSeg(`${quantifier} `),
+    ...leadSegs(predicate.lead),
     refSeg(typeName, role.playerId),
     textSeg(" instances."),
   ]);
@@ -638,24 +633,35 @@ function spanningArm(model: OrmModel, roleId: string): VerbalizationSegment[] {
     return refSeg(name, other.playerId);
   };
 
-  const lead = `{${home.roles.indexOf(role)}}`;
-  const reading = home.readings.find((r) => r.template.trimStart().startsWith(lead));
-  if (reading) {
-    const rest = reading.template.trimStart().slice(lead.length).trimStart();
+  // A reading that opens with this role's placeholder: nothing before it
+  // but whitespace, or a hyphen-bound lead, which is omitted because the
+  // caller prints the shared subject once (reading-hyphen-binding.spec.md).
+  const own = home.roles.indexOf(role);
+  const rest = home.readings
+    .map((r) => splitReading(r.template).parts)
+    .map((parts) => {
+      const first = parts.findIndex((p) => p.kind === "role");
+      const opener = parts[first];
+      const before = parts.slice(0, first);
+      const clear = before.every((p) => p.kind === "text" && p.text.trim() === "");
+      return opener?.kind === "role" && opener.index === own && clear
+        ? parts.slice(first + 1)
+        : undefined;
+    })
+    .find((parts) => parts !== undefined);
+  if (rest) {
     const segments: VerbalizationSegment[] = [];
-    // Odd indices are placeholder numbers, even ones the text between.
     // `validateReadingTemplate` accepts a placeholder written flush
     // against a word ("works on{1}in"), so the space the reading left out
     // is supplied here rather than rendering "works onsome Projectin".
-    const parts = rest.split(/\{(\d+)\}/);
-    parts.forEach((part, i) => {
-      if (i % 2 === 1) {
-        segments.push(textSeg("some "), playerRef(Number(part)));
+    rest.forEach((part, i) => {
+      if (part.kind === "role") {
+        segments.push(textSeg("some "), ...leadSegs(part.lead), playerRef(part.index));
         return;
       }
-      let text = part;
+      let text = i === 0 ? part.text.trimStart() : part.text;
       if (i > 0 && /^\w/.test(text)) text = " " + text;
-      if (i < parts.length - 1 && text && !/\s$/.test(text)) text += " ";
+      if (i < rest.length - 1 && text && !/\s$/.test(text)) text += " ";
       if (text) segments.push(textSeg(text));
     });
     return segments;

@@ -20,6 +20,7 @@ import {
   isUniqueAlone,
   OrmModel,
   type RoleConfig,
+  splitReading,
   type ValueConstraintDef,
 } from "@barwise/core";
 import { snakeCase } from "../naming.js";
@@ -501,9 +502,6 @@ function splitEntityRequires(c: OssieConcept): RequiresSplit {
   return { mandatory, unrecognized };
 }
 
-/** Ossie's hyphen binding (`has average- departure {Delay}`), which barwise does not apply. */
-const HYPHEN_BINDING = /\w- /;
-
 function addRelationship(
   model: OrmModel,
   c: OssieConcept,
@@ -519,11 +517,15 @@ function addRelationship(
     name: keys[i]!,
     playerId: playerId(model, player),
   }));
-  for (const pattern of r.verbalizes) {
-    if (HYPHEN_BINDING.test(pattern)) {
+  // barwise applies ORM's hyphen binding (`has average- departure {Delay}`),
+  // so only a hyphen that binds nothing is worth a word; asked of the
+  // converted template, which is what splitReading reads
+  // (reading-hyphen-binding.spec.md).
+  for (const [i, template] of readings.entries()) {
+    if (splitReading(template).unbound) {
       warnings.push(
-        `${name}: reading ${JSON.stringify(pattern)} uses hyphen binding, which barwise does not `
-          + `apply; kept as written (barwise-iiw).`,
+        `${name}: reading ${JSON.stringify(r.verbalizes[i])} has a hyphen that binds nothing; `
+          + `a word ending in a hyphen binds to the role player that follows it. Kept as written.`,
       );
     }
   }

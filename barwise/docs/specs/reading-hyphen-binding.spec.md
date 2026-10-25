@@ -1,6 +1,6 @@
 # Readings bind hyphenated words to the role player that follows
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- WS1
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -181,6 +181,27 @@ One PR. Acceptance:
   hyphen still warns.
 
 Each behavioural test is watched red with its change reverted.
+
+## Implementation notes
+
+- **Acceptance measured.** `tests/model/readingHyphenBinding.test.ts` (the
+  parser, every sentence shape, query and fact-type verbalization),
+  `tests/verbalization/hyphenBindingCorpus.test.ts` (five tracked models),
+  the diagram summary test and the Ossie import tests. Watched red, one
+  mutation each: `expandReading` without leads; the uniqueness, frequency,
+  ring, arm, unary and fact-type parser leads dropped; the fallback given
+  leads; the diagram's raw substitution; the Ossie importer's old regex.
+  Each failed its own test. The corpus test failed on all five models with
+  main's `FactTypeVerbalizer` restored.
+- **Corpus diff.** `barwise verbalize` over every tracked model, before and
+  after: five files change, every changed line contained a binding hyphen,
+  and no line of the new output contains one.
+- **Lead text rather than a new segment kind.** The lead is a text segment
+  before the player reference, so the structured verbalization (and every
+  surface that renders it) needs no new segment type.
+- **The fallback** joins its text and the second placeholder's lead with
+  single spaces ("has child at most one GroupItem"), since the text between
+  two placeholders ends in whitespace.
 
 ## Open decisions
 
