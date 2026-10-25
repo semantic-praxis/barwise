@@ -686,3 +686,75 @@ describe("mandatory roles", () => {
     ]);
   });
 });
+
+/**
+ * A constraint over subtypes spans the subtypes' tables, so it spills at
+ * the supertype's table (schema-export-subtype-constraints.spec.md,
+ * barwise-lwy).
+ */
+describe("constraints over subtypes", () => {
+  /** Party with subtypes LegalEntity and NaturalPerson, and one constraint over them. */
+  function parties(
+    type: "exclusion" | "exclusive_or" | "disjunctive_mandatory",
+    subtypes = ["LegalEntity", "NaturalPerson"],
+  ) {
+    const model = new OrmModel({ name: "Test" });
+    const party = model.addObjectType({
+      id: "p",
+      name: "Party",
+      kind: "entity",
+      referenceMode: "party_id",
+    });
+    const facts = subtypes.map((name) => {
+      const sub = model.addObjectType({
+        id: name,
+        name,
+        kind: "entity",
+        referenceMode: `${name}_id`,
+      });
+      return model.addSubtypeFact({ id: `sf-${name}`, subtypeId: sub.id, supertypeId: party.id })
+        .id;
+    });
+    model.addConstraint({ id: "c", type, subtypeFactIds: facts });
+    const schema = new RelationalMapper().map(model);
+    return routeConstraints(model, schema, postgres, "postgres").spilled;
+  }
+
+  it("spills an exclusion at the supertype's table, with its reason and pseudocode", () => {
+    expect(parties("exclusion").map((s) => [s.tableName, s.reason, s.spec.pseudocode])).toEqual([
+      [
+        "party",
+        "a rule over subtypes spans their tables, which no clause can state",
+        "every instance of Party is an instance of at most one of: LegalEntity, NaturalPerson",
+      ],
+    ]);
+  });
+
+  it("writes the quantity for an exclusive-or and a disjunctive mandatory", () => {
+    expect(parties("exclusive_or")[0]!.spec.pseudocode).toBe(
+      "every instance of Party is an instance of exactly one of: LegalEntity, NaturalPerson",
+    );
+    expect(parties("disjunctive_mandatory", ["LegalEntity"])[0]!.spec.pseudocode).toBe(
+      "every instance of Party is an instance of LegalEntity",
+    );
+    expect(parties("disjunctive_mandatory")[0]!.spec.pseudocode).toBe(
+      "every instance of Party is an instance of at least one of: LegalEntity, NaturalPerson",
+    );
+  });
+
+  it("names the supertype generically, and places no table, when no subtype fact resolves", () => {
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "p", name: "Party", kind: "entity", referenceMode: "party_id" });
+    model.addConstraint({ id: "c", type: "exclusion", subtypeFactIds: ["sf-gone-1", "sf-gone-2"] });
+    const schema = new RelationalMapper().map(model);
+    expect(
+      routeConstraints(model, schema, postgres, "postgres").spilled.map((s) => [
+        s.tableName,
+        s.spec.pseudocode,
+      ]),
+    ).toEqual([[
+      undefined,
+      "every instance of the supertype is an instance of at most one of: sf-gone-1, sf-gone-2",
+    ]]);
+  });
+});

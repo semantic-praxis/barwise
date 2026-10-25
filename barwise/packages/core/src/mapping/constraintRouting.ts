@@ -22,6 +22,7 @@ import { type Constraint, isOverSubtypes } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { findRole } from "../model/roleLookup.js";
+import { subtypeOperands } from "../model/subtypeOperands.js";
 import { renderValuePredicate } from "../sql/valuePredicate.js";
 import { ConstraintVerbalizer } from "../verbalization/index.js";
 import { DIALECT_PROFILES, type DialectCapabilityProfile } from "./dialectCapabilities.js";
@@ -164,14 +165,26 @@ function routeAll(
   // never by the one a 2.0 file nests it under (orm-format-3, Open
   // decision 9): its spill goes to the table of the first of them, in
   // model order, that has one -- except an external uniqueness with a
-  // column, noted beside that column as it always was.
+  // column, noted beside that column as it always was, and a constraint
+  // over subtypes, which spans no fact type and goes to its supertype's
+  // table.
   const routeAcross = (inView: ConstraintInView): void => {
     const [c] = inView;
     // A constraint over subtypes travels in the barwise annotation, as the
-    // 2.0 subtype flags it replaces did (orm-format-3 WS4b); it names no
-    // role, so it has no column or table here, and nothing below it reads
-    // one.
-    if (isOverSubtypes(c)) return;
+    // 2.0 subtype flags it replaces did (orm-format-3 WS4b), which keeps
+    // it on a DDL round trip. Each subtype is a table whose key references
+    // the supertype's, so the rule spans tables and no clause states it;
+    // it spills at the supertype's table, so an export without the
+    // annotation still reports it (schema-export-subtype-constraints.spec.md).
+    if (isOverSubtypes(c)) {
+      const { supertypeId } = subtypeOperands(c.subtypeFactIds, model);
+      spill(
+        inView,
+        "a rule over subtypes spans their tables, which no clause can state",
+        schema.tables.find((t) => t.sourceElementId === supertypeId)?.name,
+      );
+      return;
+    }
     if (c.type === "external_uniqueness") {
       const cols = c.roleIds.map((r) => columnsForJoinedRole(r, model, schema));
       const resolved = cols.filter((r) => r !== undefined);

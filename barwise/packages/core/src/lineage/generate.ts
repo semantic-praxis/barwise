@@ -7,6 +7,7 @@ import { type Constraint, subtypeFactIdsOf } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { subtypeOperands } from "../model/subtypeOperands.js";
 import type { LineageEntry, SourceReference } from "./types.js";
 
 /**
@@ -149,7 +150,8 @@ export function generateModelLineage(
   for (const c of model.constraints) {
     const facts = subtypeFactIdsOf(c).flatMap((id) => model.getSubtypeFact(id) ?? []);
     if (!c.id || facts.length === 0) continue;
-    const supertype = model.getObjectType(facts[0]!.supertypeId)?.name ?? facts[0]!.supertypeId;
+    const supertypeId = subtypeOperands(subtypeFactIdsOf(c), model).supertypeId!;
+    const supertype = model.getObjectType(supertypeId)?.name ?? supertypeId;
     const source: SourceReference = {
       elementId: c.id,
       elementType: "Constraint",
