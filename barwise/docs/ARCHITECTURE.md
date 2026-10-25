@@ -38,6 +38,7 @@ Process:
 - [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27
 - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18
 - [Plan before code](adr/plan-before-code.md) -- 2026-10-25
+- [Review policy](adr/review-policy.md) -- 2026-10-24
 
 ### Package graph
 
