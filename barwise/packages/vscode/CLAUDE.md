@@ -40,13 +40,17 @@ src/
     ImportCodeCommand.ts        TypeScript/Java/Kotlin code analysis (via barwise.import)
     ExportCommand.ts          barwise.export -- quick-pick router over the exporters below
     ExportDbtCommand.ts         dbt project export (via barwise.export)
-    ExportDdlCommand.ts         DDL export (via barwise.export)
+    ExportDdlCommand.ts         DDL export (via barwise.export); writes export/ddlExport's
+                                result and reports what DDL could not express
     ExportAvroCommand.ts        Avro schema export (via barwise.export)
     AnalyzeRepositoryCommand.ts barwise.analyzeRepository -- repo-wide code analysis
                               Diagram-side commands (barwise.highlightInDiagram,
                               copyElementName, addToView, createView, loadView) are
                               registered in client/extension.ts; the authoritative
                               user-facing list is contributes.commands in package.json
+  export/
+    ddlExport.ts              The registered `ddl` exporter call, shared by the palette
+                              command and the diagram DDL tab; no vscode import
   diagram/
     DiagramPanel.ts           Webview host; thin adapter over @barwise/diagram DiagramSession
     protocol.ts               Webview message types (envelopes over the diagram contract)
