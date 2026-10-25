@@ -5,6 +5,7 @@
 import type { FactType } from "../../model/FactType.js";
 import type { ValueRange } from "../../model/ObjectType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
+import { expandReading, splitReading } from "../../model/ReadingOrder.js";
 import {
   buildVerbalization,
   kwSeg,
@@ -76,10 +77,10 @@ export function verbalizeBinaryUniqueness(
 
   const segments: VerbalizationSegment[] = [
     kwSeg("Each "),
-    refSeg(subjectName, subjectRole.playerId),
-    textSeg(" " + predicate + " "),
+    ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
+    textSeg(" " + predicate.text + " "),
     kwSeg("at most one "),
-    refSeg(objectName, objectRole.playerId),
+    ...predicate.object(refSeg(objectName, objectRole.playerId)),
     textSeg("."),
   ];
 
@@ -184,7 +185,13 @@ export function verbalizeMandatory(
   const ot = model.getObjectType(role.playerId);
   const name = ot?.name ?? role.name;
   const reading = factType.readings[0]?.template ?? "";
-  const expanded = reading.replace(/\{\d+\}/g, name);
+  // Every slot gets the constrained player, as before (barwise-ygy); only
+  // the hyphen binding is applied (reading-hyphen-binding.spec.md).
+  const indices = splitReading(reading).parts.flatMap((p) => p.kind === "role" ? [p.index] : []);
+  const expanded = expandReading(
+    reading,
+    Array.from({ length: Math.max(factType.arity, ...indices.map((i) => i + 1)) }, () => name),
+  );
 
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("Each "),
@@ -220,10 +227,10 @@ export function verbalizeBinaryMandatory(
 
   const segments: VerbalizationSegment[] = [
     kwSeg("Each "),
-    refSeg(subjectName, subjectRole.playerId),
-    textSeg(" " + predicate + " "),
+    ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
+    textSeg(" " + predicate.text + " "),
     kwSeg("at least one "),
-    refSeg(objectName, objectRole.playerId),
+    ...predicate.object(refSeg(objectName, objectRole.playerId)),
     textSeg("."),
   ];
 
