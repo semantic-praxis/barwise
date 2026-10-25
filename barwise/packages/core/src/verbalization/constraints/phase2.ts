@@ -7,7 +7,7 @@ import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import { expandReading, leadOf, splitReading, textOf } from "../../model/ReadingOrder.js";
 import type { JoinOperand, RolePath } from "../../model/RolePath.js";
-import { SUBTYPE_QUANTITY, subtypeOperands } from "../../model/subtypeOperands.js";
+import { subtypeOperands } from "../../model/subtypeOperands.js";
 import { assertNever } from "../../util/assertNever.js";
 import {
   buildVerbalization,
@@ -60,6 +60,16 @@ export function verbalizeDisjunctiveMandatory(
  * is a Male." The supertype is the first subtype fact's; a subtype fact
  * that resolves to nothing is shown by its id.
  */
+/**
+ * How many of its subtypes each kind lets an instance of the supertype be,
+ * as the verbalization and the ConstraintSpec pseudocode both say it.
+ */
+export const SUBTYPE_QUANTITY = {
+  exclusion: "at most one",
+  disjunctive_mandatory: "at least one",
+  exclusive_or: "exactly one",
+} as const;
+
 export function verbalizeSubtypeConstraint(
   kind: "exclusion" | "disjunctive_mandatory" | "exclusive_or",
   subtypeFactIds: readonly string[],

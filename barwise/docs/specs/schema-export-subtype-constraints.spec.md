@@ -120,6 +120,21 @@ the corpus effect is recorded here.
   the prototype was stashed, so built output trails the working tree until
   the next build.
 
+- Implementation review:
+  - The quantity words moved to `verbalization/constraints/phase2.ts`, since
+    `model/` holds the metamodel. `subtypeOperands` keeps only the
+    supertype rule, and model lineage now reads it too.
+  - A disjunctive mandatory over one subtype reads "every instance of
+    Staff is an instance of Assistant", matching the verbalizer's "Each
+    Staff is a Assistant."
+  - A test pins the unresolved case: "the supertype", and no table.
+  - Declined: a malformed constraint with no roles and no subtype facts
+    also gets a spec in the Ossie export now. It fails validation, and a
+    spec with an empty operand list says more than silence.
+  - Filed: DDL lineage lists no spilled constraint as a source of its
+    table (barwise-20o). That predates this change; it covers rings and
+    mandatories as well.
+
 ## Open decisions
 
 1. **Where the spill sits.** (a) The supertype's table (recommended): the

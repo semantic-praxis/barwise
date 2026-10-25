@@ -1,19 +1,11 @@
 /**
  * What a constraint over subtypes is about, read once for every reader
- * that names it: the verbalizer, the ConstraintSpec pseudocode, and the
- * constraint router, which places its spill at the supertype's table
- * (schema-export-subtype-constraints.spec.md, barwise-lwy). Before this
- * the verbalizer held the rule and two copies would have had to agree
- * with it.
+ * that names it: the verbalizer, the ConstraintSpec pseudocode, the
+ * constraint router, which places its spill at the supertype's table, and
+ * model lineage (schema-export-subtype-constraints.spec.md, barwise-lwy).
+ * Before this the verbalizer and lineage each held the rule.
  */
 import type { OrmModel } from "./OrmModel.js";
-
-/** How many of its subtypes each kind lets an instance of the supertype be. */
-export const SUBTYPE_QUANTITY = {
-  exclusion: "at most one",
-  disjunctive_mandatory: "at least one",
-  exclusive_or: "exactly one",
-} as const;
 
 /**
  * The supertype a constraint's subtype facts name, taken from the first

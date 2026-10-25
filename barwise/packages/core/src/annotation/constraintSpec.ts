@@ -21,7 +21,8 @@ import {
 import type { FactType } from "../model/FactType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { findRole } from "../model/roleLookup.js";
-import { SUBTYPE_QUANTITY, subtypeOperands } from "../model/subtypeOperands.js";
+import { subtypeOperands } from "../model/subtypeOperands.js";
+import { SUBTYPE_QUANTITY } from "../verbalization/constraints/phase2.js";
 import type { ConstraintVerbalizer } from "../verbalization/index.js";
 
 export function buildConstraintSpec(
@@ -68,10 +69,13 @@ function subtypePseudocode(c: SubtypeConstraint, model: OrmModel): string {
   const nameOf = (id: string | undefined) =>
     id === undefined ? undefined : model.getObjectType(id)?.name;
   const supertype = nameOf(supertypeId) ?? "the supertype";
-  const subtypes = subtypeIds.map((id, i) => nameOf(id) ?? factIds[i]!).join(", ");
-  return `every instance of ${supertype} is an instance of ${
-    SUBTYPE_QUANTITY[c.type]
-  } of: ${subtypes}`;
+  const subtypes = subtypeIds.map((id, i) => nameOf(id) ?? factIds[i]!);
+  // As the verbalizer says it: "Each Staff is a Assistant."
+  if (c.type === "disjunctive_mandatory" && subtypes.length === 1) {
+    return `every instance of ${supertype} is an instance of ${subtypes[0]}`;
+  }
+  const quantity = SUBTYPE_QUANTITY[c.type];
+  return `every instance of ${supertype} is an instance of ${quantity} of: ${subtypes.join(", ")}`;
 }
 
 /**
