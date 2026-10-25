@@ -8,6 +8,7 @@ Tracking: barwise-1c2
 Plan-reviewed: 88ee8e95 (code-review, pr-review)
 Touches: +barwise/packages/formats/src/avro/avroNames.ts,
 barwise/packages/formats/src/index.ts,
+barwise/packages/formats/CLAUDE.md,
 barwise/packages/vscode/src/commands/ExportAvroCommand.ts,
 +barwise/packages/formats/tests/avroNames.test.ts,
 barwise/packages/vscode/tests/unit/exportFileCommands.test.ts
