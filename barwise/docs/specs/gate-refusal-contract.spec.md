@@ -3,7 +3,7 @@
 Status: Implemented. WS2's and WS3's designs were both corrected during
 grounding -- see their sections
 Created: 2026-09-10
-Last-updated: 2026-09-10
+Last-updated: 2026-10-25
 Tracking: barwise-987 (WS1, the instance: `audit-gate` reports PASS with zero
 advisories from a package directory and advises deleting a live security
 acceptance); barwise-989 (WS2 and WS3). The discipline this generalises exists in
@@ -121,6 +121,8 @@ Failing is not enough, because a failure reads as a finding. A gate that
 exits `1` because its tool is missing sends the reader hunting a defect
 that is not there; the seven crashing gates do a cruder version of the
 same thing with a stack trace.
+
+Recorded as `docs/adr/gate-refusal-contract.md`.
 
 ## Should we randomise the faults? (resolved: no -- a matrix, not a monkey)
 
