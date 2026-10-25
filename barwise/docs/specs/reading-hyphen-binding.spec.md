@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-iiw
+Plan-reviewed: c2a093be (code-review, pr-review)
 Touches: barwise/packages/core/src/model/ReadingOrder.ts,
 barwise/packages/core/src/index.ts,
 barwise/packages/core/src/verbalization/FactTypeVerbalizer.ts,
