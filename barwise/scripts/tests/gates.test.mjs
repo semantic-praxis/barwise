@@ -3443,6 +3443,274 @@ test("check-review-tiers fails on a trivial glob that matches no tracked file", 
   }
 });
 
+// The reach check (docs/specs/review-tier-reach.spec.md, barwise-1046): a
+// file-shaped glob whose name also lives at tracked paths the row does not
+// reach fails, unless reachAcknowledged lists exactly those paths under
+// that file name. The instructions row's `CLAUDE.md` matched the root
+// file and none of the package copies, and every earlier check stayed
+// green.
+
+const REACH_TRACKED = ["x/a.ts", ".beads/issues.jsonl", "CLAUDE.md", "p/CLAUDE.md", "q/CLAUDE.md"];
+
+/**
+ * tierFixture's inputs, with row A's and failure mode F's fields replaced.
+ * Row A defaults to the barwise-1046 shape: `CLAUDE.md` alone.
+ */
+function reachFixture(dir, rowA = {}, modeF = {}, tracked = REACH_TRACKED) {
+  const args = tierFixture(dir, ["A"], [{ heading: "A" }], tracked);
+  const table = JSON.parse(readFileSync(join(dir, "review-tiers.json"), "utf8"));
+  Object.assign(table.rows[0], { globs: ["CLAUDE.md"] }, rowA);
+  Object.assign(table.failureModes[0], modeF);
+  writeFileSync(join(dir, "review-tiers.json"), JSON.stringify(table));
+  return args;
+}
+
+test("check-review-tiers fails on a file-shaped glob whose same-named files it does not reach", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    let run = gate("check-review-tiers.mjs", dir, ...reachFixture(dir));
+    assert.equal(run.status, 1, `the barwise-1046 shape must fail: ${run.stdout}${run.stderr}`);
+    assert.match(
+      run.stderr,
+      /shadowed: row "A": CLAUDE\.md \(CLAUDE\.md\) has 2 unreached same-named path\(s\), unacknowledged:\n {4}p\/CLAUDE\.md\n {4}q\/CLAUDE\.md\n/,
+    );
+    // The same check on failureModes rows, labelled as failure modes.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["x/"] }, { globs: ["x/", "p/CLAUDE.md"] }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /shadowed: failure mode "F": CLAUDE\.md \(p\/CLAUDE\.md\) has 2 .*\n {4}CLAUDE\.md\n {4}q\/CLAUDE\.md\n/,
+    );
+    // Two same-named patterns share one shadow, so one finding names both;
+    // a glob listed twice is named once.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["CLAUDE.md", "p/CLAUDE.md", "p/CLAUDE.md"] }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /shadowed: row "A": CLAUDE\.md \(CLAUDE\.md, p\/CLAUDE\.md\) has 1 [^\n]*\n {4}q\/CLAUDE\.md\n/,
+    );
+    assert.equal(run.stderr.match(/shadowed:/g).length, 1, "one finding per file name");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers passes a shadow its row acknowledges exactly, or reaches", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    let run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, {
+        reachAcknowledged: { "CLAUDE.md": ["q/CLAUDE.md", "p/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 0, `an exact waiver passes, in any order: ${run.stderr}`);
+    // One entry per file name, however many patterns carry it.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, {
+        globs: ["CLAUDE.md", "p/CLAUDE.md"],
+        reachAcknowledged: { "CLAUDE.md": ["q/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 0, `one key covers both same-named patterns: ${run.stderr}`);
+    // An exact waiver on a failure mode.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["x/"] }, {
+        globs: ["x/", "p/CLAUDE.md"],
+        reachAcknowledged: { "CLAUDE.md": ["CLAUDE.md", "q/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 0, `a failure mode's exact waiver passes: ${run.stderr}`);
+    // Widened instead: `*/CLAUDE.md` reaches both copies, so nothing is
+    // shadowed. A final `*` names no file and a directory has no name, so
+    // `x/*` and `x/` are never checked.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["CLAUDE.md", "*/CLAUDE.md", "x/*", "x/"] }),
+    );
+    assert.equal(run.status, 0, `a row that reaches its shadow passes: ${run.stderr}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on a shadow path its acknowledgement does not list", () => {
+  // The reason the waiver is a list and not a count: a new same-named file
+  // fails the PR that adds it, instead of being waived by membership.
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = reachFixture(dir, { reachAcknowledged: { "CLAUDE.md": ["p/CLAUDE.md"] } });
+    const run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /shadowed: row "A": CLAUDE\.md \(CLAUDE\.md\) has 1 same-named path\(s\) missing from its reachAcknowledged list:\n {4}q\/CLAUDE\.md\n/,
+    );
+    assert.doesNotMatch(run.stderr, / {4}p\/CLAUDE\.md/, "the listed path is waived");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on an acknowledged path that is no longer shadowed", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const args = reachFixture(dir, {
+      reachAcknowledged: { "CLAUDE.md": ["p/CLAUDE.md", "q/CLAUDE.md", "gone/CLAUDE.md"] },
+    });
+    let run = gate("check-review-tiers.mjs", dir, ...args);
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /stale reachAcknowledged path\(s\): row "A": CLAUDE\.md, no longer shadowed:\n {4}gone\/CLAUDE\.md\n/,
+    );
+    assert.doesNotMatch(run.stderr, /shadowed: row "A"/, "the shadow itself is waived");
+    // The same on a failure mode.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { globs: ["x/"] }, {
+        globs: ["x/", "p/CLAUDE.md"],
+        reachAcknowledged: { "CLAUDE.md": ["CLAUDE.md", "q/CLAUDE.md", "gone/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /stale reachAcknowledged path\(s\): failure mode "F": CLAUDE\.md, no longer shadowed:\n {4}gone\/CLAUDE\.md\n/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers fails on an acknowledgement key that waives nothing, and says why", () => {
+  const NOT_A_NAME = "not the file name of any file-shaped pattern in this row";
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    // A key that is not the name of any file-shaped pattern of the row.
+    let run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, {
+        globs: ["x/"],
+        reachAcknowledged: { "CLAUDE.md": ["p/CLAUDE.md", "q/CLAUDE.md"] },
+      }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      new RegExp(`stale reachAcknowledged key: row "A": CLAUDE\\.md \\(${NOT_A_NAME}\\)`),
+    );
+    // A file name of the row whose shadow is empty, acknowledged with [].
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, { reachAcknowledged: { "CLAUDE.md": [] } }, {}, [
+        "x/a.ts",
+        ".beads/issues.jsonl",
+        "CLAUDE.md",
+      ]),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(
+      run.stderr,
+      /stale reachAcknowledged key: row "A": CLAUDE\.md \(its shadow is empty\)/,
+    );
+    // Keys that are patterns rather than names, and the "names" a
+    // non-file-shaped pattern would have if it counted: `**`, the empty
+    // segment after a directory's `/`, a final `*`. Each is a stale KEY,
+    // not a list of stale paths -- the entry waives nothing at all.
+    run = gate(
+      "check-review-tiers.mjs",
+      dir,
+      ...reachFixture(dir, {
+        globs: ["CLAUDE.md", "p/CLAUDE.md", "q/CLAUDE.md", "**", "x/", "x/*"],
+        reachAcknowledged: {
+          "p/CLAUDE.md": ["x/a.ts"],
+          "**": ["x/a.ts"],
+          "": ["x/a.ts"],
+          "*": ["x/a.ts"],
+        },
+      }),
+    );
+    assert.equal(run.status, 1, run.stderr);
+    for (const key of ["p/CLAUDE\\.md", "\\*\\*", "", "\\*"]) {
+      assert.match(
+        run.stderr,
+        new RegExp(`stale reachAcknowledged key: row "A": ${key} \\(${NOT_A_NAME}\\)`),
+      );
+    }
+    assert.doesNotMatch(run.stderr, /stale reachAcknowledged path/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-review-tiers REFUSES a malformed reachAcknowledged, and pr-risk ignores it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
+  try {
+    const malformed = [
+      [["p/CLAUDE.md"], /row "A": reachAcknowledged must be an object/],
+      [null, /row "A": reachAcknowledged must be an object/],
+      ["p/CLAUDE.md", /row "A": reachAcknowledged must be an object/],
+      [
+        { "CLAUDE.md": "p/CLAUDE.md" },
+        /row "A": reachAcknowledged\["CLAUDE\.md"\] must be an array/,
+      ],
+      [{ "CLAUDE.md": ["p/CLAUDE.md", ""] }, /must be an array of non-empty strings/],
+      [{ "CLAUDE.md": [7] }, /must be an array of non-empty strings/],
+      // A duplicate cannot come from any tree, so it is a broken
+      // declaration (2), not a disagreement with the tree (1).
+      [
+        { "CLAUDE.md": ["p/CLAUDE.md", "q/CLAUDE.md", "p/CLAUDE.md"] },
+        /reachAcknowledged\["CLAUDE\.md"\] lists "p\/CLAUDE\.md" twice/,
+      ],
+    ];
+    const cases = [
+      ...malformed.map(([value, reason]) => [{ reachAcknowledged: value }, {}, value, reason]),
+      // On a failure mode, labelled as one.
+      [
+        { globs: ["x/"] },
+        { reachAcknowledged: ["CLAUDE.md"] },
+        "a failure mode's array",
+        /failure mode "F": reachAcknowledged must be an object/,
+      ],
+    ];
+    for (const [rowA, modeF, what, reason] of cases) {
+      const args = reachFixture(dir, rowA, modeF);
+      const run = gate("check-review-tiers.mjs", dir, ...args);
+      assert.equal(run.status, 2, `${JSON.stringify(what)} is cannot-answer: ${run.stderr}`);
+      assert.match(run.stderr, reason);
+      // pr-risk reads rows through tierRows and never this field, so a
+      // malformed waiver must not make the classifier refuse.
+      const table = args[args.indexOf("--table") + 1];
+      const risk = gate("pr-risk.mjs", dir, ...fileList(dir, ["x/a.ts"]), "--table", table);
+      assert.equal(
+        risk.status,
+        0,
+        `pr-risk is unaffected by ${JSON.stringify(what)}: ${risk.stderr}`,
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check-review-tiers passes when every heading has exactly one row", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-tiers-"));
   try {

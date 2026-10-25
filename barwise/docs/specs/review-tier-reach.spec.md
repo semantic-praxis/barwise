@@ -1,6 +1,6 @@
 # Review-tier reach: refuse a file-shaped pattern whose name lives elsewhere unreached
 
-Status: Draft -- no workstream implemented
+Status: Implemented 2026-10-24 -- the single workstream (see Implementation notes); decisions resolved by the owner 2026-10-24
 
 Created: 2026-10-24
 Last-updated: 2026-10-24
@@ -38,13 +38,15 @@ no file name to compare, and a final `*` names no file.
 
 A file-shaped pattern's **shadow** is the set of tracked files whose
 final segment equals the pattern's final segment and which no pattern
-in the same row matches.
+in the same row matches. It depends only on the row and that file name,
+so same-named patterns in one row share one shadow, and the shadow is
+computed once per (row, file name).
 
 ## What should ship? (resolved: a shadow gate, with acknowledgements that list exactly what they waive)
 
 When a row's file-shaped pattern has a non-empty shadow, the gate shall
-fail unless the row's `reachAcknowledged` entry for that pattern lists
-exactly that shadow.
+fail unless the row's `reachAcknowledged` entry for that pattern's file
+name lists exactly that shadow.
 
 Measured with the script in "Measurement" below. Each figure says which
 tree it comes from:
@@ -85,16 +87,20 @@ check must fail it.
 In scope:
 
 - When a file-shaped pattern in `rows` or `failureModes` has a
-  non-empty shadow and the row has no `reachAcknowledged` entry for it,
-  the gate shall exit 1, naming the row, the pattern, and the shadow.
-- When a row's `reachAcknowledged` entry for a pattern differs from that
-  pattern's shadow, the gate shall exit 1, naming each path that is in
+  non-empty shadow and the row has no `reachAcknowledged` entry for its
+  file name, the gate shall exit 1, naming the row (as `row "<heading>"`
+  or `failure mode "<heading>"`), the file name, the row's patterns that
+  carry it (each once, after deduplicating the row's globs), and the
+  shadow.
+- When a row's `reachAcknowledged` entry for a file name differs from
+  that name's shadow, the gate shall exit 1, naming each path that is in
   the shadow but not acknowledged (a new shadow) and each acknowledged
   path that is no longer in the shadow (stale).
-- When a `reachAcknowledged` key is not a file-shaped pattern of the
-  same row, the gate shall exit 1 and name the key as stale.
+- When a `reachAcknowledged` key is not the file name of any file-shaped
+  pattern in the same row, or its shadow is empty, the gate shall exit 1
+  and name the key as stale, with which of the two reasons applies.
 - When `reachAcknowledged` is present but is not an object whose values
-  are arrays of non-empty strings, the gate shall exit 2.
+  are arrays of distinct, non-empty strings, the gate shall exit 2.
 - When the table, the checklist, REVIEW.md or the tracked-file list
   cannot be read, the gate shall still exit 2. These paths do not
   change, and the new check reads no new input.
@@ -123,12 +129,12 @@ Out of scope:
 
 ## Inventory
 
-| Path                                     | Today                                                                                                                  | Change                                                                                                                                                       |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `barwise/scripts/lib/review-tiers.mjs`   | `validateRows` checks heading, tier, why, globs, shared by the gate and `pr-risk`; `matchesPattern` is the one matcher | export a pure `shadowedPatterns(rows, tracked)` that validates `reachAcknowledged` itself (throws on a malformed one) and returns findings and stale entries |
-| `barwise/scripts/check-review-tiers.mjs` | completeness both ways, zero-match patterns (barwise-fs0), exit 0/1/2                                                  | call `shadowedPatterns` beside the zero-match check, inside the existing try block, so a malformed field exits 2; print each finding                         |
-| `barwise/review-tiers.json`              | 14 rows, 8 failure modes, 1 trivial pattern                                                                            | `reachAcknowledged` on the core row; the wiring row per Open decision 2; one sentence in `$comment`                                                          |
-| `barwise/scripts/tests/gates.test.mjs`   | the check-review-tiers tests drive the gate with `--table` / `--tracked` fixtures                                      | add cases for: a shadow with no acknowledgement, an exact acknowledgement, a new shadow path, a stale path, a stale key, and a malformed field (exit 2)      |
+| Path                                     | Today                                                                                                                  | Change                                                                                                                                                             |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `barwise/scripts/lib/review-tiers.mjs`   | `validateRows` checks heading, tier, why, globs, shared by the gate and `pr-risk`; `matchesPattern` is the one matcher | export a pure `shadowedPatterns(rows, tracked, kind)` that validates `reachAcknowledged` itself (throws on a malformed one) and returns findings and stale entries |
+| `barwise/scripts/check-review-tiers.mjs` | completeness both ways, zero-match patterns (barwise-fs0), exit 0/1/2                                                  | call `shadowedPatterns` beside the zero-match check, inside the existing try block, so a malformed field exits 2; print each finding                               |
+| `barwise/review-tiers.json`              | 14 rows, 8 failure modes, 1 trivial pattern                                                                            | `reachAcknowledged` on the core row; the wiring row per Open decision 2; one sentence in `$comment`                                                                |
+| `barwise/scripts/tests/gates.test.mjs`   | the check-review-tiers tests drive the gate with `--table` / `--tracked` fixtures                                      | add cases for: a shadow with no acknowledgement, an exact acknowledgement, a new shadow path, a stale path, a stale key, and a malformed field (exit 2)            |
 
 `pr-risk.mjs` reads rows through `tierRows` and never reads
 `reachAcknowledged`. The field is validated in `shadowedPatterns`, not
@@ -225,7 +231,27 @@ Record those three exit codes in the PR body. The field and the check
 land together: the check alone cannot be green on today's table, and
 the field alone is an annotation nothing reads.
 
-## Open decisions (for review)
+## Open decisions (resolved by the owner, 2026-10-24)
+
+All five were resolved as recommended:
+
+1. Ship the gate.
+2. Widen the wiring row to reach the root `package.json`, the
+   npm-script forwarder. Acknowledge the twelve
+   `barwise/packages/*/package.json` files in `reachAcknowledged` for
+   `barwise/package.json`. The core row's
+   `barwise/packages/core/package.json` is acknowledged with its exact
+   shadow list.
+3. Acknowledgements are exact lists.
+4. The field is a per-row `reachAcknowledged` object. In the
+   implementation it is keyed by file name, not by pattern:
+   `"reachAcknowledged": { "<file name>": ["<path>", ...] }`, for
+   example `"package.json": [...]`, one entry per name. See
+   Implementation notes for why this departs from the per-pattern shape
+   recommended below.
+5. `trivial` stays out of the check.
+
+The text below is the decision record as reviewed.
 
 1. **Ship this, or close the issue on (a) alone?** (a) already shipped
    and is honest about what it misses. This adds one function, one
@@ -256,6 +282,63 @@ the field alone is an annotation nothing reads.
    the shape of every `globs` array that every reader walks.
 5. **`trivial` excluded.** Recommend keeping it out, for the
    safe-direction reason in Scope.
+
+## Implementation notes
+
+- **Keyed by file name, not by pattern (departs from decision 4's
+  recommended shape).** A shadow depends only on the row and the file
+  name: two same-named patterns in one row exclude the same reached
+  files, so their shadows are always identical. Keyed by pattern, the
+  first implementation had to repeat the wiring row's twelve package
+  manifests under both `barwise/package.json` and `package.json` --
+  widening per decision 2 adds a second file-shaped pattern with the
+  same shadow -- and one new workspace package meant editing three lists
+  that could only ever agree. Keyed by name, each row has one entry per
+  name: the core row's `package.json` (13 paths) and the wiring row's
+  `package.json` (12). This also settles the owner's wording of decision
+  2, which named one key: there is now exactly one. A key that is not
+  the file name of any file-shaped pattern in its row is stale, and that
+  includes a key spelled as a pattern.
+- **An entry that waives nothing is a stale key, and says why.** Scope
+  names a key that matches nothing in the row. The implementation also
+  calls a key stale when its name's shadow is empty, even if it lists
+  nothing (`[]`). Without that, an empty list would sit on a name that
+  needs no waiver and agree with its shadow forever. The gate prints
+  which reason applies: "not the file name of any file-shaped pattern in
+  this row" or "its shadow is empty".
+- **A path listed twice is malformed (exit 2), not a finding (exit 1).**
+  A finding says the table disagrees with the tree, and editing the
+  table to match the tree fixes it. No tree produces a duplicate: the
+  list declares a set, and repeating a member breaks the declaration,
+  the same as an empty string in it.
+- **Globs are deduplicated per row before shadows are computed**, so a
+  glob listed twice is named once in a finding. Messages label entries
+  `row "<heading>"` or `failure mode "<heading>"`, as `validateRows`
+  does, so the gate calls `shadowedPatterns` once per kind.
+- **The return shape has no `shadow` field.** When a name has no
+  acknowledgement, the unacknowledged paths are the whole shadow, and
+  the gate prints them. When it has one, the shadow is the acknowledged
+  list plus the unacknowledged paths, less the stale ones, all of which
+  are printed. A separate field would carry nothing the gate does not
+  already show.
+- **The `fileShaped` clauses are only observable through stale keys.**
+  No tracked file is named `**`, the empty string or `*`, so a pattern of
+  those shapes always has an empty shadow, with or without the clause.
+  The test that makes each clause matter acknowledges the keys `**`,
+  `""` and `*` on a row that carries `**`, `x/` and `x/*`, and expects
+  each to be a stale key, not a list of stale paths.
+- **Watched red.** Before the acknowledgements, the gate on the real
+  table exited 1, naming the core row's
+  `barwise/packages/core/package.json` and the wiring row's
+  `barwise/package.json`, 13 paths each. With them it exited 0. With
+  `--table` pointing at a copy whose instructions row lists `CLAUDE.md`
+  without the package and optimizer copies, it exited 1, naming
+  `CLAUDE.md` and its 13-path shadow. Every new guard in
+  `shadowedPatterns`, its validator and the gate's count was mutated
+  with `scripts/mutate.mjs` and reported CAUGHT, and so was moving the
+  validation into `validateRows` (the `pr-risk` assertion catches it).
+  After the change to name keys, the gate on the real table exited 0,
+  and on the put-back copy it exited 1 with the same 13-path shadow.
 
 ## Risks and testing
 
