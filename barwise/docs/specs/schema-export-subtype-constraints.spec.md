@@ -1,6 +1,6 @@
 # A constraint over subtypes is reported by every schema export
 
-Status: Draft -- no workstream implemented
+Status: Implemented
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -108,6 +108,17 @@ export of a model with one returns its spec beside the loss line;
 `ossie-ontology-format.spec.md` and `writeOssie`'s header stop saying it
 goes unreported; Status moves to Implemented in the commit that lands it;
 the corpus effect is recorded here.
+
+## Implementation notes
+
+- As planned. Over the corpus, 170 of 1,428 dialect and Ossie rows change,
+  gaining 224 comment lines and nothing else. Postgres DDL and Ossie each
+  gain 14 specs, and the OpenAPI, Avro and dbt reports grow from 443 to 457.
+  The verbalization of every tracked model is unchanged by the move of the
+  supertype rule into `subtypeOperands`. A measurement taken right after a
+  spec commit read 443: the pre-commit hook had rebuilt the packages while
+  the prototype was stashed, so built output trails the working tree until
+  the next build.
 
 ## Open decisions
 

@@ -139,7 +139,9 @@ DDL, made no worse here, and each is filed:
 
 - **A constraint over subtypes** (barwise-lwy). The router skips it; DDL
   carries it in the barwise annotation; the spec builder has no roles to
-  label for it. The three formats carry it nowhere.
+  label for it. The three formats carry it nowhere. Since fixed: the
+  router spills it at the supertype's table, and the spec builder names
+  the supertype and subtypes (`schema-export-subtype-constraints.spec.md`).
 - **A mandatory role the mapping did not enforce** (barwise-plq). The
   router counts every mandatory as realized, but the mapper writes NOT
   NULL only for a role whose column sits on its own player's table. A

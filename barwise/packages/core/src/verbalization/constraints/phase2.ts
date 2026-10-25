@@ -7,6 +7,7 @@ import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import { expandReading, leadOf, splitReading, textOf } from "../../model/ReadingOrder.js";
 import type { JoinOperand, RolePath } from "../../model/RolePath.js";
+import { SUBTYPE_QUANTITY, subtypeOperands } from "../../model/subtypeOperands.js";
 import { assertNever } from "../../util/assertNever.js";
 import {
   buildVerbalization,
@@ -65,27 +66,21 @@ export function verbalizeSubtypeConstraint(
   sourceId: string,
   model: OrmModel,
 ): Verbalization {
-  const facts = subtypeFactIds.map((id) => model.getSubtypeFact(id));
-  const supertypeId = facts.find((f) => f !== undefined)?.supertypeId;
+  const { supertypeId, subtypeIds } = subtypeOperands(subtypeFactIds, model);
   const supertype = supertypeId === undefined ? undefined : model.getObjectType(supertypeId);
   const segments: VerbalizationSegment[] = [kwSeg("Each ")];
   segments.push(
     supertype ? refSeg(supertype.name, supertype.id) : textSeg("instance of the supertype"),
   );
-  const subtypes = facts.map((f, i) => {
-    const sub = f ? model.getObjectType(f.subtypeId) : undefined;
+  const subtypes = subtypeIds.map((id, i) => {
+    const sub = id === undefined ? undefined : model.getObjectType(id);
     return sub ? refSeg(sub.name, sub.id) : textSeg(subtypeFactIds[i]!);
   });
   if (kind === "disjunctive_mandatory" && subtypes.length === 1) {
     segments.push(kwSeg(" is a "), subtypes[0]!, textSeg("."));
     return buildVerbalization(sourceId, "constraint", segments);
   }
-  const quantity = kind === "exclusion"
-    ? "at most one"
-    : kind === "disjunctive_mandatory"
-    ? "at least one"
-    : "exactly one";
-  segments.push(kwSeg(` is ${quantity} of: `));
+  segments.push(kwSeg(` is ${SUBTYPE_QUANTITY[kind]} of: `));
   subtypes.forEach((seg, i) => {
     if (i > 0) segments.push(textSeg(", "));
     segments.push(seg);

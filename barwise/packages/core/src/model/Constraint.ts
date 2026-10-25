@@ -648,12 +648,17 @@ export function subtypeFactIdsOf(c: Constraint): string[] {
   }
 }
 
+/** An exclusion, disjunctive mandatory or exclusive-or over subtype facts. */
+export type SubtypeConstraint =
+  & (DisjunctiveMandatoryConstraint | ExclusionConstraint | ExclusiveOrConstraint)
+  & { readonly subtypeFactIds: readonly string[]; };
+
 /**
  * Whether a constraint's operand is subtype facts rather than roles. The one
  * test for it, so every reader agrees on a constraint whose subtype fact
  * list is empty: it is over subtypes, and validation reports it as too few.
  */
-export function isOverSubtypes(c: Constraint): boolean {
+export function isOverSubtypes(c: Constraint): c is SubtypeConstraint {
   return (c.type === "disjunctive_mandatory" || c.type === "exclusion" || c.type === "exclusive_or")
     && c.subtypeFactIds !== undefined;
 }

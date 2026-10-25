@@ -31,9 +31,8 @@ constraint DDL would need one for, or could not express at all, by the
 same rule. What each keeps of the schema's keys differs and is not
 reported: Avro has no keys or references at all (a primary key is a
 `doc` line), OpenAPI enforces no key uniqueness, and dbt writes no
-`relationships` test when `generateRelationshipTests` is false. Gaps that rule has today are
-tracked: constraints over subtypes (barwise-lwy) and key uniqueness in
-formats without keys (barwise-lqj). A mandatory role the mapping does
+`relationships` test when `generateRelationshipTests` is false. The one gap that rule has today is
+tracked: key uniqueness in formats without keys (barwise-lqj). A mandatory role the mapping does
 not enforce is reported too; DDL comments it with the reason for its shape.
 
 ### DDL (SQL)

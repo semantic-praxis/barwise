@@ -10,7 +10,7 @@ import {
 } from "../../src/mapping/constraintRouting.js";
 import { resolveDialectProfile } from "../../src/mapping/dialectCapabilities.js";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
-import type { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 /**
@@ -201,5 +201,32 @@ describe("unreportedConstraintSpecs", () => {
       .build();
     const specs = unreportedConstraintSpecs(model, new RelationalMapper().map(model));
     expect(specs.map((s) => s.verbalization)).toEqual(["Each Customer places at least one Order."]);
+  });
+});
+
+describe("a constraint over subtypes", () => {
+  it("is reported, since no schema export carries it (barwise-lwy)", () => {
+    const model = new OrmModel({ name: "Test" });
+    const party = model.addObjectType({
+      id: "p",
+      name: "Party",
+      kind: "entity",
+      referenceMode: "party_id",
+    });
+    const facts = ["LegalEntity", "NaturalPerson"].map((name) => {
+      const sub = model.addObjectType({
+        id: name,
+        name,
+        kind: "entity",
+        referenceMode: `${name}_id`,
+      });
+      return model.addSubtypeFact({ id: `sf-${name}`, subtypeId: sub.id, supertypeId: party.id })
+        .id;
+    });
+    model.addConstraint({ id: "c", type: "exclusion", subtypeFactIds: facts });
+    const schema = new RelationalMapper().map(model);
+    expect(unreportedConstraintSpecs(model, schema).map((s) => s.verbalization)).toEqual([
+      "Each Party is at most one of: LegalEntity, NaturalPerson.",
+    ]);
   });
 });
