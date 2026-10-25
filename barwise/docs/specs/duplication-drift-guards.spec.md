@@ -2,7 +2,7 @@
 
 Status: Implemented (all six workstreams; see Implementation notes)
 Created: 2026-08-26
-Last-updated: 2026-08-26
+Last-updated: 2026-10-25
 Tracking: `docs/logic-duplication-audit-2026-08-26.md` (all classes);
 extends the remedy of `docs/specs/artifact-resolution-parity.spec.md`
 (implemented, PR #347) from one instance to the class. Issues:
@@ -71,6 +71,8 @@ manifest line and forbids nothing about the design, while an
 extraction is a design change each time. Checking first also converts
 every later share into a safe refactor -- the check is the test that
 the share preserved behavior.
+
+Recorded as `docs/adr/must-agree-copies.md`.
 
 ## Scope
 
