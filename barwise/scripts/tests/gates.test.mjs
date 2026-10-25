@@ -1311,17 +1311,27 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
   // process object rather than through a pipeline, for the reason the
   // helper itself spawns without a shell.
   const dir = mutateRepo({ subject: "value = GOOD\n" });
-  const marker = `mutate-kill-probe-${process.pid}.mjs`;
+  let child;
+  let probePid;
   try {
+    // The probe records its own pid once the mutated run is executing, and
+    // the test signals exactly that process. The kill used to go through
+    // `pkill -f` on a marker after waiting only for the mutation on disk:
+    // mutate writes the file BEFORE it spawns the run, so on a loaded
+    // runner the kill could land in that gap, the probe slept out its 60 s
+    // and exited 0, and the run read UNCAUGHT -- exit 1 after 60230 ms in
+    // CI (barwise-rfb). The marker also matched mutate's own argv, so
+    // pkill signalled mutate too, and its exit status could not tell
+    // whether the probe had been reached.
     writeFileSync(
-      join(dir, marker),
+      join(dir, "probe.mjs"),
       `import { readFileSync, writeFileSync } from "node:fs";\n`
         + `if (!readFileSync("subject.txt", "utf8").includes("BAD")) process.exit(0);\n`
-        + `writeFileSync("probe-running", "");\n`
+        + `writeFileSync("probe-pid", String(process.pid));\n`
         + `setTimeout(() => {}, 60_000);\n`,
     );
 
-    const child = spawn(process.execPath, [
+    child = spawn(process.execPath, [
       join(SCRIPTS, "mutate.mjs"),
       "--file",
       "subject.txt",
@@ -1331,7 +1341,7 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
       "BAD",
       "--",
       process.execPath,
-      marker,
+      "probe.mjs",
     ], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
 
     let stderr = "";
@@ -1341,26 +1351,16 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
 
     const exited = new Promise((res) => child.on("exit", (code) => res(code)));
 
-    // Wait until the mutated run's probe says it is running, so the kill
-    // lands on it. Waiting for the mutation on disk was not enough: mutate
-    // writes the file BEFORE it spawns the run, so on a loaded runner the
-    // kill could land in that gap, match nothing, and let the probe sleep
-    // out its 60 s and exit 0 -- reported UNCAUGHT, exit 1 after 60230 ms
-    // in CI (barwise-rfb). The probe's own file is the real signal; a
-    // fixed sleep would only move the race.
-    const running = join(dir, "probe-running");
+    // Poll for the probe's pid rather than sleeping: a fixed sleep would
+    // only move the race.
+    const pidFile = join(dir, "probe-pid");
     const deadline = Date.now() + 15_000;
-    while (Date.now() < deadline && !existsSync(running)) {
+    while (Date.now() < deadline && !existsSync(pidFile)) {
       await new Promise((res) => setTimeout(res, 25));
     }
-    assert.ok(existsSync(running), "the mutated run never started, so there is nothing to kill");
-
-    // A marker unique to this run, so the kill cannot reach another
-    // test's child or a developer's unrelated process. pkill exits 1 when
-    // it matches nothing, which is the race above: a kill that reached
-    // no process is a broken test, not a reading.
-    const kill = spawnSync("pkill", ["-TERM", "-f", marker], { stdio: "ignore" });
-    assert.equal(kill.status, 0, "pkill matched no process, so the kill never landed");
+    assert.ok(existsSync(pidFile), "the mutated run never started, so there is nothing to kill");
+    probePid = Number(readFileSync(pidFile, "utf8"));
+    process.kill(probePid, "SIGTERM");
 
     const status = await exited;
 
@@ -1369,12 +1369,22 @@ test("mutate refuses a run whose command was KILLED rather than exiting", async 
       2,
       `a killed run must refuse, not report CAUGHT. stderr:\n${stderr}`,
     );
-    assert.match(stderr, /killed by SIG/);
+    assert.match(stderr, /killed by SIGTERM/);
 
     // The tree is still restored, which is the other half of the
     // guarantee and the reason the `finally` exists.
     assert.equal(readFileSync(join(dir, "subject.txt"), "utf8"), "value = GOOD\n");
   } finally {
+    // On a failed assertion above, mutate and its probe may still be
+    // running; stop both before removing the directory they work in.
+    for (const pid of [probePid, child?.pid]) {
+      if (pid === undefined) continue;
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        // Already exited.
+      }
+    }
     rmSync(dir, { recursive: true, force: true });
   }
 });
