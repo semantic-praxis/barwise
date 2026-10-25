@@ -240,8 +240,19 @@ const RULE_DESCRIPTORS = {
     description:
       "An entity type's preferred identifier rests on a role the entity plays that is not mandatory.",
     messages: {
-      default: (otName: string, constraintId: string, factTypes: string): string =>
-        `Entity type "${otName}" is identified by constraint "${constraintId}", but its role in ${factTypes} is not mandatory, so a "${otName}" could have no identifier. A reference scheme's roles are mandatory; add the mandatory constraint, or identify "${otName}" another way.`,
+      // The identifier is named by its fact types, not its constraint id:
+      // an importer's ids are UUIDs, which name nothing a modeller can find.
+      default: (
+        otName: string,
+        through: string,
+        optional: string,
+        number: "singular" | "plural",
+      ): string =>
+        `Entity type "${otName}" is identified through ${through}, but its ${
+          number === "plural" ? "roles" : "role"
+        } in ${optional} ${
+          number === "plural" ? "are" : "is"
+        } not declared mandatory, so nothing says every "${otName}" has its identifier. A reference scheme's roles are mandatory; add the mandatory constraint, or identify "${otName}" another way.`,
     },
   },
   [RULE_ID.acrossFactTypesUnknownRole]: {

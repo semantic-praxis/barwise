@@ -1081,54 +1081,71 @@ describe("an identifier resting on an optional role (identifier-roles-mandatory.
     expect(rest).toEqual([]);
     expect(warning?.severity).toBe("warning");
     expect(warning?.message).toBe(
-      'Entity type "Person" is identified by constraint "u-n", but its role in "Person has PersonNr" is not mandatory, so a "Person" could have no identifier. A reference scheme\'s roles are mandatory; add the mandatory constraint, or identify "Person" another way.',
+      'Entity type "Person" is identified through "Person has PersonNr", but its role in "Person has PersonNr" is not declared mandatory, so nothing says every "Person" has its identifier. A reference scheme\'s roles are mandatory; add the mandatory constraint, or identify "Person" another way.',
     );
   });
 
-  it("is satisfied by an alethic mandatory, and not by a deontic one", () => {
+  it("is satisfied by an alethic mandatory", () => {
     expect(optionalWarnings(personNr("alethic"))).toEqual([]);
-    expect(optionalWarnings(personNr("deontic"))).toHaveLength(1);
   });
 
-  it("names only the optional components of an external scheme", () => {
-    // Room is identified by the Building it is in and its RoomNr; only
-    // "Room has RoomNr" leaves Room's role optional.
+  it("is not satisfied by a deontic mandatory", () => {
+    const warnings = optionalWarnings(personNr("deontic"));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain('Entity type "Person" is identified through');
+  });
+
+  /**
+   * Room identified by the Building it is in and its RoomNr, each near role
+   * mandatory when `mandatoryIn` names its fact type.
+   */
+  function room(mandatoryIn: readonly ("in" | "nr")[]) {
     const model = new OrmModel({ name: "Test" });
     model.addObjectType({ id: "r", name: "Room", kind: "entity", referenceMode: "id" });
     model.addObjectType({ id: "b", name: "Building", kind: "entity", referenceMode: "nr" });
     model.addObjectType({ id: "n", name: "RoomNr", kind: "value" });
-    model.addFactType({
-      id: "ft-in",
-      name: "Room is in Building",
-      roles: [{ id: "rib-room", name: "is in", playerId: "r" }, {
-        id: "rib-b",
-        name: "houses",
-        playerId: "b",
-      }],
-      readings: ["{0} is in {1}"],
-      constraints: [
-        { type: "internal_uniqueness", roleIds: ["rib-room"] },
-        { type: "mandatory", roleId: "rib-room" },
-      ],
-    });
-    model.addFactType({
-      id: "ft-nr",
-      name: "Room has RoomNr",
-      roles: [{ id: "rhn-room", name: "has", playerId: "r" }, {
-        id: "rhn-nr",
-        name: "is of",
-        playerId: "n",
-      }],
-      readings: ["{0} has {1}"],
-      constraints: [{ type: "internal_uniqueness", roleIds: ["rhn-room"] }],
-    });
+    const component = (
+      key: "in" | "nr",
+      name: string,
+      near: string,
+      far: string,
+      farPlayer: string,
+    ) =>
+      model.addFactType({
+        id: `ft-${key}`,
+        name,
+        roles: [{ id: near, name: "near", playerId: "r" }, {
+          id: far,
+          name: "far",
+          playerId: farPlayer,
+        }],
+        readings: ["{0} near {1}"],
+        constraints: [
+          { type: "internal_uniqueness", roleIds: [near] },
+          ...(mandatoryIn.includes(key) ? [{ type: "mandatory" as const, roleId: near }] : []),
+        ],
+      });
+    component("in", "Room is in Building", "rib-room", "rib-b", "b");
+    component("nr", "Room has RoomNr", "rhn-room", "rhn-nr", "n");
     model.addConstraint({ id: "x", type: "external_uniqueness", roleIds: ["rib-b", "rhn-nr"] });
     model.setPreferredIdentifier("r", "x");
+    return model;
+  }
 
-    const warnings = optionalWarnings(model);
+  it("names only the optional components of an external scheme", () => {
+    const warnings = optionalWarnings(room(["in"]));
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]!.message).toContain('its role in "Room has RoomNr" is not mandatory');
-    expect(warnings[0]!.message).not.toContain("Room is in Building");
+    expect(warnings[0]!.message).toContain(
+      'identified through "Room is in Building" and "Room has RoomNr", but its role in "Room has RoomNr" is not declared',
+    );
+  });
+
+  it("names every optional component once, in the plural", () => {
+    const warnings = optionalWarnings(room([]));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain(
+      'its roles in "Room is in Building" and "Room has RoomNr" are not declared mandatory',
+    );
   });
 
   it("checks the uncovered role of an entity-entity binary", () => {

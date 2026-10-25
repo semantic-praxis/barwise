@@ -146,7 +146,26 @@ byte-identical before and after.
   resolves; no single-line variant of the rule makes it fire.
 - **Corpus.** The rule reports nothing on any of the 84 tracked models that
   load, so `validate` output is unchanged; on the eval payloads read as the
-  scorer reads them it reports nothing either (Observed).
+  scorer reads them it reports nothing either (Observed). It does report on
+  importer output: the pinned Ossie example (`flights.ontology.yaml`)
+  imports with 12 warnings, because `identify_by` adds the uniqueness it
+  implies and not the mandatory, and the ontology lists no identifier under
+  `requires`. The warnings are accurate to the source; whether the importer
+  should add the mandatory as it adds the uniqueness is barwise-3ik. The
+  NORMA fixtures give none, and the DDL, dbt and OpenAPI importers already
+  mark the entity role mandatory.
+- **Code review changed the rule's shape.** The message names the
+  identifier by its fact types rather than its constraint id (an
+  importer's ids are UUIDs) and takes the plural for several optional
+  roles. `identifyingRoles` drops its objectification test: the entity plays
+  no role in the fact type it objectifies, so the general case already
+  returns none, and the test was a second copy of `identifiedBy`'s arm.
+  `preferredIdentifiers` is resolved once per validation and passed to the
+  three identification checks, which each resolved it before. Two findings
+  stand: mandatory implied by other constraints is out of scope (the
+  message says "not declared mandatory" accordingly), and future scored
+  runs that leave an identifying role optional are charged for it, which is
+  the rule doing its job; no recorded score moves, so no suite bump.
 
 ## Open decisions
 

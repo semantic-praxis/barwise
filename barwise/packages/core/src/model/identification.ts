@@ -310,16 +310,16 @@ export function isMandatoryAlone(factType: FactType, roleId: string): boolean {
  * the entity's role in each binary of an external scheme, or, for an
  * internal one, the role the uniqueness leaves uncovered (the entity-value
  * binary and every other fact type alike). None when the identifier is the
- * fact type the entity objectifies, since the entity plays no role in it.
+ * fact type the entity objectifies: the entity plays no role in it (one
+ * that did would be the cycle `structural/identification-cycle` reports),
+ * so no arm of `identifiedBy` needs restating here.
  */
 export function identifyingRoles(
-  model: OrmModel,
   at: IdentifyingUniqueness,
 ): readonly { readonly factType: FactType; readonly role: Role; }[] {
   if (at.kind === "external") {
     return at.components.map((c) => ({ factType: c.factType, role: c.nearRole }));
   }
-  if (model.objectificationOf(at.factType.id)?.objectTypeId === at.entityId) return [];
   const covered = new Set(at.constraint.roleIds);
   return at.factType.roles
     .filter((r) => r.playerId === at.entityId && !covered.has(r.id))
