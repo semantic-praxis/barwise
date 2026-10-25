@@ -94,7 +94,9 @@ human-owned fields of any row whose id the detector still produces; refresh
 every derived field from the detector; stamp the placeholder only on ids that
 are genuinely new.**
 
-Recorded as `docs/adr/baselines-merge-on-write.md`.
+Recorded as `docs/adr/baselines-merge-on-write.md`, with one later
+exception: `audit:specs --write` reopens a note whose commits grew
+(barwise-qs8).
 
 ## Scope
 

@@ -3,7 +3,7 @@
 Scope: process
 Date: 2026-10-23
 Tracking: barwise-ubc, barwise-1026, barwise-qs8, barwise-eu6, barwise-5ij,
-barwise-tko, barwise-rh3,
+barwise-tko, barwise-rh3, barwise-80d,
 docs/specs/baseline-write-preserves-verdicts.spec.md
 
 ## Context
@@ -27,8 +27,10 @@ note, was decided when barwise-qs8 closed.
    gets the placeholder. A row no longer detected is reported and not
    written. There is one exception. When an `audit:specs` row gains
    commits its verdict never covered, `--write` reopens the note as
-   `TODO: re-read -- <commits> ... Previous note: <old note>`. The old
-   text is kept whole, and `--check` fails until someone re-reads it.
+   `TODO: re-read -- <commits> ... Previous note: <old note>`, and
+   `--check` fails until someone re-reads it. A row reopened again
+   merges the commit lists and keeps the original note, not the
+   intermediate `TODO`.
 2. **The merge has one owner.** Every writer calls
    `scripts/lib/baseline-merge.mjs` to read the existing rows, merge
    them and print the summary. Each writer declares its own
@@ -37,19 +39,18 @@ note, was decided when barwise-qs8 closed.
    and writes nothing; `--write` writes.
 4. **Row order depends only on the findings.** Rows are sorted by id,
    so rewriting an unchanged baseline changes nothing. The writer says
-   how many verdicts it kept, how many rows are new or still
-   unclassified, and which rows are no longer detected.
+   how many verdicts it kept, how many rows are new, and which rows
+   are no longer detected.
 5. **`audit-duplication` has no writer.** Its baseline is edited by
    hand.
 
 ## Consequences
 
 - `test:scripts` is a CI step guarded by
-  `if: steps.changes.outputs.docs_only != 'true'`. CI runs on pushes
-  to main and on pull requests into main. The step runs in every such
-  run that reaches it, and like any step it is skipped once an earlier
-  step fails. `ci:local` also runs it, and keeps going after a
-  failure. It tests:
+  `if: steps.changes.outputs.docs_only != 'true'`, so it is skipped on
+  a docs-only pull request, and like any step it is skipped once an
+  earlier step fails. `ci:local` applies the same condition and keeps
+  going after a failure. It tests:
   - the helper on its own;
   - each writer run over its committed baseline: verdicts are
     unchanged, apart from the reopen, and a second run changes
@@ -61,27 +62,36 @@ note, was decided when barwise-qs8 closed.
   writer test needs `packages/promptlab/dist`, so it skips in CI and
   in the pre-push `ci:local --commit`, which uses a fresh worktree. It
   runs only where a build already exists (barwise-eu6).
+- The summary misreports a reopen: `audit-spec-status` counts a
+  reopened verdict as kept, on that write and on later ones, while
+  `--check` fails on it (barwise-80d). The writers also report rows
+  still unclassified, which the spec's third Open decision left to the
+  reviewer and never resolved; the code added it.
 - Decision 4's report of rows no longer detected is tested only for
   `audit-corrections`. For `audit-rubric` and `audit-spec-status`
   nothing checks it (barwise-5ij).
 - Decision 2 has no gate beyond decision 5's test.
   `trial/lib/gate.mjs --write` is a fourth writer, and it does not use
-  the helper. Existing verdicts survive, but it breaks decisions 1 and
-  4: it never refreshes derived fields, it keeps rows no longer
-  detected, and it prints no kept/new/unclassified summary (barwise-tko).
+  the helper, which breaks decision 2. Existing verdicts survive and
+  its rows are sorted, but it never refreshes derived fields and keeps
+  rows no longer detected (decision 1), and prints no summary
+  (decision 4) (barwise-tko).
 - Apart from the reopen, a writer refreshes derived fields under a
   kept verdict and reports nothing about it. The spec left this as an
   unresolved Open decision ("Recommend silent refresh for now and a
   count in the summary line"). The code has the silent refresh but no
   count. This is open, not decided here (barwise-rh3).
-- `scripts/tests/expected-counts.json` also has a `--write` writer. It
-  holds only derived counts and no verdict, so this rule does not
-  cover it.
+- `scripts/tests/expected-counts.json` also has a `--write` writer
+  that does not use the helper. It holds only derived counts and no
+  verdict. No source says whether this rule covers it (barwise-tko).
 - Until architecture-index WS5 replaces them with links, these places
   also state this rule (barwise-ubc, WS5):
-  - the root `CLAUDE.md` conventions;
-  - `baseline-write-preserves-verdicts.spec.md`;
-  - the `baseline-merge.mjs` header;
+  - the root `CLAUDE.md` conventions and
+    `baseline-write-preserves-verdicts.spec.md`, both without the
+    reopen exception, and `CLAUDE.md`'s "Every `--write` path goes
+    through" the helper overstates decision 2 (barwise-tko);
+  - the `baseline-merge.mjs` header, its `mergeBaselineRows` docblock
+    and sort comment, and the `baseline-merge.test.mjs` header;
   - the comments in the three writers where they call the helper,
     plus `audit-spec-status`'s survey and reopen comments;
   - the comments on the `gates.test.mjs` writer tests.
