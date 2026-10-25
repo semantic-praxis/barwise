@@ -552,7 +552,10 @@ ontology:
     expect([mode("Carrier"), mode("FlightLeg")]).toEqual(["code", "flight_leg_id"]);
   });
 
-  it("names each reading that uses hyphen binding, and keeps it as written", () => {
+  it("keeps a hyphen-bound reading as written, and warns only about a hyphen that binds nothing", () => {
+    // barwise applies ORM's hyphen binding (reading-hyphen-binding.spec.md),
+    // so "departure- {Delay}" needs no warning; "minutes-" at the end binds
+    // to nothing.
     const { model, warnings } = load(`
 ontology:
   - { concept: Delay, type: ValueType, extends: [ Decimal ] }
@@ -560,12 +563,13 @@ ontology:
     type: EntityType
     relationships:
       - { name: dep, roles: [ { concept: Delay } ], multiplicity: ManyToOne, verbalizes: [ "{Flight} has departure- {Delay}" ] }
+      - { name: late, roles: [ { concept: Delay } ], multiplicity: ManyToOne, verbalizes: [ "{Flight} is late by {Delay} minutes-" ] }
 `);
     expect(factType(model, "Flight.dep").readings.map((r) => r.template)).toEqual([
       "{0} has departure- {1}",
     ]);
     expect(warnings).toEqual([
-      'Flight.dep: reading "{Flight} has departure- {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
+      'Flight.late: reading "{Flight} is late by {Delay} minutes-" has a hyphen that binds nothing; a word ending in a hyphen binds to the role player that follows it. Kept as written.',
       "no identify_by and no supertype, so nothing identifies them; each is given a reference mode no relationship carries: Flight.",
     ]);
   });
@@ -861,21 +865,10 @@ describe("Ossie import: the pinned flights example", () => {
       "Distance: extends NrMiles; barwise has no value-type subtyping, so Distance takes the decimal data type at the chain's root and the chain is not kept.",
       "RunwayGeometry: extends Polygon; barwise has no value-type subtyping, so RunwayGeometry takes the text data type at the chain's root and the chain is not kept.",
       "RunwayLength: extends NrFeet; barwise has no value-type subtyping, so RunwayLength takes the decimal data type at the chain's root and the chain is not kept.",
-      'CancelationReason.description: reading "{CancelationReason} has description- {String}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
-      'Airport.average_departure_delay: reading "{Airport} has average- departure {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
-      'Airport.average_arrival_delay: reading "{Airport} has average- arrival {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
-      'Flight.departure_delay: reading "{Flight} has departure- {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
       "Flight.scheduled_departure: requires is not carried as a constraint (kept in the note): Flight.scheduled_departure < Flight.scheduled_arrival",
-      'Flight.arrival_delay: reading "{Flight} has arrival- {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
-      'Flight.distance: reading "{Flight} spans actual- {Distance}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
       "Flight.departs_at: requires is not carried as a constraint (kept in the note): Flight.departs_at < Flight.arrives_at",
       "Flight.aircraft: requires is not carried as a constraint (kept in the note): Flight.operated_by(Aircraft.carrier)",
-      'Route.average_departure_delay: reading "{Route} has average- departure {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
-      'Route.average_arrival_delay: reading "{Route} has average- arrival {Delay}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
-      'Route.route_name: reading "{Route} has name- {String}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
-      'Route.destination: reading "{Route} connects to destination- {Airport}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
       "Route.destination: requires is not carried as a constraint (kept in the note): NOT Route.departure(Airport)",
-      'Route.departure: reading "{Route} connects to departure- {Airport}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
       "Route.departure: requires is not carried as a constraint (kept in the note): NOT Route.destination(Airport)",
     ]);
   });

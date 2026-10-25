@@ -62,6 +62,22 @@ describe("buildModelSummary", () => {
     expect(places.readings.every((r) => !r.includes("{0}"))).toBe(true);
   });
 
+  it("prints a hyphen-bound word before its player, without the hyphen", () => {
+    // Through core's expandReading rather than a private copy of it
+    // (reading-hyphen-binding.spec.md).
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "l", name: "Listing", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "c", name: "Currency", kind: "entity", referenceMode: "code" });
+    model.addFactType({
+      id: "ft",
+      name: "Listing has sale Currency",
+      roles: [{ name: "has", playerId: "l" }, { name: "is of", playerId: "c" }],
+      readings: ["{0} has sale- {1}"],
+    });
+    const ft = buildModelSummary(model).factTypes.find((f) => f.id === "ft")!;
+    expect(ft.readings).toEqual(["Listing has sale Currency"]);
+  });
+
   it("summarizes subtype links with resolved names", () => {
     const withSubtype = new ModelBuilder("Sub")
       .withEntityType("Party", { referenceMode: "party_id" })

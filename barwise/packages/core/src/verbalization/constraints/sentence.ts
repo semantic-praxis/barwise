@@ -5,7 +5,9 @@
  */
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
+import { leadOf, splitReading, textOf } from "../../model/ReadingOrder.js";
 import type { Role } from "../../model/Role.js";
+import { textSeg, type VerbalizationSegment } from "../Verbalization.js";
 
 /**
  * The role a local-role constraint names, which `ConstraintVerbalizer`
@@ -56,38 +58,66 @@ export function resolveCommonPlayer(
 }
 
 /**
- * Extract the predicate text from a reading template for a binary
- * fact type, given a subject role index and an object role index.
+ * A binary reading's predicate between a subject and an object role, and
+ * the words hyphen-bound to each role's player (reading-hyphen-binding.spec.md).
+ * `subject` and `object` put a player's reference after its lead, so every
+ * sentence builder places a lead the same way: immediately before the
+ * name, after any quantifier or determiner the builder writes first ("Each
+ * Listing has at most one sale Currency").
+ */
+export interface Predicate {
+  readonly text: string;
+  readonly subject: (name: VerbalizationSegment) => VerbalizationSegment[];
+  readonly object: (name: VerbalizationSegment) => VerbalizationSegment[];
+}
+
+function predicate(text: string, subjectLead = "", objectLead = ""): Predicate {
+  return {
+    text,
+    subject: (name) => [...leadSegs(subjectLead), name],
+    object: (name) => [...leadSegs(objectLead), name],
+  };
+}
+
+/**
+ * Extract the predicate of a binary fact type from the reading that names
+ * the subject role before the object role. When no reading has that
+ * order, the first reading's text between its first two placeholders is
+ * used as written, as before, with its binding hyphens removed and no
+ * leads: a lead there belongs to whichever noun the reading put after it,
+ * which is not the sentence's object.
  */
 export function extractPredicate(
   factType: FactType,
   subjectIdx: number,
   objectIdx: number,
-): string {
-  const subjectPlaceholder = `{${subjectIdx}}`;
-  const objectPlaceholder = `{${objectIdx}}`;
-
+): Predicate {
   for (const reading of factType.readings) {
-    const t = reading.template;
-    const subjectPos = t.indexOf(subjectPlaceholder);
-    const objectPos = t.indexOf(objectPlaceholder);
-    if (
-      subjectPos >= 0
-      && objectPos >= 0
-      && subjectPos < objectPos
-    ) {
-      const start = subjectPos + subjectPlaceholder.length;
-      return t.slice(start, objectPos).trim();
+    const parts = splitReading(reading.template).parts;
+    const s = parts.findIndex((p) => p.kind === "role" && p.index === subjectIdx);
+    const o = parts.findIndex((p) => p.kind === "role" && p.index === objectIdx);
+    if (s >= 0 && o > s) {
+      return predicate(textOf(parts.slice(s + 1, o)).trim(), leadOf(parts[s]), leadOf(parts[o]));
     }
   }
 
-  const t = factType.readings[0]?.template ?? "";
-  const p0 = t.indexOf("{");
-  const p1 = t.indexOf("{", p0 + 1);
-  if (p0 >= 0 && p1 >= 0) {
-    const end0 = t.indexOf("}", p0) + 1;
-    return t.slice(end0, p1).trim();
+  const first = factType.readings[0];
+  if (first) {
+    const parts = splitReading(first.template).parts;
+    const placeholders = parts.flatMap((p, i) => p.kind === "role" ? [i] : []);
+    if (placeholders.length >= 2) {
+      const [a, b] = placeholders as [number, number];
+      return predicate(`${textOf(parts.slice(a + 1, b)).trim()} ${leadOf(parts[b])}`.trim());
+    }
   }
 
-  return "...";
+  return UNKNOWN_PREDICATE;
+}
+
+/** The predicate of a reading barwise cannot read one from. */
+export const UNKNOWN_PREDICATE: Predicate = predicate("...");
+
+/** A lead as the segment that goes before its player's name, or none. */
+export function leadSegs(lead: string): VerbalizationSegment[] {
+  return lead ? [textSeg(lead + " ")] : [];
 }
