@@ -1,6 +1,6 @@
 # The editor's Avro export writes a namespace Avro accepts
 
-Status: Draft -- no workstream implemented
+Status: Implemented
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -83,6 +83,16 @@ The changes above. Acceptance, each pinned by a test:
 - The editor exports `order-system.orm.yaml` under `com.order_system`,
   with the warning.
 - `school.orm.yaml` exports under `com.school` with no warning.
+
+## Implementation notes
+
+- As planned. The first draft refused an invalid namespace in the exporter
+  and claimed no registered name could change. The high plan review
+  overturned both: Java Avro's `Schema.Name` (release-1.11.3) validates
+  only the simple name, so a Java registry accepts `com.order-system`,
+  and the MCP export can pass a namespace. The exporter is now left as it
+  was, and the editor repairs only the namespace it derives, with a
+  warning.
 
 ## Open decisions
 

@@ -115,6 +115,27 @@ beforeEach(() => {
 });
 
 describe("Barwise: Export, As Avro Schemas", () => {
+  it("makes a file name Avro rejects into a valid namespace, and says so (barwise-1c2)", async () => {
+    state.editorPath = "/work/order-system.orm.yaml";
+    try {
+      await run(new ExportAvroCommand());
+    } finally {
+      state.editorPath = "/work/school.orm.yaml";
+    }
+    expect(state.errors).toEqual([]);
+    expect(state.warnings).toEqual([
+      `The file name gives the Avro namespace "com.order-system", which Avro's name rule rejects, `
+      + `so the schemas use "com.order_system". A schema registry that accepted "com.order-system" `
+      + "will treat these as new schemas.",
+    ]);
+    expect(state.written).toEqual(expectedFiles("avro", { namespace: "com.order_system" }, "/out"));
+  });
+
+  it("warns nothing for a file name that is already a valid namespace", async () => {
+    await run(new ExportAvroCommand());
+    expect(state.warnings).toEqual([]);
+  });
+
   it("writes the avro exporter's files, review notes included", async () => {
     await run(new ExportAvroCommand());
     expect(state.written).toEqual(expectedFiles("avro", { namespace: "com.school" }, "/out"));

@@ -14,6 +14,7 @@ export { type ConstraintReportOptions, formatConstraintReport } from "./constrai
 
 // Format implementations
 export { AvroExportFormat } from "./avro/AvroExportFormat.js";
+export { isAvroNamespace, toAvroNamespace } from "./avro/avroNames.js";
 export { DdlExportFormat, PLAIN_DDL_OPTIONS } from "./ddl/DdlExportFormat.js";
 export { DdlImportFormat } from "./ddl/DdlImportFormat.js";
 export { NormaExportFormat } from "./norma/NormaExportFormat.js";

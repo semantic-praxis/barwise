@@ -6,6 +6,7 @@
  * palette's namespace), and writes its .avsc files to a chosen folder.
  */
 import { OrmYamlSerializer } from "@barwise/core";
+import { toAvroNamespace } from "@barwise/formats";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { exportWith } from "../export/registeredExport.js";
@@ -38,11 +39,23 @@ export class ExportAvroCommand {
     // Step 2: Render through the registered exporter. The namespace keeps
     // each record's full name what earlier palette exports registered: a
     // schema registry reads a changed full name as a different schema.
+    // A file name Avro's rule rejects ("order-system") is made valid, and
+    // the user is told: a lenient registry may have taken the old name, and
+    // will read the new one as different schemas.
     const baseName = path.basename(
       editor.document.uri.fsPath,
       ".orm.yaml",
     );
-    const exported = exportWith("avro", model, { namespace: `com.${baseName}` });
+    const derived = `com.${baseName}`;
+    const namespace = toAvroNamespace(derived);
+    if (namespace !== derived) {
+      vscode.window.showWarningMessage(
+        `The file name gives the Avro namespace "${derived}", which Avro's name rule rejects, `
+          + `so the schemas use "${namespace}". A schema registry that accepted "${derived}" `
+          + "will treat these as new schemas.",
+      );
+    }
+    const exported = exportWith("avro", model, { namespace });
     if (!exported.ok) {
       vscode.window.showErrorMessage(exported.reason);
       return;
