@@ -25,7 +25,7 @@
  * (the spec defers dialect-specific types until there is demand).
  */
 
-import type { SqlDialect } from "@barwise/core/sql";
+import type { SqlDialect } from "../sql/types.js";
 
 /** How a dialect carries one constraint category. */
 export type ConstraintChannel = "native" | "informational" | "absent";
