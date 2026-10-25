@@ -27,4 +27,8 @@ The rule other work must follow, stated so it can be checked.
 
 ## Consequences
 
-What follows from the rule, what it costs, and what enforces it.
+What follows from the rule, what it costs, and what enforces it. Name
+every known place the code breaks the rule, and every gap in what
+enforces it, each with its issue id or the reason it is deliberate: an
+ADR that states a rule the code does not follow is read as a
+description of the system (determinism-in-core found four).

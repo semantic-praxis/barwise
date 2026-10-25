@@ -1,10 +1,10 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24); 5 not yet
+Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25); 5 not yet
 
 Created: 2026-10-23
-Last-updated: 2026-10-24
-Plan-reviewed: 57072cf4 (code-review, pr-review)
+Last-updated: 2026-10-25
+Plan-reviewed: 9f00cfad (code-review, pr-review; re-pointed after the first two WS4 ADR PRs edited the body)
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
 barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
@@ -18,7 +18,8 @@ barwise/scripts/regen-architecture.mjs, barwise/scripts/lib/architecture-section
 barwise/review-tiers.json, .claude/skills/spec-writer/template.adr.md,
 .claude/skills/pr-review/checklist.md, barwise/scripts/tests/,
 barwise/package.json, package.json, .github/workflows/ci.yml, CLAUDE.md,
-barwise/docs/adr/determinism-in-core.md
+barwise/docs/adr/determinism-in-core.md,
+barwise/docs/adr/plan-before-code.md
 
 In one sentence: each architecture or process decision lives in one ADR
 named for its concern and edited in place; the PR that changes an ADR
@@ -358,28 +359,29 @@ serves the writer and the check.
 One PR per ADR, each reviewed with `/code-review` and `/pr-review`
 before merge (Open decision 2). Each PR adds its files to this spec's `Touches:`.
 The owner chose the first on 2026-10-24: `determinism-in-core.md`.
-Landed so far: `determinism-in-core.md`.
+Landed so far: `determinism-in-core.md`. The owner chose the second
+on 2026-10-25: `plan-before-code.md`.
 Candidates, with every place each is stated today, so WS5 can replace
 all of them with a link:
 
-| Proposed ADR                      | Scope        | Stated today in                                                                                                                 |
-| --------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `determinism-in-core.md`          | architecture | CLAUDE.md design principles; `architecture-scenarios.md` S-DET-1..5; `check-core-purity.mjs`; the `core/src/model/id.ts` header |
-| `connector-packages.md`           | architecture | CLAUDE.md "Dependency Graph" prose (core ships no interop format)                                                               |
-| `schema-versioning.md`            | architecture | the metamodel ADR's "Schema versioning" section; CLAUDE.md `migrate` row                                                        |
-| `surface-capability-parity.md`    | architecture | CLAUDE.md capability matrix ("an unmarked gap is a bug")                                                                        |
-| `production-prompt-resolution.md` | architecture | CLAUDE.md `--artifacts` paragraph; `artifact-resolution-parity.spec.md`                                                         |
-| `keyless-model-access.md`         | architecture | CLAUDE.md conventions; `keyless-model-access.spec.md`                                                                           |
-| `python-from-the-lockfile.md`     | process      | CLAUDE.md conventions                                                                                                           |
-| `gate-refusal-contract.md`        | process      | CLAUDE.md conventions; `gate-refusal-contract.spec.md`                                                                          |
-| `must-agree-copies.md`            | process      | CLAUDE.md conventions; `duplication-drift-guards.spec.md`                                                                       |
-| `findings-close-by-mechanism.md`  | process      | CLAUDE.md conventions ("A finding is not closed by a document")                                                                 |
-| `baselines-merge-on-write.md`     | process      | CLAUDE.md conventions; `baseline-write-preserves-verdicts.spec.md`                                                              |
-| `credential-handling.md`          | process      | CLAUDE.md conventions; `credential-scanning.spec.md`                                                                            |
-| `pinned-runtimes.md`              | process      | CLAUDE.md "Monorepo Commands" (Node and Python pins)                                                                            |
-| `plan-before-code.md`             | process      | CLAUDE.md conventions bullet 1 (spec first); `plan-scope-check.spec.md` (plan review)                                           |
-| `merge-delegation.md`             | process      | CLAUDE.md conventions bullet 3; `steward` skill, section 4b                                                                     |
-| `review-policy.md`                | process      | `tiered-pr-review.spec.md` "The decision of 2026-09-23"                                                                         |
+| Proposed ADR                      | Scope        | Stated today in                                                                                                                                                    |
+| --------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `determinism-in-core.md`          | architecture | CLAUDE.md design principles; `architecture-scenarios.md` S-DET-1..5; `check-core-purity.mjs`; the `core/src/model/id.ts` header                                    |
+| `connector-packages.md`           | architecture | CLAUDE.md "Dependency Graph" prose (core ships no interop format)                                                                                                  |
+| `schema-versioning.md`            | architecture | the metamodel ADR's "Schema versioning" section; CLAUDE.md `migrate` row                                                                                           |
+| `surface-capability-parity.md`    | architecture | CLAUDE.md capability matrix ("an unmarked gap is a bug")                                                                                                           |
+| `production-prompt-resolution.md` | architecture | CLAUDE.md `--artifacts` paragraph; `artifact-resolution-parity.spec.md`                                                                                            |
+| `keyless-model-access.md`         | architecture | CLAUDE.md conventions; `keyless-model-access.spec.md`                                                                                                              |
+| `python-from-the-lockfile.md`     | process      | CLAUDE.md conventions                                                                                                                                              |
+| `gate-refusal-contract.md`        | process      | CLAUDE.md conventions; `gate-refusal-contract.spec.md`                                                                                                             |
+| `must-agree-copies.md`            | process      | CLAUDE.md conventions; `duplication-drift-guards.spec.md`                                                                                                          |
+| `findings-close-by-mechanism.md`  | process      | CLAUDE.md conventions ("A finding is not closed by a document")                                                                                                    |
+| `baselines-merge-on-write.md`     | process      | CLAUDE.md conventions; `baseline-write-preserves-verdicts.spec.md`                                                                                                 |
+| `credential-handling.md`          | process      | CLAUDE.md conventions; `credential-scanning.spec.md`                                                                                                               |
+| `pinned-runtimes.md`              | process      | CLAUDE.md "Monorepo Commands" (Node and Python pins)                                                                                                               |
+| `plan-before-code.md`             | process      | CLAUDE.md conventions bullet 1 (spec first); `spec-writer` step 8 and design gate; `pr-creation` readiness; `plan-scope-check.spec.md`; `touches-required.spec.md` |
+| `merge-delegation.md`             | process      | CLAUDE.md conventions bullet 3; `steward` skill, section 4b                                                                                                        |
+| `review-policy.md`                | process      | `tiered-pr-review.spec.md` "The decision of 2026-09-23"                                                                                                            |
 
 `schema-versioning.md` is the question the list raises: today it is a
 section of the metamodel ADR, and one concern per ADR says it splits out.
