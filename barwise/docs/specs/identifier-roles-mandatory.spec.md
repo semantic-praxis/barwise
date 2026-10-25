@@ -1,6 +1,6 @@
 # A preferred identifier's roles are mandatory, or validation says so
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- WS1
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -122,6 +122,29 @@ is watched red against a variant of the rule that drops the guard it pins:
 
 And one corpus check: `barwise validate` over every tracked model is
 byte-identical before and after.
+
+## Implementation notes
+
+- **`identifyingRoles` lives beside `isMandatoryAlone`.** Which roles an
+  entity plays in its identifier is a question about the arms of
+  `identifiedBy` and `externalIdentifies`, so it is answered in
+  `model/identification.ts` (exported with `isMandatoryAlone`) rather than
+  restated in the rule.
+- **Two "well-formed" fixtures were not.** The no-diagnostics models in
+  `completenessWarnings.test.ts` and `ValidationEngine.test.ts` identified
+  Customer and Order by reference binaries with the entity roles optional,
+  which is the defect this rule reports; they now declare the mandatory
+  constraints. No other test in the monorepo changed (`npm test`, 24 of 24
+  tasks).
+- **Watched red.** Registration removed: the four behavioural tests fail.
+  The no-optional-roles guard removed: the alethic and objectification pins
+  fail, with the well-formed fixture. Modality ignored: the deontic case
+  fails. The unresolved-reference pin holds by construction, since the rule
+  reads only `preferredIdentifiers`, which keeps a reference only when it
+  resolves; no single-line variant of the rule makes it fire.
+- **Corpus.** The rule reports nothing on any of the 84 tracked models that
+  load, so `validate` output is unchanged; on the eval payloads read as the
+  scorer reads them it reports nothing either (Observed).
 
 ## Open decisions
 

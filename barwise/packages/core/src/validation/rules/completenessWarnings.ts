@@ -2,7 +2,9 @@ import {
   IDENTIFICATION_SOURCE_LABEL,
   type IdentificationSource,
   identificationSources,
+  identifyingRoles,
   isIdentified,
+  isMandatoryAlone,
   type PreferredIdentifierResolution,
   preferredIdentifiers,
   resolvePreferredIdentifier,
@@ -24,6 +26,7 @@ import { report, RULE_ID } from "../ruleId.js";
  * - Value types without a declared data type.
  * - Entity types with zero or multiple preferred identifiers.
  * - Object types that declare their identity in more than one way.
+ * - Entity types whose identifier rests on a role that is not mandatory.
  */
 export function completenessWarnings(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -35,6 +38,7 @@ export function completenessWarnings(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkMissingValueTypeDataType(model));
   diagnostics.push(...checkPreferredIdentifiers(model));
   diagnostics.push(...checkConflictingIdentification(model));
+  diagnostics.push(...checkOptionalIdentifierRoles(model));
   diagnostics.push(...checkFrequencyWithoutEffect(model));
 
   return diagnostics;
@@ -202,6 +206,39 @@ function checkPreferredIdentifiers(model: OrmModel): Diagnostic[] {
     }
   }
 
+  return diagnostics;
+}
+
+/**
+ * An identifier some instances may lack does not identify them: ORM requires
+ * a reference scheme's roles to be mandatory, and nothing checked it
+ * (identifier-roles-mandatory.spec.md). For the entity-value binary and an
+ * external scheme the mapper makes those columns the primary key, so the
+ * schema states the rule the model omits; for the other shapes the scheme
+ * is incomplete all the same, so the rule does not ask what the mapper does.
+ *
+ * Reads `preferredIdentifiers`, so an unresolved reference -- which
+ * `preferred-identifier-invalid` reports -- is not checked here as well.
+ */
+function checkOptionalIdentifierRoles(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const [entityId, at] of preferredIdentifiers(model).byEntity) {
+    const optional = identifyingRoles(model, at).filter(
+      ({ factType, role }) => !isMandatoryAlone(factType, role.id),
+    );
+    if (optional.length === 0) continue;
+    const ot = model.getObjectType(entityId)!;
+    diagnostics.push(
+      report(
+        RULE_ID.preferredIdentifierOptional,
+        "default",
+        ot.id,
+        ot.name,
+        at.constraint.id ?? "",
+        optional.map(({ factType }) => `"${factType.name}"`).join(", "),
+      ),
+    );
+  }
   return diagnostics;
 }
 

@@ -39,12 +39,14 @@ describe("ValidationEngine", () => {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "is of" },
         uniqueness: "both",
+        mandatory: "role1",
         isPreferred: true,
       })
       .withBinaryFactType("Order has OrderNumber", {
         role1: { player: "Order", name: "has" },
         role2: { player: "OrderNumber", name: "is of" },
         uniqueness: "both",
+        mandatory: "role1",
         isPreferred: true,
       })
       .withBinaryFactType("Customer places Order", {

@@ -40,12 +40,14 @@ describe("completenessWarnings", () => {
         role1: { player: "Customer", name: "has" },
         role2: { player: "CustomerId", name: "is of" },
         uniqueness: "both",
+        mandatory: "role1",
         isPreferred: true,
       })
       .withBinaryFactType("Order has OrderNumber", {
         role1: { player: "Order", name: "has" },
         role2: { player: "OrderNumber", name: "is of" },
         uniqueness: "both",
+        mandatory: "role1",
         isPreferred: true,
       })
       .withBinaryFactType("Customer places Order", {
@@ -1044,5 +1046,144 @@ describe("a frequency constraint that excludes nothing", () => {
           .build(),
       ).filter((d) => d.ruleId === "completeness/frequency-without-effect"),
     ).toHaveLength(0);
+  });
+});
+
+describe("an identifier resting on an optional role (identifier-roles-mandatory.spec.md)", () => {
+  const RULE = "completeness/preferred-identifier-optional";
+  const optionalWarnings = (model: OrmModel) =>
+    completenessWarnings(model).filter((d) => d.ruleId === RULE);
+
+  /** Person has PersonNr, both roles unique, Person identified by it. */
+  function personNr(mandatory?: "alethic" | "deontic") {
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "p", name: "Person", kind: "entity", referenceMode: "nr" });
+    model.addObjectType({ id: "n", name: "PersonNr", kind: "value" });
+    model.addFactType({
+      id: "ft",
+      name: "Person has PersonNr",
+      roles: [{ id: "rp", name: "has", playerId: "p" }, { id: "rn", name: "is of", playerId: "n" }],
+      readings: ["{0} has {1}"],
+      constraints: [
+        { id: "u-p", type: "internal_uniqueness", roleIds: ["rp"] },
+        { id: "u-n", type: "internal_uniqueness", roleIds: ["rn"] },
+        ...(mandatory
+          ? [{ id: "m-p", type: "mandatory" as const, roleId: "rp", modality: mandatory }]
+          : []),
+      ],
+    });
+    model.setPreferredIdentifier("p", "u-n");
+    return model;
+  }
+
+  it("warns when the entity's role in its entity-value binary is optional", () => {
+    const [warning, ...rest] = optionalWarnings(personNr());
+    expect(rest).toEqual([]);
+    expect(warning?.severity).toBe("warning");
+    expect(warning?.message).toBe(
+      'Entity type "Person" is identified by constraint "u-n", but its role in "Person has PersonNr" is not mandatory, so a "Person" could have no identifier. A reference scheme\'s roles are mandatory; add the mandatory constraint, or identify "Person" another way.',
+    );
+  });
+
+  it("is satisfied by an alethic mandatory, and not by a deontic one", () => {
+    expect(optionalWarnings(personNr("alethic"))).toEqual([]);
+    expect(optionalWarnings(personNr("deontic"))).toHaveLength(1);
+  });
+
+  it("names only the optional components of an external scheme", () => {
+    // Room is identified by the Building it is in and its RoomNr; only
+    // "Room has RoomNr" leaves Room's role optional.
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "r", name: "Room", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "b", name: "Building", kind: "entity", referenceMode: "nr" });
+    model.addObjectType({ id: "n", name: "RoomNr", kind: "value" });
+    model.addFactType({
+      id: "ft-in",
+      name: "Room is in Building",
+      roles: [{ id: "rib-room", name: "is in", playerId: "r" }, {
+        id: "rib-b",
+        name: "houses",
+        playerId: "b",
+      }],
+      readings: ["{0} is in {1}"],
+      constraints: [
+        { type: "internal_uniqueness", roleIds: ["rib-room"] },
+        { type: "mandatory", roleId: "rib-room" },
+      ],
+    });
+    model.addFactType({
+      id: "ft-nr",
+      name: "Room has RoomNr",
+      roles: [{ id: "rhn-room", name: "has", playerId: "r" }, {
+        id: "rhn-nr",
+        name: "is of",
+        playerId: "n",
+      }],
+      readings: ["{0} has {1}"],
+      constraints: [{ type: "internal_uniqueness", roleIds: ["rhn-room"] }],
+    });
+    model.addConstraint({ id: "x", type: "external_uniqueness", roleIds: ["rib-b", "rhn-nr"] });
+    model.setPreferredIdentifier("r", "x");
+
+    const warnings = optionalWarnings(model);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain('its role in "Room has RoomNr" is not mandatory');
+    expect(warnings[0]!.message).not.toContain("Room is in Building");
+  });
+
+  it("checks the uncovered role of an entity-entity binary", () => {
+    // A Badge is identified by the Person it belongs to: the uniqueness is
+    // on Person's role, so Badge plays the uncovered one.
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "bd", name: "Badge", kind: "entity", referenceMode: "id" });
+    model.addObjectType({ id: "p", name: "Person", kind: "entity", referenceMode: "nr" });
+    model.addFactType({
+      id: "ft",
+      name: "Badge belongs to Person",
+      roles: [{ id: "rb", name: "belongs to", playerId: "bd" }, {
+        id: "rp",
+        name: "holds",
+        playerId: "p",
+      }],
+      readings: ["{0} belongs to {1}"],
+      constraints: [{ id: "u-p", type: "internal_uniqueness", roleIds: ["rp"] }],
+    });
+    model.setPreferredIdentifier("bd", "u-p");
+
+    const warnings = optionalWarnings(model);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain('Entity type "Badge"');
+  });
+
+  it("does not check an entity identified by the fact type it objectifies", () => {
+    // Enrollment objectifies "Student takes Course" and is identified by
+    // its spanning uniqueness; Enrollment plays no role in that fact type.
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "s", name: "Student", kind: "entity", referenceMode: "nr" });
+    model.addObjectType({ id: "c", name: "Course", kind: "entity", referenceMode: "code" });
+    model.addObjectType({ id: "e", name: "Enrollment", kind: "entity", referenceMode: "id" });
+    model.addFactType({
+      id: "ft",
+      name: "Student takes Course",
+      roles: [{ id: "rs", name: "takes", playerId: "s" }, {
+        id: "rc",
+        name: "is taken by",
+        playerId: "c",
+      }],
+      readings: ["{0} takes {1}"],
+      constraints: [{ id: "u-sc", type: "internal_uniqueness", roleIds: ["rs", "rc"] }],
+    });
+    model.addObjectifiedFactType({ factTypeId: "ft", objectTypeId: "e" });
+    model.setPreferredIdentifier("e", "u-sc");
+
+    expect(optionalWarnings(model)).toEqual([]);
+  });
+
+  it("leaves an unresolved reference to preferred-identifier-invalid", () => {
+    const model = personNr();
+    model.setPreferredIdentifier("p", "no-such-constraint");
+    const ruleIds = completenessWarnings(model).map((d) => d.ruleId);
+    expect(ruleIds).toContain("completeness/preferred-identifier-invalid");
+    expect(ruleIds).not.toContain(RULE);
   });
 });

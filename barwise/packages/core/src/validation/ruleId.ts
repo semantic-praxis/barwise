@@ -46,6 +46,7 @@ export const RULE_ID = {
   missingValueTypeDataType: "completeness/missing-value-type-data-type",
   conflictingIdentification: "completeness/conflicting-identification",
   preferredIdentifierInvalid: "completeness/preferred-identifier-invalid",
+  preferredIdentifierOptional: "completeness/preferred-identifier-optional",
   acrossFactTypesUnknownRole: "constraint/across-fact-types-unknown-role",
   cardinalityInvalidRole: "constraint/cardinality-invalid-role",
   cardinalityMaxLessThanMin: "constraint/cardinality-max-less-than-min",
@@ -232,6 +233,15 @@ const RULE_DESCRIPTORS = {
         `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but a fact type it spans is not binary; each component of a reference scheme is a binary between "${otName}" and what identifies it.`,
       externalNearNotUnique: (otName: string, constraintId: string): string =>
         `Entity type "${otName}" names external uniqueness "${constraintId}" as its preferred identifier, but a role "${otName}" plays in one of its fact types has no uniqueness of its own, so one "${otName}" could have several values of that component.`,
+    },
+  },
+  [RULE_ID.preferredIdentifierOptional]: {
+    severity: "warning",
+    description:
+      "An entity type's preferred identifier rests on a role the entity plays that is not mandatory.",
+    messages: {
+      default: (otName: string, constraintId: string, factTypes: string): string =>
+        `Entity type "${otName}" is identified by constraint "${constraintId}", but its role in ${factTypes} is not mandatory, so a "${otName}" could have no identifier. A reference scheme's roles are mandatory; add the mandatory constraint, or identify "${otName}" another way.`,
     },
   },
   [RULE_ID.acrossFactTypesUnknownRole]: {
