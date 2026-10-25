@@ -438,5 +438,84 @@ describe("a one-to-one between two entities", () => {
       .map((c) => between!.getRoleById((c as { roleIds: string[]; }).roleIds[0]!)!.playerId)
       .sort();
     expect(unique, text).toEqual([customer.id, order.id].sort());
+    // And nothing more: no external uniqueness read from the same clause.
+    expect(model.constraints.filter((c) => c.type === "external_uniqueness"), text).toEqual([]);
+  });
+
+  it("reads a UNIQUE on a single foreign key column as the referenced side's uniqueness", () => {
+    const { model } = ddl.parse(`
+      CREATE TABLE customer (customer_id INTEGER NOT NULL, PRIMARY KEY (customer_id));
+      CREATE TABLE "order" (
+        order_nr INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        PRIMARY KEY (order_nr),
+        FOREIGN KEY (customer_id) REFERENCES customer (customer_id),
+        UNIQUE (customer_id)
+      );`);
+    const customer = model.getObjectTypeByName("Customer")!;
+    const order = model.getObjectTypeByName("Order")!;
+    const ft = model.factTypes.find((f) =>
+      f.roles.some((r) => r.playerId === customer.id)
+      && f.roles.some((r) => r.playerId === order.id)
+    )!;
+    const customerRole = ft.roles.find((r) => r.playerId === customer.id)!;
+    expect(
+      ft.internalConstraints.some((c) =>
+        c.type === "internal_uniqueness" && c.roleIds.length === 1
+        && c.roleIds[0] === customerRole.id
+      ),
+    ).toBe(true);
+  });
+
+  it("adds no far uniqueness for a UNIQUE over the foreign key and another column", () => {
+    const { model } = ddl.parse(`
+      CREATE TABLE customer (customer_id INTEGER NOT NULL, PRIMARY KEY (customer_id));
+      CREATE TABLE "order" (
+        order_nr INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        placed_on DATE NOT NULL,
+        PRIMARY KEY (order_nr),
+        FOREIGN KEY (customer_id) REFERENCES customer (customer_id),
+        UNIQUE (customer_id, placed_on)
+      );`);
+    const customer = model.getObjectTypeByName("Customer")!;
+    const order = model.getObjectTypeByName("Order")!;
+    const ft = model.factTypes.find((f) =>
+      f.roles.some((r) => r.playerId === customer.id)
+      && f.roles.some((r) => r.playerId === order.id)
+    )!;
+    const customerRole = ft.roles.find((r) => r.playerId === customer.id)!;
+    expect(
+      ft.internalConstraints.some((c) =>
+        c.type === "internal_uniqueness" && c.roleIds.includes(customerRole.id)
+      ),
+    ).toBe(false);
+  });
+
+  it("reads a UNIQUE over a composite foreign key once, as step 3b's external uniqueness", () => {
+    const { model } = ddl.parse(`
+      CREATE TABLE assignment (seat_id INTEGER NOT NULL, flight_id INTEGER NOT NULL, PRIMARY KEY (seat_id, flight_id));
+      CREATE TABLE ticket (
+        ticket_nr INTEGER NOT NULL,
+        seat_id INTEGER NOT NULL,
+        flight_id INTEGER NOT NULL,
+        PRIMARY KEY (ticket_nr),
+        FOREIGN KEY (seat_id, flight_id) REFERENCES assignment (seat_id, flight_id),
+        UNIQUE (seat_id, flight_id)
+      );`);
+    const ticket = model.getObjectTypeByName("Ticket")!;
+    const assignment = model.getObjectTypeByName("Assignment")!;
+    const farUniques = model.factTypes
+      .filter((f) =>
+        f.roles.some((r) => r.playerId === ticket.id)
+        && f.roles.some((r) => r.playerId === assignment.id)
+      )
+      .flatMap((f) =>
+        f.internalConstraints.filter((c) =>
+          c.type === "internal_uniqueness" && c.roleIds.length === 1
+          && f.getRoleById(c.roleIds[0]!)!.playerId !== ticket.id
+        )
+      );
+    expect(farUniques).toEqual([]);
   });
 });

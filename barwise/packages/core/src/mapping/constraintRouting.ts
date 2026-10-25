@@ -240,7 +240,9 @@ function routeAll(
           route("unique", `UNIQUE (${col.column})`, col.table, inView);
         }
         const between = single ? entityBinaryUniqueColumns(single, ft, model, schema) : undefined;
-        if (between && !isWholePrimaryKey(between, schema)) {
+        if (between === "unlocated") {
+          spill(inView, "the roles map to no column", tableForFactType(ft, model, schema));
+        } else if (typeof between === "object" && !isWholePrimaryKey(between, schema)) {
           route("unique", `UNIQUE (${between.columns.join(", ")})`, between.table, inView);
         }
         // An n-ary fact type's table is keyed on one of its uniqueness
@@ -394,7 +396,10 @@ function columnsForJoinedRole(
   const valuePlayer = located !== undefined
     && model.getObjectType(located.role.playerId)?.kind === "value";
   const columnsOf = (id: string) => {
-    if (!valuePlayer) return findColumns(id, schema);
+    if (!valuePlayer) {
+      const found = findColumns(id, schema);
+      return found && { table: found.table.name, columns: found.columns };
+    }
     const one = findColumn(id, schema);
     return one && { table: one.table, columns: [one.column] };
   };
@@ -410,10 +415,10 @@ function columnsForJoinedRole(
 function findColumns(
   roleId: string,
   schema: RelationalSchema,
-): { table: string; columns: string[]; } | undefined {
+): { table: Table; columns: string[]; } | undefined {
   for (const table of schema.tables) {
     const columns = table.columns.filter((cl) => cl.sourceRoleId === roleId).map((cl) => cl.name);
-    if (columns.length > 0) return { table: table.name, columns };
+    if (columns.length > 0) return { table, columns };
   }
   return undefined;
 }
@@ -464,9 +469,11 @@ function isWholePrimaryKey(
 
 /**
  * The columns a single-role uniqueness on a binary between two entities
- * needs UNIQUE on, or undefined when the mapping already realizes it
- * (one-to-one-entity-uniqueness.spec.md, barwise-hjy). The fact is
- * stored in one of three places:
+ * needs UNIQUE on, "realized" when the mapping already realizes it,
+ * "unlocated" when neither role has columns where the mapping stores such
+ * a fact, or undefined when it is not a binary between two entities
+ * (one-to-one-entity-uniqueness.spec.md, barwise-hjy). The fact is stored
+ * in one of three places:
  *
  *   - the role's own columns, in its own player's table: they are
  *     single-valued, which is the uniqueness itself;
@@ -481,33 +488,26 @@ function entityBinaryUniqueColumns(
   ft: FactType,
   model: OrmModel,
   schema: RelationalSchema,
-): { table: string; columns: string[]; } | undefined {
+): { table: string; columns: string[]; } | "realized" | "unlocated" | undefined {
   if (ft.arity !== 2) return undefined;
   const role = ft.getRoleById(roleId);
   const partner = ft.roles.find((r) => r.id !== roleId);
   if (!role || !partner) return undefined;
   const isEntity = (id: string) => model.getObjectType(id)?.kind === "entity";
   if (!isEntity(role.playerId) || !isEntity(partner.playerId)) return undefined;
-  // The table itself, so its source element is read from the table the
-  // columns were found in rather than from a second lookup by name.
-  const columnsIn = (id: string) => {
-    for (const table of schema.tables) {
-      const columns = table.columns.filter((cl) => cl.sourceRoleId === id).map((cl) => cl.name);
-      if (columns.length > 0) return { table, columns };
-    }
-    return undefined;
-  };
   const found = (hit: { table: Table; columns: string[]; }) => ({
     table: hit.table.name,
     columns: hit.columns,
   });
 
-  const own = columnsIn(roleId);
-  if (own) return own.table.sourceElementId === role.playerId ? undefined : found(own);
-  const absorbed = columnsIn(partner.id);
-  return absorbed && absorbed.table.sourceElementId === partner.playerId
-    ? found(absorbed)
-    : undefined;
+  const own = findColumns(roleId, schema);
+  if (own) return own.table.sourceElementId === role.playerId ? "realized" : found(own);
+  const absorbed = findColumns(partner.id, schema);
+  if (absorbed && absorbed.table.sourceElementId === partner.playerId) return found(absorbed);
+  // Neither role's columns are where the three places put them: the
+  // mapping stored the fact nowhere this can see, so the caller spills
+  // rather than counting it realized.
+  return "unlocated";
 }
 
 /**

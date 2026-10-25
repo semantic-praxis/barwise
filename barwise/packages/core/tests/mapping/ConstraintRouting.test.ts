@@ -418,9 +418,8 @@ describe("uniqueness on a binary between two entities", () => {
       .build();
     const schema = new RelationalMapper().map(model);
     const clauses = routeConstraints(model, schema, postgres, "postgres").clauses;
-    expect(clauses).toHaveLength(1);
-    expect(clauses[0]!.tableName).toBe("employee");
-    expect(clauses[0]!.sql).toMatch(/^UNIQUE \(\w+\)$/);
+    // employee.fk_emp_nr is the successor; each one succeeds at most once.
+    expect(clauses.map((c) => [c.tableName, c.sql])).toEqual([["employee", "UNIQUE (fk_emp_nr)"]]);
   });
 
   it("routes UNIQUE on the role an objectifying entity is not keyed on", () => {
@@ -438,11 +437,9 @@ describe("uniqueness on a binary between two entities", () => {
     const schema = new RelationalMapper().map(model);
     const table = schema.tables.find((t) => t.name === "issue")!;
     const clauses = routeConstraints(model, schema, postgres, "postgres").clauses;
-    // One role is the key; the other is UNIQUE beside it.
-    expect(clauses).toHaveLength(1);
-    expect(clauses[0]!.tableName).toBe("issue");
-    const unique = clauses[0]!.sql.replace(/^UNIQUE \((.*)\)$/, "$1");
-    expect(table.primaryKey.columnNames).not.toContain(unique);
+    // Keyed on the person; the passport is UNIQUE beside it.
+    expect(table.primaryKey.columnNames).toEqual(["person_id"]);
+    expect(clauses.map((c) => [c.tableName, c.sql])).toEqual([["issue", "UNIQUE (passport_nr)"]]);
   });
 
   it("routes one UNIQUE over every column of a composite foreign key", () => {
@@ -525,6 +522,14 @@ describe("uniqueness on a binary between two entities", () => {
       })
       .build();
     const schema = new RelationalMapper().map(model);
-    expect(routeConstraints(model, schema, postgres, "postgres").clauses).toHaveLength(2);
+    const table = schema.tables.find((t) => t.sourceElementId === model.factTypes[0]!.id)!;
+    // Keyed on both columns, each UNIQUE by itself.
+    expect(
+      routeConstraints(model, schema, postgres, "postgres").clauses.map((
+        c,
+      ) => [c.tableName, c.sql]),
+    )
+      .toEqual(table.primaryKey.columnNames.map((c) => [table.name, `UNIQUE (${c})`]));
+    expect(table.primaryKey.columnNames).toHaveLength(2);
   });
 });

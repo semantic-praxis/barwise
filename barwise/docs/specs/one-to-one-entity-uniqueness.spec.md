@@ -119,6 +119,16 @@ the existing DDL import tests pass.
 - The router resolves the role's columns to their `Table` in one pass, so
   the source-element check reads the table the columns were found in.
 
+- Implementation review: the importer read a UNIQUE over a composite
+  foreign key twice, as a far uniqueness on each per-column fact type and
+  as step 3b's external uniqueness; it now adds the far uniqueness only
+  for a single-column foreign key. And the router returned the same
+  "nothing to do" for a realized uniqueness and for one whose roles have
+  no column at all; the second now spills ("the roles map to no column")
+  rather than vanishing. Over the corpus that spill never fires; each
+  dialect with UNIQUE gains exactly the 36 clauses, BigQuery and
+  Databricks (no UNIQUE) spill them instead.
+
 ## Open decisions
 
 1. **Where "realized" is decided.** (a) The router derives it from where

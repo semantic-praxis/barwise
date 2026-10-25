@@ -520,6 +520,7 @@ export class DdlImportFormat implements ImportFormat {
               entityType,
               referencedEntityId,
               read,
+              fk.columns,
               table,
               annotations,
               warnings,
@@ -1139,20 +1140,20 @@ export class DdlImportFormat implements ImportFormat {
     entityType: { readonly id: string; readonly name: string; },
     referencedEntityId: string,
     column: ParsedColumn,
+    fkColumns: readonly string[],
     table: ParsedTable,
     annotations: ReadAnnotations,
     warnings: string[],
   ): Binary | undefined {
     const referencedEntity = model.getObjectType(referencedEntityId);
     if (!referencedEntity) return undefined;
-    // A foreign key whose columns are, by themselves, a UNIQUE of the table:
-    // each referenced row appears at most once, the one-to-one the export
-    // writes for an absorbed binary (one-to-one-entity-uniqueness.spec.md).
-    const fk = table.foreignKeys.find((f) => f.columns.includes(column.name));
-    const farUnique = fk !== undefined
-      && table.uniqueConstraints.some((u) =>
-        u.length === fk.columns.length && fk.columns.every((c) => u.includes(c))
-      );
+    // A single-column foreign key that is, by itself, a UNIQUE of the
+    // table: each referenced row appears at most once, the one-to-one the
+    // export writes for an absorbed binary (one-to-one-entity-uniqueness.spec.md).
+    // A composite one is read by step 3b as an external uniqueness over the
+    // per-column fact types, so it is not read here as well.
+    const farUnique = fkColumns.length === 1
+      && table.uniqueConstraints.some((u) => u.length === 1 && u[0] === column.name);
 
     const annotation = this.columnAnnotation(
       model,
