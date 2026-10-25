@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-1c2
+Plan-reviewed: 88ee8e95 (code-review, pr-review)
 Touches: +barwise/packages/formats/src/avro/avroNames.ts,
 barwise/packages/formats/src/index.ts,
 barwise/packages/vscode/src/commands/ExportAvroCommand.ts,
