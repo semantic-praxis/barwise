@@ -1,10 +1,10 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25; review-policy, 2026-10-25; must-agree-copies, 2026-10-25; baselines-merge-on-write, 2026-10-25; findings-close-by-mechanism, 2026-10-25); 5 not yet
+Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25; review-policy, 2026-10-25; must-agree-copies, 2026-10-25; baselines-merge-on-write, 2026-10-25; findings-close-by-mechanism, 2026-10-25; gate-refusal-contract, 2026-10-25); 5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-25
-Plan-reviewed: 2ba5dbab (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
+Plan-reviewed: 6e2b4670 (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
 barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
@@ -371,7 +371,7 @@ all of them with a link:
 | `production-prompt-resolution.md` | architecture | CLAUDE.md `--artifacts` paragraph; `artifact-resolution-parity.spec.md`                                                                                                                                                                        |
 | `keyless-model-access.md`         | architecture | CLAUDE.md conventions; `keyless-model-access.spec.md`                                                                                                                                                                                          |
 | `python-from-the-lockfile.md`     | process      | CLAUDE.md conventions                                                                                                                                                                                                                          |
-| `gate-refusal-contract.md`        | process      | CLAUDE.md conventions; `gate-refusal-contract.spec.md`                                                                                                                                                                                         |
+| `gate-refusal-contract.md`        | process      | CLAUDE.md conventions; `gate-refusal-contract.spec.md`; `REVIEW.md`; `pr-review` checklist; `fault-matrix.mjs` header; `tracked.mjs`, `ci-local.mjs` comments; `trial/README.md`                                                               |
 | `must-agree-copies.md`            | process      | CLAUDE.md conventions; `duplication-drift-guards.spec.md`; `deterministic-guards.spec.md`; skills `duplication-audit`, `spec-writer`, `pr-review`, `steward`; `REVIEW.md` "Do not report"; `check-parity.mjs`, `audit-duplication.mjs` headers |
 | `findings-close-by-mechanism.md`  | process      | CLAUDE.md conventions; `assertion-audit`, `session-review`, `duplication-audit` skills, `steward` 3; drift-guards WS5; ratchet headers; baseline `$comment`s; `ci.yml` ratchet comments                                                        |
 | `baselines-merge-on-write.md`     | process      | CLAUDE.md conventions; `baseline-write-preserves-verdicts.spec.md`; `baseline-merge.mjs` header, docblock, sort comment and test header; writer call-site, survey and reopen comments; `gates.test.mjs` writer-test comments                   |

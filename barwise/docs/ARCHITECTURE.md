@@ -38,6 +38,7 @@ Process:
 - [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-10-23
 - [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27
 - [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-08-29
+- [Gate refusal contract](adr/gate-refusal-contract.md) -- 2026-09-17
 - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18
 - [Must-agree copies carry a check](adr/must-agree-copies.md) -- 2026-08-30
 - [Plan before code](adr/plan-before-code.md) -- 2026-10-25
