@@ -24,7 +24,8 @@ barwise/packages/formats/src/openapi/OpenApiExportFormat.ts,
 barwise/packages/formats/src/avro/AvroExportFormat.ts,
 barwise/packages/formats/CLAUDE.md,
 barwise/packages/dbt/src/DbtExportFormat.ts,
-+barwise/packages/core/tests/mapping/constraintRouting.test.ts,
++barwise/packages/core/tests/mapping/ConstraintRouting.test.ts,
++barwise/packages/core/tests/mapping/unreportedConstraintSpecs.test.ts,
 +barwise/packages/core/tests/mapping/constraintsAcrossFactTypes.test.ts,
 +barwise/packages/core/tests/sql/valuePredicate.test.ts,
 barwise/packages/formats/tests/DdlDialectExport.test.ts,
@@ -162,8 +163,11 @@ DDL, made no worse here, and each is filed:
   `core/src/mapping`, exported from `@barwise/core/mapping`, with
   `unreportedConstraintSpecs(model, schema): ConstraintSpec[]`, which
   routes under a module-level profile with UNIQUE and CHECK absent and
-  returns the spilled specs. The profile is not exported, so nothing
-  else restates it.
+  returns the spilled specs. The profile is the postgres one with
+  `unique` and `check` set to `absent` (primary and foreign keys stay
+  native, which is what the schema carries); it is not exported, so
+  nothing else restates it. Its own test pins the six-kind report,
+  the one-spec-per-constraint dedupe and the empty result.
 - `buildConstraintSpec` moves to `core/src/annotation/constraintSpec.ts`,
   exported from `@barwise/core/annotation`. Its `findRole` is rewritten
   over `OrmModel.factTypesHolding([roleId])` with the preferred fact type
