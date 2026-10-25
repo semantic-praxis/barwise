@@ -7,6 +7,8 @@ Last-updated: 2026-10-25
 Tracking: barwise-wmm
 Plan-reviewed: 316d0812 (code-review, pr-review)
 Touches: barwise/packages/vscode/src/commands/ExportDdlCommand.ts,
+barwise/packages/vscode/src/commands/ExportCommand.ts,
+barwise/packages/vscode/CLAUDE.md,
 barwise/packages/vscode/src/diagram/tabPanels.ts,
 +barwise/packages/vscode/src/export/ddlExport.ts,
 +barwise/packages/vscode/tests/unit/exportDdlCommand.test.ts
@@ -60,9 +62,9 @@ In scope:
   that result's text.
 - When that result has `constraintSpecs`, the command shall write the
   `formatConstraintReport` text to a "Barwise DDL Export" output channel,
-  as the import commands do, and show a warning whose message is the
-  report's own heading line (so the warning and the report state the same
-  count) with a "Show report" action that reveals the channel. With none,
+  as the import commands do, and show a warning that names the file and
+  carries the report's own heading line (so the warning and the report
+  state the same count), with a "Show report" action that reveals the channel. With none,
   it shows the information message.
 - The information message names the file and no table count: the count
   was a second reading of the model, the one place the message could
@@ -99,7 +101,7 @@ ratchet. Acceptance:
 
 - the ring model's written file contains the router's `-- Constraint (not
   expressible in SQL DDL)` comment, the output channel receives "No Person
-  is parent of that same Person.", and the warning's message is the
+  is parent of that same Person.", and the warning carries the
   report's heading line;
 - the unique-value model's written file contains `UNIQUE (email)`;
 - the diagram tab's DDL and the palette's file are equal for the same
@@ -114,11 +116,20 @@ holds by construction and is pinned against a future second copy.
   ring model writes the spill comment, the channel receives its
   verbalization, and the warning is the report heading; the unique-email
   model writes `UNIQUE (email)`; the palette file equals the diagram
-  tab DDL. With the command reverted, four of its five tests fail (the
-  parse-error test covers unchanged behaviour and passes either way).
-- **One channel per session.** The report channel is created on first
-  use and reused, rather than once per export as the import commands do,
-  so repeated exports do not add an Output entry each run.
+  tab DDL. With the command reverted, its four behavioural tests fail
+  (the parse-error test covers unchanged behaviour and passes either way).
+- **One channel per session, cleared per export.** The report channel is
+  created on first use and reused, rather than once per export as the
+  import commands do, so repeated exports do not add an Output entry each
+  run; it is cleared first, so a stale report never reads as current.
+- **Code review changed four details.** The warning names the file as
+  well as the heading, since the heading alone ends in a colon and the
+  file name had dropped out; the command does not await the warning, so
+  `barwise.export` settles once the file is written; the refusal path has
+  a test (watched red with the guard removed); and the "As DDL" picker
+  description now says the file carries constraint clauses and example
+  INSERTs, which option (a) adds. The diagram tab comments every line of
+  a multi-line refusal.
 
 ## Open decisions
 

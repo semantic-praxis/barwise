@@ -43,6 +43,9 @@ vi.mock("vscode", () => ({
       state.errors.push(message);
     },
     createOutputChannel: () => ({
+      clear: () => {
+        state.channel.length = 0;
+      },
       appendLine: (line: string) => state.channel.push(line),
       show: () => {
         state.shown = true;
@@ -103,9 +106,16 @@ const uniqueEmail = [
   "",
 ].join("\n");
 
-async function run(text: string): Promise<void> {
+async function run(
+  text: string,
+  editorPath: string,
+  command: { execute(): Promise<void>; } = new ExportDdlCommand(),
+): Promise<void> {
   state.editorText = text;
-  await new ExportDdlCommand().execute();
+  state.editorPath = editorPath;
+  await command.execute();
+  // The warning is not awaited by the command; let its action settle.
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe("Barwise: Export, As DDL", () => {
@@ -120,40 +130,66 @@ describe("Barwise: Export, As DDL", () => {
   });
 
   it("writes the spill comment and reports the ring it could not express", async () => {
-    await run(ring);
+    await run(ring, "/work/ring.orm.yaml");
     expect(state.written).toContain("-- Constraint (not expressible in SQL DDL)");
     const report = state.channel.join("\n");
     expect(report).toContain("No Person is parent of that same Person.");
-    // The warning is the report's heading, so the two state one count.
-    expect(state.warnings).toEqual(["1 constraint(s) the ddl format could not express:"]);
-    expect(report).toContain(state.warnings[0]);
+    // The warning carries the report's heading, so the two state one count.
+    expect(state.warnings).toEqual([
+      "Exported DDL to ring.sql. 1 constraint(s) the ddl format could not express.",
+    ]);
+    expect(report).toContain("1 constraint(s) the ddl format could not express:");
     expect(state.infos).toEqual([]);
     expect(state.shown).toBe(false);
   });
 
   it("reveals the report when the user asks for it", async () => {
     state.warningChoice = "Show report";
-    await run(ring);
+    await run(ring, "/work/ring.orm.yaml");
     expect(state.shown).toBe(true);
   });
 
   it("writes the UNIQUE clause for a secondary unique value", async () => {
-    await run(uniqueEmail);
+    await run(uniqueEmail, "/work/shop.orm.yaml");
     expect(state.written).toContain("UNIQUE (email)");
     expect(state.warnings).toEqual([]);
-    expect(state.infos).toEqual(["Exported DDL to ring.sql"]);
+    expect(state.infos).toEqual(["Exported DDL to shop.sql"]);
   });
 
   it("writes what the diagram's DDL tab shows for the same model", async () => {
     // Both come from exportDdl; pinned against a future second copy.
-    await run(ring);
+    await run(ring, "/work/ring.orm.yaml");
     const model = new OrmYamlSerializer().deserialize(ring);
     expect(state.written).toBe(buildTabPanels(model).ddl);
   });
 
+  it("keeps only the latest export's report in the channel", async () => {
+    await run(ring, "/work/ring.orm.yaml");
+    await run(ring, "/work/again.orm.yaml");
+    expect(state.channel.filter((line) => line.startsWith("=== Export"))).toEqual([
+      "=== Export: again.sql ===",
+    ]);
+  });
+
   it("refuses with a parse error and writes nothing", async () => {
-    await run("model: [");
+    await run("model: [", "/work/broken.orm.yaml");
     expect(state.written).toBeUndefined();
     expect(state.errors[0]).toMatch(/^Failed to parse Barwise model:/);
+  });
+});
+
+describe("Barwise: Export, As DDL, when the exporter refuses", () => {
+  it("shows the refusal and writes no file", async () => {
+    vi.resetModules();
+    vi.doMock("../../src/export/ddlExport.js", () => ({
+      exportDdl: () => ({ ok: false, reason: "DDL export failed: boom" }),
+    }));
+    const { ExportDdlCommand: Refusing } = await import("../../src/commands/ExportDdlCommand.js");
+    state.written = undefined;
+    state.errors.length = 0;
+    await run(ring, "/work/ring.orm.yaml", new Refusing());
+    expect(state.errors).toEqual(["DDL export failed: boom"]);
+    expect(state.written).toBeUndefined();
+    vi.doUnmock("../../src/export/ddlExport.js");
   });
 });

@@ -82,13 +82,19 @@ export class ExportDdlCommand {
       vscode.window.showInformationMessage(`Exported DDL to ${fileName}`);
       return;
     }
-    reportChannel ??= vscode.window.createOutputChannel("Barwise DDL Export");
-    reportChannel.appendLine(`=== Export: ${fileName} ===`);
-    reportChannel.appendLine(report);
-    // The warning is the report's own heading, so the two cannot state
-    // different counts.
-    const heading = report.split("\n", 1)[0]!;
-    const choice = await vscode.window.showWarningMessage(heading, "Show report");
-    if (choice === "Show report") reportChannel.show(true);
+    const channel = reportChannel ??= vscode.window.createOutputChannel("Barwise DDL Export");
+    // This export's report only, so a stale one never reads as current.
+    channel.clear();
+    channel.appendLine(`=== Export: ${fileName} ===`);
+    channel.appendLine(report);
+    // The warning carries the report's own heading, so the two cannot state
+    // different counts. Not awaited: the command (and barwise.export) settles
+    // once the file is written, not when the notification is dismissed.
+    const heading = report.split("\n", 1)[0]!.replace(/:$/, "");
+    void vscode.window
+      .showWarningMessage(`Exported DDL to ${fileName}. ${heading}.`, "Show report")
+      .then((choice) => {
+        if (choice === "Show report") channel.show(true);
+      });
   }
 }

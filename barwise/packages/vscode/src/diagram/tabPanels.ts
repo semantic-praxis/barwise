@@ -59,7 +59,10 @@ function buildYaml(model: OrmModel): string {
 
 function buildDdl(model: OrmModel): string {
   const exported = exportDdl(model);
-  return exported.ok ? exported.result.text : `-- ${exported.reason}`;
+  // Every line commented, so a multi-line reason stays valid SQL.
+  return exported.ok
+    ? exported.result.text
+    : exported.reason.split("\n").map((line) => `-- ${line}`).join("\n");
 }
 
 function buildPopulations(model: OrmModel): readonly PopulationTable[] {

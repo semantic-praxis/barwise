@@ -24,7 +24,7 @@ const EXPORT_OPTIONS: ExportOption[] = [
   {
     id: "ddl",
     label: "As DDL",
-    description: "Generate CREATE TABLE statements",
+    description: "Generate SQL DDL: tables, constraint clauses, and example INSERTs",
   },
   {
     id: "avro",

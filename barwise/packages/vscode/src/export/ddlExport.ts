@@ -22,6 +22,9 @@ export function exportDdl(model: OrmModel): DdlExport {
   try {
     return { ok: true, result: exporter.export(model) };
   } catch (err) {
-    return { ok: false, reason: `DDL export failed: ${(err as Error).message}` };
+    return {
+      ok: false,
+      reason: `DDL export failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 }
