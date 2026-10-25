@@ -27,8 +27,9 @@ corrections made during grounding are in the spec above.
    nothing, an empty tracked-file listing, a missing tool, a missing
    manifest or lockfile, and a shallow clone when the gate reads
    history. Each gate names its own preconditions.
-3. **A gate gives the same reading from any directory in the
-   repository.** No caller has to pass a root.
+3. **A gate gives the same reading from the repository root,
+   `barwise/` and a package directory**, the three directories the
+   spec requires and measures. No caller has to pass a root.
 4. **Whatever reads a gate keeps the third value.** `ci:local` reports
    REFUSED separately from FAIL and exits 2 when refusals are the only
    non-zero results. `mutate` refuses when its command already fails
@@ -38,28 +39,36 @@ corrections made during grounding are in the spec above.
 
 ## Consequences
 
-- `scripts/lib/tracked.mjs` gives every gate that imports it the
-  `git` half of decision 2: exit 2 when `git` fails, prints no root, or
-  lists no files. Tools, manifests and shallow clones are handled gate by
-  gate. `gates.test.mjs` pins those refusals, cwd invariance for a
-  hand-listed subset of gates, and the `ci-local` and `mutate` refusals.
-  CI runs it in `test:scripts`, guarded `if:
-  steps.changes.outputs.docs_only != 'true'`. Refusal paths are
-  mutation-tested only by hand (barwise-1049), and the cwd list covers 5
-  of the 9 `tracked.mjs` importers it was written for (barwise-1006,
-  item 6).
-- `npm run fault-matrix` runs each `ci.yml` step whose npm script is
-  `node scripts/<name>.mjs` (25 on main) under `git` empty, `git` absent,
-  a shallow answer and three working directories, and refuses if the
-  tree is dirty after a gate. It reads exit codes only. It does not check
+- `scripts/lib/tracked.mjs` guards two `git` calls for the gates that
+  use them: `REPO_ROOT` refuses when `git rev-parse --show-toplevel`
+  fails or prints nothing, and `trackedFiles()` refuses on an empty
+  listing. Every other `git` call a gate makes (merge-base, show, diff,
+  log) is that gate's own to guard, as barwise-ydl shows. Tools,
+  manifests and shallow clones are handled gate by gate.
+- `gates.test.mjs` pins the git-failure refusal for a hand-kept list
+  of about ten gates, though more than twenty scripts import
+  `tracked.mjs` (barwise-1006, item 6, which counted an older list);
+  cwd invariance for three scripts; and the `ci-local` and `mutate`
+  refusals. CI runs it in `test:scripts`, guarded
+  `if: steps.changes.outputs.docs_only != 'true'`, so it is skipped on
+  a docs-only pull request and, like any step, once an earlier step
+  fails. Refusal paths are mutation-tested only by hand (barwise-1049).
+- `npm run fault-matrix` runs each `ci.yml` step whose npm script
+  contains a `node scripts/<name>.mjs` segment, also inside an `&&`
+  chain (25 of the 43 npm steps on main), under `git` empty, `git`
+  absent, a shallow answer and three working directories. It refuses
+  when a gate changes `git status --porcelain`, and when a script
+  chains two node gates. It reads exit codes only. It does not check
   a refusal's message, has no missing-tool, manifest or lockfile axis,
   and does not see a write undone before the gate exits. It runs on
   demand, not in CI, as decided in the spec ("Should WS3 run in CI at
   all? (resolved: no.)"). Its FALSE GREEN verdict is pinned against
   `classify` in `gates.test.mjs`.
-- Gates outside the matrix: `test:trial`, `test:mcp-checks`,
-  `test:cli-checks`, `check:beads` and `validate:examples`, which are not
-  `node scripts/` gates, and the third-party tools.
+- The other 18 npm steps are outside the matrix, among them
+  `test:trial`, `test:mcp-checks`, `test:cli-checks`, `check:beads`,
+  `validate:examples`, `test:optimizer` (pytest through uv), turbo's
+  `build`, `lint` and `test:coverage`, and the VS Code check and bundle
+  steps. Nothing checks them against this contract.
 - A reading taken for this ADR ran 24 of the 25 matrix gates (not
   `test:scripts`). 21 conform on all four axes. `check-lockfile-agrees`
   refused unperturbed, correctly, because the checkout's `node_modules`
@@ -87,8 +96,10 @@ corrections made during grounding are in the spec above.
   Scope, "Out of scope"); `python-uv-guard.mjs` uses exit 1 for "could
   not answer" because 2 blocks the command in Claude Code's hook contract
   (`agent-python-uv-hook.spec.md`, R5).
-- Until architecture-index WS5 replaces them with links, the root
-  `CLAUDE.md` conventions, the `fault-matrix.mjs` header, comments in
-  `tracked.mjs` and `ci-local.mjs`, and `trial/README.md` also state this
-  rule (barwise-ubc, WS5). Another 42 tracked files name the spec,
+- Until architecture-index WS5 replaces them with links, these places
+  also state this rule (barwise-ubc, WS5): the root `CLAUDE.md`
+  conventions; `gate-refusal-contract.spec.md`; `REVIEW.md` (its opening,
+  its severity list and "Always check" item 2); the `pr-review`
+  checklist's repo-root line; the `fault-matrix.mjs` header; comments in
+  `tracked.mjs` and `ci-local.mjs`; and `trial/README.md`. Another 42 tracked files name the spec,
   mostly to cite it for their own exit codes rather than to restate it.
