@@ -28,7 +28,10 @@ describe("formatConstraintReport", () => {
 
   it("adds pseudocode and example in detail, continuation lines indented", () => {
     const report = formatConstraintReport(
-      [spec("Rule A.", "x != y", "valid: (1, 2)\ninvalid: (1, 1)"), spec("Rule A.")],
+      [
+        spec("Rule A.", "x != y", "valid: (1, 2)\ninvalid: (1, 1)"),
+        spec("Rule A.", "x != y", "valid: (1, 2)\ninvalid: (1, 1)"),
+      ],
       "ddl",
       { detail: true },
     );
@@ -40,6 +43,26 @@ describe("formatConstraintReport", () => {
         "  Pseudocode: x != y",
         "  Example: valid: (1, 2)",
         "    invalid: (1, 1)",
+      ].join("\n"),
+    );
+  });
+
+  it("lists every distinct check under a sentence two specs share", () => {
+    // A value type's own value constraint: one sentence, one check per column.
+    const report = formatConstraintReport(
+      [spec("Hour is 8 or 9.", "start in {8, 9}"), spec("Hour is 8 or 9.", "end in {8, 9}")],
+      "avro",
+      { detail: true },
+    );
+    expect(report).toBe(
+      [
+        "1 constraint(s) the avro format could not express:",
+        "",
+        "- Hour is 8 or 9. (x2)",
+        "  Pseudocode: start in {8, 9}",
+        "  Example: e",
+        "  Pseudocode: end in {8, 9}",
+        "  Example: e",
       ].join("\n"),
     );
   });

@@ -23,6 +23,8 @@ import {
   avroSchemaToJson,
   RelationalMapper,
   renderAvro,
+  unreportedConstraintSpecs,
+  withConstraintSpecs,
 } from "@barwise/core/mapping";
 
 /**
@@ -106,6 +108,9 @@ export class AvroExportFormat implements ExportFormatAdapter {
       lineage: generateDdlLineage(model, schema),
       files,
       annotations: annotations.length > 0 ? annotations : undefined,
+      // The constraints the schema does not carry, by the DDL router's own
+      // rule (schema-export-constraint-specs.spec.md).
+      ...withConstraintSpecs(unreportedConstraintSpecs(model, schema)),
     };
   }
 }

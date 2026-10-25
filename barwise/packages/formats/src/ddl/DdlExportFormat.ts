@@ -32,6 +32,7 @@ import {
   routeConstraints,
   type RoutedClause,
   type SpilledConstraint,
+  withConstraintSpecs,
 } from "@barwise/core/mapping";
 import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
 
@@ -122,9 +123,7 @@ export class DdlExportFormat implements ExportFormatAdapter {
       // set it, so every manifest recorded `sources: []` (barwise-ofb).
       lineage: generateDdlLineage(model, schema),
       annotations: annotations.length > 0 ? annotations : undefined,
-      constraintSpecs: routing.spilled.length > 0
-        ? routing.spilled.map((s) => s.spec)
-        : undefined,
+      ...withConstraintSpecs(routing.spilled.map((s) => s.spec)),
     };
   }
 

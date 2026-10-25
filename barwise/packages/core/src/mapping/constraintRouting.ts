@@ -90,6 +90,17 @@ export function unreportedConstraintSpecs(
 }
 
 /**
+ * `constraintSpecs` as an ExportResult field: present only when there is
+ * something to report, so an absent field and an empty list cannot mean
+ * different things to a reader of the result.
+ */
+export function withConstraintSpecs(
+  specs: readonly ConstraintSpec[],
+): { constraintSpecs?: readonly ConstraintSpec[]; } {
+  return specs.length > 0 ? { constraintSpecs: specs } : {};
+}
+
+/**
  * Route every non-realized constraint in the model through the
  * dialect capability profile.
  */

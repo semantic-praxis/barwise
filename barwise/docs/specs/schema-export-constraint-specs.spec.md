@@ -1,6 +1,6 @@
 # OpenAPI, Avro and dbt exports report the constraints they drop
 
-Status: Implemented -- WS1
+Status: Implemented
 
 Created: 2026-10-25
 Last-updated: 2026-10-25
@@ -36,7 +36,13 @@ barwise/docs/specs/external-preferred-identifier.spec.md,
 barwise/docs/specs/ossie-ontology-format.spec.md,
 barwise/docs/specs/join-ring-constraint.spec.md,
 barwise/docs/IMPORT_EXPORT.md,
-barwise/docs/CLI.md
+barwise/docs/CLI.md,
+barwise/docs/MCP.md,
+barwise/packages/formats/src/constraintReport.ts,
+barwise/packages/formats/tests/constraintReport.test.ts,
+barwise/packages/formats/src/ossie/OssieExportFormat.ts,
+barwise/packages/cli/tests/commands/exportConstraintReport.test.ts,
++barwise/packages/formats/tests/helpers/unreportedFixture.ts
 
 When the OpenAPI, Avro or dbt exporter writes a model, each constraint
 the DDL router would spill if the target had neither UNIQUE nor CHECK
@@ -198,14 +204,17 @@ pass unchanged apart from their import paths; `check:spec-touches` and
 
 Each adapter sets `constraintSpecs` from `unreportedConstraintSpecs`
 when it is non-empty. `docs/CLI.md` and `docs/IMPORT_EXPORT.md` stop
-listing DDL and Ossie as the only formats that report. Acceptance: for
-each format, a test model holding a secondary uniqueness, a role value
-constraint, a value type's own value constraint, a value comparison
-across tables, a ring and a subset, with distinct players and values so
-no two verbalizations coincide, reports all six and no mandatory; the
-CLI, MCP and editor reports show them through the existing
-`formatConstraintReport` path with no surface change; the counts over
-the tracked models are recorded here.
+listing DDL and Ossie as the only formats that report. Acceptance: a
+test model holding a secondary uniqueness, a role value constraint, a
+value type's own value constraint, a value comparison, a ring and a
+subset, with distinct players and values so no two verbalizations
+coincide, reports all six by content and no mandatory, pinned once in
+core (`unreportedConstraintSpecs.test.ts`), since all three formats call
+the one function; each adapter's test pins that it passes its rendered
+schema through (a constraint reported, a carried one not, no field when
+nothing drops); a CLI export of each format shows its report on stderr
+through the existing `formatConstraintReport` path; the counts over the
+tracked models are recorded here.
 
 ## Implementation notes
 
@@ -227,6 +236,20 @@ the tracked models are recorded here.
   every dialect, with and without annotations, and Ossie export of each,
   is byte-identical before and after the move, `constraintSpecs`
   included (1,428 outputs, compared as one JSON file).
+- WS2: the three adapters set `constraintSpecs` through one core helper,
+  `withConstraintSpecs`, which leaves the field out when the list is
+  empty; DDL and Ossie now use it too, so the rule has one home. Measured over the 84
+  tracked models that load: each of OpenAPI, Avro and dbt reports 366
+  specs, in 54 models. That is 3 more than the router-level 363 above,
+  which are the distinct constraints the router's per-table dedupe had
+  merged. Each adapter's test pins the wiring (a ring reported, a
+  NOT NULL mandatory not, no field when nothing drops); content is
+  pinned once, in core. Implementation review found the shared report
+  (`formatConstraintReport`) groups by verbalization and kept the first
+  spec of each group, which in the MCP detail block dropped the
+  pseudocode of a value type's second column. The heading still counts
+  rules and the CLI line still reads `(xN)`, but the detail block now
+  lists every distinct pseudocode in a group.
 
 ## Open decisions
 

@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { AvroExportFormat } from "../src/avro/AvroExportFormat.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
+import { MENTOR_RING_PSEUDOCODE, mentorsModel } from "./helpers/unreportedFixture.js";
 
 const avroFormat = new AvroExportFormat();
 
@@ -220,5 +221,21 @@ describe("AvroExportFormat", () => {
       const file = result.files![0]!;
       expect(file.name).toMatch(/^[A-Z]/);
     });
+  });
+});
+
+/**
+ * The format renders only the relational schema, so the constraints that
+ * schema does not carry are reported (schema-export-constraint-specs.spec.md):
+ * the ring is, the mandatory the mapping enforces as NOT NULL is not.
+ */
+describe("constraints the export does not carry", () => {
+  it("reports each one as a constraint spec", () => {
+    const specs = new AvroExportFormat().export(mentorsModel(true)).constraintSpecs;
+    expect(specs?.map((s) => s.pseudocode)).toEqual([MENTOR_RING_PSEUDOCODE]);
+  });
+
+  it("sets no constraintSpecs when the schema carries them all", () => {
+    expect(new AvroExportFormat().export(mentorsModel(false)).constraintSpecs).toBeUndefined();
   });
 });

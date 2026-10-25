@@ -4,8 +4,11 @@
  * so the CLI's stderr lines and the MCP tool's block cannot drift apart
  * in wording, count, or grouping.
  *
- * Specs are grouped by verbalization, because the DDL router spills one
- * rule once per table it touches; the heading counts rules, not spills.
+ * Specs are grouped by verbalization, and the heading counts rules: a
+ * value type's own value constraint is one sentence spilled once per
+ * column it constrains, and two constraints can read alike. In detail,
+ * every distinct pseudocode in a group is listed, since each is a check
+ * to implement (schema-export-constraint-specs.spec.md).
  */
 import type { ConstraintSpec } from "@barwise/core";
 
@@ -27,26 +30,30 @@ export function formatConstraintReport(
   options: ConstraintReportOptions = {},
 ): string | undefined {
   if (!specs || specs.length === 0) return undefined;
-  const groups = new Map<string, { spec: ConstraintSpec; count: number; }>();
+  const groups = new Map<string, { specs: ConstraintSpec[]; count: number; }>();
   for (const spec of specs) {
     const group = groups.get(spec.verbalization);
-    if (group) group.count++;
-    else groups.set(spec.verbalization, { spec, count: 1 });
+    if (!group) groups.set(spec.verbalization, { specs: [spec], count: 1 });
+    else {
+      group.count++;
+      const same = group.specs.some((s) =>
+        s.pseudocode === spec.pseudocode && s.example === spec.example
+      );
+      if (!same) group.specs.push(spec);
+    }
   }
   const where = options.domain ? ` (domain ${options.domain})` : "";
   const lines = [`${groups.size} constraint(s) the ${format} format could not express${where}:`];
-  for (const { spec, count } of groups.values()) {
-    const item = `- ${spec.verbalization}${count > 1 ? ` (x${count})` : ""}`;
+  for (const [verbalization, { specs: distinct, count }] of groups) {
+    const item = `- ${verbalization}${count > 1 ? ` (x${count})` : ""}`;
     if (!options.detail) {
       lines.push(`  ${item}`);
       continue;
     }
-    lines.push(
-      "",
-      item,
-      labelled("Pseudocode", spec.pseudocode),
-      labelled("Example", spec.example),
-    );
+    lines.push("", item);
+    for (const spec of distinct) {
+      lines.push(labelled("Pseudocode", spec.pseudocode), labelled("Example", spec.example));
+    }
   }
   return lines.join("\n");
 }
