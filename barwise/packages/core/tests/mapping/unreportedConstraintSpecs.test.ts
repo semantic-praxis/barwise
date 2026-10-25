@@ -187,4 +187,19 @@ describe("unreportedConstraintSpecs", () => {
       .build();
     expect(unreportedConstraintSpecs(model, new RelationalMapper().map(model))).toEqual([]);
   });
+
+  it("reports a mandatory the mapping does not enforce (barwise-plq)", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_nr" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+        mandatory: "role1",
+      })
+      .build();
+    const specs = unreportedConstraintSpecs(model, new RelationalMapper().map(model));
+    expect(specs.map((s) => s.verbalization)).toEqual(["Each Customer places at least one Order."]);
+  });
 });
