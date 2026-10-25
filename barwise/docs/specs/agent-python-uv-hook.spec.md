@@ -3,7 +3,7 @@
 Status: Implemented 2026-09-26 -- the single workstream
 
 Created: 2026-09-26
-Last-updated: 2026-09-26
+Last-updated: 2026-10-25
 Tracking: barwise-1060
 
 The repo's rule is that every Python execution resolves from the lockfile:
@@ -59,6 +59,8 @@ both call, rather than being written a second time.
   tracked script's working directory is set by whoever calls it.
 - **R7.** A heredoc body is not read as commands. It is data on a
   command's stdin, and the interpreter that reads it is on the `<<` line.
+
+Recorded as `docs/adr/python-from-the-lockfile.md`.
 
 ## Scope
 
