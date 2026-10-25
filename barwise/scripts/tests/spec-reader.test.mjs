@@ -210,6 +210,17 @@ test("check:spec-touches passes resolving, planned-new and planned-deleted entri
   }
 });
 
+test("check:spec-touches says a --cutoff given with the fixture overrides was ignored", () => {
+  const f = gateFixture({ "a.spec.md": spec("barwise/x.ts") }, ["barwise/x.ts"]);
+  try {
+    const r = f.run("--cutoff", "HEAD");
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /not applied \(fixture overrides; --cutoff ignored\)/);
+  } finally {
+    f.done();
+  }
+});
+
 test("check:spec-touches fails on an unmarked entry that names nothing tracked", () => {
   const f = gateFixture({
     "a.spec.md": spec("barwise/x.ts, barwise/moved.ts, barwise/nodir/, barwise/*/none.ts"),

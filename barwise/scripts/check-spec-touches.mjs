@@ -19,9 +19,11 @@
  * population named only such specs. So a corpus spec whose file name
  * appears nowhere under barwise/docs/specs/ (corpus or archive/) in the
  * tree of the cutoff commit, `TOUCHES_REQUIRED_SINCE` in
- * lib/spec-reader.mjs, fails unless its `Touches:` has an unmarked entry
- * or a `-` entry tracked at the cutoff, outside barwise/docs/specs/
- * (`newSpecVerdict`). By file name, not path: a spec moved into or out of
+ * lib/spec-reader.mjs, fails unless its `Touches:` has an entry standing
+ * for a path outside barwise/docs/specs/: an unmarked entry, expanded
+ * against the tracked tree, or a `-` entry naming a path tracked at the
+ * cutoff, now, or at any commit between (`newSpecVerdict`). By file name,
+ * not path: a spec moved into or out of
  * archive/ is the existing spec the owner exempted, and a rename to a new
  * name reads as new (Open decision 2). An empty `Touches:` is left to the
  * tree rule's own finding, so it is reported once.
@@ -35,88 +37,97 @@
  * Exit 0 every entry resolves and every new spec declares a tracked path,
  * 1 one does not (named), 2 the tracked-file list could not be read or
  * came back empty, a spec could not be read, or the new-spec rule could
- * not run: the cutoff is not in this clone (a shallow clone, usually), or
- * git failed. When the tree rule has findings and the new-spec rule
+ * not run: the cutoff is not in this clone (a shallow clone, usually, and
+ * the message says which fix applies), `--cutoff` names no single commit,
+ * or git failed (no fetch advice: fetching would not mend it). Git
+ * readings come from lib/git-run.mjs, shared with check:plan-review. When
+ * the tree rule has findings and the new-spec rule
  * cannot run, the findings are printed first and the exit is 1: the
  * change fails whatever the new-spec rule would have said.
  *
  * `--tracked <file>` and `--specs <dir>` override the inputs for this
  * gate's own tests; under them the new-spec rule is not applied, and the
- * OK line says so. `--cutoff <rev>` stands in for the cutoff, for the
+ * OK line says so, and that a `--cutoff` given with them was ignored.
+ * `--cutoff <rev>` stands in for the cutoff, for the
  * gate's tests and for replaying the rule over history; nothing in CI
  * passes it.
  */
-import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { opt } from "./lib/args.mjs";
+import { gitAt } from "./lib/git-run.mjs";
 import { matchesPattern, patternFault } from "./lib/review-tiers.mjs";
 import {
   inSpecCorpus,
   newSpecVerdict,
+  SPECS_DIR,
   touches,
   TOUCHES_REQUIRED_SINCE,
 } from "./lib/spec-reader.mjs";
 
-const SPECS = "barwise/docs/specs/";
 const fileName = (p) => p.slice(p.lastIndexOf("/") + 1);
+const nulList = (out) => out.split("\u0000").filter(Boolean);
 
 /**
  * The corpus specs new since the cutoff, each with the rule's verdict on
  * the entries the tree rule already read. Throws, never exits, so the
  * caller decides how a refusal sits beside the tree rule's findings.
  */
-function newSpecs(root, specs) {
-  const git = (args) => {
-    try {
-      return execFileSync("git", args, {
-        cwd: root,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        maxBuffer: 64 * 1024 * 1024,
-      });
-    } catch (err) {
-      const why = err.stderr?.toString().trim().split("\n")[0] || err.message.split("\n")[0];
-      throw new Error(`\`git ${args.join(" ")}\` failed: ${why}`);
-    }
-  };
-  const cutoff = opt("--cutoff") ?? TOUCHES_REQUIRED_SINCE;
-  let present = true;
-  try {
-    execFileSync("git", ["rev-parse", "--verify", "--quiet", `${cutoff}^{commit}`], {
-      cwd: root,
-      stdio: "ignore",
-    });
-  } catch (err) {
-    // --quiet exits 1 for "no such commit"; anything else is git failing.
-    if (err.status !== 1) {
-      throw new Error(`\`git rev-parse --verify ${cutoff}\` exited ${err.status ?? err.signal}`);
-    }
-    present = false;
+function newSpecs(root, specs, current) {
+  const git = gitAt(root);
+  const given = opt("--cutoff");
+  const cutoff = given ?? TOUCHES_REQUIRED_SINCE;
+  // undefined is "no such commit" (exit 1); git failing throws from
+  // commit() with its own message, and gets no fetch advice: fetching
+  // would not mend it.
+  const id = git.commit(cutoff);
+  if (id === undefined) {
+    // A shallow clone can lack any commit, so it is named either way; a
+    // `--cutoff` in a full clone is a bad revision, which no fetch mends.
+    const shallow = git.run(["rev-parse", "--is-shallow-repository"]).trim() === "true";
+    const what = given !== null
+      ? `--cutoff ${given} names no single commit in this clone (unknown, or an ambiguous abbreviation).`
+      : `the cutoff ${cutoff} is not in this clone, so which specs are new cannot be read.`;
+    const fix = shallow
+      ? "\n  This clone is shallow. Fix: git fetch --unshallow"
+      : given === null
+      ? "\n  Fix: git fetch origin main"
+      : "";
+    throw new Error(what + fix);
   }
-  if (!present) {
-    const shallow = git(["rev-parse", "--is-shallow-repository"]).trim() === "true";
-    throw new Error(
-      `the cutoff ${cutoff} is not in this clone, so which specs are new cannot be read.\n`
-        + (shallow
-          ? "  This clone is shallow. Fix: git fetch --unshallow"
-          : "  Fix: git fetch origin main"),
-    );
-  }
-  const atCutoff = git(["ls-tree", "-r", "-z", "--name-only", cutoff]).split("\u0000")
-    .filter(Boolean);
+  const atCutoff = nulList(git.run(["ls-tree", "-r", "-z", "--name-only", id]));
   if (atCutoff.length === 0) throw new Error(`git listed no files at the cutoff ${cutoff}`);
-  const held = new Set(atCutoff);
-  const existing = new Set(atCutoff.filter((f) => f.startsWith(SPECS)).map(fileName));
-  const trackedAtCutoff = (path) => {
-    const dir = path.endsWith("/") ? path : `${path}/`;
-    return held.has(path) || atCutoff.some((f) => f.startsWith(dir));
+  const existing = new Set(atCutoff.filter((f) => f.startsWith(SPECS_DIR)).map(fileName));
+  const fresh = specs.filter((s) => !existing.has(fileName(s.id)));
+  // What a `-` entry may name: a path tracked at the cutoff, in the current
+  // tree, or at any commit between. The cutoff alone ages: a file created
+  // after it and deleted by the plan could never satisfy a `-` entry, and
+  // the same entry left unmarked fails the tree rule once the deletion
+  // lands. Read only when a new spec has a `-` entry.
+  let known = null;
+  const knownPaths = () => {
+    if (known === null) {
+      const between = git.run([
+        "log",
+        "--format=",
+        "--name-only",
+        "-z",
+        "--no-renames",
+        `${id}..HEAD`,
+      ]);
+      known = [...new Set([...atCutoff, ...current, ...nulList(between.replace(/\n/g, "\u0000"))])];
+    }
+    return known;
   };
   return {
     cutoff,
-    specs: specs.filter((s) => !existing.has(fileName(s.id))).map((s) => ({
+    specs: fresh.map((s) => ({
       path: s.id,
-      verdict: newSpecVerdict(s.entries, trackedAtCutoff),
+      verdict: newSpecVerdict(
+        s.entries,
+        current,
+        s.entries?.some((e) => e.mark === "-") ? knownPaths() : [],
+      ),
     })),
   };
 }
@@ -209,7 +220,7 @@ let fresh = null;
 let cannot = null;
 if (lib) {
   try {
-    fresh = newSpecs(lib.REPO_ROOT, specs);
+    fresh = newSpecs(lib.REPO_ROOT, specs, tracked);
   } catch (err) {
     cannot = err.message;
   }
@@ -247,8 +258,9 @@ if (undeclared.length > 0) {
     );
   }
   console.error(
-    "A new spec declares the paths its plan changes: at least one unmarked entry, or a -path\n"
-      + "tracked at the cutoff, outside barwise/docs/specs/; +path entries alone do not count.\n"
+    "A new spec declares the paths its plan changes: at least one entry standing for a path\n"
+      + "outside barwise/docs/specs/ -- unmarked, or a -path tracked at or since the cutoff;\n"
+      + "+path entries alone do not count.\n"
       + "A spec whose file name was under barwise/docs/specs/ at the cutoff is exempt\n"
       + "(docs/specs/touches-required.spec.md).",
   );
@@ -265,7 +277,9 @@ const reach = fresh
   ? `${fresh.specs.length} spec(s) new since the cutoff ${
     fresh.cutoff.slice(0, 8)
   }, each declaring a tracked path`
-  : "the new-spec rule was not applied (fixture overrides)";
+  : `the new-spec rule was not applied (fixture overrides${
+    process.argv.includes("--cutoff") ? "; --cutoff ignored" : ""
+  })`;
 console.log(
   `check:spec-touches: ${declaring} spec(s) declare Touches:, every entry resolves; ${reach}. OK`,
 );

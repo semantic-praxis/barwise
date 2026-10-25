@@ -15,10 +15,12 @@
  * A spec is ADDED when the diff reports status A under --no-renames and
  * `inSpecCorpus` accepts its path. It is NEW when, besides, no file with
  * its name existed anywhere under barwise/docs/specs/ (corpus or archive/)
- * at the merge base: the spec's rule for "existing". It SATISFIES the
- * rule when its `Touches:` has an unmarked entry, or a `-` entry naming a
- * path tracked at the merge base; `+` entries alone do not, so a
- * placeholder such as `+none` cannot pass.
+ * at the merge base, which stands in for the gate's cutoff. It SATISFIES
+ * the rule when `newSpecVerdict` (lib/spec-reader.mjs, the gate's own
+ * predicate) finds an entry standing for a path outside
+ * barwise/docs/specs/: an unmarked entry expanded against the tree at
+ * head, or a `-` entry naming a path tracked at the merge base, at head,
+ * or between; `+` entries alone do not, so `+none` cannot pass.
  *
  * `--branches` also lists unmerged remote branches that add a new spec
  * failing the rule today. That part reads live remote refs and is not
@@ -73,9 +75,26 @@ const lines = (s) => s.split("\n").filter(Boolean);
 const holds = (rev, path) => git(["ls-tree", "-z", "--name-only", rev, "--", path]) !== "";
 const outsideDocs = (p) => !p.startsWith("barwise/docs/") && !p.startsWith(".beads/");
 
-/** The rule's verdict on a spec's text at `head`, with `mergeBase` for `-` entries. */
-function verdict(text, mergeBase) {
-  return newSpecVerdict(touches(text), (path) => holds(mergeBase, path));
+const filesAt = (rev) =>
+  git(["ls-tree", "-r", "-z", "--name-only", rev]).split("\u0000").filter(Boolean);
+
+/**
+ * The rule's verdict on a spec's text at `head`, read as the gate reads it
+ * with `mergeBase` as the cutoff: unmarked entries expand against the tree
+ * at `head`, and `-` entries against every path tracked at `mergeBase`, at
+ * `head`, or at a commit between.
+ */
+function verdict(text, mergeBase, head) {
+  const entries = touches(text);
+  if (!entries?.length) return newSpecVerdict(entries, [], []);
+  const current = filesAt(head);
+  const between = () =>
+    git(["log", "--format=", "--name-only", "-z", "--no-renames", `${mergeBase}..${head}`])
+      .replace(/\n/g, "\u0000").split("\u0000").filter(Boolean);
+  const known = entries.some((e) => e.mark === "-")
+    ? [...new Set([...filesAt(mergeBase), ...current, ...between()])]
+    : [];
+  return newSpecVerdict(entries, current, known);
 }
 
 /** Status letters of `git diff --name-status -z`, renames included when asked. */
@@ -168,7 +187,7 @@ for (const [sha, subject] of commits) {
   const specs = added.map((path) => ({
     path,
     isNew: !namesAtBase.has(base(path)),
-    verdict: verdict(git(["show", `${head}:${path}`]), mergeBase),
+    verdict: verdict(git(["show", `${head}:${path}`]), mergeBase, head),
   }));
   const changed = lines(git(["diff", "--name-only", "--no-renames", mergeBase, head]));
   if (specs.length > 0) {
@@ -272,7 +291,7 @@ if (process.argv.includes("--branches")) {
     );
     for (const d of nameStatus(mergeBase, r, false, SPECS)) {
       if (d.s !== "A" || !inSpecCorpus(d.path) || names.has(base(d.path))) continue;
-      const v = verdict(git(["show", `${r}:${d.path}`]), mergeBase);
+      const v = verdict(git(["show", `${r}:${d.path}`]), mergeBase, r);
       if (v !== "satisfies") failing.push(`${r} ${base(d.path)} (${v})`);
     }
   }
