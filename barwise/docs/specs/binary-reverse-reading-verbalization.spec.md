@@ -7,12 +7,11 @@ Last-updated: 2026-10-25
 Tracking: barwise-wsl
 Touches: barwise/packages/core/src/verbalization/constraints/sentence.ts,
 barwise/packages/core/src/verbalization/constraints/phase1.ts,
-barwise/packages/core/src/verbalization/constraints/phase2.ts,
 +barwise/packages/core/tests/verbalization/reverseReading.test.ts,
 barwise/packages/core/tests/model/readingHyphenBinding.test.ts
 
-When a binary fact type's mandatory, uniqueness or single-role frequency
-constraint sits on a role that no reading names before the other role,
+When a binary fact type's mandatory or uniqueness constraint sits on a
+role that no reading names before the other role,
 the verbalizer shall write the sentence from the reading as the modeller
 wrote it -- "For each Customer, some Order is placed by that Customer."
 -- rather than slice that reading's predicate and read it backwards.
@@ -31,8 +30,8 @@ for the fact type. A sentence that turns a reading round asserts a fact
 the model does not contain. The fix composes from pieces that exist: the
 n-ary mandatory already writes "For each Agreement, some Party ... signs
 that Agreement." through `quantifiedReading`
-(`nary-mandatory-verbalization.spec.md`), and the binary sentences gain
-the same frame for the same situation.
+(`nary-mandatory-verbalization.spec.md`), and the binary sentences share
+that frame, one helper for both, for the same situation.
 
 ## Observed today (at 4a812272)
 
@@ -47,6 +46,12 @@ sentence, passes roles 0 and 1 of a fact type whose two players are the
 same type, where each ring statement is unchanged by reversing every
 edge, so it keeps the fallback.
 
+`quantifiedReading` writes "some Y" for every placeholder other than the
+constrained role's, and `validateReadingTemplate` accepts a placeholder
+repeated in one reading, so "{1} owns {0} via {1}" gives "some Currency
+owns that Listing via some Currency": two Currencies where the reading
+has one.
+
 Over every tracked `.orm.yaml` (6,088 verbalization rows), 125
 constraint sentences in 6 files take the fallback: 108 uniqueness and 17
 mandatory, no frequency. Most are reference-mode uniqueness written from
@@ -54,24 +59,27 @@ mandatory, no frequency. Most are reference-mode uniqueness written from
 
 ## Scope
 
-- When a binary mandatory, uniqueness or single-role frequency is on a
-  role that no reading names before the other, and some reading names
-  both, the verbalizer shall write "For each X, Q Y <reading> that X.",
-  X the constrained role's player, Y the other's, and Q "some", "at most
-  one", or the frequency bound ("at least 2", "exactly 2", "at least 1
-  and at most 3").
+- When a binary mandatory or uniqueness is on a role that no reading
+  names before the other, the verbalizer shall write "For each X, Q Y
+  <first reading> that X.", X the constrained role's player, Y the
+  other's, and Q "some" or "at most one". The first reading names both
+  roles, since `FactType` validates every reading template, which must
+  name every role, and it names the other role first, since none names
+  the constrained role first.
 - A lead bound by a hyphen stays with its own placeholder, after "that"
   or after Q, as every sentence builder places it
   (`reading-hyphen-binding.spec.md`).
 - When a reading names the constrained role first, the sentence is
   unchanged ("Each Customer places at least one Order.").
-- When no reading names both roles, the old fallback stays. That state
-  cannot be loaded: `FactType` validates every reading template, which
-  must name every role.
+- When a reading repeats a placeholder, the verbalizer shall write
+  "that Y" after its first mention, in this sentence and the n-ary
+  mandatory's.
 
-Out of scope: the ring sentence (direction-symmetric, above); plural
-agreement after a number ("exactly 2 Order is placed by"), which the
-forward frequency sentence already lacks ("exactly 2 Order"); and the
+Out of scope: the ring sentence (direction-symmetric, above); the
+single-role frequency sentence, which reads backwards the same way
+(barwise-zx2: the frame would make the counted noun the subject of a
+singular verb, "exactly 2 Order is placed by", and "For each X" asserts
+that every X plays the role, which a frequency does not); and the
 fact-type verbalization, which prints readings as written.
 
 ## Workstreams
@@ -80,16 +88,16 @@ fact-type verbalization, which prints readings as written.
 
 `orderedPredicate` splits the ordered-reading search out of
 `extractPredicate`; `forEachReading` in `sentence.ts` writes the frame
-from the first reading naming both roles, through `quantifiedReading`,
-which gains the quantifier for the other roles (default "some", so the
-n-ary sentence is unchanged). The three callers ask `orderedPredicate`
-first and use `forEachReading` when it finds nothing. Acceptance, each
-pinned by a test asserting the exact sentence: a mandatory, a uniqueness
-and each of the three frequency bounds on the role the only reading
-names second; both sentences unchanged when a reverse reading exists and
-for the role the reading names first; a hyphen-bound lead stays on its
-noun; every other test in the monorepo passes; the corpus effect is
-recorded here.
+from the first reading through `quantifiedReading`, which gains the
+quantifier for the other roles and the repeat rule. The n-ary mandatory's
+"For each" branch calls `forEachReading` with "some", so the two frames
+are one. The two binary callers ask `orderedPredicate` first and use
+`forEachReading` when it finds nothing. Acceptance, each pinned by a test
+asserting the exact sentence: a mandatory and a uniqueness on the role
+the only reading names second; both unchanged when a reverse reading
+exists and for the role the reading names first; a hyphen-bound lead
+after Q and after "that"; a repeated placeholder; every other test in
+the monorepo passes; the corpus effect is recorded here.
 
 ## Open decisions
 
@@ -99,11 +107,10 @@ recorded here.
    one", as the forward binary sentence says: matches the sentence a
    reader sees for the other direction, and makes the n-ary and binary
    "For each" sentences differ. Recommend (a).
-2. **Frequency in scope.** (a) Include it (recommended): the same
-   fallback, the same fix, three lines; the corpus has no case, so the
-   tests carry it. (b) Leave it for its plural problem: the backwards
-   sentence stays for a shape users can build. Recommend (a); the
-   missing plural is no worse than the forward sentence's.
+2. **Frequency.** (a) Leave it to barwise-zx2 (recommended): the frame
+   that fixes its direction breaks its agreement and implies a mandatory,
+   and the corpus has no case. (b) Include it: fixes the direction now,
+   pinning two new defects as tested output. Recommend (a).
 
 ## Risks and testing
 
@@ -112,7 +119,9 @@ sentences above change and no other row does; every test in core,
 formats, cli, mcp, learn, llm, promptlab, diagram, dbt and code-analysis
 passes, with one expectation changed: `readingHyphenBinding.test.ts`
 pinned the backwards sentence ("Each Listing is sale price of at most one
-Currency.") as the fallback's behaviour, and now pins the forward one
-over a reading whose lead stays on its noun. A surface that compares
+Currency.") as the fallback's behaviour, and now pins "For each Listing,
+at most one Currency is that sale price of Listing." over the same
+reading, whose lead "sale price of" stays bound to Listing by the
+binding rule. A surface that compares
 verbalization text across versions (a diff of `barwise verbalize`
 output) sees these sentences change once.
