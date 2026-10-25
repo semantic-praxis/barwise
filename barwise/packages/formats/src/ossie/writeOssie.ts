@@ -5,7 +5,7 @@
  * The rules are the inverse of `mapOssieToOrm`, and each is held to what
  * that importer reads back: a construct is written only in a shape it
  * would read as the same thing, and anything else is a loss -- a line in
- * the document's comment block, and, for a constraint with roles, a
+ * the document's comment block, and, for a constraint, a
  * `constraintSpecs` entry. Deterministic: the same model writes the same
  * document.
  */
@@ -17,13 +17,11 @@ import {
   externalIdentifies,
   type FactType,
   type IdentifyingComponent,
-  isOverSubtypes,
   type ObjectType,
   type OrmModel,
   type PreferredIdentifiers,
   preferredIdentifiers,
   resolvePreferredIdentifier,
-  roleIdsOf,
 } from "@barwise/core";
 import { buildConstraintSpec } from "@barwise/core/annotation";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
@@ -97,9 +95,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   };
   const loseConstraint = (inView: ConstraintInView, element: string, what: string): void => {
     lose(element, what);
-    if (roleIdsOf(inView[0]).length > 0 && !isOverSubtypes(inView[0])) {
-      specs.push(buildConstraintSpec(inView, model, verbalizer));
-    }
+    specs.push(buildConstraintSpec(inView, model, verbalizer));
   };
 
   const names = conceptNames(model, lose);

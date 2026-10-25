@@ -388,7 +388,9 @@ a test can fix its output.
   `formats/src/constraintSpec.ts` (one copy, both callers) -- for the
   constraints that builder can describe, those with roles; a value type's
   own value constraint and a constraint over subtypes have none, and
-  appear in the block only. The block is not optional: nothing in the CLI,
+  appear in the block only. (Since barwise-lwy the builder describes a
+  constraint over subtypes too, and every lost constraint gets a spec:
+  `schema-export-subtype-constraints.spec.md`.) The block is not optional: nothing in the CLI,
   MCP or editor reads `constraintSpecs` today, for DDL either
   (barwise-wc0), so without it an unexpressible constraint would vanish
   unseen.

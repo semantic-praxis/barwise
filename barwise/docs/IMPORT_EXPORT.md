@@ -21,6 +21,20 @@ All export formats share these options:
 Every export runs the validation engine first. In default (non-strict)
 mode, validation diagnostics appear as comments in the output.
 
+The DDL, OpenAPI, Avro, dbt and Ossie exports report the constraints
+they could not carry,
+with a verbalization, a pseudocode predicate and a counterexample for
+each. DDL routes what it can into UNIQUE and CHECK clauses per dialect
+and reports the rest. OpenAPI, Avro and dbt render only the relational
+schema, and none has a UNIQUE or CHECK clause, so they report every
+constraint DDL would need one for, or could not express at all, by the
+same rule. What each keeps of the schema's keys differs and is not
+reported: Avro has no keys or references at all (a primary key is a
+`doc` line), OpenAPI enforces no key uniqueness, and dbt writes no
+`relationships` test when `generateRelationshipTests` is false. The one gap that rule has today is
+tracked: key uniqueness in formats without keys (barwise-lqj). A mandatory role the mapping does
+not enforce is reported too; DDL comments it with the reason for its shape.
+
 ### DDL (SQL)
 
 **Format name**: `ddl`

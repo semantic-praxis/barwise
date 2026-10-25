@@ -22,10 +22,11 @@ import { type Constraint, isOverSubtypes } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { findRole } from "../model/roleLookup.js";
+import { subtypeOperands } from "../model/subtypeOperands.js";
 import { renderValuePredicate } from "../sql/valuePredicate.js";
 import { ConstraintVerbalizer } from "../verbalization/index.js";
 import { DIALECT_PROFILES, type DialectCapabilityProfile } from "./dialectCapabilities.js";
-import type { RelationalSchema } from "./RelationalSchema.js";
+import type { RelationalSchema, Table } from "./RelationalSchema.js";
 
 /** A constraint clause to inject into a rendered CREATE TABLE. */
 export interface RoutedClause {
@@ -87,6 +88,17 @@ export function unreportedConstraintSpecs(
     specs.push(s.spec);
   }
   return specs;
+}
+
+/**
+ * `constraintSpecs` as an ExportResult field: present only when there is
+ * something to report, so an absent field and an empty list cannot mean
+ * different things to a reader of the result.
+ */
+export function withConstraintSpecs(
+  specs: readonly ConstraintSpec[],
+): { constraintSpecs?: readonly ConstraintSpec[]; } {
+  return specs.length > 0 ? { constraintSpecs: specs } : {};
 }
 
 /**
@@ -153,14 +165,26 @@ function routeAll(
   // never by the one a 2.0 file nests it under (orm-format-3, Open
   // decision 9): its spill goes to the table of the first of them, in
   // model order, that has one -- except an external uniqueness with a
-  // column, noted beside that column as it always was.
+  // column, noted beside that column as it always was, and a constraint
+  // over subtypes, which spans no fact type and goes to its supertype's
+  // table.
   const routeAcross = (inView: ConstraintInView): void => {
     const [c] = inView;
     // A constraint over subtypes travels in the barwise annotation, as the
-    // 2.0 subtype flags it replaces did (orm-format-3 WS4b); it names no
-    // role, so it has no column or table here, and nothing below it reads
-    // one.
-    if (isOverSubtypes(c)) return;
+    // 2.0 subtype flags it replaces did (orm-format-3 WS4b), which keeps
+    // it on a DDL round trip. Each subtype is a table whose key references
+    // the supertype's, so the rule spans tables and no clause states it;
+    // it spills at the supertype's table, so an export without the
+    // annotation still reports it (schema-export-subtype-constraints.spec.md).
+    if (isOverSubtypes(c)) {
+      const { supertypeId } = subtypeOperands(c.subtypeFactIds, model);
+      spill(
+        inView,
+        "a rule over subtypes spans their tables, which no clause can state",
+        schema.tables.find((t) => t.sourceElementId === supertypeId)?.name,
+      );
+      return;
+    }
     if (c.type === "external_uniqueness") {
       const cols = c.roleIds.map((r) => columnsForJoinedRole(r, model, schema));
       const resolved = cols.filter((r) => r !== undefined);
@@ -207,17 +231,22 @@ function routeAll(
       continue;
     }
     switch (c.type) {
-      // Realized structurally by the relational mapping.
-      case "mandatory":
+      case "mandatory": {
+        // Realized only by a NOT NULL column for the role in its own
+        // player's table (mandatory-role-routing.spec.md, barwise-plq).
+        const gap = mandatoryGap(c.roleId, ft, model, schema);
+        if (gap) spill(inView, gap.reason, gap.table ?? tableForFactType(ft, model, schema));
         break;
+      }
 
       case "internal_uniqueness": {
-        // The only uniqueness the mapping does not realize is a
-        // single-role constraint on the value side of an
-        // entity-value binary (a secondary unique column).
-        const col = c.roleIds.length === 1
-          ? valueColumnForUniqueness(c.roleIds[0]!, ft, model, schema)
-          : undefined;
+        // The mapping does not realize a single-role constraint on the
+        // value side of an entity-value binary (a secondary unique
+        // column), nor one on a binary between two entities whose fact it
+        // stored anywhere but the role's own player's table (barwise-hjy),
+        // nor a second key of an n-ary table (barwise-kgh).
+        const single = c.roleIds.length === 1 ? c.roleIds[0]! : undefined;
+        const col = single ? valueColumnForUniqueness(single, ft, model, schema) : undefined;
         // ... unless the mapping realized it as the primary key after
         // all. Since barwise-967 the identifying binary IS the key, so
         // routing its uniqueness would emit
@@ -226,6 +255,12 @@ function routeAll(
         // key already enforces.
         if (col && !isPrimaryKey(col, schema)) {
           route("unique", `UNIQUE (${col.column})`, col.table, inView);
+        }
+        const between = single ? entityBinaryUniqueColumns(single, ft, model, schema) : undefined;
+        if (between === "unlocated") {
+          spill(inView, "the roles map to no column", tableForFactType(ft, model, schema));
+        } else if (typeof between === "object" && !isWholePrimaryKey(between, schema)) {
+          route("unique", `UNIQUE (${between.columns.join(", ")})`, between.table, inView);
         }
         // An n-ary fact type's table is keyed on one of its uniqueness
         // constraints; any other one is a UNIQUE on the same table
@@ -378,7 +413,10 @@ function columnsForJoinedRole(
   const valuePlayer = located !== undefined
     && model.getObjectType(located.role.playerId)?.kind === "value";
   const columnsOf = (id: string) => {
-    if (!valuePlayer) return findColumns(id, schema);
+    if (!valuePlayer) {
+      const found = findColumns(id, schema);
+      return found && { table: found.table.name, columns: found.columns };
+    }
     const one = findColumn(id, schema);
     return one && { table: one.table, columns: [one.column] };
   };
@@ -394,10 +432,10 @@ function columnsForJoinedRole(
 function findColumns(
   roleId: string,
   schema: RelationalSchema,
-): { table: string; columns: string[]; } | undefined {
+): { table: Table; columns: string[]; } | undefined {
   for (const table of schema.tables) {
     const columns = table.columns.filter((cl) => cl.sourceRoleId === roleId).map((cl) => cl.name);
-    if (columns.length > 0) return { table: table.name, columns };
+    if (columns.length > 0) return { table, columns };
   }
   return undefined;
 }
@@ -447,9 +485,100 @@ function isWholePrimaryKey(
 }
 
 /**
+ * The columns a single-role uniqueness on a binary between two entities
+ * needs UNIQUE on, "realized" when the mapping already realizes it,
+ * "unlocated" when neither role has columns where the mapping stores such
+ * a fact, or undefined when it is not a binary between two entities
+ * (one-to-one-entity-uniqueness.spec.md, barwise-hjy). The fact is stored
+ * in one of three places:
+ *
+ *   - the role's own columns, in its own player's table: they are
+ *     single-valued, which is the uniqueness itself;
+ *   - the role's own columns, in another table (an associative table, or
+ *     the table of an entity objectifying the fact type): each value may
+ *     appear once;
+ *   - the partner role's columns, in the partner's player's table (a
+ *     one-to-one absorbed on the other side): each value may appear once.
+ */
+function entityBinaryUniqueColumns(
+  roleId: string,
+  ft: FactType,
+  model: OrmModel,
+  schema: RelationalSchema,
+): { table: string; columns: string[]; } | "realized" | "unlocated" | undefined {
+  if (ft.arity !== 2) return undefined;
+  const role = ft.getRoleById(roleId);
+  const partner = ft.roles.find((r) => r.id !== roleId);
+  if (!role || !partner) return undefined;
+  const isEntity = (id: string) => model.getObjectType(id)?.kind === "entity";
+  if (!isEntity(role.playerId) || !isEntity(partner.playerId)) return undefined;
+  const found = (hit: { table: Table; columns: string[]; }) => ({
+    table: hit.table.name,
+    columns: hit.columns,
+  });
+
+  const own = findColumns(roleId, schema);
+  if (own && inPlayerTable(own, roleId, ft)) return "realized";
+  if (own) return found(own);
+  const absorbed = findColumns(partner.id, schema);
+  if (absorbed && absorbed.table.sourceElementId === partner.playerId) return found(absorbed);
+  // Neither role's columns are where the three places put them: the
+  // mapping stored the fact nowhere this can see, so the caller spills
+  // rather than counting it realized.
+  return "unlocated";
+}
+
+/**
+ * Whether a role's columns sit in its own player's table: where the
+ * mapping stores a fact it realizes as a column of the player. Both the
+ * one-to-one uniqueness rule and the mandatory rule read it, so they
+ * agree on where a role's fact lives.
+ */
+function inPlayerTable(found: { table: Table; }, roleId: string, ft: FactType): boolean {
+  return found.table.sourceElementId === ft.getRoleById(roleId)?.playerId;
+}
+
+/**
+ * Why the relational mapping does not enforce a mandatory role, and the
+ * table to note it at, or undefined when it does: a NOT NULL column for
+ * the role in its own player's table (mandatory-role-routing.spec.md,
+ * barwise-plq). The reasons name the shape, so the report says what a
+ * reader would have to add.
+ */
+function mandatoryGap(
+  roleId: string,
+  ft: FactType,
+  model: OrmModel,
+  schema: RelationalSchema,
+): { reason: string; table?: string; } | undefined {
+  const found = findColumns(roleId, schema);
+  if (found && inPlayerTable(found, roleId, ft)) {
+    const nullable = found.table.columns.some((c) => c.sourceRoleId === roleId && c.nullable);
+    if (!nullable) return undefined;
+    return {
+      reason: ft.arity === 1
+        ? "a unary fact maps to a nullable flag, which no column constraint makes true"
+        : "the role's column is nullable",
+      table: found.table.name,
+    };
+  }
+  const playerId = ft.getRoleById(roleId)?.playerId;
+  if (model.getObjectType(playerId ?? "")?.kind === "value") {
+    return {
+      reason: "a value type has no table in which to require the role",
+      table: found?.table.name,
+    };
+  }
+  const playerTable = schema.tables.find((t) => t.sourceElementId === playerId);
+  return {
+    reason: "each instance must appear in another table, which no column can require",
+    table: found?.table.name ?? playerTable?.name,
+  };
+}
+
+/**
  * For a single-role uniqueness constraint: the value column it makes
- * unique, when the role is the value side of an entity-value binary
- * (any other uniqueness is realized by the mapping itself).
+ * unique, when the role is the value side of an entity-value binary.
  */
 function valueColumnForUniqueness(
   roleId: string,

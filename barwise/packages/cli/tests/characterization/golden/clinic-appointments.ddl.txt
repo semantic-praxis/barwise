@@ -58,6 +58,7 @@ CREATE TABLE exam_room (
   PRIMARY KEY (room_number)
 );
 
+-- Constraint (each instance must appear in another table, which no column can require): Each Appointment is for some Patient with some Doctor on some AppointmentDate at some TimeSlot.
 -- Table: appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot
 -- Source: Appointment is for Patient with Doctor on AppointmentDate at TimeSlot (a0831743-6a6a-4ad3-aa2a-80c2b3200d76)
 -- barwise:v1 {"kind":"factTable","table":"appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot","factType":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"roles":[{"name":"is for","player":"Appointment","columns":["confirmation_number"]},{"name":"attends","player":"Patient","columns":["medical_record_number"]},{"name":"sees","player":"Doctor","columns":["provider_id"]},{"name":"is on","player":"AppointmentDate","columns":["appointment_date"],"valueDefinition":"The calendar date of an appointment."},{"name":"is at","player":"TimeSlot","columns":["time_slot"],"valueDefinition":"A half-hour time slot during which an appointment can be scheduled."}]}

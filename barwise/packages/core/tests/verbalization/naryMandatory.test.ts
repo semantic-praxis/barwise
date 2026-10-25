@@ -44,6 +44,14 @@ describe("mandatory on a non-binary fact type", () => {
       .toEqual(["Each Agreement is signed by some Customer for some Organization."]);
   });
 
+  it("names a placeholder the reading repeats with 'that' after its first mention", () => {
+    // binary-reverse-reading-verbalization.spec.md: a second "some" would
+    // introduce a second Organization.
+    expect(signs(["{0} on behalf of {1} signs {2} for {1}"], "ra")).toEqual([
+      "For each Agreement, some Customer on behalf of some Organization signs that Agreement for that Organization.",
+    ]);
+  });
+
   it("frames the first reading with 'For each' when no reading opens with the role", () => {
     expect(signs(["{0} on behalf of {1} signs {2}"], "ra")).toEqual([
       "For each Agreement, some Customer on behalf of some Organization signs that Agreement.",
@@ -58,7 +66,7 @@ describe("mandatory on a non-binary fact type", () => {
       "Each new Customer on behalf of some Organization signs some draft Agreement.",
     ]);
     expect(signs(["{0} on behalf of {1} signs draft- {2}"], "ra")).toEqual([
-      "For each Agreement, some Customer on behalf of some Organization signs that draft Agreement.",
+      "For each draft Agreement, some Customer on behalf of some Organization signs that draft Agreement.",
     ]);
   });
 

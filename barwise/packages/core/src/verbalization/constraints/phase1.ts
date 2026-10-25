@@ -5,7 +5,6 @@
 import type { FactType } from "../../model/FactType.js";
 import type { ValueRange } from "../../model/ObjectType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import { splitReading } from "../../model/ReadingOrder.js";
 import type { Role } from "../../model/Role.js";
 import {
   buildVerbalization,
@@ -17,10 +16,11 @@ import {
   type VerbalizationSegment,
 } from "../Verbalization.js";
 import {
-  extractPredicate,
+  forEachReading,
   leadSegs,
   localRole,
   openingReading,
+  orderedPredicate,
   quantifiedReading,
   rolePlayer,
 } from "./sentence.js";
@@ -65,34 +65,48 @@ export function verbalizeBinaryUniqueness(
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const constrainedIdx = factType.roles.findIndex(
-    (r) => r.id === constrainedRoleId,
-  );
-  const otherIdx = constrainedIdx === 0 ? 1 : 0;
+  return binarySentence(constrainedRoleId, factType, model, "at most one ", "at most one ");
+}
 
-  const subjectRole = factType.roles[constrainedIdx]!;
-  const objectRole = factType.roles[otherIdx]!;
-  const subjectType = model.getObjectType(subjectRole.playerId);
-  const objectType = model.getObjectType(objectRole.playerId);
-  const subjectName = subjectType?.name ?? subjectRole.name;
-  const objectName = objectType?.name ?? objectRole.name;
+/**
+ * "Each {Subject} {predicate} {forward} {Object}." from the reading that
+ * names the constrained role first, else "For each {Subject}, {reverse}
+ * {Object} ... that {Subject}." from the reading as given
+ * (binary-reverse-reading-verbalization.spec.md, barwise-wsl). The binary
+ * uniqueness and mandatory sentences differ only in their quantifiers.
+ */
+function binarySentence(
+  roleId: string,
+  factType: FactType,
+  model: OrmModel,
+  forward: string,
+  reverse: string,
+): Verbalization {
+  const own = factType.roles.findIndex((r) => r.id === roleId);
+  const other = own === 0 ? 1 : 0;
 
-  const predicate = extractPredicate(
-    factType,
-    constrainedIdx,
-    otherIdx,
-  );
+  const predicate = orderedPredicate(factType, own, other);
+  if (!predicate) {
+    return buildVerbalization(
+      factType.id,
+      "constraint",
+      forEachReading(model, factType, own, reverse),
+    );
+  }
 
-  const segments: VerbalizationSegment[] = [
+  const subjectRole = factType.roles[own]!;
+  const objectRole = factType.roles[other]!;
+  const subjectName = model.getObjectType(subjectRole.playerId)?.name ?? subjectRole.name;
+  const objectName = model.getObjectType(objectRole.playerId)?.name ?? objectRole.name;
+
+  return buildVerbalization(factType.id, "constraint", [
     kwSeg("Each "),
     ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
     textSeg(" " + predicate.text + " "),
-    kwSeg("at most one "),
+    kwSeg(forward),
     ...predicate.object(refSeg(objectName, objectRole.playerId)),
     textSeg("."),
-  ];
-
-  return buildVerbalization(factType.id, "constraint", segments);
+  ]);
 }
 
 /**
@@ -215,15 +229,11 @@ function verbalizeNaryMandatory(role: Role, factType: FactType, model: OrmModel)
     ]);
   }
 
-  // The constructor refuses a fact type with no reading.
-  const parts = splitReading(factType.readings[0]!.template).parts;
-  return buildVerbalization(factType.id, "constraint", [
-    kwSeg("For each "),
-    subject,
-    textSeg(", "),
-    ...quantifiedReading(model, factType, parts, own),
-    textSeg("."),
-  ]);
+  return buildVerbalization(
+    factType.id,
+    "constraint",
+    forEachReading(model, factType, own, "some "),
+  );
 }
 
 export function verbalizeBinaryMandatory(
@@ -231,34 +241,7 @@ export function verbalizeBinaryMandatory(
   factType: FactType,
   model: OrmModel,
 ): Verbalization {
-  const mandatoryIdx = factType.roles.findIndex(
-    (r) => r.id === roleId,
-  );
-  const otherIdx = mandatoryIdx === 0 ? 1 : 0;
-
-  const subjectRole = factType.roles[mandatoryIdx]!;
-  const objectRole = factType.roles[otherIdx]!;
-  const subjectType = model.getObjectType(subjectRole.playerId);
-  const objectType = model.getObjectType(objectRole.playerId);
-  const subjectName = subjectType?.name ?? subjectRole.name;
-  const objectName = objectType?.name ?? objectRole.name;
-
-  const predicate = extractPredicate(
-    factType,
-    mandatoryIdx,
-    otherIdx,
-  );
-
-  const segments: VerbalizationSegment[] = [
-    kwSeg("Each "),
-    ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
-    textSeg(" " + predicate.text + " "),
-    kwSeg("at least one "),
-    ...predicate.object(refSeg(objectName, objectRole.playerId)),
-    textSeg("."),
-  ];
-
-  return buildVerbalization(factType.id, "constraint", segments);
+  return binarySentence(roleId, factType, model, "at least one ", "some ");
 }
 
 /**

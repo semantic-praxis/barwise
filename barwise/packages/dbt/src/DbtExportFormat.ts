@@ -21,6 +21,8 @@ import {
   type RelationalSchema,
   renderDbt,
   type Table,
+  unreportedConstraintSpecs,
+  withConstraintSpecs,
 } from "@barwise/core/mapping";
 
 /**
@@ -135,6 +137,9 @@ export class DbtExportFormat implements ExportFormatAdapter {
       lineage: generateDdlLineage(model, schema),
       files,
       annotations,
+      // The constraints the schema does not carry, by the DDL router's own
+      // rule (schema-export-constraint-specs.spec.md).
+      ...withConstraintSpecs(unreportedConstraintSpecs(model, schema)),
     };
   }
 }

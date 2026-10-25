@@ -8,6 +8,7 @@
  * entry, which the export surfaces report beside the artifact.
  */
 import type { ExportFormatAdapter, ExportOptions, ExportResult, OrmModel } from "@barwise/core";
+import { withConstraintSpecs } from "@barwise/core/mapping";
 import { stringify } from "yaml";
 import { writeOssie } from "./writeOssie.js";
 
@@ -28,6 +29,6 @@ export class OssieExportFormat implements ExportFormatAdapter {
       ].join("\n")
       : "";
     const text = header + stringify(document, { lineWidth: 0 });
-    return { text, ...(constraintSpecs.length > 0 ? { constraintSpecs } : {}) };
+    return { text, ...withConstraintSpecs(constraintSpecs) };
   }
 }

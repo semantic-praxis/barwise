@@ -1,19 +1,28 @@
 /**
  * The ConstraintSpec payload for a constraint an export format cannot
  * express: its verbalization, a per-kind pseudocode predicate, and a
- * counterexample. Shared by every format that spills constraints (the DDL
- * router, the Ossie writer), so the pseudocode is written once.
+ * counterexample. Shared by every format that spills constraints (the
+ * constraint router, the Ossie writer), so the pseudocode is written once.
  *
- * It describes constraints that have roles. A value type's own value
- * constraint is not a `Constraint`, and a constraint over subtypes has no
- * roles to label, so neither is passed here.
+ * A constraint over subtypes names its supertype and subtypes instead of
+ * roles (schema-export-subtype-constraints.spec.md, barwise-lwy). A value type's own value
+ * constraint is not a `Constraint` in the model, but the router builds one
+ * for each role it constrains and passes that, so each column's spec names
+ * its own role.
  */
 import { generateCounterexampleInView } from "../counterexample/index.js";
 import type { ConstraintSpec } from "../export/types.js";
-import { type Constraint, roleIdsOf } from "../model/Constraint.js";
+import {
+  type Constraint,
+  isOverSubtypes,
+  roleIdsOf,
+  type SubtypeConstraint,
+} from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
 import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import { findRole } from "../model/roleLookup.js";
+import { subtypeOperands } from "../model/subtypeOperands.js";
+import { SUBTYPE_QUANTITY } from "../verbalization/constraints/phase2.js";
 import type { ConstraintVerbalizer } from "../verbalization/index.js";
 
 export function buildConstraintSpec(
@@ -50,11 +59,32 @@ export function buildConstraintSpec(
 }
 
 /**
+ * A constraint over subtypes as membership of the supertype's instances
+ * in the subtypes: each subtype is a table whose key references the
+ * supertype's, so this is the rule a reader checks across those tables.
+ */
+function subtypePseudocode(c: SubtypeConstraint, model: OrmModel): string {
+  const factIds = c.subtypeFactIds;
+  const { supertypeId, subtypeIds } = subtypeOperands(factIds, model);
+  const nameOf = (id: string | undefined) =>
+    id === undefined ? undefined : model.getObjectType(id)?.name;
+  const supertype = nameOf(supertypeId) ?? "the supertype";
+  const subtypes = subtypeIds.map((id, i) => nameOf(id) ?? factIds[i]!);
+  // As the verbalizer says it: "Each Staff is a Assistant."
+  if (c.type === "disjunctive_mandatory" && subtypes.length === 1) {
+    return `every instance of ${supertype} is an instance of ${subtypes[0]}`;
+  }
+  const quantity = SUBTYPE_QUANTITY[c.type];
+  return `every instance of ${supertype} is an instance of ${quantity} of: ${subtypes.join(", ")}`;
+}
+
+/**
  * A per-type pseudocode predicate: enough for a human or agent to
  * implement the constraint in query logic, a dbt test, or application
  * code.
  */
 function constraintPseudocode(c: Constraint, ft: FactType | undefined, model: OrmModel): string {
+  if (isOverSubtypes(c)) return subtypePseudocode(c, model);
   // Every kind that reads it is internal, so has a fact type.
   const fact = ft?.name ?? "";
   switch (c.type) {

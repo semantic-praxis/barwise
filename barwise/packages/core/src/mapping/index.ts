@@ -6,6 +6,7 @@ export {
   type RoutedClause,
   type SpilledConstraint,
   unreportedConstraintSpecs,
+  withConstraintSpecs,
 } from "./constraintRouting.js";
 export {
   type ConstraintChannel,

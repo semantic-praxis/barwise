@@ -285,6 +285,25 @@ describe("Ossie export: the loss report", () => {
     expect(result.constraintSpecs![0]!.pseudocode).toBe("for all x: not Person knows Person(x, x)");
   });
 
+  it("gives a constraint over subtypes a constraint spec beside its loss line", () => {
+    // schema-export-subtype-constraints.spec.md (barwise-lwy): it has no
+    // roles, and the spec builder now names its supertype and subtypes.
+    const m = new OrmModel({ name: "M" });
+    const party = entity(m, "Party");
+    const facts = ["LegalEntity", "NaturalPerson"].map((name) =>
+      m.addSubtypeFact({ subtypeId: entity(m, name).id, supertypeId: party.id }).id
+    );
+    m.addConstraint({ id: "x-1", type: "exclusion", subtypeFactIds: facts });
+    const { losses, result } = exported(m);
+    expect(losses).toContain("constraint x-1: exclusion is not expressible in Ossie");
+    expect(result.constraintSpecs?.map((c) => [c.verbalization, c.pseudocode])).toEqual([
+      [
+        "Each Party is at most one of: LegalEntity, NaturalPerson.",
+        "every instance of Party is an instance of at most one of: LegalEntity, NaturalPerson",
+      ],
+    ]);
+  });
+
   it("writes a value constraint only in a shape the importer reads back", () => {
     const m = new OrmModel({ name: "M" });
     value(m, "Grade", { name: "text" }, { valueConstraint: { values: ["A", "It's"] } });
