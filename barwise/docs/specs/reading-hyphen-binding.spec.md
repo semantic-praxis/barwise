@@ -77,8 +77,9 @@ In scope:
   and the text before it no longer contains them; plus whether any hyphen in
   the template was left unbound.
 - **The binding rule.** A _binding hyphen_ is a hyphen that directly
-  follows a letter or digit and is followed by whitespace or directly by a
-  placeholder (`sale- {1}`, `sale-{1}`). In the text between the previous
+  follows a letter or digit and is followed by whitespace, directly by a
+  placeholder, or by the end of the template (`sale- {1}`, `sale-{1}`,
+  `smiles-`). In the text between the previous
   placeholder (or the start) and placeholder `{n}`, the first token ending in
   a binding hyphen begins the lead, which runs to `{n}`. The lead drops every
   binding hyphen in it and collapses its whitespace to single spaces; it is
@@ -171,8 +172,9 @@ One PR. Acceptance:
 - Query: `describe` of a hyphen-bound fact type prints "has sale Currency".
 - A standing corpus test, `hyphenBindingCorpus.test.ts`: every tracked model
   under `docs/`, `examples/` and `packages/promptlab/evals/` that uses the
-  notation verbalizes with no line containing a letter or digit followed by
-  a hyphen and then whitespace, punctuation, a quote mark or the line end. It fails if any reader reintroduces the raw hyphen.
+  notation verbalizes with no binding hyphen left in any line (the binding
+  rule's own definition, applied to the output), and every reading in those
+  models has nothing unbound. It fails if any reader reintroduces the raw hyphen.
 - The diagram summary of a hyphen-bound fact type reads "has sale Currency".
 - The Ossie flights import warns about no hyphen; a reading with an unbound
   hyphen still warns.
