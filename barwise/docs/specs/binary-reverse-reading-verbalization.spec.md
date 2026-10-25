@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-wsl
+Plan-reviewed: a18ab1ec (code-review, pr-review)
 Touches: barwise/packages/core/src/verbalization/constraints/sentence.ts,
 barwise/packages/core/src/verbalization/constraints/phase1.ts,
 +barwise/packages/core/tests/verbalization/reverseReading.test.ts,
