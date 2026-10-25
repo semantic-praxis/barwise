@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-u8y
+Plan-reviewed: b62f11b3 (code-review, pr-review)
 Touches: +barwise/packages/core/src/mapping/constraintRouting.ts,
 +barwise/packages/core/src/mapping/dialectCapabilities.ts,
 +barwise/packages/core/src/annotation/constraintSpec.ts,
