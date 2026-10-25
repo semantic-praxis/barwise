@@ -9,6 +9,7 @@ Plan-reviewed: 316d0812 (code-review, pr-review)
 Touches: barwise/packages/vscode/src/commands/ExportDdlCommand.ts,
 barwise/packages/vscode/src/commands/ExportCommand.ts,
 barwise/packages/vscode/CLAUDE.md,
+barwise/docs/getting-started/vscode.md,
 barwise/packages/vscode/src/diagram/tabPanels.ts,
 +barwise/packages/vscode/src/export/ddlExport.ts,
 +barwise/packages/vscode/tests/unit/exportDdlCommand.test.ts

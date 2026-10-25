@@ -137,7 +137,9 @@ its rules.
 
 - **As dbt Project**: pick an existing dbt project folder; it writes
   `models/schema.yml` and one SQL model per table.
-- **As DDL**: choose where to save the `.sql` file.
+- **As DDL**: choose where to save the `.sql` file. It writes the DDL the
+  diagram's DDL tab shows (the CLI's `barwise export --format ddl`), and when a
+  constraint has no SQL form, a warning offers a report naming each one.
 - **As Avro Schemas**: pick a folder; it writes one `.avsc` per table.
 
 OpenAPI and NORMA export are available only through `#barwiseExport` in chat.
