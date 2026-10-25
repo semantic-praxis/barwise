@@ -19,7 +19,8 @@ barwise/packages/vscode/tests/unit/exportDdlCommand.test.ts,
 barwise/packages/vscode/CLAUDE.md,
 barwise/packages/dbt/src/DbtExportFormat.ts,
 barwise/packages/dbt/tests/DbtExportFormat.test.ts,
-barwise/docs/getting-started/vscode.md
+barwise/docs/getting-started/vscode.md,
+barwise/docs/IMPORT_EXPORT.md
 
 When a user runs **Barwise: Export** and picks "As Avro Schemas" or "As dbt
 Project", the extension shall write the files the registered `avro` or `dbt`

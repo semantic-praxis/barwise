@@ -154,6 +154,10 @@ barwise export clinic.orm.yaml --format dbt --output dbt_project/
 - `sourceName` -- dbt source name in `schema.yml` (defaults to `"raw"`)
 - `generateRelationshipTests` -- include dbt relationship tests
   (defaults to `true`)
+- `modelsDir` -- the directory the model files and `schema.yml` are
+  written under (defaults to `"models"`; the editor uses
+  `"models/staging"`). A relative path inside the project; anything else is
+  refused.
 
 **What you get**:
 
