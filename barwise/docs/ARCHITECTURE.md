@@ -29,6 +29,7 @@ February 2026 design record.
 
 Architecture:
 
+- [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24
 - [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17
 - [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23
 
