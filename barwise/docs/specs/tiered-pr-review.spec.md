@@ -45,6 +45,8 @@ as the record of it, each marked where the decision made it moot.
 
 ## The decision of 2026-09-23: review everything non-trivial, block nothing
 
+Recorded as `docs/adr/review-policy.md`.
+
 The owner, after WS3 measured the high-risk tier at 55% of merges and
 Open decision 6 laid out accepting it, narrowing it, or making blocking
 cheap: "I don't think we need to manage the copilot reviews this
