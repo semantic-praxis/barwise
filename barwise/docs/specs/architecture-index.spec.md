@@ -1,6 +1,6 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25; review-policy, 2026-10-25; must-agree-copies, 2026-10-25); 5 not yet
+Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25; review-policy, 2026-10-25; must-agree-copies, 2026-10-25; baselines-merge-on-write, 2026-10-25); 5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-25
@@ -374,7 +374,7 @@ all of them with a link:
 | `gate-refusal-contract.md`        | process      | CLAUDE.md conventions; `gate-refusal-contract.spec.md`                                                                                                                                                                                         |
 | `must-agree-copies.md`            | process      | CLAUDE.md conventions; `duplication-drift-guards.spec.md`; `deterministic-guards.spec.md`; skills `duplication-audit`, `spec-writer`, `pr-review`, `steward`; `REVIEW.md` "Do not report"; `check-parity.mjs`, `audit-duplication.mjs` headers |
 | `findings-close-by-mechanism.md`  | process      | CLAUDE.md conventions ("A finding is not closed by a document")                                                                                                                                                                                |
-| `baselines-merge-on-write.md`     | process      | CLAUDE.md conventions; `baseline-write-preserves-verdicts.spec.md`                                                                                                                                                                             |
+| `baselines-merge-on-write.md`     | process      | CLAUDE.md conventions; `baseline-write-preserves-verdicts.spec.md`; `baseline-merge.mjs` header; writer call-site, survey and reopen comments; `gates.test.mjs` writer-test comments                                                           |
 | `credential-handling.md`          | process      | CLAUDE.md conventions; `credential-scanning.spec.md`                                                                                                                                                                                           |
 | `pinned-runtimes.md`              | process      | CLAUDE.md "Monorepo Commands" (Node and Python pins)                                                                                                                                                                                           |
 | `plan-before-code.md`             | process      | CLAUDE.md conventions bullet 1 (spec first); `spec-writer` step 8 and design gate; `pr-creation` readiness; `plan-scope-check.spec.md`; `touches-required.spec.md`                                                                             |

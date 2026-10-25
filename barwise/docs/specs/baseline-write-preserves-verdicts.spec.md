@@ -4,7 +4,7 @@ Status: Implemented. Both workstreams shipped together; three things the draft
 had wrong or missing are recorded in Implementation notes below
 
 Created: 2026-09-15
-Last-updated: 2026-09-15
+Last-updated: 2026-10-25
 Tracking: barwise-1026 (the instance: `audit-corrections --write` replaced 66
 recorded classifications with `TODO: classify` to add one row). The shape is the
 one `docs/specs/gate-refusal-contract.spec.md` names one layer out -- an
@@ -93,6 +93,8 @@ So the merge rule follows from the id, not from a preference: **preserve the
 human-owned fields of any row whose id the detector still produces; refresh
 every derived field from the detector; stamp the placeholder only on ids that
 are genuinely new.**
+
+Recorded as `docs/adr/baselines-merge-on-write.md`.
 
 ## Scope
 
