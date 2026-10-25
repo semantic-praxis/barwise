@@ -6,10 +6,12 @@ Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-u8y
 Touches: +barwise/packages/core/src/mapping/constraintRouting.ts,
-+barwise/packages/core/src/mapping/constraintSpec.ts,
 +barwise/packages/core/src/mapping/dialectCapabilities.ts,
-+barwise/packages/core/src/mapping/valuePredicate.ts,
++barwise/packages/core/src/annotation/constraintSpec.ts,
++barwise/packages/core/src/sql/valuePredicate.ts,
 barwise/packages/core/src/mapping/index.ts,
+barwise/packages/core/src/annotation/index.ts,
+barwise/packages/core/src/sql/index.ts,
 barwise/packages/core/CLAUDE.md,
 barwise/packages/formats/src/constraintSpec.ts,
 barwise/packages/formats/src/ddl/constraintRouting.ts,
@@ -22,6 +24,9 @@ barwise/packages/formats/src/openapi/OpenApiExportFormat.ts,
 barwise/packages/formats/src/avro/AvroExportFormat.ts,
 barwise/packages/formats/CLAUDE.md,
 barwise/packages/dbt/src/DbtExportFormat.ts,
++barwise/packages/core/tests/mapping/constraintRouting.test.ts,
++barwise/packages/core/tests/mapping/constraintsAcrossFactTypes.test.ts,
++barwise/packages/core/tests/sql/valuePredicate.test.ts,
 barwise/packages/formats/tests/DdlDialectExport.test.ts,
 barwise/packages/formats/tests/valuePredicate.test.ts,
 barwise/packages/formats/tests/ConstraintRouting.test.ts,
@@ -29,7 +34,12 @@ barwise/packages/formats/tests/constraintsAcrossFactTypes.test.ts,
 barwise/packages/formats/tests/OpenApiExportFormat.test.ts,
 barwise/packages/formats/tests/AvroExportFormat.test.ts,
 barwise/packages/dbt/tests/DbtExportFormat.test.ts,
-barwise/docs/IMPORT_EXPORT.md
+barwise/audit-baseline.json,
+barwise/docs/specs/external-preferred-identifier.spec.md,
+barwise/docs/specs/ossie-ontology-format.spec.md,
+barwise/docs/specs/join-ring-constraint.spec.md,
+barwise/docs/IMPORT_EXPORT.md,
+barwise/docs/CLI.md
 
 When the OpenAPI, Avro or dbt exporter writes a model, each constraint
 the DDL router would spill if the target had neither UNIQUE nor CHECK
@@ -48,17 +58,22 @@ router (`routeConstraints`) already decides, constraint by constraint,
 what that schema realized and what needs an extra UNIQUE or CHECK clause
 or must spill. A format with no UNIQUE and no CHECK clause is a dialect
 whose profile marks both absent, and the router then spills exactly what
-the schema did not carry. So the three formats reuse the router's
-judgement with that profile instead of defining "realized" a second time.
+the schema did not carry, by its own rule. So the three formats share the
+router's judgement instead of defining "realized" a second time, and one
+core function owns that reduction so the three adapters cannot drift.
 
-The router, its dialect profiles, its value predicate and the spec
-builder are pure functions of the model, the schema and the profile.
-They move into `@barwise/core/mapping`, beside `RelationalMapper` and
-`renderDdl`, which already live there, so `@barwise/dbt`, which depends
-on `core` only, can call them. `@barwise/formats` keeps the DDL format
-descriptor and calls them back, as it already does for `renderDdl`.
+Everything that moves is pure, so it can live in core, each piece in the
+module it belongs to: the router and the dialect profiles in
+`@barwise/core/mapping`, beside `RelationalMapper` and `renderDdl`; the
+spec builder in `@barwise/core/annotation`, the module that already
+describes export losses, since it reads no schema and the Ossie writer
+uses it too; and the CHECK predicate renderer and parser in
+`@barwise/core/sql`, beside `SqlDialect`. `@barwise/dbt` depends on
+`core` only, so this is what lets it report at all; `@barwise/formats`
+keeps the DDL and Ossie descriptors and calls back into core, as it
+already does for `renderDdl`.
 
-## Observed today (at c330c792)
+## Observed today (at a6e4929b)
 
 - **Input.** OpenAPI (`OpenApiExportFormat.ts:49-69`), Avro
   (`AvroExportFormat.ts:56-70`) and dbt (`DbtExportFormat.ts:56-71`) map
@@ -75,114 +90,143 @@ descriptor and calls them back, as it already does for `renderDdl`.
   constraint over subtypes. A second loop routes a value type's own
   value constraint as a CHECK on each role it plays.
 - **A profile with both clauses absent spills both.** `route()` spills
-  with "UNIQUE is not supported by <dialect>" or "CHECK is not supported
-  by <dialect>" when the profile says `absent`. So
-  `{ unique: "absent", check: "absent" }` turns every clause the router
-  would add into a spill, and leaves the realized-structurally skips as
-  they are. Measured over the 84 tracked `.orm.yaml` files that load and
-  map: with that profile the router returns no clauses and, in every
-  model, as many spills as the postgres profile's spills and clauses
-  together; 363 specs in all, which is what the three formats would
-  report over the corpus (script:
-  `routeConstraints(model, schema, profile)` both ways per model).
+  when the profile marks the capability `absent`, so a profile with
+  `unique` and `check` absent turns every clause the router would add
+  into a spill and leaves the realized-structurally skips as they are.
+  Measured over the 84 tracked `.orm.yaml` files that load and map: that
+  profile returns no clauses, and in every model as many spills as the
+  postgres profile's spills and clauses together; 363 specs in all,
+  which is what the three formats would report over the corpus (script:
+  `routeConstraints` with each profile, per model). That equality is not
+  an invariant: spills dedupe by table and verbalization, clauses by
+  table and SQL, so a value type's own value constraint on two columns
+  of one table is two CHECK clauses but one spill. One spill is the
+  right count for a report, since it is one constraint.
+- **The spill reason does not reach the report.** `ConstraintSpec`
+  carries only `verbalization`, `pseudocode` and `example`
+  (`core/src/export/types.ts`); the reason ("CHECK is not supported by
+  postgres") is written only into DDL's SQL comments. So the three
+  formats need no format-shaped reason.
 - **Dependencies.** `buildConstraintSpec` (`formats/src/constraintSpec.ts`)
-  needs only core, its counterexample and its verbalization subpaths,
-  plus the file's own `findRole`. The router adds `valuePredicate.ts`
-  (which `DdlImportFormat` also reads, for `parseValuePredicate`) and
+  needs only core, its counterexample and verbalization subpaths, and
+  the file's own `findRole`, a lookup of a role's fact type that tries a
+  given fact type first. The router adds `valuePredicate.ts` (which
+  `DdlImportFormat` also reads, for `parseValuePredicate`) and
   `dialectCapabilities.ts`. `@barwise/dbt` depends on `core` only
-  (`scripts/lib/intended.cjs`, `"dbt": ["core"]`), so today it can reach
-  none of them.
+  (`scripts/lib/intended.cjs`, `"dbt": ["core"]`).
 - **Notes the three formats already write.** `collectExportAnnotations`
-  notes a composite primary key and a value type's own value constraint
-  (as a suggestion for an `accepted_values` test), for all three; dbt
-  writes them as YAML comments through `annotateDbtExport`. Neither is a
-  `ConstraintSpec`, and neither survives an export with annotations off.
+  notes a composite primary key and a value type's own value constraint,
+  for all three; dbt writes them as YAML comments through
+  `annotateDbtExport`. Neither is a `ConstraintSpec`, and neither
+  survives an export with annotations off.
 
 ## Scope
 
-- When the OpenAPI, Avro or dbt exporter writes a model, it shall run
-  the router with `{ unique: "absent", check: "absent" }` over the schema
-  it rendered and return the spilled constraints' specs as
-  `constraintSpecs`, and no `constraintSpecs` field when none spill.
+- When the OpenAPI, Avro or dbt exporter writes a model, it shall return
+  the specs of every constraint the router spills under a profile with
+  UNIQUE and CHECK absent, from one core function, and no
+  `constraintSpecs` field when there are none.
 - When the DDL exporter writes a model in any dialect, its text and its
   `constraintSpecs` shall not change.
 - When the Ossie exporter writes a model, its output shall not change.
 
-What this does not report, each a gap the router already has for DDL and
-none made worse here:
+What this does not report. Each is a gap the router already has for
+DDL, made no worse here, and each is filed:
 
-- A constraint over subtypes. The router skips it, and DDL carries it in
-  the barwise annotation instead; the spec builder has no roles to label
-  for it. The three formats carry it nowhere. Filed as barwise-lwy.
-- A mandatory role the mapping did not enforce. The router counts every
-  mandatory as realized, but a mandatory on a role of a many-to-many fact
-  type ("each Person speaks some Language") becomes a key column of an
-  associative table, which says nothing about every Person having a row.
-  DDL is silent on it today. Filed as barwise-plq.
-- A key's uniqueness in a format with no keys (Avro, OpenAPI). The
-  router counts it realized by the primary key, which Avro and OpenAPI
-  do not enforce. Open decision 2.
+- **A constraint over subtypes** (barwise-lwy). The router skips it; DDL
+  carries it in the barwise annotation; the spec builder has no roles to
+  label for it. The three formats carry it nowhere.
+- **A mandatory role the mapping did not enforce** (barwise-plq). The
+  router counts every mandatory as realized, but the mapper writes NOT
+  NULL only for a role whose column sits on its own player's table. A
+  mandatory on the other role of a one-to-many binary ("each Customer
+  places some Order"), on either role of a many-to-many or associatively
+  mapped one-to-one, or on the value role of an entity-value binary is
+  enforced nowhere and reported nowhere.
+- **The second uniqueness of a one-to-one entity binary** (barwise-hjy).
+  The mapper absorbs it as a foreign key column; "each Customer places at
+  most one Order" needs UNIQUE on that column, and the router routes
+  UNIQUE only for an entity-value binary's value column, so it is lost
+  without a word.
+- **A key's uniqueness where the format has no keys** (barwise-lqj).
+  Avro writes a primary key as a `doc` line, OpenAPI as a path
+  parameter, and dbt tests only a single-column key with `unique`; a
+  composite key gets no test (161 tables over the corpus). The router
+  counts the uniqueness realized by the primary key. Open decision 2.
 
 ## Workstreams
 
-### 1. The router and the spec builder move to core
+### 1. The pieces move to core
 
-`constraintRouting.ts`, `dialectCapabilities.ts`, `valuePredicate.ts`
-and `constraintSpec.ts` move from `formats/src` to `core/src/mapping`,
-exported from `@barwise/core/mapping`. `findRole` (a role and its fact
-type, the given fact type first) moves with them and stays internal to
-the module: both of its callers move too, so core gains no second public
-role lookup beside `OrmModel.findRole`. The formats files go;
-`DdlExportFormat`, `DdlImportFormat` (which reads
-`parseValuePredicate`) and `writeOssie` import from core, and the four
-formats tests that import the moved files (`DdlDialectExport`,
-`valuePredicate`, `ConstraintRouting`, `constraintsAcrossFactTypes`)
-import them from `@barwise/core/mapping` and stay in formats, beside
-the DDL descriptor they exercise. Both package
-CLAUDE.md layouts are updated. Acceptance: the formats and dbt suites
-pass unchanged, and DDL export of every tracked `.orm.yaml` in every
-dialect is byte-identical before and after, with the same
-`constraintSpecs`.
+- `constraintRouting.ts` and `dialectCapabilities.ts` move to
+  `core/src/mapping`, exported from `@barwise/core/mapping`, with
+  `unreportedConstraintSpecs(model, schema): ConstraintSpec[]`, which
+  routes under a module-level profile with UNIQUE and CHECK absent and
+  returns the spilled specs. The profile is not exported, so nothing
+  else restates it.
+- `buildConstraintSpec` moves to `core/src/annotation/constraintSpec.ts`,
+  exported from `@barwise/core/annotation`. Its `findRole` is rewritten
+  over `OrmModel.factTypesHolding([roleId])` with the preferred fact type
+  first, so core gains no second role-to-fact-type lookup.
+- `valuePredicate.ts` moves to `core/src/sql`, exported from
+  `@barwise/core/sql`.
+- The four formats files are deleted; `DdlExportFormat`,
+  `DdlImportFormat` and `writeOssie` import from core.
+- Tests follow the code: `ConstraintRouting`, `constraintsAcrossFactTypes`
+  and `valuePredicate` move to `core/tests` mirroring the new paths, and
+  count toward core's coverage floors. `DdlDialectExport` exercises the
+  DDL descriptor and stays in formats, its imports updated.
+- The gates that name paths move with them, in the same commit:
+  `audit-baseline.json`'s row for the `Record<SqlDialect, ...>` union in
+  `dialectCapabilities.ts` is re-keyed to the new path (the detector
+  hashes the path into the id); this spec's Touches and the Touches of
+  `external-preferred-identifier`, `ossie-ontology-format` and
+  `join-ring-constraint` replace the deleted paths with the new ones
+  (`check:spec-touches` has no marker for a deleted file); both package
+  CLAUDE.md layouts are updated.
+
+Acceptance: DDL export of every tracked `.orm.yaml` in every dialect is
+byte-identical before and after, with the same `constraintSpecs`; the
+Ossie export of every tracked model is byte-identical; the moved tests
+pass unchanged apart from their import paths; `check:spec-touches` and
+`audit:duplication --check` pass.
 
 ### 2. dbt, OpenAPI and Avro report
 
-Each adapter calls `routeConstraints(model, schema, NO_CLAUSES, name)`
-and returns its spilled specs. Acceptance: for each format, a test model
-holding a secondary uniqueness, a role value constraint, a value type
-value constraint, a value comparison, a ring and a subset reports all
-six and no mandatory; the CLI, MCP and editor reports show them through
-the existing `formatConstraintReport` path with no surface change; the
-counts over the tracked models are recorded here.
-
-The router's spill reason ("CHECK is not supported by openapi") does
-not reach the report: `ConstraintSpec` carries only the verbalization,
-pseudocode and example, and the reason is written only into DDL's SQL
-comments. So the three formats need no format-shaped reason.
+Each adapter sets `constraintSpecs` from `unreportedConstraintSpecs`
+when it is non-empty. `docs/CLI.md` and `docs/IMPORT_EXPORT.md` stop
+listing DDL and Ossie as the only formats that report. Acceptance: for
+each format, a test model holding a secondary uniqueness, a role value
+constraint, a value type's own value constraint, a value comparison
+across tables, a ring and a subset, with distinct players and values so
+no two verbalizations coincide, reports all six and no mandatory; the
+CLI, MCP and editor reports show them through the existing
+`formatConstraintReport` path with no surface change; the counts over
+the tracked models are recorded here.
 
 ## Open decisions
 
-1. **How `@barwise/dbt` reaches the router.** (a) Move it to
-   `@barwise/core/mapping` (recommended): pure, beside the mapper and
-   DDL renderer it reads, and reachable from every package without a new
-   edge. (b) Give `@barwise/dbt` a dependency on `@barwise/formats`: no
-   move, but the first connector-to-connector edge, and dbt carries
-   formats' whole surface for one function. (c) A copy in dbt: two
-   routers that must agree, which a byte-identical copy could register
-   in `parity.manifest.json` but which then must change in lockstep.
-   Recommend (a).
-2. **A key's uniqueness in Avro and OpenAPI.** Avro writes a primary key
-   as a `doc` line, OpenAPI as a path parameter; neither enforces
-   uniqueness. (a) Leave it out of this change and file it
-   (recommended): reporting it needs the router to say which uniqueness
-   a key realized, which it does not record today, and it adds one entry
-   per entity to every Avro and OpenAPI report. (b) Report it now: needs
-   that new router output in workstream 1. Recommend (a), filed as
-   barwise-lqj in the same commit as this spec.
+1. **How `@barwise/dbt` reaches the router.** (a) Move it to core
+   (recommended): pure, beside the mapper and DDL renderer it reads, and
+   reachable from every package without a new edge. (b) Give
+   `@barwise/dbt` a dependency on `@barwise/formats`: no move, but the
+   first connector-to-connector edge, and dbt carries formats' whole
+   surface for one function. (c) A copy in dbt: two routers that must
+   agree; a byte-identical copy could be registered in
+   `parity.manifest.json`, but every router change would then be made
+   twice. Recommend (a).
+2. **A key's uniqueness where the format has no keys.** Avro and OpenAPI
+   enforce no key, and dbt tests a composite key with nothing. (a) Leave
+   it out of this change, filed as barwise-lqj (recommended): reporting
+   it needs the router to say which uniqueness a key realized, which it
+   does not record today, and it adds one entry per entity to every Avro
+   and OpenAPI report. (b) Report it now: needs that new router output in
+   workstream 1. Recommend (a).
 
 ## Risks and testing
 
-Workstream 1 is a move of a working router; the byte-identical DDL
-corpus diff across dialects is its gate. Workstream 2 is the
-user-visible change, pinned per format by the six-kind test. The three
-gaps above are named so a reader does not take the new reports for a
-complete account.
+Workstream 1 is a move of a working router; the byte-identical DDL and
+Ossie corpus diffs are its gate. Workstream 2 is the user-visible change,
+pinned per format by the six-kind test. The four gaps above are named,
+and filed, so a reader does not take the new reports for a complete
+account of what a schema export loses.
