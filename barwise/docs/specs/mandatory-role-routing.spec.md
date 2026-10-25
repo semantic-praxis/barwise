@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-25
 Last-updated: 2026-10-25
 Tracking: barwise-plq
+Plan-reviewed: ba974020 (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/constraintRouting.ts,
 barwise/packages/core/tests/mapping/ConstraintRouting.test.ts,
 barwise/packages/core/tests/mapping/unreportedConstraintSpecs.test.ts,
