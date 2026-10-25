@@ -49,7 +49,8 @@ run on which changes is a separate decision, owned by the root
   hook inspects a merge: the GitHub MCP merge tool matches no hook in
   `.claude/settings.json`, and `gh pr merge` passes through the Bash
   hooks, which do not look at merges. A session that never loads
-  `steward` can merge, as #679 did.
+  `steward` can merge without the review, as #679 did before section 4b
+  existed.
 - Decision 2's pin holds only when the agent passes the SHA; GitHub then
   refuses a merge whose head has moved. Nothing requires the pin or the
   comment (barwise-zdd).
