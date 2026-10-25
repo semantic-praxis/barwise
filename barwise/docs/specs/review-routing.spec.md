@@ -244,6 +244,11 @@ a human reviewer who does not run the skill. Not grounded: CI's checkout
 depth and whether `origin/main` resolves there are unverified, and
 `pr-risk` refuses (exit 2) on a shallow clone by design.
 
+Grounded 2026-10-24: `ci.yml` checks out with `fetch-depth: 0`, so the
+shallow refusal would not fire. **Deferred by the owner on 2026-10-24:**
+build it once reviewers are shown to use the WS1 routing, as Open
+decision 1 recommends; WS1 merged that day.
+
 ## API and migration impact
 
 - `pr-risk --json` gains `failureModes` and `failureModesBeyondReach`;
