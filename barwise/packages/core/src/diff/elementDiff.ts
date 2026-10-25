@@ -896,7 +896,10 @@ export function diffDefinition(a: Definition, b: Definition): ChangeDescription[
  * `constraintKey` keys a uniqueness: renaming a role, or listing the roles
  * in another order, leaves the identifier what it was. A role id the fact
  * type lacks is named as such rather than by its id, which two models built
- * apart do not share.
+ * apart do not share. An external identifier is named by its components,
+ * each a fact type and its far role's position and player, sorted by that
+ * text for the same reason the roles are sorted
+ * (external-preferred-identifier.spec.md).
  */
 function preferredIdentifierLabel(
   model: OrmModel,
@@ -905,7 +908,18 @@ function preferredIdentifierLabel(
   keyedBy?: DiffIdentity,
 ): string | undefined {
   const resolved = resolvePreferredIdentifier(model, entityId);
-  if (resolved.ok) {
+  const nameOf = (ft: FactType) => keyedBy ? keyedBy.factTypeKey(model, ft.id) : `"${ft.name}"`;
+  const player = (id: string) =>
+    keyedBy ? keyedBy.objectTypeKey(model, id) : playerName(model, id, other);
+  if (resolved.ok && resolved.at.kind === "external") {
+    const { components, constraint } = resolved.at;
+    const parts = components.map(({ factType, farRole }) =>
+      `${nameOf(factType)} role ${factType.roles.indexOf(farRole) + 1}: ${player(farRole.playerId)}`
+    ).sort();
+    const modality = constraint.modality === "deontic" ? ", deontic" : "";
+    return `external (${parts.join("; ")}${modality})`;
+  }
+  if (resolved.ok && resolved.at.kind === "internal") {
     const { factType, constraint } = resolved.at;
     const at = (id: string) => factType.roles.findIndex((r) => r.id === id);
     const roles = constraint.roleIds.map(at).sort((x, y) => x - y).map((i) =>

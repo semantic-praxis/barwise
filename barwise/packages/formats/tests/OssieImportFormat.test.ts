@@ -4,7 +4,7 @@
  * spec's Scope against a small document, the version refusal, every
  * warning, and the pinned `flights.ontology.yaml`.
  */
-import { type OrmModel, ValidationEngine } from "@barwise/core";
+import { type OrmModel, resolvePreferredIdentifier, ValidationEngine } from "@barwise/core";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -271,7 +271,7 @@ ontology:
     ]);
   });
 
-  it("keeps a composite identifier as an external uniqueness and names the lost preference", () => {
+  it("stores a composite identifier as an external uniqueness and names it preferred", () => {
     const { model, warnings } = load(`
 ontology:
   - { concept: Name, type: ValueType, extends: [ String ] }
@@ -290,11 +290,37 @@ ontology:
         factType(model, "City.state").roles[1]!.id,
       ],
     });
-    expect(model.preferredIdentifierOf(model.getObjectTypeByName("City")!.id)).toBeUndefined();
+    // ManyToOne already makes each City's role unique, so nothing is added
+    // (external-preferred-identifier.spec.md, WS2).
+    expect(model.preferredIdentifierOf(model.getObjectTypeByName("City")!.id)).toBe(external!.id);
     expect(warnings).toEqual([
       "no identify_by and no supertype, so nothing identifies them; each is given a reference mode no relationship carries: State.",
-      "City: identify_by [name, state] is kept as an external uniqueness; barwise cannot yet name one as a preferred identifier (barwise-alg).",
     ]);
+  });
+
+  it("adds the uniqueness identify_by implies on a component the multiplicity left open", () => {
+    const { model, warnings } = load(`
+ontology:
+  - { concept: Name, type: ValueType, extends: [ String ] }
+  - { concept: State, type: EntityType, identify_by: [ code ], relationships: [ { name: code, roles: [ { concept: Name } ], multiplicity: OneToOne, verbalizes: [ "{State} has code {Name}" ] } ] }
+  - concept: City
+    type: EntityType
+    identify_by: [ name, state ]
+    relationships:
+      - { name: name, roles: [ { concept: Name } ], verbalizes: [ "{City} has {Name}" ] }
+      - { name: state, roles: [ { concept: State } ], multiplicity: ManyToOne, verbalizes: [ "{City} is in {State}" ] }
+`);
+    const city = model.getObjectTypeByName("City")!.id;
+    const near = factType(model, "City.name").roles[0]!.id;
+    expect(
+      factType(model, "City.name").internalConstraints.some((c) =>
+        c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === near
+      ),
+    ).toBe(true);
+    expect(resolvePreferredIdentifier(model, city).ok).toBe(true);
+    expect(warnings).toContain(
+      "City: identify_by [name, state] implies each City has at most one name; added that uniqueness, which the multiplicity did not state.",
+    );
   });
 });
 
@@ -851,9 +877,6 @@ describe("Ossie import: the pinned flights example", () => {
       "Route.destination: requires is not carried as a constraint (kept in the note): NOT Route.departure(Airport)",
       'Route.departure: reading "{Route} connects to departure- {Airport}" uses hyphen binding, which barwise does not apply; kept as written (barwise-iiw).',
       "Route.departure: requires is not carried as a constraint (kept in the note): NOT Route.destination(Airport)",
-      "City: identify_by [name, state] is kept as an external uniqueness; barwise cannot yet name one as a preferred identifier (barwise-alg).",
-      "Runway: identify_by [designator, airport] is kept as an external uniqueness; barwise cannot yet name one as a preferred identifier (barwise-alg).",
-      "Model: identify_by [name, manufacturer] is kept as an external uniqueness; barwise cannot yet name one as a preferred identifier (barwise-alg).",
     ]);
   });
 });

@@ -1,4 +1,11 @@
-import { type InternalUniquenessConstraint, isInternalUniqueness } from "./Constraint.js";
+import { inferExternalUniquenessJoin } from "../externalUniqueness.js";
+import {
+  type ExternalUniquenessConstraint,
+  type InternalUniquenessConstraint,
+  isExternalUniqueness,
+  isInternalUniqueness,
+  isMandatoryRole,
+} from "./Constraint.js";
 import type { FactType } from "./FactType.js";
 import type { ObjectType, ValueType } from "./ObjectType.js";
 import type { OrmModel } from "./OrmModel.js";
@@ -41,7 +48,10 @@ export interface PreferredIdentifyingBinary {
  * metamodel question -- the validator asks it to report a cycle and the
  * mapper asks it to order settlement, and neither owns the answer.
  */
-export function identificationGraph(model: OrmModel): Map<string, readonly string[]> {
+export function identificationGraph(
+  model: OrmModel,
+  identifiers: PreferredIdentifiers = preferredIdentifiers(model),
+): Map<string, readonly string[]> {
   const edges = new Map<string, string[]>();
   const add = (from: string, to: string): void => {
     const existing = edges.get(from);
@@ -63,6 +73,16 @@ export function identificationGraph(model: OrmModel): Map<string, readonly strin
     if (sf.providesIdentification) add(sf.subtypeId, sf.supertypeId);
   }
 
+  // An entity identified by an external uniqueness takes its key from the
+  // far roles' players, so an entity among them settles first
+  // (external-preferred-identifier.spec.md).
+  for (const [entityId, at] of identifiers.byEntity) {
+    if (at.kind !== "external") continue;
+    for (const { farRole } of at.components) {
+      if (model.getObjectType(farRole.playerId)?.kind === "entity") add(entityId, farRole.playerId);
+    }
+  }
+
   return edges;
 }
 
@@ -82,8 +102,9 @@ export function identificationGraph(model: OrmModel): Map<string, readonly strin
  */
 export function identificationOrder(
   model: OrmModel,
+  identifiers?: PreferredIdentifiers,
 ): { readonly order: readonly string[]; } | { readonly cycle: readonly string[]; } {
-  const edges = identificationGraph(model);
+  const edges = identificationGraph(model, identifiers);
   const order: string[] = [];
   const settled = new Set<string>();
   const onPath: string[] = [];
@@ -124,11 +145,44 @@ export interface PreferredIdentifiers {
   readonly byConstraint: ReadonlyMap<string, IdentifyingUniqueness>;
 }
 
-/** The uniqueness constraint that identifies an entity type, and where it is. */
-export interface IdentifyingUniqueness {
-  readonly entityId: string;
-  readonly constraint: InternalUniquenessConstraint;
+/**
+ * The uniqueness constraint that identifies an entity type, and where it
+ * is: an internal one in one fact type, or an external one over the far
+ * roles of several binaries the entity plays in
+ * (external-preferred-identifier.spec.md). A union, so each reader decides
+ * the external case where it compiles rather than reading a fact type
+ * that is not there.
+ */
+export type IdentifyingUniqueness =
+  | {
+    readonly kind: "internal";
+    readonly entityId: string;
+    readonly constraint: InternalUniquenessConstraint;
+    readonly factType: FactType;
+  }
+  | {
+    readonly kind: "external";
+    readonly entityId: string;
+    readonly constraint: ExternalUniquenessConstraint;
+    /** One per role of the constraint, in its role order. */
+    readonly components: readonly IdentifyingComponent[];
+  };
+
+/** The internal arm: what a 2.0 flag, and so `PlacedFlags`, can name. */
+export type InternalIdentifyingUniqueness = Extract<IdentifyingUniqueness, { kind: "internal"; }>;
+
+/** One binary of an external reference scheme. */
+export interface IdentifyingComponent {
   readonly factType: FactType;
+  /** The role the identified entity plays, unique on its own. */
+  readonly nearRole: Role;
+  /** The constraint's role: what identifies the entity. */
+  readonly farRole: Role;
+}
+
+/** The fact types an identifier spends: its one, or one per component. */
+export function identifyingFactTypes(at: IdentifyingUniqueness): readonly FactType[] {
+  return at.kind === "internal" ? [at.factType] : at.components.map((c) => c.factType);
 }
 
 /**
@@ -137,8 +191,9 @@ export interface IdentifyingUniqueness {
  *
  * Each entity names its preferred identifier by constraint id, stored on
  * the model (`OrmModel.preferredIdentifierOf`). A reference counts only
- * when the constraint is an internal uniqueness that identifies that
- * entity by `identifiedBy`'s rule; one that does not is ignored here and
+ * when the constraint identifies that entity -- an internal uniqueness by
+ * `identifiedBy`'s rule, an external one by `externalIdentifies`'s; one
+ * that does not is ignored here and
  * reported by `completeness/preferred-identifier-invalid`, so no reader
  * keys a table on a constraint that identifies something else.
  *
@@ -164,12 +219,29 @@ export type PreferredIdentifierResolution =
   | { readonly ok: true; readonly at: IdentifyingUniqueness; }
   | {
     readonly ok: false;
-    readonly reason: "none" | "dangling" | "not-uniqueness" | "not-this-entity";
+    readonly reason: PreferredIdentifierFailure;
+    /** For `external-other-entity`: the object the constraint does identify. */
+    readonly identifies?: string;
   };
 
 /**
+ * Why a stored reference identifies nothing. The `external-` reasons are
+ * the shape rules of external-preferred-identifier.spec.md, one each, so
+ * validation can say which failed.
+ */
+export type PreferredIdentifierFailure =
+  | "none"
+  | "dangling"
+  | "not-uniqueness"
+  | "not-this-entity"
+  | "external-no-common-object"
+  | "external-other-entity"
+  | "external-not-binary"
+  | "external-near-not-unique";
+
+/**
  * An entity's stored preferred identifier, checked: the constraint exists,
- * is an internal uniqueness, and identifies this entity. The one check
+ * is a uniqueness, and identifies this entity. The one check
  * `preferredIdentifiers` and validation share, so a reference validation
  * accepts is the one every reader uses.
  */
@@ -182,11 +254,112 @@ export function resolvePreferredIdentifier(
   const inView = model.getConstraintInView(constraintId);
   if (!inView) return { ok: false, reason: "dangling" };
   const [c, factType] = inView;
+  if (isExternalUniqueness(c)) return externalIdentifies(model, c, entityId);
   if (!factType || !isInternalUniqueness(c)) return { ok: false, reason: "not-uniqueness" };
   const placed = identifiedBy(model, factType, c);
   return placed?.at.entityId === entityId && placed.at.constraint === c
     ? { ok: true, at: placed.at }
     : { ok: false, reason: "not-this-entity" };
+}
+
+/**
+ * The entity an external uniqueness identifies, if it has the reference
+ * scheme shape: for a reader that holds the constraint and asks whom it
+ * could name (an importer reading a flag, a writer inferring a scheme the
+ * model does not store), rather than checking a stored reference.
+ */
+export function externallyIdentifiedEntity(
+  model: OrmModel,
+  c: ExternalUniquenessConstraint,
+): string | undefined {
+  const joined = inferExternalUniquenessJoin(c.roleIds, model)?.commonObjectId;
+  // The join can land on a value type; only an entity has an identifier.
+  if (joined === undefined || model.getObjectType(joined)?.kind !== "entity") return undefined;
+  return externalIdentifies(model, c, joined).ok ? joined : undefined;
+}
+
+/**
+ * Whether a role is unique on its own, alethically: what makes a reference
+ * scheme's component single-valued (rule 3 of
+ * external-preferred-identifier.spec.md). Shared with the Ossie importer,
+ * which adds the uniqueness when it is missing, so what it adds is what
+ * this accepts.
+ */
+export function isUniqueAlone(factType: FactType, roleId: string): boolean {
+  return factType.internalConstraints.some((u) =>
+    isInternalUniqueness(u) && u.roleIds.length === 1 && u.roleIds[0] === roleId
+    && (u.modality ?? "alethic") === "alethic"
+  );
+}
+
+/**
+ * Whether a role carries its own alethic mandatory constraint: the other
+ * half of what a reference scheme needs of the roles its entity plays, so
+ * that every instance has its identifier (identifier-roles-mandatory.spec.md).
+ * Alethic for the reason `isUniqueAlone` gives: a deontic mandatory says
+ * each instance ought to have one, which does not make the scheme total.
+ */
+export function isMandatoryAlone(factType: FactType, roleId: string): boolean {
+  return factType.internalConstraints.some((c) =>
+    isMandatoryRole(c) && c.roleId === roleId && (c.modality ?? "alethic") === "alethic"
+  );
+}
+
+/**
+ * The roles an entity plays in its own identifier, with their fact types:
+ * the entity's role in each binary of an external scheme, or, for an
+ * internal one, the role the uniqueness leaves uncovered (the entity-value
+ * binary and every other fact type alike). None when the identifier is the
+ * fact type the entity objectifies: the entity plays no role in it (one
+ * that did would be the cycle `structural/identification-cycle` reports),
+ * so no arm of `identifiedBy` needs restating here.
+ */
+export function identifyingRoles(
+  at: IdentifyingUniqueness,
+): readonly { readonly factType: FactType; readonly role: Role; }[] {
+  if (at.kind === "external") {
+    return at.components.map((c) => ({ factType: c.factType, role: c.nearRole }));
+  }
+  const covered = new Set(at.constraint.roleIds);
+  return at.factType.roles
+    .filter((r) => r.playerId === at.entityId && !covered.has(r.id))
+    .map((role) => ({ factType: at.factType, role }));
+}
+
+/**
+ * Whether an external uniqueness identifies `entityId`: ORM's reference
+ * scheme shape (external-preferred-identifier.spec.md).
+ * `inferExternalUniquenessJoin` finds the object the constraint joins on
+ * -- two roles or more, one per fact type, a common object playing one
+ * other role in each and none of the constraint's own -- and is the answer
+ * population validation and the counterexample generator already use, so
+ * the object they join on and the one the mapper keys cannot differ. An
+ * identifier needs two things more than a join: each fact type a binary,
+ * and each near role unique on its own, so each entity has one of each
+ * component. Alethically unique: a deontic uniqueness says each entity
+ * ought to have one, which does not make a column single-valued.
+ */
+export function externalIdentifies(
+  model: OrmModel,
+  c: ExternalUniquenessConstraint,
+  entityId: string,
+): PreferredIdentifierResolution {
+  const join = inferExternalUniquenessJoin(c.roleIds, model);
+  if (!join) return { ok: false, reason: "external-no-common-object" };
+  if (join.commonObjectId !== entityId) {
+    return { ok: false, reason: "external-other-entity", identifies: join.commonObjectId };
+  }
+  const components: IdentifyingComponent[] = [];
+  for (const factType of join.factTypes) {
+    if (factType.arity !== 2) return { ok: false, reason: "external-not-binary" };
+    const nearRole = factType.getRoleById(join.keyRoleByFactType.get(factType.id)!)!;
+    const farRole = factType.getRoleById(join.constrainedRoleByFactType.get(factType.id)!)!;
+    if (!isUniqueAlone(factType, nearRole.id)) {
+      return { ok: false, reason: "external-near-not-unique" };
+    }
+    components.push({ factType, nearRole, farRole });
+  }
+  return { ok: true, at: { kind: "external", entityId, constraint: c, components } };
 }
 
 /**
@@ -219,14 +392,14 @@ function identifiedBy(
   model: OrmModel,
   factType: FactType,
   c: InternalUniquenessConstraint,
-): { readonly at: IdentifyingUniqueness; readonly rank: number; } | undefined {
+): { readonly at: InternalIdentifyingUniqueness; readonly rank: number; } | undefined {
   const isEntity = (id: string) => model.getObjectType(id)?.kind === "entity";
   const covered = new Set(c.roleIds);
 
   const objectType = model.objectificationOf(factType.id)?.objectTypeId;
   if (objectType && covered.size >= factType.roles.length - 1) {
     return isEntity(objectType)
-      ? { at: { entityId: objectType, constraint: c, factType }, rank: 1 }
+      ? { at: { kind: "internal", entityId: objectType, constraint: c, factType }, rank: 1 }
       : undefined;
   }
 
@@ -240,7 +413,15 @@ function identifiedBy(
       (u): u is InternalUniquenessConstraint => isInternalUniqueness(u) && onValueRole(u),
     );
     return onValue
-      ? { at: { entityId: binary.entityRole.playerId, constraint: onValue, factType }, rank: 0 }
+      ? {
+        at: {
+          kind: "internal",
+          entityId: binary.entityRole.playerId,
+          constraint: onValue,
+          factType,
+        },
+        rank: 0,
+      }
       : undefined;
   }
 
@@ -248,20 +429,20 @@ function identifiedBy(
   const only = uncovered.length === 1 ? uncovered[0]!.playerId : undefined;
   const playsCovered = factType.roles.some((r) => covered.has(r.id) && r.playerId === only);
   return only !== undefined && isEntity(only) && !playsCovered
-    ? { at: { entityId: only, constraint: c, factType }, rank: 1 }
+    ? { at: { kind: "internal", entityId: only, constraint: c, factType }, rank: 1 }
     : undefined;
 }
 
 /** What `placePreferredFlags` makes of a model's 2.0 flags. */
 export interface PlacedFlags {
   /** The identifier each named entity gets, after the tie-break. */
-  readonly byEntity: ReadonlyMap<string, IdentifyingUniqueness>;
+  readonly byEntity: ReadonlyMap<string, InternalIdentifyingUniqueness>;
   /**
    * Every flag that names each entity, before the tie-break, in model
    * order: two or more is the 2.0 modelling error of an entity with two
    * identifiers, which the stored reference cannot express.
    */
-  readonly candidates: ReadonlyMap<string, readonly IdentifyingUniqueness[]>;
+  readonly candidates: ReadonlyMap<string, readonly InternalIdentifyingUniqueness[]>;
   /** Flagged uniquenesses that identify no entity, in model order. */
   readonly dropped: readonly InternalUniquenessConstraint[];
 }
@@ -277,8 +458,11 @@ export function placePreferredFlags(
   model: OrmModel,
   isFlagged: (c: InternalUniquenessConstraint) => boolean,
 ): PlacedFlags {
-  const chosen = new Map<string, { readonly at: IdentifyingUniqueness; readonly rank: number; }>();
-  const candidates = new Map<string, IdentifyingUniqueness[]>();
+  const chosen = new Map<
+    string,
+    { readonly at: InternalIdentifyingUniqueness; readonly rank: number; }
+  >();
+  const candidates = new Map<string, InternalIdentifyingUniqueness[]>();
   const dropped: InternalUniquenessConstraint[] = [];
   for (const factType of model.factTypes) {
     for (const c of factType.internalConstraints) {
@@ -417,7 +601,7 @@ export function preferredIdentifyingBinary(
   identifiers = preferredIdentifiers(model),
 ): PreferredIdentifyingBinary | undefined {
   const at = identifiers.byEntity.get(entity.id);
-  if (!at) return undefined;
+  if (at?.kind !== "internal") return undefined;
   const binary = entityValueRoles(model, at.factType);
   if (!binary || binary.entityRole.playerId !== entity.id) return undefined;
   const valuePlayer = model.getObjectType(binary.valueRole.playerId);
@@ -450,13 +634,14 @@ export function preferredIdentifyingBinary(
  * this repository alone, none of them contradictory.
  *
  * A union rather than a count, because the diagnostic that reads this
- * names the kinds and a count cannot. The preferred-uniqueness arm is the
+ * names the kinds and a count cannot. The preferred-uniqueness arm names
+ * the constraint, which is one id whether it is internal or external. It is the
  * entity's stored reference when it identifies the entity
  * (`preferredIdentifiers`); an entity names one at most, so two of that
  * kind cannot arise (orm-format-3 WS4b-ii).
  */
 export type IdentificationSource =
-  | { readonly kind: "preferred-uniqueness"; readonly factTypeId: string; }
+  | { readonly kind: "preferred-uniqueness"; readonly constraintId: string; }
   | { readonly kind: "objectification"; readonly factTypeId: string; }
   | { readonly kind: "identifying-subtype"; readonly supertypeId: string; };
 
@@ -475,7 +660,8 @@ export function identificationSources(
   const sources: IdentificationSource[] = [];
 
   const at = identifiers.byEntity.get(entity.id);
-  if (at) sources.push({ kind: "preferred-uniqueness", factTypeId: at.factType.id });
+  // A resolved identifier was looked up by its id, so it has one.
+  if (at) sources.push({ kind: "preferred-uniqueness", constraintId: at.constraint.id! });
 
   for (const oft of model.objectifiedFactTypes) {
     if (oft.objectTypeId === entity.id) {

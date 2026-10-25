@@ -9,9 +9,12 @@ export {
   sqlFormat,
 } from "./registration.js";
 
+// The report of an export's constraintSpecs, shared by the surfaces
+export { type ConstraintReportOptions, formatConstraintReport } from "./constraintReport.js";
+
 // Format implementations
 export { AvroExportFormat } from "./avro/AvroExportFormat.js";
-export { DdlExportFormat } from "./ddl/DdlExportFormat.js";
+export { DdlExportFormat, PLAIN_DDL_OPTIONS } from "./ddl/DdlExportFormat.js";
 export { DdlImportFormat } from "./ddl/DdlImportFormat.js";
 export { NormaExportFormat } from "./norma/NormaExportFormat.js";
 export { NormaImportFormat } from "./norma/NormaImportFormat.js";

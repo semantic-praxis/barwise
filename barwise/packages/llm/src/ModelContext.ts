@@ -39,9 +39,13 @@ export function buildExistingModelContext(model: OrmModel): string {
 
   // Fact types (non-identifier only, to keep the context concise).
   // Skip identifier fact types (they're implied by reference_mode): the
-  // ones core's one rule says identify an entity.
+  // ones core's one rule says identify an entity. Only an internal
+  // identifier's: an external scheme's components are not what the
+  // reference mode implies, so hiding them would hide the scheme.
   const identifying = new Set(
-    [...preferredIdentifiers(model).byEntity.values()].map((at) => at.factType.id),
+    [...preferredIdentifiers(model).byEntity.values()].flatMap((at) =>
+      at.kind === "internal" ? [at.factType.id] : []
+    ),
   );
   const factTypes = model.factTypes.filter((ft) => !identifying.has(ft.id) || ft.arity > 2);
   if (factTypes.length > 0) {

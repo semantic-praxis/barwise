@@ -1765,7 +1765,8 @@ Implementation notes (2026-10-21, WS4b-ii, the stored identifier and format 3.0)
   unchanged, and move with the corpus in WS5 (barwise-n9n.psp). `barwise migrate` (decision
   5, barwise-n9n.a6d) is its own PR next, because reporting the flags a file loses needs
   the 2.0 reader to return them. An external uniqueness as an identifier
-  (barwise-alg) is still not stored.
+  (barwise-alg) was not stored here; `external-preferred-identifier.spec.md`
+  stores it.
 - **Code review found three places the flag had been doing a second job.**
   Merge kept a reference only when the merged model held its id, but a
   merged fact type can hold the other side's copy of the uniqueness, so a

@@ -274,7 +274,12 @@ function addUnlessHeld(
 ): void {
   const candidate = withModality(nc, mapped);
   if (isExternalConstraint(candidate)) {
-    if (holdsSame(ctx.model.constraints, candidate)) return;
+    // A duplicate an entity names as its identifier, or that NORMA marks
+    // IsPreferred, stays, as the internal pass spares one: dropping it
+    // would drop the identifier with it.
+    const identifies = ctx.namedIdentifiers.has(nc.id)
+      || (nc.type === "uniqueness" && nc.isPreferred);
+    if (!identifies && holdsSame(ctx.model.constraints, candidate)) return;
     ctx.model.addConstraint({ ...candidate, id: ctx.constraintIds.claim(nc) });
   } else {
     if (holdsSame(ft.internalConstraints, candidate)) return;

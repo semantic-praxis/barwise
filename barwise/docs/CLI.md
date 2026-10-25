@@ -84,7 +84,11 @@ turn, each under a `== context ==` header (or as an array in JSON).
 
 ### schema
 
-Generate a relational schema from the ORM model.
+Generate a relational schema from the ORM model. Deprecated: use `export
+--format ddl`. Its DDL is exactly what `barwise export --format ddl
+--no-annotate --no-examples` prints, and the constraints DDL could not
+express are reported on stderr the same way; `--output` writes the file and
+no lineage manifest.
 
 ```sh
 barwise schema university.orm.yaml
@@ -128,6 +132,14 @@ Options:
 - `--no-annotate` -- exclude TODO/NOTE annotations
 - `--strict` -- fail on validation errors
 - `--no-examples` -- exclude population example data
+
+When the format reports constraints it could not express (today `ddl`,
+which spills them per dialect, and `ossie`), `export` writes them to
+stderr after the artifact: a heading with the count and format, then one
+line per distinct verbalization, with `(xN)` when the same rule was
+spilled more than once. Stdout and the exit code are unchanged, so
+`barwise export ... | psql` still receives only the artifact. A project
+export reports each domain as it is written, naming the domain.
 
 Given a `.orm-project.yaml` manifest, `export` exports each domain (or
 the one named with `--domain`). A project's

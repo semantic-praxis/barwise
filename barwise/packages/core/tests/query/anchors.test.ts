@@ -66,6 +66,7 @@ describe("queryModel: anchors", () => {
     expect(a.referenceMode).toBe("customer_id");
     expect(a.preferredIdentifier).toEqual({
       factType: "Customer has CustomerId",
+      factTypes: ["Customer has CustomerId"],
       identifierTypes: ["CustomerId"],
     });
     expect(a.mandatoryRoles).toEqual(["Customer has CustomerId"]);
@@ -76,6 +77,7 @@ describe("queryModel: anchors", () => {
     const [a] = anchorsOf(runQuery(importedModel(), "anchors Customer"));
     expect(a!.preferredIdentifier).toEqual({
       factType: "CustomerId identifies Customer",
+      factTypes: ["CustomerId identifies Customer"],
       identifierTypes: ["CustomerId"],
     });
     expect(a!.missingIdentifier).toBe(false);

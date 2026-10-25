@@ -1,16 +1,18 @@
 /**
  * Export As DDL command.
  *
- * Takes the active .orm.yaml, maps it to a relational schema,
- * renders CREATE TABLE DDL statements, and writes to a .sql file.
+ * Takes the active .orm.yaml, renders it through the registered `ddl`
+ * exporter (the same call the diagram's DDL tab makes, via
+ * `exportWith`), writes the result to a .sql file, and reports any
+ * constraint the DDL could not express.
  */
 import { OrmYamlSerializer } from "@barwise/core";
-import { RelationalMapper, renderDdl } from "@barwise/core/mapping";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { exportWith } from "../export/registeredExport.js";
+import { reportExport } from "./exportReport.js";
 
 const serializer = new OrmYamlSerializer();
-const mapper = new RelationalMapper();
 
 export class ExportDdlCommand {
   async execute(): Promise<void> {
@@ -34,9 +36,13 @@ export class ExportDdlCommand {
       return;
     }
 
-    // Step 2: Map and render DDL.
-    const schema = mapper.map(model);
-    const ddl = renderDdl(schema);
+    // Step 2: Render through the registered exporter.
+    const exported = exportWith("ddl", model);
+    if (!exported.ok) {
+      vscode.window.showErrorMessage(exported.reason);
+      return;
+    }
+    const { result } = exported;
 
     // Step 3: Pick output location.
     const baseName = path.basename(
@@ -59,15 +65,13 @@ export class ExportDdlCommand {
     // Step 4: Write and open.
     await vscode.workspace.fs.writeFile(
       outputUri,
-      Buffer.from(ddl, "utf-8"),
+      Buffer.from(result.text, "utf-8"),
     );
 
     const doc = await vscode.workspace.openTextDocument(outputUri);
     await vscode.window.showTextDocument(doc);
 
-    const tableCount = schema.tables.length;
-    vscode.window.showInformationMessage(
-      `Exported ${tableCount} CREATE TABLE statement(s) to ${path.basename(outputUri.fsPath)}`,
-    );
+    // Step 5: Confirm the write, or report what the DDL could not express.
+    reportExport(result, "ddl", `Exported DDL to ${path.basename(outputUri.fsPath)}`);
   }
 }

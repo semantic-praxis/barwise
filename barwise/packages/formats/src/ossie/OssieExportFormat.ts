@@ -3,11 +3,9 @@
  * (`docs/specs/ossie-ontology-format.spec.md`, WS2).
  *
  * Writes the model as an Ossie ontology document in YAML. Every construct
- * the document cannot carry is a line in a comment block at its top --
- * nothing in the CLI, MCP or editor reads `constraintSpecs` yet
- * (barwise-wc0), so the block is where a reader sees what was lost -- and
+ * the document cannot carry is a line in a comment block at its top, and
  * each unexpressible constraint with roles is also a `constraintSpecs`
- * entry.
+ * entry, which the export surfaces report beside the artifact.
  */
 import type { ExportFormatAdapter, ExportOptions, ExportResult, OrmModel } from "@barwise/core";
 import { stringify } from "yaml";

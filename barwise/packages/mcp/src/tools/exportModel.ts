@@ -4,7 +4,7 @@
 
 import { getExporter, listExporters } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
-import { registerStandardFormats } from "@barwise/formats";
+import { formatConstraintReport, registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveModels, type SourceInput, sourcePath } from "../workspace/resolve.js";
@@ -135,12 +135,27 @@ export function executeExportModel(
 
     // Return the primary text output, spilling to a file when large.
     // For multi-file formats, the text field contains a combined view.
-    return boundedTextResult(result.text, {
+    const artifact = boundedTextResult(result.text, {
       kind: `export-${format}`,
       source: sourcePath(source),
       outputPath,
       extension: extensionForFormat(format),
     });
+    // In full: an agent acting on the export needs the predicate and the
+    // example, not only the sentence.
+    const reportText = formatConstraintReport(result.constraintSpecs, format, {
+      detail: true,
+      ...(domain ? { domain } : {}),
+    });
+    if (!reportText) return artifact;
+    // A second block, so `content[0]` stays the artifact. Bounded on its
+    // own, and never to `outputPath`: that path names the artifact, and
+    // a spilled report written there would overwrite it.
+    const report = boundedTextResult(reportText, {
+      kind: `export-${format}-constraints`,
+      source: sourcePath(source),
+    });
+    return { content: [...artifact.content, ...report.content] };
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : String(error));
   }

@@ -12,6 +12,7 @@ import { matchesConstraintType } from "../model/constraintKeyword.js";
 import type { FactType } from "../model/FactType.js";
 import { type ModelGraph, requireGraph } from "../model/graph.js";
 import {
+  identifyingFactTypes,
   isIdentified,
   type PreferredIdentifiers,
   preferredIdentifiers,
@@ -423,15 +424,24 @@ class QueryContext {
   private entityAnchors(entity: ObjectType): EntityAnchors {
     this.identifiers ??= preferredIdentifiers(this.model);
     const identifying = this.identifiers.byEntity.get(entity.id);
-    const preferredIdentifier: EntityAnchors["preferredIdentifier"] = identifying && {
-      factType: identifying.factType.name,
-      // The roles the uniqueness covers: for an objectified type
-      // identified by all but one role, the uncovered one identifies
-      // nothing.
-      identifierTypes: identifying.factType.roles
-        .filter((r) => identifying.constraint.roleIds.includes(r.id) && r.playerId !== entity.id)
-        .map((r) => this.graph.player(r).name),
-    };
+    const preferredIdentifier: EntityAnchors["preferredIdentifier"] =
+      identifying?.kind === "external"
+        ? {
+          factTypes: identifyingFactTypes(identifying).map((ft) => ft.name),
+          identifierTypes: identifying.components.map((c) => this.graph.player(c.farRole).name),
+        }
+        : identifying && {
+          factType: identifying.factType.name,
+          factTypes: [identifying.factType.name],
+          // The roles the uniqueness covers: for an objectified type
+          // identified by all but one role, the uncovered one identifies
+          // nothing.
+          identifierTypes: identifying.factType.roles
+            .filter((r) =>
+              identifying.constraint.roleIds.includes(r.id) && r.playerId !== entity.id
+            )
+            .map((r) => this.graph.player(r).name),
+        };
     const mandatoryFactTypes = new Set<string>();
 
     for (const ft of this.model.factTypesForObjectType(entity.id)) {
