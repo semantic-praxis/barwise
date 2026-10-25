@@ -402,6 +402,8 @@ baseline is read, its `tracked` entries shall enumerate exactly the
 detectable findings still open; and when the skill's method section
 is read, detection shall be one command, not a grep procedure.
 
+Recorded as `docs/adr/findings-close-by-mechanism.md`.
+
 ### 6. Write the rule where authors will meet it
 
 Add the invariant to root `CLAUDE.md` Conventions ("a copy that must
