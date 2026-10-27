@@ -673,6 +673,18 @@
       "caught_by": "reasoning",
       "note": "Corrections to the WS4b draft. The compiler showed the llm parser never wrote the flags the draft listed it as writing. A dangling subtype fact id would make a model unloadable, so removal prunes the operand; two code review rounds then caught that pruning every kind made a disjunctive mandatory or exclusive-or stronger, that NORMA wrote partitions over every subtype of a supertype, and that reading NORMA partitions back as flags merged two exclusions and dropped modality, which moved the one-to-one NORMA mapping forward into 4b-i."
     },
+    "ossie-export-verified-by-reimport::0fd9b18a7d2f": {
+      "spec": "ossie-export-verified-by-reimport.spec.md",
+      "excerpt": "when the ossie exporter has written a document, it shall read the written text back through the ossie importer, compare the result with the source model, and ad",
+      "caught_by": "not-a-correction",
+      "note": "The spec's opening requirement. It says the writer's predictions were wrong in earlier review rounds, which is the problem statement, not a correction to this spec."
+    },
+    "ossie-export-verified-by-reimport::9358f7e2d965": {
+      "spec": "ossie-export-verified-by-reimport.spec.md",
+      "excerpt": "- as planned in the revised plan. the first draft claimed the read-back found an external uniqueness the import adds. the high plan review showed that was an ar",
+      "caught_by": "execution",
+      "note": "The high plan review re-ran the prototype with roles restored to source order: the claimed added external uniqueness paired away, leaving a preferred identifier on Model, and readings compared equal, so ignoring them was wrong."
+    },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",
       "excerpt": "- production extraction derives a budget too. processtranscript had the same exposure -- a user importing a long transcript got a silently truncated model with ",

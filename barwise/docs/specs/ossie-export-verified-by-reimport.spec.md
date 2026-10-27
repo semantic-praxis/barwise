@@ -1,6 +1,6 @@
 # The Ossie export checks its loss report by reading the document back
 
-Status: Proposed
+Status: Implemented
 
 Created: 2026-10-27
 Last-updated: 2026-10-27
@@ -208,6 +208,32 @@ Measured and recorded here rather than pinned by a test:
 - Elements that carry both a predicted loss and a further difference of
   another kind (Open decision 2).
 - Export time over the corpus, before and after.
+
+## Implementation notes
+
+- As planned in the revised plan. The first draft claimed the read-back
+  found an external uniqueness the import adds. The high plan review
+  showed that was an artifact of role order: once roles are back in
+  source order, the constraint pairs, and what remains is a preferred
+  identifier on `Model`. The draft also proposed ignoring readings,
+  which in fact compare equal once their placeholders are renumbered.
+- Each `lose` call takes a `LossKey`. An internal constraint's loss is
+  keyed by its fact type, an external one's by its id, and a subtype's
+  defining-rule and identification losses by the subtype fact.
+- Measured over the 84 tracked models that load (82 export):
+  - 23 new lines, each checked by hand as a real difference:
+    - 19 deontic mandatories that come back alethic;
+    - 4 preferred identifiers stored on read-back: `Model` in the two
+      auction files, and `Room` in `test-plan/fixtures/external-uniqueness.orm.yaml`
+      and `external-uniqueness-violation.orm.yaml`. The prototype's
+      looser name match had hidden the `Room` cases.
+  - 2 exports of every model give identical text.
+  - Export time over the corpus went from 0.17 s writing alone to 5.3 s
+    with the read-back, about 65 ms per model.
+  - Open decision 2(a) silences 1 element: `Student` in
+    `trial/customers/C10-university/kernel.orm.yaml` comes back with a
+    preferred identifier, while its only loss line names its reference
+    mode. Filed as barwise-huw.
 
 ## Open decisions
 
