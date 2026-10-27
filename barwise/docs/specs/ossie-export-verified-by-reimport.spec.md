@@ -5,6 +5,7 @@ Status: Proposed
 Created: 2026-10-27
 Last-updated: 2026-10-27
 Tracking: barwise-5bv
+Plan-reviewed: 6664a497 (code-review, pr-review)
 Touches: barwise/packages/formats/src/ossie/writeOssie.ts,
 barwise/packages/formats/src/ossie/OssieExportFormat.ts,
 +barwise/packages/formats/src/ossie/verifyOssie.ts,
