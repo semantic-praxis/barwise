@@ -4,8 +4,7 @@ Scope: process
 Date: 2026-09-12
 Tracking: barwise-ubc, barwise-1021, barwise-1022, barwise-1028, barwise-3wu, barwise-i23,
 barwise-jha, barwise-8fc, barwise-flw, barwise-sma,
-docs/specs/credential-scanning.spec.md,
-docs/specs/gate-refusal-contract.spec.md
+docs/specs/credential-scanning.spec.md
 
 ## Context
 
@@ -19,7 +18,9 @@ documentation, and fixtures imitating real payloads. The rule is stated in
 the root `CLAUDE.md` conventions ("A leaked credential is rotated, never
 reverted"). Why detection is delegated, why the wrapper exists, and the
 rejected alternatives are in `credential-scanning.spec.md`; removing the
-places a key can be written down is `docs/specs/keyless-model-access.spec.md`.
+places a key can be written down is `docs/adr/keyless-model-access.md`,
+and the exit contract Decision 4 applies is
+`docs/adr/gate-refusal-contract.md`.
 
 ## Decision
 
@@ -55,17 +56,24 @@ places a key can be written down is `docs/specs/keyless-model-access.spec.md`.
 - Pre-push runs `ci:local -- --commit` for each pushed commit, which
   derives `check:secrets` from `ci.yml` with no condition, so the history
   scan runs before each push. It uses whatever gitleaks is on PATH.
-- The session hook runs only in remote sessions (`CLAUDE_CODE_REMOTE`),
-  after the npm install and build; there it installs the pin and
-  unshallows the clone, and either failing is non-fatal. If the install
-  fails while another gitleaks is on PATH, the gate runs with that one.
+- The session hook runs only in remote sessions (`CLAUDE_CODE_REMOTE`).
+  There it installs the pin and unshallows the clone, and either failing
+  is non-fatal; but both come after an unguarded npm install and build
+  under `set -euo pipefail`, so a failed build skips both, and the
+  session's `check:secrets` then refuses. If the install fails while
+  another gitleaks is on PATH, the gate runs with that one.
 - What holds each decision:
   - 1: no check is possible. The wrapper's finding message and the
     pre-commit hook's own line both say to rotate.
-  - 2: nothing checks that `.gitleaks.toml` keeps `useDefault = true` and
-    exactly one local rule; a second rule fails no test (barwise-3wu). barwise-1028
+  - 2: the `gates.test.mjs` probes stage the real `.gitleaks.toml`, so
+    dropping `useDefault` (two default-set probes stop being detected)
+    or the Anthropic rule (its probe) fails a test. Nothing checks that
+    there is exactly one local rule (barwise-3wu). barwise-1028
     (open) tracks sending the Anthropic rule upstream.
-  - 3: the pre-commit hook and the CI step. The `--staged` scan does not
+  - 3: the pre-commit hook and the CI step. The git hooks exist only
+    after `npm run prepare` (`.npmrc` sets `ignore-scripts`), and not
+    in a `git worktree` checkout (barwise-mdp); a clone without them
+    commits and pushes with no local scan, and CI scans after the push. The `--staged` scan does not
     inspect untracked files or history, and a clean merge commit runs
     `pre-merge-commit`, which validates only the tracker; neither scan
     inspects unreachable objects (spec, Out of scope, for untracked files
@@ -74,15 +82,16 @@ places a key can be written down is `docs/specs/keyless-model-access.spec.md`.
     asserts redaction on the secret itself, and covers gitleaks absent, an
     odd gitleaks status, a missing config and a shallow clone; it runs in
     CI under `npm run test:scripts` (`if:
-    steps.changes.outputs.docs_only != 'true'`). The exec-error and
-    unresolvable-root refusals have no test (barwise-i23). The pre-commit hook reads every non-zero
+    steps.changes.outputs.docs_only != 'true'`). The
+    unresolvable-root refusal is covered by the git-failure cases
+    (`ROOT_DEPENDENT_GATES`); the exec-error refusal (gitleaks present
+    but failing to spawn) has no test (barwise-i23). The pre-commit hook reads every non-zero
     status as a finding and prints "credential-shaped content in the tree"
-    and "ROTATE it" after a refusal too (barwise-jha). Pre-push reports a refusal
-    separately only when no other gate failed.
+    and "ROTATE it" after a refusal too (barwise-jha). `ci:local` names a refusal
+    as "could not answer" separately from failures in every run.
   - 5: the version is assigned only in the install script today (it also
     appears in a `.gitleaks.toml` comment and a test stub), but nothing
-    keeps `ci.yml` or the session hook from assigning another (same new
-    issue as 2).
+    keeps `ci.yml` or the session hook from assigning another (barwise-3wu).
 - Left open in the spec, not decided here (its Open decisions carry
   recommendations, none marked resolved; the first, keeping the local
   Anthropic rule, is settled by CLAUDE.md, which Decision 2 follows):
@@ -91,9 +100,10 @@ places a key can be written down is `docs/specs/keyless-model-access.spec.md`.
   - whether `.gitleaksignore` entries are checked for staleness; no such
     file exists yet (barwise-flw);
   - whether GitHub push protection is enabled. The spec calls it "not
-    assertable from this tree". `git push --no-verify`, the documented
-    escape hatch for work in progress, lets a commit that also skipped
-    pre-commit reach the remote before any scan (barwise-sma).
+    assertable from this tree". Until then a commit reaches the remote
+    before any scan when the hooks are absent (above) or skipped with
+    `--no-verify`, the documented escape hatch for work in progress
+    (barwise-sma).
 - Until architecture-index WS5 replaces them with links, the root
   `CLAUDE.md` conventions bullet, `credential-scanning.spec.md`, the
   headers of `check-secrets.mjs`, `.gitleaks.toml` and

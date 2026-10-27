@@ -56,6 +56,8 @@ step carries no docs-only skip.
 
 ## Should we write our own detectors? (resolved: no -- and the first draft of this spec said yes)
 
+Recorded as `docs/adr/credential-handling.md`.
+
 **No, and this is the spec's largest correction.** The first version of this
 gate shipped ten hand-written vendor-prefix regexes and an entropy argument
 for preferring them. It was rejected in review on one sentence -- do not
@@ -89,8 +91,6 @@ documentation and in countless fixtures; a scanner that flags it fails every
 commit that quotes a manual, and a gate that fails on documentation is a
 gate that gets switched off. gitleaks knows that key by name. Nobody was
 going to hand-maintain that list here.
-
-Recorded as `docs/adr/credential-handling.md`.
 
 ### What survives as ours: one rule, measured
 
