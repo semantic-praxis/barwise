@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-27
 Last-updated: 2026-10-27
 Tracking: barwise-lqj
+Plan-reviewed: cc43bfdc (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/renderers/dbt.ts,
 barwise/packages/core/src/mapping/renderers/DbtExportAnnotator.ts,
 barwise/packages/core/src/mapping/index.ts,
