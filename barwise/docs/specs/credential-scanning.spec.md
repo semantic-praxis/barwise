@@ -4,7 +4,7 @@ Status: Implemented. The gate, its wiring and its tests landed with this
 spec, and the history reading was taken (1056 commits, 0 findings).
 
 Created: 2026-09-12
-Last-updated: 2026-09-12
+Last-updated: 2026-10-27
 Tracking: barwise-1021 (the gate); barwise-1022 (the history reading);
 barwise-1028 (send the Anthropic rule upstream). Triggered by the
 "Principles of AI Development" manifesto, whose "Trust the boundaries, not
@@ -90,6 +90,8 @@ commit that quotes a manual, and a gate that fails on documentation is a
 gate that gets switched off. gitleaks knows that key by name. Nobody was
 going to hand-maintain that list here.
 
+Recorded as `docs/adr/credential-handling.md`.
+
 ### What survives as ours: one rule, measured
 
 gitleaks 8.28.0 detects **no** Anthropic key. Three realistic shapes were
@@ -132,6 +134,8 @@ this repository:
 
 It also prints the rotation instruction, which is the one thing a reader
 needs and no scanner says.
+
+Recorded as `docs/adr/credential-handling.md`.
 
 ## Scope
 
