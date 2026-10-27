@@ -31,6 +31,7 @@ export {
   renderAvro,
 } from "./renderers/avro.js";
 export {
+  DBT_KEY_TEST,
   type DbtModelFile,
   type DbtProject,
   type DbtRenderOptions,

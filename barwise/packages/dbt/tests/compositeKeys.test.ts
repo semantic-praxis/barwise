@@ -40,6 +40,24 @@ models:
 `;
 
 describe("a composite-key dbt model", () => {
+  it("reads every test's arguments from dbt 1.10's arguments block as well (barwise-lqj)", () => {
+    // The key test and the relationships tests both move their arguments.
+    const moved = yaml
+      .replace(
+        "combination_of_columns: [course_id, crn]",
+        "arguments:\n            combination_of_columns: [course_id, crn]",
+      )
+      .replaceAll(
+        /relationships: \{ (to: "ref\('\w+'\)", field: \w+) \}/g,
+        "relationships: { arguments: { $1 } }",
+      );
+    expect(moved).toContain("relationships: { arguments: {");
+    const { model, report } = importDbtProject([moved]);
+    expect(JSON.stringify(report)).toContain("Composite key (course_id, crn)");
+    expect(model.objectifiedFactTypes.map((o) => model.getObjectType(o.objectTypeId)?.name))
+      .toEqual(["Offering"]);
+  });
+
   it("is no longer reported as a model with no identifier", () => {
     const { report } = importDbtProject([yaml]);
     const text = JSON.stringify(report);

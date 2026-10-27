@@ -172,9 +172,16 @@ function parseObjectTest(raw: Record<string, unknown>): DbtTest[] {
   const tests: DbtTest[] = [];
 
   for (const [key, value] of Object.entries(raw)) {
-    const config = value !== null && typeof value === "object" && !Array.isArray(value)
+    const given = value !== null && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+    // dbt 1.10 moves a test's arguments under `arguments:`; read either
+    // spelling, the top level winning where both name one key
+    // (dbt-composite-key-tests.spec.md, barwise-lqj).
+    const args = given["arguments"];
+    const config = args !== null && typeof args === "object" && !Array.isArray(args)
+      ? { ...(args as Record<string, unknown>), ...given }
+      : given;
 
     switch (key) {
       case "not_null":

@@ -110,9 +110,27 @@ function sqlTypeToDbtType(sqlType: string): string {
 // schema.yml rendering
 // ---------------------------------------------------------------------------
 
+/**
+ * The dbt_utils test that keys a model on several columns. The dbt
+ * importer reads the same name back as a composite key, so it imports this
+ * constant rather than spelling it again.
+ */
+export const DBT_KEY_TEST = "dbt_utils.unique_combination_of_columns";
+
+/**
+ * The columns a model's `DBT_KEY_TEST` names, or undefined when the model
+ * gets none: a key over several columns. The renderer writes the test from
+ * it, and the export annotator notes the dbt_utils dependency from it.
+ */
+export function dbtKeyTestColumns(table: Table): readonly string[] | undefined {
+  const key = table.primaryKey.columnNames;
+  return key.length > 1 ? key : undefined;
+}
+
 interface SchemaModel {
   name: string;
   columns: SchemaColumn[];
+  tests?: Array<Record<string, unknown>>;
 }
 
 interface SchemaColumn {
@@ -148,7 +166,16 @@ function buildSchemaModel(table: Table, genRelTests: boolean): SchemaModel {
     return entry;
   });
 
-  return { name: table.name, columns };
+  // A key over several columns has no column to carry `unique`, so it is
+  // tested on the model, as the dbt importer reads a composite key back
+  // (dbt-composite-key-tests.spec.md, barwise-lqj). The test is dbt_utils',
+  // which the project must declare; dbt core has no multi-column unique.
+  const key = dbtKeyTestColumns(table);
+  return {
+    name: table.name,
+    columns,
+    ...(key ? { tests: [{ [DBT_KEY_TEST]: { combination_of_columns: [...key] } }] } : {}),
+  };
 }
 
 function buildColumnTests(

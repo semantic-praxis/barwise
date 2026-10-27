@@ -299,5 +299,32 @@ describe("dbt renderer", () => {
       expect(assocModel).toBeDefined();
       expect(assocModel!.sql).toContain("student_enrolls_in_course");
     });
+
+    it("tests a key over several columns on the model, a single-column key only on its column (barwise-lqj)", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Student", { referenceMode: "student_id" })
+        .withEntityType("Course", { referenceMode: "course_id" })
+        .withBinaryFactType("Student enrolls in Course", {
+          role1: { player: "Student", name: "enrolls in" },
+          role2: { player: "Course", name: "has enrolled" },
+        })
+        .build();
+
+      const schema = mapper.map(model);
+      const doc = parse(renderDbt(schema).schemaYaml) as {
+        models: Array<{ name: string; tests?: unknown[]; }>;
+      };
+      const tests = Object.fromEntries(doc.models.map((m) => [m.name, m.tests]));
+      const key = schema.tables.find((t) => t.name === "student_enrolls_in_course")!
+        .primaryKey.columnNames;
+      expect(key).toHaveLength(2);
+      expect(tests).toEqual({
+        student: undefined,
+        course: undefined,
+        student_enrolls_in_course: [
+          { "dbt_utils.unique_combination_of_columns": { combination_of_columns: key } },
+        ],
+      });
+    });
   });
 });
