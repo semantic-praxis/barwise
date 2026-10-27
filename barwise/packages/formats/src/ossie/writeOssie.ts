@@ -17,6 +17,7 @@ import {
   externalIdentifies,
   type FactType,
   type IdentifyingComponent,
+  type IdentifyingUniqueness,
   type ObjectType,
   type OrmModel,
   type PreferredIdentifiers,
@@ -30,6 +31,7 @@ import { snakeCase } from "../naming.js";
 import {
   DERIVATION_ITEM_SEPARATOR,
   DERIVED_BY_NOTE_PREFIX,
+  impliedMandatoryRoles,
   ossieFactTypeName,
   REQUIRES_NOTE_PREFIX,
 } from "./mapOssieToOrm.js";
@@ -178,6 +180,19 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   // identify_by, decided before relationships are written so a covered
   // far-role uniqueness is not reported.
   const identifyBy = new Map<string, string[]>();
+  // Ossie's identify_by makes an identifier's roles mandatory on import, so
+  // one the model leaves optional comes back mandatory: said here, on its
+  // fact type, since the read-back check is silent on a fact type that
+  // already has a line (ossie-identifier-implies-mandatory.spec.md).
+  const predictImpliedMandatory = (ot: ObjectType, at: IdentifyingUniqueness): void => {
+    for (const { factType, role } of impliedMandatoryRoles(at)) {
+      lose(
+        `fact type ${factType.name}`,
+        `role ${role.name} of ${ot.name} is optional; Ossie's identify_by makes it mandatory on import`,
+        { kind: "fact_type", id: factType.id },
+      );
+    }
+  };
   for (const ot of model.objectTypes) {
     if (ot.kind !== "entity") continue;
     const pid = model.preferredIdentifierOf(ot.id);
@@ -185,15 +200,19 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       const resolved = resolvePreferredIdentifier(model, ot.id);
       const w = written.find((x) => x.ft.internalConstraints.some((c) => c.id === pid));
       const c = w?.ft.internalConstraints.find((k) => k.id === pid);
-      const rels = resolved.ok && resolved.at.kind === "external"
-        ? componentRelationships(resolved.at.components, written)
-        : undefined;
-      if (rels) {
+      const external = resolved.ok && resolved.at.kind === "external" ? resolved.at : undefined;
+      const rels = external && componentRelationships(external.components, written);
+      if (external && rels) {
         identifyBy.set(ot.id, rels);
         covered.add(pid);
+        predictImpliedMandatory(ot, external);
       } else if (w && c && isSingleIdentifier(w, c, ot.id)) {
         identifyBy.set(ot.id, [w.name]);
         covered.add(pid);
+        // The one branch that writes identify_by for an identifier core may
+        // not resolve to this entity; with none resolved, the read-back
+        // check reports what comes back.
+        if (resolved.ok) predictImpliedMandatory(ot, resolved.at);
       } else {
         lose(ot.name, "its preferred identifier is not one Ossie's identify_by can name", {
           kind: "object_type",
@@ -209,12 +228,14 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     for (const ext of model.constraints) {
       if (ext.type !== "external_uniqueness" || covered.has(ext.id!)) continue;
       const resolvedExt = externalIdentifies(model, ext, ot.id);
-      const rels = resolvedExt.ok && resolvedExt.at.kind === "external"
-        ? componentRelationships(resolvedExt.at.components, written)
+      const external = resolvedExt.ok && resolvedExt.at.kind === "external"
+        ? resolvedExt.at
         : undefined;
-      if (rels) {
+      const rels = external && componentRelationships(external.components, written);
+      if (external && rels) {
         identifyBy.set(ot.id, rels);
         covered.add(ext.id!);
+        predictImpliedMandatory(ot, external);
         break;
       }
     }

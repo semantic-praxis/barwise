@@ -151,7 +151,9 @@ byte-identical before and after.
   imports with 12 warnings, because `identify_by` adds the uniqueness it
   implies and not the mandatory, and the ontology lists no identifier under
   `requires`. The warnings are accurate to the source; whether the importer
-  should add the mandatory as it adds the uniqueness is barwise-3ik. The
+  should add the mandatory as it adds the uniqueness is barwise-3ik.
+  Since decided: it does, and the example imports with none
+  (`ossie-identifier-implies-mandatory.spec.md`). The
   NORMA fixtures give none, and the DDL, dbt and OpenAPI importers already
   mark the entity role mandatory.
 - **Code review changed the rule's shape.** The message names the
