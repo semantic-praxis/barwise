@@ -447,6 +447,8 @@ report by re-importing the written document instead.
    will break; a refusal that names both versions is a clear signal to
    update, where best-effort reading of a changed schema would import wrong
    models without a word.
+   Recorded, with decisions 1 and 5 and the Scope, as
+   `docs/adr/ossie-interchange.md`.
 3. **Implied spanning uniqueness.** A relationship with no multiplicity
    has set semantics, so its links never repeat: a uniqueness spanning
    every role. Options: emit that uniqueness on import (validation then
