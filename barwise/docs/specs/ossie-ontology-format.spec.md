@@ -280,6 +280,10 @@ license header, which is what redistributing it requires.
 
 ### 2. Export and the round trip
 
+Since extended: the export reads its own text back and reports what the
+loss predictions below miss (`ossie-export-verified-by-reimport.spec.md`,
+barwise-5bv).
+
 Grounded 2026-10-24, after WS1 merged, and revised after its plan review.
 `writeOssie` (model to document) and `OssieExportFormat`, added to
 `ossieFormat`, which then has both directions. Each rule below is stated so

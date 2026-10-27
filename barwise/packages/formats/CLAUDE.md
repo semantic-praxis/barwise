@@ -62,6 +62,8 @@ src/
   ossie/OssieImportFormat.ts     The importer adapter
   ossie/writeOssie.ts            ORM model -> Ossie document + loss report
   ossie/OssieExportFormat.ts     The exporter adapter (YAML, loss comment block)
+  ossie/verifyOssie.ts           The written text read back and diffed against the
+                                 source: a line for what the writer's guesses missed
 tests/
   helpers/ModelBuilder.ts  Fluent model builder (test-only)
   fixtures/*.orm           NORMA XML fixtures
