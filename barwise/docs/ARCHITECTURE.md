@@ -35,6 +35,8 @@ Architecture:
 - [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17
 - [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23
 - [Production prompt resolution](adr/production-prompt-resolution.md) -- 2026-08-26
+- [Schema versioning](adr/schema-versioning.md) -- 2026-10-21
+- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-09-10
 
 Process:
 
