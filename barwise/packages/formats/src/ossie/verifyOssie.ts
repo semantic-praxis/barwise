@@ -96,9 +96,9 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
     ftDoc.name = src.name;
   }
 
-  // An id is a whole string value wherever the document refers to its
-  // element, so replacing every value equal to a minted id reaches each
-  // reference without a list of the fields that hold one. Done on the
+  // An id is a whole string, as a value or a key, wherever the document
+  // refers to its element, so replacing every string equal to a minted id
+  // reaches each reference without a list of the fields that hold one. Done on the
   // document, not its text: a minted id may be a prefix of another, and a
   // source id may need quoting in YAML ("1", "true").
   return new OrmYamlSerializer().deserialize(stringify(reId(doc, ids)));
@@ -108,7 +108,10 @@ function reId(value: unknown, ids: ReadonlyMap<string, string>): unknown {
   if (typeof value === "string") return ids.get(value) ?? value;
   if (Array.isArray(value)) return value.map((v) => reId(v, ids));
   if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, reId(v, ids)]));
+    // Keys too: a population's role values are keyed by role id.
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [ids.get(k) ?? k, reId(v, ids)]),
+    );
   }
   return value;
 }
