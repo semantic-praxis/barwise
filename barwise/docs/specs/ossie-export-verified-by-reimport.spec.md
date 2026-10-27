@@ -12,7 +12,8 @@ barwise/packages/formats/src/ossie/OssieExportFormat.ts,
 barwise/packages/formats/tests/OssieExportFormat.test.ts,
 +barwise/packages/formats/tests/OssieVerify.test.ts,
 barwise/packages/formats/CLAUDE.md,
-barwise/docs/specs/ossie-ontology-format.spec.md
+barwise/docs/specs/ossie-ontology-format.spec.md,
+barwise/correction-baseline.json
 
 When the Ossie exporter has written a document, it shall read the written
 text back through the Ossie importer, compare the result with the source
