@@ -5,6 +5,7 @@ Status: Proposed
 Created: 2026-10-27
 Last-updated: 2026-10-27
 Tracking: barwise-3ik
+Plan-reviewed: 2b148c82 (code-review, pr-review)
 Touches: barwise/packages/formats/src/ossie/mapOssieToOrm.ts,
 barwise/packages/formats/src/ossie/writeOssie.ts,
 barwise/packages/formats/tests/OssieImportFormat.test.ts,
