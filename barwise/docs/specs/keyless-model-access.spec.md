@@ -5,7 +5,7 @@ Code settings for the OS keychain), WS3 (`--api-key` refused), and WS2 (the
 MCP server borrows the client's model through sampling).
 
 Created: 2026-09-12
-Last-updated: 2026-10-25
+Last-updated: 2026-10-27
 Tracking: barwise-1029 (WS1, the VS Code setting and SecretStorage);
 barwise-1030 (WS2, MCP sampling); barwise-1031 (WS3, retire `--api-key`).
 Follows `docs/specs/credential-scanning.spec.md`, which added the detector.

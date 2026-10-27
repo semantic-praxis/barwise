@@ -22,8 +22,6 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
 
 ## Decision
 
-## Decision
-
 1. **No key in argv.** `--api-key` is refused on every CLI command. The
    five commands that took it still declare it, so the error can name
    `ANTHROPIC_API_KEY` as the replacement, and one `preAction` hook on the
@@ -53,30 +51,35 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
   through `detectProvider()`, and VS Code with `llmProvider: "anthropic"`
   and no stored secret, whose `AnthropicLlmClient` falls back to
   `ANTHROPIC_API_KEY`.
-- A script passing `--api-key` fails with exit 1; the message names the
-  variable and says to rotate, unless commander reports a missing required
-  option first, as `import batch` without `--model` does. The key is not
-  used either way.
+- A script passing `--api-key` fails with exit 1 and the key is not
+  used. On the five declaring commands the message names the variable and
+  says to rotate, unless commander reports another argument or option
+  error first (a missing required one, an unknown one, an invalid
+  choice); every other command reports an unknown option.
 - No gate script checks this rule. Each decision is held by unit tests,
   run in CI by `npm run test:coverage` (`if:
-  steps.changes.outputs.docs_only != 'true'`), or by nothing:
+  steps.changes.outputs.docs_only != 'true'`, so skipped on a docs-only
+  pull request and, like any step, once an earlier step fails), or by
+  nothing:
   - 1: `cli/tests/commands/apiKeyFlag.test.ts`. The hook matches the
     spelling `--api-key` only, so a new command declaring a differently
     named key option is not refused (barwise-xsg).
   - 2: `vscode/tests/unit/anthropicKey.test.ts` covers the migration.
-    Nothing asserts the setting's `application` scope, and the migration
-    runs only when the Anthropic path reads a key, so a legacy key in a
-    workspace settings file of a user on the default Copilot path is never
-    moved or cleared (barwise-ybi).
+    Nothing asserts the setting's `application` scope. The migration runs
+    only when the Anthropic path reads a key and secret storage is empty,
+    so a legacy workspace key is never moved or cleared for a user on the
+    default Copilot path, or for one who already stored a key with the
+    set-key command (barwise-ybi).
   - 3: `mcp/tests/llm/samplingClient.test.ts` covers the `sampling.tools`
-    check both ways and the fallback. Nothing tests that
+    check both ways and the fallback; two of its tests also pin, as
+    correct, the provider bypass and the route note below, and would
+    change with barwise-2n1. Nothing tests that
     `barwise.llmProvider` defaults to `copilot` (barwise-ybi). An
     explicit `provider` input to the MCP tools, which the calling model
     can supply, skips sampling, and the route note says "this server's own
     API key" even when the fallback reached keyless Ollama (barwise-2n1).
   - 4: the measurement lane cannot reach a host-backed client:
-    `npm run depcruise` (CI, `if: steps.changes.outputs.docs_only !=
-    'true'`) holds promptlab to core, llm and learn, and both host-backed
+    `npm run depcruise` (CI, under the same docs-only guard) holds promptlab to core, llm and learn, and both host-backed
     clients live in `mcp` and `vscode`. That the key is workspace-scoped
     with a spend limit is "not assertable from this tree" (spec, Open
     decisions); it rests on the operator.
@@ -85,15 +88,27 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
   provider key, shown by a sentinel test over written files. Only the
   call log has a related test, over one record
   (`llm/tests/observe/callLog.test.ts`) (barwise-ppb).
-- Left to the owner: whether `detectProvider()` should refuse a key
-  outside promptlab. The spec's Open decision answers only "Recommended:
-  no".
-- Until architecture-index WS5 replaces them with links, the root
-  `CLAUDE.md` conventions bullet, `keyless-model-access.spec.md`,
-  `packages/mcp/CLAUDE.md` and `packages/vscode/CLAUDE.md`, the comments
-  in `cli/src/cli.ts`, `cli/src/commands/apiKeyFlag.ts`,
-  `vscode/src/llm/anthropicKey.ts`, `vscode/src/mcp/ToolRegistration.ts`,
-  `vscode/src/commands/ImportTranscriptCommand.ts` and
-  `mcp/src/llm/resolveClient.ts`, the setting's deprecation message in
-  `vscode/package.json`, and the user docs `docs/CLI.md`, `docs/getting-started/cli.md` and
-  `docs/local-eval-runbook.md` also state this rule (barwise-ubc, WS5).
+- Left to the owner: the spec marks none of its Open decisions resolved,
+  and the code follows each recommendation. Whether retiring `--api-key`
+  needed a major version (it shipped in v1.7.0, a minor); whether MCP
+  sampling should be preferred even when a key is also configured (the
+  root `CLAUDE.md` says only that the MCP path needs no key where the
+  client advertises sampling); and whether `detectProvider()` should
+  refuse a key outside promptlab ("Recommended: no").
+- Until architecture-index WS5 replaces them with links, these places
+  also state this rule (barwise-ubc, WS5):
+  - the root `CLAUDE.md` conventions bullet and
+    `keyless-model-access.spec.md`;
+  - `packages/mcp/CLAUDE.md`, `packages/vscode/CLAUDE.md` and
+    `packages/promptlab/CLAUDE.md`;
+  - comments in `cli/src/cli.ts`, `cli/src/commands/apiKeyFlag.ts`,
+    `vscode/src/llm/anthropicKey.ts`, `vscode/src/client/extension.ts`,
+    `vscode/src/mcp/ToolRegistration.ts`,
+    `vscode/src/commands/ImportTranscriptCommand.ts`,
+    `mcp/src/llm/resolveClient.ts`, `mcp/src/llm/SamplingLlmClient.ts`,
+    `mcp/src/tools/import.ts` and `optimizer/barwise_optimizer/compile.py`;
+  - the setting's deprecation message in `vscode/package.json`;
+  - the user docs: `README.md`, `packages/vscode/README.md`,
+    `docs/CLI.md`, `docs/MCP.md`, `docs/getting-started/cli.md`,
+    `docs/getting-started/vscode.md`, `examples/README.md` and
+    `docs/local-eval-runbook.md`.
