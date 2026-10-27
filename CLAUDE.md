@@ -25,8 +25,9 @@ provides the theoretical foundation for fact-based modeling.
 - **Determinism in the core.** Validation, verbalization, mapping,
   diff, and query are pure and deterministic -- same input, same
   output. Non-determinism (LLM calls, network I/O, clocks) lives in
-  the outer packages (`llm`, `cli`, `mcp`, `vscode`)
-  (`docs/adr/determinism-in-core.md`).
+  the outer packages (`llm`, `cli`, `mcp`, `vscode`). New
+  capabilities go in `core` only if they can preserve this; if they
+  cannot, they belong one layer out (`docs/adr/determinism-in-core.md`).
 
 - **Explicit over implicit.** Cross-domain references go through
   declared context mappings; data products declare the domains they
@@ -199,8 +200,9 @@ determinism rule applied one layer further out than `core`.
 
 Formats live in connector packages -- `@barwise/formats` (DDL, OpenAPI,
 Avro, NORMA, SQL, Ossie), `@barwise/dbt` and `@barwise/code-analysis` --
-which own their I/O and register through one `register*Formats()` each;
-core ships no interop format (`docs/adr/connector-packages.md`).
+which own their I/O and register through `registerStandardFormats()`,
+`registerDbtFormats()` and code-analysis's own registration; core ships
+no interop format (`docs/adr/connector-packages.md`).
 
 Changes to `@barwise/core` can break all downstream packages. Run the
 full monorepo build and tests after modifying core's public API.
@@ -208,9 +210,7 @@ full monorepo build and tests after modifying core's public API.
 ## Current State
 
 All development phases are complete; the full suite passes in CI
-across all 12 packages. Core ships no interop format: the standard
-descriptors live in `@barwise/formats`, dbt in `@barwise/dbt`, and
-code importers in `@barwise/code-analysis`.
+across all 12 packages.
 
 ### Capability matrix across the three surfaces
 
@@ -243,7 +243,9 @@ default on). The rules, what is pinned and what is not checked are in
 
 Gaps marked `deliberate` are being re-decided under the owner's
 2026-10-12 direction that MCP and VS Code mirror the CLI (barwise-0wa).
-The MCP and VS Code tool lists are pinned by `toEqual` tests; the table
+The MCP and VS Code tool lists are pinned by `toEqual` tests
+(`mcp/tests/serverSpawn.test.ts`, `vscode/tests/unit/toolRegistration.test.ts`),
+so adding a tool means updating that list and this table; the table
 itself is maintained by hand, and nothing compares it with the code
 (barwise-1005, barwise-xpt).
 
@@ -357,8 +359,9 @@ what CI skips, and `--all` runs everything. Plain `npm run ci:local`
 checks the working tree, for use before a commit. `git push --no-verify`
 is the escape hatch for work in progress. The hooks exist only after
 `npm run prepare`, and do not run at all in a `git worktree` checkout
-(barwise-mdp): there, run `npm run ci:local -- --commit <sha>` by hand
-before pushing.
+(barwise-mdp): there, run `npm run prepare` first, or run
+`npm run check:secrets -- --staged` before committing and
+`npm run ci:local -- --commit <sha>` before pushing.
 
 ## Versioning and Releases
 
@@ -395,9 +398,11 @@ skill (`.claude/skills/release/`).
   are fine.
 - **Every Python execution resolves from the project lockfile.** The
   form is `uv run --frozen [--only-group <g>] ...`, and `--locked` in
-  CI. Never a bare `python3`, `python`, `pip` or `pip3`; never
-  `--with`, `--with-requirements`, `--isolated`, `--no-project`,
-  `uv pip`, `uvx`, `uv tool run` or PEP 723 inline metadata. Keep
+  CI. Never a bare `python3`, `python`, `pip` or `pip3` (the one
+  exception is CI's pinned uv bootstrap); never `--with`,
+  `--with-requirements`, `--isolated`, `--no-project`, `uv pip`, `uvx`,
+  `uv tool run` or PEP 723 inline metadata. An optional tier (sqlglot)
+  is a dependency-group in the single `pyproject.toml`. Keep
   `pyproject.toml` (at `barwise/`) an ancestor of anything that runs
   Python -- `uv run --frozen` with no project found exits 0 and resolves
   nothing -- and pass `--project` from outside `barwise/`. A one-off is
@@ -405,12 +410,16 @@ skill (`.claude/skills/release/`).
   `PreToolUse` hook enforce it (`docs/adr/python-from-the-lockfile.md`).
 - A copy that must agree with other code carries a check in the commit
   that creates it: share it, derive it, register it in
-  `barwise/parity.manifest.json`, or drift-test it
-  (`docs/adr/must-agree-copies.md`).
+  `barwise/parity.manifest.json`, or drift-test it -- a comment asking
+  the editor to update the other copy is not a check. `npm run
+  audit:duplication -- --check` ratchets candidates against
+  `barwise/audit-baseline.json`; the `duplication-audit` skill has the
+  rubric (`docs/adr/must-agree-copies.md`).
 - A finding is closed by a mechanism, not a document: land a check that
   fails when it regresses, or a baseline row that must be removed when it
-  is fixed, and wire the ratchet into CI
-  (`docs/adr/findings-close-by-mechanism.md`).
+  is fixed, and wire the ratchet into CI. `audit:rubric`, `audit:specs`
+  and `audit:corrections` are the other ratchets; the `assertion-audit`
+  skill has the method (`docs/adr/findings-close-by-mechanism.md`).
 - A baseline's verdicts are merged on write, never regenerated: the
   writers go through `scripts/lib/baseline-merge.mjs` (the trial gate's
   does not yet, barwise-tko), and
@@ -425,8 +434,9 @@ skill (`.claude/skills/release/`).
   full history in CI -- and `.gitleaks.toml` takes no rule beyond the
   one for Anthropic keys (`docs/adr/credential-handling.md`).
 - **A key has nowhere to be written down.** `--api-key` is refused on
-  every command and the VS Code key lives in secret storage; the default
-  paths need no key; the measurement lane is the one lane that holds
+  every command and the VS Code key lives in secret storage; VS Code's
+  default path needs no key, nor does the MCP server's where the client
+  advertises sampling; the measurement lane is the one lane that holds
   one, workspace-scoped with a spend limit
   (`docs/adr/keyless-model-access.md`).
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).

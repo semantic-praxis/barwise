@@ -49,9 +49,8 @@ toolset; which gaps survive that direction is being decided row by row
   once an earlier step fails).
 - No CI test compares the matrix rows with the registrations, so
   decisions 1 to 3 have no gate. A tool added to the code and to its
-  pinned list leaves the matrix row unchanged and the suite green; the
-  root `CLAUDE.md` sentence saying such a change "fails until this table
-  is updated" overclaims (barwise-1005, for the MCP and VS Code columns).
+  pinned list leaves the matrix row unchanged and the suite green
+  (barwise-1005, for the MCP and VS Code columns).
   For the rest (barwise-xpt): `commandRouting.test.ts` pins the CLI's
   own 19-entry table and that each entry routes to its command, but not
   the matrix's CLI column or its subcommand rows; an integration test
@@ -66,8 +65,8 @@ toolset; which gaps survive that direction is being decided row by row
   direction, every `deliberate` row except `merge` (decided by the
   owner, barwise-xjf) awaits the owner's call row by row. The matrix also
   disagrees with itself and the code:
-  - `project init` reads `under review`, so `CLAUDE.md`'s "every
-    remaining gap is marked deliberate" is false;
+  - `project init` reads `under review`, a label decision 1 does not
+    name;
   - the `gym` row says MCP has it, but `gym show` has no MCP tool, and
     its `deliberate` VS Code gap is "a later workstream" in
     `modeling-gym.spec.md`;
@@ -91,5 +90,5 @@ toolset; which gaps survive that direction is being decided row by row
   the rule in one line with a link since architecture-index WS5), these places
   also state this rule: the `pr-review` checklist ("When a surface
   changed"); `assertion-audit` rules 4 and 6; `duplication-audit` rule 5;
-  `REVIEW.md` (the barwise-1fr item); the `audit-baseline.json` note on
-  the tool-list halves; and the comments in the two pinned tests.
+  `REVIEW.md` (the barwise-1fr item); and the comments in the two pinned
+  tests.
