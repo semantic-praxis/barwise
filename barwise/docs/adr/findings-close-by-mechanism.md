@@ -105,9 +105,9 @@ verdict on every row is safe to gate on, when raw detection is not.
 - `audit:specs` can answer differently on a branch head than on its
   merge ref (barwise-dm0), and it misses a Status of "Not implemented"
   (barwise-1048).
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5):
-  - the root `CLAUDE.md` conventions;
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule:
   - the `assertion-audit`, `session-review` and `duplication-audit`
     skills, and `steward` section 3;
   - `duplication-drift-guards.spec.md` WS5;

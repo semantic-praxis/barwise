@@ -99,10 +99,10 @@ format lives and how it reaches the surfaces.
   package" for `diagram` and `llm` too, which register no format, and
   S-COMP-1's guard still reads "Not yet gated" although depcruise now
   gates the direction (barwise-5f9).
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5): the root `CLAUDE.md` (design
-  principles Composability and Explicit over implicit, package list,
-  "Dependency Graph", Current State); the `formats`, `dbt` and
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule: the root `CLAUDE.md`'s Composability principle
+  and package list; the `formats`, `dbt` and
   `code-analysis` package `CLAUDE.md` files; `architecture-scenarios.md`
   S-COMP-1 and S-EXPL-5; and the headers of `formats/src/registration.ts`,
   `dbt/src/registration.ts` and core's `format/registry.ts`.

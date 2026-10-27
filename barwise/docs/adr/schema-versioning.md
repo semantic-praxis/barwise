@@ -101,10 +101,10 @@ was a section of the metamodel ADR before this one.
   later") without deciding against it (barwise-y1b).
 - 1.0 includes value ranges (barwise-5t9.1), which shipped before this
   rule; the discipline began with the 1.0 to 1.1 bump.
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5): the metamodel ADR's
-  bounded-cost filter; the root `CLAUDE.md` ("Explicit over implicit"
-  and the `migrate` row); `docs/CLI.md` (`migrate`);
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule: the metamodel ADR's
+  bounded-cost filter; the root `CLAUDE.md` `migrate` row; `docs/CLI.md` (`migrate`);
   `architecture-scenarios.md` S-EXPL-1 and S-EXPL-2; the `pr-review`
   checklist's `schemaVersion` item; `orm-format-3.spec.md`,
   `diagram-references-by-id.spec.md` and `diagram-empty-view.spec.md`;

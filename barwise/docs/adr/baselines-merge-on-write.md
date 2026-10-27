@@ -84,12 +84,11 @@ note, was decided when barwise-qs8 closed.
 - `scripts/tests/expected-counts.json` also has a `--write` writer
   that does not use the helper. It holds only derived counts and no
   verdict. No source says whether this rule covers it (barwise-tko).
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5):
-  - the root `CLAUDE.md` conventions and
-    `baseline-write-preserves-verdicts.spec.md`, both without the
-    reopen exception, and `CLAUDE.md`'s "Every `--write` path goes
-    through" the helper overstates decision 2 (barwise-tko);
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule:
+  - `baseline-write-preserves-verdicts.spec.md`, without the reopen
+    exception;
   - the `baseline-merge.mjs` header, its `mergeBaselineRows` docblock
     and sort comment, and the `baseline-merge.test.mjs` header;
   - the comments in the three writers where they call the helper,
