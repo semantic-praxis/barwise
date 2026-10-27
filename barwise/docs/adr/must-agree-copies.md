@@ -97,9 +97,9 @@ members.
 - The spec deferred comparing behaviour rather than bytes, and
   reconciling copies that had already diverged. The audit's diverged
   copies (barwise-863 to 867 and 873) are all closed.
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5):
-  - the root `CLAUDE.md` conventions;
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule:
   - `duplication-drift-guards.spec.md` and
     `deterministic-guards.spec.md`;
   - the `duplication-audit`, `spec-writer`, `pr-review` and `steward`

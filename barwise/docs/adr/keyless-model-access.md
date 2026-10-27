@@ -95,10 +95,10 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
   root `CLAUDE.md` says only that the MCP path needs no key where the
   client advertises sampling); and whether `detectProvider()` should
   refuse a key outside promptlab ("Recommended: no").
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5):
-  - the root `CLAUDE.md` conventions bullet and
-    `keyless-model-access.spec.md`;
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule:
+  - `keyless-model-access.spec.md`;
   - `packages/mcp/CLAUDE.md`, `packages/vscode/CLAUDE.md` and
     `packages/promptlab/CLAUDE.md`;
   - comments in `cli/src/cli.ts`, `cli/src/commands/apiKeyFlag.ts`,

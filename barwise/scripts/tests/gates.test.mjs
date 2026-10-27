@@ -2983,7 +2983,8 @@ test("audit-spec-status writes nothing without --write", () => {
 });
 
 test("audit-duplication.mjs still has no baseline writer", () => {
-  // CLAUDE.md and baseline-write-preserves-verdicts.spec.md both say this gate
+  // docs/adr/baselines-merge-on-write.md (decision 5) and
+  // baseline-write-preserves-verdicts.spec.md both say this gate
   // never had the clobber defect BECAUSE it has no writer -- its 48 candidates
   // are hand-maintained. That is a claim about code, so it is checked here
   // rather than asserted in prose: adding a writer to this script would make

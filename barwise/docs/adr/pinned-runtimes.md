@@ -85,8 +85,8 @@ declared authority is proposed, not built: workstream 4 of
 - uv itself is pinned only in CI (0.12.7, "a version input like any
   other"). The web-session hook installs the latest release. Whether to
   pin it locally is an open question recorded on barwise-921.
-- Until architecture-index WS5 replaces them with links, the root
-  `CLAUDE.md` "Monorepo Commands", `README.md`, `GETTING_STARTED.md`,
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), `README.md`, `GETTING_STARTED.md`,
   `steward` section 4, `session-start.sh` and `ci.yml` comments also
-  state this rule (barwise-ubc, WS5). `session-node-pin.spec.md` points
+  state this rule. `session-node-pin.spec.md` points
   here from its resolved heading.
