@@ -1,6 +1,6 @@
 # An Ossie identifier makes its roles mandatory
 
-Status: Proposed
+Status: Implemented
 
 Created: 2026-10-27
 Last-updated: 2026-10-27
@@ -11,7 +11,6 @@ barwise/packages/formats/src/ossie/writeOssie.ts,
 barwise/packages/formats/tests/OssieImportFormat.test.ts,
 barwise/packages/formats/tests/OssieExportFormat.test.ts,
 barwise/packages/formats/tests/OssieVerify.test.ts,
-barwise/packages/cli/tests/importerIds.test.ts,
 barwise/docs/specs/ossie-ontology-format.spec.md,
 barwise/docs/specs/identifier-roles-mandatory.spec.md
 
@@ -40,8 +39,7 @@ about `identify_by` implying anything. So barwise keeps declaring the
 mandatory rather than assuming another reader shares its inference.
 
 The rule is decided once. The importer and the exporter's loss prediction
-both call one function, built on core's own `identifyingRoles` and
-`isMandatoryAlone`, which are what the diagnostic checks.
+both call one function, built on core's own `identifyingRoles`, the roles the diagnostic checks. It counts a mandatory of any modality, where the diagnostic counts only an alethic one: a deontic mandatory is not optional, and the writer already writes it to `requires`.
 
 ## Observed today (at 6e6e631f)
 
@@ -119,8 +117,10 @@ The changes above. Each item below is pinned by a test:
 - Importing a concept with `identify_by` over one relationship gives one
   alethic mandatory on its first role.
 - The same holds for each relationship of a composite `identify_by`.
-- The CLI fixture's `Party`, with `identify_by` and `requires` on the
-  same relationship, gets one mandatory, not two.
+- A concept with `identify_by` and `requires` on the same relationship
+  (the shape of the CLI fixture's `Party`) gets one mandatory, not two.
+  This is pinned in `OssieImportFormat.test.ts`; the CLI fixture's own
+  test is unchanged and passes.
 - Importing the pinned flights example gives no
   `completeness/preferred-identifier-optional` diagnostic. It gives 12
   today.
@@ -144,6 +144,43 @@ Doc edits:
 - `identifier-roles-mandatory.spec.md`: its flights note gains "Since
   decided: barwise-3ik".
 - The Ossie spec's import section states the reading.
+
+## Implementation notes
+
+- As planned in the revised plan. The first draft left the mandatory out
+  of the export and relied on the read-back check to report an optional
+  identifying role. The high plan review showed three problems: the check
+  is silent on a fact type that already has a loss line; dropping the
+  mandatory went against "explicit over implicit"; and the writer would
+  have carried a copy of the importer's rule. The plan was rewritten to
+  keep the export explicit, with one shared rule and a writer prediction.
+- The pre-implementation corpus count read only stored identifiers. It
+  found none of the 378 left a role optional. Through the export, the
+  prediction fires 4 times: on the two Room fixtures
+  (`test-plan/fixtures/external-uniqueness.orm.yaml` and
+  `external-uniqueness-violation.orm.yaml`), whose external uniqueness is
+  written as `identify_by` over roles the model leaves optional. Each line
+  is right, since the import makes those roles mandatory.
+- The dedupe test passes with the new pass removed, as it should: it
+  guards against a second mandatory, and fails when `impliedMandatoryRoles`
+  stops excluding roles that already carry one.
+
+- Implementation review:
+  - Both external-identifier branches of the writer (stored and
+    inferred) now have a test. Each test fails when its branch's
+    prediction is removed.
+  - Each branch binds its identifier once. The one call still guarded is
+    the single-identifier branch, where `identify_by` can be written for
+    an identifier core does not resolve to the entity.
+  - The line names the role, not just the entity.
+  - Declined: keying read-back coverage per constraint so that a
+    prediction line does not cover other differences on its fact type.
+    That is barwise-huw's change, and this line uses the same fact-type
+    key every prediction uses.
+  - Declined: predicting in the unresolved single-identifier case. It
+    needs an objectified binary whose stored identifier resolves to
+    another entity, and the read-back check reports it when the fact type
+    has no other line.
 
 ## Open decisions
 

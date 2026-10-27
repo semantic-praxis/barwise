@@ -119,7 +119,10 @@ In scope:
     an external uniqueness over their far roles, stored as the preferred
     identifier, each relationship gaining the uniqueness on the entity's
     role with a warning when the multiplicity did not state it
-    (`external-preferred-identifier.spec.md`, WS2; barwise-alg);
+    (`external-preferred-identifier.spec.md`, WS2; barwise-alg). Either
+    way, each identifying role is made mandatory too, without a warning,
+    since a preferred identifier names every instance
+    (`ossie-identifier-implies-mandatory.spec.md`; barwise-3ik);
   - `description` is the element's definition;
   - a `derived_by` list on a relationship is the fact type's derivation
     rule, and on an entity with a supertype the defining rule of each of

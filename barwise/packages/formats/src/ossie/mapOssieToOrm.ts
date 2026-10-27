@@ -15,10 +15,15 @@
  */
 import {
   type ConceptualDataTypeName,
+  type FactType,
   generateId,
+  identifyingRoles,
+  type IdentifyingUniqueness,
   type InternalConstraint,
   isUniqueAlone,
   OrmModel,
+  resolvePreferredIdentifier,
+  type Role,
   type RoleConfig,
   splitReading,
   type ValueConstraintDef,
@@ -123,6 +128,7 @@ export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapR
     addSubtypes(model, c);
     addIdentifier(model, c, warnings);
     addMandatoryRoles(model, c, resolved.requires.get(c)!);
+    addIdentifierMandatories(model, c);
   }
   return { model, warnings };
 }
@@ -691,6 +697,37 @@ function addMandatoryRoles(model: OrmModel, c: OssieConcept, split: RequiresSpli
   for (const rel of split.mandatory) {
     const ft = relationshipFact(model, c.concept, rel);
     ft.addConstraint({ type: "mandatory", id: generateId(), roleId: ft.roles[0]!.id });
+  }
+}
+
+/**
+ * The roles an identifier leaves optional: its identifying roles that carry
+ * no mandatory of any modality. A preferred identifier names every instance
+ * of its entity, so `identify_by` reads as making these mandatory; the
+ * importer adds them, and the exporter predicts the change for a model that
+ * leaves one optional, from this one rule
+ * (ossie-identifier-implies-mandatory.spec.md, barwise-3ik).
+ */
+export function impliedMandatoryRoles(
+  at: IdentifyingUniqueness,
+): readonly { readonly factType: FactType; readonly role: Role; }[] {
+  return identifyingRoles(at).filter(({ factType, role }) =>
+    !factType.internalConstraints.some((k) => k.type === "mandatory" && k.roleId === role.id)
+  );
+}
+
+/**
+ * After `requires` is read, so a relationship listed there as well keeps
+ * the one mandatory it already has. No warning: the only Ossie example
+ * leaves every identifier's mandatory unstated, so one would fire on each
+ * identified concept.
+ */
+function addIdentifierMandatories(model: OrmModel, c: OssieConcept): void {
+  if ((c.identify_by ?? []).length === 0) return;
+  const resolved = resolvePreferredIdentifier(model, conceptId(model, c.concept));
+  if (!resolved.ok) return;
+  for (const { factType, role } of impliedMandatoryRoles(resolved.at)) {
+    factType.addConstraint({ type: "mandatory", id: generateId(), roleId: role.id });
   }
 }
 

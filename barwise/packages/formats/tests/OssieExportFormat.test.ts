@@ -157,7 +157,10 @@ describe("Ossie export: the pinned flights example", () => {
 /**
  * A document as what it means: concepts and relationships keyed by name,
  * `requires` as a set with each bound in one orientation, `extends`
- * dropped for the concepts the import flattened.
+ * dropped for the concepts the import flattened. A `requires` entry naming
+ * one of the concept's own `identify_by` relationships is dropped too:
+ * `identify_by` implies it (ossie-identifier-implies-mandatory.spec.md),
+ * and the export states it where the source left it implied.
  */
 function meaning(doc: OssieDocument, flattened: ReadonlySet<string>) {
   const bound = (e: string) => {
@@ -166,6 +169,11 @@ function meaning(doc: OssieDocument, flattened: ReadonlySet<string>) {
     const flip = { "<=": ">=", ">=": "<=", "<": ">", ">": "<" }[m[2]!]!;
     return `${m[3]} ${flip} ${m[1]}`;
   };
+  const implied = (c: OssieConcept, requires: readonly string[] | undefined) => {
+    const ids = new Set((c.identify_by ?? []).map((rel) => `${c.concept}.${rel}`));
+    const kept = (requires ?? []).filter((e) => !ids.has(e.trim())).map(bound).sort();
+    return kept.length > 0 ? kept : undefined;
+  };
   return {
     name: doc.name,
     description: doc.description,
@@ -173,7 +181,7 @@ function meaning(doc: OssieDocument, flattened: ReadonlySet<string>) {
     ontology: Object.fromEntries(doc.ontology.map((c) => [c.concept, {
       ...c,
       extends: flattened.has(c.concept) ? undefined : c.extends,
-      requires: c.requires ? [...c.requires].map(bound).sort() : undefined,
+      requires: implied(c, c.requires),
       relationships: Object.fromEntries((c.relationships ?? []).map((r) => [r.name, r])),
     }])),
   };

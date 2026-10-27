@@ -324,6 +324,70 @@ ontology:
   });
 });
 
+/** Each mandatory on a fact type as the role name it constrains, with its modality. */
+function mandatories(model: OrmModel, name: string): string[] {
+  const ft = factType(model, name);
+  return ft.internalConstraints.flatMap((c) =>
+    c.type === "mandatory"
+      ? [`${ft.roles.find((r) => r.id === c.roleId)!.name}:${c.modality ?? "alethic"}`]
+      : []
+  );
+}
+
+describe("Ossie import: identify_by makes its roles mandatory", () => {
+  // ossie-identifier-implies-mandatory.spec.md, barwise-3ik.
+  it("makes the concept's role of a single identifying relationship mandatory, without a warning", () => {
+    const { model, warnings } = load(`
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ] }
+  - concept: Carrier
+    type: EntityType
+    identify_by: [ code ]
+    relationships:
+      - { name: code, roles: [ { concept: Code } ], multiplicity: OneToOne, verbalizes: [ "{Carrier} has {Code}" ] }
+`);
+    expect(mandatories(model, "Carrier.code")).toEqual(["Carrier:alethic"]);
+    expect(warnings).toEqual([]);
+  });
+
+  it("makes each component of a composite identifier mandatory", () => {
+    const { model } = load(`
+ontology:
+  - { concept: Name, type: ValueType, extends: [ String ] }
+  - { concept: State, type: EntityType, identify_by: [ code ], relationships: [ { name: code, roles: [ { concept: Name } ], multiplicity: OneToOne, verbalizes: [ "{State} has code {Name}" ] } ] }
+  - concept: City
+    type: EntityType
+    identify_by: [ name, state ]
+    relationships:
+      - { name: name, roles: [ { concept: Name } ], multiplicity: ManyToOne, verbalizes: [ "{City} has {Name}" ] }
+      - { name: state, roles: [ { concept: State } ], multiplicity: ManyToOne, verbalizes: [ "{City} is in {State}" ] }
+`);
+    expect(mandatories(model, "City.name")).toEqual(["City:alethic"]);
+    expect(mandatories(model, "City.state")).toEqual(["City:alethic"]);
+  });
+
+  it("adds no second mandatory when requires already states it", () => {
+    const { model } = load(`
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ] }
+  - concept: Party
+    type: EntityType
+    identify_by: [ code ]
+    requires: [ Party.code ]
+    relationships:
+      - { name: code, roles: [ { concept: Code } ], multiplicity: OneToOne, verbalizes: [ "{Party} has {Code}" ] }
+`);
+    expect(mandatories(model, "Party.code")).toEqual(["Party:alethic"]);
+  });
+
+  it("leaves the pinned flights example with no optional identifier", () => {
+    const { model } = new OssieImportFormat().parse(readFileSync(fixture, "utf8"));
+    const optional = new ValidationEngine().validate(model)
+      .filter((d) => d.ruleId === "completeness/preferred-identifier-optional");
+    expect(optional).toEqual([]);
+  });
+});
+
 describe("Ossie import: requires", () => {
   it("reads an enumeration and a range as a value constraint, either operand order", () => {
     const { model, warnings } = load(`

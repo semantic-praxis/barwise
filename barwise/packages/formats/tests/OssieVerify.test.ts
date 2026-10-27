@@ -230,4 +230,97 @@ describe("Ossie export: the read-back check", () => {
     );
     expect(text.split("\n").filter((l) => l.trim() === "^")).toEqual([]);
   });
+
+  it("says an optional identifying role comes back mandatory, though the fact type has another line", () => {
+    // ossie-identifier-implies-mandatory.spec.md: the read-back check is
+    // silent on a fact type that already has a line, so the writer says it.
+    const m = new OrmModel({ name: "M" });
+    const person = m.addObjectType({
+      id: id("ot"),
+      name: "Person",
+      kind: "entity",
+      referenceMode: "person_id",
+    });
+    const pid = m.addObjectType({
+      id: id("ot"),
+      name: "PersonId",
+      kind: "value",
+      dataType: { name: "integer" },
+    });
+    const roles = [
+      { id: id("r"), name: "Person", playerId: person.id },
+      { id: id("r"), name: "PersonId", playerId: pid.id },
+    ];
+    const pidUc = id("uc");
+    m.addFactType({
+      id: id("ft"),
+      name: "Person.person_id",
+      roles,
+      // Brace text the writer reports: the fact type's other line.
+      readings: ["{0} has {1} {sic}"],
+      constraints: [
+        { type: "internal_uniqueness", id: id("uc"), roleIds: [roles[0]!.id] },
+        { type: "internal_uniqueness", id: pidUc, roleIds: [roles[1]!.id] },
+      ],
+    });
+    m.setPreferredIdentifier(person.id, pidUc);
+    const all = losses(m);
+    expect(all.filter((l) => l.startsWith("fact type Person.person_id:"))).toEqual([
+      "fact type Person.person_id: role Person of Person is optional; Ossie's identify_by makes it mandatory on import",
+      'fact type Person.person_id: reading "{0} has {1} {sic}" has brace text, written with parentheses',
+    ]);
+    expect(verified(m)).toEqual([]);
+  });
+
+  /** Room, identified by its number and building, both of whose Room roles are optional. */
+  function rooms(stored: boolean): OrmModel {
+    const m = new OrmModel({ name: "M" });
+    const room = m.addObjectType({
+      id: id("ot"),
+      name: "Room",
+      kind: "entity",
+      referenceMode: "room_id",
+    });
+    const binary = (name: string, valueName: string, roleName: string) => {
+      const v = m.addObjectType({
+        id: id("ot"),
+        name: valueName,
+        kind: "value",
+        dataType: { name: "text" },
+      });
+      const roles = [
+        { id: id("r"), name: roleName, playerId: room.id },
+        { id: id("r"), name: valueName, playerId: v.id },
+      ];
+      m.addFactType({
+        id: id("ft"),
+        name,
+        roles,
+        readings: ["{0} has {1}"],
+        constraints: [{ type: "internal_uniqueness", id: id("uc"), roleIds: [roles[0]!.id] }],
+      });
+      return roles[1]!.id;
+    };
+    const eu = id("eu");
+    m.addConstraint({
+      type: "external_uniqueness",
+      id: eu,
+      roleIds: [
+        binary("Room.number", "RoomNumber", "Room"),
+        binary("Room.building", "Building", "is in"),
+      ],
+    });
+    if (stored) m.setPreferredIdentifier(room.id, eu);
+    return m;
+  }
+
+  for (const stored of [true, false]) {
+    it(`says each optional component comes back mandatory, with the identifier ${stored ? "stored" : "inferred"}`, () => {
+      const lines = losses(rooms(stored)).filter((l) => l.includes("makes it mandatory on import"));
+      expect(lines).toEqual([
+        "fact type Room.number: role Room of Room is optional; Ossie's identify_by makes it mandatory on import",
+        "fact type Room.building: role is in of Room is optional; Ossie's identify_by makes it mandatory on import",
+      ]);
+    });
+  }
 });
