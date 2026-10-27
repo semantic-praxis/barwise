@@ -77,12 +77,18 @@ both call one function, built on core's own `identifyingRoles` and
 ## Scope
 
 - `impliedMandatoryRoles(at)`, exported from `mapOssieToOrm.ts`, shall
-  return the roles of an identifying uniqueness that are not mandatory
-  alone, each with its fact type. It is built on `identifyingRoles` and
-  `isMandatoryAlone`. The importer passes the identifier it stored. The
-  writer passes the one it writes as `identify_by`, which includes an
-  external uniqueness written for an entity with no stored identifier
-  (`externalIdentifies`).
+  return the roles of an identifying uniqueness that carry no mandatory of
+  any modality, each with its fact type. It is built on
+  `identifyingRoles`. A deontic mandatory is excluded because it is not
+  optional: `writeOssie` writes it to `requires`, and the read-back check
+  reports that it comes back alethic.
+  - The importer passes the identifier it stored. It produces no deontic
+    constraints, so "no mandatory" and "not `isMandatoryAlone`" agree
+    there.
+  - The writer passes the identifying uniqueness it already resolved when
+    deciding to write `identify_by`: `resolved.at` for a stored
+    identifier, and `resolvedExt.at` (`externalIdentifies`) for an
+    external uniqueness on an entity with none. It rebuilds nothing.
 - After `addMandatoryRoles`, the importer shall add an alethic mandatory
   on each role `impliedMandatoryRoles` returns. Because it runs after
   `requires` is read and asks whether a mandatory is already there, a
@@ -126,8 +132,11 @@ The changes above. Each item below is pinned by a test:
   already has another loss line, exports with the prediction line.
 - The shop-model test's `requires` assertion is unchanged.
 
-Measured and recorded here, not pinned: the prediction lines over the
-84 tracked models that load.
+Measured before implementation, with a scratchpad script over the 84
+tracked models that load: 378 entities have a stored identifier, and
+none has an identifying role without a mandatory. So the prediction
+line fires on no tracked model. Implementation re-measures it through
+the export.
 
 Doc edits:
 
@@ -171,5 +180,11 @@ Doc edits:
 - Import: an ontology that lists an identifying relationship in
   `requires` imports as before, with one mandatory. One that does not
   now gets a mandatory it did not state, which is the point.
-- Export: output is unchanged, apart from the new prediction line for
-  optional identifying roles. That line is counted over the corpus.
+- Export of a native model: output is unchanged, apart from the
+  prediction line for an optional identifying role, which fires on none
+  of the 84 tracked models.
+- Export of an imported Ossie document: it gains a `requires` entry for
+  each identifying relationship, because the import now holds that
+  mandatory. The flights test (`OssieExportFormat.test.ts`, "comes back
+  equal ... compared by meaning") absorbs this through the `meaning`
+  change in Workstream 1.
