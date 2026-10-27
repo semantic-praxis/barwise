@@ -44,6 +44,8 @@ src/
   openapi/OpenApiImportFormat.ts OpenAPI 3.x -> ORM
   openapi/OpenApiExportFormat.ts ORM -> OpenAPI JSON (wraps renderOpenApi)
   avro/AvroExportFormat.ts       ORM -> Avro schema (wraps renderAvro)
+  avro/avroNames.ts              Avro's namespace rule, and the repair the editor
+                                 uses for a namespace taken from a file name
   sql/SqlImportFormat.ts         Raw SQL files -> ORM (text + directory scan)
   sql/SqlglotBridge.ts           Optional sqlglot sidecar: structural SQL tier
                                  + sourceText normalization
