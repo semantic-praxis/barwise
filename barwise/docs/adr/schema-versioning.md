@@ -3,6 +3,7 @@
 Scope: architecture
 Date: 2026-10-21
 Tracking: barwise-ubc, barwise-1063, barwise-n9n, barwise-vvg, barwise-6om, barwise-y1b,
+barwise-jj8,
 docs/specs/archive/schema-versioning.spec.md,
 docs/specs/diagram-references-by-id.spec.md,
 docs/specs/orm-format-3.spec.md
@@ -27,18 +28,21 @@ was a section of the metamodel ADR before this one.
 1. **The version is the compatibility signal.** Every `.orm.yaml` states
    an `orm_version`. The serializer stamps `CURRENT_ORM_VERSION` on
    every file it writes, and the JSON Schema pins the same value as a
-   `const`, so a file from a newer build is refused with a "written by a
-   newer barwise" error rather than a schema failure on an unknown
-   construct.
+   `const`, so a reader given a file whose version exceeds its own
+   refuses it with a "written by a newer barwise" error rather than a
+   schema failure on an unknown construct.
 2. **An additive change bumps the minor version; a breaking or
    structural change bumps the major with a real migration.** Adding an
-   optional construct or field is additive. A change an older reader
-   would misread rather than ignore is structural (diagram references
-   moving from names to ids was one).
-3. **Only a minor bump is shared across its cycle.** The first additive
-   change after a released version bumps the minor; every later
-   additive change before the next release joins it without touching
-   the version. A breaking change takes its own major bump.
+   optional construct or field is a minor change: bump
+   `CURRENT_ORM_VERSION` and the schema `const`, and register a forward
+   migration (a no-op for a purely additive change). A change an older
+   reader would misread rather than ignore is structural (diagram
+   references moving from names to ids was one).
+3. **The minor bump is shared across its unreleased cycle.** The first
+   additive change after a released version performs the bump; every
+   later additive change before the next release adds its construct to
+   the already-bumped schema without touching the version -- not one
+   bump per construct or per pull request.
 4. **Older files load at the current version; a surface writes them
    back only when it writes an edit.** A migration brings an older file
    forward on load, either as a step on the raw document
@@ -55,23 +59,31 @@ was a section of the metamodel ADR before this one.
   version, and a newer version is refused with "newer barwise", never
   the schema's `const` message. It runs in CI through
   `npm run test:coverage` (`if: steps.changes.outputs.docs_only !=
-  'true'`).
+  'true'`, so skipped on a docs-only pull request and, like any step,
+  once an earlier step fails). A file at the same version that uses a
+  construct the reader lacks still fails at the schema; decision 1 does
+  not cover that.
 - Decision 2 has no gate: whether a change is additive or structural is
   a judgment each spec makes and its review checks, as
   `diagram-references-by-id.spec.md` D1 and `orm-format-3.spec.md` did.
+  Its mechanism does not fit today's loader: raw-document steps run only
+  up to `LEGACY_ORM_VERSION` (2.0), and a version between that and the
+  current one is refused, so a 3.0 to 3.1 bump done as written would
+  refuse every 3.0 file until the loader changes (barwise-jj8).
 - Decision 3 has no gate: a change to `orm-model.schema.json` that
   leaves `CURRENT_ORM_VERSION` equal to the last tagged release's passes
-  CI (barwise-vvg).
-- What "a released version" means is not stated as a rule. The moving
-  `edge` pre-release is rebuilt on every push to main, and
-  `diagram-empty-view.spec.md` resolved its question on the reading that
-  `edge` is unreleased. Under that reading `join_ring` (#746) and the
-  external-uniqueness preferred identifier (#767) joined the unreleased
-  3.0 after #708, so an earlier `edge` build refuses such a file at the
-  schema rather than with "newer barwise". The same resolution changed
-  what `elements: []` means inside 2.0 with no bump, a change an older
-  2.0 reader misreads, which decisions 2 and 3 reserve for a major; it
-  accepted that exposure in its PR (barwise-6om).
+  CI (barwise-vvg, which waits on barwise-6om for what "released"
+  means).
+- Decision 3 is silent on what counts as released and on what happens
+  inside an unreleased major. v1.7.0 wrote 1.1; 2.0 and 3.0 have landed
+  since only in the moving `edge` pre-release. `join_ring` (#746) and
+  the external-uniqueness preferred identifier (#767), both additive,
+  joined 3.0 after #708 with no minor bump, so an earlier 3.0 `edge`
+  build refuses such a file at the schema rather than with "newer
+  barwise". `diagram-empty-view.spec.md` changed what `elements: []`
+  means inside 2.0 with no bump, a structural change an older 2.0 reader
+  misreads, and accepted that exposure in its PR. Whether either is
+  allowed is open (barwise-6om).
 - Decision 4's load and write paths are tested: the 1.0 forward load in
   `SchemaVersioning.test.ts`, the 2.0 reader and `migrate` in
   `format30.test.ts`, the command in `cli/tests/commands/migrate.test.ts`,
@@ -89,8 +101,11 @@ was a section of the metamodel ADR before this one.
   later") without deciding against it (barwise-y1b).
 - 1.0 includes value ranges (barwise-5t9.1), which shipped before this
   rule; the discipline began with the 1.0 to 1.1 bump.
-- Until architecture-index WS5 replaces them with links, the metamodel
-  ADR's bounded-cost filter, the root `CLAUDE.md` ("Explicit over
-  implicit" and the `migrate` row), `docs/CLI.md` (`migrate`) and the
-  `CURRENT_ORM_VERSION` comment in `schemaVersion.ts` also state this
-  rule (barwise-ubc, WS5).
+- Until architecture-index WS5 replaces them with links, these places
+  also state this rule (barwise-ubc, WS5): the metamodel ADR's
+  bounded-cost filter; the root `CLAUDE.md` ("Explicit over implicit"
+  and the `migrate` row); `docs/CLI.md` (`migrate`);
+  `architecture-scenarios.md` S-EXPL-1 and S-EXPL-2; the `pr-review`
+  checklist's `schemaVersion` item; `orm-format-3.spec.md`,
+  `diagram-references-by-id.spec.md` and `diagram-empty-view.spec.md`;
+  and the `CURRENT_ORM_VERSION` comment in `schemaVersion.ts`.

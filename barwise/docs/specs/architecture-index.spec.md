@@ -366,7 +366,7 @@ all of them with a link:
 | --------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `determinism-in-core.md`          | architecture | CLAUDE.md design principles; `architecture-scenarios.md` S-DET-1..5; `check-core-purity.mjs`; the `core/src/model/id.ts` header                                                                                                                |
 | `connector-packages.md`           | architecture | CLAUDE.md principles, package list, "Dependency Graph", Current State; formats, dbt, code-analysis `CLAUDE.md`; scenarios S-COMP-1, S-EXPL-5; three registration headers                                                                       |
-| `schema-versioning.md`            | architecture | metamodel ADR bounded-cost filter; CLAUDE.md "Explicit over implicit", `migrate` row; `CLI.md` migrate; `CURRENT_ORM_VERSION` comment; orm-format-3, diagram-references-by-id, diagram-empty-view                                              |
+| `schema-versioning.md`            | architecture | metamodel ADR bounded-cost filter; CLAUDE.md "Explicit over implicit", `migrate` row; `CLI.md`; scenarios S-EXPL-1, S-EXPL-2; `pr-review` checklist; three specs; `schemaVersion.ts` comment                                                   |
 | `surface-capability-parity.md`    | architecture | CLAUDE.md capability matrix ("an unmarked gap is a bug")                                                                                                                                                                                       |
 | `production-prompt-resolution.md` | architecture | CLAUDE.md `--artifacts` row and paragraph; `llm/CLAUDE.md`, `cli/CLAUDE.md`; `artifact-resolution-parity.spec.md`; `selectArtifact.ts`, `callLog.ts`, `prompt.ts` comments; `promptRun.test.ts` header                                         |
 | `keyless-model-access.md`         | architecture | CLAUDE.md conventions; `keyless-model-access.spec.md`; mcp, vscode, promptlab `CLAUDE.md`; key-handling comments in cli, mcp, vscode, optimizer; `vscode/package.json` deprecation; user docs                                                  |
@@ -381,8 +381,9 @@ all of them with a link:
 | `merge-delegation.md`             | process      | CLAUDE.md conventions bullet 3; `steward` skill, section 4b; `pr-review` skill (description, section 6); `REVIEW.md`; `pr-creation` skill; `steward-skill.spec.md`                                                                             |
 | `review-policy.md`                | process      | `tiered-pr-review` 09-23; `REVIEW.md`; CLAUDE.md conv. 3; `copilot-review.yml`; `review-tiers.json`; `steward` 7; `pr-review`, checklist; `pr-creation`; `review-md`, `review-routing`                                                         |
 
-`schema-versioning.md` is the question the list raises: today it is a
-section of the metamodel ADR, and one concern per ADR says it splits out.
+`schema-versioning.md` was the question the list raised: it was a
+section of the metamodel ADR, and one concern per ADR split it out on
+2026-10-27.
 
 ### 5. Shorten the root `CLAUDE.md` (provisional: after WS4)
 

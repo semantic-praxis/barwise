@@ -2,7 +2,7 @@
 
 Status: Implemented 2026-09-25 (single change).
 Created: 2026-09-25
-Last-updated: 2026-09-25
+Last-updated: 2026-10-27
 Tracking: barwise-1066
 
 ## Principle
@@ -21,8 +21,10 @@ Yes. Absent means "show every element", and `[]` means the view shows
 nothing. A view emptied by removing elements then says exactly what is
 left in it, which is nothing, and both guards go away.
 
-No new version. ADR `schema-versioning` bumps the format once per unreleased cycle, and
-2.0 is unreleased: v1.7.0 is the latest release, and 2.0 exists only in
+No new version. This spec read the once-per-unreleased-cycle bump as
+covering it, and 2.0 is unreleased (whether that rule, written for minor
+bumps in ADR `schema-versioning`, covers a change inside an unreleased
+major is open: barwise-6om): v1.7.0 is the latest release, and 2.0 exists only in
 the moving `edge` pre-release since #557 merged on 2026-09-25. The 2.0
 serializer never writes `elements: []`, so the only 2.0 file that
 changes meaning is one someone hand-edited to contain an empty list, in
