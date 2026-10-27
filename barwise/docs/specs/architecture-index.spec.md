@@ -1,10 +1,10 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25; review-policy, 2026-10-25; must-agree-copies, 2026-10-25; baselines-merge-on-write, 2026-10-25; findings-close-by-mechanism, 2026-10-25; gate-refusal-contract, 2026-10-25; python-from-the-lockfile, 2026-10-25; pinned-runtimes, 2026-10-25; production-prompt-resolution, 2026-10-25; keyless-model-access, 2026-10-27); 5 not yet
+Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25; review-policy, 2026-10-25; must-agree-copies, 2026-10-25; baselines-merge-on-write, 2026-10-25; findings-close-by-mechanism, 2026-10-25; gate-refusal-contract, 2026-10-25; python-from-the-lockfile, 2026-10-25; pinned-runtimes, 2026-10-25; production-prompt-resolution, 2026-10-25; keyless-model-access, 2026-10-27; credential-handling, 2026-10-27); 5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-27
-Plan-reviewed: 0e40ee3b (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
+Plan-reviewed: 83b36dc6 (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
 barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
@@ -375,7 +375,7 @@ all of them with a link:
 | `must-agree-copies.md`            | process      | CLAUDE.md conventions; `duplication-drift-guards.spec.md`; `deterministic-guards.spec.md`; skills `duplication-audit`, `spec-writer`, `pr-review`, `steward`; `REVIEW.md` "Do not report"; `check-parity.mjs`, `audit-duplication.mjs` headers |
 | `findings-close-by-mechanism.md`  | process      | CLAUDE.md conventions; `assertion-audit`, `session-review`, `duplication-audit` skills, `steward` 3; drift-guards WS5; ratchet headers; baseline `$comment`s; `ci.yml` ratchet comments                                                        |
 | `baselines-merge-on-write.md`     | process      | CLAUDE.md conventions; `baseline-write-preserves-verdicts.spec.md`; `baseline-merge.mjs` header, docblock, sort comment and test header; writer call-site, survey and reopen comments; `gates.test.mjs` writer-test comments                   |
-| `credential-handling.md`          | process      | CLAUDE.md conventions; `credential-scanning.spec.md`                                                                                                                                                                                           |
+| `credential-handling.md`          | process      | CLAUDE.md conventions; `credential-scanning.spec.md`; `check-secrets.mjs`, `.gitleaks.toml`, `install-gitleaks.sh` headers; `ci.yml`, pre-commit, `session-start.sh`, `gates.test.mjs` comments                                                |
 | `pinned-runtimes.md`              | process      | CLAUDE.md "Monorepo Commands" (Node, Python pins); README Prerequisites; GETTING_STARTED Install; `steward` 4; `session-start.sh`; `ci.yml` comments                                                                                           |
 | `plan-before-code.md`             | process      | CLAUDE.md conventions bullet 1 (spec first); `spec-writer` step 8 and design gate; `pr-creation` readiness; `plan-scope-check.spec.md`; `touches-required.spec.md`                                                                             |
 | `merge-delegation.md`             | process      | CLAUDE.md conventions bullet 3; `steward` skill, section 4b; `pr-review` skill (description, section 6); `REVIEW.md`; `pr-creation` skill; `steward-skill.spec.md`                                                                             |
