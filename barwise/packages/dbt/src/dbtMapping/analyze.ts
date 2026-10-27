@@ -2,7 +2,8 @@
  * Analysis phase: identify PKs, FKs, and custom tests across models.
  */
 
-import { candidateKeysOf, combinationOf, compositeKeyOf, KEY_TEST } from "./compositeKeys.js";
+import { DBT_KEY_TEST } from "@barwise/core/mapping";
+import { candidateKeysOf, combinationOf, compositeKeyOf } from "./compositeKeys.js";
 import { findRelationshipTest, hasTest } from "./constraints.js";
 import { type DbtMapperContext, type RelationshipInfo } from "./context.js";
 
@@ -30,7 +31,7 @@ export function analyzeModels(ctx: DbtMapperContext): void {
         "identifier",
         m.name,
         candidates.length > 1
-          ? `${candidates.length} ${KEY_TEST} tests each name a possible key (${
+          ? `${candidates.length} ${DBT_KEY_TEST} tests each name a possible key (${
             candidates.map((k) => `(${k.join(", ")})`).join(", ")
           }) and none is marked preferred. Cannot determine primary identifier.`
           : `No column with both unique and not_null tests found. Cannot determine primary identifier.`,

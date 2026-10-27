@@ -888,7 +888,7 @@
         "x-barwise-annotations": [
           {
             "severity": "note",
-            "message": "Composite primary key (person_id, is_child_of_person_id): unique as a combination; no single column is unique."
+            "message": "Composite primary key (person_id, is_child_of_person_id): unique as a combination."
           }
         ]
       }

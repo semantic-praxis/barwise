@@ -33,7 +33,7 @@ reported: Avro has no keys or references at all (a primary key is a
 `doc` line), OpenAPI enforces no key uniqueness, and dbt writes no
 `relationships` test when `generateRelationshipTests` is false. A key is not reported:
 Avro writes it on its columns, and dbt tests it, a key over several columns with
-`dbt_utils.unique_combination_of_columns`, which the dbt project must declare. A mandatory role
+`dbt_utils.unique_combination_of_columns`, which the dbt project must declare. OpenAPI's item path names only the first column of a key over several columns (barwise-pki). A mandatory role
 the mapping does not enforce is reported too; DDL comments it with the reason for its shape.
 
 ### DDL (SQL)

@@ -21,7 +21,7 @@ import {
 import { formatBarwiseComment, stripBarwiseComments } from "../../annotation/helpers.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { RelationalSchema } from "../RelationalSchema.js";
-import { DBT_KEY_TEST } from "./dbt.js";
+import { DBT_KEY_TEST, dbtKeyTestColumns } from "./dbt.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -144,7 +144,7 @@ function formatAnnotationComment(annotation: ExportAnnotation): string {
  */
 function dbtKeyNotes(schema: RelationalSchema): ExportAnnotation[] {
   return schema.tables
-    .filter((t) => t.primaryKey.columnNames.length > 1)
+    .filter((t) => dbtKeyTestColumns(t) !== undefined)
     .map((t) => ({
       tableName: t.name,
       severity: "note",

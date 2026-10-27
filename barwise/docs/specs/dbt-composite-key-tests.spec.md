@@ -11,6 +11,10 @@ barwise/packages/core/src/mapping/renderers/DbtExportAnnotator.ts,
 barwise/packages/core/src/mapping/index.ts,
 barwise/packages/core/src/annotation/ExportAnnotationCollector.ts,
 barwise/packages/dbt/src/dbtMapping/compositeKeys.ts,
+barwise/packages/dbt/src/dbtMapping/analyze.ts,
+barwise/packages/dbt/src/DbtSchemaParser.ts,
+barwise/examples/transcripts/clinic-appointments.openapi.json,
+barwise/examples/transcripts/pii-redaction.openapi.json,
 barwise/packages/core/tests/mapping/dbt.test.ts,
 barwise/packages/core/tests/mapping/DbtExportAnnotator.test.ts,
 +barwise/packages/dbt/tests/compositeKeyExport.test.ts,
@@ -114,6 +118,24 @@ These are measured and recorded here rather than pinned by a test:
   (barwise-ivl), and that OpenAPI's item path does not carry a
   composite key (barwise-pki). The plan was rewritten to count shapes
   and to defer OpenAPI.
+- Implementation review:
+  - `DbtSchemaParser` now unwraps dbt 1.10's `arguments:` block for
+    every test, not only the key test. With only the key test unwrapped,
+    a fully 1.10-style project found the key but resolved its references
+    to no model.
+  - The shared note says only "unique as a combination". "No single
+    column is unique" is false where a key column also has its own
+    uniqueness.
+  - `dbtKeyTestColumns` decides which models get the key test, and the
+    renderer and the annotator both read it.
+  - The importer's `KEY_TEST` alias is gone; its readers import
+    `DBT_KEY_TEST`.
+  - The committed example OpenAPI outputs carry the reworded note.
+  - IMPORT_EXPORT names OpenAPI's composite-key gap (barwise-pki).
+  - Declined: a notice with `--no-annotate`. That flag asks for no notes,
+    and `dbt compile` names the missing macro.
+  - Declined: folding the two notes into one. One states a fact for
+    every format, the other a dbt dependency.
 
 ## Open decisions
 

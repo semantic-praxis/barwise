@@ -23,18 +23,10 @@ import { findRelationshipTest, hasTest } from "./constraints.js";
 import type { CompositeInfo, DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
 
-/** The model-level dbt test whose columns name a composite key. */
-export const KEY_TEST = DBT_KEY_TEST;
-
 /** The columns a model-level combination test names, or undefined for any other test. */
 export function combinationOf(test: DbtModel["modelTests"][number]): string[] | undefined {
-  if (test.type !== "custom" || test.name !== KEY_TEST) return undefined;
-  // dbt 1.10 moves a generic test's arguments under `arguments:`.
-  const args = test.config["arguments"];
-  const cols = test.config["combination_of_columns"]
-    ?? (args !== null && typeof args === "object"
-      ? (args as Record<string, unknown>)["combination_of_columns"]
-      : undefined);
+  if (test.type !== "custom" || test.name !== DBT_KEY_TEST) return undefined;
+  const cols = test.config["combination_of_columns"];
   return Array.isArray(cols) ? cols.map(String) : undefined;
 }
 
@@ -199,7 +191,7 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
     ctx.report.info(
       "identifier",
       m.name,
-      `Composite key (${key.join(", ")}) from ${KEY_TEST}: imported as ${
+      `Composite key (${key.join(", ")}) from ${DBT_KEY_TEST}: imported as ${
         info.objectified ? "an objectified" : "a"
       } fact type over ${roles.map((r) => r[0]).join(", ")}.`,
     );
