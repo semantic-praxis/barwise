@@ -93,10 +93,9 @@ are in `artifact-resolution-parity.spec.md`.
 - barwise-0wa (in progress) is re-deciding every capability-matrix row
   marked "deliberate", this one included. Mirroring the override into MCP
   or VS Code would change Decisions 1 to 3.
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5): the root `CLAUDE.md` (the
-  `--artifacts` matrix row and the paragraph beneath it);
-  `packages/llm/CLAUDE.md` (the promotion-path note);
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule: `packages/llm/CLAUDE.md` (the promotion-path note);
   `packages/cli/CLAUDE.md`; `artifact-resolution-parity.spec.md` (Open
   decision 1); the `selectArtifact.ts` header; the `promptHash` comment
   in `callLog.ts`; the `prompt artifact` and `prompt run` comments in

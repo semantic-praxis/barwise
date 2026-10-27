@@ -7,11 +7,6 @@
       "why": "a placeholder in the template's example Inventory row"
     },
     {
-      "file": "CLAUDE.md",
-      "token": ".vscode/settings.json",
-      "why": "a user's workspace settings file, named as where a key must not be written"
-    },
-    {
       "file": "barwise/packages/vscode/CLAUDE.md",
       "token": ".vscode/settings.json",
       "why": "a user's workspace settings file, named as where a key must not be written"

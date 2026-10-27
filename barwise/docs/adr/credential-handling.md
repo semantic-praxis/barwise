@@ -104,10 +104,11 @@ and the exit contract Decision 4 applies is
     before any scan when the hooks are absent (above) or skipped with
     `--no-verify`, the documented escape hatch for work in progress
     (barwise-sma).
-- Until architecture-index WS5 replaces them with links, the root
-  `CLAUDE.md` conventions bullet, `credential-scanning.spec.md`, the
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5),
+  `credential-scanning.spec.md`, the
   headers of `check-secrets.mjs`, `.gitleaks.toml` and
   `install-gitleaks.sh`, the comments on the `ci.yml` secret-scan steps,
   the pre-commit hook, `.claude/hooks/session-start.sh`, and the
   check-secrets section of `scripts/tests/gates.test.mjs` also state this
-  rule (barwise-ubc, WS5).
+  rule.

@@ -87,9 +87,9 @@ toolset; which gaps survive that direction is being decided row by row
 - User docs carry only a name map, not a second matrix. A
   `gettingStartedDocs.test.ts` in cli, mcp and vscode checks each name
   they cite against that surface; it checks names, not reach.
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5): the root `CLAUDE.md` matrix
-  section and its cli bullet; the `pr-review` checklist ("When a surface
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule: the `pr-review` checklist ("When a surface
   changed"); `assertion-audit` rules 4 and 6; `duplication-audit` rule 5;
   `REVIEW.md` (the barwise-1fr item); the `audit-baseline.json` note on
   the tool-list halves; and the comments in the two pinned tests.

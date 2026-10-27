@@ -73,6 +73,7 @@ run on which changes is a separate decision, owned by the root
 - The condition vouches that the review recommended `merge` on that
   head. It cannot show the review was done well; that is `pr-review`'s
   own discipline.
-- Until architecture-index WS5 replaces them with links, `steward`
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), `steward`
   section 4b, the `pr-review` skill, `REVIEW.md` and `pr-creation`
-  also state parts of this rule (barwise-ubc, WS5).
+  also state parts of this rule.

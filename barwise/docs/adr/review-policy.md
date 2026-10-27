@@ -103,9 +103,9 @@ condition, is a separate decision (`steward` section 4b).
   Claude Code Review service and protecting `main` are an Owner's
   settings (`review-md.spec.md`, Scope); the service was not enabled as
   of 2026-10-23.
-- Until architecture-index WS5 replaces them with links,
-  `tiered-pr-review.spec.md`, `REVIEW.md`, the root `CLAUDE.md`
-  conventions, the `copilot-review.yml` header, `review-tiers.json`, the
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5),
+  `tiered-pr-review.spec.md`, `REVIEW.md`, the `copilot-review.yml` header, `review-tiers.json`, the
   `steward` (section 7), `pr-review` (section 3 and `checklist.md`) and
   `pr-creation` skills, `review-md.spec.md` and
-  `review-routing.spec.md` also state this rule (barwise-ubc, WS5).
+  `review-routing.spec.md` also state this rule.

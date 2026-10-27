@@ -25,16 +25,16 @@ provides the theoretical foundation for fact-based modeling.
 - **Determinism in the core.** Validation, verbalization, mapping,
   diff, and query are pure and deterministic -- same input, same
   output. Non-determinism (LLM calls, network I/O, clocks) lives in
-  the outer packages (`llm`, `cli`, `mcp`, `vscode`). New
-  capabilities go in `core` only if they can preserve this; if they
-  cannot, they belong one layer out.
+  the outer packages (`llm`, `cli`, `mcp`, `vscode`)
+  (`docs/adr/determinism-in-core.md`).
 
 - **Explicit over implicit.** Cross-domain references go through
   declared context mappings; data products declare the domains they
-  compose; every `.orm.yaml` carries a `schemaVersion`; import and
-  export formats register through a named `FormatDescriptor` rather
-  than being auto-discovered. When in doubt, require declaration
-  instead of inference.
+  compose; every `.orm.yaml` carries an `orm_version`
+  (`docs/adr/schema-versioning.md`); import and export formats
+  register through a named `FormatDescriptor` rather than being
+  auto-discovered (`docs/adr/connector-packages.md`). When in doubt,
+  require declaration instead of inference.
 
 - **DRY (secondary).** Remove duplication when it does not
   compromise orthogonality or composability. A small amount of
@@ -181,13 +181,11 @@ working in a package:
 ```
 
 This block is a rendering for readers. The authority is `INTENDED` in
-`barwise/scripts/lib/intended.cjs`, the map dependency-cruiser enforces;
+`barwise/scripts/lib/intended.cjs` (`docs/adr/package-graph-authority.md`);
 `npm run check:architecture` fails when this block, or a package's
 runtime `dependencies`, disagrees with it, so change both in one commit.
 Draw it to the grammar in `barwise/scripts/check-architecture.mjs`
-(`GRAMMAR`): a line outside it is refused by name, and the refusal
-prints the grammar. It exists because a drawing with no syntax
-separating rows from comments was misread five different ways.
+(`GRAMMAR`); a line outside it is refused by name.
 
 The one thing outside that graph is `barwise/optimizer/`: the DSPy
 prompt-optimization lane. It is Python, it is dev-time only, and it
@@ -199,16 +197,10 @@ dependency -- if a capability built in that lane turns out to be needed
 at run time, it moves into `@barwise/llm` as TypeScript. That is the
 determinism rule applied one layer further out than `core`.
 
-`@barwise/code-analysis` is the template for the connector convention:
-a package outside `core` that keeps its own I/O (LSP sessions, repo
-scanning) and registers importers into the `FormatDescriptor` registry,
-rather than putting that I/O in `core`. `@barwise/dbt` follows the same
-convention for the dbt importer/exporter (project-directory scanning and
-the `dbt compile` subprocess), registering via `registerDbtFormats()`.
-`@barwise/formats` carries the standard interop descriptors (DDL,
-OpenAPI, Avro, NORMA, SQL, Ossie) via `registerStandardFormats()`, so `core`
-ships no interop format at all -- only the registry, the format
-interfaces, and the native `.orm.yaml`.
+Formats live in connector packages -- `@barwise/formats` (DDL, OpenAPI,
+Avro, NORMA, SQL, Ossie), `@barwise/dbt` and `@barwise/code-analysis` --
+which own their I/O and register through one `register*Formats()` each;
+core ships no interop format (`docs/adr/connector-packages.md`).
 
 Changes to `@barwise/core` can break all downstream packages. Run the
 full monorepo build and tests after modifying core's public API.
@@ -223,17 +215,12 @@ code importers in `@barwise/code-analysis`.
 ### Capability matrix across the three surfaces
 
 The surfaces do **not** all expose the same capabilities. Consult this
-before assuming one is reachable from the surface you are working on,
-and update it in the same commit that changes a surface's reach.
-
-**What "yes" means in the VS Code column**: the capability is reachable
-from the editor, by either mechanism -- a `contributes.commands` palette
-entry, or a language-model tool registered by `ToolRegistration.ts`.
-Both count, and the column said so for `review` while counting the same
-registration as "no" for seven others, which is how it came to assert
-divergence that had not held for some time (barwise-988). Where a row's
-VS Code answer rests on the tool registration rather than the palette,
-it is qualified by `barwise.enableMcpServer`, which defaults on.
+before assuming one is reachable from the surface you are working on.
+An unmarked gap is a bug, and a change to a surface's reach updates this
+table in the same commit. A VS Code "yes" means a palette command or a
+language-model tool (the latter gated by `barwise.enableMcpServer`,
+default on). The rules, what is pinned and what is not checked are in
+`docs/adr/surface-capability-parity.md`.
 
 | Capability                                            | CLI | MCP | VS Code | Divergence                                                                                                                                                                                     |
 | ----------------------------------------------------- | --- | --- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -254,32 +241,17 @@ it is qualified by `barwise.enableMcpServer`, which defaults on.
 | reference inference (`--infer-references`)            | yes | no  | no      | deliberate: a warehouse-import option, no use elsewhere yet                                                                                                                                    |
 | content-only matching on diff (`--matching content`)  | yes | yes | yes     | none on diff (VS Code as a language-model tool); merge stays id-first on every surface, since its id lookups assume a shared id is one element; its hazard under coinciding ids is barwise-xv1 |
 
-Every remaining gap is marked deliberate, which is the point: an
-unmarked gap is a bug.
+Gaps marked `deliberate` are being re-decided under the owner's
+2026-10-12 direction that MCP and VS Code mirror the CLI (barwise-0wa).
+The MCP and VS Code tool lists are pinned by `toEqual` tests; the table
+itself is maintained by hand, and nothing compares it with the code
+(barwise-1005, barwise-xpt).
 
-The `--artifacts` row hides a boundary the table's own axis cannot
-show, because it falls _within_ the CLI rather than between surfaces:
-`barwise prompt eval`, `prompt artifact` and `prompt run` accept a
-directory of unshipped prompt candidates; `barwise import transcript`
-and `barwise review` do not, and must not
-(`docs/specs/artifact-resolution-parity.spec.md`). Production resolves
-over `builtinArtifacts` alone, which is what makes the prompt any run
-sent recoverable afterwards -- a pure function of barwise version,
-surface, provider and model, which `barwise prompt artifact` computes
-offline. Put the flag on a production command and an unreviewed prompt
-can do real modelling work while the recorded `promptHash` resolves to
-nothing. Trying a candidate against a live model is `barwise prompt
-run`, which is what that lane is for. The tool lists behind the MCP and VS Code columns are now pinned --
-`mcp/tests/serverSpawn.test.ts` and
-`vscode/tests/unit/toolRegistration.test.ts` each assert their complete
-sorted list with `toEqual`, so adding or removing a tool fails until
-this table is updated in the same commit. The rest of the table is
-still hand-maintained and is therefore still the kind of claim that
-goes stale: it asserted parity that did not hold for two years'
-worth of readers (`docs/unwired-capability-audit-2026-08-20.md`), and
-then asserted divergence that did not hold either, because "deliberate"
-reads as intent and nothing checked it (barwise-988). Treat a surface
-change as incomplete until this table agrees with it.
+The `--artifacts` row hides a boundary within the CLI: `prompt eval`,
+`prompt artifact` and `prompt run` accept unshipped prompt candidates;
+`import transcript` and `review` must not, so the prompt any production
+run sent stays recoverable (`docs/adr/production-prompt-resolution.md`).
+Trying a candidate against a live model is `barwise prompt run`.
 
 One name collision worth stating, because it looks like a gap and is
 not: VS Code's `barwise.newProject` scaffolds a `.orm.yaml` **model**,
@@ -363,23 +335,11 @@ the pre-commit hook with "Property X does not exist on type Y" naming
 something you plainly just added. Run `npm run build` from `barwise/`
 first whenever a change crossed a package boundary.
 
-**Node is pinned in `.nvmrc`, and both workflows read it.** Not a
-preference: v8 coverage thresholds are not portable across Node versions.
-V8 leaves functions it never compiled out of its coverage report, so a
-module no test constructs is counted as one function on Node 22 and
-nineteen on Node 26 -- `@barwise/code-analysis` read 95% functions on one
-and 81% on the other from identical source. A floating runtime means the
-gate passes or fails by whichever Node you happen to have.
-
-**Python is pinned in `.python-version`, beside `.nvmrc`, and only to the
-minor.** `uv.lock` branched on `python_full_version < '3.12'`, so `uv sync
---frozen` honoured the lock and still installed numpy 2.4.6 locally against
-2.5.2 in CI, from one commit -- the interpreter selects which half of the
-lock applies, and nothing pinned it. The lock now carries a single
-resolution. The pin stops at the minor because an exact patch is not
-enforced: with `.python-version` reading `3.13.12`, `uv sync` prints "Using
-CPython 3.13.7" and exits 0. Verify the interpreter that ran, never the
-file that asked.
+**Runtimes are pinned.** Node is the version in `.nvmrc`, which every
+workflow reads -- v8 coverage thresholds are not portable across Node
+versions. Python is pinned to the minor in `.python-version`. Verify the
+interpreter that ran, never the file that asked
+(`docs/adr/pinned-runtimes.md`).
 
 **The hooks split by cost, not by preference.** Pre-commit is the fast
 path: staged-file linting, a build, and the tests of packages a change
@@ -393,14 +353,12 @@ already computed. A working tree holds build
 output and unpushed files a CI checkout lacks, and on PR #641 a script test
 passed here because `dist` existed and failed in CI
 (`docs/specs/pushed-tree-verification.spec.md`). A docs-only change skips
-what CI skips, and `--all` runs everything. Measured 2026-10-14: 208s for a push with source changes,
-about 30s more than checking the same commit in the working tree, most of
-it `npm ci`; 392s when `test:coverage` has to run for the first time. Plain
-`npm run ci:local` still checks the working tree, for use before a commit.
-The full list belongs at the push because a push is what makes CI run,
-and because the same list per commit is a hook people turn off. `git push
---no-verify` is the escape hatch for work in progress; a red push is the
-thing the wait exists to avoid.
+what CI skips, and `--all` runs everything. Plain `npm run ci:local`
+checks the working tree, for use before a commit. `git push --no-verify`
+is the escape hatch for work in progress. The hooks exist only after
+`npm run prepare`, and do not run at all in a `git worktree` checkout
+(barwise-mdp): there, run `npm run ci:local -- --commit <sha>` by hand
+before pushing.
 
 ## Versioning and Releases
 
@@ -411,23 +369,20 @@ skill (`.claude/skills/release/`).
 
 ## Conventions (Monorepo-Wide)
 
-- Create a spec file before beginning development, so there is a
-  documented and reviewed plan that keeps the quality of work high.
-  Use the `spec-writer` skill for the house spec format, the
-  design-principle framing, and the pre-flight checklist; specs live
-  in `barwise/docs/specs/`.
+- Create a spec before beginning development, and have its plan
+  reviewed before implementing it (`docs/adr/plan-before-code.md`).
+  The `spec-writer` skill has the house format, the design-principle
+  framing and the pre-flight checklist; specs live in
+  `barwise/docs/specs/`.
 - Doc naming and dating (stable kebab names for specs, dated filenames
   for point-in-time artifacts) follows the convention in the
   `spec-writer` skill.
-- Opening a PR follows the `pr-creation` skill, reviewing one
-  follows `pr-review`, and merging one follows the `steward` skill's
-  section 4b (the owner's condition: the review has recommended
-  `merge` on the head being merged); the barwise invariants CI cannot check live once,
-  in `pr-review/checklist.md`, which the author runs before a reviewer
-  has to (`docs/specs/pr-skills.spec.md`). Which review runs when
-  (`/code-review`, `/security-review`, `/pr-review`, the Claude Code
-  Review service) and the failure modes reviews here keep finding live
-  in the root `REVIEW.md` (`docs/specs/review-md.spec.md`).
+- Opening a PR follows the `pr-creation` skill, reviewing one follows
+  `pr-review`, and merging one follows the `steward` skill's section 4b:
+  the review has recommended `merge` on the head being merged
+  (`docs/adr/merge-delegation.md`). Which review runs when is the root
+  `REVIEW.md` (`docs/adr/review-policy.md`); the invariants CI cannot
+  check live in `pr-review/checklist.md`.
 - TypeScript strict mode. Base config in `barwise/tsconfig.base.json`
   uses NodeNext module resolution; the vscode package overrides to
   Bundler resolution for esbuild.
@@ -440,159 +395,40 @@ skill (`.claude/skills/release/`).
   are fine.
 - **Every Python execution resolves from the project lockfile.** The
   form is `uv run --frozen [--only-group <g>] ...`, and `--locked` in
-  CI so a stale lock fails the build instead of being re-resolved
-  silently. Never a bare `python3`, `python` or `pip`. Never `--with`,
-  `--with-requirements`, `--isolated`, or `uv pip`. An optional tier
-  (sqlglot) is a dependency-group in the single `pyproject.toml`, so it
-  lives in the lock and `--only-group` installs it alone.
-
-  **The flag only means anything when a project is discovered.**
-  `uv run --frozen` does not fail where there is no `pyproject.toml` to
-  find -- it silently runs a uv-managed interpreter with no lock and no
-  dependencies, and exits 0. That is why the project sits at `barwise/`
-  rather than in `barwise/optimizer/`: `uv run` discovers a project by
-  walking UP from the cwd, so from `barwise/packages/formats` the old
-  location was a sibling and invisible, and every `--frozen` call there
-  would have read as compliant while resolving nothing. Keep
-  `pyproject.toml` an ancestor of anything that runs Python, and never
-  take a green `uv run --frozen` as evidence the lock was used.
-
-  Pinning the interpreter is not enough, and neither is `uv run` by
-  itself. Against a lock pinning `sqlglot==27.28.0`, `uv run --with
-  sqlglot==27.20.0` runs 27.20.0 -- and so do the `--frozen` and
-  `--locked` spellings of it, while `uv lock --check` still reports
-  clean. An older library, silently, undetected: `--with` is a lock
-  bypass the assertion flags do not close, which is why it is banned
-  outright rather than paired with something. The interpreter half of
-  this is the `.python-version` pin above; this is the dependency half,
-  and the failure is the same one (numpy 2.4.6 against 2.5.2 from one
-  commit) one layer down.
-
-  A one-off is still a run of this project: put the script in the repo
-  and run it `--frozen`. Not `--with`, and not PEP 723 inline script
-  metadata, which pins versions in the script where the lock does not
-  govern them. Every required and banned form above is literal text in
-  a command, which is what makes this checkable where "activate the
-  venv first" is not (barwise-921). The one standing exception is
-  bootstrapping uv itself.
-
-  Two checks read it, from one rule module
-  (`scripts/lib/python-uv-rules.mjs`): `npm run check:python-uv` over
-  tracked files, and a `PreToolUse` hook on an agent's own Bash
-  commands (`scripts/hooks/python-uv-guard.mjs`), which refuses a bare
-  interpreter before it runs. The hook also refuses a `uv run` outside
-  `barwise/` without `--project`, because the working directory is in
-  its input, and that directory is the one this section says `--frozen`
-  silently depends on. The hook exists because the gate never
-  saw the `python3 - <<EOF` an agent types, which ran twice in one day
-  (barwise-1060).
-- A copy that must agree with other code is never guarded by a
-  comment: share it, derive it from the authority, register the pair
-  in `barwise/parity.manifest.json` (checked by `npm run
-  check:parity`), or give it a drift test -- in the same commit that
-  creates the copy. `npm run audit:duplication -- --check` ratchets
-  new candidates against `barwise/audit-baseline.json`; the
-  `duplication-audit` skill carries the rubric and the full-sweep
-  method. Deliberately parallel code stays (DRY is secondary);
-  unchecked must-agree code does not
-  (`docs/specs/duplication-drift-guards.spec.md`).
-- A finding is not closed by a document. The same rule the
-  must-agree copies follow -- share it, derive it, register it, or
-  drift-test it, in the same commit -- applies to anything an audit
-  turns up: land a check that fails when it regresses, or a baseline
-  row that has to be removed when it is fixed.
-  `npm run audit:rubric -- --check` ratchets the eval rubric's
-  discriminating checks against `barwise/rubric-baseline.json` the way `audit:duplication` ratchets
-  the copies; both fail on a new unclassified finding AND on a stale
-  entry, so the baselines always enumerate exactly what is open.
-  `npm run audit:specs -- --check` is the third: a spec whose `Status`
-  claims no implementation must not be sitting on top of commits that
-  touched the source it names (barwise-910). A
-  sweep run by hand runs once, and the next edit reintroduces what it
-  found. The `assertion-audit` skill carries the three mutation passes
-  and the method rules.
-- **A baseline's verdicts are merged on write, never regenerated.**
-  Every `--write` path goes through
-  `scripts/lib/baseline-merge.mjs`: it preserves the human-owned
-  fields of any row the detector still produces, refreshes the derived
-  ones, and stamps the placeholder only on genuinely new ids. Before
-  that, all three writers rebuilt their row map from the detector
-  alone, so the documented way to add ONE row was the way to destroy
-  every judgment in the file -- measured, 90 of 90 verdicts replaced
-  and 74 notes blanked, from the spellings the scripts advertise. The
-  loss was silent: it surfaced only because a later `--check` happened
-  to fail on an untouched row. `audit-spec-status` was the worst of
-  the three, because its write was the `else` of `--check` and so bare
-  `npm run audit:specs` -- the spelling you try first to see what the
-  gate says -- rewrote the baseline; it now surveys, and `--write`
-  writes. Rows are written sorted by id, so a rerun is a no-op instead
-  of a 73-row reshuffle nobody can review
-  (`docs/specs/baseline-write-preserves-verdicts.spec.md`).
-  `audit-duplication` has no writer and needs none; its baseline is
-  hand-maintained, which is why it never had this defect.
-- **A gate that cannot see its input must not print PASS.** Pass, fail,
-  and **could not answer** -- exit `2` for the third, which is what
-  `mutate.mjs` and `audit-gate.mjs` already used and what every gate now
-  uses. It exists because `PASS` otherwise means both "the thing is
-  fine" and "I could not see the thing", and the reader cannot tell
-  which: `audit-gate` reported PASS with zero advisories from a package
-  directory, and `check-shell` reported an absent shellcheck with the
-  same exit code it uses for a real bug in a script
-  (`docs/specs/gate-refusal-contract.spec.md`). `npm run fault-matrix`
-  is the instrument: it runs every node gate ci.yml names under four
-  environment faults -- `git` answering emptily, `git` absent, a shallow
-  clone, three working directories -- and reports which refuse, which
-  are independent of the fault, and which answer anyway. Whether a gate
-  DEPENDS on the broken thing is measured (the `git` shim logs every
-  call), not declared, so no list has to be kept in step. On demand,
-  like `mutate`; not in CI.
-- **A leaked credential is rotated, never reverted.** It is the one gate
-  whose failure a later commit cannot undo: reverting, deleting the branch
-  and rewriting history all leave the key valid and already disclosed.
-  `.gitignore` covering `.env` was what stood in for it, and could not see
-  the three paths a secret actually arrives by here -- machine-written
-  tracked files under `eval-payloads/` and `eval-runs/`, commands pasted
-  into documentation, and fixtures imitating real payloads
-  (`docs/specs/credential-scanning.spec.md`).
-
-  **Detection is gitleaks', not ours.** `npm run check:secrets -- --staged`
-  runs at the pre-commit hook (the index, depth-independent, ~0.15s) and
-  `npm run check:secrets` scans all reachable commits in CI. The first
-  version of this gate hand-wrote ten vendor regexes; they flagged AWS's
-  own documented example key, which is a false positive that fails every
-  commit quoting a manual. Do not add rules here -- `.gitleaks.toml` is
-  `[extend] useDefault = true` plus exactly ONE rule, for Anthropic keys,
-  which gitleaks 8.28.0 genuinely does not detect (measured: 0 of 3
-  realistic shapes, including a plain `ANTHROPIC_API_KEY=` assignment).
-  That is the credential this repo is most likely to leak, and
-  barwise-1028 tracks sending the rule upstream so we stop carrying it.
-
-  The wrapper exists for the gate contract, not for detection: exit `2`
-  when gitleaks is absent, when `.gitleaks.toml` is absent (its defaults
-  would silently drop the Anthropic rule), when a history scan is asked of
-  a shallow clone, or when gitleaks exits anything but 0 or 1. It always
-  passes `--redact`, because CI logs are retained and searchable so an
-  echoing gate becomes a second durable copy of the leak, and `--verbose`,
-  because without it the output is "leaks found: 1" with no rule, file or
-  line. The version is pinned with a verified digest in
-  `scripts/install-gitleaks.sh` -- one home, shared by `ci.yml` and the
-  session hook, because gitleaks ships RULES and two versions would apply
-  different rule sets to the same diff. A fresh session clone is shallow;
-  the hook unshallows it so the history scan can answer. Taken once over
-  1056 commits: 0 findings (barwise-1022).
-- **A key has nowhere to be written down.** Detection is the weaker half, so
-  the places a credential could sit are gone
-  (`docs/specs/keyless-model-access.spec.md`). `--api-key` is refused on
-  every CLI command -- argv reaches shell history, CI logs and
-  `/proc/<pid>/cmdline` -- and that refusal lives once on the root program,
-  so a newly added command cannot reintroduce it. In VS Code the key is in
-  `ExtensionContext.secrets`, not a setting `.vscode/settings.json` could
-  carry into a commit. The editor's default path needs no key at all
-  (`CopilotLlmClient` over `vscode.lm`), and the MCP server's does not either
-  where the client advertises sampling. The one lane that must hold a key is
-  promptlab and the optimizer: a host-mediated call has no attributable
-  model, so a score computed through one measures nothing. Give that lane a
-  workspace-scoped key with a spend limit, never a personal one.
+  CI. Never a bare `python3`, `python`, `pip` or `pip3`; never
+  `--with`, `--with-requirements`, `--isolated`, `--no-project`,
+  `uv pip`, `uvx`, `uv tool run` or PEP 723 inline metadata. Keep
+  `pyproject.toml` (at `barwise/`) an ancestor of anything that runs
+  Python -- `uv run --frozen` with no project found exits 0 and resolves
+  nothing -- and pass `--project` from outside `barwise/`. A one-off is
+  a script in the repo run `--frozen`. `check:python-uv` and a
+  `PreToolUse` hook enforce it (`docs/adr/python-from-the-lockfile.md`).
+- A copy that must agree with other code carries a check in the commit
+  that creates it: share it, derive it, register it in
+  `barwise/parity.manifest.json`, or drift-test it
+  (`docs/adr/must-agree-copies.md`).
+- A finding is closed by a mechanism, not a document: land a check that
+  fails when it regresses, or a baseline row that must be removed when it
+  is fixed, and wire the ratchet into CI
+  (`docs/adr/findings-close-by-mechanism.md`).
+- A baseline's verdicts are merged on write, never regenerated: the
+  writers go through `scripts/lib/baseline-merge.mjs` (the trial gate's
+  does not yet, barwise-tko), and
+  `npm run audit:specs` writes only with `--write`
+  (`docs/adr/baselines-merge-on-write.md`).
+- **A gate that cannot see its input must not print PASS.** Exit 0
+  pass, 1 a finding, 2 could not answer; a refusal never uses the
+  finding code (`docs/adr/gate-refusal-contract.md`).
+  `npm run fault-matrix` measures it, on demand.
+- **A leaked credential is rotated, never reverted.** Detection is
+  gitleaks' -- `npm run check:secrets -- --staged` at pre-commit, the
+  full history in CI -- and `.gitleaks.toml` takes no rule beyond the
+  one for Anthropic keys (`docs/adr/credential-handling.md`).
+- **A key has nowhere to be written down.** `--api-key` is refused on
+  every command and the VS Code key lives in secret storage; the default
+  paths need no key; the measurement lane is the one lane that holds
+  one, workspace-scoped with a spend limit
+  (`docs/adr/keyless-model-access.md`).
 - ESLint config is shared at the repo root (`barwise/eslint.config.mjs`).
 - Turborepo (`barwise/turbo.json`) orchestrates build/test/lint with
   correct dependency ordering.

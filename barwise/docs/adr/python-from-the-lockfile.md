@@ -102,9 +102,9 @@ project, and the rejected alternatives are in the two specs above.
   which the gate still reads once the script is tracked (gate header;
   hook spec, Risks). Other agents' shells and hand-typed commands are
   out of the hook's scope (hook spec, Scope).
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5): the root `CLAUDE.md`
-  conventions; `python-lockfile-execution.spec.md` and
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule: `python-lockfile-execution.spec.md` and
   `agent-python-uv-hook.spec.md`; `optimizer/CLAUDE.md`; the `pr-review`
   checklist; `review-tiers.json`; the headers of `check-python-uv.mjs`,
   `python-uv-rules.mjs`, `python-uv-guard.mjs` and `check-beads.sh`;

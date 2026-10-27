@@ -96,9 +96,9 @@ corrections made during grounding are in the spec above.
   Scope, "Out of scope"); `python-uv-guard.mjs` uses exit 1 for "could
   not answer" because 2 blocks the command in Claude Code's hook contract
   (`agent-python-uv-hook.spec.md`, R5).
-- Until architecture-index WS5 replaces them with links, these places
-  also state this rule (barwise-ubc, WS5): the root `CLAUDE.md`
-  conventions; `gate-refusal-contract.spec.md`; `REVIEW.md` (its opening,
+- Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states
+  the rule in one line with a link since architecture-index WS5), these places
+  also state this rule: `gate-refusal-contract.spec.md`; `REVIEW.md` (its opening,
   its severity list and "Always check" item 2); the `pr-review`
   checklist's repo-root line; the `fault-matrix.mjs` header; comments in
   `tracked.mjs` and `ci-local.mjs`; and `trial/README.md`. Another 42 tracked files name the spec,
