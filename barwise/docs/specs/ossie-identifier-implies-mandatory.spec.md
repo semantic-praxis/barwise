@@ -9,115 +9,167 @@ Touches: barwise/packages/formats/src/ossie/mapOssieToOrm.ts,
 barwise/packages/formats/src/ossie/writeOssie.ts,
 barwise/packages/formats/tests/OssieImportFormat.test.ts,
 barwise/packages/formats/tests/OssieExportFormat.test.ts,
-barwise/docs/specs/ossie-ontology-format.spec.md
+barwise/packages/formats/tests/OssieVerify.test.ts,
+barwise/packages/cli/tests/importerIds.test.ts,
+barwise/docs/specs/ossie-ontology-format.spec.md,
+barwise/docs/specs/identifier-roles-mandatory.spec.md
 
 When an Ossie concept names its preferred identifier with `identify_by`,
 the importer shall make each identifying role mandatory, as it already
-makes it unique. The exporter shall then leave that mandatory implied,
-not write it into `requires`.
+makes it unique. The exporter keeps writing such a mandatory into
+`requires`, as it does today, so the document still says it. When a
+model's identifying role is optional, the export says that it will read
+back mandatory.
 
 Today an identifying role is mandatory only when the ontology also lists
 it in `requires`. The only Ossie example never does: 0 of the 15
 identifying relationships in the pinned `flights.ontology.yaml` appear in
 `requires`, including on `Airport`, which uses `requires` for two other
 roles. So importing it gives 12 `completeness/preferred-identifier-optional`
-warnings, one per identified concept. Each says the model lacks something
-the source evidently meant.
+diagnostics, one per identified concept.
 
 ## Principle
 
-Define errors out of existence. A preferred identifier names every
-instance of its entity, so ORM requires its roles to be mandatory. The
-Ossie example shows authors writing `identify_by` and leaving the
-mandatory unstated. Reading `identify_by` as implying the mandatory makes
-the 12 warnings disappear at the source rather than asking every user to
-dismiss them. It is the same reading the importer already applies to
-uniqueness.
+Define errors out of existence on the way in, and stay explicit on the way
+out. A preferred identifier names every instance of its entity, so ORM
+requires its roles to be mandatory, and the Ossie example leaves that
+unstated. Reading `identify_by` as implying it removes the 12
+diagnostics at the source. On export, the pinned schema says nothing
+about `identify_by` implying anything. So barwise keeps declaring the
+mandatory rather than assuming another reader shares its inference.
+
+The rule is decided once. The importer and the exporter's loss prediction
+both call one function, built on core's own `identifyingRoles` and
+`isMandatoryAlone`, which are what the diagnostic checks.
 
 ## Observed today (at 6e6e631f)
 
-- `addIdentifier` (`formats/src/ossie/mapOssieToOrm.ts`):
-  - For one identifying relationship, it adds the far role's uniqueness
-    when the multiplicity did not state it, with a warning. It adds no
-    mandatory.
-  - For several, it adds each near role's uniqueness the same way, then
-    the external uniqueness. Again it adds no mandatory.
-- `addMandatoryRoles` adds a mandatory on a relationship's first role for
-  each bare `Concept.rel` in `requires`.
+- `mapOssieToOrm` (`formats/src/ossie/mapOssieToOrm.ts`) calls
+  `addIdentifier` before `addMandatoryRoles`.
+  - `addIdentifier` adds the uniqueness `identify_by` implies, with a
+    warning, and stores the preferred identifier. It adds no mandatory.
+  - `addMandatoryRoles` adds a mandatory on a relationship's first role
+    for each bare `Concept.rel` in `requires`, without checking for one
+    already there.
 - `writeOssie` writes a mandatory first role as `Concept.rel` in the
-  concept's `requires`, through the `addMandatory` callback in
-  `writeRelationship`. It writes one for an identifying role as well.
-- The pinned Ossie schema describes `identify_by` as "names of
-  relationships to use as the preferred identifier of this concept". It
-  says nothing about mandatory roles either way.
-- Since barwise-5bv, the export reads its document back and reports any
-  element that comes back different with no loss line naming it.
+  concept's `requires`, through the `addMandatory` callback. That
+  includes identifying roles: the shop-model test at
+  `OssieExportFormat.test.ts:221` pins `Customer.customer_has_customernr`
+  in `requires`. The writer predicts no loss for an identifying role that
+  is optional.
+- Core's `identifyingRoles(at)` gives an identifier's roles:
+  - for an external uniqueness, each component's near role;
+  - for an internal one, the role it leaves uncovered.
+
+  `isMandatoryAlone(ft, roleId)` says whether a role carries an alethic
+  mandatory. `completeness/preferred-identifier-optional` reports where
+  the second is false for one of the first.
+- The read-back check (barwise-5bv) counts a loss line on a fact type as
+  covering every difference on it. So it cannot be relied on to report an
+  added mandatory on a fact type that already has a loss line.
+- The CLI's `importerIds.test.ts` imports an Ossie fixture whose `Party`
+  has `identify_by: [ code ]` and `requires: [ Party.code ]`.
+- `identifier-roles-mandatory.spec.md` says the 12 flights warnings "are
+  accurate to the source" and defers the question to barwise-3ik.
+- The flights round-trip test compares documents by meaning, with each
+  `requires` list as a set.
 
 ## Scope
 
-- When a concept has `identify_by`, the importer shall add a mandatory on
-  the first role (the concept's own role) of each relationship it names,
-  unless one is already there.
-  - It shall not warn when doing so. The 12 warnings this replaces were
-    noise on the only real example, and a warning that fires on every
-    identified concept teaches readers to skip warnings (Open decision 2).
-- When a mandatory first role belongs to a relationship the concept's
-  `identify_by` names, `writeOssie` shall not write it to `requires`. It
-  is implied, and it reads back as the same mandatory.
-- A source model whose identifying role is not mandatory exports as
-  before. The read-back check (barwise-5bv) then reports that the role
-  comes back mandatory, which is the truth.
+- `impliedMandatoryRoles(at)`, exported from `mapOssieToOrm.ts`, shall
+  return the roles of an identifying uniqueness that are not mandatory
+  alone, each with its fact type. It is built on `identifyingRoles` and
+  `isMandatoryAlone`. The importer passes the identifier it stored. The
+  writer passes the one it writes as `identify_by`, which includes an
+  external uniqueness written for an entity with no stored identifier
+  (`externalIdentifies`).
+- After `addMandatoryRoles`, the importer shall add an alethic mandatory
+  on each role `impliedMandatoryRoles` returns. Because it runs after
+  `requires` is read and asks whether a mandatory is already there, a
+  relationship that is both identifying and in `requires` gets one
+  mandatory.
+  - It shall not warn, for the reason in Open decision 2.
+- `writeOssie` shall keep writing a mandatory identifying role into
+  `requires`, as today.
+- When `impliedMandatoryRoles` returns a role for the identifier an entity
+  is written with, `writeOssie` shall predict a loss on that
+  fact type: `the <Entity> role is optional; Ossie's identify_by makes it
+  mandatory on import`. The prediction does not rely on the read-back
+  check, which a fact type's other loss lines can silence.
 
 Out of scope:
 
 - The uniqueness warnings `addIdentifier` already writes.
-- Deontic mandatory roles. They are already reported by the read-back
-  check, because Ossie has no modality.
+- Deontic mandatory roles. Ossie has no modality, and the read-back
+  check reports them.
 
 ## Workstreams
 
-### 1. Read the mandatory, and leave it implied on the way out
+### 1. Read the mandatory in, and say when it was not there
 
 The changes above. Each item below is pinned by a test:
 
-- Importing a concept with `identify_by` over one relationship gives a
-  mandatory on its first role.
+- Importing a concept with `identify_by` over one relationship gives one
+  alethic mandatory on its first role.
 - The same holds for each relationship of a composite `identify_by`.
-- A concept that also lists the relationship in `requires` gets one
-  mandatory, not two.
+- The CLI fixture's `Party`, with `identify_by` and `requires` on the
+  same relationship, gets one mandatory, not two.
 - Importing the pinned flights example gives no
   `completeness/preferred-identifier-optional` diagnostic. It gives 12
   today.
-- Exporting the imported flights example writes no `requires` entry the
-  source did not have. The existing "comes back equal" test covers this.
-- A model whose identifying role is optional exports with the read-back
-  line naming the added mandatory.
+- Exporting the imported flights example writes the identifying
+  relationships into `requires` and no loss line. The "comes back equal
+  by meaning" test treats `C.rel` in `requires` as implied when `rel` is
+  in `C`'s `identify_by`, which is the reading this spec adopts. That
+  test's `meaning` function changes to say so.
+- A model whose identifying role is optional, on a fact type that
+  already has another loss line, exports with the prediction line.
+- The shop-model test's `requires` assertion is unchanged.
+
+Measured and recorded here, not pinned: the prediction lines over the
+84 tracked models that load.
+
+Doc edits:
+
+- `identifier-roles-mandatory.spec.md`: its flights note gains "Since
+  decided: barwise-3ik".
+- The Ossie spec's import section states the reading.
 
 ## Open decisions
 
-1. **Read `identify_by` as implying mandatory?**
+1. **Read `identify_by` as implying mandatory on import?**
    - (a) Yes (recommended). This matches ORM's reference-scheme rule and
-     how the only Ossie example is written. It removes 12 warnings, and
-     the flights example still round-trips.
-   - (b) No, leave the warnings. The model stays exactly what the source
-     states, but every identified concept keeps a validation warning the
-     source author would not recognize as a problem.
+     how the only Ossie example is written, and it removes 12
+     diagnostics.
+   - (b) No, leave the diagnostics. The model stays exactly what the
+     source states, but every identified concept keeps a diagnostic the
+     source author would not recognize.
 
-   Recommend (a). The one cost is a hypothetical ontology that means an
-   identifier which some instances lack. ORM has no such identifier, and
-   barwise could not model it anyway.
+   Recommend (a). The cost is a hypothetical ontology that means an
+   identifier some instances lack, which barwise cannot model anyway.
 2. **Warn when the mandatory is added?**
-   - (a) No warning (recommended). The reading is the convention, as the
-     uniqueness reading would be if multiplicities were always written.
-   - (b) One warning per concept. This is explicit, but it is 12 lines on
-     the only example, each saying the same thing.
+   - (a) No warning (recommended). On the only example it would be 12
+     identical lines, and a warning on every identified concept teaches
+     readers to skip warnings.
+   - (b) One warning per concept. This is explicit, but it is noise.
 
-   Recommend (a), with the rule stated in the Ossie spec's import
-   section, where a reader looks for how Ossie maps.
+   Recommend (a), with the reading stated in the Ossie spec's import
+   section.
+3. **On export, write the implied mandatory or leave it out?**
+   - (a) Write it (recommended). This keeps today's output and states
+     the mandatory to readers that do not share barwise's reading. The
+     cost is that the flights round trip now differs by meaning-equal
+     `requires` entries, which the comparison normalizes.
+   - (b) Leave it out. The flights document round-trips exactly, but
+     another reader following the schema literally sees an optional
+     identifier, and the writer carries a copy of the importer's rule.
+
+   Recommend (a).
 
 ## Risks and testing
 
-An ontology that lists an identifying relationship in `requires` imports
-as before (one mandatory). One that does not now gets a mandatory it did
-not state. Measured by the flights test above. No other tracked file is
-in Ossie format.
+- Import: an ontology that lists an identifying relationship in
+  `requires` imports as before, with one mandatory. One that does not
+  now gets a mandatory it did not state, which is the point.
+- Export: output is unchanged, apart from the new prediction line for
+  optional identifying roles. That line is counted over the corpus.
