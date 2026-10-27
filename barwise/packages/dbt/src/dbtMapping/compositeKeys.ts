@@ -11,6 +11,7 @@
  */
 
 import { generateId, type InternalConstraint } from "@barwise/core";
+import { DBT_KEY_TEST } from "@barwise/core/mapping";
 import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
 import {
   claimValueType,
@@ -23,12 +24,17 @@ import type { CompositeInfo, DbtMapperContext } from "./context.js";
 import { toPascalCase } from "./naming.js";
 
 /** The model-level dbt test whose columns name a composite key. */
-export const KEY_TEST = "dbt_utils.unique_combination_of_columns";
+export const KEY_TEST = DBT_KEY_TEST;
 
 /** The columns a model-level combination test names, or undefined for any other test. */
 export function combinationOf(test: DbtModel["modelTests"][number]): string[] | undefined {
   if (test.type !== "custom" || test.name !== KEY_TEST) return undefined;
-  const cols = test.config["combination_of_columns"];
+  // dbt 1.10 moves a generic test's arguments under `arguments:`.
+  const args = test.config["arguments"];
+  const cols = test.config["combination_of_columns"]
+    ?? (args !== null && typeof args === "object"
+      ? (args as Record<string, unknown>)["combination_of_columns"]
+      : undefined);
   return Array.isArray(cols) ? cols.map(String) : undefined;
 }
 

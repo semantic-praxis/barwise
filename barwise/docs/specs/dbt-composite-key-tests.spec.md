@@ -1,6 +1,6 @@
 # The dbt export tests a key over several columns
 
-Status: Draft -- no workstream implemented
+Status: Implemented
 
 Created: 2026-10-27
 Last-updated: 2026-10-27
@@ -105,6 +105,15 @@ These are measured and recorded here rather than pinned by a test:
 - The corpus effect.
 - The doc edits in `schema-export-constraint-specs.spec.md` and
   `IMPORT_EXPORT.md`.
+
+## Implementation notes
+
+- As planned in the revised plan. The first draft counted re-import
+  warnings and claimed 2 of 161 keys failed. The high plan review showed
+  that 9 more re-import silently with a reference read as a value
+  (barwise-ivl), and that OpenAPI's item path does not carry a
+  composite key (barwise-pki). The plan was rewritten to count shapes
+  and to defer OpenAPI.
 
 ## Open decisions
 

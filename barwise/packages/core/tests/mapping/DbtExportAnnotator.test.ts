@@ -200,6 +200,17 @@ describe("DbtExportAnnotator", () => {
           && a.message.includes("Composite primary key"),
       );
       expect(pkNote).toBeDefined();
+      // Its key test is dbt_utils', so the note says the project needs it
+      // (dbt-composite-key-tests.spec.md, barwise-lqj).
+      expect(
+        result.annotations.filter((a) => a.message.includes("dbt_utils")).map((a) => [
+          a.tableName,
+          a.message,
+        ]),
+      ).toEqual([[
+        "student_enrolls_in_course",
+        "Key tested with dbt_utils.unique_combination_of_columns: the project must declare the dbt_utils package.",
+      ]]);
     });
   });
 

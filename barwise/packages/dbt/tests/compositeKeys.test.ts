@@ -40,6 +40,17 @@ models:
 `;
 
 describe("a composite-key dbt model", () => {
+  it("reads the key from dbt 1.10's arguments block as well (barwise-lqj)", () => {
+    const moved = yaml.replace(
+      "combination_of_columns: [course_id, crn]",
+      "arguments:\n            combination_of_columns: [course_id, crn]",
+    );
+    expect(moved).not.toBe(yaml);
+    expect(JSON.stringify(importDbtProject([moved]).report)).toContain(
+      "Composite key (course_id, crn)",
+    );
+  });
+
   it("is no longer reported as a model with no identifier", () => {
     const { report } = importDbtProject([yaml]);
     const text = JSON.stringify(report);

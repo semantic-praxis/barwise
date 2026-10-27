@@ -63,7 +63,7 @@ CREATE TABLE ticket (
 -- Constraint (not expressible in SQL DDL): If Person1 is parent of Person2 then Person2 does not is parent of Person1.
 -- Table: person_is_parent_of_person
 -- Source: Person is parent of Person (ft-person-parent-of)
--- NOTE(barwise): Composite primary key (person_id, is_child_of_person_id). Individual unique tests are not generated.
+-- NOTE(barwise): Composite primary key (person_id, is_child_of_person_id): unique as a combination; no single column is unique.
 -- barwise:v1 {"kind":"factTable","table":"person_is_parent_of_person","factType":"Person is parent of Person","readings":["{0} is parent of {1}","{1} is child of {0}"],"roles":[{"name":"is parent of","player":"Person","columns":["person_id"]},{"name":"is child of","player":"Person","columns":["is_child_of_person_id"]}]}
 CREATE TABLE person_is_parent_of_person (
   -- TODO(barwise): No column description. Add a definition to the value type.

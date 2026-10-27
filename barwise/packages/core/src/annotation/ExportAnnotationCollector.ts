@@ -104,7 +104,7 @@ export function collectExportAnnotations(
         category: "constraint",
         message: `Composite primary key (${
           table.primaryKey.columnNames.join(", ")
-        }). Individual unique tests are not generated.`,
+        }): unique as a combination; no single column is unique.`,
       });
     }
 

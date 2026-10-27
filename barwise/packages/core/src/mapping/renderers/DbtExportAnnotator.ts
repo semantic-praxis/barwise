@@ -21,6 +21,7 @@ import {
 import { formatBarwiseComment, stripBarwiseComments } from "../../annotation/helpers.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { RelationalSchema } from "../RelationalSchema.js";
+import { DBT_KEY_TEST } from "./dbt.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -50,7 +51,7 @@ export function annotateDbtExport(
   model: OrmModel,
   schema: RelationalSchema,
 ): ExportAnnotationResult {
-  const annotations = collectExportAnnotations(model, schema);
+  const annotations = [...collectExportAnnotations(model, schema), ...dbtKeyNotes(schema)];
 
   if (annotations.length === 0) {
     return { schemaYaml: stripBarwiseComments(schemaYaml), annotations };
@@ -134,4 +135,20 @@ function formatAnnotationComment(annotation: ExportAnnotation): string {
     ? `${annotation.message} Or set it in the dbt YAML.`
     : annotation.message;
   return formatBarwiseComment(annotation.severity, message);
+}
+
+/**
+ * One note per model keyed on several columns: its key test is
+ * dbt_utils', so a project that does not declare dbt_utils fails at
+ * compile (dbt-composite-key-tests.spec.md, barwise-lqj).
+ */
+function dbtKeyNotes(schema: RelationalSchema): ExportAnnotation[] {
+  return schema.tables
+    .filter((t) => t.primaryKey.columnNames.length > 1)
+    .map((t) => ({
+      tableName: t.name,
+      severity: "note",
+      category: "constraint",
+      message: `Key tested with ${DBT_KEY_TEST}: the project must declare the dbt_utils package.`,
+    }));
 }

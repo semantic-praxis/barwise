@@ -161,6 +161,10 @@ DDL, made no worse here, and each is filed:
   parameter, and dbt tests only a single-column key with `unique`; a
   composite key gets no test (161 tables over the corpus). The router
   counts the uniqueness realized by the primary key. Open decision 2.
+  Since decided: dbt tests a composite key with
+  `dbt_utils.unique_combination_of_columns`, Avro and OpenAPI report no
+  key, and OpenAPI's item path for a composite key is barwise-pki
+  (`dbt-composite-key-tests.spec.md`).
 
 ## Workstreams
 
