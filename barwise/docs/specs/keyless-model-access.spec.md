@@ -5,7 +5,7 @@ Code settings for the OS keychain), WS3 (`--api-key` refused), and WS2 (the
 MCP server borrows the client's model through sampling).
 
 Created: 2026-09-12
-Last-updated: 2026-09-12
+Last-updated: 2026-10-27
 Tracking: barwise-1029 (WS1, the VS Code setting and SecretStorage);
 barwise-1030 (WS2, MCP sampling); barwise-1031 (WS3, retire `--api-key`).
 Follows `docs/specs/credential-scanning.spec.md`, which added the detector.
@@ -74,6 +74,8 @@ The consolation is that the lane which must hold a key is the one where the
 key is least exposed: it is dev-time only, it is not a shipped surface, and
 its credential can be a separate workspace-scoped key with its own spend
 limit.
+
+Recorded as `docs/adr/keyless-model-access.md`.
 
 ## Scope
 
