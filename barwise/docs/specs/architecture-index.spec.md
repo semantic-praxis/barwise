@@ -1,10 +1,10 @@
 # Living ADRs, one per concern, indexed in a current section of ARCHITECTURE.md
 
-Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25; review-policy, 2026-10-25; must-agree-copies, 2026-10-25; baselines-merge-on-write, 2026-10-25; findings-close-by-mechanism, 2026-10-25; gate-refusal-contract, 2026-10-25; python-from-the-lockfile, 2026-10-25; pinned-runtimes, 2026-10-25; production-prompt-resolution, 2026-10-25; keyless-model-access, 2026-10-27; credential-handling, 2026-10-27); 5 not yet
+Status: Workstreams 1-3 implemented 2026-10-24 (one package graph; the ADR convention and its checks; the generated section of ARCHITECTURE.md); 4 in progress (determinism-in-core, 2026-10-24; plan-before-code, 2026-10-25; merge-delegation, 2026-10-25; review-policy, 2026-10-25; must-agree-copies, 2026-10-25; baselines-merge-on-write, 2026-10-25; findings-close-by-mechanism, 2026-10-25; gate-refusal-contract, 2026-10-25; python-from-the-lockfile, 2026-10-25; pinned-runtimes, 2026-10-25; production-prompt-resolution, 2026-10-25; keyless-model-access, 2026-10-27; credential-handling, 2026-10-27; connector-packages, 2026-10-27); 5 not yet
 
 Created: 2026-10-23
 Last-updated: 2026-10-27
-Plan-reviewed: 83b36dc6 (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
+Plan-reviewed: 8de3f062 (code-review, pr-review; re-pointed after WS4 ADR PRs edited the body)
 Tracking: barwise-ubc
 Touches: barwise/docs/ARCHITECTURE.md, barwise/.dependency-cruiser.cjs,
 barwise/scripts/lib/intended.cjs, barwise/scripts/arch-triage.mjs,
@@ -365,7 +365,7 @@ all of them with a link:
 | Proposed ADR                      | Scope        | Stated today in                                                                                                                                                                                                                                |
 | --------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `determinism-in-core.md`          | architecture | CLAUDE.md design principles; `architecture-scenarios.md` S-DET-1..5; `check-core-purity.mjs`; the `core/src/model/id.ts` header                                                                                                                |
-| `connector-packages.md`           | architecture | CLAUDE.md "Dependency Graph" prose (core ships no interop format)                                                                                                                                                                              |
+| `connector-packages.md`           | architecture | CLAUDE.md principles, package list, "Dependency Graph", Current State; formats, dbt, code-analysis `CLAUDE.md`; scenarios S-COMP-1, S-EXPL-5; three registration headers                                                                       |
 | `schema-versioning.md`            | architecture | the metamodel ADR's "Schema versioning" section; CLAUDE.md `migrate` row                                                                                                                                                                       |
 | `surface-capability-parity.md`    | architecture | CLAUDE.md capability matrix ("an unmarked gap is a bug")                                                                                                                                                                                       |
 | `production-prompt-resolution.md` | architecture | CLAUDE.md `--artifacts` row and paragraph; `llm/CLAUDE.md`, `cli/CLAUDE.md`; `artifact-resolution-parity.spec.md`; `selectArtifact.ts`, `callLog.ts`, `prompt.ts` comments; `promptRun.test.ts` header                                         |

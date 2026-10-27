@@ -29,6 +29,7 @@ February 2026 design record.
 
 Architecture:
 
+- [Connector packages](adr/connector-packages.md) -- 2026-10-24
 - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24
 - [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12
 - [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17

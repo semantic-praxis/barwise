@@ -3,7 +3,7 @@
 Status: Implemented -- WS1 (import) and WS2 (export and round trip)
 
 Created: 2026-10-24
-Last-updated: 2026-10-24
+Last-updated: 2026-10-27
 Tracking: barwise-pf2.1
 Plan-reviewed: 9a7009d1 (code-review, pr-review)
 Touches: +barwise/packages/formats/src/ossie/,
@@ -236,6 +236,8 @@ rather than a thin shell over core, as the NORMA writer already is: the
 package convention that export descriptors call back into core describes
 the DDL, OpenAPI and Avro shells, and WS2 amends formats `CLAUDE.md` to say
 a format with no core renderer keeps its writer here.
+
+Recorded as `docs/adr/connector-packages.md`.
 
 ## Alternatives considered
 
