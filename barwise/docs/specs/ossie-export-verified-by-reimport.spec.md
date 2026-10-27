@@ -126,13 +126,25 @@ Results:
 
   It builds the copy with `writeDocument`, edits the fact type entries of
   that document, stringifies it, replaces the ids in the text, and reads
-  it back with `OrmYamlSerializer.deserialize`. Replacing ids over the text
-  is complete by construction, because every minted id is a UUID that
-  occurs only where the model refers to that element. No hand-kept list of
-  id-bearing fields is needed.
+  it back with `OrmYamlSerializer.deserialize`. Replacing a mapped id over
+  the text needs no list of the fields that hold it, because every minted
+  id is a UUID that occurs only where the model refers to that element.
+- Only object types, fact types and roles are paired by id. Everything else
+  keeps its minted id, and `diffModels` pairs it the way it pairs a fresh
+  LLM import against its base:
+  - constraints by content key, which reads role ids, now the source's;
+  - subtype facts by their two ends;
+  - definitions by term.
+
+  The prototype relies on the same pairing. Importing one document twice,
+  with every id fresh, gives no difference, and the 70 constraint
+  "changes" vanish once role ids and order are the source's.
 - It shall compare the source with the aligned copy using `diffModels`.
   Nothing is filtered out: names, role names and role order already agree,
   so any difference is real.
+- A delta is keyed by its source side: the source element of a modified or
+  removed delta. An added delta has no source side, so no predicted loss
+  covers it and it always gets a line.
 - Each loss shall record the element it is about, as the diff keys them:
   - an object type, a fact type (internal constraints included), an
     external constraint, a subtype fact, a population, an objectification
@@ -150,9 +162,11 @@ Results:
   A removed external constraint with roles also gets a `constraintSpecs`
   entry, as a predicted constraint loss does.
 - Loss text shall carry no id the re-import minted. Labels come from the
-  aligned copy, which carries source names and source ids. A constraint
-  id the re-import minted, which alignment cannot map, shall be written as
-  its kind and roles, never as the id.
+  aligned copy, which carries source names and source ids. An id
+  alignment cannot map (a constraint or subtype fact the re-import added)
+  shall be written as its kind and roles, never as the id.
+- The check runs on the export path. `OssieExportFormat` is the only
+  caller of `writeOssie`, which stays the pure writer and does not verify.
 - The existing predicted losses stay, with their text. They say why a
   construct was not written ("Ossie has no glossary"), which a diff cannot
   say.
