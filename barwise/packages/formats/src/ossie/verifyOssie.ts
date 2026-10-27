@@ -74,9 +74,10 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
     if (id !== undefined) ids.set(ot.id, id);
   }
 
+  const byImportedName = new Map(written.factTypes.map((w) => [w.importedName, w]));
   const doc = writeDocument(back);
   for (const ftDoc of doc.model.fact_types ?? []) {
-    const w = written.factTypes.find((x) => x.importedName === ftDoc.name);
+    const w = byImportedName.get(ftDoc.name);
     const src = w && source.getFactType(w.id);
     if (!w || !src || ftDoc.roles.length !== w.order.length) continue;
     ids.set(ftDoc.id, src.id);
@@ -95,12 +96,21 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
     ftDoc.name = src.name;
   }
 
-  // Every minted id is a UUID that occurs only where the model refers to
-  // its element, so replacing it over the text reaches every reference
-  // without a list of the fields that hold one.
-  let text = stringify(doc);
-  for (const [minted, sourceId] of ids) text = text.split(minted).join(sourceId);
-  return new OrmYamlSerializer().deserialize(text);
+  // An id is a whole string value wherever the document refers to its
+  // element, so replacing every value equal to a minted id reaches each
+  // reference without a list of the fields that hold one. Done on the
+  // document, not its text: a minted id may be a prefix of another, and a
+  // source id may need quoting in YAML ("1", "true").
+  return new OrmYamlSerializer().deserialize(stringify(reId(doc, ids)));
+}
+
+function reId(value: unknown, ids: ReadonlyMap<string, string>): unknown {
+  if (typeof value === "string") return ids.get(value) ?? value;
+  if (Array.isArray(value)) return value.map((v) => reId(v, ids));
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, reId(v, ids)]));
+  }
+  return value;
 }
 
 /** The key of a delta's source side, as `lossKey` spells it; none for an added element. */
@@ -108,11 +118,7 @@ function sourceKey(delta: ModelDelta): string | undefined {
   if (delta.kind === "added") return undefined;
   if (delta.elementType === "definition") return lossKey({ kind: "definition", id: delta.term });
   const id = delta.existing?.id;
-  if (id === undefined) return undefined;
-  const kind = delta.elementType === "objectified_fact_type"
-    ? "objectification"
-    : delta.elementType;
-  return lossKey({ kind, id });
+  return id === undefined ? undefined : lossKey({ kind: delta.elementType, id });
 }
 
 function line(delta: ModelDelta): string {

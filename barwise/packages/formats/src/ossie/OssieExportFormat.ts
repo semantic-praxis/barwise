@@ -58,8 +58,17 @@ function readBack(
   try {
     back = new OssieImportFormat().parse(body).model;
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return { losses: [`model: the document does not read back: ${message}`], constraintSpecs: [] };
+    return failed("the document does not read back", e);
   }
-  return verifyOssie(model, back, written.written, written.reported);
+  try {
+    return verifyOssie(model, back, written.written, written.reported);
+  } catch (e) {
+    return failed("the document was read back, but could not be compared with the model", e);
+  }
+}
+
+/** One loss line on one comment line: an importer message can hold a code frame. */
+function failed(what: string, e: unknown): ReturnType<typeof verifyOssie> {
+  const message = (e instanceof Error ? e.message : String(e)).replace(/\s+/g, " ").trim();
+  return { losses: [`model: ${what}: ${message}`], constraintSpecs: [] };
 }

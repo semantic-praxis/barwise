@@ -679,7 +679,7 @@
       "caught_by": "not-a-correction",
       "note": "The spec's opening requirement. It says the writer's predictions were wrong in earlier review rounds, which is the problem statement, not a correction to this spec."
     },
-    "ossie-export-verified-by-reimport::9358f7e2d965": {
+    "ossie-export-verified-by-reimport::ee418e5d7c13": {
       "spec": "ossie-export-verified-by-reimport.spec.md",
       "excerpt": "- as planned in the revised plan. the first draft claimed the read-back found an external uniqueness the import adds. the high plan review showed that was an ar",
       "caught_by": "execution",

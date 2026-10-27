@@ -23,7 +23,7 @@ const verified = (model: OrmModel) =>
   losses(model).filter((l) => /: (comes back|does not come back)/.test(l));
 
 let seq = 0;
-const id = (tag: string) => `${tag}-${++seq}`;
+let id = (tag: string) => `${tag}-${++seq}`;
 
 /** Person, identified by a PersonId it references, and a Name it has. */
 function people(opts: { nameMandatory?: InternalConstraint["modality"] | false; } = {}) {
@@ -202,5 +202,32 @@ describe("Ossie export: the read-back check", () => {
     expect(minted.length).toBeGreaterThan(0);
     for (const mintedId of minted) expect(first).not.toContain(mintedId);
     expect(exporter.export(m).text).toBe(first);
+  });
+
+  it("keeps source ids YAML would read as another type, or as a mapping", () => {
+    const tags = ["1", "true", "a: b", "2", "null", "3", "4", "5", "6", "7", "8", "9", "10"];
+    const plain = id;
+    let next = 0;
+    id = () => tags[next++] ?? plain("x");
+    try {
+      const { m } = people({ nameMandatory: "deontic" });
+      expect(m.objectTypes.map((o) => o.id)).toEqual(["1", "true", "a: b"]);
+      expect(verified(m)).toEqual([
+        "Fact type: Person.name: comes back changed: constraints added: mandatory; constraints removed: mandatory (deontic)",
+      ]);
+    } finally {
+      id = plain;
+    }
+  });
+
+  it("keeps an importer message with a code frame on one comment line", () => {
+    vi.spyOn(OssieImportFormat.prototype, "parse").mockImplementation(() => {
+      throw new Error("Not a readable Ossie document: bad at line 5:\n\n    - id: x\n          ^");
+    });
+    const text = exporter.export(people().m).text;
+    expect(text).toContain(
+      "# barwise: model: the document does not read back: Not a readable Ossie document: bad at line 5: - id: x ^",
+    );
+    expect(text.split("\n").filter((l) => l.trim() === "^")).toEqual([]);
   });
 });

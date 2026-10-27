@@ -229,11 +229,29 @@ Measured and recorded here rather than pinned by a test:
       looser name match had hidden the `Room` cases.
   - 2 exports of every model give identical text.
   - Export time over the corpus went from 0.17 s writing alone to 5.3 s
-    with the read-back, about 65 ms per model.
+    with the read-back, about 65 ms per model (4.9 s after the review fixes).
   - Open decision 2(a) silences 1 element: `Student` in
     `trial/customers/C10-university/kernel.orm.yaml` comes back with a
     preferred identifier, while its only loss line names its reference
     mode. Filed as barwise-huw.
+- Implementation review:
+  - Ids are replaced on the document, not over its text. Over the text, a
+    source id YAML reads as another type (`"1"`, `"true"`) or as a mapping
+    (`"a: b"`) made the export throw, and a minted id that prefixes another
+    rewrote both. Pinned by the YAML-id test, which fails on the text
+    version. The prefix case has no test: the diff falls back to pairing by
+    name and role position, so no realistic model makes it observable.
+  - A failure inside the comparison is a loss line too, as a refused
+    read-back already was, and an importer message with a code frame is
+    collapsed onto one comment line.
+  - `LossKey` reuses core's `ElementType`, so no kind is translated.
+  - Model-level fields stay checked by prediction alone: `diffModels` has
+    no model-level delta.
+  - Declined: reporting an external constraint that comes back with
+    different content as one change. The diff cannot pair it, so it
+    reports it as removed and added. Both lines are true, and the removed
+    one keeps its constraint spec, since the document does not state that
+    constraint.
 
 ## Open decisions
 
