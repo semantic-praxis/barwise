@@ -6,7 +6,7 @@ grounded 2026-10-18, 3a-i and the verbalization and validation parts of 3a-ii im
 resolved by the owner (1 to 8 on 2026-10-17, 9 and the revision of 4 on
 2026-10-18)
 Created: 2026-10-16
-Last-updated: 2026-10-23
+Last-updated: 2026-10-27
 Tracking: barwise-n9n (constraint ids and placement); barwise-7oz (WS2); barwise-loo (one subtype
 partition per supertype); barwise-alg (external uniqueness as preferred
 identifier); barwise-971 (five rules for "the preferred identifier", Open
@@ -334,7 +334,7 @@ still imports.
 ## Workstreams (each independently shippable)
 
 **The format changes in one workstream, WS4; everything before it keeps
-reading and writing 2.0 without loss.** ADR `metamodel-evolution-policy` allows a shared version
+reading and writing 2.0 without loss.** ADR `schema-versioning` allows a shared version
 bump across several PRs only for additive minor changes; a breaking change
 bumps the major version "with a real migration". Bumping to 3.0 in an early
 workstream and adding to it later would let any build in between save a file
@@ -346,6 +346,7 @@ represent, in one PR. Subtype constraints and the preferred-identifier
 reference are in WS4 for that reason: a 2.0 serializer would have to convert
 them back to flags on save, and steps 3 and 4 drop what the flags cannot
 hold, so a 2.0 save between workstreams would silently lose data.
+Recorded as `docs/adr/schema-versioning.md`.
 
 ### 1. The metamodel ADR and this spec (implemented 2026-10-23)
 

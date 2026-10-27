@@ -1,0 +1,96 @@
+# Schema versioning
+
+Scope: architecture
+Date: 2026-10-21
+Tracking: barwise-ubc, barwise-1063, barwise-n9n, barwise-vvg, barwise-6om, barwise-y1b,
+docs/specs/archive/schema-versioning.spec.md,
+docs/specs/diagram-references-by-id.spec.md,
+docs/specs/orm-format-3.spec.md
+
+## Context
+
+The native `.orm.yaml` grows: the metamodel evolution policy
+(`docs/adr/metamodel-evolution-policy.md`) decides which constructs it
+gains, and this ADR decides what the file's `orm_version` says when it
+does. A reader that meets a construct it does not know should fail with
+a message that names the cause, not a schema error, and an older file
+should keep loading after an upgrade. The archived schema-versioning
+spec built the mechanism (one current version, a migration registry,
+the "newer barwise" error); the diagram-references-by-id spec applied
+the major-bump rule (1.1 to 2.0), and the orm-format-3 spec applied it
+again (2.0 to 3.0) with a reader for the previous major and
+`barwise migrate`. Their reasoning and alternatives are there. The rule
+was a section of the metamodel ADR before this one.
+
+## Decision
+
+1. **The version is the compatibility signal.** Every `.orm.yaml` states
+   an `orm_version`. The serializer stamps `CURRENT_ORM_VERSION` on
+   every file it writes, and the JSON Schema pins the same value as a
+   `const`, so a file from a newer build is refused with a "written by a
+   newer barwise" error rather than a schema failure on an unknown
+   construct.
+2. **An additive change bumps the minor version; a breaking or
+   structural change bumps the major with a real migration.** Adding an
+   optional construct or field is additive. A change an older reader
+   would misread rather than ignore is structural (diagram references
+   moving from names to ids was one).
+3. **Only a minor bump is shared across its cycle.** The first additive
+   change after a released version bumps the minor; every later
+   additive change before the next release joins it without touching
+   the version. A breaking change takes its own major bump.
+4. **Older files load at the current version; a surface writes them
+   back only when it writes an edit.** A migration brings an older file
+   forward on load, either as a step on the raw document
+   (`ORM_VERSION_MIGRATIONS`) or, where the step needs the model,
+   through the previous major's reader (2.0 to 3.0). The file on disk
+   becomes the current version when a surface writes an edit to it, or
+   when `barwise migrate` rewrites it.
+
+## Consequences
+
+- Core's `SchemaVersioning.test.ts` checks decision 1: a file at the
+  current version loads (which fails if the schema `const` and
+  `CURRENT_ORM_VERSION` disagree), output is stamped with the current
+  version, and a newer version is refused with "newer barwise", never
+  the schema's `const` message. It runs in CI through
+  `npm run test:coverage` (`if: steps.changes.outputs.docs_only !=
+  'true'`).
+- Decision 2 has no gate: whether a change is additive or structural is
+  a judgment each spec makes and its review checks, as
+  `diagram-references-by-id.spec.md` D1 and `orm-format-3.spec.md` did.
+- Decision 3 has no gate: a change to `orm-model.schema.json` that
+  leaves `CURRENT_ORM_VERSION` equal to the last tagged release's passes
+  CI (barwise-vvg).
+- What "a released version" means is not stated as a rule. The moving
+  `edge` pre-release is rebuilt on every push to main, and
+  `diagram-empty-view.spec.md` resolved its question on the reading that
+  `edge` is unreleased. Under that reading `join_ring` (#746) and the
+  external-uniqueness preferred identifier (#767) joined the unreleased
+  3.0 after #708, so an earlier `edge` build refuses such a file at the
+  schema rather than with "newer barwise". The same resolution changed
+  what `elements: []` means inside 2.0 with no bump, a change an older
+  2.0 reader misreads, which decisions 2 and 3 reserve for a major; it
+  accepted that exposure in its PR (barwise-6om).
+- Decision 4's load and write paths are tested: the 1.0 forward load in
+  `SchemaVersioning.test.ts`, the 2.0 reader and `migrate` in
+  `format30.test.ts`, the command in `cli/tests/commands/migrate.test.ts`,
+  and `merge.test.ts` asserting `barwise merge` leaves both inputs
+  untouched, all under `test:coverage`. No general check covers other
+  commands; the capability matrix's `migrate` and `merge` rows record by
+  hand which surfaces write files.
+- Migration loses what the serializer or a lenient load does not carry:
+  `barwise migrate` drops YAML comments because it writes from the model
+  (barwise-ok6), and a 2.0 merge fragment's `is_preferred` flags are
+  dropped by the lenient load (barwise-n9n.f06). Any surface edit that
+  writes an older file has the same comment loss.
+- `.orm-project.yaml` and `.map.yaml` carry no version; the archived
+  spec left them out of scope ("the same pattern can extend to those
+  later") without deciding against it (barwise-y1b).
+- 1.0 includes value ranges (barwise-5t9.1), which shipped before this
+  rule; the discipline began with the 1.0 to 1.1 bump.
+- Until architecture-index WS5 replaces them with links, the metamodel
+  ADR's bounded-cost filter, the root `CLAUDE.md` ("Explicit over
+  implicit" and the `migrate` row), `docs/CLI.md` (`migrate`) and the
+  `CURRENT_ORM_VERSION` comment in `schemaVersion.ts` also state this
+  rule (barwise-ubc, WS5).

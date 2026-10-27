@@ -2,7 +2,7 @@
 
 Status: Implemented 2026-09-24 (single workstream). D1-D3 were built at their recommended defaults: 2.0, unknown names kept, dangling references warn.
 Created: 2026-09-24
-Last-updated: 2026-09-25
+Last-updated: 2026-10-27
 Tracking: barwise-1063
 
 ## Principle
@@ -29,7 +29,7 @@ legibility argument is about the constructs a human or an LLM authors.
 
 The version bump is not optional. A barwise that reads 1.1 would load a
 2.0 file, look each id up as a name, find nothing and render the whole
-model. That is the same silent failure this spec removes. ADR `metamodel-evolution-policy` says
+model. That is the same silent failure this spec removes. ADR `schema-versioning` says
 a structural change bumps the major version with a real migration, and
 the bump is what turns an older reader's silent misread into the
 serializer's existing "written by a newer barwise" error.
@@ -119,7 +119,7 @@ kinds. This spec relies on that and does not add a check for it.
   a key's meaning would depend on what else is in the file, and a name
   that happens to equal another element's id resolves to the wrong
   element without any sign.
-- **Minor bump (1.2).** ADR `metamodel-evolution-policy` reserves minor bumps for additive
+- **Minor bump (1.2).** ADR `schema-versioning` reserves minor bumps for additive
   changes that an older reader can ignore. An older reader cannot ignore
   this one; it misreads it.
 
@@ -164,9 +164,10 @@ Everything in Scope, with tests:
 
 ## Open decisions (for review)
 
-- **D1: major or minor bump.** Recommended: 2.0, per ADR `metamodel-evolution-policy` (see
+- **D1: major or minor bump.** Recommended: 2.0, per ADR `schema-versioning` (see
   Alternatives). The trade-off is a release note saying files written
   from now on need barwise 1.8 or later.
+  Recorded as `docs/adr/schema-versioning.md`.
 - **D2: an unknown name during migration.** Keep it verbatim so the new
   warning reports it (recommended), or drop it silently. Keeping costs a
   warning on a file that already had a broken reference. Dropping loses
