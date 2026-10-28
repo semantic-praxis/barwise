@@ -18,8 +18,8 @@ import {
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
   planRead,
-  READ_PLAN_ADVICE,
   type ReadPlan,
+  unsupportedVersionMessage,
 } from "./schemaVersion.js";
 import { subtypeConstraintsFromFlags } from "./subtypeFlags.js";
 import { deserializeConstraint, serializeConstraint } from "./yaml/constraint.js";
@@ -61,8 +61,7 @@ function versionErrorMessage(
   version: string,
   plan: Extract<ReadPlan, { ok: false; }>,
 ): string {
-  const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
-  return `${head} ${READ_PLAN_ADVICE[plan.reason]}`;
+  return unsupportedVersionMessage("orm_version", version, CURRENT_ORM_VERSION, plan.reason);
 }
 
 /** What reading a file changed beyond its format (`OrmYamlSerializer.migrate`). */

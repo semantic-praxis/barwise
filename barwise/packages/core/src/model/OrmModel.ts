@@ -12,6 +12,7 @@ import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
 import { generateId } from "./id.js";
+import { checkedIri, NAMESPACE_PATTERN } from "./namespace.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
@@ -120,7 +121,7 @@ export class OrmModel {
     this._name = config.name.trim();
     this._domainContext = config.domainContext;
     this._note = config.note;
-    this._namespace = config.namespace;
+    this._namespace = checkedIri(config.namespace, NAMESPACE_PATTERN, "namespace");
   }
 
   get name(): string {
@@ -155,7 +156,7 @@ export class OrmModel {
   }
 
   set namespace(value: string | undefined) {
-    this._namespace = value;
+    this._namespace = checkedIri(value, NAMESPACE_PATTERN, "namespace");
   }
 
   // ---- Object Types ----

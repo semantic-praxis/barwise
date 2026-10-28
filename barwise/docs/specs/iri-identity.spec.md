@@ -442,8 +442,11 @@ both are unreleased (owner decision, 2026-10-28):
 - `namespace` on a model's header: an absolute IRI ending in `/` or `#`, the
   two endings RDF vocabularies use.
 
-The schemas check the shape with one pattern each; core does not
-dereference either. `OrmProjectConfig` and `OrmProject` gain `iriBase`, and
+The schemas check the shape with one pattern each, and core holds the same
+two patterns (`IRI_BASE_PATTERN`, `NAMESPACE_PATTERN` in `namespace.ts`,
+drift-tested against the schemas) and refuses a value that fails them where
+it is set, so a model or project in memory can always be saved and
+reopened. Core does not dereference either. `OrmProjectConfig` and `OrmProject` gain `iriBase`, and
 `ProjectSerializer`'s document type, `buildProject` and `serialize` each
 carry it, because each lists its fields explicitly and a field one of them
 leaves out is silently dropped (barwise-937's lesson, one file over).
@@ -469,9 +472,11 @@ load refusals, so a domain stays attached and a project that gains
 `iri_base` keeps loading:
 
 - `project/domain-namespace-overridden`: a domain whose file declares a
-  `namespace` in a project that declares `iri_base`. The project's wins in
-  `namespaceOf`, which is what the message says; the fix is to delete the
-  domain's line.
+  `namespace`, other than the one the project gives it, in a project that
+  declares `iri_base`. The project's wins in `namespaceOf`, which is what the
+  message says; the fix is to delete the domain's line or make it agree. An
+  equal one is not reported, because it is what keeps a load of the domain
+  file on its own giving the same answer.
 - `project/duplicate-namespace`: two domains of one project with one namespace -- two
   contexts with one `localName()` (`Order Mgmt` and `Order_Mgmt`), or two
   domains of a project without `iri_base` declaring the same `namespace`.

@@ -1,3 +1,4 @@
+import type { DomainModel } from "../../model/DomainModel.js";
 import { namespaceOf } from "../../model/namespace.js";
 import type { OrmProject } from "../../model/OrmProject.js";
 import type { Diagnostic } from "../Diagnostic.js";
@@ -181,40 +182,47 @@ function checkProductDependencies(project: OrmProject): Diagnostic[] {
  */
 function checkNamespaces(project: OrmProject): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const byNamespace = new Map<string, string[]>();
+  const byNamespace = new Map<string, DomainModel[]>();
 
   for (const domain of project.domains) {
-    const ref = { iriBase: project.iriBase, context: domain.context };
-    const namespace = namespaceOf(domain.model, ref);
+    const iriBase = project.iriBase;
+    const namespace = namespaceOf(domain.model, { iriBase, context: domain.context });
     const own = domain.model?.namespace;
-    if (project.iriBase !== undefined && own !== undefined && namespace !== undefined) {
-      diagnostics.push(
-        report(
-          RULE_ID.domainNamespaceOverridden,
-          "default",
-          domain.path,
-          domain.path,
-          domain.context,
-          own,
-          namespace,
-        ),
-      );
+    if (iriBase !== undefined && own !== undefined) {
+      const projects = namespaceOf(undefined, { iriBase, context: domain.context });
+      // A domain's own namespace equal to the project's is harmless, and
+      // keeps a load of the domain file on its own giving the same answer.
+      if (own !== projects) {
+        diagnostics.push(
+          report(
+            RULE_ID.domainNamespaceOverridden,
+            "default",
+            domain.path,
+            domain.path,
+            domain.context,
+            own,
+            projects,
+          ),
+        );
+      }
     }
     if (namespace === undefined) continue;
-    const contexts = byNamespace.get(namespace) ?? [];
-    contexts.push(domain.context);
-    byNamespace.set(namespace, contexts);
+    const domains = byNamespace.get(namespace) ?? [];
+    domains.push(domain);
+    byNamespace.set(namespace, domains);
   }
 
-  for (const [namespace, contexts] of byNamespace) {
-    if (contexts.length < 2) continue;
+  for (const [namespace, domains] of byNamespace) {
+    if (domains.length < 2) continue;
+    // Pinned to the first domain's file, as every other project rule names
+    // a file, so a consumer can open where the conflict starts.
     diagnostics.push(
       report(
         RULE_ID.duplicateNamespace,
         "default",
+        domains[0]!.path,
         namespace,
-        namespace,
-        contexts.map((c) => JSON.stringify(c)).join(", "),
+        domains.map((d) => JSON.stringify(d.context)).join(", "),
       ),
     );
   }

@@ -186,8 +186,8 @@ newer barwise is refused as such. `.map.yaml` files carry their own
 
 `iri_base` is optional. It is the absolute IRI, ending in `/`, that every
 domain's namespace starts with: the base and the project's own segments,
-followed by each domain's context, so `ordering` above it would be
-`https://data.acme.com/auctions/ordering/`. The project's `name` is a
+followed by each domain's context, so `catalog` above would be
+`https://data.acme.com/auctions/catalog/`. The project's `name` is a
 display label and is not part of any IRI. A domain file outside such a
 project can declare its own `namespace` in its model header instead; a
 domain that declares one inside a project with `iri_base` is reported by

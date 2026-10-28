@@ -13,6 +13,7 @@
 import { stringify } from "yaml";
 import { roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
+import { IRI_BASE_PATTERN } from "../model/namespace.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";
@@ -474,7 +475,9 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
   // valid base, so it becomes the project's and each domain's namespace is
   // that plus its context; a `#`-ending one cannot be a base.
   const sourceNamespace = source.namespace;
-  const iriBase = sourceNamespace?.endsWith("/") ? sourceNamespace : undefined;
+  const iriBase = sourceNamespace !== undefined && IRI_BASE_PATTERN.test(sourceNamespace)
+    ? sourceNamespace
+    : undefined;
   if (sourceNamespace !== undefined && iriBase === undefined) {
     warnings.push(
       `The source's namespace "${sourceNamespace}" ends in "#", so it cannot be the `

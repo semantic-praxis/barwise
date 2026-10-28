@@ -1,5 +1,6 @@
 import { ContextMapping, type ContextMappingConfig } from "./ContextMapping.js";
 import { DomainModel, type DomainModelConfig } from "./DomainModel.js";
+import { checkedIri, IRI_BASE_PATTERN } from "./namespace.js";
 import type { ObjectType } from "./ObjectType.js";
 import { type ProductConfig, ProductDependency } from "./ProductDependency.js";
 
@@ -99,7 +100,7 @@ export class OrmProject {
     }
     this._name = config.name.trim();
     this._settings = config.settings ? { ...config.settings } : {};
-    this._iriBase = config.iriBase;
+    this._iriBase = checkedIri(config.iriBase, IRI_BASE_PATTERN, "iri_base");
 
     for (const dc of config.domains ?? []) {
       this.addDomain(dc);
@@ -121,7 +122,7 @@ export class OrmProject {
   }
 
   set iriBase(value: string | undefined) {
-    this._iriBase = value;
+    this._iriBase = checkedIri(value, IRI_BASE_PATTERN, "iri_base");
   }
 
   set name(value: string) {

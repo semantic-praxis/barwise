@@ -240,9 +240,29 @@ export function formatVersionProblem(doc: unknown, current: string): string | un
   if (typeof doc !== "object" || doc === null) return undefined;
   const version = (doc as Record<string, unknown>).format_version;
   if (typeof version !== "string") return undefined;
+  // A version that is not dotted numbers is malformed, not newer:
+  // `compareOrmVersions` falls back to string order for it, which would
+  // tell a user with a typo to upgrade barwise.
+  if (!/^\d+(\.\d+)*$/.test(version)) {
+    return unsupportedVersionMessage("format_version", version, current, "unknown");
+  }
   const plan = planRead(version, { current, legacy: majorFirst(current), migrations: [] });
   if (plan.ok) return undefined;
-  return `Unsupported format_version "${version}" (this build reads ${current}): ${
-    READ_PLAN_ADVICE[plan.reason]
+  return unsupportedVersionMessage("format_version", version, current, plan.reason);
+}
+
+/**
+ * The refusal for a document whose version this build cannot read, in one
+ * shape for every versioned file kind: the field, the stated and readable
+ * versions, and {@link READ_PLAN_ADVICE} for the reason.
+ */
+export function unsupportedVersionMessage(
+  field: "orm_version" | "format_version",
+  version: string,
+  current: string,
+  reason: Extract<ReadPlan, { ok: false; }>["reason"],
+): string {
+  return `Unsupported ${field} "${version}" (this build reads ${current}): ${
+    READ_PLAN_ADVICE[reason]
   }`;
 }

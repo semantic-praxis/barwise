@@ -10,6 +10,7 @@ import { parse } from "yaml";
 import { ModelSplitError, splitFiles, splitModel } from "../../src/project/splitModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
+import { ProjectSerializer } from "../../src/serialization/ProjectSerializer.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 
@@ -137,7 +138,9 @@ describe("splitModel", () => {
       projectName: "Shop",
       domains: { crm: ["Customer"], billing: ["Invoice"] },
     });
-    expect(parse(result.manifestYaml).project.iri_base).toBe("https://data.acme.com/shop/");
+    expect(new ProjectSerializer().deserialize(result.manifestYaml).iriBase).toBe(
+      "https://data.acme.com/shop/",
+    );
     for (const d of result.domains) expect(parse(d.yaml).model.namespace).toBeUndefined();
     expect(result.warnings.some((w) => w.includes("namespace"))).toBe(false);
   });

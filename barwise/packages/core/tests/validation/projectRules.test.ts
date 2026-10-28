@@ -304,6 +304,16 @@ describe("projectRules: namespaces (iri-identity WS4)", () => {
     expect(d?.message).toContain("https://data.acme.com/acme/ordering/");
   });
 
+  it("accepts a domain namespace equal to the one iri_base gives it", () => {
+    const project = new OrmProject({ name: "Acme", iriBase: "https://data.acme.com/acme/" });
+    project
+      .addDomain({ path: "domains/ordering.orm.yaml", context: "ordering" })
+      .setModel(
+        new OrmModel({ name: "Ordering", namespace: "https://data.acme.com/acme/ordering/" }),
+      );
+    expect(ruleIds(project)).toEqual([]);
+  });
+
   it("accepts a domain's own namespace in a project without iri_base", () => {
     const project = new OrmProject({ name: "Acme" });
     project
@@ -317,6 +327,7 @@ describe("projectRules: namespaces (iri-identity WS4)", () => {
     project.addDomain({ path: "a.orm.yaml", context: "Order Mgmt" });
     project.addDomain({ path: "b.orm.yaml", context: "Order_Mgmt" });
     const [d] = projectRules(project).filter((x) => x.ruleId === "project/duplicate-namespace");
+    expect(d?.elementId).toBe("a.orm.yaml");
     expect(d?.message).toContain("https://data.acme.com/acme/Order_Mgmt/");
     expect(d?.message).toContain('"Order Mgmt", "Order_Mgmt"');
   });

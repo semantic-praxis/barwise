@@ -99,6 +99,14 @@ describe("format_version", () => {
     expect(formatVersionProblem({}, "1.0")).toBeUndefined();
   });
 
+  it("calls a malformed version unknown, not newer, so a typo is not told to upgrade", () => {
+    for (const bad of ["abc", "v1", "1.x"]) {
+      expect(formatVersionProblem({ format_version: bad }, "1.0")).toContain(
+        READ_PLAN_ADVICE.unknown,
+      );
+    }
+  });
+
   it("gives a model the same advice for the same reason", () => {
     const newerModel = `orm_version: "99.0"\nmodel:\n  name: M\n`;
     expect(() => new OrmYamlSerializer().deserialize(newerModel)).toThrow(READ_PLAN_ADVICE.newer);
