@@ -1,6 +1,7 @@
 /**
  * Every uniqueness the DDL export writes as a UNIQUE clause comes back from
- * a dbt export and re-import (dbt-alternate-uniqueness.spec.md). Before,
+ * a dbt export and re-import (dbt-alternate-uniqueness.spec.md), and from
+ * both DDL round trips (objectified-key-identifier.spec.md). Before,
  * the dbt export wrote a test only for each table's key, so all of them
  * were lost: every one of these 24 tracked models came back with none. It
  * lives here because cli is the one package that depends on core and dbt.
@@ -15,6 +16,7 @@
 import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { RelationalMapper, routeUniqueOnly } from "@barwise/core/mapping";
 import { DbtExportFormat, importDbtProject } from "@barwise/dbt";
+import { DdlExportFormat, DdlImportFormat } from "@barwise/formats";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -71,14 +73,65 @@ function dbtRoundTrip(model: OrmModel): OrmModel {
   return importDbtProject([schemaYaml]).model;
 }
 
-describe("a dbt round trip keeps every uniqueness the DDL export writes", () => {
+/**
+ * The DDL round trips are held to the same descriptions. The annotated one
+ * gained a UNIQUE in four of these models, on an objectified relationship
+ * keyed on one column, until barwise-i3r (objectified-key-identifier.spec.md).
+ */
+const ROUND_TRIPS: Record<string, (m: OrmModel) => OrmModel> = {
+  dbt: dbtRoundTrip,
+  "DDL with annotations": (m) =>
+    new DdlImportFormat().parse(new DdlExportFormat().export(m).text).model,
+  "DDL without annotations": (m) =>
+    new DdlImportFormat().parse(new DdlExportFormat().export(m, { annotate: false }).text).model,
+};
+
+const load = (file: string) =>
+  new OrmYamlSerializer().deserialize(readFileSync(resolve(ROOT, file), "utf8"));
+
+describe("a round trip keeps every uniqueness the DDL export writes", () => {
   for (const file of MODELS) {
-    it(file, () => {
-      const model = new OrmYamlSerializer().deserialize(readFileSync(resolve(ROOT, file), "utf8"));
-      const before = uniques(model);
-      // Not vacuous: each listed model has one.
-      expect(before.length).toBeGreaterThan(0);
-      expect(uniques(dbtRoundTrip(model))).toEqual(before);
+    for (const [way, trip] of Object.entries(ROUND_TRIPS)) {
+      it(`${file}, through ${way}`, () => {
+        const model = load(file);
+        const before = uniques(model);
+        // Not vacuous: each listed model has one.
+        expect(before.length).toBeGreaterThan(0);
+        expect(uniques(trip(model))).toEqual(before);
+      });
+    }
+  }
+});
+
+/** An entity's preferred identifier, by its fact type's name and the players of its roles. */
+function preferred(model: OrmModel, entityName: string): string {
+  const entity = model.getObjectTypeByName(entityName);
+  const id = entity && model.preferredIdentifierOf(entity.id);
+  const found = id ? model.everyConstraint().find(([c]) => c.id === id) : undefined;
+  if (!found) return "none";
+  const [c, ft] = found;
+  const roles = model.factTypes.flatMap((f) => f.roles);
+  const players = "roleIds" in c
+    ? c.roleIds.map((r) => model.getObjectType(roles.find((x) => x.id === r)!.playerId)!.name)
+    : [];
+  return `${ft?.name ?? "model"}: ${players.join(", ")}`;
+}
+
+describe("an annotated DDL round trip keeps the preferred identifier of an objectifier keyed on one column", () => {
+  // Each entity objectifies a relationship whose one-column key it takes;
+  // the import used to give it a second, typed identifier over that column.
+  const cases: [string, string][] = [
+    ["trial/customers/C05-manufacturer/kernel.orm.yaml", "WorkOrder"],
+    ["trial/customers/C06-logistics/kernel.orm.yaml", "Booking"],
+    ["trial/findings/barwise-nqd/base.orm.yaml", "WorkOrder"],
+    ["trial/findings/barwise-nqd/incoming.orm.yaml", "WorkOrder"],
+  ];
+  for (const [file, entity] of cases) {
+    it(`${file}: ${entity}`, () => {
+      const model = load(file);
+      expect(preferred(model, entity)).not.toBe("none");
+      expect(preferred(ROUND_TRIPS["DDL with annotations"]!(model), entity))
+        .toBe(preferred(model, entity));
     });
   }
 });
