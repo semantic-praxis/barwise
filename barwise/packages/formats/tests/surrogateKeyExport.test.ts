@@ -6,12 +6,16 @@
  * written as a UNIQUE.
  */
 import { OrmYamlSerializer } from "@barwise/core";
-import { RelationalMapper, routeUniqueOnly } from "@barwise/core/mapping";
+import {
+  RelationalMapper,
+  routeUniqueOnly,
+  SURROGATE_POPULATION_NOTE,
+} from "@barwise/core/mapping";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DdlExportFormat, SURROGATE_POPULATION_NOTE } from "../src/ddl/DdlExportFormat.js";
+import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 const tracked = execFileSync("git", ["ls-files", "--", "*.orm.yaml"], { cwd: ROOT })
@@ -59,5 +63,16 @@ describe("a DDL export with generated keys", () => {
     expect(without).toContain("INSERT INTO");
     expect(withKeys).not.toContain("INSERT INTO");
     expect(withKeys).toContain(`-- ${SURROGATE_POPULATION_NOTE.split("\n")[0]}`);
+  });
+
+  it("names the natural keys a dialect with no UNIQUE cannot enforce", () => {
+    const model = load("packages/formats/tests/fixtures/externalIdentifier.orm.yaml")!;
+    const text = new DdlExportFormat().export(model, {
+      surrogateKeys: true,
+      annotate: false,
+      dialect: "bigquery",
+    }).text;
+    expect(text).toContain("-- bigquery has no UNIQUE, so these natural keys");
+    expect(text).toContain("--   room (building_code, room_nr)");
   });
 });

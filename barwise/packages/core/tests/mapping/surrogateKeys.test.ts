@@ -118,6 +118,17 @@ describe("withSurrogateKeys", () => {
     });
   });
 
+  it("rewrites a reference to a shared-key subtype whose key collapsed, to its new key", () => {
+    const lab = table("lab", ["building_code", "room_nr", "hazard"], ["building_code", "room_nr"], [
+      fk(["building_code", "room_nr"], "room", ["building_code", "room_nr"]),
+    ]);
+    const experiment = table("experiment", ["experiment_id", "building_code", "room_nr"], [
+      "experiment_id",
+    ], [fk(["building_code", "room_nr"], "lab", ["building_code", "room_nr"])]);
+    const out = withSurrogateKeys(schemaOf(experiment, lab, room()));
+    expect(shape(get(out, "experiment")).foreignKeys).toEqual(["lab_key->lab(room_key)"]);
+  });
+
   it("settles a chain, hashing a key from source columns only", () => {
     const seat = table(
       "seat",

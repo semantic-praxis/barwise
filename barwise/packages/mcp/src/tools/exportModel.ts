@@ -79,9 +79,7 @@ export function registerExportModelTool(server: McpServer): void {
               .describe(
                 "Give every table keyed on several columns a generated key, the hash of "
                   + "its natural key, and make every reference to one a single column "
-                  + `(${
-                    surrogateKeyFormats().join(", ")
-                  })`,
+                  + `(${surrogateKeyFormats().join(", ")})`,
               ),
           })
           .catchall(z.unknown())

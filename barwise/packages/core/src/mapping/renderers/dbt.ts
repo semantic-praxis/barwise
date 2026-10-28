@@ -121,7 +121,9 @@ function renderModelSql(table: Table, sourceName: string): string {
  * a composite foreign key with a NULL column references nothing.
  */
 function generatedKeySql(columns: readonly string[], nullable: boolean): string {
-  const hash = `{{ dbt_utils.generate_surrogate_key([${columns.map((c) => `'${c}'`).join(", ")}]) }}`;
+  const hash = `{{ dbt_utils.generate_surrogate_key([${
+    columns.map((c) => `'${c}'`).join(", ")
+  }]) }}`;
   return nullable
     ? `CASE WHEN ${columns.map((c) => `${c} IS NULL`).join(" OR ")} THEN NULL ELSE ${hash} END`
     : hash;

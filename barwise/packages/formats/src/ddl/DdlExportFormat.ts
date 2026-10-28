@@ -46,7 +46,6 @@ import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
  */
 export const PLAIN_DDL_OPTIONS = { annotate: false, includeExamples: false } as const;
 
-
 /**
  * DDL (SQL CREATE TABLE) export format.
  *
@@ -132,7 +131,8 @@ export class DdlExportFormat implements ExportFormatAdapter {
       ? schema.tables.filter((t) => t.naturalKey)
       : [];
     if (unstated.length > 0) {
-      ddlText += `\n-- ${dialect} has no UNIQUE, so these natural keys, which generated keys replaced, `
+      ddlText +=
+        `\n-- ${dialect} has no UNIQUE, so these natural keys, which generated keys replaced, `
         + `are not enforced:\n${
           unstated.map((t) => `--   ${t.name} (${t.naturalKey!.join(", ")})`).join("\n")
         }\n`;
