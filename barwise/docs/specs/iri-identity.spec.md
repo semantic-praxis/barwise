@@ -83,7 +83,7 @@ In scope:
   general first (`https://data.acme.com/acme/ordering/`). A standalone model
   may declare a `namespace` in its header; a domain file loaded through a
   project that declares one is refused, so the namespace has one source.
-  A model with no namespace is Open decision 11.
+  A model with no namespace is decision 11.
 - When a model refers to an element of another domain, the model shall
   declare `imports`, each binding an alias to a context name or to an
   absolute namespace IRI; a reference with an undeclared alias is a
@@ -93,25 +93,25 @@ In scope:
   `source_context` and `target_context` fields declare.
 - When an element is created, its local name shall come from the rule for
   its kind, through one normalizer, `localName()` in core, which reserves
-  `:` for aliases and `.` for the role separator (Open decision 3):
+  `:` for aliases and `.` for the role separator (decision 3):
   - object type: its name;
-  - fact type: Open decision 2;
+  - fact type: decision 2;
   - role: its fact type's local name, `.`, and its role name, which is
     required today;
   - constraint, subtype fact, objectification: a name minted once from its
     canonical verbalization and stored (owner decision, 2026-10-28);
-  - population and fact instance: Open decision 7.
+  - population and fact instance: decision 7.
 - When a rule would give an element a local name another element of the
   model already holds, the system shall append `_2`, `_3`, and report it,
-  except where Open decision 5 refuses instead. The order is a function of
+  except where decision 5 refuses instead. The order is a function of
   the input: object types before fact types before everything else, then
   document order, so two builds of one input agree.
 - When an element's stored id no longer matches the name it was made from,
-  validation shall warn, naming both (Open decisions 13 and 14). Neither
+  validation shall warn, naming both (decisions 13 and 14). Neither
   changes on its own.
 - When the user renames an element, the system shall change its local name
   and every id that embeds it -- a fact type's roles, and the population and
-  fact instance ids Open decision 7 chooses -- and rewrite every reference to
+  fact instance ids decision 7 chooses -- and rewrite every reference to
   each: in its own model, its population rows and diagram layouts, the
   shadows and `alias:` references in the project's other domains, and the
   project's mapping files. `renameInModel` serves a standalone model and
@@ -139,7 +139,7 @@ In scope:
   changed to 4.0" rather than as an ordinary change, and impact analysis
   given a UUID shall say the manifest predates 4.0 instead of returning
   nothing. `barwise migrate` restamps the exports that were fresh under the
-  3.x hash, so a stale export stays stale (Open decision 15).
+  3.x hash, so a stale export stays stale (decision 15).
 
 Out of scope:
 
@@ -148,7 +148,7 @@ Out of scope:
   project and domain; adding them is its own decision.
 - **Data products.** Element IRIs never include a product
   (`ossie-interchange.md`, decision 5). A product's own IRI is deferred.
-- **Mapping to an outside vocabulary** beyond the field Open decision 1
+- **Mapping to an outside vocabulary** beyond the field decision 1
   chooses. An OWL or RDF export is later work.
 - **Publishing or dereferencing IRIs.** barwise forms them; it does not
   serve them.
@@ -178,10 +178,10 @@ workspace, and corrected by two rounds of plan review.
 | `OrmModel.addFactType`                                              | refuses a role whose player is not in the model                                                                                                                                                                 | unchanged: the shadow is in the model, so a split domain still loads, maps and verbalizes alone                                                  |
 | `EntityMapping`, `OrmProject.parseQualifiedRef`                     | `context:Name`, split on the first colon                                                                                                                                                                        | unchanged; `localName()` never emits `:`, and absolute IRIs appear only in `iri_base` and `imports`                                              |
 | `lineage/manifest.ts`, `impact.ts`                                  | per-directory `.barwise/lineage.yaml` with `elementId` and a `modelHash`; `canonicalizeIds` maps every string equal to an id to `#n`; impact matches by id                                                      | `canonicalizeIds` removed; `migrate` rewrites ids and restamps only exports that were fresh (WS6)                                                |
-| `Population` and fact instances                                     | rows keyed by role id; six population rules, `YamlSourceMap`, NORMA's population mapping and `getInstance`/`removeInstance` use the instance id                                                                 | Open decision 7; rows re-keyed by role local name (WS6)                                                                                          |
+| `Population` and fact instances                                     | rows keyed by role id; six population rules, `YamlSourceMap`, NORMA's population mapping and `getInstance`/`removeInstance` use the instance id                                                                 | decision 7; rows re-keyed by role local name (WS6)                                                                                               |
 | `DiagramLayout`                                                     | positions keyed by object type or fact type id, in one record                                                                                                                                                   | re-keyed (WS6); the cross-kind index keeps keys distinct                                                                                         |
 | importers (`formats`, `dbt`, `llm`, code-analysis)                  | call `generateId()`; NORMA keeps its source ids; `cli/tests/importerIds.test.ts` requires minted ids, exempting NORMA                                                                                           | build local names; the test checks the naming rules (WS6)                                                                                        |
-| exporters                                                           | NORMA writes `_<id>`; DDL comments name `(<id>)`; Ossie's loss block names ids; SVG writes `data-id`                                                                                                            | NORMA per Open decision 12; the rest print local names (WS6)                                                                                     |
+| exporters                                                           | NORMA writes `_<id>`; DDL comments name `(<id>)`; Ossie's loss block names ids; SVG writes `data-id`                                                                                                            | NORMA per decision 12; the rest print local names (WS6)                                                                                          |
 | surfaces                                                            | `impact_analysis` and `lineage impact` take an id; diagnostics, verbalization, describe and query return ids; VS Code finds elements by the `id:` scalar                                                        | same fields, local-name values (WS6); rename is new (WS5)                                                                                        |
 | `determinism-in-core.md` decision 4, `importer-role-ids.spec.md` R1 | ids minted only at creation; importers never build ids from names                                                                                                                                               | amended in WS6's PR                                                                                                                              |
 | `schema-versioning.md` decisions 2 and 4                            | a minor bump registers a migration; a surface writes the current version on its next edit                                                                                                                       | WS1 makes a minor loadable; decision 4 stands, because migration works per file                                                                  |
@@ -262,10 +262,10 @@ Core forms an IRI; it does not dereference one.
   Rejected for now: `OrmModel.addFactType` refuses a player it does not hold,
   and mapping and verbalization read the player's reference mode and kind,
   so every domain would stop loading or mapping on its own.
-- **Ossie's `Concept.relationship` for fact types.** Open decision 2's
+- **Ossie's `Concept.relationship` for fact types.** decision 2's
   option (b).
 - **A category segment** (`object-type/Customer`). Rejected by the owner;
-  the suffix rule and Open decision 4 handle where it would bite.
+  the suffix rule and decision 4 handle where it would bite.
 - **A `renamed_from` list on each element.** A second set of identifiers for
   one element, which is what this spec removes.
 
@@ -289,7 +289,7 @@ build refuses every tracked 3.0 file. No format change.
 in `OrmModel`, with three warnings on 3.x:
 
 - two elements of any kinds whose local names would be equal (an object
-  type and a fact type named alike is Open decision 4's case);
+  type and a fact type named alike is decision 4's case);
 - two roles of one fact type with the same role name;
 - a name `localName()` changes beyond whitespace, so a reader sees the id
   the migration will store.
@@ -301,7 +301,7 @@ suffix or rename.
 
 An optional `name` on constraints, subtype facts and objectifications, set
 from the canonical verbalization through `localName()` when the element is
-created, with the staleness check Open decision 14 chooses. An additive
+created, with the staleness check decision 14 chooses. An additive
 field, so the cycle's minor bump to 3.1, which WS1 makes loadable. The
 synthetic `subtype:` and `objectified:` names go. Ground first: the
 importers and the LLM constraint parser (`llm/src/parse/constraints.ts`)
@@ -315,7 +315,8 @@ where references become names; in 3.x they would only hold UUIDs. If WS3 and
 WS4 ship in one release cycle they share 3.1 (`schema-versioning.md`,
 decision 3); if not, WS4 is 3.2. Every current build refuses a project file carrying
 `iri_base`, because `orm-project.schema.json` closes `project` with
-`additionalProperties: false`; Open decision 16.
+`additionalProperties: false`, so this workstream waits on barwise-y1b,
+which versions the project file (decision 16).
 
 ### 5. Rename and rename recognition (provisional: not yet grounded)
 
@@ -323,7 +324,7 @@ decision 3); if not, WS4 is 3.2. Every current build refuses a project file carr
 states, exposed as `barwise rename`, an MCP tool and an editor command, with
 a capability-matrix row in the same PR; `rename` modifies its input, which
 among CLI commands only `migrate` does today, so the row says so. Diff and
-merge add rename recognition after the name pass, by Open decision 8. Built on 3.x, where a rename
+merge add rename recognition after the name pass, by decision 8. Built on 3.x, where a rename
 keeps the UUID, and exercised again on 4.0 by WS6.
 
 ### 6. Format 4.0: local names are the ids (provisional: not yet grounded)
@@ -364,7 +365,10 @@ names.
   pinned tool lists (`mcp/tests/serverSpawn.test.ts`,
   `vscode/tests/unit/toolRegistration.test.ts`).
 
-## Open decisions (for review)
+## Decisions (resolved by the owner, 2026-10-28)
+
+Each was put to the owner with its options; every recommendation was
+accepted. The options stay, so a later reader sees what was weighed.
 
 1. **An outside IRI such as `foaf:Agent`.** (a) barwise's identity is always
    its own, and an optional `equivalent_iri` states that the element means
@@ -372,18 +376,18 @@ names.
    `equivalent_iri` into Ossie's `iri` when present, and the identity IRI
    otherwise. (b) an element may take the outside IRI as its identity, as
    Ossie allows; one field, but it breaks the namespace rule, and two
-   domains reusing `foaf:Agent` collide in one project. **Recommend (a)**:
+   domains reusing `foaf:Agent` collide in one project. **Decided: (a)**:
    the field is a statement about the element, not a second way to find it.
 2. **A fact type's local name.** (a) its own name, normalized:
    `Customer_places_Order`. (b) Ossie's `Concept.relationship`, which needs a
    rule for which player owns a fact type; 363 roles in the corpus collide on
    `<player>.<role name>` across fact types (two `SalesOrder.has` in
-   `examples/getting-started/shop.orm.yaml`). **Recommend (a).**
+   `examples/getting-started/shop.orm.yaml`). **Decided: (a).**
 3. **Normalization.** (a) keep case, replace each run of whitespace with
    `_`, and percent-encode `:`, `.`, `/`, `#`, `?`, `%` and anything else an
    IRI path segment cannot hold, so a local name never reads as an alias or
    a role separator. (b) PascalCase-join (`CustomerPlacesOrder`), which reads
-   worse and collides more. **Recommend (a).** A minted name with a
+   worse and collides more. **Decided: (a).** A minted name with a
    defining rule (`... defined as: ...`) is then encoded, not parsed.
 4. **An objectified fact type named like its object type.** 22 fact types in
    the corpus share their objectifying type's name (11 in
@@ -391,43 +395,43 @@ names.
    convention. (a) the migration renames the fact type to its first reading,
    which is unique and readable. (b) the pair shares one id, since ORM treats
    them as one thing, at the cost of an exception to the cross-kind index.
-   **Recommend (a).**
+   **Decided: (a).**
 5. **Two roles of one fact type with the same role name.** Required, but
    unique nowhere today. (a) the suffix rule (`.has`, `.has_2`). (b) refuse,
-   and make the author rename one. **Recommend (a) for the migration and (b)
+   and make the author rename one. **Decided: (a) for the migration and (b)
    for new authoring**, which WS2's warning prepares.
 6. **Minted names that are long.** A constraint's local name is a sentence
    (`Each_Person_either_drives_some_Car_or_rides_some_Bus_but_not_both`).
-   Keep it whole, as the owner chose: truncation collides. Recorded so the
-   length is a decision, not a surprise.
+   **Decided: keep it whole**, as the owner chose: truncation collides.
+   Recorded so the length is a decision, not a surprise.
 7. **Populations and fact instances.** (a) a population's local name is its
    fact type's local name plus `.population`, under the suffix rule; a fact
    instance keeps an `id`, its population's local name plus the next number
    that population has not used (`.1`, `.2`), never reused, because six
    population rules, the editor's source map and the NORMA population
    mapping key on it. (b) fact instances drop their id and every one of
-   those sites moves to positions. **Recommend (a).**
+   those sites moves to positions. **Decided: (a).**
 8. **How diff recognizes a rename.** (a) after the id and name passes, pair
    the rest by content (same kind, roles, players and constraints) and
    report a pair whose names differ as a rename. (b) report a rename only
-   when told (`--rename old=new`). **Recommend (a) for diff**, with (b) as the override for an edit that
+   when told (`--rename old=new`). **Decided: (a) for diff**, with (b) as the override for an edit that
    renamed and changed content at once, **and never for merge**: a content
    pair can be two different entity types of one shape (a transcript's new
    `Supplier` beside the base's `Vendor`), so merge adds it and diff reports
    it as a possible rename. The pass runs last, on what the name pass left.
 9. **A moved element.** Split and a move between domains change an IRI. (a)
    no forwarding record; the old IRI is in git history. (b) a project-level
-   table of moved IRIs. **Recommend (a)** until a consumer outside the
+   table of moved IRIs. **Decided: (a)** until a consumer outside the
    project needs (b).
 10. **The metamodel-evolution filters.** Identity is metadata, not a
     construct, so _verbalizable_ does not apply; it is inline and local, and
     more deterministic than today. It fails _bounded cost_, whose budget is a
-    shared minor bump: this is a major. **Recommend accepting the major
+    shared minor bump: this is a major. **Decided: accepting the major
     knowingly**, as `orm-format-3` did, and saying so in the release notes.
 11. **A model with no namespace.** (a) allowed: its ids are local names, and
     `iriOf` returns nothing until a namespace is declared; exporting to Ossie
     or RDF asks for one. (b) every 4.0 file must declare one, so an import or
-    a new model must be told one. **Recommend (a)**: a quick transcript import
+    a new model must be told one. **Decided: (a)**: a quick transcript import
     should not need a domain name.
 12. **NORMA ids.** NORMA accepts any unique token as an id
     (`formats/src/norma/normaId.ts`), and today barwise keeps a NORMA file's
@@ -436,31 +440,31 @@ names.
     loaded, and a NORMA round trip gets new ids. (b) store the source GUID
     in a `norma_id` field, which is a second identifier. (c) write `_` plus
     the local name, which reads well but must pass NORMA's id syntax for
-    every encoded name. **Recommend (a)**; ground (c) before WS6.
+    every encoded name. **Decided: (a)**; ground (c) before WS6.
 13. **Does `name` stay beside `id`?** (a) yes: `name` is the display text
     (`Customer places Order`, with its spaces and case), `id` is
     `localName(name)` at creation, and an edit to `name` that is not a
     rename leaves them apart, which validation reports and rename repairs.
     (b) no: `name` is dropped and read back from the id, which loses the
     difference between `Customer Account` and `Customer_Account` and prints
-    an encoded name wherever a name is shown. **Recommend (a).**
+    an encoded name wherever a name is shown. **Decided: (a).**
 14. **When a minted name counts as stale.** (a) when its text differs from
     the current verbalization, which also fires on every constraint after a
     release changes the verbalizer's wording. (b) when the element's content
     -- kind, roles, values -- differs from what it was minted from, which
     needs a stored content key and ignores wording changes. (c) never; a
-    minted name is a name. **Recommend (b).**
+    minted name is a name. **Decided: (b).**
 15. **Lineage across the format change.** (a) a 3.x manifest reads stale
     once, with the reason named, and a re-export or `migrate` restamps it.
     (b) keep `canonicalizeIds` in 4.0, fixed to replace only `id` values and
     reference fields, so a 3.x hash and a 4.0 hash of one model agree and
     nothing reads stale. (b) is quieter but keeps code whose reason the
-    format removes. **Recommend (a).**
+    format removes. **Decided: (a).**
 16. **The project file and older builds.** (a) do barwise-y1b first, so the
     project file carries a version and an older build refuses `iri_base`
     with "written by a newer barwise" instead of a schema error. (b) ship
     `iri_base` unversioned and name the break in the release notes.
-    **Recommend (a).**
+    **Decided: (a).**
 
 ## Risks and testing
 
