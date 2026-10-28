@@ -88,7 +88,9 @@ describe("the table line names an identifier the key does not state", () => {
     expect(tableLine(text, "purchase_order_item")?.identifiedBy).toEqual([
       "purchase_order_item_id",
     ]);
-    const back = parse(text).model;
+    const { model: back, warnings } = parse(text);
+    // The key's reference is the subtype fact, imported: nothing to say.
+    expect(warnings.filter((w) => w.includes("purchase_order_item"))).toEqual([]);
     expect(identifiers(back).get("PurchaseOrderItem")).toBe(
       "internal_uniqueness PurchaseOrderItem/PurchaseOrderItemId:PurchaseOrderItemId",
     );
@@ -96,10 +98,11 @@ describe("the table line names an identifier the key does not state", () => {
 
   it("names nothing a plain key states", () => {
     const text = ddl(load(C05)!);
-    const lines = [...readAnnotations(text, []).tables.values()];
-    const named = lines.filter((l) => "identifiedBy" in l && l.identifiedBy !== undefined);
-    // Only the identifiers that are not their table's key.
-    expect(named.length).toBeLessThan(lines.length / 4);
+    const named = [...readAnnotations(text, []).tables.values()]
+      .filter((l) => "identifiedBy" in l && l.identifiedBy !== undefined)
+      .map((l) => l.table);
+    // The one identifier in C05 that is not its table's key.
+    expect(named).toEqual(["work_order"]);
   });
 
   it("names nothing on a dialect that writes no UNIQUE, which reports the uniqueness as spilled", () => {
@@ -109,6 +112,46 @@ describe("the table line names an identifier the key does not state", () => {
 });
 
 describe("the import reads the key's uniqueness as the identifier", () => {
+  it("leaves a key that is one composite foreign key unpreferred, as the export keys it apart", () => {
+    const { model } = parse(`
+      CREATE TABLE order_line (order_id INTEGER, line_nr INTEGER, PRIMARY KEY (order_id, line_nr));
+      CREATE TABLE shipment (
+        order_id INTEGER NOT NULL,
+        line_nr INTEGER NOT NULL,
+        shipped_on DATE,
+        PRIMARY KEY (order_id, line_nr),
+        FOREIGN KEY (order_id, line_nr) REFERENCES order_line (order_id, line_nr)
+      );
+    `);
+    expect(identifiers(model).get("Shipment")).toBeUndefined();
+  });
+
+  it("says when the line names another identifier than a composite key's", () => {
+    const line = `-- barwise:v1 ${
+      JSON.stringify({
+        kind: "table",
+        table: "enrollment",
+        entity: "Enrollment",
+        referenceMode: "enrollment_id",
+        supertypes: [],
+        identifiedBy: ["code"],
+      })
+    }`;
+    const { model, warnings } = parse(`${line}
+      CREATE TABLE enrollment (
+        student_nr INTEGER NOT NULL,
+        course_nr INTEGER NOT NULL,
+        code TEXT NOT NULL,
+        PRIMARY KEY (student_nr, course_nr),
+        UNIQUE (code)
+      );`);
+    expect(identifiers(model).get("Enrollment")).toBe("internal_uniqueness Enrollment/Code:Code");
+    expect(warnings).toEqual([
+      `Table "enrollment": composite PRIMARY KEY (student_nr, course_nr) is imported as an external `
+      + `uniqueness over its columns, not its preferred identifier: the annotation names another.`,
+    ]);
+  });
+
   it("prefers an objectified relationship's uniqueness over its key, from plain DDL", () => {
     const { model } = parse(`
       CREATE TABLE student (student_id INTEGER PRIMARY KEY);

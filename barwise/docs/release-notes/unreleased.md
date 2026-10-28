@@ -152,8 +152,8 @@ its identifier was not the table's key: 42 entities in the tracked models
 did. The import now makes the uniqueness a multi-column key reads as the
 entity's preferred identifier, for plain and annotated DDL alike, as it
 already did for a key of one column. A composite primary key over plain
-columns now imports as the entity's identifier, not beside an invented
-reference mode. Where the identifier is not the key (an objectifier
+columns is now the entity's identifier; it used to be stored unpreferred,
+so the next export keyed the table on an invented column. Where the identifier is not the key (an objectifier
 identified by a value of its own, a subtype keyed on its supertype link),
 the barwise annotation names its columns in a new `identifiedBy` field,
 and the import reads it.

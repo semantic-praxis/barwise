@@ -42,11 +42,12 @@ export interface TableAnnotation {
    */
   readonly supertypes?: readonly SupertypeLink[];
   /**
-   * The columns the entity's stored preferred identifier is over, written
-   * only when they are not the table's key, which the import reads as the
-   * identifier by itself (annotation-preferred-identifier.spec.md): an
-   * objectifier keyed on its relationship and identified by a value, a
-   * subtype keyed on its supertype link.
+   * The columns the entity's stored preferred identifier is over
+   * (annotation-preferred-identifier.spec.md). Written when they are not
+   * the table's key, which the import reads as the identifier by itself:
+   * an objectifier keyed on its relationship and identified by a value.
+   * And written when they are a one-column key that an identifying
+   * supertype link also is, which the import reads as the link alone.
    */
   readonly identifiedBy?: readonly string[];
 }
@@ -279,11 +280,17 @@ function namesIdentifier(
   uniques: readonly (readonly string[])[],
 ): boolean {
   const key = table.primaryKey.columnNames;
-  if (!sameColumnSet(columns, key)) return uniques.some((u) => sameColumnSet(u, columns));
-  return supertypes.some((s) => s.providesIdentification && sameColumnSet(s.columns, key));
+  if (!sameColumns(columns, key)) return uniques.some((u) => sameColumns(u, columns));
+  // Only a one-column key gets an identifier beside its link on import.
+  return key.length === 1
+    && supertypes.some((s) => s.providesIdentification && sameColumns(s.columns, key));
 }
 
-function sameColumnSet(a: readonly string[], b: readonly string[]): boolean {
+/**
+ * Whether two column lists name the same columns, in any order. Shared with
+ * the import, which asks the same question of the lines this side writes.
+ */
+export function sameColumns(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((c) => b.includes(c));
 }
 

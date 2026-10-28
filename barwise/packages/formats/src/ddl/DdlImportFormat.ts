@@ -46,6 +46,7 @@ import {
   type ReadAnnotations,
   readAnnotations,
   type Relationship,
+  sameColumns,
   type SupertypeLink,
 } from "./barwiseAnnotation.js";
 import { bareName, headNoun, sameUpToNumber } from "./nameMatching.js";
@@ -455,7 +456,14 @@ export class DdlImportFormat implements ImportFormat {
           const namesKey = found?.kind === "table" && found.identifiedBy !== undefined
             && sameColumns(found.identifiedBy, table.primaryKey);
           if (kept.identifiedByKey && !namesKey || objectifiedKey) continue;
-          const binary = this.createKeyIdentifier(model, entity, table, annotations, warnings);
+          const binary = this.createKeyIdentifier(
+            model,
+            entity,
+            table,
+            annotations,
+            warnings,
+            kept.identifiedByKey,
+          );
           if (binary) binaries.set(columnKey(table.name, table.primaryKey[0]!), binary);
           continue;
         }
@@ -698,31 +706,39 @@ export class DdlImportFormat implements ImportFormat {
       // preferred identifier, as createKeyIdentifier makes a one-column
       // key's: the mapper keys a table on its entity's identifier
       // (annotation-preferred-identifier.spec.md).
-      const rolesOf = (cols: readonly string[]) =>
-        unexpressible(cols) === undefined
-          ? [...new Set(cols.map((c) => partOf(c)!.farRoleId))]
-          : undefined;
-      const keyRoles = table.primaryKey.length > 1 ? rolesOf(table.primaryKey) : undefined;
-      if (keyRoles && entityType.kind === "entity" && !model.preferredIdentifierOf(entityId)) {
-        preferUniquenessOver(model, entityId, keyRoles);
-      }
+      // A key that is one composite foreign key is not: the reference's
+      // one-to-one does not key the exported table, which takes an invented
+      // reference mode beside it.
+      const rolesOf = (cols: readonly string[]): { roles: string[]; } | { reason: string; } => {
+        const reason = unexpressible(cols);
+        return reason === undefined
+          ? { roles: [...new Set(cols.map((c) => partOf(c)!.farRoleId))] }
+          : { reason };
+      };
+      const keyRoles = table.primaryKey.length > 1 && keyResult?.kind !== "reference"
+        ? rolesOf(table.primaryKey)
+        : undefined;
+      const keyPreferred = keyRoles !== undefined && "roles" in keyRoles
+        && entityType.kind === "entity" && !model.preferredIdentifierOf(entityId)
+        && preferUniquenessOver(model, entityId, keyRoles.roles);
       // An identifier the key does not state, named by the table line.
+      let overridden = false;
       const line = annotations.tables.get(tableKey(table.name));
       if (
         line?.kind === "table" && line.entity === entityType.name && line.identifiedBy
         && entityType.kind === "entity"
       ) {
         const cols = line.identifiedBy;
-        const reason = unexpressible(cols);
-        if (reason || !preferUniquenessOver(model, entityId, rolesOf(cols)!)) {
+        const read = rolesOf(cols);
+        if ("reason" in read || !preferUniquenessOver(model, entityId, read.roles)) {
           warnings.push(
             `Table "${table.name}": the annotation names the entity's identifier as (${
               cols.join(", ")
             }), which ${
-              reason ?? "reads as no uniqueness that identifies it"
+              "reason" in read ? read.reason : "reads as no uniqueness that identifies it"
             }; the identifier is kept as imported (annotation-preferred-identifier.spec.md).`,
           );
-        }
+        } else overridden = !sameColumns(cols, table.primaryKey);
       }
 
       if (keyResult) {
@@ -731,14 +747,15 @@ export class DdlImportFormat implements ImportFormat {
         const identified = `the entity is identified by "${
           entityType.kind === "entity" ? entityType.referenceMode : ""
         }"`;
-        const preferred = model.getConstraint(model.preferredIdentifierOf(entityId) ?? "");
         warnings.push(
           result.kind === "imported"
             ? `Table "${table.name}": composite PRIMARY KEY (${key}) is imported as an external `
               + `uniqueness over its columns, ${
-                preferred?.type === "external_uniqueness"
-                  ? "the entity's preferred identifier"
-                  : "which does not identify the entity alone, so it is not its preferred identifier"
+                !keyPreferred
+                  ? "which does not identify the entity alone, so it is not its preferred identifier"
+                  : overridden
+                  ? "not its preferred identifier: the annotation names another"
+                  : "the entity's preferred identifier"
               }.`
             : result.kind === "reference"
             ? `Table "${table.name}": composite PRIMARY KEY (${key}) is one foreign key, imported `
@@ -1135,6 +1152,8 @@ export class DdlImportFormat implements ImportFormat {
     table: ParsedTable,
     annotations: ReadAnnotations,
     warnings: string[],
+    /** The key's reference was imported, as the identifying subtype fact. */
+    linkedToSupertype = false,
   ): Binary | undefined {
     if (table.primaryKey.length !== 1) return undefined;
     const column = table.columns.find((c) => c.name === table.primaryKey[0]);
@@ -1151,7 +1170,7 @@ export class DdlImportFormat implements ImportFormat {
     // well would add a second key column on export. Keep the typed key and
     // say what was not imported (barwise-1078).
     const fk = table.foreignKeys.find((f) => f.columns.includes(column.name));
-    if (fk) {
+    if (fk && !linkedToSupertype) {
       warnings.push(
         `Table "${table.name}": key column "${column.name}" also references "${fk.referencedTable}"; `
           + `the key is imported, the reference is not (barwise-1078).`,
@@ -1891,11 +1910,6 @@ function preferUniquenessOver(
   }
   model.setPreferredIdentifier(entityId, before);
   return false;
-}
-
-/** Whether two column lists name the same columns, in any order. */
-function sameColumns(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((c) => b.includes(c));
 }
 
 function compositeReading(table: ParsedTable, referenced: boolean): CompositeReading | undefined {
