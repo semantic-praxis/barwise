@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-td6
+Plan-reviewed: f62f224f (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/,
 barwise/packages/core/src/annotation/,
 barwise/packages/core/src/export/types.ts,
