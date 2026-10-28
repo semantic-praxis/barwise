@@ -1,6 +1,6 @@
 # The OpenAPI item path names every key column
 
-Status: Proposed
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -91,6 +91,20 @@ Not pinned by a new test: the two CLI goldens are regenerated with
 regeneration is expected to change only each composite-key table's item
 path and its three parameter lists, and the PR shows that diff for
 review.
+
+## Implementation notes
+
+- As planned in the revised plan. The first draft said the clinic golden
+  had two composite-key tables and planned to regenerate the example
+  outputs. The high plan review showed it has one, and that the examples
+  are already 187 lines out of date (barwise-om4). The examples are left
+  alone.
+- `primaryKeyParams` replaces `primaryKeyParam` and feeds both the path
+  and `renderItemPaths`.
+- The new test fails with the fix removed. Regenerating the goldens
+  changed 2 files, 50 lines added and 2 removed: each composite-key
+  table's item path, plus one added parameter on each of its three
+  operations.
 
 ## API and migration impact
 

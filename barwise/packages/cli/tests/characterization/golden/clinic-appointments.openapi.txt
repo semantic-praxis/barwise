@@ -747,13 +747,21 @@
         }
       }
     },
-    "/doctor-is-assigned-to-exam-room-on-appointment-date/{provider_id}": {
+    "/doctor-is-assigned-to-exam-room-on-appointment-date/{provider_id}/{appointment_date}": {
       "get": {
         "summary": "Get a DoctorIsAssignedToExamRoomOnAppointmentDate by ID",
         "operationId": "getDoctorIsAssignedToExamRoomOnAppointmentDate",
         "parameters": [
           {
             "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "appointment_date",
             "in": "path",
             "required": true,
             "schema": {
@@ -783,6 +791,14 @@
         "parameters": [
           {
             "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "appointment_date",
             "in": "path",
             "required": true,
             "schema": {
@@ -822,6 +838,14 @@
         "parameters": [
           {
             "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "appointment_date",
             "in": "path",
             "required": true,
             "schema": {

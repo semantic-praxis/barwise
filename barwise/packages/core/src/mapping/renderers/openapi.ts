@@ -114,10 +114,12 @@ export function renderOpenApi(
     schemas[schemaName] = renderComponentSchema(table, example);
 
     const resourcePath = `${basePath}${toKebabCase(table.name)}`;
-    const idPath = `${resourcePath}/{${primaryKeyParam(table)}}`;
+    // One list feeds the path and the parameters, so they cannot disagree.
+    const keyParams = primaryKeyParams(table);
+    const idPath = `${resourcePath}/${keyParams.map((name) => `{${name}}`).join("/")}`;
 
     paths[resourcePath] = renderCollectionPaths(schemaName);
-    paths[idPath] = renderItemPaths(schemaName, primaryKeyParam(table));
+    paths[idPath] = renderItemPaths(schemaName, keyParams);
   }
 
   return {
@@ -240,20 +242,20 @@ function renderCollectionPaths(schemaName: string): Record<string, unknown> {
 
 function renderItemPaths(
   schemaName: string,
-  paramName: string,
+  paramNames: readonly string[],
 ): Record<string, unknown> {
-  const parameter = {
-    name: paramName,
+  const parameters = paramNames.map((name) => ({
+    name,
     in: "path",
     required: true,
     schema: { type: "string" },
-  };
+  }));
 
   return {
     get: {
       summary: `Get a ${schemaName} by ID`,
       operationId: `get${schemaName}`,
-      parameters: [parameter],
+      parameters,
       responses: {
         "200": {
           description: `A ${schemaName} resource`,
@@ -269,7 +271,7 @@ function renderItemPaths(
     put: {
       summary: `Update a ${schemaName}`,
       operationId: `update${schemaName}`,
-      parameters: [parameter],
+      parameters,
       requestBody: {
         required: true,
         content: {
@@ -293,7 +295,7 @@ function renderItemPaths(
     delete: {
       summary: `Delete a ${schemaName}`,
       operationId: `delete${schemaName}`,
-      parameters: [parameter],
+      parameters,
       responses: {
         "204": { description: `${schemaName} deleted` },
         "404": { description: `${schemaName} not found` },
@@ -404,9 +406,12 @@ function normalizePath(path: string): string {
 }
 
 /**
- * Derive a URL parameter name from the table's primary key.
- * Uses the first PK column name, or "id" as fallback.
+ * The item path's parameters: every primary-key column, in key order, so
+ * a key over several columns addresses one row rather than many
+ * (openapi-composite-key-path.spec.md, barwise-pki). "id" when the table
+ * has no key, as before.
  */
-function primaryKeyParam(table: Table): string {
-  return table.primaryKey.columnNames[0] ?? "id";
+function primaryKeyParams(table: Table): readonly string[] {
+  const key = table.primaryKey.columnNames;
+  return key.length > 0 ? key : ["id"];
 }

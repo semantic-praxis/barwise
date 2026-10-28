@@ -733,6 +733,41 @@ describe("OpenAPI renderer", () => {
 
       expect(pathKeys).toContain("/log-entry/{id}");
     });
+
+    it("names every column of a key over several columns, in key order, in the path and every item operation", () => {
+      // openapi-composite-key-path.spec.md (barwise-pki): the first column
+      // alone addresses many rows.
+      const column = (name: string) => ({
+        name,
+        dataType: "TEXT",
+        dataTypeDefaulted: false,
+        nullable: false,
+      });
+      const relSchema: RelationalSchema = {
+        sourceModelId: "test",
+        tables: [{
+          name: "seat_booking",
+          columns: [column("flight_id"), column("seat_no"), column("leg_no"), column("passenger")],
+          primaryKey: { columnNames: ["flight_id", "leg_no", "seat_no"] },
+          foreignKeys: [],
+          sourceElementId: "ft-seat-booking",
+        }],
+      };
+      const spec = renderOpenApi(relSchema);
+      const itemPath = "/seat-booking/{flight_id}/{leg_no}/{seat_no}";
+      expect(Object.keys(spec.paths)).toEqual(["/seat-booking", itemPath]);
+      const item = spec.paths[itemPath] as Record<
+        string,
+        { parameters: { name: string; in: string; required: boolean; }[]; }
+      >;
+      for (const op of ["get", "put", "delete"]) {
+        expect(item[op]!.parameters.map((p) => [p.name, p.in, p.required])).toEqual([
+          ["flight_id", "path", true],
+          ["leg_no", "path", true],
+          ["seat_no", "path", true],
+        ]);
+      }
+    });
   });
 
   describe("openApiToJson", () => {
