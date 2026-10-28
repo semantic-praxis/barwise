@@ -13,7 +13,7 @@
 import { stringify } from "yaml";
 import { roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
-import { IRI_BASE_PATTERN } from "../model/namespace.js";
+import { IRI_BASE_PATTERN } from "../model/iri.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";

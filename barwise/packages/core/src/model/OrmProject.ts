@@ -1,6 +1,6 @@
 import { ContextMapping, type ContextMappingConfig } from "./ContextMapping.js";
 import { DomainModel, type DomainModelConfig } from "./DomainModel.js";
-import { checkedIri, IRI_BASE_PATTERN } from "./namespace.js";
+import { checkedIri, IRI_BASE_PATTERN } from "./iri.js";
 import type { ObjectType } from "./ObjectType.js";
 import { type ProductConfig, ProductDependency } from "./ProductDependency.js";
 

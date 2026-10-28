@@ -3,7 +3,8 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { IRI_BASE_PATTERN, NAMESPACE_PATTERN, namespaceOf } from "../../src/model/namespace.js";
+import { IRI_BASE_PATTERN, NAMESPACE_PATTERN } from "../../src/model/iri.js";
+import { namespaceOf } from "../../src/model/namespace.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmProject } from "../../src/model/OrmProject.js";
 

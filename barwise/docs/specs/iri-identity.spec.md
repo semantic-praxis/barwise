@@ -443,7 +443,7 @@ both are unreleased (owner decision, 2026-10-28):
   two endings RDF vocabularies use.
 
 The schemas check the shape with one pattern each, and core holds the same
-two patterns (`IRI_BASE_PATTERN`, `NAMESPACE_PATTERN` in `namespace.ts`,
+two patterns (`IRI_BASE_PATTERN`, `NAMESPACE_PATTERN` in `model/iri.ts`,
 drift-tested against the schemas) and refuses a value that fails them where
 it is set, so a model or project in memory can always be saved and
 reopened. Core does not dereference either. `OrmProjectConfig` and `OrmProject` gain `iriBase`, and

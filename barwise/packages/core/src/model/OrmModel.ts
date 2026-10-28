@@ -12,7 +12,7 @@ import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
 import { generateId } from "./id.js";
-import { checkedIri, NAMESPACE_PATTERN } from "./namespace.js";
+import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
