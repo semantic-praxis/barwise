@@ -133,8 +133,8 @@ In scope:
   file cannot see is an owner whose local name took a suffix; a 4.0
   project load reports the shadow's alias as unresolved, naming the owner,
   and `barwise migrate` given the project fixes both sides.
-- When a 4.0 build checks lineage on a model whose manifest was written
-  under 3.x, it shall report each export as stale with the reason "ids
+- When a 4.0 build checks lineage against a manifest whose element ids are
+  UUIDs, which only a 3.x model can have written, it shall report each export as stale with the reason "ids
   changed to 4.0" rather than as an ordinary change, and impact analysis
   given a UUID shall say the manifest predates 4.0 instead of returning
   nothing. `barwise migrate` restamps the exports that were fresh under the
