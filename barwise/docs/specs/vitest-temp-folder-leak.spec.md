@@ -74,11 +74,12 @@ vitest and checks that the temp directory is empty afterwards.
     never transformed a module would leave the directory empty without
     proving anything;
   - otherwise fail if the directory is not empty.
-- The fixture is one test file that imports only `vitest`. In CI and
+- The fixture is one test file that imports only `vitest` and `node:os`. It asserts that `os.tmpdir()` in the run equals the directory the test chose, so `1 passed` also proves the run used it. In CI and
   the pre-push gate, `test:scripts` runs before `npm run build`, so a
   file that imports a workspace package would fail there for want of
   `dist`. Prototype on 5.0.1: it runs in about 160 ms and leaves one
   `<id>/ssr/` folder.
+- The test runs the workspace's own vitest, `barwise/node_modules/vitest/vitest.mjs`, which the lockfile pins, and its failure message names that version. The runner collects only `scripts/tests/*.test.mjs`, so the fixture under `fixtures/` is never run as a script test itself.
 - The new file is added to `scripts/tests/expected-counts.json`
   (`npm run test:scripts -- --write`), or the runner refuses it.
 
