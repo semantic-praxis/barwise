@@ -9,6 +9,7 @@ Touches: barwise/scripts/check-architecture.mjs,
 barwise/scripts/lib/architecture-section.mjs,
 +barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/lib/ci-gates.mjs,
 barwise/scripts/mutate.mjs, barwise/scripts/fault-matrix.mjs,
+barwise/package.json, barwise/package-lock.json,
 barwise/scripts/tests/,
 barwise/docs/adr/, barwise/docs/ARCHITECTURE.md,
 .claude/skills/spec-writer/template.adr.md
@@ -98,7 +99,8 @@ In scope:
   entry is written as CI writes the step, `npm run audit:specs --
   --check`.
   What a step runs is decided by one new function, `stepScript(args)` in
-  `ci-gates.mjs`, returning `{ script, args }` or null. It splits at the
+  `ci-gates.mjs`, returning `{ script, args }`, `null` (not a root
+  script), or `{ refused: <reason> }` (cannot tell). It splits at the
   first `--`. Before it, the first token must be the npm subcommand `run`
   (or its alias `run-script`), so `npm audit` never counts as the
   `audit` script. Any token whose name, the part before `=`, is
@@ -109,12 +111,15 @@ In scope:
   `--quiet`, `-q` and `--if-present` are skipped. Any other token
   starting with `-` might take the next token as its value
   (`--loglevel warn`), so `stepScript` cannot tell which token is the
-  script, and it refuses (the check exits 2) rather than guess. The first
-  remaining token is the script. After `--`, the tokens are
-  the arguments.
+  script, and it refuses rather than guess; the check then exits 2. The
+  first remaining token is the script. The arguments are every token
+  after the script, with the first `--` dropped, so a positional token
+  before `--` (`run x foo`) is an argument too and `npm run x` does not
+  match it.
   `resolveNodeGate()` in `scripts/fault-matrix.mjs` names a step's
   script with its own inline rule today; WS1 makes it take the name from
-  `stepScript()` and return null when that does, before its own
+  `stepScript()` and return null when that returns null or refuses (so
+  `fault-matrix` keeps skipping what it skips today), before its own
   node-gate resolution, so the naming cannot drift. The two are not
   identical functions: `resolveNodeGate` also returns null for every
   script that is not a single node gate (`lint`, `build`, `dup`), so the
@@ -124,18 +129,31 @@ In scope:
   become auditable by `fault-matrix`, where today it is skipped; no
   `ci.yml` step has that form now. No ADR relies on a workspace step
   today.
+- An entry naming an umbrella script -- `test`, `test:coverage`,
+  `test:scripts`, `build`, `lint`, `ci:local` -- is a finding even when
+  it is wired. Each runs every suite or every package, so it cannot point
+  at one decision; the entry names the test file or the specific gate
+  instead. That turns WS2's "replace every `test:coverage` citation" from
+  a prose instruction into a rule the check enforces. The list lives in
+  `adr-enforcement.mjs`.
 - A step marked `continue-on-error: true`, or in a job marked so, is not
   wired: it cannot fail CI. A `continue-on-error` whose value is not the
   literal `true` or `false` (an expression such as
   `${{ matrix.experimental }}`) is a refusal, exit 2. `ciSteps()` does
-  not report that key today, so WS1 extends it to
-  return `continueOnError` beside `condition`; `ci:local` and
+  not report that key today, and it has no notion of jobs: it reads every
+  line after the first `steps:` as part of the current step, so a second
+  job's header keys would land on the previous job's last step. WS1
+  makes it track jobs (a key at the indent of the first job under
+  `jobs:` starts a new one and resets the step state), reads job-level
+  `continue-on-error` and `if:` into each step of that job, and returns
+  `continueOnError` beside `condition`; `ci:local` and
   `fault-matrix` do not use the new field in this spec (`ci:local`
   still runs `dup` and `filesize` as blocking, a divergence from CI
   filed separately as barwise-4vj), and the shape pinned by
   `scripts/tests/ci-conditions.test.mjs` is updated with it. Where the
   same arguments appear in two steps, `ciSteps()` keeps one entry, and
-  its `continueOnError` is true only if every occurrence has the key,
+  its `continueOnError` is true only if every occurrence is
+  `continue-on-error: true` (an explicit `false` is blocking),
   so step order cannot decide whether a gate is wired: a script is wired
   if any step that runs it can fail CI. `condition` keeps its current
   first-occurrence rule, which `ci:local` and `fault-matrix` read. The
@@ -144,12 +162,18 @@ In scope:
   `npm run dup` and `npm run filesize` each run once in `ci.yml`, with
   `continue-on-error: true`, and `must-agree-copies` names `dup` in its
   prose, so WS2 must not declare it.
-- A step guarded by an `if:` counts as wired. Most guards are
-  `docs_only != 'true'`, which skips only changes that cannot violate a
-  code decision; the narrower ones (`test:optimizer`, `pull_request`
-  only) enforce on exactly the changes CI's classifier sends them, and
-  the classifier is the authority on that, not this check. An ADR whose
-  enforcer is narrowly guarded says so in its Consequences.
+- A step guarded by an `if:` counts as wired only if `shouldRun()` in
+  `ci-gates.mjs`, the classifier reader `ci:local` already uses,
+  understands its condition (step-level and job-level combined). Those
+  forms are `docs_only`/`optimizer` comparisons and the
+  `pull_request` event test. Most guards are `docs_only != 'true'`,
+  which skips only changes that cannot violate a code decision; the
+  narrower ones (`test:optimizer`, `pull_request` only) enforce on
+  exactly the changes CI's classifier sends them, and an ADR whose
+  enforcer is narrowly guarded says so in its Consequences. Any other
+  condition, `if: false` included, is one the check cannot evaluate, and
+  it refuses (exit 2): a gate switched off with `if: false` must not
+  keep counting as an enforcer.
 - When an entry names a hook, it takes one of two forms, and the check
   shall exit 1 unless its conditions hold.
   `hook <Event> <path>`: the path is tracked, and `.claude/settings.json`,
@@ -172,14 +196,15 @@ In scope:
   `hook barwise/.husky/<name> runs npm run <script>`: the husky file is
   tracked, `<script>` is a key of `barwise/package.json` `scripts`, and
   the husky file has a line that invokes the script in one of two
-  shapes, and no other shape counts. Either the line is the invocation
-  alone -- `npm run`, flags as defined for CI steps above, `<script>`,
-  `-- <args>` exactly as the entry declares them (the same exact-argument
-  rule as for CI steps) -- optionally followed by `|| exit $?` or
-  `|| exit <non-zero literal>`, and the file contains no `set +e`
-  before it, since the bare form relies on husky's `sh -e`. Or it is
-  `if ! <invocation>; then`, and the `then` branch, before any `else`,
-  `elif` or `fi`, contains `exit <non-zero literal>`. Not `exit $?`:
+  shapes, and no other shape counts. Either the line is the invocation -- `npm run`, flags as defined for CI steps above, `<script>`, `--
+  <args>` exactly as the entry declares them (the same exact-argument
+  rule as for CI steps) -- followed by `|| exit $?` or
+  `|| exit <non-zero literal>`. Or it is `if ! <invocation>; then`, and
+  the `then` branch, before any `else`, `elif` or `fi`, contains
+  `exit <non-zero literal>`. A bare invocation with no explicit exit is
+  not accepted: it relies on husky's `sh -e`, and errexit can be turned
+  off in more spellings (`set +e`, `set +o errexit`, `set -u +e`) than a
+  lexical rule should try to list. Not `exit $?`:
   inside that branch `$?` is the status of the negated test or of the
   last `echo`, both 0. That is a whitelist rather than a list of
   forbidden suffixes, because the ways to discard a status (`| tee`,
@@ -198,12 +223,19 @@ In scope:
   `.test.mjs` directly in `barwise/scripts/tests/` (not a subdirectory:
   `run-script-tests.mjs` reads that directory with a non-recursive
   `readdirSync`), with `test:scripts` wired as above. Or a file under
-  `barwise/packages/<pkg>/` that matches that package's test include --
+  `barwise/packages/<pkg>/` that matches, under `picomatch`, that
+  package's test include --
   the `testInclude` literal in its `vitest.config.ts`, else the default
   `tests/**/*.test.ts` in `barwise/vitest.shared.ts`, or the
   `typecheck.include` literal where the config has one (core runs
   `tests/types/**/*.test-d.ts` that way) -- where the package
   defines `test:coverage` and the root `test:coverage` is wired as above.
+  The matcher is `picomatch`, the library vitest itself matches includes
+  with (4.0.7 is installed today as a dependency of vitest); WS1
+  declares it as a root devDependency at that version so the check and
+  vitest read a glob the same way. Node's `path.matchesGlob` is not used:
+  `scripts/lib/review-tiers.mjs` records that it is experimental on the
+  pinned Node and declines dot-segments.
   Tracked is not enough: `packages/vscode/tests/integration/` is tracked,
   vscode's `testInclude` is `tests/unit/**/*.test.ts`, and no `ci.yml`
   step runs the integration suite. The two arrays are read by key path,
@@ -292,7 +324,8 @@ ADR's declared state; an earlier draft did, marked most rows
 What this shows:
 
 - 17 of 20 ADRs already name an enforcer; the header makes that list
-  checkable rather than new. Every npm script they name today exists and,
+  checkable rather than new. Every npm script they name today, apart
+  from the two below that were proposed and never built, exists and,
   except `ci:local`, `fault-matrix`, `mutate`, `plan-scope`, `pr:risk`,
   `prepare`, `regen:builtins` and `trial:gate`, runs in `ci.yml`, and
   `dup` runs only with `continue-on-error`. Those nine are not enforcers, and WS2 must not copy them into an
@@ -392,7 +425,7 @@ parentheses, so `none (barwise-zdd: decisions 1, 3)` is one entry; an
 unbalanced parenthesis is a finding. A newline is read as a space, not
 a separator: most entries contain spaces, and a header wrapped by hand
 or by a reflow must not split `hook barwise/.husky/pre-commit runs npm
-run check:secrets` in two. In exchange, every entry must match its form
+run check:secrets -- --staged` in two. In exchange, every entry must match its form
 exactly, and a token left over is a finding: `npm run purity npm run
 depcruise`, a wrapped line whose comma was dropped, fails rather than
 letting `purity` pass for both. An `<issue-id>` is `barwise-` followed
@@ -404,7 +437,7 @@ in `scripts/lib/beads-ids.mjs`), and older children are numeric
 ```
 npm run <script>
 npm run <script> -- <args>
-hook barwise/.husky/<name> runs npm run <script> [-- <args>]   -- tried before the form below
+hook barwise/.husky/<name> runs npm run <script> [-- <args>]   -- tried first; args as the hook passes them
 hook <Event> <repo-rooted path>               -- Event is one word, no `/`; settings.json
 <repo-rooted path to a test file>
 none (<issue-id>[: <free text naming which decisions>])
@@ -484,18 +517,22 @@ headers and opens their gap issues. If WS3 has landed, each also runs
 `npm run regen:architecture`, since the backfill changes what the index
 renders.
 
+The first WS2 PR also changes `architectureRepo()` in `gates.test.mjs`,
+which copies every real ADR into its fixture but none of the inputs
+enforcement entries read (`ci.yml`, the root `package.json`, the
+tracker, settings, hook scripts, vitest configs, test files). The first
+ADR to carry a header would otherwise make every existing graph and
+ADR-shape case exit 2. Copying those inputs in would tie unrelated
+graph tests to the live tracker, `ci.yml` and settings, and copy over a
+megabyte of tracker per case. So `architectureRepo()` instead rewrites
+each copied ADR's `Enforced-by:` value to a single synthetic
+`none (barwise-fx1)` and writes a one-line tracker holding that open
+issue. The graph and shape cases keep testing what they test; WS1's own
+cases test enforcement against inputs built for them. The synthetic
+`ADR_OK` gains the same line.
+
 The last WS2 PR makes an absent header a finding and updates
-`template.adr.md` so a new ADR starts with the line. It also extends
-`architectureRepo()` in `gates.test.mjs`, which copies every real ADR
-into its fixture, so the fixture carries the inputs the real entries
-read: `ci.yml`, the root `package.json`, the tracker, settings, husky
-files, the vitest configs and the named test files. Without that,
-every existing `check:architecture` case exits 2 once the ADRs carry
-entries. (That extension may land earlier, with the first backfill PR
-whose entries the fixture cannot resolve.) The fixture is built and
-committed once per test file and copied per case, so the tracker (over
-a megabyte) is not re-copied and re-committed about ten times. The
-fixture's synthetic `ADR_OK` gains an `Enforced-by:` line as well.
+`template.adr.md` so a new ADR starts with the line.
 
 ### 3. Show enforcement in the generated index
 
