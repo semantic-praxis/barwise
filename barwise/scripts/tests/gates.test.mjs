@@ -7275,3 +7275,30 @@ test("check:architecture cannot answer with no ADR to check", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("check-plan-review reads the base branch's tip when the event's base commit is stale", () => {
+  // The branch merged main to resolve a conflict after main moved, and
+  // main's own commit changes a planned path; the event still names the
+  // earlier tip (PR #852). With GITHUB_BASE_REF the gate counts only the
+  // branch's commits, and without it the stale base still reads main's.
+  const r = planRepo();
+  try {
+    r.spec();
+    const specAt = r.commit("spec");
+    r.spec({ reviewed: specAt });
+    r.commit("record the review");
+    r.implement(1);
+    r.commit("implement");
+    r.g("checkout", "-q", "main");
+    writeFileSync(join(r.dir, "src", "b.ts"), "export const b = 2;\n");
+    r.commit("main moves, touching a planned path");
+    r.g("checkout", "-q", "feature");
+    r.g("merge", "-q", "--no-edit", "main");
+    const stale = r.run({ BASE_SHA: r.base });
+    assert.equal(stale.status, 1, stale.stdout + stale.stderr);
+    const fresh = r.run({ BASE_SHA: r.base, GITHUB_BASE_REF: "main" });
+    assert.equal(fresh.status, 0, fresh.stdout + fresh.stderr);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
