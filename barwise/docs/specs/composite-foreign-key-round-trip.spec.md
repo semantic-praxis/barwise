@@ -1,6 +1,6 @@
 # A multi-column foreign key round-trips as one reference
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -235,7 +235,7 @@ Out of scope:
 - The dbt export writes no non-key UNIQUE (barwise-ivl does not change
   that), so a one-to-one multi-column reference loses its referenced-role
   uniqueness on the dbt round trip, as a one-to-one single-column one
-  does today. A follow-up issue is filed when this spec lands.
+  does today. Filed as barwise-go4.
 - A dbt model keyed by a combination of values gets no entity
   (barwise-alg's dbt side). A multi-column reference to one keeps the
   reading above. If a tracked model needs it to pass the round-trip
@@ -276,6 +276,49 @@ Out of scope:
   `foreign_key` constraint for a multi-column reference, which needs dbt
   1.9 or later, and that dbt applies it only under an enforced contract.
 
+## Implementation notes
+
+- Measured with the scratchpad `ivl-count.mjs` at the implementation
+  head: all three round trips keep the 21 references, and no table
+  differs. `compositeForeignKeyRoundTrip.test.ts` holds that per foreign
+  key. On the unfixed source it and the three parity cases fail (21 of
+  their 38 tests); with the fix every suite passes.
+- The parity case for a foreign key outside the key uses an objectified
+  table, with a column beside the reference. The comparison sees only the
+  fact types an objectifier plays in, so an entity like C03's `claim`
+  would compare nothing.
+- Implementation review, fixed:
+  - The single-column-key exception covers a foreign key that includes
+    the key column, not only one that is the key column. With only the
+    latter, a foreign key over (key, other) built a reference while
+    barwise-1078's warning said none was imported.
+  - A foreign key naming a column the table does not declare (another
+    case, say) is no reference. Built as one, it crashed the import.
+  - WS1 said a foreign key to a table imported as no entity keeps
+    today's reading "so nothing is dropped". Today's DDL reading dropped
+    a declared one. A multi-column one now keeps its columns with a
+    warning, as the dbt importer does; a declared single-column one is
+    still dropped, as before. Which applies no longer depends on the
+    order the foreign keys are declared.
+  - WS3 said a combination test over exactly one foreign key's columns
+    is no candidate key. When it is the model's only key, the model now
+    gets an entity with a key of its own and a one-to-one reference, as
+    the DDL importer reads such a table. Without it the dbt round trip
+    lost the table.
+  - WS3 said the dbt importer declines what the DDL importer declines. A
+    declined key there skipped the whole model, which had imported before
+    `constraints:` was read. Instead the foreign key that would decline
+    it is set aside with a warning, and the model keeps its earlier
+    reading.
+  - A composite role's reference is found by its columns, not its first
+    column, which can carry a single-column reference of its own.
+  - One `sameColumns` helper per package; `external()` returns a
+    discriminated result.
+- Implementation review, kept: a composite PRIMARY KEY over part of a
+  multi-column foreign key is refused with a warning rather than read as
+  an external uniqueness over the references, as WS1 says of a UNIQUE.
+  The release note names keys as well as UNIQUEs.
+
 ## Open decisions
 
 1. **Enforce a contract on the dbt models?**
@@ -302,8 +345,8 @@ Out of scope:
   key change shape: one reference instead of several. That is the fix,
   and the release note says so. A model saved from an earlier import
   keeps its extra references until it is re-imported.
-- Some UNIQUE constraints that imported before, over part of a
-  multi-column foreign key, are now refused with a warning. They
+- Some UNIQUE constraints and composite keys that imported before, over
+  part of a multi-column foreign key, are now refused with a warning. They
   constrained a reference that did not exist, so the import was wrong.
 - The dbt importer change spans about eight mapping functions. The
   parity test checks that the two importers agree. The round-trip test
