@@ -28,7 +28,7 @@ the random UUID it carries today. A file stores each element's local name -- `Cu
 declared once, so an element's full IRI is its namespace followed by its
 local name. Identity becomes something a person can read and a second tool
 can rebuild. It is a structural change to `.orm.yaml`, so it ships as format
-4.0 with a project-wide migration, after workstreams that each land alone
+4.0 with a migration that works one file at a time, after workstreams that each land alone
 and keep 3.x files readable and lossless.
 
 ## Principle
@@ -84,9 +84,10 @@ In scope:
   project that declares one is refused, so the namespace has one source.
   A model with no namespace is Open decision 11.
 - When a model refers to an element of another domain, the model shall
-  declare `imports`, each binding an alias to a context name of the same
-  project or, outside a project, to an absolute namespace IRI; a reference
-  with an undeclared alias is a validation error in 4.0. Mapping files keep
+  declare `imports`, each binding an alias to a context name or to an
+  absolute namespace IRI; a reference with an undeclared alias is a
+  validation error in 4.0, and a declared alias whose context no loaded
+  project supplies is a warning, so a standalone domain file still loads. Mapping files keep
   their `context:Name` references, whose contexts their own
   `source_context` and `target_context` fields declare.
 - When an element is created, its local name shall come from the rule for
@@ -100,29 +101,44 @@ In scope:
     canonical verbalization and stored (owner decision, 2026-10-28);
   - population and fact instance: Open decision 7.
 - When a rule would give an element a local name another element of the
-  model already holds, the system shall append `_2`, `_3`, in creation
-  order, and report it.
+  model already holds, the system shall append `_2`, `_3`, and report it,
+  except where Open decision 5 refuses instead. The order is a function of
+  the input: object types before fact types before everything else, then
+  document order, so two builds of one input agree.
 - When an element's stored id no longer matches the name it was made from,
   validation shall warn, naming both (Open decisions 13 and 14). Neither
   changes on its own.
 - When the user renames an element, the system shall change its local name
-  and every id that embeds it -- a fact type's roles, populations and fact
-  instances -- and rewrite every reference to each: in its own model, its
-  population rows and diagram layouts, the shadows and `alias:` references
-  in the project's other domains, the project's mapping files, and the
-  lineage manifests that cover it. `renameInModel` serves a standalone
-  model and `renameInProject` names the domain.
+  and every id that embeds it -- a fact type's roles, and the population and
+  fact instance ids Open decision 7 chooses -- and rewrite every reference to
+  each: in its own model, its population rows and diagram layouts, the
+  shadows and `alias:` references in the project's other domains, and the
+  project's mapping files. `renameInModel` serves a standalone model and
+  `renameInProject` names the domain; both are pure and return the
+  old-to-new id map, which the surface's rename command uses to rewrite the
+  lineage manifests it can see.
 - When diff or merge compares two models, it shall pair elements by id,
-  then by name, as today, then by content, and report the content pairs
-  whose names differ as renames (Open decision 8).
-- When a 3.x model is loaded, the 3.x reader shall assign local names by
-  these rules, rewrite references, population rows and layout keys, report
-  each suffix it added, and keep each element's original UUID in memory, so
-  that diffing two 3.x revisions (`barwise history`) still pairs exactly.
-- When `barwise migrate` is given a project, it shall migrate every domain
-  in one run, so a shadow's `alias:Name` matches its owner's new local
-  name; given one domain file of a project, it shall refuse and name the
-  project.
+  then by name, as today, and then recognize renames by the rule Open
+  decision 8 chooses.
+- When a 3.x file is loaded, the 3.x reader shall assign local names by
+  these rules from that file alone, rewrite references, population rows and
+  layout keys, report each suffix it added, and keep each element's
+  original UUID in memory, so that diffing two 3.x revisions (`barwise
+  history`) still pairs exactly. A shadow, which in 3.x carries its owner's
+  name and `source_context`, becomes `<source_context>:localName(name)`,
+  and the reader adds the import that alias needs; so domains of one
+  project can be migrated in any order and still agree, and a surface may
+  write any one of them as 4.0 on its next edit, as
+  `schema-versioning.md` decision 4 already says. The one case a single
+  file cannot see is an owner whose local name took a suffix; a 4.0
+  project load reports the shadow's alias as unresolved, naming the owner,
+  and `barwise migrate` given the project fixes both sides.
+- When a 4.0 build checks lineage on a model whose manifest was written
+  under 3.x, it shall report each export as stale with the reason "ids
+  changed to 4.0" rather than as an ordinary change, and impact analysis
+  given a UUID shall say the manifest predates 4.0 instead of returning
+  nothing. `barwise migrate` restamps the exports that were fresh under the
+  3.x hash, so a stale export stays stale (Open decision 15).
 
 Out of scope:
 
@@ -146,27 +162,28 @@ Out of scope:
 Grounded on main at `ca83b642` by a full read of id use across the
 workspace, and corrected by two rounds of plan review.
 
-| Area                                                                | Current state                                                                                                                                              | Verdict                                                                                                         |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `serialization/OrmYamlSerializer.ts`                                | brings older files forward only to 2.0, then reads 2.0; a version between 2.0 and current is refused (barwise-jj8)                                         | reads 3.0 in a 3.1 build (WS1)                                                                                  |
-| `core/src/model/id.ts`                                              | `generateId()` (v4, or the v7 a surface installs); `createUuidv7Generator`                                                                                 | element ids stop using it (WS6)                                                                                 |
-| element ids                                                         | object type, fact type, role, constraint, subtype fact, objectification, population, fact instance; required by the schema, no pattern                     | become local names (WS6)                                                                                        |
-| `OrmModel` stores                                                   | one map per kind; `refuseHeldId` checks within a kind, so an object type and a fact type may share an id                                                   | a cross-kind local-name index (WS2 reports, WS6 enforces)                                                       |
-| `SubtypeFact`, `ObjectifiedFactType` names                          | synthetic, built from ids (`subtype:<sub>:<super>`)                                                                                                        | minted names (WS3)                                                                                              |
-| names (`model/name.ts`, `validation/rules/structural.ts`, schema)   | object type and fact type names unique per model, in separate namespaces; `role_name` required (minLength 1) but unique nowhere; no character rule         | `localName()` and the cross-kind and per-fact-type checks (WS2)                                                 |
-| `diff/identity.ts`, `elementDiff.ts`                                | pair by id, then by name or content key; the name pass keeps a transcript import working against its base                                                  | a content pass after the name pass, reporting renames (WS5)                                                     |
-| `diff/ModelMerge.ts`                                                | keeps the existing id; `mergedId` derives a UUIDv8 on a clash                                                                                              | a clash takes the suffix rule (WS6)                                                                             |
-| `project/splitModel.ts`                                             | shadow object types carry the owner's UUID and `source_context`; cross-domain constraints dropped                                                          | shadows keep their data, take the owner's `alias:Name` as id, drop `source_context`; split writes imports (WS6) |
-| `OrmModel.addFactType`                                              | refuses a role whose player is not in the model                                                                                                            | unchanged: the shadow is in the model, so a split domain still loads, maps and verbalizes alone                 |
-| `EntityMapping`, `OrmProject.parseQualifiedRef`                     | `context:Name`, split on the first colon                                                                                                                   | unchanged; `localName()` never emits `:`, and absolute IRIs appear only in `iri_base` and `imports`             |
-| `lineage/manifest.ts`, `impact.ts`                                  | per-directory `.barwise/lineage.yaml` with `elementId` and a `modelHash`; `canonicalizeIds` maps every string equal to an id to `#n`; impact matches by id | `canonicalizeIds` removed; `migrate` rewrites ids and restamps only exports that were fresh (WS6)               |
-| `Population` and fact instances                                     | rows keyed by role id; six population rules, `YamlSourceMap`, NORMA's population mapping and `getInstance`/`removeInstance` use the instance id            | Open decision 7; rows re-keyed by role local name (WS6)                                                         |
-| `DiagramLayout`                                                     | positions keyed by object type or fact type id, in one record                                                                                              | re-keyed (WS6); the cross-kind index keeps keys distinct                                                        |
-| importers (`formats`, `dbt`, `llm`, code-analysis)                  | call `generateId()`; NORMA keeps its source ids; `cli/tests/importerIds.test.ts` requires minted ids, exempting NORMA                                      | build local names; the test checks the naming rules (WS6)                                                       |
-| exporters                                                           | NORMA writes `_<id>`; DDL comments name `(<id>)`; Ossie's loss block names ids; SVG writes `data-id`                                                       | NORMA per Open decision 12; the rest print local names (WS6)                                                    |
-| surfaces                                                            | `impact_analysis` and `lineage impact` take an id; diagnostics, verbalization, describe and query return ids; VS Code finds elements by the `id:` scalar   | same fields, local-name values (WS6); rename is new (WS5)                                                       |
-| `determinism-in-core.md` decision 4, `importer-role-ids.spec.md` R1 | ids minted only at creation; importers never build ids from names                                                                                          | amended in WS6's PR                                                                                             |
-| `schema-versioning.md` decisions 2 and 4                            | a minor bump registers a migration; a surface writes the current version on its next edit                                                                  | WS1 makes a minor loadable; WS6 makes a project's domains migrate together                                      |
+| Area                                                                | Current state                                                                                                                                                                                                   | Verdict                                                                                                                                          |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `serialization/OrmYamlSerializer.ts`                                | brings older files forward only to 2.0, then reads 2.0; a version between 2.0 and current is refused (barwise-jj8)                                                                                              | reads 3.0 in a 3.1 build (WS1)                                                                                                                   |
+| `core/src/model/id.ts`                                              | `generateId()` (v4, or the v7 a surface installs); `createUuidv7Generator`                                                                                                                                      | element ids stop using it (WS6)                                                                                                                  |
+| element ids                                                         | object type, fact type, role, constraint, subtype fact, objectification, population, fact instance; required by the schema, no pattern                                                                          | become local names (WS6)                                                                                                                         |
+| `OrmModel` stores                                                   | one map per kind; `refuseHeldId` checks within a kind, so an object type and a fact type may share an id                                                                                                        | a cross-kind local-name index (WS2 reports, WS6 enforces)                                                                                        |
+| `SubtypeFact`, `ObjectifiedFactType` names                          | synthetic, built from ids (`subtype:<sub>:<super>`)                                                                                                                                                             | minted names (WS3)                                                                                                                               |
+| names (`model/name.ts`, `validation/rules/structural.ts`, schema)   | object type and fact type names unique per model, in separate namespaces; `role_name` required (minLength 1) but unique nowhere; no character rule                                                              | `localName()` and the cross-kind and per-fact-type checks (WS2)                                                                                  |
+| `diff/identity.ts`, `elementDiff.ts`                                | pair by id, then by name or content key; the name pass keeps a transcript import working against its base                                                                                                       | a content pass after the name pass, reporting renames (WS5)                                                                                      |
+| `diff/ModelMerge.ts`                                                | keeps the existing id; `mergedId` derives a UUIDv8 on a clash                                                                                                                                                   | a clash takes the suffix rule (WS6)                                                                                                              |
+| `project/splitModel.ts`                                             | shadow object types carry the owner's UUID and `source_context`; cross-domain constraints dropped                                                                                                               | shadows keep their data, take the owner's `alias:Name` as id, drop `source_context`; split writes imports (WS6)                                  |
+| other `source_context` readers                                      | `mcp/src/tools/split.ts` tells shadows from owned types by it; diff has a `sourceContext` change kind (`breakingLevel.ts`); standalone files set it by hand (`trial/customers/C04-marketplace/kernel.orm.yaml`) | read the alias prefix of the id instead; a standalone file's alias binds to the context name and stays unresolved until a project loads it (WS6) |
+| `OrmModel.addFactType`                                              | refuses a role whose player is not in the model                                                                                                                                                                 | unchanged: the shadow is in the model, so a split domain still loads, maps and verbalizes alone                                                  |
+| `EntityMapping`, `OrmProject.parseQualifiedRef`                     | `context:Name`, split on the first colon                                                                                                                                                                        | unchanged; `localName()` never emits `:`, and absolute IRIs appear only in `iri_base` and `imports`                                              |
+| `lineage/manifest.ts`, `impact.ts`                                  | per-directory `.barwise/lineage.yaml` with `elementId` and a `modelHash`; `canonicalizeIds` maps every string equal to an id to `#n`; impact matches by id                                                      | `canonicalizeIds` removed; `migrate` rewrites ids and restamps only exports that were fresh (WS6)                                                |
+| `Population` and fact instances                                     | rows keyed by role id; six population rules, `YamlSourceMap`, NORMA's population mapping and `getInstance`/`removeInstance` use the instance id                                                                 | Open decision 7; rows re-keyed by role local name (WS6)                                                                                          |
+| `DiagramLayout`                                                     | positions keyed by object type or fact type id, in one record                                                                                                                                                   | re-keyed (WS6); the cross-kind index keeps keys distinct                                                                                         |
+| importers (`formats`, `dbt`, `llm`, code-analysis)                  | call `generateId()`; NORMA keeps its source ids; `cli/tests/importerIds.test.ts` requires minted ids, exempting NORMA                                                                                           | build local names; the test checks the naming rules (WS6)                                                                                        |
+| exporters                                                           | NORMA writes `_<id>`; DDL comments name `(<id>)`; Ossie's loss block names ids; SVG writes `data-id`                                                                                                            | NORMA per Open decision 12; the rest print local names (WS6)                                                                                     |
+| surfaces                                                            | `impact_analysis` and `lineage impact` take an id; diagnostics, verbalization, describe and query return ids; VS Code finds elements by the `id:` scalar                                                        | same fields, local-name values (WS6); rename is new (WS5)                                                                                        |
+| `determinism-in-core.md` decision 4, `importer-role-ids.spec.md` R1 | ids minted only at creation; importers never build ids from names                                                                                                                                               | amended in WS6's PR                                                                                                                              |
+| `schema-versioning.md` decisions 2 and 4                            | a minor bump registers a migration; a surface writes the current version on its next edit                                                                                                                       | WS1 makes a minor loadable; decision 4 stands, because migration works per file                                                                  |
 
 Verbalization needs no change: it is deterministic and gives one sentence
 per constraint, subtype fact and objectification (`Verbalizer.ts:188-243`,
@@ -295,9 +312,9 @@ build these elements without passing through one creation point.
 optional, with `namespaceOf` in core. Imports and `iriOf` wait for WS6,
 where references become names; in 3.x they would only hold UUIDs. If WS3 and
 WS4 ship in one release cycle they share 3.1 (`schema-versioning.md`,
-decision 3); if not, WS4 is 3.2. The project file has no version
-(barwise-y1b), so an older build may refuse a project file carrying
-`iri_base`; decide y1b first, or say so in the release notes.
+decision 3); if not, WS4 is 3.2. Every current build refuses a project file carrying
+`iri_base`, because `orm-project.schema.json` closes `project` with
+`additionalProperties: false`; Open decision 16.
 
 ### 5. Rename and rename recognition (provisional: not yet grounded)
 
@@ -305,19 +322,15 @@ decision 3); if not, WS4 is 3.2. The project file has no version
 states, exposed as `barwise rename`, an MCP tool and an editor command, with
 a capability-matrix row in the same PR; `rename` modifies its input, which
 among CLI commands only `migrate` does today, so the row says so. Diff and
-merge add the content pass after the name pass. Built on 3.x, where a rename
+merge add rename recognition after the name pass, by Open decision 8. Built on 3.x, where a rename
 keeps the UUID, and exercised again on 4.0 by WS6.
 
 ### 6. Format 4.0: local names are the ids (provisional: not yet grounded)
 
 The 4.0 schema, the 3.x reader, and `barwise migrate`, which keeps its
-`--check` and `--format json` contract and migrates a project's domains
-together. For lineage, `migrate` computes each export's freshness under the
-3.x hash first, rewrites ids, and restamps the new hash only on the exports
-that were fresh, so a stale export stays stale; a manifest is rewritten only
-when every model it covers is migrated. A surface editing one domain of an
-unmigrated project keeps writing 3.x until the project is migrated, which
-amends `schema-versioning.md` decision 4 for project domains.
+`--check` and `--format json` contract and, given a project, migrates its
+domains in one run, which also settles a suffixed owner's shadows. Lineage follows the Scope: `migrate` restamps only exports that were fresh,
+and an edit-path upgrade reports "ids changed to 4.0".
 
 Every importer builds local names; exporters follow the Inventory;
 `canonicalizeIds` goes; merge's clash rule takes the suffix rule; split's
@@ -344,8 +357,8 @@ names.
   (`core/tests/model/id.test.ts`, `cli/tests/entryIdGenerator.test.ts`,
   `vscode/tests/unit/activateIdGenerator.test.ts`,
   `mcp/tests/serverSpawn.test.ts`) change in WS6.
-- A standalone `.orm.yaml` stays 3.x until it is edited or migrated; a
-  project's domains stay 3.x until the project is migrated.
+- An `.orm.yaml` stays 3.x until it is edited or migrated, one file at a
+  time; domains of one project may sit at 3.x and 4.0 together.
 - `barwise rename` and its MCP tool change the capability matrix and the
   pinned tool lists (`mcp/tests/serverSpawn.test.ts`,
   `vscode/tests/unit/toolRegistration.test.ts`).
@@ -396,10 +409,11 @@ names.
 8. **How diff recognizes a rename.** (a) after the id and name passes, pair
    the rest by content (same kind, roles, players and constraints) and
    report a pair whose names differ as a rename. (b) report a rename only
-   when told (`--rename old=new`). **Recommend (a)**, with (b) as the
-   override for an edit that renamed and changed content at once. A content
-   pass can pair two different entity types with the same shape, which is
-   why it runs last and only on what the name pass left.
+   when told (`--rename old=new`). **Recommend (a) for diff**, with (b) as the override for an edit that
+   renamed and changed content at once, **and never for merge**: a content
+   pair can be two different entity types of one shape (a transcript's new
+   `Supplier` beside the base's `Vendor`), so merge adds it and diff reports
+   it as a possible rename. The pass runs last, on what the name pass left.
 9. **A moved element.** Split and a move between domains change an IRI. (a)
    no forwarding record; the old IRI is in git history. (b) a project-level
    table of moved IRIs. **Recommend (a)** until a consumer outside the
@@ -435,6 +449,17 @@ names.
     -- kind, roles, values -- differs from what it was minted from, which
     needs a stored content key and ignores wording changes. (c) never; a
     minted name is a name. **Recommend (b).**
+15. **Lineage across the format change.** (a) a 3.x manifest reads stale
+    once, with the reason named, and a re-export or `migrate` restamps it.
+    (b) keep `canonicalizeIds` in 4.0, fixed to replace only `id` values and
+    reference fields, so a 3.x hash and a 4.0 hash of one model agree and
+    nothing reads stale. (b) is quieter but keeps code whose reason the
+    format removes. **Recommend (a).**
+16. **The project file and older builds.** (a) do barwise-y1b first, so the
+    project file carries a version and an older build refuses `iri_base`
+    with "written by a newer barwise" instead of a schema error. (b) ship
+    `iri_base` unversioned and name the break in the release notes.
+    **Recommend (a).**
 
 ## Risks and testing
 
@@ -445,7 +470,7 @@ names.
   rename it adds is reported; `migrate --check` shows them before writing.
 - **A content pass pairs the wrong elements.** It runs after the id and name
   passes, on what they left; WS5's tests include two entity types of one
-  shape, one removed and one added under new names.
+  shape, one removed and one added under new names, in diff and in merge.
 - Run the full monorepo build and tests after each workstream; WS6 changes
   core's public API.
 
