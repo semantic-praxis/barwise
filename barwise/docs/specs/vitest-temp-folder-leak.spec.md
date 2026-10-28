@@ -5,6 +5,7 @@ Status: Proposed
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-fvi
+Plan-reviewed: 3eeb2bdd (code-review, pr-review)
 Touches: barwise/package-lock.json,
 barwise/packages/cli/package.json,
 barwise/packages/code-analysis/package.json,
