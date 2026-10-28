@@ -167,11 +167,11 @@ workspace, and corrected by two rounds of plan review.
 
 | Area                                                                | Current state                                                                                                                                                                                                   | Verdict                                                                                                                                          |
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `serialization/OrmYamlSerializer.ts`                                | brings older files forward only to 2.0, then reads 2.0; a version between 2.0 and current is refused (barwise-jj8)                                                                                              | reads 3.0 in a 3.1 build (WS1)                                                                                                                   |
+| `serialization/OrmYamlSerializer.ts`                                | brings older files forward only to 2.0, then reads 2.0; a version between 2.0 and current is refused (barwise-jj8)                                                                                              | reads every minor of the current major (WS1)                                                                                                     |
 | `core/src/model/id.ts`                                              | `generateId()` (v4, or the v7 a surface installs); `createUuidv7Generator`                                                                                                                                      | element ids stop using it (WS6)                                                                                                                  |
 | element ids                                                         | object type, fact type, role, constraint, subtype fact, objectification, population, fact instance; required by the schema, no pattern                                                                          | become local names (WS6)                                                                                                                         |
 | `OrmModel` stores                                                   | one map per kind; `refuseHeldId` checks within a kind, so an object type and a fact type may share an id                                                                                                        | a cross-kind local-name index (WS2 reports, WS6 enforces)                                                                                        |
-| `SubtypeFact`, `ObjectifiedFactType` names                          | synthetic, built from ids (`subtype:<sub>:<super>`)                                                                                                                                                             | minted names (WS3)                                                                                                                               |
+| `SubtypeFact`, `ObjectifiedFactType` names                          | synthetic, built from ids (`subtype:<sub>:<super>`)                                                                                                                                                             | minted names stored beside them (WS3); the display names go in WS6                                                                               |
 | names (`model/name.ts`, `validation/rules/structural.ts`, schema)   | object type and fact type names unique per model, in separate namespaces; `role_name` required (minLength 1) but unique nowhere; no character rule                                                              | `localName()` and the cross-kind and per-fact-type checks (WS2)                                                                                  |
 | `diff/identity.ts`, `elementDiff.ts`                                | pair by id, then by name or content key; the name pass keeps a transcript import working against its base                                                                                                       | a content pass after the name pass, reporting renames (WS5)                                                                                      |
 | `diff/ModelMerge.ts`                                                | keeps the existing id; `mergedId` derives a UUIDv8 on a clash                                                                                                                                                   | a clash takes the suffix rule (WS6)                                                                                                              |
@@ -282,8 +282,8 @@ recognizes a rename before any build changes identity on one. WS7 follows.
 
 `OrmYamlSerializer` brings a 3.0 file forward to the current 3.x through the
 registered migrations instead of refusing it, and
-`docs/adr/schema-versioning.md` says so in place. Without it, the first 3.1
-build refuses every tracked 3.0 file. No format change.
+`docs/adr/schema-versioning.md` says so in place. Without it, the first
+minor bump refuses every tracked 3.0 file. No format change.
 
 ### 2. One normalizer and the name checks
 
@@ -312,23 +312,59 @@ The cross-kind index is the validation rule's own map for now: an
 `OrmModel` store that refuses a held local name is WS6's, where ids become
 local names and a refusal at construction means something.
 
-### 3. Minted names for unnamed elements (3.1) (provisional: not yet grounded)
+### 3. Minted names for unnamed elements
 
-An optional `name` on constraints, subtype facts and objectifications, set
-from the canonical verbalization through `localName()` when the element is
-created, with the staleness check decision 14 chooses. An additive
-field, so the cycle's minor bump to 3.1, which WS1 makes loadable. The
-synthetic `subtype:` and `objectified:` names go. Ground first: the
-importers and the LLM constraint parser (`llm/src/parse/constraints.ts`)
-build these elements without passing through one creation point.
+Grounded 2026-10-28. Two choices the owner made that day shape it:
+
+- **The fields join 3.0, with no version bump.** 3.0 has never been in a
+  tagged release (v1.7.0, the last, writes 1.1; 2.0 and 3.0 have shipped
+  only in `edge`), and `schema-versioning.md` decision 3 lets an additive
+  change join an unreleased version, as `join_ring` (#746) and the
+  external preferred identifier (#767) did. A 3.0 `edge` build older than
+  this refuses a file with names at the schema rather than as "newer
+  barwise"; that exposure is the one barwise-6om already records.
+- **A name is minted when the model is saved.** Constraints, subtype facts
+  and objectifications are built in many places -- every importer, the LLM
+  parser (`llm/src/parse/constraints.ts`), merge, the editing surfaces --
+  and core's model classes cannot call the verbalizer, which imports them.
+  So `writeDocument` mints, for each such element that has no name yet,
+  its name from the canonical verbalization through `localName()`, and
+  stores beside it the content key it was minted from. The writer stays
+  pure: it does not change the model, and saving an unchanged model twice
+  writes the same names. Once a file holding names is loaded, the names
+  are the element's and the writer keeps them.
+
+What ships:
+
+- `mintedName` and `mintedFrom` on every constraint kind, `SubtypeFact`
+  and `ObjectifiedFactType`, written as `name` and `minted_from`, optional
+  in the 3.0 schema. The in-memory `subtype:<sub>:<super>` and
+  `objectified:<ft>:<ot>` display names, which nothing parses, stay until
+  WS6, where an element's id is its name.
+- A minted name collides with nothing: the suffix rule runs over object
+  type and fact type local names and every name already minted, in
+  document order.
+- The content key is diff's: a constraint's is the key diff pairs
+  constraints by in its content pass (`elementDiff.ts`, `constraintKey`
+  over `roleKeys`), exported from `diff/` for one model rather than
+  copied; a subtype fact's is its subtype's and supertype's names, an
+  objectification's its fact type's and object type's. Names, not ids, so
+  WS6's change of ids leaves every key as it was.
+- `structural/stale-minted-name` (warning): an element whose stored
+  `minted_from` differs from its current key, naming the verbalization a
+  fresh name would come from (decision 14). A wording change in a later
+  release changes no key, so it warns about nothing.
+- Diff compares neither field: a minted name is derived, and a file saved
+  before this workstream holds none, so comparing it would report every
+  constraint as changed. Reporting renames is WS5's.
 
 ### 4. Namespace declarations (provisional: not yet grounded)
 
 `iri_base` on the project and `namespace` on a standalone model's header,
 optional, with `namespaceOf` in core. Imports and `iriOf` wait for WS6,
-where references become names; in 3.x they would only hold UUIDs. If WS3 and
-WS4 ship in one release cycle they share 3.1 (`schema-versioning.md`,
-decision 3); if not, WS4 is 3.2. Every current build refuses a project file carrying
+where references become names; in 3.x they would only hold UUIDs. Like
+WS3, the model fields join 3.0 while 3.0 is unreleased, and a minor
+bump once it is (`schema-versioning.md`, decisions 2 and 3). Every current build refuses a project file carrying
 `iri_base`, because `orm-project.schema.json` closes `project` with
 `additionalProperties: false`, so this workstream waits on barwise-y1b,
 which versions the project file (decision 16).
