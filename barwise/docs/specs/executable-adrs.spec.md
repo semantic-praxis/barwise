@@ -101,9 +101,13 @@ In scope:
   What a step runs is decided by one new function, `stepScript(args)` in
   `ci-gates.mjs`, returning `{ script, args }`, `null` (not a root
   script), or `{ refused: <reason> }` (cannot tell). It splits at the
-  first `--`. Before it, the first token must be the npm subcommand `run`
-  (or its alias `run-script`), so `npm audit` never counts as the
-  `audit` script. Any token whose name, the part before `=`, is
+  first `--`. Before it, the npm subcommand must be `run` (or its alias
+  `run-script`), so `npm audit` never counts as the `audit` script.
+  Flags before the subcommand (`npm --silent run x`) are read by the same
+  flag rule as flags after it. A step whose subcommand is anything else
+  that runs a script (`npm test`, `npm start`) refuses rather than
+  answering null, so a real enforcer written that way is never reported
+  unwired. Any token whose name, the part before `=`, is
   `--workspace`, `--workspaces`, `-w`, `-ws`, `--prefix` or `-C` makes
   the answer null, wherever it sits before `--`: those run another
   package.json. Of the other flags, a token with `=` carries its own
@@ -121,8 +125,9 @@ In scope:
   `stepScript()` and return null when that returns null or refuses (so
   `fault-matrix` keeps skipping what it skips today), before its own
   node-gate resolution, so the naming cannot drift. The two are not
-  identical functions: `resolveNodeGate` also returns null for every
-  script that is not a single node gate (`lint`, `build`, `dup`), so the
+  identical functions: `resolveNodeGate` also returns null for a script
+  that runs no node gate (`lint`, `build`, `dup`), and keeps its own
+  `refuse()` for a script that chains several, so the
   pinned property is that wherever `resolveNodeGate` names a script,
   `stepScript` names the same one, over every `ci.yml` step. One
   behaviour changes on purpose: a step like `run --silent x` would
@@ -130,10 +135,10 @@ In scope:
   `ci.yml` step has that form now. No ADR relies on a workspace step
   today.
 - An entry naming an umbrella script -- `test`, `test:coverage`,
-  `test:scripts`, `build`, `lint`, `ci:local` -- is a finding even when
+  `test:scripts`, `test:trial`, `build`, `lint`, `ci:local` -- is a finding even when
   it is wired. Each runs every suite or every package, so it cannot point
   at one decision; the entry names the test file or the specific gate
-  instead. That turns WS2's "replace every `test:coverage` citation" from
+  instead. That turns WS2's "replace every umbrella citation" from
   a prose instruction into a rule the check enforces. The list lives in
   `adr-enforcement.mjs`.
 - A step marked `continue-on-error: true`, or in a job marked so, is not
@@ -156,15 +161,25 @@ In scope:
   `continue-on-error: true` (an explicit `false` is blocking),
   so step order cannot decide whether a gate is wired: a script is wired
   if any step that runs it can fail CI. `condition` keeps its current
-  first-occurrence rule, which `ci:local` and `fault-matrix` read. The
-  two fields are separate summaries over the occurrences, not a pair
-  describing one step, and the check reads only `continueOnError`. Separately,
+  first-occurrence rule, which `ci:local` and `fault-matrix` read. Those
+  two summaries come from different steps, so the check reads neither:
+  WS1 adds `ciStepOccurrences()`, the same parse without the dedupe,
+  and a script is wired only if one single occurrence both runs it with
+  the declared arguments, can fail CI, and passes the condition rule
+  below. Step order then decides nothing. Separately,
   `npm run dup` and `npm run filesize` each run once in `ci.yml`, with
   `continue-on-error: true`, and `must-agree-copies` names `dup` in its
   prose, so WS2 must not declare it.
 - A step guarded by an `if:` counts as wired only if `shouldRun()` in
   `ci-gates.mjs`, the classifier reader `ci:local` already uses,
-  understands its condition (step-level and job-level combined). Those
+  understands its condition (step-level and job-level combined), and the
+  condition runs the step for a code change: `shouldRun(condition,
+  { docsOnly: false, optimizer: true }).run` is true. An inverted guard
+  (`docs_only == 'true'`) or a contradiction (`docs_only == 'true' &&
+  docs_only == 'false'`) is understood and never runs on a code change,
+  so it is not wired. `optimizer: true` is the classification under
+  which every understood guard can run, so a narrowly guarded gate still
+  counts. Those
   forms are `docs_only`/`optimizer` comparisons and the
   `pull_request` event test. Most guards are `docs_only != 'true'`,
   which skips only changes that cannot violate a code decision; the
@@ -173,7 +188,10 @@ In scope:
   enforcer is narrowly guarded says so in its Consequences. Any other
   condition, `if: false` included, is one the check cannot evaluate, and
   it refuses (exit 2): a gate switched off with `if: false` must not
-  keep counting as an enforcer.
+  keep counting as an enforcer. `ci.yml` has one job today, so job-level
+  conditions are empty; a future split into jobs whose guards read
+  `needs.<job>.outputs` would make the check refuse until `shouldRun()`
+  learns that form, which is safe, and loud.
 - When an entry names a hook, it takes one of two forms, and the check
   shall exit 1 unless its conditions hold.
   `hook <Event> <path>`: the path is tracked, and `.claude/settings.json`,
@@ -183,8 +201,9 @@ In scope:
   word is `node` followed by the path, or is the path itself (as
   `.claude/hooks/session-start.sh` is run), after an optional `env`
   prefix: `env`, then its options, where `-u` and `--unset` consume the
-  next token as a variable name (every hook here is `env -u
-  BARWISE_EXIT_DIR node ...`), then any `NAME=VALUE` assignments. The
+  next token as a variable name (most hooks here begin `env -u
+  BARWISE_EXIT_DIR`, followed by `node <path>`, by `bd prime`, or by a
+  direct script path), then any `NAME=VALUE` assignments. The
   path may be
   quoted and prefixed with `$CLAUDE_PROJECT_DIR/`, and is followed by a
   quote, whitespace or the end. So `echo <path>`, `echo node <path>` and
@@ -218,6 +237,15 @@ In scope:
   the decay this spec exists to catch. Both rules are lexical; they show
   the hook is wired and invokes the script, not that the line is
   reachable, which again is WS4's question.
+- A test-file entry may carry a selector, `<path> :: <title>`, naming one
+  test by its title. The check exits 1 unless exactly one `test(` or
+  `it(` call in the file has that string as its literal title. A file
+  that holds the tests of many decisions -- `barwise/scripts/tests/gates.test.mjs`,
+  over 200 cases -- must be declared with a selector: an entry naming the
+  whole file is an umbrella by the rule above, because deleting the
+  cases that pin a decision would leave the file, and the entry, intact.
+  The selector is what makes "a test can be renamed and the check
+  catches it" true at the level of one test.
 - When an entry names a test file, the check shall exit 1 unless the
   path is tracked and a CI step runs its suite. Two places qualify. A
   `.test.mjs` directly in `barwise/scripts/tests/` (not a subdirectory:
@@ -233,7 +261,12 @@ In scope:
   The matcher is `picomatch`, the library vitest itself matches includes
   with (4.0.7 is installed today as a dependency of vitest); WS1
   declares it as a root devDependency at that version so the check and
-  vitest read a glob the same way. Node's `path.matchesGlob` is not used:
+  vitest read a glob the same way, with the options vitest uses for
+  discovery: `dot: true`, and vitest's default excludes
+  (`**/node_modules/**`, `**/dist/**` and the rest of its list) applied
+  as a second, negative match. The devDependency uses the range vitest
+  declares (`^4.0.7`), not an exact pin, so one install resolves both
+  to the same copy, and a drift test asserts they did. Node's `path.matchesGlob` is not used:
   `scripts/lib/review-tiers.mjs` records that it is experimental on the
   pinned Node and declines dot-segments.
   Tracked is not enough: `packages/vscode/tests/integration/` is tracked,
@@ -355,7 +388,7 @@ What this shows:
   its prose names an unguarded decision, is the header-and-prose drift
   this spec exists to remove. `ossie-interchange` is one example: decision 5 is not built (barwise-wcg),
   decision 6 has no gate, and part of decision 1 is review-only.
-- Five ADRs cite `test:coverage`, which runs every package test and so
+- Seven ADRs cite `test:coverage`, which runs every package test and so
   cannot point at one decision. Their entries name the test
   files that pin the decision instead (for example
   `barwise/packages/mcp/tests/serverSpawn.test.ts` for
@@ -439,7 +472,7 @@ npm run <script>
 npm run <script> -- <args>
 hook barwise/.husky/<name> runs npm run <script> [-- <args>]   -- tried first; args as the hook passes them
 hook <Event> <repo-rooted path>               -- Event is one word, no `/`; settings.json
-<repo-rooted path to a test file>
+<repo-rooted path to a test file>[ :: <test title>]
 none (<issue-id>[: <free text naming which decisions>])
 ```
 
@@ -503,7 +536,13 @@ guard and one `none` entry per unguarded decision, each on its own
 follow-up issue: what enforcer to build, or, where none could check the
 decision as written, which of the three outcomes in "Does every
 unguarded decision get an issue?" to pursue. Replace every
-`test:coverage` citation with the test files that pin the decision.
+umbrella citation (`test:coverage`, `test:scripts` and the rest of the
+list in Scope) with the test files, and selectors, that pin the
+decision. Where the real enforcer has no form in this grammar -- another
+workflow such as `copilot-review.yml`, a multi-line `run: |` step -- WS2
+does not declare a proxy test that would stay green with the mechanism
+switched off; it records a `none` entry on an issue to make that
+enforcer declarable.
 Open gap issues as children of the umbrella that proposed them
 (barwise-920, barwise-921) or as new issues, never by citing an umbrella
 that can close for unrelated reasons.
@@ -529,7 +568,10 @@ each copied ADR's `Enforced-by:` value to a single synthetic
 `none (barwise-fx1)` and writes a one-line tracker holding that open
 issue. The graph and shape cases keep testing what they test; WS1's own
 cases test enforcement against inputs built for them. The synthetic
-`ADR_OK` gains the same line.
+`ADR_OK` gains the same line. Once WS3 renders enforcement into the
+index, the rewritten ADRs no longer match the copied `ARCHITECTURE.md`,
+so `architectureRepo()` regenerates the section after the rewrite, as
+`stageAdr()` already does for the ADRs it stages.
 
 The last WS2 PR makes an absent header a finding and updates
 `template.adr.md` so a new ADR starts with the line.
