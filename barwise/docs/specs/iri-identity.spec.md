@@ -5,7 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-wcg
-Plan-reviewed: 7de80cf1 (code-review, pr-review)
+Plan-reviewed: ef452225 (code-review, pr-review; re-pointed after the owner resolved its decisions)
 Touches: barwise/packages/core/src/model/,
 barwise/packages/core/src/serialization/,
 barwise/packages/core/schemas/,
