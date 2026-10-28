@@ -116,10 +116,11 @@ recorded in barwise-wcg until that issue's spec holds it.
   (`formats/src/ossie/ossieSchema.ts`, tested in
   `OssieImportFormat.test.ts`, "Ossie import: fields the pinned schema does
   not define"; `docs/specs/ossie-unknown-fields.spec.md`, barwise-pf2.6d0).
-  One gap is known: the exporter decides
-  what is a loss by predicting what the importer will read back; three
-  review rounds on PR #762 each found a prediction that was wrong, and
-  re-importing to verify the loss report is barwise-5bv.
+  The exporter decides what is a loss by predicting what the importer will
+  read back, and three review rounds on PR #762 each found a prediction
+  that was wrong; it now also reads the written document back and adds a
+  loss line for any difference no prediction named (`verifyOssie.ts`,
+  barwise-5bv).
 - The model's name is the one exception decision 4 does not report: a
   caller-supplied name replaces the document's `name` without a warning,
   and the CLI always supplies one (`--name`, defaulting to the file name),

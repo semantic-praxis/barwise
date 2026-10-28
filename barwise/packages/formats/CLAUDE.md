@@ -22,8 +22,9 @@ does NOT depend on any editor or tool package.
 Allowed runtime dependencies: `@barwise/core`, `yaml`, `fast-xml-parser`,
 `ajv`. No others without discussion. `ajv` is there for one reason: the
 Ossie importer validates against the pinned schema at run time, to name
-fields it does not define (`docs/specs/ossie-unknown-fields.spec.md`). The SQL importer uses `node:fs` for its
-directory-scan path and spawns an optional short-lived `python3`
+fields it does not define (`docs/specs/ossie-unknown-fields.spec.md`).
+The SQL importer uses `node:fs` for its directory-scan path and spawns an
+optional short-lived `python3`
 subprocess for the sqlglot structural tier (allowed outside core; the
 cascade degrades to core's pure regex tier when python3 or sqlglot is
 absent).
