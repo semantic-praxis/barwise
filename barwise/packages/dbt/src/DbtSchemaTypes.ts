@@ -75,6 +75,12 @@ export interface DbtModel {
   readonly modelTests: readonly DbtTest[];
   /** Model-level foreign_key constraints over two or more columns. */
   readonly foreignKeys: readonly DbtForeignKey[];
+  /**
+   * The model-level `primary_key` constraint's columns, when it declares
+   * one: the key, so a secondary unique column is not guessed to be it
+   * (dbt-alternate-uniqueness.spec.md).
+   */
+  readonly primaryKey?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------

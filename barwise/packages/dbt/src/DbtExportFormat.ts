@@ -20,8 +20,8 @@ import {
   RelationalMapper,
   type RelationalSchema,
   renderDbt,
+  routeUniqueOnly,
   type Table,
-  unreportedConstraintSpecs,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
 
@@ -69,10 +69,16 @@ export class DbtExportFormat implements ExportFormatAdapter {
     // models/schema.yml is the file most likely to exist already.
     const modelsDir = resolveModelsDir(options?.modelsDir);
 
+    // The uniquenesses the DDL export writes as UNIQUE clauses, by the
+    // router's own decision, are written as dbt tests; the rest are
+    // reported (dbt-alternate-uniqueness.spec.md).
+    const { uniques, constraintSpecs } = routeUniqueOnly(model, schema);
+
     // Render dbt project.
     const dbtProject = renderDbt(schema, {
       sourceName,
       generateRelationshipTests,
+      uniques,
     });
 
     // Optionally annotate the schema.yml with TODO/NOTE comments.
@@ -80,7 +86,7 @@ export class DbtExportFormat implements ExportFormatAdapter {
     let annotations: ExportResult["annotations"];
 
     if (annotate) {
-      const annotationResult = annotateDbtExport(schemaYaml, model, schema);
+      const annotationResult = annotateDbtExport(schemaYaml, model, schema, uniques);
       schemaYaml = annotationResult.schemaYaml;
       annotations = annotationResult.annotations;
     }
@@ -137,9 +143,9 @@ export class DbtExportFormat implements ExportFormatAdapter {
       lineage: generateDdlLineage(model, schema),
       files,
       annotations,
-      // The constraints the schema does not carry, by the DDL router's own
-      // rule (schema-export-constraint-specs.spec.md).
-      ...withConstraintSpecs(unreportedConstraintSpecs(model, schema)),
+      // The constraints neither the schema nor a dbt test carries, by the
+      // DDL router's own rule (schema-export-constraint-specs.spec.md).
+      ...withConstraintSpecs(constraintSpecs),
     };
   }
 }

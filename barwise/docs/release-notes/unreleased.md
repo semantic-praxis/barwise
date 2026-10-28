@@ -114,3 +114,24 @@ model.
   exactly one multi-column foreign key imports as an entity with a key of
   its own and a one-to-one reference. The dbt importer used to find no
   identifier and skip such a model.
+
+### The dbt export keeps every uniqueness
+
+- **Export.** `schema.yml` now tests every uniqueness the DDL export
+  writes as a UNIQUE clause: a secondary unique column, a one-to-one
+  reference, or a second key of a relationship table. Before, only each
+  table's key was tested and the rest were reported as dropped.
+  - A uniqueness over several columns uses
+    `dbt_utils.unique_combination_of_columns`. A project that never needed
+    dbt_utils may now need to declare it; the export's annotation notes
+    each model that does.
+  - Each model states its key as a `primary_key` constraint (dbt 1.5 or
+    later). No contract is written, so it is metadata and the models build
+    as before.
+  - `dbt test` now runs these tests, so data that breaks a uniqueness the
+    model states fails it.
+- **Import.** The dbt importer reads a declared `primary_key` as the key.
+  It reads `unique` on a reference column as a one-to-one, and a
+  combination test beside the key as the uniqueness the DDL importer reads
+  for the same UNIQUE. Before, those were reported for manual review. A
+  project without `primary_key` keeps the old key guess.

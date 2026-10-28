@@ -97,7 +97,39 @@ export function candidateKeysOf(m: DbtModel): string[][] {
  */
 export function compositeKeyOf(m: DbtModel): string[] | undefined {
   const keys = candidateKeysOf(m);
+  // A declared primary key is the key whatever else qualifies, so every
+  // phase that asks reads the same one; one that is not a candidate is no
+  // composite key (dbt-alternate-uniqueness.spec.md).
+  const declared = declaredKeyOf(m);
+  if (declared) return declared.length > 1 ? keys.find((k) => sameColumns(k, declared)) : undefined;
   return keys.length === 1 ? keys[0] : undefined;
+}
+
+/**
+ * Whether a combination test holds over every row SQL UNIQUE constrains:
+ * it has no `where` filter, or only the one the export writes over nullable
+ * columns, `<each column> is not null`, which skips the rows SQL UNIQUE
+ * skips (dbt-alternate-uniqueness.spec.md). Any other filter makes it a
+ * uniqueness over some rows only, which is no ORM uniqueness.
+ */
+export function holdsForEveryRow(test: DbtModel["modelTests"][number]): boolean {
+  if (test.type !== "custom") return true;
+  const where = (test.config["config"] as { where?: unknown; } | undefined)?.where;
+  if (where === undefined) return true;
+  const names = combinationOf(test) ?? [];
+  return where === names.map((c) => `${c} is not null`).join(" and ");
+}
+
+/**
+ * The model's `primary_key` constraint's columns, when every one is a
+ * column of the model; a constraint naming another is set aside, and the
+ * key is found from the tests as without one.
+ */
+export function declaredKeyOf(m: DbtModel): readonly string[] | undefined {
+  const declared = m.primaryKey;
+  return declared && declared.every((n) => m.columns.some((c) => c.name === n))
+    ? declared
+    : undefined;
 }
 
 /**
@@ -344,7 +376,12 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       // it does for identifier and ordinary columns (PR #621 review).
       // Every column of a multi-column role records it, as the mapper
       // writes it on each of the columns it makes for the role.
-      for (const c of cols) ctx.columnRoleIdMap.set(`${m.name}::${c}`, roleId);
+      for (const c of cols) {
+        ctx.columnRoleIdMap.set(`${m.name}::${c}`, roleId);
+        // A role of the relationship stands for itself in a uniqueness over
+        // the model's columns, as DDL step 3b reads a taken column.
+        ctx.farRoleIdMap.set(`${m.name}::${c}`, roleId);
+      }
       const accepted = rel
         ? undefined
         : col.tests.find((t): t is Extract<DbtTest, { type: "accepted_values"; }> =>

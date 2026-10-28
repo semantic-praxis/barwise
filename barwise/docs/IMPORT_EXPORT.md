@@ -157,6 +157,13 @@ barwise export clinic.orm.yaml --format openapi --output api-spec.json
   applies a constraint only under an enforced one, so it states the
   reference for readers and for re-import without changing how the model
   builds. Re-importing reads it back as one reference.
+- Every uniqueness the DDL export writes as a UNIQUE clause: a `unique`
+  test on one column, a `dbt_utils.unique_combination_of_columns` test
+  over several. A combination over a nullable column carries a `where`
+  filter, so rows with a NULL in it are not tested, as SQL UNIQUE skips
+  them. Each model also states its key as a model-level `primary_key`
+  constraint (dbt 1.5 or later; metadata without a contract), so a
+  re-import never mistakes another unique column for the key.
 - Seed CSV files when population data exists
 
 **When to use it**:

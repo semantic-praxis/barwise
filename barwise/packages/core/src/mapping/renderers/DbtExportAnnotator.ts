@@ -20,7 +20,7 @@ import {
 } from "../../annotation/ExportAnnotationCollector.js";
 import { formatBarwiseComment, stripBarwiseComments } from "../../annotation/helpers.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import type { RelationalSchema } from "../RelationalSchema.js";
+import type { RelationalSchema, RoutedUnique } from "../RelationalSchema.js";
 import { DBT_KEY_TEST, dbtKeyTestColumns } from "./dbt.js";
 
 // ---------------------------------------------------------------------------
@@ -45,13 +45,19 @@ export interface ExportAnnotationResult {
  * @param schemaYaml - The schema.yml string produced by renderDbt().
  * @param model - The ORM model that was mapped.
  * @param schema - The relational schema produced by RelationalMapper.
+ * @param uniques - The UNIQUEs renderDbt was given, so the dbt_utils note
+ *   names a combination test written for one as well as for a key.
  */
 export function annotateDbtExport(
   schemaYaml: string,
   model: OrmModel,
   schema: RelationalSchema,
+  uniques: readonly RoutedUnique[] = [],
 ): ExportAnnotationResult {
-  const annotations = [...collectExportAnnotations(model, schema), ...dbtKeyNotes(schema)];
+  const annotations = [
+    ...collectExportAnnotations(model, schema),
+    ...dbtKeyNotes(schema, uniques),
+  ];
 
   if (annotations.length === 0) {
     return { schemaYaml: stripBarwiseComments(schemaYaml), annotations };
@@ -138,17 +144,26 @@ function formatAnnotationComment(annotation: ExportAnnotation): string {
 }
 
 /**
- * One note per model keyed on several columns: its key test is
- * dbt_utils', so a project that does not declare dbt_utils fails at
- * compile (dbt-composite-key-tests.spec.md, barwise-lqj).
+ * One note per model with a combination test, a key over several columns
+ * or a uniqueness over several: the test is dbt_utils', so a project that
+ * does not declare dbt_utils fails at compile (dbt-composite-key-tests.spec.md,
+ * barwise-lqj; dbt-alternate-uniqueness.spec.md).
  */
-function dbtKeyNotes(schema: RelationalSchema): ExportAnnotation[] {
-  return schema.tables
-    .filter((t) => dbtKeyTestColumns(t) !== undefined)
-    .map((t) => ({
+function dbtKeyNotes(
+  schema: RelationalSchema,
+  uniques: readonly RoutedUnique[],
+): ExportAnnotation[] {
+  return schema.tables.flatMap((t): ExportAnnotation[] => {
+    const key = dbtKeyTestColumns(t) !== undefined;
+    const unique = uniques.some((u) => u.tableName === t.name && u.columns.length > 1);
+    if (!key && !unique) return [];
+    const what = key && unique ? "Key and uniqueness" : key ? "Key" : "Uniqueness";
+    return [{
       tableName: t.name,
       severity: "note",
       category: "constraint",
-      message: `Key tested with ${DBT_KEY_TEST}: the project must declare the dbt_utils package.`,
-    }));
+      message:
+        `${what} tested with ${DBT_KEY_TEST}: the project must declare the dbt_utils package.`,
+    }];
+  });
 }

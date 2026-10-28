@@ -103,7 +103,53 @@ function parseModel(raw: Record<string, unknown>): DbtModel {
     ? rawModelTests.flatMap((t) => parseTest(t))
     : [];
 
-  return { name, description, columns, modelTests, foreignKeys: parseForeignKeys(raw.constraints) };
+  const primaryKey = parsePrimaryKey(raw.constraints) ?? columnPrimaryKey(raw.columns);
+  return {
+    name,
+    description,
+    columns,
+    modelTests,
+    foreignKeys: parseForeignKeys(raw.constraints),
+    ...(primaryKey ? { primaryKey } : {}),
+  };
+}
+
+/**
+ * The columns that carry a column-level `primary_key` constraint, dbt's
+ * usual form for a key of one column, or undefined when none does.
+ */
+function columnPrimaryKey(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const names = raw.flatMap((c) => {
+    if (c === null || typeof c !== "object") return [];
+    const col = c as Record<string, unknown>;
+    const constraints = Array.isArray(col.constraints) ? col.constraints : [];
+    // A column with no name cannot be the key; it is no column of the
+    // model to declare.
+    if (typeof col.name !== "string" || col.name === "") return [];
+    return constraints.some((k) =>
+        k !== null && typeof k === "object" && (k as Record<string, unknown>).type === "primary_key"
+      )
+      ? [col.name]
+      : [];
+  });
+  return names.length > 0 ? names : undefined;
+}
+
+/**
+ * The columns of the first model-level `primary_key` constraint naming at
+ * least one, or undefined (dbt-alternate-uniqueness.spec.md).
+ */
+function parsePrimaryKey(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  for (const c of raw) {
+    if (c === null || typeof c !== "object") continue;
+    const r = c as Record<string, unknown>;
+    if (r.type === "primary_key" && Array.isArray(r.columns) && r.columns.length > 0) {
+      return r.columns.map(String);
+    }
+  }
+  return undefined;
 }
 
 /**
