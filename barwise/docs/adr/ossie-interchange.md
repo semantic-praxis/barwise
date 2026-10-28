@@ -145,8 +145,8 @@ recorded in barwise-wcg until that issue's spec holds it.
   it and stay in force until barwise-wcg's spec amends them:
   `docs/adr/determinism-in-core.md` (ids minted once, at creation, and
   diff and merge pairing elements by id first) and
-  `docs/specs/importer-role-ids.spec.md` R1 (an importer's ids come from
-  `generateId()`, never from a source's names). With identity built from
+  `docs/specs/importer-role-ids.spec.md` R1 (an importer takes a role's id
+  from `generateId()`, never from a string built out of names). With identity built from
   names, a rename changes an element's IRI, so the spec must also say how
   diff and merge tell a rename from a removal plus an addition.
 - Decision 6 has no gate; that barwise keeps its ORM 2 terms is held by
