@@ -234,7 +234,8 @@ Measured and recorded here rather than pinned by a test:
   - Open decision 2(a) silences 1 element: `Student` in
     `trial/customers/C10-university/kernel.orm.yaml` comes back with a
     preferred identifier, while its only loss line names its reference
-    mode. Filed as barwise-huw.
+    mode. Filed as barwise-huw. Since decided: object-type lines take
+    option (b), `ossie-export-precise-losses.spec.md`.
 - Implementation review:
   - Ids are replaced on the document, not over its text. Over the text, a
     source id YAML reads as another type (`"1"`, `"true"`) or as a mapping

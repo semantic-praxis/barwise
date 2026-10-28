@@ -284,7 +284,8 @@ describe("Ossie export: the loss report", () => {
     ft.addConstraint({
       type: "ring",
       id: "ring-1",
-      roleIds: [ft.roles[0]!.id, ft.roles[1]!.id],
+      roleId1: ft.roles[0]!.id,
+      roleId2: ft.roles[1]!.id,
       ringType: "irreflexive",
     });
     const { losses, result } = exported(m);

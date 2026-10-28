@@ -61,7 +61,7 @@ function readBack(
     return failed("the document does not read back", e);
   }
   try {
-    return verifyOssie(model, back, written.written, written.reported);
+    return verifyOssie(model, back, written.written, written.covers);
   } catch (e) {
     return failed("the document was read back, but could not be compared with the model", e);
   }
