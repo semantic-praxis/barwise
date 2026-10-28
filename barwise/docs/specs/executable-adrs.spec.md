@@ -7,7 +7,8 @@ Last-updated: 2026-10-28
 Tracking: barwise-ym8
 Touches: barwise/scripts/check-architecture.mjs,
 barwise/scripts/lib/architecture-section.mjs,
-+barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/tests/,
++barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/lib/ci-gates.mjs,
+barwise/scripts/mutate.mjs, barwise/scripts/tests/,
 barwise/docs/adr/, barwise/docs/ARCHITECTURE.md,
 .claude/skills/spec-writer/template.adr.md
 
@@ -49,7 +50,9 @@ property in workstream 4, an on-demand probe in the shape of
 `npm run fault-matrix`, which is not a CI gate. Gating CI on the shadow
 alone is safe here because the shadow is not used as evidence that an
 ADR is respected; it only stops the ADR from claiming an enforcer that
-is gone.
+is gone. WS3's index keeps to that: it labels the list `declared`, and
+its section header says a declared enforcer exists and runs, not that
+it catches a violation.
 
 ## Scope
 
@@ -67,10 +70,18 @@ In scope:
   `--flag` tokens, then `<script>` as the first token that is not a
   flag. The match is on that token alone, because CI writes
   `run audit:specs -- --check`; a whole-string comparison would call
-  three enforced ADRs unwired. A step with a `--workspace` or `-w` flag
-  before its script runs a package's script, not a root one, so it is
-  never a match, even if a root script of the same name exists later;
-  no ADR relies on one today.
+  three enforced ADRs unwired. A step with a workspace flag before its
+  script -- any token whose name, the part before `=`, is `--workspace`,
+  `--workspaces`, `-w` or `-ws` (CI writes `--workspace=barwise-vscode`)
+  -- runs package scripts, not a root one, so it is never a match, even
+  if a root script of the same name exists later; no ADR relies on one
+  today.
+- A step marked `continue-on-error: true` is not wired: it cannot fail
+  CI. `ciSteps()` does not report that key today, so WS1 extends it to
+  return `continueOnError` beside `condition`; `ci:local` and
+  `fault-matrix` ignore the new field. `npm run dup` and
+  `npm run filesize` are such steps now, and `must-agree-copies` names
+  `dup` in its prose.
 - A step guarded by an `if:` counts as wired. Most guards are
   `docs_only != 'true'`, which skips only changes that cannot violate a
   code decision; the narrower ones (`test:optimizer`, `pull_request`
@@ -80,8 +91,9 @@ In scope:
 - When an entry names a hook, it takes one of two forms, and the check
   shall exit 1 unless its conditions hold.
   `hook <Event> <path>`: the path is tracked, and `.claude/settings.json`,
-  parsed as JSON, has a `hooks.<Event>` entry with a `command` that
-  contains the path. A path that survives only in a permission rule, or
+  parsed as JSON, has an entry under `hooks.<Event>` whose nested
+  `hooks` list holds a `command` that contains the path (the real shape
+  is `hooks.<Event>[i].hooks[j].command`). A path that survives only in a permission rule, or
   under another event, does not count. The entry's `matcher` is not
   checked; a matcher that never fires is the kind of defect WS4's
   probes are for.
@@ -103,7 +115,9 @@ In scope:
   `readdirSync`), with `test:scripts` wired as above. Or a file under
   `barwise/packages/<pkg>/` that matches that package's test include --
   the `testInclude` literal in its `vitest.config.ts`, else the default
-  `tests/**/*.test.ts` in `barwise/vitest.shared.ts` -- where the package
+  `tests/**/*.test.ts` in `barwise/vitest.shared.ts`, or the
+  `typecheck.include` literal where the config has one (core runs
+  `tests/types/**/*.test-d.ts` that way) -- where the package
   defines `test:coverage` and the root `test:coverage` is wired as above.
   Tracked is not enough: `packages/vscode/tests/integration/` is tracked,
   vscode's `testInclude` is `tests/unit/**/*.test.ts`, and no `ci.yml`
@@ -143,9 +157,9 @@ In scope:
   the real ADRs carry entries, the fixture needs the inputs those
   entries read. WS2 owns that change.
 - When `npm run regen:architecture` renders the generated section of
-  `barwise/docs/ARCHITECTURE.md`, each ADR line shall show its enforcers
-  or `unenforced`, so a reader (or an agent session) sees which
-  decisions are guarded without opening twenty files.
+  `barwise/docs/ARCHITECTURE.md`, each ADR line shall show its declared
+  enforcers or `unenforced`, so a reader (or an agent session) sees
+  which decisions name a guard without opening twenty files.
 
 Out of scope:
 
@@ -187,8 +201,8 @@ What this shows:
 - 17 of 20 ADRs already name an enforcer; the header makes that list
   checkable rather than new. Every npm script they name today exists and,
   except `ci:local`, `fault-matrix`, `plan-scope`, `pr:risk`, `prepare`,
-  `regen:builtins` and `trial:gate`, runs in `ci.yml`. Those seven are
-  local tools, not enforcers, and WS2 must not copy them into an
+  `regen:builtins` and `trial:gate`, runs in `ci.yml`, and `dup` runs
+  only with `continue-on-error`. Those eight are not enforcers, and WS2 must not copy them into an
   `Enforced-by:` line: the check would correctly fail them. So nothing
   is broken now; the check is a ratchet against future drift.
 - Two named checks do not exist (`check:pins`, `audit:skips`), and both
@@ -224,26 +238,32 @@ barwise/scripts/lib/adr-enforcement.mjs       (new)
   parseEnforcedBy(text) -- the one parser of the header, used by the
                            check and by renderSection, so the index and
                            the check cannot disagree on an entry
-  splitEntries(value)   -- comma/newline split outside parentheses;
-                           reports an unbalanced parenthesis
+  splitEntries(value)   -- comma split outside parentheses, newlines
+                           read as spaces; reports an unbalanced
+                           parenthesis
 
 barwise/scripts/check-architecture.mjs        (existing; one new pass)
   adrs           -- already read
-  enforcement    -- new: resolve each parsed entry
+  enforcement    -- new: resolve each parsed entry; runs after the
+                    graph and ADR-shape passes, reads its inputs in its
+                    own try, and an unreadable input there never hides
+                    their findings
        uses ciSteps()        from scripts/lib/ci-gates.mjs   (existing)
        uses parseTracker()   from scripts/lib/beads-merge.mjs (existing)
        uses trackedPaths()   from scripts/lib/architecture-section.mjs
   every input read under --root, and only when an entry needs it
-  exit 0 / 1 finding / 2 could not read
+  exit 0 / 1 any finding / 2 a refusal and no finding
 
 barwise/scripts/lib/architecture-section.mjs  (renderSection)
-  - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- purity, depcruise
-  - [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- check:parity; gap: barwise-920
+  - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity, depcruise
+  - [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- declared: check:parity; gap: barwise-920.1
   - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18 -- unenforced (barwise-zdd)
 ```
 
-Rendering rule: the enforcers in declared order, then each `none`
-entry as `gap: <issue-id>` or `gap: deliberate`. An ADR with no
+Rendering rule: `declared: ` and the enforcers in declared order,
+joined by `, `; then, after `; `, each `none` entry as `gap: <issue-id>`
+or `gap: deliberate`, joined by `, `. (`barwise-920.1` above stands for
+the child gap issue WS2 opens; its real id is minted then.) An ADR with no
 enforcer renders `unenforced (<issue-id or deliberate>, ...)` instead.
 Each entry renders so its kind shows: `npm run x` as `x`; a husky
 entry as `x (pre-commit hook)`; a settings hook as its file name
@@ -252,9 +272,15 @@ file as its file name. So credential-handling renders
 `check:secrets, check:secrets (pre-commit hook)`, and a reader can tell
 the CI scan from the local hook.
 
-Entry grammar. Entries are separated by commas or newlines that sit
-outside parentheses, so `none (barwise-zdd: decisions 1, 3, 4)` is one
-entry; an unbalanced parenthesis is a finding. Each entry is one of:
+Entry grammar. Entries are separated by commas that sit outside
+parentheses, so `none (barwise-zdd: decisions 1 to 4)` is one entry; an
+unbalanced parenthesis is a finding. A newline is read as a space, not
+a separator, because dprint wraps headers at 80 columns and most
+entries contain spaces: `hook barwise/.husky/pre-commit runs npm run
+check:secrets` must survive a wrap anywhere. An `<issue-id>` is
+`barwise-` followed by `[a-z0-9]+(\.[0-9]+)*`, so a child issue such as
+`barwise-920.1` (the shape `beads-crud create --parent` mints) is one id,
+not an umbrella id plus text. Each entry is one of:
 
 ```
 npm run <script>
@@ -347,7 +373,10 @@ WS2 because it changes generated output a reviewer reads byte for byte.
 For an ADR whose decision has a concrete violation, record one probe --
 a file, a planted edit and the gate expected to go red -- and run it with
 `scripts/mutate.mjs`, which already plants a mutation, runs a command
-and reports whether it was caught. A script runs every probe on demand,
+and reports whether it was caught. `mutate.mjs` counts any non-zero
+exit as caught, so a probe that makes the gate refuse (exit 2) would pass
+as discrimination; WS4 adds an expected-exit option to it and every
+probe expects 1. A script runs every probe on demand,
 as `fault-matrix` does for refusals. Not a CI gate: each probe is a full
 gate run. Ungrounded: where probes live, and whether process ADRs
 (`plan-before-code`) admit a plantable violation at all.
@@ -370,7 +399,12 @@ gate run. Ungrounded: where probes live, and whether process ADRs
   ADR reader and lives where the other ADR-shape checks already live.
   Recommend: extend, because the ADR checks are already in that script,
   and the graph check and ADR checks already report under separate
-  headings.
+  headings. The cost of extending is coupling the graph gate to the
+  tracker's and settings' health; the Target architecture contains it
+  (the enforcement pass reads its inputs in its own try, after the other
+  passes, and a refusal there never hides their findings). If the
+  reviewer judges that containment not enough, the new script is the
+  answer.
 - **Should a `none` entry require an open issue?** Requiring it makes
   "unenforced" a tracked state that cannot outlive its issue silently,
   which is the point. The cost: a decision that is unenforceable by
