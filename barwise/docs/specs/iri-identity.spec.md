@@ -101,8 +101,8 @@ In scope:
   - role: its fact type's local name, `.`, and its role name, which is
     required today;
   - constraint, subtype fact, objectification: a name minted from its
-    canonical verbalization the first time the model is saved, and stored
-    (owner decision, 2026-10-28; minted at creation in WS6);
+    canonical verbalization when the element is created, and stored, with
+    the content key it was minted from (owner decision, 2026-10-28; WS6);
   - population and fact instance: decision 7.
 - When a rule would give an element a local name another element of the
   model already holds, the system shall append `_2`, `_3`, and report it,
@@ -274,9 +274,10 @@ Core forms an IRI; it does not dereference one.
 
 ## Workstreams (each independently shippable)
 
-WS1 to WS4 change only what a 3.x file can say, and WS5 adds operations, so
-no build before WS6 writes a file a later build cannot migrate; that is the
-pattern `orm-format-3.spec.md` used. WS5 lands before WS6, so diff
+WS1, WS2 and WS4 change only what a 3.x file can say, and WS5 adds
+operations, so no build before WS6 writes a file a later build cannot migrate; that is the
+pattern `orm-format-3.spec.md` used. WS3 was folded into WS6 and ships
+nothing of its own. WS5 lands before WS6, so diff
 recognizes a rename before any build changes identity on one. WS7 follows.
 
 ### 1. The loader reads a minor bump (barwise-jj8)
@@ -320,42 +321,52 @@ review rounds showed that a separate 3.x phase of stored names leaks. It was
 designed to mint when a model is saved, through one save function, but the
 main editing path -- typing in the YAML editor and saving -- never passes
 through barwise's serializer, so files edited that way would never be named;
-and merge and split each needed a rule of their own. The model already has
-one seam every creation path passes: the place an absent id is filled in
-(`FactType.ts`, `OrmModel.ts`), into which the surfaces install an id
-generator at startup (`setIdGenerator`). In 4.0 a minted name is the
-element's id, so it is minted there, by a namer installed the same way from
-a layer that can verbalize.
+and merge and split each needed a rule of their own. In 4.0 a minted name is
+the element's id, so minting belongs where ids are given, which is WS6's to
+design. What the reviews established, for WS6 to start from:
 
-What the grounding settled, for WS6 to start from:
-
+- **Where ids are given is not one place today.** `OrmModel.addConstraint`
+  and `FactType` fill an absent constraint id; `ModelElement`'s constructor
+  fills a subtype fact's and an objectification's; and importers, the LLM
+  parser (`llm/src/parse/constraints.ts`) and the dbt mapping set ids
+  themselves with `generateId()`. None of these places has the whole model,
+  which minting needs: the verbalization reads players and readings, and a
+  fact type's constraints are given ids before it joins a model. Nor should
+  minting be a process-wide namer installed the way `setIdGenerator` is:
+  that exists because a UUID needs a clock and randomness, and minting is
+  pure, so it belongs in core with no installation step, or a caller that
+  did not install one would get other ids for the same model. A model-level
+  pass after an element joins a model, or a creation API that takes the
+  model, are the candidates.
 - **The content key for decision 14 is barwise's own, derived from the
-  serializer.** `mintedKey` takes the element's serialized form -- the
-  authority on what it states, so ring types, frequency and cardinality
-  ranges, value ranges, comparison operators, subset sides and
-  subtype-fact operands are in it without being listed again -- drops its
-  id and name, and replaces each reference by name: an object type by its
-  name, a role by its position in its fact type and that fact type's
-  readings and players (which is what a constraint's sentence is built
-  from, not the fact type's name). A subtype fact's key is its two types'
-  names and its defining rule; an objectification's, its fact type's key
-  and its object type's name. It is not diff's `constraintKey`, which keeps
-  ids in places (another fact type's role, a join path, an unresolved
-  reference), and storing which would make every later change to how diff
-  pairs constraints a format change.
-- **Nothing is minted from a verbalization that is not of the element:**
-  not in a model `graphOf` refuses, where a dangling player reads as its
-  role name, and not from the verbalizer's "Malformed:" fallback, which
-  `graphOf` does not catch (a role of the wrong fact type). The closing
-  period is dropped before `localName()`.
+  serializer, and stored.** `mintedKey` takes the element's serialized form
+  -- the authority on what it states, so ring types, frequency and
+  cardinality ranges, value ranges, comparison operators, subset sides and
+  subtype-fact operands are in it without being listed again -- drops its id
+  and name, and replaces each reference by name: an object type by its name,
+  a role by its position in its fact type and that fact type's readings and
+  players (what a constraint's sentence is built from, not the fact type's
+  name). A subtype fact's key is its two types' names and its defining
+  rule; an objectification's, its fact type's key and its object type's
+  name. The 4.0 schema stores it as `minted_from` beside the id. It is not
+  diff's `constraintKey`, which keeps ids in places (another fact type's
+  role, a join path, an unresolved reference), and storing which would make
+  every later change to how diff pairs constraints a format change.
+- **Nothing is minted from a verbalization that is not of the element:** not
+  in a model `graphOf` refuses, where a dangling player reads as its role
+  name, and not from the verbalizer's "Malformed:" fallback, which `graphOf`
+  does not catch (a role of the wrong fact type). The closing period is
+  dropped before `localName()`.
 - **`stale-minted-name` is a graph rule**, run only when the graph builds,
-  so a dangling reference is reported once, as itself. A name without a
-  stored key was written by a person or a tool and is never stale.
-- **Merge.** An accepted modification paired by id carries changed content,
-  so it keeps the base's id and takes a fresh key and, where the sentence
-  changed, is reported stale rather than silently renamed; an accepted
-  fact type rebuilt from the incoming side keeps the base's ids for its
-  constraints where they pair.
+  so a dangling reference is reported once, as itself. An id with no stored
+  key was written by a person or a tool and is never stale.
+- **Merge needs a change.** Today an accepted modification takes the
+  incoming side's constraint ids: `addFactTypeToMerged` keeps only the fact
+  type's id, and internal constraints pass through with the incoming ids.
+  In 4.0 merge keeps the base's id and the base's stored key for an element
+  it pairs, so a modification that changed what the element says is
+  reported stale by key, as decision 14 chooses, rather than renamed
+  silently or judged by its wording.
 - **Lineage and diff ignore the stored key**, which is derived.
 
 ### 4. Namespace declarations (provisional: not yet grounded)
@@ -386,8 +397,8 @@ domains in one run, which also settles a suffixed owner's shadows. Lineage follo
 and an edit-path upgrade reports "ids changed to 4.0".
 
 Every importer builds local names, and an element with no name of its own
-takes one minted by the namer the surfaces install at the id-fill seam, as
-WS3 records; exporters follow the Inventory;
+takes a minted one, stored with its `minted_from` key, by the mechanism and
+rules WS3 records; exporters follow the Inventory;
 `canonicalizeIds` goes; merge's clash rule takes the suffix rule; split's
 shadows take the owner's `alias:Name` and drop `source_context`;
 `cli/tests/importerIds.test.ts` checks the naming rules. The same PR amends
