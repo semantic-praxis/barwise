@@ -1,7 +1,8 @@
 # IRI identity: readable names replace UUIDs (format 4.0)
 
-Status: In progress -- WS1 implemented 2026-10-28 (the loader reads a minor of the
-current major, barwise-jj8); WS2 to WS7 to come
+Status: In progress -- WS1 and WS2 implemented 2026-10-28 (the loader reads a
+minor of the current major, barwise-jj8; `localName()` and the name checks);
+WS3 to WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -286,17 +287,25 @@ build refuses every tracked 3.0 file. No format change.
 
 ### 2. One normalizer and the name checks
 
-`localName()` in `core/src/model/name.ts` and a cross-kind local-name index
-in `OrmModel`, with three warnings on 3.x:
+`localName()` in `core/src/model/name.ts`, exported from core, and three
+rules in `validation/rules/structural.ts` that preview on 3.x what 4.0 will
+do:
 
-- two elements of any kinds whose local names would be equal (an object
-  type and a fact type named alike is decision 4's case);
-- two roles of one fact type with the same role name;
-- a name `localName()` changes beyond whitespace, so a reader sees the id
-  the migration will store.
+- `structural/local-name-collision` (warning): an object type and a fact
+  type, or two of one kind whose names differ, with one local name. An
+  objectified fact type named like its objectifying type gets its own
+  message, which says the migration will rename the fact type (decision 4);
+- `structural/duplicate-role-name` (warning): two roles of one fact type
+  with the same role name;
+- `structural/encoded-local-name` (info): a name whose local name is more
+  than its whitespace turned to `_`. Information, not a warning, because
+  an encoded id is correct, only worth seeing once.
 
-No format change. It tells every existing model what the migration will
-suffix or rename.
+No format change. Over the 84 tracked models that load, the rules report
+exactly the 22 objectified fact types decision 4 names, and nothing else.
+The cross-kind index is the validation rule's own map for now: an
+`OrmModel` store that refuses a held local name is WS6's, where ids become
+local names and a refusal at construction means something.
 
 ### 3. Minted names for unnamed elements (3.1) (provisional: not yet grounded)
 

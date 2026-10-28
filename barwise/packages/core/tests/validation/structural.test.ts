@@ -442,3 +442,97 @@ describe("structural/diagram-empty-view and isScopedView", () => {
     ]);
   });
 });
+
+describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
+  const ids = (model: OrmModel, rule: string) =>
+    structuralWellFormedness(model).filter((d) => d.ruleId === rule);
+
+  it("warns when an object type and a fact type would take one id", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Order Line", { referenceMode: "nr" })
+      .withEntityType("Order", { referenceMode: "nr" })
+      .withBinaryFactType("Order_Line", {
+        role1: { player: "Order", name: "has" },
+        role2: { player: "Order Line", name: "is of" },
+      })
+      .build();
+    const found = ids(model, "structural/local-name-collision");
+    expect(found).toHaveLength(1);
+    expect(found[0]!.severity).toBe("warning");
+    expect(found[0]!.message).toBe(
+      'The fact type "Order_Line" and the object type "Order Line" would both take the id "Order_Line" in format 4.0; rename one, or the migration will add a suffix.',
+    );
+  });
+
+  it("names the objectification case and what the migration will do", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "nr" })
+      .withEntityType("Marriage", { referenceMode: "nr" })
+      .withBinaryFactType("Marriage", {
+        role1: { player: "Person", name: "marries" },
+        role2: { player: "Person", name: "is married to" },
+        uniqueness: "spanning",
+      })
+      .withObjectifiedFactType("Marriage", "Marriage")
+      .build();
+    const found = ids(model, "structural/local-name-collision");
+    expect(found.map((d) => d.message)).toEqual([
+      'The fact type "Marriage" has its objectifying object type\'s name, so both would take the id "Marriage" in format 4.0; the migration will rename the fact type to its first reading.',
+    ]);
+  });
+
+  it("leaves an exact repeat within one kind to duplicate-object-type-name", () => {
+    const model = new OrmModel({ name: "Test" });
+    const a = createObjectType({ name: "Customer", kind: "entity", referenceMode: "nr" });
+    const b = createObjectType({ name: "Customer", kind: "entity", referenceMode: "nr" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (model as any)._objectTypes.set(a.id, a);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (model as any)._objectTypes.set(b.id, b);
+    expect(ids(model, "structural/local-name-collision")).toEqual([]);
+    expect(ids(model, "structural/duplicate-object-type-name")).toHaveLength(1);
+  });
+
+  it("warns when two roles of one fact type share a role name, naming the id", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Person", { referenceMode: "nr" })
+      .withBinaryFactType("Person knows Person", {
+        role1: { player: "Person", name: "knows" },
+        role2: { player: "Person", name: "knows" },
+      })
+      .build();
+    const found = ids(model, "structural/duplicate-role-name");
+    expect(found.map((d) => [d.severity, d.message])).toEqual([[
+      "warning",
+      'Fact type "Person knows Person" has two roles named "knows"; in format 4.0 both would take the id "Person_knows_Person.knows", so the migration will add a suffix to the second and new authoring will refuse it. Give one a different role name.',
+    ]]);
+  });
+
+  it("reports, as information, a name whose id is encoded", () => {
+    const model = new ModelBuilder("Test").withEntityType("v1.2 Order", { referenceMode: "nr" })
+      .build();
+    expect(ids(model, "structural/encoded-local-name").map((d) => [d.severity, d.message])).toEqual(
+      [[
+        "info",
+        'The object type "v1.2 Order" will take the id "v1%2E2_Order" in format 4.0, with its reserved or unsafe characters percent-encoded.',
+      ]],
+    );
+  });
+
+  it("says nothing about a model whose names map cleanly", () => {
+    const model = new ModelBuilder("Test")
+      .withEntityType("Customer", { referenceMode: "nr" })
+      .withEntityType("Order", { referenceMode: "nr" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+      })
+      .build();
+    const rules = [
+      "structural/local-name-collision",
+      "structural/duplicate-role-name",
+      "structural/encoded-local-name",
+    ];
+    expect(structuralWellFormedness(model).filter((d) => rules.includes(d.ruleId))).toEqual([]);
+  });
+});
