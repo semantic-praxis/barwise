@@ -34,6 +34,7 @@ import {
   type InternalConstraint,
   type ObjectType,
   OrmModel,
+  resolvePreferredIdentifier,
   subtypeConstraintsFromFlags,
   type ValueConstraintDef,
 } from "@barwise/core";
@@ -448,7 +449,12 @@ export class DdlImportFormat implements ImportFormat {
         );
         if (kept.size > 0 || declared.length === 0) {
           subtypeLinks.set(tableKey(table.name), kept.columns);
-          if (kept.identifiedByKey || objectifiedKey) continue;
+          // A key that is the identifying link and, by the line, the
+          // entity's own identifier as well: the source model stored both
+          // (annotation-preferred-identifier.spec.md).
+          const namesKey = found?.kind === "table" && found.identifiedBy !== undefined
+            && sameColumns(found.identifiedBy, table.primaryKey);
+          if (kept.identifiedByKey && !namesKey || objectifiedKey) continue;
           const binary = this.createKeyIdentifier(model, entity, table, annotations, warnings);
           if (binary) binaries.set(columnKey(table.name, table.primaryKey[0]!), binary);
           continue;
@@ -686,17 +692,54 @@ export class DdlImportFormat implements ImportFormat {
           );
         }
       }
-      if (compositeKey) {
+      const keyResult = compositeKey ? external(table.primaryKey) : undefined;
+
+      // The uniqueness a key of several columns reads as is the entity's
+      // preferred identifier, as createKeyIdentifier makes a one-column
+      // key's: the mapper keys a table on its entity's identifier
+      // (annotation-preferred-identifier.spec.md).
+      const rolesOf = (cols: readonly string[]) =>
+        unexpressible(cols) === undefined
+          ? [...new Set(cols.map((c) => partOf(c)!.farRoleId))]
+          : undefined;
+      const keyRoles = table.primaryKey.length > 1 ? rolesOf(table.primaryKey) : undefined;
+      if (keyRoles && entityType.kind === "entity" && !model.preferredIdentifierOf(entityId)) {
+        preferUniquenessOver(model, entityId, keyRoles);
+      }
+      // An identifier the key does not state, named by the table line.
+      const line = annotations.tables.get(tableKey(table.name));
+      if (
+        line?.kind === "table" && line.entity === entityType.name && line.identifiedBy
+        && entityType.kind === "entity"
+      ) {
+        const cols = line.identifiedBy;
+        const reason = unexpressible(cols);
+        if (reason || !preferUniquenessOver(model, entityId, rolesOf(cols)!)) {
+          warnings.push(
+            `Table "${table.name}": the annotation names the entity's identifier as (${
+              cols.join(", ")
+            }), which ${
+              reason ?? "reads as no uniqueness that identifies it"
+            }; the identifier is kept as imported (annotation-preferred-identifier.spec.md).`,
+          );
+        }
+      }
+
+      if (keyResult) {
         const key = table.primaryKey.join(", ");
-        const result = external(table.primaryKey);
+        const result = keyResult;
         const identified = `the entity is identified by "${
           entityType.kind === "entity" ? entityType.referenceMode : ""
         }"`;
+        const preferred = model.getConstraint(model.preferredIdentifierOf(entityId) ?? "");
         warnings.push(
           result.kind === "imported"
             ? `Table "${table.name}": composite PRIMARY KEY (${key}) is imported as an external `
-              + `uniqueness over its columns; ${identified}, since an external uniqueness cannot yet `
-              + `be preferred (barwise-ezn).`
+              + `uniqueness over its columns, ${
+                preferred?.type === "external_uniqueness"
+                  ? "the entity's preferred identifier"
+                  : "which does not identify the entity alone, so it is not its preferred identifier"
+              }.`
             : result.kind === "reference"
             ? `Table "${table.name}": composite PRIMARY KEY (${key}) is one foreign key, imported `
               + `as a one-to-one reference; ${identified} (composite-foreign-key-round-trip.spec.md).`
@@ -1819,6 +1862,35 @@ function keyIdentifiedByObjectification(
     o.objectTypeId === entity.id && o.factTypeId === binary.factType.id
   );
   return objectifies && objectificationGivesKey(binary.factType.id, model);
+}
+
+/**
+ * Make the first uniqueness over exactly `roleIds` that identifies the
+ * entity its preferred identifier: internal ones first, then external,
+ * each in model order. A uniqueness over the right roles can still not
+ * identify the entity (a single role of a ternary, say), and the model
+ * would store it without complaint, so each is checked as validation
+ * checks it. False, with the identifier unchanged, when none does.
+ */
+function preferUniquenessOver(
+  model: OrmModel,
+  entityId: string,
+  roleIds: readonly string[],
+): boolean {
+  const over = (ids: readonly string[]) => sameColumns(ids, roleIds);
+  const candidates = [
+    ...model.factTypes.flatMap((ft) =>
+      ft.internalConstraints.filter((c) => c.type === "internal_uniqueness" && over(c.roleIds))
+    ),
+    ...model.constraints.filter((c) => c.type === "external_uniqueness" && over(c.roleIds)),
+  ];
+  const before = model.preferredIdentifierOf(entityId);
+  for (const c of candidates) {
+    model.setPreferredIdentifier(entityId, c.id);
+    if (resolvePreferredIdentifier(model, entityId).ok) return true;
+  }
+  model.setPreferredIdentifier(entityId, before);
+  return false;
 }
 
 /** Whether two column lists name the same columns, in any order. */

@@ -143,3 +143,17 @@ as a work order keyed on its batch, used to come back from a DDL export
 with barwise annotations carrying a second identifier. The next export
 then wrote an extra column for it, with a UNIQUE. The import now leaves
 the key to the relationship, so the table exports as it did before.
+
+### A DDL round trip keeps each entity's preferred identifier
+
+An entity that came back from a DDL export and import used to lose its
+preferred identifier when its table was keyed on several columns, or when
+its identifier was not the table's key: 42 entities in the tracked models
+did. The import now makes the uniqueness a multi-column key reads as the
+entity's preferred identifier, for plain and annotated DDL alike, as it
+already did for a key of one column. A composite primary key over plain
+columns now imports as the entity's identifier, not beside an invented
+reference mode. Where the identifier is not the key (an objectifier
+identified by a value of its own, a subtype keyed on its supertype link),
+the barwise annotation names its columns in a new `identifiedBy` field,
+and the import reads it.
