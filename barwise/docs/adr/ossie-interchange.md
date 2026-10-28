@@ -32,7 +32,7 @@ alternatives behind decisions 1 to 4. On 2026-10-28 the owner revised
 decision 1 and added decisions 5 and 6, after comparing the two more
 closely: barwise does not try to replace Ossie, takes ideas from it where
 they serve barwise, and leans on it for what Ossie owns. Their reasoning is
-recorded in barwise-wcg until that issue's spec holds it.
+recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
 
 ## Decision
 
@@ -148,8 +148,8 @@ recorded in barwise-wcg until that issue's spec holds it.
   diff and merge pairing elements by id first) and
   `docs/specs/importer-role-ids.spec.md` R1 (an importer takes a role's id
   from `generateId()`, never from a string built out of names). With identity built from
-  names, a rename changes an element's IRI, so the spec must also say how
-  diff and merge tell a rename from a removal plus an addition.
+  names, a rename changes an element's IRI, which that spec's decision 8
+  answers: diff and merge tell a rename from a removal plus an addition.
 - Decision 6 has no gate; that barwise keeps its ORM 2 terms is held by
   review. The translation is tested construct by construct in
   `OssieImportFormat.test.ts` and `OssieExportFormat.test.ts`. It is
