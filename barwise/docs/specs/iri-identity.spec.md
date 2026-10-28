@@ -7,7 +7,7 @@ WS3 folded into WS6; WS4 to WS7 to come
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-wcg
-Plan-reviewed: ef452225 (code-review, pr-review; re-pointed after the owner resolved its decisions)
+Plan-reviewed: e7acea95 (code-review, pr-review; re-pointed after WS3 was folded into WS6)
 Touches: barwise/packages/core/src/model/,
 barwise/packages/core/src/serialization/,
 barwise/packages/core/schemas/,
