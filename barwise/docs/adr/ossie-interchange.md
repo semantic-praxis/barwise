@@ -102,8 +102,11 @@ recorded in barwise-wcg until that issue's spec holds it.
   document written against a later commit that keeps the string passes.
   One such change is caught at run time: a field the later commit added
   is not in the pinned schema, so it is named in the warnings (decision 4,
-  below). A changed type, enum or meaning, or a removed field, under the
-  same string is not; for those the commit pin holds only for the tests.
+  below). A changed type or enum on a field the mapper reads is refused by
+  `parseOssie`'s own checks (an upstream `multiplicity` value other than
+  `ManyToOne` or `OneToOne` fails the import). A changed type or enum on any
+  other field, a changed meaning, or a removed field, under the same string,
+  passes; for those the commit pin holds only for the tests.
 - Decision 4 is tested on the pinned example and on unit cases.
   `OssieExportFormat.test.ts` imports `flights.ontology.yaml`, exports it,
   and compares the result construct by construct, excluding only what the
