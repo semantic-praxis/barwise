@@ -1,6 +1,6 @@
 # A test run leaves nothing in the temp directory
 
-Status: Proposed
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -108,6 +108,22 @@ The changes above. Each item below is pinned or measured:
   coverage plugin's peer dependency is exact), then restores with
   `npm ci`.
 - The full monorepo suite and coverage pass on the bumped lock.
+
+## Implementation notes
+
+- As planned in the revised plan. The first draft ran a test file from
+  `@barwise/learn`. The high plan review showed that this needs core's
+  `dist`, which CI has not built when `test:scripts` runs, and that an
+  empty directory alone could pass without vitest having run. The test
+  now runs a build-free fixture and requires vitest to pass first.
+- npm resolves 5.0.5 with its own dependencies moved to match: vite
+  8.3.4 to 8.3.5, rolldown 1.2.14 to 1.2.15, chai, magic-string, obug,
+  std-env, tinybench, tinyrainbow, why-is-node-running, postcss. These
+  come from `npm install` and `npm update` alike, and they are kept as
+  the tooling resolved them rather than edited by hand.
+- Red check: with `vitest@5.0.1` and `@vitest/coverage-v8@5.0.1`
+  installed `--no-save`, the test fails with "vitest 5.0.1 left these in
+  its temp directory". After `npm ci` restores 5.0.5, it passes.
 
 ## Open decisions
 
