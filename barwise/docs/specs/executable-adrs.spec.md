@@ -127,15 +127,20 @@ In scope:
   node-gate resolution, so the naming cannot drift. The two are not
   identical functions: `resolveNodeGate` also returns null for a script
   that runs no node gate (`lint`, `build`, `dup`), and keeps its own
-  `refuse()` for a script that chains several, so the
-  pinned property is that wherever `resolveNodeGate` names a script,
-  `stepScript` names the same one, over every `ci.yml` step. One
-  behaviour changes on purpose: a step like `run --silent x` would
-  become auditable by `fault-matrix`, where today it is skipped; no
-  `ci.yml` step has that form now. No ADR relies on a workspace step
+  `refuse()` for a script that chains several. Taking the name from
+  `stepScript()` makes their naming agree by construction, so a test
+  comparing the two would be one that cannot fail. The test instead pins
+  fixed expected values, one per step form: `run x`, `run x -- --check`,
+  `run --silent x`, `run x foo`, `run --workspace=w x`, `run -C dir x`,
+  `run --loglevel warn x`, `npm test`, `npm audit`. Two behaviours change
+  on purpose, and the test names both: `run --silent x` becomes
+  auditable by `fault-matrix` (skipped today), and `run x foo` resolves
+  `x` with the argument `foo` (today the name `x foo` matches nothing).
+  No `ci.yml` step has either form now. No ADR relies on a workspace step
   today.
 - An entry naming an umbrella script -- `test`, `test:coverage`,
-  `test:scripts`, `test:trial`, `build`, `lint`, `ci:local` -- is a finding even when
+  `test:scripts`, `test:trial`, `test:optimizer`, `build`, `lint`,
+  `ci:local` -- is a finding even when
   it is wired. Each runs every suite or every package, so it cannot point
   at one decision; the entry names the test file or the specific gate
   instead. That turns WS2's "replace every umbrella citation" from
@@ -150,52 +155,60 @@ In scope:
   job's header keys would land on the previous job's last step. WS1
   makes it track jobs (a key at the indent of the first job under
   `jobs:` starts a new one and resets the step state), reads job-level
-  `continue-on-error` and `if:` into each step of that job, and returns
-  `continueOnError` beside `condition`; `ci:local` and
-  `fault-matrix` do not use the new field in this spec (`ci:local`
-  still runs `dup` and `filesize` as blocking, a divergence from CI
-  filed separately as barwise-4vj), and the shape pinned by
-  `scripts/tests/ci-conditions.test.mjs` is updated with it. Where the
-  same arguments appear in two steps, `ciSteps()` keeps one entry, and
-  its `continueOnError` is true only if every occurrence is
-  `continue-on-error: true` (an explicit `false` is blocking),
-  so step order cannot decide whether a gate is wired: a script is wired
-  if any step that runs it can fail CI. `condition` keeps its current
-  first-occurrence rule, which `ci:local` and `fault-matrix` read. Those
-  two summaries come from different steps, so the check reads neither:
-  WS1 adds `ciStepOccurrences()`, the same parse without the dedupe,
-  and a script is wired only if one single occurrence both runs it with
-  the declared arguments, can fail CI, and passes the condition rule
-  below. Step order then decides nothing. Separately,
-  `npm run dup` and `npm run filesize` each run once in `ci.yml`, with
+  `continue-on-error` and `if:` into each step of that job, and exposes
+  the result as `ciStepOccurrences()`: every step, not deduplicated, each
+  with its arguments, its combined `condition` and its
+  `continueOnError`. `ciSteps()` keeps its current shape and dedupe and
+  is derived from that list, so `ci:local`, `fault-matrix` and the shape
+  pinned by `scripts/tests/ci-conditions.test.mjs` see no change; no
+  deduplicated `continueOnError` exists for a later caller to read and
+  disagree with. (`ci:local` still runs `dup` and `filesize` as blocking,
+  a divergence from CI filed separately as barwise-4vj.) A script is
+  wired only if one single occurrence both runs it with the declared
+  arguments, can fail CI, and passes the condition rule below, so step
+  order decides nothing. Separately, `npm run dup` and
+  `npm run filesize` each run once in `ci.yml`, with
   `continue-on-error: true`, and `must-agree-copies` names `dup` in its
   prose, so WS2 must not declare it.
 - A step guarded by an `if:` counts as wired only if `shouldRun()` in
   `ci-gates.mjs`, the classifier reader `ci:local` already uses,
   understands its condition (step-level and job-level combined), and the
-  condition runs the step for a code change: `shouldRun(condition,
-  { docsOnly: false, optimizer: true }).run` is true. An inverted guard
-  (`docs_only == 'true'`) or a contradiction (`docs_only == 'true' &&
-  docs_only == 'false'`) is understood and never runs on a code change,
-  so it is not wired. `optimizer: true` is the classification under
-  which every understood guard can run, so a narrowly guarded gate still
-  counts. Those
+  condition runs the step for some code change: with `docsOnly: false`,
+  `shouldRun(...).run` is true for `optimizer: true` or for
+  `optimizer: false`. Both values are tried because guards on either
+  side exist: `test:optimizer` runs only when `optimizer == 'true'`, and
+  a guard `optimizer != 'true'` runs on every other code change. An
+  inverted guard (`docs_only == 'true'`) or a contradiction
+  (`docs_only == 'true' && docs_only == 'false'`) is understood and
+  never runs on a code change, so it is not wired. Those
   forms are `docs_only`/`optimizer` comparisons and the
   `pull_request` event test. Most guards are `docs_only != 'true'`,
   which skips only changes that cannot violate a code decision; the
   narrower ones (`test:optimizer`, `pull_request` only) enforce on
   exactly the changes CI's classifier sends them, and an ADR whose
   enforcer is narrowly guarded says so in its Consequences. Any other
-  condition, `if: false` included, is one the check cannot evaluate, and
-  it refuses (exit 2): a gate switched off with `if: false` must not
-  keep counting as an enforcer. `ci.yml` has one job today, so job-level
+  condition, `if: false` included, is one the check cannot evaluate: a
+  gate switched off with `if: false` must not keep counting as an
+  enforcer.
+- A refusal is scoped to the entry it affects, never to the whole check.
+  An occurrence the check cannot read -- `stepScript()` refuses, the
+  `if:` is not understood, `continue-on-error` is an expression --
+  matters only to an entry it might satisfy: one whose script it names,
+  or any npm entry when `stepScript()` could not tell the script. For
+  each npm entry: wired if some readable occurrence proves it; else
+  exit 2 if some unreadable occurrence might be it; else exit 1. A
+  `--loglevel warn knip` step or an `if: ${{ always() }}` on a step no
+  entry needs changes nothing, so the graph gate stays independent of
+  unrelated `ci.yml` edits. `ci.yml` has one job today, so job-level
   conditions are empty; a future split into jobs whose guards read
   `needs.<job>.outputs` would make the check refuse until `shouldRun()`
   learns that form, which is safe, and loud.
 - When an entry names a hook, it takes one of two forms, and the check
   shall exit 1 unless its conditions hold.
   `hook <Event> <path>`: the path is tracked, and `.claude/settings.json`,
-  parsed as JSON, has an entry under `hooks.<Event>` whose nested
+  parsed as JSON, does not set `disableAllHooks: true` (which switches
+  every hook off, and makes every settings-hook entry unwired), and has
+  an entry under `hooks.<Event>` whose nested
   `hooks` list holds a `command` that runs the path (the real shape is
   `hooks.<Event>[i].hooks[j].command`). Runs means the command's first
   word is `node` followed by the path, or is the path itself (as
@@ -237,20 +250,30 @@ In scope:
   the decay this spec exists to catch. Both rules are lexical; they show
   the hook is wired and invokes the script, not that the line is
   reachable, which again is WS4's question.
-- A test-file entry may carry a selector, `<path> :: <title>`, naming one
-  test by its title. The check exits 1 unless exactly one `test(` or
-  `it(` call in the file has that string as its literal title. A file
-  that holds the tests of many decisions -- `barwise/scripts/tests/gates.test.mjs`,
-  over 200 cases -- must be declared with a selector: an entry naming the
-  whole file is an umbrella by the rule above, because deleting the
-  cases that pin a decision would leave the file, and the entry, intact.
-  The selector is what makes "a test can be renamed and the check
-  catches it" true at the level of one test.
+- A test-file entry always carries a selector, `<path> :: <title>`,
+  naming one test. A whole-file entry is a finding: deleting the cases
+  that pin a decision would leave the file, and such an entry, intact,
+  so a file is as much an umbrella as `test:scripts`. The selector
+  matches the title's literal text up to its first interpolation, so a
+  loop-built title such as ``test(`check-secrets fails on a staged
+  ${rule}`, ...)`` (`gates.test.mjs:768`) is named by its prefix,
+  `check-secrets fails on a staged`, and a `test.each` / `it.each` title
+  the same way. The check exits 1 unless exactly one `test`/`it` call,
+  or one `.each` table, in the file matches, and that call is live: not
+  `.skip`, `.todo`, `.skipIf`, `.runIf` or `.fails`, not passed a
+  `skip` or `todo` option, and not inside a `describe.skip` or
+  `describe.todo`. A test that never runs cannot fail CI, the same reason
+  a `continue-on-error` step is not wired. The selector is what makes "a
+  test can be renamed and the check catches it" true at the level of one
+  test.
 - When an entry names a test file, the check shall exit 1 unless the
-  path is tracked and a CI step runs its suite. Two places qualify. A
+  path is tracked and a CI step runs its suite. Three places qualify. A
   `.test.mjs` directly in `barwise/scripts/tests/` (not a subdirectory:
   `run-script-tests.mjs` reads that directory with a non-recursive
-  `readdirSync`), with `test:scripts` wired as above. Or a file under
+  `readdirSync`), with `test:scripts` wired as above. A file matched by
+  the glob in the `test:trial` script itself (`node --test
+  trial/tests/*.test.mjs` today, read from `barwise/package.json` rather
+  than copied), with `test:trial` wired as above. Or a file under
   `barwise/packages/<pkg>/` that matches, under `picomatch`, that
   package's test include --
   the `testInclude` literal in its `vitest.config.ts`, else the default
@@ -262,9 +285,11 @@ In scope:
   with (4.0.7 is installed today as a dependency of vitest); WS1
   declares it as a root devDependency at that version so the check and
   vitest read a glob the same way, with the options vitest uses for
-  discovery: `dot: true`, and vitest's default excludes
-  (`**/node_modules/**`, `**/dist/**` and the rest of its list) applied
-  as a second, negative match. The devDependency uses the range vitest
+  discovery: `dot: true`, and vitest's default excludes applied as a
+  second, negative match. The excludes are imported, not copied:
+  `configDefaults.exclude` from `vitest/config` (`**/node_modules/**`
+  and `**/.git/**` today), so a vitest upgrade that changes them changes
+  the check with it. The devDependency uses the range vitest
   declares (`^4.0.7`), not an exact pin, so one install resolves both
   to the same copy, and a drift test asserts they did. Node's `path.matchesGlob` is not used:
   `scripts/lib/review-tiers.mjs` records that it is experimental on the
@@ -277,8 +302,11 @@ In scope:
   `include` inside its `typecheck` object. `named-files` packages
   (vscode, diagram-ui) also have a `coverage.include`, which is never
   read as a test list. A config where either key is present but is not a
-  string-array literal is a refusal (exit 2), not a pass. Other suites CI runs (`test:trial`,
-  `test:optimizer`) are declared by their npm script.
+  string-array literal is a refusal (exit 2), not a pass. `test:optimizer`
+  runs pytest, outside this grammar; a decision it pins cannot be declared by
+  `npm run test:optimizer`, which is on the umbrella list as the
+  optimizer lane's whole suite, so such a decision gets a `none`
+  entry on an issue to make its test declarable.
   Both discovery rules restate code owned elsewhere -- the
   non-recursive `.test.mjs` filter in `run-script-tests.mjs` and the
   default include in `vitest.shared.ts` -- so WS1 adds a drift test in
@@ -472,7 +500,7 @@ npm run <script>
 npm run <script> -- <args>
 hook barwise/.husky/<name> runs npm run <script> [-- <args>]   -- tried first; args as the hook passes them
 hook <Event> <repo-rooted path>               -- Event is one word, no `/`; settings.json
-<repo-rooted path to a test file>[ :: <test title>]
+<repo-rooted path to a test file> :: <test title or its literal prefix>
 none (<issue-id>[: <free text naming which decisions>])
 ```
 
