@@ -46,6 +46,7 @@ export {
 } from "./renderers/dbt.js";
 export { annotateDbtExport, type ExportAnnotationResult } from "./renderers/DbtExportAnnotator.js";
 export { renderDdl } from "./renderers/ddl.js";
+export { AVRO_NAME, avroFieldNames, toAvroName } from "./renderers/names.js";
 export {
   type OpenApiPropertyType,
   type OpenApiRenderOptions,

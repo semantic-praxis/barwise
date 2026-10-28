@@ -24,6 +24,7 @@
 import { renderPopulationAsOpenApiExamples } from "../../export/populationRenderer.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { RelationalSchema, Table } from "../RelationalSchema.js";
+import { uniqueNames } from "./names.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -115,9 +116,9 @@ export function renderOpenApi(
 
     const resourcePath = `${basePath}${toKebabCase(table.name)}`;
     // The path's segments and the operations' parameters come from this one
-    // list; a step that renames a key column (barwise-9g3) must apply here.
+    // list, so a renamed key column (barwise-9g3) is renamed in both.
     const keyParams = primaryKeyParams(table);
-    const idPath = `${resourcePath}/${keyParams.map((name) => `{${name}}`).join("/")}`;
+    const idPath = `${resourcePath}/${keyParams.map((p) => `{${p.name}}`).join("/")}`;
 
     paths[resourcePath] = renderCollectionPaths(schemaName);
     paths[idPath] = renderItemPaths(schemaName, keyParams);
@@ -243,14 +244,15 @@ function renderCollectionPaths(schemaName: string): Record<string, unknown> {
 
 function renderItemPaths(
   schemaName: string,
-  paramNames: readonly string[],
+  params: readonly PathParam[],
 ): Record<string, unknown> {
   // A fresh list per operation, so a caller editing one does not edit all three.
   const parameters = () =>
-    paramNames.map((name) => ({
+    params.map(({ name, column }) => ({
       name,
       in: "path",
       required: true,
+      ...(column !== name ? { description: `The key column "${column}".` } : {}),
       schema: { type: "string" },
     }));
 
@@ -412,9 +414,34 @@ function normalizePath(path: string): string {
  * The item path's parameters: every primary-key column, in key order, so
  * a key over several columns addresses one row rather than many
  * (openapi-composite-key-path.spec.md, barwise-pki). "id" when the table
- * has no key, as before.
+ * has no key, as before. A column whose name is no template variable is
+ * renamed, and its parameter says so in a description.
  */
-function primaryKeyParams(table: Table): readonly string[] {
+function primaryKeyParams(table: Table): readonly PathParam[] {
   const key = table.primaryKey.columnNames;
-  return key.length > 0 ? key : ["id"];
+  if (key.length === 0) return [{ name: "id", column: "id" }];
+  // Every column's name counts as taken, so a path parameter cannot share
+  // a name with a property of another column.
+  const named = uniqueNames(
+    key,
+    (c) => TEMPLATE_VARIABLE.test(c),
+    (c) => c.replace(/[^A-Za-z0-9_]/g, "_"),
+    table.columns.map((c) => c.name),
+  );
+  return key.map((column) => ({ name: named.get(column)!, column }));
 }
+
+/** A path parameter: its template variable, and the key column it carries. */
+interface PathParam {
+  readonly name: string;
+  readonly column: string;
+}
+
+/**
+ * An RFC 6570 variable name, which OpenAPI path templating follows: letters,
+ * digits and `_`, with single dots between (percent-encoding is legal too,
+ * but a column name holding one is rewritten rather than read as an
+ * escape). A column outside it, such as `(ambiguous)` from an unresolved
+ * reference mode, made a path client generators reject (barwise-9g3).
+ */
+const TEMPLATE_VARIABLE = /^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/;

@@ -8,7 +8,7 @@
  * (avro-namespace-from-file-name.spec.md, barwise-1c2).
  */
 
-const SEGMENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+import { AVRO_NAME as SEGMENT, toAvroName } from "@barwise/core/mapping";
 
 /** Whether a namespace is one Avro's specification accepts. */
 export function isAvroNamespace(namespace: string): boolean {
@@ -29,11 +29,6 @@ export function toAvroNamespace(text: string): string {
   if (isAvroNamespace(text)) return text;
   return text
     .split(".")
-    .map((segment) => {
-      const cleaned = [...segment.normalize("NFKD").replace(/\p{M}/gu, "")]
-        .map((ch) => /[A-Za-z0-9_]/.test(ch) ? ch : "_")
-        .join("");
-      return /^[A-Za-z_]/.test(cleaned) ? cleaned : `_${cleaned}`;
-    })
+    .map(toAvroName)
     .join(".");
 }

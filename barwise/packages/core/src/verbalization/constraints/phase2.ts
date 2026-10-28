@@ -19,15 +19,15 @@ import {
 } from "../Verbalization.js";
 import {
   eachReading,
-  extractPredicate,
   forEachReading,
   leadSegs,
   localRole,
   openingReading,
   quantifiedReading,
   resolveCommonPlayer,
+  ringClause,
+  ringReading,
   rolePlayer,
-  UNKNOWN_PREDICATE,
 } from "./sentence.js";
 
 export function verbalizeDisjunctiveMandatory(
@@ -237,20 +237,14 @@ export function verbalizeRing(
   const name3 = refSeg(typeName + "3", typeId);
   const same = refSeg(typeName, typeId);
 
-  const predicate = factType.arity === 2
-    ? extractPredicate(factType, 0, 1)
-    : UNKNOWN_PREDICATE;
-  // "{subject} [does not] {predicate} [determiner] {object}", each lead
-  // before the name in its own role slot (reading-hyphen-binding.spec.md).
+  // The whole reading after the subject, each lead before the name in its
+  // own role slot (reading-hyphen-binding.spec.md).
+  const reading = ringReading(factType, 0, 1);
   const clause = (
     subject: VerbalizationSegment,
     object: VerbalizationSegment,
     options: { readonly negated?: boolean; readonly determiner?: string; } = {},
-  ): VerbalizationSegment[] => [
-    ...predicate.subject(subject),
-    textSeg(` ${options.negated ? "does not " : ""}${predicate.text} ${options.determiner ?? ""}`),
-    ...predicate.object(object),
-  ];
+  ): VerbalizationSegment[] => ringClause(reading, subject, object, options);
 
   switch (ringType) {
     case "irreflexive": {

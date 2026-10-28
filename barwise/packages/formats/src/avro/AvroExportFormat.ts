@@ -18,10 +18,12 @@ import { collectExportAnnotations, type ExportAnnotation } from "@barwise/core/a
 import { generateDdlLineage } from "@barwise/core/lineage";
 import {
   type AvroField,
+  avroFieldNames,
   type AvroSchema,
   type AvroSchemaSet,
   avroSchemaToJson,
   RelationalMapper,
+  type RelationalSchema,
   renderAvro,
   unreportedConstraintSpecs,
   withConstraintSpecs,
@@ -73,7 +75,7 @@ export class AvroExportFormat implements ExportFormatAdapter {
 
     // Inject annotations into doc fields.
     if (annotate && annotations.length > 0) {
-      avroSchemaSet = injectDocAnnotations(avroSchemaSet, annotations);
+      avroSchemaSet = injectDocAnnotations(avroSchemaSet, annotations, schema);
     }
 
     // Build individual files.
@@ -141,7 +143,14 @@ function formatDocAnnotation(severity: "todo" | "note", message: string): string
 function injectDocAnnotations(
   schemaSet: AvroSchemaSet,
   annotations: readonly ExportAnnotation[],
+  schema: RelationalSchema,
 ): AvroSchemaSet {
+  // An annotation names a column; the renderer may have renamed its field
+  // to a valid Avro name (barwise-9g3).
+  const fieldOf = (tableName: string, column: string) => {
+    const table = schema.tables.find((t) => t.name === tableName);
+    return (table ? avroFieldNames(table).get(column) : undefined) ?? column;
+  };
   // Index annotations by PascalCase record name and record::column.
   const recordAnnotations = new Map<string, ExportAnnotation[]>();
   const fieldAnnotations = new Map<string, ExportAnnotation[]>();
@@ -150,7 +159,7 @@ function injectDocAnnotations(
     const recordName = toPascalCase(a.tableName);
 
     if (a.columnName) {
-      const key = `${recordName}::${a.columnName}`;
+      const key = `${recordName}::${fieldOf(a.tableName, a.columnName)}`;
       const existing = fieldAnnotations.get(key) ?? [];
       existing.push(a);
       fieldAnnotations.set(key, existing);

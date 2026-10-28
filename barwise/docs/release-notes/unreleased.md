@@ -175,6 +175,20 @@ identified by a value of its own, a subtype keyed on its supertype link),
 the barwise annotation names its columns in a new `identifiedBy` field,
 and the import reads it.
 
+### Ring sentences, OpenAPI path parameters and Avro field names
+
+- A ring constraint's sentence keeps the reading's text after its second
+  role: "No EntityNode specializes that same EntityNode as supertype." It
+  used to drop "as supertype".
+- An OpenAPI item path names each key parameter with a valid template
+  variable, and an Avro record each field with a valid Avro name. A
+  column named outside those alphabets, such as `(ambiguous)` from an
+  unresolved reference mode, is renamed (`_ambiguous_`), and the
+  parameter's description or the field's doc names the column.
+- The example exports under `examples/transcripts/` are gone. They had
+  drifted from the exporters, and nothing checked them; the CLI's
+  characterization goldens now record and check the same exports.
+
 ### The Ossie import names fields the pinned schema does not define
 
 A field in an Apache Ossie ontology document that the pinned
