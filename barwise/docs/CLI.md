@@ -408,7 +408,9 @@ Options:
 - `--format <ddl|openapi|norma|ossie>` -- source format (required).
   `ossie` reads an Apache Ossie ontology document at version
   `0.2.0.dev0` and refuses any other version; each construct it cannot
-  carry is a warning (`docs/specs/ossie-ontology-format.spec.md`)
+  carry is a warning (`docs/specs/ossie-ontology-format.spec.md`), and so
+  is each field the pinned schema does not define
+  (`docs/specs/ossie-unknown-fields.spec.md`)
 - `--output <file>` -- write .orm.yaml to file instead of stdout
 - `--name <name>` -- model name (defaults to filename)
 - `--infer-references` -- read a column with no declared foreign key
