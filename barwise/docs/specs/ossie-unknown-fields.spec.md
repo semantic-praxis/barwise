@@ -89,7 +89,9 @@ need not exist. This is the convention `@barwise/core` already follows:
 `core/src/serialization/SchemaValidator.ts` imports
 `../../schemas/orm-model.schema.json` with `with { type: "json" }`, which
 from `dist/serialization/` resolves to the same package-level `schemas/`
-directory, and the CLI, MCP and VS Code bundles inline the JSON. dprint
+directory; the unbundled `dist` the CLI and MCP server run from in the
+workspace resolves it the same way, and their esbuild bundles and the VS
+Code extension's inline it. dprint
 already excludes `**/schemas/**`, so the files stay byte-identical to the
 pinned commit. The flights example stays a test fixture; the license note
 moves with the JSON into `schemas/ossie/README.md`.
