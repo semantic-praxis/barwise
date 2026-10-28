@@ -18,9 +18,11 @@ barwise/packages/llm/package.json,
 barwise/packages/mcp/package.json,
 barwise/packages/promptlab/package.json,
 barwise/packages/vscode/package.json,
-+barwise/scripts/tests/vitest-tmp.test.mjs
++barwise/scripts/tests/vitest-tmp.test.mjs,
++barwise/scripts/tests/fixtures/vitest-tmp/one.test.mjs,
+barwise/scripts/tests/expected-counts.json
 
-When a vitest run ends, it shall leave nothing behind in the temp
+When a vitest run completes, it shall leave nothing behind in the temp
 directory. Today every run leaves one `/tmp/<21-character id>/ssr/` folder,
 about 4 MB of transformed modules. On 2026-10-25 a session container held
 about 26,000 of them. The per-session disk allowance ran out, `npm ci` in
@@ -61,17 +63,32 @@ vitest and checks that the temp directory is empty afterwards.
 
 ## Scope
 
-- Every package shall declare `vitest` and `@vitest/coverage-v8` as
-  `^5.0.5`, and the lockfile shall resolve both to 5.0.5. The floor names
-  the first version with the fix, so a fresh resolve cannot pick the
-  leaking one.
-- `scripts/tests/vitest-tmp.test.mjs` shall run one package's vitest on
-  one small test file, with `TMPDIR` set to a new empty directory, and
-  shall fail if the directory is not empty after the run. It runs under
-  `npm run test:scripts`, which CI and the pre-push gate already run.
+- When the lockfile is resolved, `vitest` and `@vitest/coverage-v8`
+  shall resolve to 5.0.5, and every package shall declare both as
+  `^5.0.5`. The floor names the first version with the fix, so a fresh
+  resolve cannot pick a leaking one.
+- When `npm run test:scripts` runs, `scripts/tests/vitest-tmp.test.mjs`
+  shall run vitest on `scripts/tests/fixtures/vitest-tmp/`, with `TMPDIR`
+  set to a new empty directory, and:
+  - fail if vitest does not exit 0 with `1 passed`, because a run that
+    never transformed a module would leave the directory empty without
+    proving anything;
+  - otherwise fail if the directory is not empty.
+- The fixture is one test file that imports only `vitest`. In CI and
+  the pre-push gate, `test:scripts` runs before `npm run build`, so a
+  file that imports a workspace package would fail there for want of
+  `dist`. Prototype on 5.0.1: it runs in about 160 ms and leaves one
+  `<id>/ssr/` folder.
+- The new file is added to `scripts/tests/expected-counts.json`
+  (`npm run test:scripts -- --write`), or the runner refuses it.
 
 Out of scope:
 
+- Interrupted runs. 5.0.5 clears the folder only through `close()`.
+  Its SIGINT and SIGTERM handler, and its teardown-timeout exit, end the
+  process without closing, so Ctrl-C or a cancelled task still leaves a
+  folder. That is far rarer than every completed run, and it is
+  upstream's to fix.
 - Removing folders an earlier version already leaked. They belong to the
   container, not the repository. A fresh session starts clean.
 - Other vitest changes between 5.0.1 and 5.0.5. They are patch releases,
@@ -83,9 +100,11 @@ Out of scope:
 
 The changes above. Each item below is pinned or measured:
 
-- With 5.0.5, the run measured above leaves no new folder in `/tmp`.
-- The new test passes on 5.0.5 and fails on 5.0.1. The red check
-  reinstalls 5.0.1 locally, without committing it.
+- The new test passes on 5.0.5.
+- It fails on 5.0.1. The red check installs `vitest@5.0.1` and
+  `@vitest/coverage-v8@5.0.1` together, with `--no-save` (the
+  coverage plugin's peer dependency is exact), then restores with
+  `npm ci`.
 - The full monorepo suite and coverage pass on the bumped lock.
 
 ## Open decisions
@@ -101,10 +120,14 @@ The changes above. Each item below is pinned or measured:
      changes test isolation across 12 packages to avoid a leak.
 
    Recommend (a).
-2. **What the test runs.** One small test file in `@barwise/learn`, the
-   smallest package with a vitest config (recommended), so the test
-   costs a few seconds. The leak is in vitest's close path, not in what
-   is tested, so any one file shows it.
+2. **What the test runs.**
+   - (a) A fixture that imports only `vitest` (recommended). It needs no
+     build, so it runs where `test:scripts` runs, before `npm run
+     build`.
+   - (b) A real package test file, such as one of `@barwise/learn`'s. That
+     needs core's `dist`, which CI has not built yet at that point.
+
+   Recommend (a).
 
 ## Risks and testing
 
