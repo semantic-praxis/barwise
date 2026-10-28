@@ -949,8 +949,10 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (name: string, kind: string, other: string, otherKind: string, id: string): string =>
         `The ${kind} "${name}" and the ${otherKind} "${other}" would both take the id "${id}" in format 4.0; rename one, or the migration will add a suffix.`,
-      objectified: (name: string, id: string): string =>
-        `The fact type "${name}" has its objectifying object type's name, so both would take the id "${id}" in format 4.0; the migration will rename the fact type to its first reading.`,
+      objectified: (name: string, objectType: string, id: string): string =>
+        `The fact type "${name}" and the object type "${objectType}" that objectifies it would both take the id "${id}" in format 4.0; the migration will rename the fact type to its first reading.`,
+      population: (factType: string, id: string): string =>
+        `Fact type "${factType}" has a role named "population" and a population, which would both take the id "${id}" in format 4.0; the migration will add a suffix to the population. Rename the role to avoid it.`,
     },
   },
   [RULE_ID.duplicateRoleName]: {
@@ -958,8 +960,8 @@ const RULE_DESCRIPTORS = {
     description:
       "Two roles of one fact type share a role name, so in format 4.0, where a role's id is its fact type's and its role name, they would take one id.",
     messages: {
-      default: (factType: string, role: string, id: string): string =>
-        `Fact type "${factType}" has two roles named "${role}"; in format 4.0 both would take the id "${id}", so the migration will add a suffix to the second and new authoring will refuse it. Give one a different role name.`,
+      default: (factType: string, roles: string, id: string): string =>
+        `Fact type "${factType}" has roles ${roles} that would all take the id "${id}" in format 4.0, so the migration will add a suffix to all but the first and new authoring will refuse them. Give each a different role name.`,
     },
   },
   [RULE_ID.encodedLocalName]: {

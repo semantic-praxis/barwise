@@ -287,21 +287,26 @@ build refuses every tracked 3.0 file. No format change.
 
 ### 2. One normalizer and the name checks
 
-`localName()` in `core/src/model/name.ts`, exported from core, and three
-rules in `validation/rules/structural.ts` that preview on 3.x what 4.0 will
+`localName()` in `core/src/model/name.ts`, exported from core with
+`localNameEncodes()`, and three rules in `validation/rules/structural.ts` that preview on 3.x what 4.0 will
 do:
 
 - `structural/local-name-collision` (warning): an object type and a fact
   type, or two of one kind whose names differ, with one local name. An
   objectified fact type named like its objectifying type gets its own
   message, which says the migration will rename the fact type (decision 4);
-- `structural/duplicate-role-name` (warning): two roles of one fact type
-  with the same role name;
-- `structural/encoded-local-name` (info): a name whose local name is more
-  than its whitespace turned to `_`. Information, not a warning, because
+- `structural/duplicate-role-name` (warning): roles of one fact type with
+  one local name, reported once per group; a role named `population` on a
+  populated fact type takes its population's id (decision 7) and is
+  reported as a collision;
+- `structural/encoded-local-name` (info): an object type, fact type or role
+  name whose local name is more than its whitespace turned to `_`. Information, not a warning, because
   an encoded id is correct, only worth seeing once.
 
-No format change. Over the 84 tracked models that load, the rules report
+`localName()` applies Unicode NFC first, as RFC 3987 advises, so names
+that print alike share an id, and keeps exactly RFC 3987's `ucschar`
+beyond ASCII, less the bidirectional formatting characters its section
+4.1 bars. No format change. Over the 84 tracked models that load, the rules report
 exactly the 22 objectified fact types decision 4 names, and nothing else.
 The cross-kind index is the validation rule's own map for now: an
 `OrmModel` store that refuses a held local name is WS6's, where ids become

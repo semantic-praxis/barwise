@@ -2,7 +2,7 @@ import { describeConstraintRepeat } from "../../model/Constraint.js";
 import { isScopedView } from "../../model/DiagramLayout.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
-import { localName } from "../../model/name.js";
+import { localName, localNameEncodes } from "../../model/name.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import { subtypePairKey } from "../../model/SubtypeFact.js";
 import { groupRepeats } from "../../util/groupRepeats.js";
@@ -22,6 +22,8 @@ import { report, RULE_ID } from "../ruleId.js";
  * - No duplicate objectification of the same fact type.
  * - No two constraints share an id.
  * - No two subtype facts relate the same pair.
+ * - What format 4.0 will do to names: ids that would collide, and ids that
+ *   would be percent-encoded (`checkLocalNames`).
  *
  * What is NOT here any more: whether each of those references resolves
  * at all. `graphOf` owns that, so these rules receive a graph in which
@@ -31,7 +33,7 @@ import { report, RULE_ID } from "../ruleId.js";
  * a rule id is a promise to whoever reads validator output.
  *
  * They ship as two exports rather than one, and the split is worth more
- * than it looks. Seven of the ten checks read no reference at all: two
+ * than it looks. Eight of the eleven checks read no reference at all: three
  * compare names, one counts readings, one walks subtype ids as a graph
  * of ids, one checks a diagram's ids, and two compare element ids. Left in the graph-taking export they would be suppressed
  * whenever any id in the model dangled -- and `barwise validate` on a
@@ -222,22 +224,26 @@ function checkDuplicateFactTypeNames(model: OrmModel): Diagnostic[] {
  * modeller sees it before the migration does it
  * (docs/specs/iri-identity.spec.md, WS2). In 4.0 an element's id is its
  * name through `localName`, object types and fact types share one
- * namespace, and a role's id is its fact type's and its role name. So:
+ * namespace, a role's id is its fact type's and its role name, and a
+ * population's is its fact type's and `.population` (decision 7). So:
  *
  * - two object types or fact types whose local names are equal, though
  *   their names are not (an exact repeat within a kind is already
- *   `duplicate-*-name`), collide;
- * - two roles of one fact type with the same role name collide;
+ *   `duplicate-*-name`), collide; a fact type that collides with the type
+ *   objectifying it is decision 4's case, which the migration renames;
+ * - roles of one fact type with one local name collide, reported once per
+ *   group, and so does a role named `population` with its fact type's
+ *   population;
  * - a name whose local name is more than its whitespace turned to `_`
  *   gets an encoded id, which is worth seeing once.
  *
  * Roles of different fact types cannot collide, and no role collides with
- * an object type or a fact type: a role's local name holds a `.` and no
+ * an object type or a fact type: a role's local name holds a `.`, which no
  * other local name can.
  */
 function checkLocalNames(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const objectifying = new Map(
+  const objectifier = new Map(
     model.objectifiedFactTypes.map((o) => [o.factTypeId, o.objectTypeId] as const),
   );
   const elements = [
@@ -247,40 +253,65 @@ function checkLocalNames(model: OrmModel): Diagnostic[] {
   const seen = new Map<string, { kind: string; id: string; name: string; }>();
   for (const e of elements) {
     const local = localName(e.name);
-    if (local !== e.name.trim().replace(/\s+/gu, "_")) {
+    if (localNameEncodes(e.name)) {
       diagnostics.push(report(RULE_ID.encodedLocalName, "default", e.id, e.kind, e.name, local));
     }
     const first = seen.get(local);
     if (!first) {
       seen.set(local, e);
-    } else if (!(first.kind === e.kind && first.name === e.name)) {
-      diagnostics.push(
-        objectifying.get(e.id) === first.id
-          ? report(RULE_ID.localNameCollision, "objectified", e.id, e.name, local)
-          : report(
-            RULE_ID.localNameCollision,
-            "default",
-            e.id,
-            e.name,
-            e.kind,
-            first.name,
-            first.kind,
-            local,
-          ),
-      );
+      continue;
     }
+    if (first.kind === e.kind && first.name === e.name) continue;
+    const objectType = model.getObjectType(objectifier.get(e.id) ?? "");
+    diagnostics.push(
+      objectType && localName(objectType.name) === local
+        ? report(RULE_ID.localNameCollision, "objectified", e.id, e.name, objectType.name, local)
+        : report(
+          RULE_ID.localNameCollision,
+          "default",
+          e.id,
+          e.name,
+          e.kind,
+          first.name,
+          first.kind,
+          local,
+        ),
+    );
   }
+
+  const populated = new Set(model.populations.map((p) => p.factTypeId));
   for (const ft of model.factTypes) {
-    const roles = new Set<string>();
+    const ftLocal = localName(ft.name);
+    const groups = new Map<string, { id: string; name: string; }[]>();
     for (const role of ft.roles) {
       const local = localName(role.name);
-      if (roles.has(local)) {
-        const id = `${localName(ft.name)}.${local}`;
+      if (localNameEncodes(role.name)) {
         diagnostics.push(
-          report(RULE_ID.duplicateRoleName, "default", role.id, ft.name, role.name, id),
+          report(
+            RULE_ID.encodedLocalName,
+            "default",
+            role.id,
+            "role",
+            role.name,
+            `${ftLocal}.${local}`,
+          ),
         );
       }
-      roles.add(local);
+      groups.set(local, [...(groups.get(local) ?? []), { id: role.id, name: role.name }]);
+    }
+    for (const [local, roles] of groups) {
+      const id = `${ftLocal}.${local}`;
+      if (roles.length > 1) {
+        const names = roles.map((r) => `"${r.name}"`).join(", ");
+        diagnostics.push(
+          report(RULE_ID.duplicateRoleName, "default", roles[1]!.id, ft.name, names, id),
+        );
+      }
+      if (local === "population" && populated.has(ft.id)) {
+        diagnostics.push(
+          report(RULE_ID.localNameCollision, "population", roles[0]!.id, ft.name, id),
+        );
+      }
     }
   }
   return diagnostics;
