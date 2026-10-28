@@ -15,6 +15,7 @@
     "python-uv-guard.test.mjs": 32,
     "session-start.test.mjs": 7,
     "spec-reader.test.mjs": 17,
-    "tracker-conflicts.test.mjs": 20
+    "tracker-conflicts.test.mjs": 20,
+    "vitest-tmp.test.mjs": 1
   }
 }
