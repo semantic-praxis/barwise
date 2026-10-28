@@ -85,6 +85,12 @@
       "caught_by": "execution",
       "note": "Writing the test is what surfaced it: classifyChange returned the literal \"caution\" for both a deliberate caution and an unrecognized string, so no test could distinguish them. Split into classifyKnownChange returning BreakingLevel | undefined."
     },
+    "composite-foreign-key-round-trip::f6798b7cf08e": {
+      "spec": "composite-foreign-key-round-trip.spec.md",
+      "excerpt": "- models imported from ddl with a multi-column foreign key outside the key change shape: one reference instead of several. that is the fix, and the release note",
+      "caught_by": "not-a-correction",
+      "note": "A Risks bullet describing the intended change of shape, not a correction of the draft."
+    },
     "core-branching-load::09caa79b9010": {
       "spec": "core-branching-load.spec.md",
       "excerpt": "shipped (barwise-935). ringproperty and ringproperties sit beside ringtype; population/ring.ts holds one checker per property and words findings from a record<r",

@@ -492,7 +492,7 @@ describe("a one-to-one between two entities", () => {
     ).toBe(false);
   });
 
-  it("reads a UNIQUE over a composite foreign key once, as step 3b's external uniqueness", () => {
+  it("reads a UNIQUE over a composite foreign key as its one reference's one-to-one", () => {
     const { model } = ddl.parse(`
       CREATE TABLE assignment (seat_id INTEGER NOT NULL, flight_id INTEGER NOT NULL, PRIMARY KEY (seat_id, flight_id));
       CREATE TABLE ticket (
@@ -516,6 +516,10 @@ describe("a one-to-one between two entities", () => {
           && f.getRoleById(c.roleIds[0]!)!.playerId !== ticket.id
         )
       );
-    expect(farUniques).toEqual([]);
+    // One reference over both columns, unique on the assignment side, and
+    // no external uniqueness beside it (composite-foreign-key-round-trip.spec.md).
+    expect(farUniques).toHaveLength(1);
+    expect(model.everyConstraint().filter(([c]) => c.type === "external_uniqueness"))
+      .toHaveLength(1); // assignment's own key
   });
 });

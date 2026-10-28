@@ -11,7 +11,7 @@ import {
   resolveColumnType,
 } from "./columnTypes.js";
 import { compositeRoleColumns } from "./compositeKeys.js";
-import type { DbtMapperContext } from "./context.js";
+import { type DbtMapperContext, readsAsReference } from "./context.js";
 import { toPascalCase } from "./naming.js";
 
 export function createValueTypes(ctx: DbtMapperContext): void {
@@ -20,8 +20,11 @@ export function createValueTypes(ctx: DbtMapperContext): void {
     if (!entityId) continue;
 
     const pk = ctx.pkMap.get(m.name);
-    const rels = ctx.relMap.get(m.name) ?? [];
-    const relColNames = new Set(rels.map((r) => r.columnName));
+    // A column of a reference read as a fact type is that reference's
+    // (factTypes.ts); a multi-column one with no entity to point at is read
+    // as values (readsAsReference).
+    const rels = (ctx.relMap.get(m.name) ?? []).filter((r) => readsAsReference(ctx, r));
+    const relColNames = new Set(rels.flatMap((r) => r.columns));
     const roleCols = compositeRoleColumns(ctx, m.name);
     const entityName = toPascalCase(m.name);
 

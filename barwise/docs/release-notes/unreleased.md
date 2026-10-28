@@ -89,3 +89,28 @@ warning resolved before the move to Fusion (dbt 2.x). A project on dbt
 `require_generic_test_arguments_property: true`. One before 1.10.5
 cannot read it. Re-importing a project in either form gives the same
 model.
+
+### A foreign key over several columns round-trips as one reference
+
+- **dbt export.** A foreign key over several columns used to be dropped,
+  because dbt's `relationships` test takes one column. It is now written
+  as a model-level `foreign_key` constraint, which needs dbt 1.9 or later.
+  No contract is written, so dbt records the constraint without enforcing
+  it, and the models build as before. Re-importing the project reads it as
+  one reference.
+- **DDL import.** A foreign key over several columns outside the table's
+  key used to import as one reference per column, so
+  `claim (policy_id, term_number)` gained two references to
+  `policy_period`. It now imports as one. It is mandatory when every
+  column is NOT NULL, and one-to-one when its columns are a UNIQUE of the
+  table. A model imported earlier keeps its extra references until it is
+  imported again.
+- **Some UNIQUEs and keys are now refused with a warning.** A UNIQUE, or a
+  composite PRIMARY KEY, over part of such a foreign key, or over a column
+  two foreign keys share, used to import as a constraint on a reference
+  that did not exist. It is now refused with a warning naming the
+  columns, as a UNIQUE over part of a relationship's role already was.
+- **A key that is one foreign key.** A DDL table or dbt model whose key is
+  exactly one multi-column foreign key imports as an entity with a key of
+  its own and a one-to-one reference. The dbt importer used to find no
+  identifier and skip such a model.
