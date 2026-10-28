@@ -69,17 +69,14 @@ export interface RingReading {
   readonly subjectIndex: number;
   readonly subjectLead: string;
   readonly rest: readonly ReadingPart[];
-  /** False for a reading taken backwards, whose leads belong to the other noun. */
-  readonly leads: boolean;
 }
 
 /**
  * The ring reading of a binary fact type: the first reading that names the
  * subject role before the object role. When none does, the first reading
- * is taken by placeholder position, its first placeholder the subject,
- * with no leads: a lead there belongs to whichever noun the reading put
- * after it. That reads the fact backwards, which the ring sentence is
- * unchanged by.
+ * is taken by placeholder position, its first placeholder the subject.
+ * That reads the fact backwards, which the ring sentence is unchanged by;
+ * each lead stays with the name in its own slot.
  */
 export function ringReading(
   factType: FactType,
@@ -96,7 +93,6 @@ export function ringReading(
         subjectIndex: subjectIdx,
         subjectLead: leadOf(parts[s]),
         rest: parts.slice(s + 1),
-        leads: true,
       };
     }
   }
@@ -104,7 +100,7 @@ export function ringReading(
   const a = first?.findIndex((p) => p.kind === "role") ?? -1;
   const opener = first?.[a];
   if (opener?.kind === "role" && first!.slice(a + 1).some((p) => p.kind === "role")) {
-    return { subjectIndex: opener.index, subjectLead: "", rest: first!.slice(a + 1), leads: false };
+    return { subjectIndex: opener.index, subjectLead: opener.lead, rest: first!.slice(a + 1) };
   }
   return UNKNOWN_RING_READING;
 }
@@ -114,7 +110,6 @@ const UNKNOWN_RING_READING: RingReading = {
   subjectIndex: 0,
   subjectLead: "",
   rest: [{ kind: "text", text: " ... " }, { kind: "role", index: 1, lead: "" }],
-  leads: false,
 };
 
 /**
@@ -139,11 +134,14 @@ export function ringClause(
       if (!endsInSpace()) segments.push(textSeg(" "));
       const own = part.index === reading.subjectIndex;
       if (!own && options.determiner) segments.push(textSeg(options.determiner));
-      segments.push(...leadSegs(reading.leads ? part.lead : ""), own ? subject : object);
+      segments.push(...leadSegs(part.lead), own ? subject : object);
       return;
     }
-    let text = i === last ? part.text.trimEnd().replace(/\.$/, "") : part.text;
+    let text = i === last ? part.text.trimEnd().replace(/\.$/, "").trimEnd() : part.text;
+    // One space at most between a name and the text after it, however many
+    // the reading wrote.
     if (endsInSpace()) text = text.trimStart();
+    else if (/^\s/.test(text)) text = " " + text.trimStart();
     else if (/^[\p{L}\p{N}]/u.test(text)) text = " " + text;
     if (text) segments.push(textSeg(text));
   });

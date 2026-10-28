@@ -62,7 +62,7 @@
     {
       "name": "_ambiguous_",
       "type": "string",
-      "doc": "Primary key. The column \"(ambiguous)\"."
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     },
     {
       "name": "start_position",
@@ -139,7 +139,7 @@
     {
       "name": "_ambiguous_",
       "type": "string",
-      "doc": "Primary key. The column \"(ambiguous)\"."
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     }
   ],
   "doc": "[NOTE(barwise): Definition available from ORM model: \"A decision made by a reviewer on a single finding, recording the decision typ...\"]"
@@ -266,7 +266,7 @@
     {
       "name": "_ambiguous_",
       "type": "string",
-      "doc": "Primary key. The column \"(ambiguous)\"."
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     }
   ],
   "doc": "[NOTE(barwise): Composite primary key (scan_version, (ambiguous)): unique as a combination.]"
@@ -282,7 +282,7 @@
     {
       "name": "_ambiguous_",
       "type": "string",
-      "doc": "Primary key. The column \"(ambiguous)\"."
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     },
     {
       "name": "employee_id",
@@ -303,12 +303,12 @@
     {
       "name": "_ambiguous_",
       "type": "string",
-      "doc": "Primary key. The column \"(ambiguous)\"."
+      "doc": "Primary key. The column \"(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     },
     {
       "name": "has_decision_about__ambiguous_",
       "type": "string",
-      "doc": "Primary key. The column \"has_decision_about_(ambiguous)\"."
+      "doc": "Primary key. The column \"has_decision_about_(ambiguous)\". [TODO(barwise): No column description. Add a definition to the value type.] [TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.]"
     }
   ],
   "doc": "[NOTE(barwise): Composite primary key ((ambiguous), has_decision_about_(ambiguous)): unique as a combination.]"

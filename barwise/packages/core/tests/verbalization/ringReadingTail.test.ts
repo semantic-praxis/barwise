@@ -61,6 +61,18 @@ describe("a ring sentence keeps the reading's text outside its placeholders", ()
     expect(ring("the {0} precedes {1}", "irreflexive")).toBe("No Node precedes that same Node.");
   });
 
+  it("writes one space where the reading wrote several", () => {
+    expect(ring("{0}  reports to {1} .", "asymmetric")).toBe(
+      "If Node1 reports to Node2 then Node2 does not reports to Node1.",
+    );
+  });
+
+  it("keeps each lead with the name in its slot when the reading is taken backwards", () => {
+    expect(ring("{1} is mentored by senior- {0}", "irreflexive")).toBe(
+      "No Node is mentored by that same senior Node.",
+    );
+  });
+
   it("reads a reading with no subject-first order by placeholder position", () => {
     expect(ring("{1} follows {0} in sequence", "irreflexive")).toBe(
       "No Node follows that same Node in sequence.",

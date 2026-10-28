@@ -855,7 +855,7 @@ describe("Phase 2 constraint verbalization", () => {
       expect(v[0]!.text).toContain("'Promotion is active' role");
     });
 
-    it("extractPredicate uses fallback when reading order does not match subject/object", () => {
+    it("the ring reading falls back to placeholder order when no reading names the subject first", () => {
       // Build a fact type where the reading template has {1} before {0}.
       const model = new OrmModel({ name: "Test" });
       const a = model.addObjectType({ name: "Alpha", kind: "entity", referenceMode: "a_id" });
@@ -872,9 +872,9 @@ describe("Phase 2 constraint verbalization", () => {
         ],
       });
 
-      // The ring sentence is extractPredicate's one caller: with subjectIdx=0
-      // and objectIdx=1 and only {1} before {0}, the primary path fails and
-      // the fallback takes the text between the two placeholders as written.
+      // With subjectIdx=0 and objectIdx=1 and only {1} before {0}, no reading
+      // names the subject first, and ringReading takes the first reading by
+      // placeholder position.
       const v = verbalizer.verbalizeAll(ft.id, model);
       expect(v.map((x) => x.text)).toEqual(["No Alpha is linked from that same Alpha."]);
     });

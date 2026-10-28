@@ -24,6 +24,7 @@
 import { renderPopulationAsOpenApiExamples } from "../../export/populationRenderer.js";
 import type { OrmModel } from "../../model/OrmModel.js";
 import type { RelationalSchema, Table } from "../RelationalSchema.js";
+import { uniqueNames } from "./names.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -419,21 +420,14 @@ function normalizePath(path: string): string {
 function primaryKeyParams(table: Table): readonly PathParam[] {
   const key = table.primaryKey.columnNames;
   if (key.length === 0) return [{ name: "id", column: "id" }];
-  // A valid name is kept, and reserved first, so a renamed column never
-  // takes it; any column's name counts as taken, so a path parameter
-  // cannot share a name with a property of another column.
-  const taken = new Set(table.columns.map((c) => c.name));
-  const named = new Map(key.filter((c) => TEMPLATE_VARIABLE.test(c)).map((c) => [c, c]));
-  for (const column of key) {
-    if (named.has(column)) continue;
-    const base = column.replace(/[^A-Za-z0-9_]/g, "_");
-    let name = base;
-    for (let n = 2; taken.has(name) || [...named.values()].includes(name); n++) {
-      name = `${base}_${n}`;
-    }
-    named.set(column, name);
-    taken.add(name);
-  }
+  // Every column's name counts as taken, so a path parameter cannot share
+  // a name with a property of another column.
+  const named = uniqueNames(
+    key,
+    (c) => TEMPLATE_VARIABLE.test(c),
+    (c) => c.replace(/[^A-Za-z0-9_]/g, "_"),
+    table.columns.map((c) => c.name),
+  );
   return key.map((column) => ({ name: named.get(column)!, column }));
 }
 
