@@ -1,6 +1,6 @@
 # The Ossie export reports what it cannot write, precisely
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -9,8 +9,9 @@ Plan-reviewed: 7acdf232 (code-review, pr-review)
 Touches: barwise/packages/formats/src/ossie/writeOssie.ts,
 barwise/packages/formats/src/ossie/verifyOssie.ts,
 barwise/packages/formats/src/ossie/OssieExportFormat.ts,
+barwise/packages/core/src/diff/index.ts,
 barwise/packages/formats/tests/OssieExportFormat.test.ts,
-barwise/packages/formats/tests/OssieVerify.test.ts,
++barwise/packages/formats/tests/OssieLossScope.test.ts,
 barwise/docs/specs/ossie-export-verified-by-reimport.spec.md
 
 When the Ossie export meets something it cannot write, it shall say so
@@ -119,7 +120,7 @@ not explain hides exactly the defect the check was built to find.
   | `no data type; written as String`                                       | `dataTypeAdded`                          |
   | `data type ... written as ...`, `data type length or scale not written` | `dataTypeChanged`                        |
   | `value constraint is not a shape ...`                                   | `valueConstraint`                        |
-  | `no identifier Ossie can state; reference mode ... not written`         | `referenceMode`, `preferredIdentifier`   |
+  | `no identifier Ossie can state; reference mode ... not written`         | `referenceMode`                          |
   | `reference mode ... not written` (two sites)                            | `referenceMode`                          |
   | `its preferred identifier is not one Ossie's identify_by can name`      | `preferredIdentifier`                    |
   | `written as <name>, a name Ossie can read back`                         | `name`                                   |
@@ -150,6 +151,56 @@ Out of scope:
 - Changing what Student's export writes. The new line reports it, and
   whether it is right is the barwise-alg question that is already
   decided.
+
+## Implementation notes
+
+- As planned, with one row narrowed. The "no identifier Ossie can state"
+  line was planned to explain `referenceMode` and `preferredIdentifier`.
+  Implementation found the second one spare:
+  - an entity whose stored identifier cannot be written always also gets
+    the "its preferred identifier is not one Ossie's identify_by can
+    name" line;
+  - an entity with no stored identifier has no identifier change to
+    explain.
+
+  Over the corpus, dropping it changes no output. A narrower row can
+  only add a line, never hide one, so the row explains `referenceMode`
+  alone.
+- Measured through the export, before and after, over the 84 tracked
+  models that load:
+  - `validation-errors.orm.yaml` exports instead of throwing, with the
+    one stray-role line;
+  - there is one new read-back line, Student's preferred identifier;
+  - nothing else changes.
+- `OssieExportFormat.test.ts`'s ring test built its constraint with
+  `roleIds`, a field `RingConstraint` does not have. Its roles were
+  never real role ids, so the stray-role filter caught it. The fixture
+  now uses `roleId1` and `roleId2`, and what it asserts is unchanged.
+- `OssieLossScope.test.ts` holds the table to the diff. Each case checks
+  that the line's set is wide enough (no line on the element) and that
+  no kind in it is spare (each one, taken out, leaves a line). Seen red:
+  - making every line cover its element whole fails every row case
+    and the barwise-huw case;
+  - adding `name` to the aliases row fails that row;
+  - keeping the stray constraint fails the barwise-5x3 case.
+
+- Implementation review:
+  - The stray-role line explains `constraintsRemoved` only. Covering its
+    fact type whole would have silenced any other difference there, the
+    defect this spec removes. It is the one scoped fact-type line, and
+    the corpus output is unchanged by it.
+  - The drift test now has a case for every row and every call site the
+    first version missed: the preferred-identifier line, the reordered
+    note, the three notes that would read back as something else, and
+    the subtype's reference mode. That is 21 cases in all.
+  - `ChangeKind` is core's own, now exported from `@barwise/core/diff`,
+    not a second definition in the writer.
+  - The barwise-5x3 test pins the one constraint spec, not "at least one".
+  - Declined: narrowing `Explains` on object-type lines to the
+    object-type change kinds. That is a second hand-kept list of the same
+    facts the table holds. A wrong kind on a row already fails that
+    row's "wide enough" check, because the kind the line really causes
+    is left unexplained.
 
 ## Open decisions
 

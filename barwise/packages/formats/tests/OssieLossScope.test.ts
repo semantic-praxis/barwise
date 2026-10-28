@@ -10,12 +10,13 @@
  * with any one kind taken out it does (no kind in the set is spare).
  */
 import { OrmModel } from "@barwise/core";
+import type { ChangeKind } from "@barwise/core/diff";
 import { describe, expect, it } from "vitest";
 import { stringify } from "yaml";
 import { OssieExportFormat } from "../src/ossie/OssieExportFormat.js";
 import { OssieImportFormat } from "../src/ossie/OssieImportFormat.js";
 import { verifyOssie } from "../src/ossie/verifyOssie.js";
-import { type ChangeKind, lossKey, writeOssie } from "../src/ossie/writeOssie.js";
+import { lossKey, writeOssie } from "../src/ossie/writeOssie.js";
 
 let seq = 0;
 const id = (tag: string) => `${tag}-${++seq}`;
@@ -63,6 +64,16 @@ function coded(config: Partial<Config> = {}): { m: OrmModel; otId: string; } {
   });
   m.setPreferredIdentifier(thing.id, pid);
   return { m, otId: thing.id };
+}
+
+/** Student, a subtype of Thing that takes its identifier from Thing. */
+function subtype(config: Partial<Config>): { m: OrmModel; otId: string; } {
+  const { m, otId: thingId } = coded();
+  const student = m.addObjectType(
+    { id: id("ot"), name: "Student", kind: "entity", ...config } as Config,
+  );
+  m.addSubtypeFact({ subtypeId: student.id, supertypeId: thingId, providesIdentification: true });
+  return { m, otId: student.id };
 }
 
 const value = (config: Partial<Config>) =>
@@ -151,6 +162,46 @@ const CASES: readonly {
     line: /^Thing: reference mode thing_number not written/,
     explains: ["referenceMode"],
     model: () => coded({ referenceMode: "thing_number" }),
+  },
+  {
+    line: /note comes back reordered/,
+    explains: ["note"],
+    model: () => coded({ note: "derived_by: a\n\nderived_by: b" }),
+  },
+  {
+    line: /note line not written, it would read back as a mandatory role/,
+    explains: ["note"],
+    model: () => coded({ note: "requires: Thing.thing_code" }),
+  },
+  {
+    // A stored identifier that is not one: the uniqueness on Thing's own
+    // role. Its line and the no-identifier line fire together.
+    line: /its preferred identifier is not one Ossie's identify_by can name/,
+    explains: ["preferredIdentifier", "referenceMode"],
+    model: () => {
+      const c = coded();
+      const ft = c.m.factTypes[0]!;
+      const near = ft.internalConstraints.find((k) =>
+        k.type === "internal_uniqueness" && k.roleIds[0] === ft.roles[0]!.id
+      )!;
+      c.m.setPreferredIdentifier(c.otId, near.id!);
+      return c;
+    },
+  },
+  {
+    line: /^Student: reference mode student_number not written/,
+    explains: ["referenceMode"],
+    model: () => subtype({ referenceMode: "student_number" }),
+  },
+  {
+    line: /note line not written: derived_by/,
+    explains: ["note"],
+    model: () => subtype({ referenceMode: "student_id", note: "derived_by: enrolled" }),
+  },
+  {
+    line: /note line not written, it would read back as a constraint/,
+    explains: ["note"],
+    model: () => value({ note: "requires: Code == 'A'" }),
   },
   {
     line: /written as A_B, a name Ossie can read back/,
@@ -279,6 +330,8 @@ describe("Ossie export: a constraint naming another fact type's role (barwise-5x
     expect(stray).toEqual([
       "# barwise: fact type Person has Age: internal_uniqueness names a role that is not one of this fact type's roles; not written",
     ]);
-    expect(result.constraintSpecs?.length).toBeGreaterThan(0);
+    // Its one spec, the stray uniqueness: the other loss lines name no constraint.
+    expect(result.constraintSpecs).toHaveLength(1);
+    expect(result.constraintSpecs![0]!.verbalization).toMatch(/Person/);
   });
 });

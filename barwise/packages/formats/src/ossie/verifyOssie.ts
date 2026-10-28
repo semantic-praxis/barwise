@@ -17,10 +17,10 @@ import {
   writeDocument,
 } from "@barwise/core";
 import { buildConstraintSpec } from "@barwise/core/annotation";
-import { deltaLabel, diffModels, type ModelDelta } from "@barwise/core/diff";
+import { type ChangeKind, deltaLabel, diffModels, type ModelDelta } from "@barwise/core/diff";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
 import { stringify } from "yaml";
-import { type ChangeKind, lossKey, type OssieCorrespondence } from "./writeOssie.js";
+import { lossKey, type OssieCorrespondence } from "./writeOssie.js";
 
 export interface OssieVerifyResult {
   /** One line per element that comes back different, unreported before. */
@@ -51,13 +51,11 @@ export function verifyOssie(
     const covered = key === undefined ? undefined : covers.get(key);
     if (covered === "all") continue;
     let changes = delta.changeDescriptions;
-    if (covered !== undefined) {
-      // A scoped line explains changes, never an element that does not come
-      // back or comes back added.
-      if (delta.kind === "modified" && "changes" in delta) {
-        changes = delta.changeDescriptions.filter((_, i) => !covered.has(delta.changes[i]!.change));
-        if (changes.length === 0) continue;
-      }
+    // A scoped line explains changes, never an element that does not come
+    // back or comes back added.
+    if (covered !== undefined && delta.kind === "modified") {
+      changes = delta.changeDescriptions.filter((_, i) => !covered.has(delta.changes[i]!.change));
+      if (changes.length === 0) continue;
     }
     losses.push(line(delta, changes));
     if (delta.kind === "removed" && delta.elementType === "constraint" && delta.existing) {

@@ -26,7 +26,7 @@ import {
   roleIdsOf,
 } from "@barwise/core";
 import { buildConstraintSpec } from "@barwise/core/annotation";
-import type { ChangeDescription, ElementType } from "@barwise/core/diff";
+import type { ChangeKind, ElementType } from "@barwise/core/diff";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
 import { snakeCase } from "../naming.js";
 import {
@@ -82,8 +82,6 @@ type OtherLossKey =
   // note, domain context) are checked by the writer's predictions alone.
   | { readonly kind: "model"; };
 
-/** A kind of change `diffModels` reports on an element. */
-export type ChangeKind = ChangeDescription["change"];
 /** The changes a loss line explains: some kinds, or every difference on its element. */
 type Explains = readonly ChangeKind[] | "all";
 
@@ -163,12 +161,17 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       explains === "all" || held === "all" ? "all" : new Set([...(held ?? []), ...explains]),
     );
   };
-  const loseConstraint = (inView: ConstraintInView, element: string, what: string): void => {
+  const loseConstraint = (
+    inView: ConstraintInView,
+    element: string,
+    what: string,
+    explains: Explains = "all",
+  ): void => {
     const [c, ft] = inView;
     const key: OtherLossKey = ft
       ? { kind: "fact_type", id: ft.id }
       : { kind: "constraint", id: c.id! };
-    lose(element, what, key);
+    lose(element, what, key, explains);
     specs.push(buildConstraintSpec(inView, model, verbalizer));
   };
 
@@ -186,15 +189,19 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     // A constraint naming another fact type's role is reported here, once,
     // and read by nothing else: its role has no index in this fact type,
     // and looking one up crashed the writer (barwise-5x3).
-    const own = ft.internalConstraints.filter((c) =>
-      roleIdsOf(c).every((id) => ft.roles.some((r) => r.id === id))
-    );
+    const own: OwnConstraints[number][] = [];
     for (const c of ft.internalConstraints) {
-      if (own.includes(c)) continue;
+      if (roleIdsOf(c).every((id) => ft.roles.some((r) => r.id === id))) {
+        own.push(c);
+        continue;
+      }
+      // It explains only its own absence, so another difference on the
+      // fact type is still reported.
       loseConstraint(
         [c, ft],
         `fact type ${ft.name}`,
         `${c.type} names a role that is not one of this fact type's roles; not written`,
+        ["constraintsRemoved"],
       );
     }
     const order = roleOrder(ft, own, model, isBuiltin, identifiers);
@@ -532,6 +539,7 @@ function roleOrder(
 
   // `X.rel`: X is the longest player name the fact type name begins with,
   // followed by a dot, so a concept named with a dot is found whole.
+  let idRole: number | undefined;
   let xRole = -1;
   let xLength = -1;
   ft.roles.forEach((r, i) => {
@@ -543,8 +551,8 @@ function roleOrder(
   });
   if (xRole >= 0) {
     order = first(xRole);
-  } else if (n === 2 && identifierRole(ft, own, model, identifiers) !== undefined) {
-    order = first(1 - identifierRole(ft, own, model, identifiers)!);
+  } else if (n === 2 && (idRole = identifierRole(ft, own, model, identifiers)) !== undefined) {
+    order = first(1 - idRole);
   } else if (n === 2 && new Set(singles).size === 1) {
     order = first(singles[0]!);
   } else if (n >= 3) {
