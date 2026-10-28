@@ -37,6 +37,7 @@ import {
   subtypeConstraintsFromFlags,
   type ValueConstraintDef,
 } from "@barwise/core";
+import { objectificationGivesKey } from "@barwise/core/mapping";
 import { parseSqlDataType, parseValuePredicate } from "@barwise/core/sql";
 import {
   type ColumnAnnotation,
@@ -422,6 +423,12 @@ export class DdlImportFormat implements ImportFormat {
     for (const table of accepted) {
       const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
       const found = annotations.tables.get(tableKey(table.name));
+      // A key the objectified relationship gives is that relationship's; a
+      // typed identifier or a subtype fact over it as well would give the
+      // entity a second key, which exports as a second column and a UNIQUE
+      // on it (barwise-i3r).
+      const objectifiedKey = entity !== undefined
+        && keyIdentifiedByObjectification(model, table, entity, consumed);
       const declared = entity && found?.kind === "table" && found.entity === entity.name
         ? found.supertypes
         : undefined;
@@ -441,12 +448,13 @@ export class DdlImportFormat implements ImportFormat {
         );
         if (kept.size > 0 || declared.length === 0) {
           subtypeLinks.set(tableKey(table.name), kept.columns);
-          if (kept.identifiedByKey) continue;
+          if (kept.identifiedByKey || objectifiedKey) continue;
           const binary = this.createKeyIdentifier(model, entity, table, annotations, warnings);
           if (binary) binaries.set(columnKey(table.name, table.primaryKey[0]!), binary);
           continue;
         }
       }
+      if (objectifiedKey) continue;
       const sub = entity ? subtypeReading(table, byKey) : undefined;
       if (sub && "candidates" in sub) {
         warnings.push(
@@ -1788,6 +1796,29 @@ function skipDefaultExpression(text: string): string {
 interface CompositeReading {
   readonly roles: readonly string[][];
   readonly objectified: boolean;
+}
+
+/**
+ * Whether the table's one key column is a role of the fact type its entity
+ * objectifies, built in step 1b, and that fact type gives the table its
+ * key, by the mapper's own rule (`objectificationGivesKey`). A fact type
+ * over values alone does not, so its table keeps its typed identifier.
+ * Asked of the model as well as `consumed`, which is keyed by unqualified
+ * table name.
+ */
+function keyIdentifiedByObjectification(
+  model: OrmModel,
+  table: ParsedTable,
+  entity: ObjectType,
+  consumed: ReadonlyMap<string, ReadonlyMap<string, Binary>>,
+): boolean {
+  if (table.primaryKey.length !== 1) return false;
+  const binary = consumed.get(tableKey(table.name))?.get(table.primaryKey[0]!);
+  if (!binary) return false;
+  const objectifies = model.objectifiedFactTypes.some((o) =>
+    o.objectTypeId === entity.id && o.factTypeId === binary.factType.id
+  );
+  return objectifies && objectificationGivesKey(binary.factType.id, model);
 }
 
 /** Whether two column lists name the same columns, in any order. */

@@ -67,6 +67,20 @@ export interface RelationalMapperOptions {
   readonly preferredIdentifierStrategy?: PreferredIdentifierStrategy;
 }
 
+/**
+ * Whether the table of the entity that objectifies this fact type is keyed
+ * on the fact type's roles: when an entity plays one of them, so the key
+ * is a reference the table absorbs. Otherwise the entity keeps its own
+ * reference-mode column. The DDL importer asks the same question of a
+ * table it reads back (objectified-key-identifier.spec.md, barwise-i3r),
+ * so it is one function both call.
+ */
+export function objectificationGivesKey(factTypeId: string, model: OrmModel): boolean {
+  const factType = model.getFactType(factTypeId);
+  return factType !== undefined
+    && factType.roles.some((role) => model.getObjectType(role.playerId)?.kind === "entity");
+}
+
 export class RelationalMapper {
   /**
    * Map an ORM model to a relational schema.
@@ -249,10 +263,7 @@ export class RelationalMapper {
    * columns, so there would be nothing for the key to be.
    */
   private absorbsAKey(oft: ObjectifiedFactType | undefined, model: OrmModel): boolean {
-    if (!oft) return false;
-    const factType = model.getFactType(oft.factTypeId);
-    if (!factType) return false;
-    return factType.roles.some((role) => model.getObjectType(role.playerId)?.kind === "entity");
+    return oft !== undefined && objectificationGivesKey(oft.factTypeId, model);
   }
 
   /**

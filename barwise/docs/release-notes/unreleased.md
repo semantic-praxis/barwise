@@ -135,3 +135,11 @@ model.
   combination test beside the key as the uniqueness the DDL importer reads
   for the same UNIQUE. Before, those were reported for manual review. A
   project without `primary_key` keeps the old key guess.
+
+### An annotated DDL round trip no longer adds a key column
+
+A table whose entity objectifies a relationship keyed on one column, such
+as a work order keyed on its batch, used to come back from a DDL export
+with barwise annotations carrying a second identifier. The next export
+then wrote an extra column for it, with a UNIQUE. The import now leaves
+the key to the relationship, so the table exports as it did before.

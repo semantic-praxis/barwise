@@ -1,9 +1,11 @@
 /**
  * Every uniqueness the DDL export writes as a UNIQUE clause comes back from
- * a dbt export and re-import (dbt-alternate-uniqueness.spec.md). Before,
+ * a dbt export and re-import (dbt-alternate-uniqueness.spec.md), and from
+ * both DDL round trips (objectified-key-identifier.spec.md). Before,
  * the dbt export wrote a test only for each table's key, so all of them
  * were lost: every one of these 24 tracked models came back with none. It
- * lives here because cli is the one package that depends on core and dbt.
+ * lives in cli, the one package that depends on both formats and dbt, so
+ * the three round trips are held to one description of the same models.
  *
  * Each UNIQUE is described without names, which can change on re-import (a
  * relationship's column is renamed for its player): per column, whether it
@@ -15,6 +17,7 @@
 import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { RelationalMapper, routeUniqueOnly } from "@barwise/core/mapping";
 import { DbtExportFormat, importDbtProject } from "@barwise/dbt";
+import { DdlExportFormat, DdlImportFormat } from "@barwise/formats";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -71,14 +74,32 @@ function dbtRoundTrip(model: OrmModel): OrmModel {
   return importDbtProject([schemaYaml]).model;
 }
 
-describe("a dbt round trip keeps every uniqueness the DDL export writes", () => {
+/**
+ * The DDL round trips are held to the same descriptions. The annotated one
+ * gained a UNIQUE in four of these models, on an objectified relationship
+ * keyed on one column, until barwise-i3r (objectified-key-identifier.spec.md).
+ */
+const ROUND_TRIPS: Record<string, (m: OrmModel) => OrmModel> = {
+  dbt: dbtRoundTrip,
+  "DDL with annotations": (m) =>
+    new DdlImportFormat().parse(new DdlExportFormat().export(m).text).model,
+  "DDL without annotations": (m) =>
+    new DdlImportFormat().parse(new DdlExportFormat().export(m, { annotate: false }).text).model,
+};
+
+const load = (file: string) =>
+  new OrmYamlSerializer().deserialize(readFileSync(resolve(ROOT, file), "utf8"));
+
+describe("a round trip keeps every uniqueness the DDL export writes", () => {
   for (const file of MODELS) {
-    it(file, () => {
-      const model = new OrmYamlSerializer().deserialize(readFileSync(resolve(ROOT, file), "utf8"));
-      const before = uniques(model);
-      // Not vacuous: each listed model has one.
-      expect(before.length).toBeGreaterThan(0);
-      expect(uniques(dbtRoundTrip(model))).toEqual(before);
-    });
+    for (const [way, trip] of Object.entries(ROUND_TRIPS)) {
+      it(`${file}, through ${way}`, () => {
+        const model = load(file);
+        const before = uniques(model);
+        // Not vacuous: each listed model has one.
+        expect(before.length).toBeGreaterThan(0);
+        expect(uniques(trip(model))).toEqual(before);
+      });
+    }
   }
 });
