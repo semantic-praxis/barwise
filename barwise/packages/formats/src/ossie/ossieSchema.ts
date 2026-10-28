@@ -9,7 +9,10 @@
  * on every object it closes), so ajv reads that here rather than barwise
  * restating it: a moved pin moves the answer with it.
  *
- * Only `additionalProperties` errors are read. Every other violation is
+ * Only `additionalProperties` errors are read. `unevaluatedProperties`
+ * closes an object too; the pinned schemas do not use it, and
+ * `tests/OssieSchema.test.ts` fails if a re-pin does, so this is changed
+ * then rather than missing its fields silently. Every other violation is
  * either refused by `parseOssie` (a field the mapper reads) or sits in a
  * subtree the mapper drops whole with a warning (the spec's Out of scope).
  */
@@ -18,8 +21,12 @@ import ontologySchema from "../../schemas/ossie/ontology.json" with { type: "jso
 import ossieCoreSchema from "../../schemas/ossie/ossie-schema.json" with { type: "json" };
 import { OSSIE_VERSION } from "./OssieTypes.js";
 
-/** The URL `ontology.json`'s `$ref`s name for the core schema, on Ossie's moving `main`. */
-const OSSIE_CORE_SCHEMA_URL =
+/**
+ * The URL `ontology.json`'s `$ref`s name for the core schema, on Ossie's
+ * moving `main`. Written here, not read from the schema: a re-pin that
+ * changed it fails every Ossie test at compile, before it can ship.
+ */
+export const OSSIE_CORE_SCHEMA_URL =
   "https://raw.githubusercontent.com/apache/ossie/main/core-spec/ossie-schema.json";
 
 /**
@@ -33,7 +40,8 @@ export function compileOssieSchema(ajv: Ajv2020): ValidateFunction {
   // The core schema keeps its own `$id`; it is registered under the URL as
   // well. Deleting the `$id`, as an earlier copy of this did, would mutate
   // the imported JSON module every importer of it shares.
-  ajv.addSchema(ossieCoreSchema, OSSIE_CORE_SCHEMA_URL);
+  // Registered once per `ajv`, so a second compile on it does not throw.
+  if (!ajv.getSchema(OSSIE_CORE_SCHEMA_URL)) ajv.addSchema(ossieCoreSchema, OSSIE_CORE_SCHEMA_URL);
   return ajv.compile(ontologySchema);
 }
 
@@ -45,6 +53,9 @@ let importValidator: ValidateFunction | undefined;
  * error on every import. The export test compiles strictly, so CI still
  * sees such a schema. No format is read, so none is validated. Compiled
  * on first use (about 75 ms) and kept: most processes import no Ossie.
+ * Loading the module is not deferred: `ajv/dist/2020.js` adds about 3 ms
+ * over the ajv core already loads, and deferring it would need an
+ * asynchronous import that `ImportFormat.parse` cannot await.
  */
 function validator(): ValidateFunction {
   importValidator ??= compileOssieSchema(
@@ -85,7 +96,9 @@ function renderPath(raw: unknown, pointer: string, field: string): string {
       const index = Number(segment);
       const item: unknown = at[index];
       const conceptName = i === 1 && segments[0] === "ontology" ? nameOf(item) : undefined;
-      path = conceptName === undefined ? `${path}[${index}]` : `concept ${conceptName}`;
+      path = conceptName === undefined
+        ? `${path}[${index}]`
+        : `concept ${isPlain(conceptName) ? conceptName : JSON.stringify(conceptName)}`;
       at = item;
     } else {
       path += key(segment, path === "");
@@ -101,8 +114,13 @@ function nameOf(component: unknown): string | undefined {
   return typeof name === "string" ? name : undefined;
 }
 
+/** A name that cannot be mistaken for path punctuation. */
+function isPlain(name: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
 function key(name: string, first: boolean): string {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return `[${JSON.stringify(name)}]`;
+  if (!isPlain(name)) return `[${JSON.stringify(name)}]`;
   return first ? name : `.${name}`;
 }
 

@@ -4,23 +4,35 @@
  * schemas rather than stated.
  *
  * The importer reads every `additionalProperties` error as an unknown
- * field. That is right only where the closed object is not reached from
- * inside a branch that may fail -- `oneOf`, `anyOf`, `not`, `if`/`then`/
- * `else`, `dependentSchemas` -- since ajv keeps a failed branch's errors,
- * and the field it names may be one the matching branch defines. The
- * pinned schemas close no object under a branch; this fails if a re-pin
- * does, so the importer is changed then instead of warning wrongly.
+ * field. Under a union (`oneOf`, `anyOf`, `contains`) ajv discards a
+ * branch's errors when the union holds, but keeps every branch's when it
+ * fails as a whole, and then a closed branch names fields another branch
+ * defines. Errors under `not`, `if` and the like are discarded or kept by
+ * rules of their own. Rather than read each keyword's rule, the check is
+ * conservative: the pinned schemas reach no closed object from inside any
+ * of these, and this fails if a re-pin does, so the importer is changed
+ * then instead of warning wrongly. It also fails on
+ * `unevaluatedProperties`, which closes an object without an
+ * `additionalProperties` error the importer would read.
  */
 import { describe, expect, it } from "vitest";
 import ontologySchema from "../schemas/ossie/ontology.json" with { type: "json" };
 import ossieCoreSchema from "../schemas/ossie/ossie-schema.json" with { type: "json" };
+import { OSSIE_CORE_SCHEMA_URL } from "../src/ossie/ossieSchema.js";
 
 type Schema = Record<string, unknown>;
 
-const CORE_URL = "https://raw.githubusercontent.com/apache/ossie/main/core-spec/ossie-schema.json";
-
 /** Keywords whose subschemas may fail while the document still validates. */
-const BRANCHES = new Set(["oneOf", "anyOf", "not", "if", "then", "else", "dependentSchemas"]);
+const BRANCHES = new Set([
+  "oneOf",
+  "anyOf",
+  "contains",
+  "not",
+  "if",
+  "then",
+  "else",
+  "dependentSchemas",
+]);
 
 /**
  * Every closed object reachable from `root`, as the chain of keywords that
@@ -81,7 +93,9 @@ function closedObjects(
 
 describe("the pinned Ossie schemas", () => {
   it("close no object under a branch that may fail", () => {
-    const { all, underBranch } = closedObjects(ontologySchema, { [CORE_URL]: ossieCoreSchema });
+    const { all, underBranch } = closedObjects(ontologySchema, {
+      [OSSIE_CORE_SCHEMA_URL]: ossieCoreSchema,
+    });
     expect(underBranch).toEqual([]);
     // The walk reached the closed objects it was asked about: the document,
     // a concept, a relationship and a role, and through `semantic_model`
@@ -93,6 +107,12 @@ describe("the pinned Ossie schemas", () => {
       expect.stringMatching(/-> #\/\$defs\/Role$/),
       expect.stringMatching(/semantic_model -> https:.*ossie-schema\.json$/),
     ]));
+  });
+
+  it("close no object with unevaluatedProperties, which the importer does not read", () => {
+    for (const schema of [ontologySchema, ossieCoreSchema]) {
+      expect(JSON.stringify(schema)).not.toContain("unevaluatedProperties");
+    }
   });
 
   it("the check finds one reached through a $ref under oneOf (so the test above can fail)", () => {

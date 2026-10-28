@@ -29,15 +29,20 @@
       // fixed baseline rows as still open (barwise-lh9, 2026-09-26).
       "outputs": ["dist/**", "!dist/bundle/**"]
     },
+    // schemas/ is read by src at run time and by tests (core's .orm.yaml
+    // schemas, formats' pinned Ossie schemas). The build hash happens to
+    // cover it, since build reads every package file; naming it here keeps
+    // a schema-only change from replaying a cached pass if build's inputs
+    // are ever narrowed.
     "test": {
       "dependsOn": ["build"],
       "outputs": [],
-      "inputs": ["src/**", "tests/**"]
+      "inputs": ["src/**", "tests/**", "schemas/**"]
     },
     "test:coverage": {
       "dependsOn": ["build"],
       "outputs": ["coverage/**"],
-      "inputs": ["src/**", "tests/**"]
+      "inputs": ["src/**", "tests/**", "schemas/**"]
     },
     "test:watch": {
       "cache": false,

@@ -966,6 +966,14 @@ ontology:
       unknown(`concept Code["a/b~c"]`),
     ]);
   });
+
+  it("quotes a concept name that is not a plain identifier, so its dots are not path steps", () => {
+    const { warnings } = load(`
+ontology:
+  - { concept: "x.y", type: ValueType, extends: [ String ], z: 1 }
+`);
+    expect(warnings).toEqual([unknown(`concept "x.y".z`)]);
+  });
 });
 
 describe("Ossie import: the pinned flights example", () => {

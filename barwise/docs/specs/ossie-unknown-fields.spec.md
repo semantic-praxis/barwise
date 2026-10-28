@@ -20,7 +20,8 @@ barwise/packages/formats/CLAUDE.md,
 barwise/package-lock.json,
 barwise/docs/adr/ossie-interchange.md,
 barwise/docs/CLI.md,
-+barwise/packages/formats/tests/OssieSchema.test.ts
++barwise/packages/formats/tests/OssieSchema.test.ts,
+barwise/turbo.json
 
 When an imported Ossie document carries a field the pinned schema does not
 define, the importer shall name that field, by its path, in
@@ -190,13 +191,23 @@ brackets (`["a/b"]`), whether it is the unknown field or a key on the way
 to it. The unknown key itself is `params.additionalProperty`.
 
 One assumption is checked rather than stated: an `additionalProperties`
-error under a `oneOf`, `anyOf`, `not`, `if`/`then`/`else` or
-`dependentSchemas` branch that failed would name a field the document's
-matching branch does define. The pinned schemas reach no closed object
-from any such branch (AIContext's object branch sets
-`additionalProperties: true`). A test walks both schemas from
+error is an unknown field only where no branch keyword is on the way to
+the closed object. When a union (`oneOf`, `anyOf`, `contains`) fails as
+a whole, ajv keeps every branch's errors, and a closed branch then names
+fields another branch defines. The check is conservative: the pinned
+schemas reach no closed object from inside `oneOf`, `anyOf`, `contains`,
+`not`, `if`/`then`/`else` or `dependentSchemas` (AIContext's object
+branch sets `additionalProperties: true`). A test walks both schemas from
 `ontology.json`'s root, following `$ref` into either file, and fails if a
-closed object is reachable from inside a branch.
+closed object is reachable from inside one; another fails if either uses
+`unevaluatedProperties`, which closes an object without an
+`additionalProperties` error.
+
+**Implementation notes.** The guard tests live in `tests/OssieSchema.test.ts`.
+`docs/CLI.md`'s `--format ossie` line names the new warning, and
+`turbo.json` lists `schemas/**` as a test input, since the schemas left
+`tests/`. A concept name that is not a plain identifier is quoted in the
+path (`concept "x.y".z`), so its dots are not read as steps.
 
 ## Workstreams
 
