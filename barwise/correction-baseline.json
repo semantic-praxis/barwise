@@ -196,8 +196,8 @@
     "dbt-export-current-test-syntax::a7b541c918f8": {
       "spec": "dbt-export-current-test-syntax.spec.md",
       "excerpt": "- renderdbt shall write datatests: on columns and models. - it shall write every test that takes arguments through one helper, generictest(name, args), which re",
-      "caught_by": "reasoning",
-      "note": "The high implementation review read dbt behaviour against the parser: dropping every arguments key lost an older test input of that name, and the top level winning disagreed with dbt from 1.10.8, so both were corrected."
+      "caught_by": "not-a-correction",
+      "note": "A Scope requirement (the export writes data_tests: through one helper), not a correction to the spec."
     },
     "ddl-import-fidelity::0d08b981db76": {
       "spec": "ddl-import-fidelity.spec.md",
