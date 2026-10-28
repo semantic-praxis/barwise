@@ -35,6 +35,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The base commit this run tests the pull request against. Checkout
+      # gives GitHub's synthetic merge of the pull request into its base,
+      # and that merge's first parent is the base tip it merged with. The
+      # event's pull_request.base.sha is not: it can name an earlier tip, so
+      # after main moved, base..HEAD held main's own new commits, and the
+      # tracker and plan-review gates read them as this pull request's
+      # (PR #852, twice in an hour).
+      - name: Base of the merge under test
+        id: base
+        if: github.event_name == 'pull_request'
+        run: echo "sha=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+
       # A pull request that touches only Markdown or beads tracker data
       # (.beads/, e.g. issues.jsonl) still needs its prose formatting
       # checked (dprint covers .md; it ignores .jsonl), but not build,
@@ -52,7 +64,7 @@ jobs:
         # `ci:local` imports, so the local runner skips exactly what this
         # job skips (barwise-954). This step runs before setup-node, on the
         # runner's own Node, which is why that file imports builtins only.
-        run: node scripts/lib/changed-class.mjs '${{ github.event.pull_request.base.sha }}' >> "$GITHUB_OUTPUT"
+        run: node scripts/lib/changed-class.mjs '${{ steps.base.outputs.sha }}' >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v7
         with:
@@ -134,7 +146,7 @@ jobs:
       - run: npm run check:tracker-closes
         if: github.event_name == 'pull_request'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
 
       # Every path and `node <path>` an instruction file cites resolves to a
       # tracked file. The 2026-10-04 prompt audit found 26 stale references
@@ -205,7 +217,7 @@ jobs:
       - run: npm run check:plan-review
         if: github.event_name == 'pull_request'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
 
       # A NUL byte makes git classify a source file as binary: no diff, no
       # blame, no review, and a patch taken from it loses changes silently.

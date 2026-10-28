@@ -41,9 +41,7 @@
  * named commit and a body a later reader can compare.
  *
  * Base: `--base <ref>`, else $BASE_SHA (ci.yml passes the pull request's
- * base commit), else origin/main; without `--base`, the base branch's tip
- * ($GITHUB_BASE_REF, which Actions sets) when it is a later fork point the
- * head contains, since the event's base commit goes stale. The changed files are the three-dot
+ * base commit), else origin/main. The changed files are the three-dot
  * diff `base...HEAD`, as pr-risk reads them: a two-dot diff counts the
  * base's own new commits as this branch's changes. `--head <rev>` stands
  * in for HEAD, to measure the rule over merged history; nothing in CI
@@ -115,26 +113,6 @@ if (git(["rev-parse", "--is-shallow-repository"]).trim() !== "false") {
     "this is a shallow clone, so whether a review commit precedes the first\n"
       + "  implementation commit cannot be read. Fix: git fetch --unshallow",
   );
-}
-
-// The event's base commit goes stale when the base branch moves and the
-// branch merges it in: GitHub keeps `pull_request.base.sha` at the
-// earlier tip, so `base..head` held the base branch's own new commits,
-// and one changing a planned file read as implemented before the review
-// (PR #852, after merging main to resolve a conflict). The base branch's
-// current tip is the later fork point when it descends from that commit
-// and the head contains it.
-const baseRef = process.env.GITHUB_BASE_REF?.trim();
-if (baseRef && opt("--base") === null) {
-  const tip = [`origin/${baseRef}`, baseRef].find((r) =>
-    gitAnswers(["rev-parse", "--verify", "--quiet", `${r}^{commit}`])
-  );
-  if (
-    tip && gitAnswers(["merge-base", "--is-ancestor", base, tip])
-    && gitAnswers(["merge-base", "--is-ancestor", tip, head])
-  ) {
-    base = tip;
-  }
 }
 
 const mergeBase = git(["merge-base", base, head]).trim();
