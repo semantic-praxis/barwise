@@ -9,10 +9,13 @@ import { describe, expect, it } from "vitest";
 import {
   applyMigrations,
   compareOrmVersions,
+  CURRENT_MAJOR_FIRST_VERSION,
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
   type OrmVersionMigration,
   planMigration,
+  planRead,
+  type ReadVersions,
 } from "../../src/serialization/schemaVersion.js";
 
 describe("compareOrmVersions", () => {
@@ -110,5 +113,61 @@ describe("the registered migrations", () => {
       ok: false,
       reason: "unknown",
     });
+  });
+});
+
+// A build one minor past its major's first version, as the first minor
+// bump after 3.0 will be: barwise-jj8 was that every 3.0 file would then
+// be refused as a version no release wrote.
+const AT_3_1: ReadVersions = {
+  current: "3.1",
+  currentMajorFirst: "3.0",
+  legacy: "2.0",
+  migrations: [bump("1.0", "1.1"), bump("1.1", "2.0"), bump("3.0", "3.1")],
+};
+
+describe("planRead", () => {
+  it("brings a file of an earlier minor of the current major forward to the current reader", () => {
+    const plan = planRead("3.0", AT_3_1);
+    expect(plan).toEqual({ ok: true, reader: "current", steps: [AT_3_1.migrations[2]] });
+    const doc = applyMigrations(
+      { orm_version: "3.0", model: { name: "T" } },
+      plan.ok ? plan.steps : [],
+    );
+    expect(doc.orm_version).toBe("3.1");
+  });
+
+  it("reads the current version with no steps", () => {
+    expect(planRead("3.1", AT_3_1)).toEqual({ ok: true, reader: "current", steps: [] });
+  });
+
+  it("refuses an earlier minor of the current major that no migration reaches", () => {
+    expect(planRead("3.0", { ...AT_3_1, migrations: AT_3_1.migrations.slice(0, 2) })).toEqual({
+      ok: false,
+      reason: "unknown",
+    });
+  });
+
+  it("reads the previous major with the legacy reader, older files migrated to it", () => {
+    expect(planRead("2.0", AT_3_1)).toEqual({ ok: true, reader: "legacy", steps: [] });
+    expect(planRead("1.0", AT_3_1)).toEqual({
+      ok: true,
+      reader: "legacy",
+      steps: AT_3_1.migrations.slice(0, 2),
+    });
+  });
+
+  it("refuses a version between the two majors, which no release wrote", () => {
+    expect(planRead("2.1", AT_3_1)).toEqual({ ok: false, reason: "unknown" });
+  });
+
+  it("refuses a newer version as newer", () => {
+    expect(planRead("3.2", AT_3_1)).toEqual({ ok: false, reason: "newer" });
+  });
+
+  it("defaults to this build's versions", () => {
+    expect(CURRENT_MAJOR_FIRST_VERSION <= CURRENT_ORM_VERSION).toBe(true);
+    expect(planRead(CURRENT_ORM_VERSION)).toEqual({ ok: true, reader: "current", steps: [] });
+    expect(planRead(CURRENT_MAJOR_FIRST_VERSION)).toMatchObject({ ok: true, reader: "current" });
   });
 });

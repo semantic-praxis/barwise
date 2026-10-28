@@ -1,7 +1,7 @@
 # Schema versioning
 
 Scope: architecture
-Date: 2026-10-21
+Date: 2026-10-28
 Tracking: barwise-ubc, barwise-1063, barwise-n9n, barwise-vvg, barwise-6om, barwise-y1b,
 barwise-jj8,
 docs/specs/archive/schema-versioning.spec.md,
@@ -35,7 +35,10 @@ was a section of the metamodel ADR before this one.
    structural change bumps the major with a real migration.** Adding an
    optional construct or field is a minor change: bump
    `CURRENT_ORM_VERSION` and the schema `const`, and register a forward
-   migration (a no-op for a purely additive change). A change an older
+   migration (a no-op for a purely additive change). The loader reads every
+   version from `CURRENT_MAJOR_FIRST_VERSION` up to the current one by
+   applying those steps, so a minor bump keeps every earlier file of its
+   major loadable; a major bump moves `CURRENT_MAJOR_FIRST_VERSION`. A change an older
    reader would misread rather than ignore is structural (diagram
    references moving from names to ids was one).
 3. **The minor bump is shared across its unreleased cycle.** The first
@@ -66,10 +69,14 @@ was a section of the metamodel ADR before this one.
 - Decision 2 has no gate: whether a change is additive or structural is
   a judgment each spec makes and its review checks, as
   `diagram-references-by-id.spec.md` D1 and `orm-format-3.spec.md` did.
-  Its mechanism does not fit today's loader: raw-document steps run only
-  up to `LEGACY_ORM_VERSION` (2.0), and a version between that and the
-  current one is refused, so a 3.0 to 3.1 bump done as written would
-  refuse every 3.0 file until the loader changes (barwise-jj8).
+  Its mechanism is tested without a real minor: `planRead` in
+  `serialization/schemaVersion.ts` takes the build's versions as a
+  parameter, and `schemaVersion.test.ts` reads a 3.0 document in a
+  synthetic 3.1 build through a 3.0-to-3.1 step, refuses a 3.0 file no
+  step reaches, and still refuses a version between the two majors
+  (barwise-jj8). Nothing checks that a real minor bump registers its step;
+  without one, the planner refuses the earlier minor as unknown rather
+  than misreading it.
 - Decision 3 has no gate: a change to `orm-model.schema.json` that
   leaves `CURRENT_ORM_VERSION` equal to the last tagged release's passes
   CI (barwise-vvg, which waits on barwise-6om for what "released"
