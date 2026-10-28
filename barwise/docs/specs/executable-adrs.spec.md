@@ -62,6 +62,22 @@ says so). Until it is settled, a declared CI enforcer can go red on a
 pull request that still merges. This spec does not settle it; the
 index's section header names barwise-raw beside the word `declared`.
 
+## Does every unguarded decision get an issue? (resolved: yes)
+
+Resolved by the owner on 2026-10-28: a decision that is unenforceable
+as written is filed for follow-up, not marked exempt. An earlier draft
+proposed a `none (deliberate: <reason>)` form with no issue, for
+decisions held by review or by authority, and recommended it. The owner
+chose the stricter rule, and it is the more useful one: "nothing could
+check this" is usually a statement about the decision's wording, not
+about the world. The follow-up issue for such a decision asks for one
+of three outcomes: build an enforcer; restate the decision so a check
+can see it (often by naming the artifact a violation would leave); or,
+if neither is possible, retire it from the ADR into prose guidance,
+where it no longer claims the force of a decision. Any of the three
+removes the `none` entry, and the issue then closes in the order Scope
+gives.
+
 ## Scope
 
 In scope:
@@ -203,10 +219,6 @@ In scope:
   default include in `vitest.shared.ts` -- so WS1 adds a drift test in
   `gates.test.mjs` that reads both sources and fails when either differs
   from what the check assumes, per `docs/adr/must-agree-copies.md`.
-- When an entry is `none (deliberate: <reason>)`, the check shall accept
-  it with no tracker lookup -- subject to the Open decision on that form,
-  which WS1 waits on. The parser tries this form first, so `deliberate`
-  is never read as an issue id.
 - When an entry is `none (<issue-id>[: <which decisions>])`, the check
   shall exit 1 unless `<issue-id>` exists in `.beads/issues.jsonl` with
   a status other than `closed`. Each `none` names a gap issue, one whose
@@ -216,7 +228,8 @@ In scope:
   the gap issue closes afterwards in a tracker-only PR, as
   `check:tracker-closes` requires. Closing a gap issue while the ADR
   still says `none` fails the check, which is intended: it means the
-  enforcer was never declared.
+  enforcer was never declared. There is no `none` without an issue (see
+  "Does every unguarded decision get an issue?").
 - When the check needs an input (`ci.yml`, `barwise/package.json`, the
   tracker, `.claude/settings.json`, `barwise/.husky/`, a
   `vitest.config.ts`) and cannot read it, it shall exit 2, per
@@ -299,8 +312,8 @@ What this shows:
   would lose their tracked gap. WS2 reads which decisions zdd covers and
   opens a gap issue for each one it does not, one `none` entry per
   issue. Decision 5, that the owner's instruction overrides the
-  condition, is a grant of authority with nothing to check, and takes
-  `none (deliberate: ...)`.
+  condition, is a grant of authority with nothing to check as written,
+  so it gets a follow-up issue like the rest.
 - The rule behind both rows, which WS2 applies to every ADR rather than
   only to the rows above: each decision that an ADR's own Consequences
   call unenforced, not built, review-only or without a gate gets a
@@ -360,12 +373,12 @@ barwise/scripts/lib/architecture-section.mjs  (renderSection)
 ```
 
 Rendering rule: `declared: ` and the enforcers in declared order,
-joined by `, `; then, after `; `, each `none` entry as `gap: <issue-id>`
-or `gap: deliberate`, joined by `, `. (`barwise-920.<new>` above stands for
+joined by `, `; then, after `; `, each `none` entry as `gap: <issue-id>`,
+joined by `, `. (`barwise-920.<new>` above stands for
 the child gap issue WS2 opens; its real id is minted then.) An ADR with
 no `Enforced-by:` header, which WS1 still allows, renders with no
 suffix at all, as today, so WS3 can land before WS2 finishes. An ADR with no
-enforcer renders `unenforced (<issue-id or deliberate>, ...)` instead.
+enforcer renders `unenforced (<issue-id>, ...)` instead.
 Each entry renders so its kind shows: `npm run x` as `x`; a husky
 entry as `x (pre-commit hook)`; a settings hook as its file name
 without extension and its event, `python-uv-guard (PreToolUse)`; a test
@@ -393,7 +406,6 @@ npm run <script> -- <args>
 hook barwise/.husky/<name> runs npm run <script> [-- <args>]   -- tried before the form below
 hook <Event> <repo-rooted path>               -- Event is one word, no `/`; settings.json
 <repo-rooted path to a test file>
-none (deliberate: <reason>)                   -- per Open decisions; tried first
 none (<issue-id>[: <free text naming which decisions>])
 ```
 
@@ -426,9 +438,6 @@ on one separator and clamps an unmatched `)` rather than reporting it.
 
 ### 1. The check, with an absent header allowed
 
-Waits on the Open decision about `none (deliberate: ...)`, because the
-grammar WS1 ships has to know whether that form exists.
-
 Add `scripts/lib/adr-enforcement.mjs` (the header parser and the
 entry splitter), then the enforcement pass to `check-architecture.mjs`,
 validating every `Enforced-by:` entry that is
@@ -456,9 +465,10 @@ is a separate `audit:duplication` question, not this spec's.
 
 WS2 is an audit, not a copy of a table. For each ADR, read every
 numbered decision and its Consequences, and declare one entry per
-guard and one `none` entry per unguarded decision: a gap issue where an
-enforcer could be built, `deliberate` where the decision is held by
-review or by authority and nothing could check it. Replace every
+guard and one `none` entry per unguarded decision, each on its own
+follow-up issue: what enforcer to build, or, where none could check the
+decision as written, which of the three outcomes in "Does every
+unguarded decision get an issue?" to pursue. Replace every
 `test:coverage` citation with the test files that pin the decision.
 Open gap issues as children of the umbrella that proposed them
 (barwise-920, barwise-921) or as new issues, never by citing an umbrella
@@ -533,14 +543,6 @@ gate run. Ungrounded: where probes live, and whether process ADRs
   passes, and a refusal there never hides their findings). If the
   reviewer judges that containment not enough, the new script is the
   answer.
-- **Should a `none` entry require an open issue?** Requiring it makes
-  "unenforced" a tracked state that cannot outlive its issue silently,
-  which is the point. The cost: a decision that is unenforceable by
-  nature (`constraint-coverage-policy` is a trust statement) carries an
-  issue that may never close. Alternative: allow `none (deliberate:
-  <reason>)` with no issue. Recommend: allow both forms, so an honest
-  "never checkable" does not need a fake open issue. This decision
-  blocks WS1, whose grammar has to include or exclude the form.
 - **Does the header duplicate Consequences?** Yes, partly: the
   enforcer's name appears in both. The header is checked and the prose is
   not, so the prose can still drift. Options: leave the prose as is, or
