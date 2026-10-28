@@ -55,6 +55,13 @@ is gone. WS3's index keeps to that: it labels the list `declared`, and
 its section header says a declared enforcer exists and runs, not that
 it catches a violation.
 
+One precondition sits under even the shadow: "runs in CI and can fail
+it" means a red check blocks a merge only if `main` requires the `ci`
+check, and that is unsettled (barwise-raw; `docs/adr/merge-delegation.md`
+says so). Until it is settled, a declared CI enforcer can go red on a
+pull request that still merges. This spec does not settle it; the
+index's section header names barwise-raw beside the word `declared`.
+
 ## Scope
 
 In scope:
@@ -81,8 +88,13 @@ In scope:
   `audit` script. Any token whose name, the part before `=`, is
   `--workspace`, `--workspaces`, `-w`, `-ws`, `--prefix` or `-C` makes
   the answer null, wherever it sits before `--`: those run another
-  package.json. Other flags (any token starting with `-`) are skipped,
-  and the first remaining token is the script. After `--`, the tokens are
+  package.json. Of the other flags, a token with `=` carries its own
+  value and is skipped, and the boolean flags `--silent`, `-s`,
+  `--quiet`, `-q` and `--if-present` are skipped. Any other token
+  starting with `-` might take the next token as its value
+  (`--loglevel warn`), so `stepScript` cannot tell which token is the
+  script, and it refuses (the check exits 2) rather than guess. The first
+  remaining token is the script. After `--`, the tokens are
   the arguments.
   `resolveNodeGate()` in `scripts/fault-matrix.mjs` names a step's
   script with its own inline rule today; WS1 makes it take the name from
@@ -96,8 +108,11 @@ In scope:
   become auditable by `fault-matrix`, where today it is skipped; no
   `ci.yml` step has that form now. No ADR relies on a workspace step
   today.
-- A step marked `continue-on-error: true` is not wired: it cannot fail
-  CI. `ciSteps()` does not report that key today, so WS1 extends it to
+- A step marked `continue-on-error: true`, or in a job marked so, is not
+  wired: it cannot fail CI. A `continue-on-error` whose value is not the
+  literal `true` or `false` (an expression such as
+  `${{ matrix.experimental }}`) is a refusal, exit 2. `ciSteps()` does
+  not report that key today, so WS1 extends it to
   return `continueOnError` beside `condition`; `ci:local` and
   `fault-matrix` do not use the new field in this spec (`ci:local`
   still runs `dup` and `filesize` as blocking, a divergence from CI
@@ -105,7 +120,11 @@ In scope:
   `scripts/tests/ci-conditions.test.mjs` is updated with it. Where the
   same arguments appear in two steps, `ciSteps()` keeps one entry, and
   its `continueOnError` is true only if every occurrence has the key,
-  so step order cannot decide whether a gate is wired. Separately,
+  so step order cannot decide whether a gate is wired: a script is wired
+  if any step that runs it can fail CI. `condition` keeps its current
+  first-occurrence rule, which `ci:local` and `fault-matrix` read. The
+  two fields are separate summaries over the occurrences, not a pair
+  describing one step, and the check reads only `continueOnError`. Separately,
   `npm run dup` and `npm run filesize` each run once in `ci.yml`, with
   `continue-on-error: true`, and `must-agree-copies` names `dup` in its
   prose, so WS2 must not declare it.
@@ -139,10 +158,14 @@ In scope:
   the husky file has a line that invokes the script in one of two
   shapes, and no other shape counts. Either the line is the invocation
   alone -- `npm run`, flags as defined for CI steps above, `<script>`,
-  optional `-- <args>` -- optionally followed by `|| exit $?` or
-  `|| exit <non-zero literal>`; or it is `if ! <invocation>; then`, and
-  the `if` block it opens contains `exit $?` or `exit <non-zero
-  literal>` before its `fi`. That is a whitelist rather than a list of
+  `-- <args>` exactly as the entry declares them (the same exact-argument
+  rule as for CI steps) -- optionally followed by `|| exit $?` or
+  `|| exit <non-zero literal>`, and the file contains no `set +e`
+  before it, since the bare form relies on husky's `sh -e`. Or it is
+  `if ! <invocation>; then`, and the `then` branch, before any `else`,
+  `elif` or `fi`, contains `exit <non-zero literal>`. Not `exit $?`:
+  inside that branch `$?` is the status of the negated test or of the
+  last `echo`, both 0. That is a whitelist rather than a list of
   forbidden suffixes, because the ways to discard a status (`| tee`,
   `|| echo`, a trailing `&`, an `if` block with no exit) are open-ended,
   and root `CLAUDE.md` already names the pipe case: a gate's status
@@ -221,38 +244,44 @@ Out of scope:
 ## Inventory
 
 Grounded 2026-10-28 by extracting the npm scripts each ADR names and
-resolving them against `package.json` and `ciSteps()`.
+resolving them against `package.json` and `ciSteps()`. The third column
+counts lines in each ADR matching phrases such as "no gate",
+"review-only", "not built", "nothing enforces" and "by design". It is a
+shadow, not a census: it shows where unguarded decisions are likely, and
+WS2 reads each decision to find them. This spec does not predict each
+ADR's declared state; an earlier draft did, marked most rows
+"enforced", and was wrong for most of them.
 
-| ADR                            | Enforcers named in prose today                                     | Declared state after WS2                                                    |
-| ------------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| `baselines-merge-on-write`     | `audit:specs`, `test:scripts`                                      | enforced; `trial:gate` writer is barwise-tko                                |
-| `connector-packages`           | `purity`, `depcruise`                                              | enforced                                                                    |
-| `constraint-coverage-policy`   | none                                                               | `none (deliberate: ...)`, per Open decisions                                |
-| `credential-handling`          | `check:secrets`, gitleaks pre-commit hook                          | enforced, incl. `hook barwise/.husky/pre-commit runs npm run check:secrets` |
-| `determinism-in-core`          | `purity`                                                           | enforced                                                                    |
-| `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others    | enforced                                                                    |
-| `gate-refusal-contract`        | `test:scripts`; `fault-matrix` is on demand                        | enforced                                                                    |
-| `keyless-model-access`         | `test:coverage`, `depcruise`                                       | enforced: `depcruise` and named test files                                  |
-| `merge-delegation`             | none; the ADR says so (barwise-zdd)                                | `none` per decision: zdd and new gap issues (WS2)                           |
-| `metamodel-evolution-policy`   | none                                                               | to be determined in WS2                                                     |
-| `must-agree-copies`            | `check:parity`, `audit:duplication`                                | enforced                                                                    |
-| `ossie-interchange`            | `test:coverage`; decision 5 not built (barwise-wcg), 6 has no gate | named test files, plus `none` for 1 (part), 5, 6                            |
-| `package-graph-authority`      | `check:architecture`, `depcruise`                                  | enforced                                                                    |
-| `pinned-runtimes`              | `check:parity`; `check:pins` proposed, not built (barwise-920)     | enforced, plus `none` on a new gap issue                                    |
-| `plan-before-code`             | `check:plan-review`, `check:spec-touches`                          | enforced                                                                    |
-| `production-prompt-resolution` | `test:coverage`                                                    | enforced, by named test files                                               |
-| `python-from-the-lockfile`     | `check:python-uv`, PreToolUse hook; `audit:skips` deferred         | enforced, plus `none` on a new gap issue                                    |
-| `review-policy`                | `check:review-tiers`                                               | enforced                                                                    |
-| `schema-versioning`            | `test:coverage`                                                    | enforced, by named test files                                               |
-| `surface-capability-parity`    | `test:coverage` (the two `toEqual` tool-list tests)                | enforced, by named test files                                               |
+| ADR                            | Enforcers named in prose today                                     | Gap phrases in its Consequences |
+| ------------------------------ | ------------------------------------------------------------------ | ------------------------------- |
+| `baselines-merge-on-write`     | `audit:specs`, `test:scripts`                                      | 2                               |
+| `connector-packages`           | `purity`, `depcruise`                                              | 4                               |
+| `constraint-coverage-policy`   | none                                                               | 0                               |
+| `credential-handling`          | `check:secrets`, gitleaks pre-commit hook                          | 2                               |
+| `determinism-in-core`          | `purity`                                                           | 0                               |
+| `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others    | 3                               |
+| `gate-refusal-contract`        | `test:scripts`; `fault-matrix` is on demand                        | 1                               |
+| `keyless-model-access`         | `test:coverage`, `depcruise`                                       | 1                               |
+| `merge-delegation`             | none; the ADR says so (barwise-zdd)                                | 1                               |
+| `metamodel-evolution-policy`   | none                                                               | 1                               |
+| `must-agree-copies`            | `check:parity`, `audit:duplication`                                | 0                               |
+| `ossie-interchange`            | `test:coverage`; decision 5 not built (barwise-wcg), 6 has no gate | 4                               |
+| `package-graph-authority`      | `check:architecture`, `depcruise`                                  | 0                               |
+| `pinned-runtimes`              | `check:parity`; `check:pins` proposed, not built (barwise-920)     | 5                               |
+| `plan-before-code`             | `check:plan-review`, `check:spec-touches`                          | 2                               |
+| `production-prompt-resolution` | `test:coverage`                                                    | 1                               |
+| `python-from-the-lockfile`     | `check:python-uv`, PreToolUse hook; `audit:skips` deferred         | 3                               |
+| `review-policy`                | `check:review-tiers`                                               | 4                               |
+| `schema-versioning`            | `test:coverage`                                                    | 2                               |
+| `surface-capability-parity`    | `test:coverage` (the two `toEqual` tool-list tests)                | 2                               |
 
 What this shows:
 
 - 17 of 20 ADRs already name an enforcer; the header makes that list
   checkable rather than new. Every npm script they name today exists and,
-  except `ci:local`, `fault-matrix`, `plan-scope`, `pr:risk`, `prepare`,
-  `regen:builtins` and `trial:gate`, runs in `ci.yml`, and `dup` runs
-  only with `continue-on-error`. Those eight are not enforcers, and WS2 must not copy them into an
+  except `ci:local`, `fault-matrix`, `mutate`, `plan-scope`, `pr:risk`,
+  `prepare`, `regen:builtins` and `trial:gate`, runs in `ci.yml`, and
+  `dup` runs only with `continue-on-error`. Those nine are not enforcers, and WS2 must not copy them into an
   `Enforced-by:` line: the check would correctly fail them. So nothing
   is broken now; the check is a ratchet against future drift.
 - Two named checks do not exist (`check:pins`, `audit:skips`), and both
@@ -277,8 +306,7 @@ What this shows:
   call unenforced, not built, review-only or without a gate gets a
   `none` entry. An ADR whose header lists enforcers and no gaps, while
   its prose names an unguarded decision, is the header-and-prose drift
-  this spec exists to remove. `ossie-interchange` is the example the
-  first Inventory pass missed: decision 5 is not built (barwise-wcg),
+  this spec exists to remove. `ossie-interchange` is one example: decision 5 is not built (barwise-wcg),
   decision 6 has no gate, and part of decision 1 is review-only.
 - Five ADRs cite `test:coverage`, which runs every package test and so
   cannot point at one decision. Their entries name the test
@@ -424,27 +452,39 @@ reader is added. `beads-crud.mjs`, `check-tracker-closes.mjs` and
 `audit-spec-status.mjs` keep their own inline parsers; converging them
 is a separate `audit:duplication` question, not this spec's.
 
-### 2. Backfill all twenty ADRs, then require the header
+### 2. Audit and backfill the ADRs, then require the header
 
-Add `Enforced-by:` to each ADR per the Inventory, replacing every
+WS2 is an audit, not a copy of a table. For each ADR, read every
+numbered decision and its Consequences, and declare one entry per
+guard and one `none` entry per unguarded decision: a gap issue where an
+enforcer could be built, `deliberate` where the decision is held by
+review or by authority and nothing could check it. Replace every
 `test:coverage` citation with the test files that pin the decision.
-Open the gap issues the Inventory calls for (children of barwise-920
-and barwise-921). Where WS2 finds no enforcer for
-`metamodel-evolution-policy`, it opens a gap issue for a `none` entry,
-or uses the `deliberate` form if the decision admits no check. Extend
+Open gap issues as children of the umbrella that proposed them
+(barwise-920, barwise-921) or as new issues, never by citing an umbrella
+that can close for unrelated reasons.
+
+The size is not known in advance. The Inventory's gap-phrase column
+suggests most ADRs have at least one unguarded decision, and the
+review that found this counted decisions with no gate in ten ADRs an
+earlier draft called enforced. So WS2 lands as several PRs, a few ADRs
+each, while an absent header is still allowed; each adds its ADRs'
+headers and opens their gap issues. If WS3 has landed, each also runs
+`npm run regen:architecture`, since the backfill changes what the index
+renders.
+
+The last WS2 PR makes an absent header a finding and updates
+`template.adr.md` so a new ADR starts with the line. It also extends
 `architectureRepo()` in `gates.test.mjs`, which copies every real ADR
-into its fixture, so the fixture also carries the inputs the real
-entries read: `ci.yml`, the root `package.json`, the tracker, settings,
-husky files, the vitest configs and the named test files. Without that,
+into its fixture, so the fixture carries the inputs the real entries
+read: `ci.yml`, the root `package.json`, the tracker, settings, husky
+files, the vitest configs and the named test files. Without that,
 every existing `check:architecture` case exits 2 once the ADRs carry
-entries. The fixture is built and committed once per test file and
-copied per case, so the tracker (over a megabyte) is not re-copied and
-re-committed about ten times. The fixture's synthetic `ADR_OK` gains an `Enforced-by:` line
-as well. In the same PR, run `npm run regen:architecture` if WS3 has
-landed, since the backfill changes what the index renders, and make an
-absent header a finding. Update `template.adr.md` so a new
-ADR starts with the line. Coupled into one PR because requiring the
-header without the backfill would turn CI red.
+entries. (That extension may land earlier, with the first backfill PR
+whose entries the fixture cannot resolve.) The fixture is built and
+committed once per test file and copied per case, so the tracker (over
+a megabyte) is not re-copied and re-committed about ten times. The
+fixture's synthetic `ADR_OK` gains an `Enforced-by:` line as well.
 
 ### 3. Show enforcement in the generated index
 
@@ -462,7 +502,9 @@ and reports whether it was caught. `mutate.mjs` counts any non-zero
 exit as caught, so a probe that makes the gate refuse (exit 2) would pass
 as discrimination; WS4 adds an expected-exit option to it and every
 probe expects 1. A script runs every probe on demand,
-as `fault-matrix` does for refusals. Not a CI gate: each probe is a full
+as `fault-matrix` does for refusals, under a new npm script with its
+generated root forwarder (`check:root-scripts` requires one); WS4 adds
+both to `Touches:` when it is grounded. Not a CI gate: each probe is a full
 gate run. Ungrounded: where probes live, and whether process ADRs
 (`plan-before-code`) admit a plantable violation at all.
 
@@ -470,8 +512,9 @@ gate run. Ungrounded: where probes live, and whether process ADRs
 
 - No package changes; scripts, docs and one skill template only. No
   public API moves.
-- `check:architecture` already runs in CI unguarded, so no `ci.yml`
-  change and no new root forwarder.
+- `check:architecture` already runs in CI unguarded, so WS1 to WS3 need
+  no `ci.yml` change and no new root forwarder. WS4 adds one npm script
+  and its forwarder.
 - Every future ADR must carry the header, which `template.adr.md`
   states.
 
