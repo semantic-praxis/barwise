@@ -1,3 +1,4 @@
+import { namespaceOf } from "../../model/namespace.js";
 import type { OrmProject } from "../../model/OrmProject.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -17,6 +18,8 @@ export type ProjectValidationRule = (project: OrmProject) => Diagnostic[];
  * - Entity mappings in context mappings reference object types that exist
  *   in the source and target domains (when loaded).
  * - Product dependencies reference existing domains and mappings.
+ * - Each domain has one namespace source and its own namespace
+ *   (iri-identity WS4).
  */
 export function projectRules(project: OrmProject): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -24,6 +27,7 @@ export function projectRules(project: OrmProject): Diagnostic[] {
   diagnostics.push(...checkMappingContextsExist(project));
   diagnostics.push(...checkEntityMappingReferences(project));
   diagnostics.push(...checkProductDependencies(project));
+  diagnostics.push(...checkNamespaces(project));
 
   return diagnostics;
 }
@@ -162,6 +166,57 @@ function checkProductDependencies(project: OrmProject): Diagnostic[] {
         );
       }
     }
+  }
+
+  return diagnostics;
+}
+
+/**
+ * A namespace has one source and one owner (iri-identity WS4). A domain
+ * file that declares its own `namespace` in a project with `iri_base` is
+ * overridden, and said so, rather than refused, so the domain still loads
+ * and a project that gains `iri_base` keeps working. Two domains with one
+ * namespace -- contexts that normalize alike, or two declared alike --
+ * would give their elements one IRI once ids are names (WS6).
+ */
+function checkNamespaces(project: OrmProject): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const byNamespace = new Map<string, string[]>();
+
+  for (const domain of project.domains) {
+    const ref = { iriBase: project.iriBase, context: domain.context };
+    const namespace = namespaceOf(domain.model, ref);
+    const own = domain.model?.namespace;
+    if (project.iriBase !== undefined && own !== undefined && namespace !== undefined) {
+      diagnostics.push(
+        report(
+          RULE_ID.domainNamespaceOverridden,
+          "default",
+          domain.path,
+          domain.path,
+          domain.context,
+          own,
+          namespace,
+        ),
+      );
+    }
+    if (namespace === undefined) continue;
+    const contexts = byNamespace.get(namespace) ?? [];
+    contexts.push(domain.context);
+    byNamespace.set(namespace, contexts);
+  }
+
+  for (const [namespace, contexts] of byNamespace) {
+    if (contexts.length < 2) continue;
+    diagnostics.push(
+      report(
+        RULE_ID.duplicateNamespace,
+        "default",
+        namespace,
+        namespace,
+        contexts.map((c) => JSON.stringify(c)).join(", "),
+      ),
+    );
   }
 
   return diagnostics;

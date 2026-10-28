@@ -8,11 +8,20 @@ import {
 } from "../model/ContextMapping.js";
 import type { EntityMappingConfig } from "../model/EntityMapping.js";
 import type { SemanticConflictConfig } from "../model/SemanticConflict.js";
+import { formatVersionProblem } from "./schemaVersion.js";
+
+/**
+ * The `format_version` this build reads and writes for `.map.yaml`. The
+ * serializer stamps it on every mapping file, and the schema pins its
+ * `const` to the same value (iri-identity WS4, barwise-y1b).
+ */
+export const CURRENT_MAPPING_FORMAT_VERSION = "1.0";
 
 /**
  * The shape of a parsed .map.yaml document.
  */
 interface MappingYamlDocument {
+  format_version?: string;
   mapping: {
     source_context: string;
     target_context: string;
@@ -48,6 +57,7 @@ export class MappingSerializer {
    */
   serialize(mapping: ContextMapping): string {
     const doc: MappingYamlDocument = {
+      format_version: CURRENT_MAPPING_FORMAT_VERSION,
       mapping: {
         source_context: mapping.sourceContext,
         target_context: mapping.targetContext,
@@ -95,6 +105,9 @@ export class MappingSerializer {
         `Invalid YAML: ${(err as Error).message}`,
       );
     }
+
+    const versionProblem = formatVersionProblem(parsed, CURRENT_MAPPING_FORMAT_VERSION);
+    if (versionProblem) throw new MappingDeserializationError(versionProblem);
 
     const valid = this.validate(parsed);
     if (!valid) {

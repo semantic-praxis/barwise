@@ -18,6 +18,7 @@ import {
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
   planRead,
+  READ_PLAN_ADVICE,
   type ReadPlan,
 } from "./schemaVersion.js";
 import { subtypeConstraintsFromFlags } from "./subtypeFlags.js";
@@ -60,14 +61,8 @@ function versionErrorMessage(
   version: string,
   plan: Extract<ReadPlan, { ok: false; }>,
 ): string {
-  const advice = {
-    newer: "the file was written by a newer barwise; upgrade barwise to read it.",
-    unknown: "no migration path is available; re-export from a compatible version.",
-    cycle: "the migration registry loops back on itself, which is a bug in barwise.",
-    unregistered: "no registered migration reaches it, which is a bug in barwise.",
-  };
   const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
-  return `${head} ${advice[plan.reason]}`;
+  return `${head} ${READ_PLAN_ADVICE[plan.reason]}`;
 }
 
 /** What reading a file changed beyond its format (`OrmYamlSerializer.migrate`). */
@@ -251,6 +246,7 @@ export class OrmYamlSerializer {
     const model = new OrmModel({
       name: doc.model.name,
       domainContext: doc.model.domain_context,
+      namespace: doc.model.namespace,
       note: doc.model.note,
     });
 
@@ -366,6 +362,9 @@ export function writeDocument(model: OrmModel): OrmYamlDocument {
 
   if (model.domainContext) {
     doc.model.domain_context = model.domainContext;
+  }
+  if (model.namespace) {
+    doc.model.namespace = model.namespace;
   }
   if (model.note) {
     doc.model.note = model.note;

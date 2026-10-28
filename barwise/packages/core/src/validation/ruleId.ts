@@ -101,6 +101,8 @@ export const RULE_ID = {
   valueConstraintViolation: "population/value-constraint-violation",
   valueTypeDomainViolation: "population/value-type-domain-violation",
   valueTypeDataTypeViolation: "population/value-type-data-type-violation",
+  domainNamespaceOverridden: "project/domain-namespace-overridden",
+  duplicateNamespace: "project/duplicate-namespace",
   entityMappingSourceMissing: "project/entity-mapping-source-missing",
   entityMappingTargetMissing: "project/entity-mapping-target-missing",
   mappingSourceContextMissing: "project/mapping-source-context-missing",
@@ -794,6 +796,23 @@ const RULE_DESCRIPTORS = {
       ): string =>
         `Population "${popId}": instance "${instId}" has value "${val}" for a role played by `
         + `value type "${playerName}", which declares data type ${dataTypeName}.`,
+    },
+  },
+  [RULE_ID.domainNamespaceOverridden]: {
+    severity: "error",
+    description:
+      "A domain declares its own namespace in a project whose iri_base already gives it one.",
+    messages: {
+      default: (domainPath: string, context: string, own: string, projects: string): string =>
+        `Domain "${context}" (${domainPath}) declares namespace "${own}", but the project's iri_base gives it "${projects}", which is the one used. Delete the domain's namespace line.`,
+    },
+  },
+  [RULE_ID.duplicateNamespace]: {
+    severity: "error",
+    description: "Two domains of a project have one namespace, so their elements would share IRIs.",
+    messages: {
+      default: (namespace: string, contexts: string): string =>
+        `Domains ${contexts} have the same namespace "${namespace}", so their elements would share IRIs. Rename a context, or give each domain its own namespace.`,
     },
   },
   [RULE_ID.entityMappingSourceMissing]: {

@@ -70,6 +70,12 @@ export interface OrmProjectConfig {
   readonly mappings?: readonly ContextMappingConfig[];
   readonly products?: readonly ProductConfig[];
   readonly settings?: ProjectSettings;
+  /**
+   * The absolute IRI, ending in `/`, that every domain's namespace starts
+   * with: the base and the project's own segments, so the display `name` is
+   * in no IRI (`namespaceOf`, iri-identity WS4).
+   */
+  readonly iriBase?: string;
 }
 
 /**
@@ -85,6 +91,7 @@ export class OrmProject {
   private readonly _mappings: ContextMapping[] = [];
   private readonly _products: Map<string, ProductDependency> = new Map();
   private _settings: ProjectSettings;
+  private _iriBase: string | undefined;
 
   constructor(config: OrmProjectConfig) {
     if (!config.name || config.name.trim().length === 0) {
@@ -92,6 +99,7 @@ export class OrmProject {
     }
     this._name = config.name.trim();
     this._settings = config.settings ? { ...config.settings } : {};
+    this._iriBase = config.iriBase;
 
     for (const dc of config.domains ?? []) {
       this.addDomain(dc);
@@ -106,6 +114,14 @@ export class OrmProject {
 
   get name(): string {
     return this._name;
+  }
+
+  get iriBase(): string | undefined {
+    return this._iriBase;
+  }
+
+  set iriBase(value: string | undefined) {
+    this._iriBase = value;
   }
 
   set name(value: string) {

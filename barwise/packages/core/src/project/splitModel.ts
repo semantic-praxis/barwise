@@ -468,7 +468,21 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
   // -- Build mapping files ------------------------------------------------
   const mappingSerializer = new MappingSerializer();
   const mappings: SplitMappingFile[] = [];
-  const project = new OrmProject({ name: config.projectName.trim() });
+  // The domains get the project's namespace, not the source's: a domain
+  // that kept the source's `namespace` would be overridden by any
+  // `iri_base` (iri-identity WS4). A `/`-ending source namespace is a
+  // valid base, so it becomes the project's and each domain's namespace is
+  // that plus its context; a `#`-ending one cannot be a base.
+  const sourceNamespace = source.namespace;
+  const iriBase = sourceNamespace?.endsWith("/") ? sourceNamespace : undefined;
+  if (sourceNamespace !== undefined && iriBase === undefined) {
+    warnings.push(
+      `The source's namespace "${sourceNamespace}" ends in "#", so it cannot be the `
+        + `project's iri_base and is not carried into the split; declare an iri_base `
+        + `ending in "/" in the manifest.`,
+    );
+  }
+  const project = new OrmProject({ name: config.projectName.trim(), iriBase });
   for (const ctx of contexts) {
     project.addDomain({ path: `domains/${ctx}.orm.yaml`, context: ctx });
   }

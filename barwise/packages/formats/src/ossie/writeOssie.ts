@@ -358,6 +358,11 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   if (model.domainContext) {
     lose("model", `domain context ${model.domainContext} not written`, { kind: "model" });
   }
+  if (model.namespace) {
+    // An element's identity IRI needs local-name ids, which arrive with
+    // format 4.0 (iri-identity WS6); until then the namespace is a loss.
+    lose("model", `namespace ${model.namespace} not written`, { kind: "model" });
+  }
 
   if (ontology.length === 0) {
     // The schema requires one concept, and the importer refuses none; a

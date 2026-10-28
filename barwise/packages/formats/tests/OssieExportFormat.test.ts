@@ -446,6 +446,14 @@ describe("Ossie export: the loss report", () => {
     ]));
   });
 
+  it("names a model's namespace as not written, until ids are local names", () => {
+    const m = new OrmModel({ name: "M", namespace: "https://data.acme.com/sales/" });
+    entity(m, "Customer");
+    expect(exported(m).losses).toContain(
+      "model: namespace https://data.acme.com/sales/ not written",
+    );
+  });
+
   it("does not write a composite identifier over a ring binary, which the importer refuses", () => {
     const m = new OrmModel({ name: "M" });
     const p = entity(m, "Person");

@@ -287,3 +287,54 @@ describe("projectRules", () => {
     });
   });
 });
+
+describe("projectRules: namespaces (iri-identity WS4)", () => {
+  const ruleIds = (project: OrmProject) => projectRules(project).map((d) => d.ruleId);
+
+  it("reports a domain namespace the project's iri_base overrides, naming both", () => {
+    const project = new OrmProject({ name: "Acme", iriBase: "https://data.acme.com/acme/" });
+    project
+      .addDomain({ path: "domains/ordering.orm.yaml", context: "ordering" })
+      .setModel(new OrmModel({ name: "Ordering", namespace: "https://x.example/a/" }));
+    const [d] = projectRules(project).filter(
+      (x) => x.ruleId === "project/domain-namespace-overridden",
+    );
+    expect(d?.severity).toBe("error");
+    expect(d?.message).toContain("https://x.example/a/");
+    expect(d?.message).toContain("https://data.acme.com/acme/ordering/");
+  });
+
+  it("accepts a domain's own namespace in a project without iri_base", () => {
+    const project = new OrmProject({ name: "Acme" });
+    project
+      .addDomain({ path: "domains/ordering.orm.yaml", context: "ordering" })
+      .setModel(new OrmModel({ name: "Ordering", namespace: "https://x.example/a/" }));
+    expect(ruleIds(project)).toEqual([]);
+  });
+
+  it("reports two contexts that normalize to one namespace, with no model loaded", () => {
+    const project = new OrmProject({ name: "Acme", iriBase: "https://data.acme.com/acme/" });
+    project.addDomain({ path: "a.orm.yaml", context: "Order Mgmt" });
+    project.addDomain({ path: "b.orm.yaml", context: "Order_Mgmt" });
+    const [d] = projectRules(project).filter((x) => x.ruleId === "project/duplicate-namespace");
+    expect(d?.message).toContain("https://data.acme.com/acme/Order_Mgmt/");
+    expect(d?.message).toContain('"Order Mgmt", "Order_Mgmt"');
+  });
+
+  it("reports two domains declaring one namespace in a project without iri_base", () => {
+    const project = new OrmProject({ name: "Acme" });
+    for (const context of ["crm", "billing"]) {
+      project
+        .addDomain({ path: `${context}.orm.yaml`, context })
+        .setModel(new OrmModel({ name: context, namespace: "https://x.example/core/" }));
+    }
+    expect(ruleIds(project)).toEqual(["project/duplicate-namespace"]);
+  });
+
+  it("reports nothing for distinct namespaces", () => {
+    const project = new OrmProject({ name: "Acme", iriBase: "https://data.acme.com/acme/" });
+    project.addDomain({ path: "a.orm.yaml", context: "crm" });
+    project.addDomain({ path: "b.orm.yaml", context: "billing" });
+    expect(ruleIds(project)).toEqual([]);
+  });
+});

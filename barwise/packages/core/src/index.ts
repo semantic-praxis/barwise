@@ -119,6 +119,7 @@ export {
 } from "./model/identification.js";
 export { ModelElement } from "./model/ModelElement.js";
 export { localName } from "./model/name.js";
+export { type DomainRef, namespaceOf } from "./model/namespace.js";
 export {
   ObjectifiedFactType,
   type ObjectifiedFactTypeConfig,
@@ -193,6 +194,7 @@ export {
 } from "./project/index.js";
 export { canonicalJson, derivedId } from "./serialization/derivedId.js";
 export {
+  CURRENT_MAPPING_FORMAT_VERSION,
   MappingDeserializationError,
   MappingSerializer,
 } from "./serialization/MappingSerializer.js";
@@ -213,6 +215,7 @@ export {
   ProjectLoadError,
 } from "./serialization/projectAssembly.js";
 export {
+  CURRENT_PROJECT_FORMAT_VERSION,
   ProjectDeserializationError,
   ProjectSerializer,
 } from "./serialization/ProjectSerializer.js";
