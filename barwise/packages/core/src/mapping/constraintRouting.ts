@@ -370,7 +370,7 @@ function routeAll(
   }
 }
 
-/** Keep the first occurrence of each key, preserving order. */
+/** Each placement once per table and constraint, in order: one pass. */
 function onePerTable(placements: readonly ConstraintPlacement[]): ConstraintPlacement[] {
   const seen = new Map<string, Set<unknown>>();
   return placements.filter(({ tableName, inView }) => {
@@ -382,6 +382,7 @@ function onePerTable(placements: readonly ConstraintPlacement[]): ConstraintPlac
   });
 }
 
+/** Keep the first occurrence of each key, preserving order. */
 function dedupeBy<T>(items: readonly T[], key: (item: T) => string): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
