@@ -51,7 +51,10 @@ field can occur, and nothing in barwise restates that graph.
 
 - **(a) ajv over the pinned schema.** Compile `ontology.json`, with
   `ossie-schema.json` registered under the URL its `$ref`s name, as the
-  export test already does. Validate the raw parsed document with
+  export test already does (but with the named `{ Ajv2020 }` import, as
+  core imports `{ Ajv }`: the test's default import does not type-check
+  under NodeNext, and only passes because tests are not compiled).
+  Validate the raw parsed document with
   `allErrors`, keep the `additionalProperties` errors, and render each as a
   path. Coverage is every object the schema closes, including the ones
   inside `ontology_mappings` and its `semantic_model` (which refers to the
@@ -97,10 +100,18 @@ In scope:
 
 - When an imported document has a field the pinned schema does not define,
   at any depth, the importer shall add one warning per field, naming its
-  path from the document root (`ontology[3].relationships[0].colour`), with
-  the concept's name beside a path under `ontology[i]`, and proceed as it
-  does today. The confidence becomes `medium`, which any warning already
-  makes it.
+  path in the vocabulary `parseOssie`'s refusals already use: a path under
+  `ontology[i]` starts `concept <name>`
+  (`concept Airport.relationships[0].colour`), any other starts at the
+  document root (`colour`, `ontology_mappings[0].extra`). It then proceeds
+  as it does today. The confidence becomes `medium`, which any warning
+  already makes it.
+- That includes a field inside `ontology_mappings`, which the mapper
+  already drops whole with a warning. Skipping it would take a list of
+  the subtrees the mapper drops, which must agree with the mapper and
+  would go silent the day the mapper starts reading one; one uniform rule
+  needs no list. The cost is a warning per unknown key in a deprecated
+  block, which documents in practice do not carry.
 - When a document has no such field, the importer's warnings shall be
   exactly what they are today. The pinned `flights.ontology.yaml` imports
   with the same warning list (its existing `toEqual` test pins this).
@@ -112,16 +123,22 @@ In scope:
   about the document's shape, and the mapper's are about what the model
   could not carry.
 
-Out of scope: schema violations other than an unknown field. Each is either
-refused already or sits where nothing is imported. A field the mapper reads
-is type-checked by `parseOssie`, which refuses a wrong one. Everything else
-the schema constrains is inside a subtree the importer drops whole with a
-warning: `ontology_mappings` (its `anyOf`, `minItems` and `required`),
-`ai_context`, and the `format: "iri"` on `prefixes` values. So decision 4
-holds for them without a check, and reporting them would add warnings about
-data barwise already says it discards. If a later pin makes the mapper read
-one of those places, `parseOssie` gains the check, as for every field it
-reads.
+Out of scope: schema violations other than an unknown field, because none
+of them loses anything a warning does not already name. A field the mapper
+reads is type-checked by `parseOssie`, which refuses a wrong one.
+Everything else the schema constrains is inside a subtree the importer
+drops whole with a warning: `ontology_mappings` (its `anyOf`, `minItems`
+and `required`), `ai_context`, and the `format: "iri"` on `prefixes`
+values. An unknown field is different in kind: it sits beside fields that
+are imported, and nothing else names it. If a later pin makes the mapper
+read one of those subtrees, `parseOssie` gains the check, as for every
+field it reads.
+
+Also out of scope, and still open after this spec: a later upstream commit
+that keeps `0.2.0.dev0` but changes a field's type, an enum, or a meaning,
+or removes a field. The check here catches the one change of that kind a
+schema can see on the document -- an added field -- and decision 3's
+Consequences bullet says the rest stays open.
 
 ## Target architecture
 
@@ -146,22 +163,35 @@ formats/src/ossie/OssieImportFormat.ts
 
 The validator compiles on first use and is kept at module scope: most
 processes never import Ossie, and the compile is the expensive part.
-ajv's run-time options are the export test's strict ones with
-`validateFormats: false`, since no format result is read; the export test
-keeps its own `iri` format by passing an ajv it configured to
-`compileOssieSchema`.
 
-The rendering is mechanical: ajv's `instancePath` (a JSON pointer) becomes
-dotted keys and bracketed indexes, the unknown key comes from
-`params.additionalProperty`, and a key that is not a plain identifier is
-written as a JSON string in brackets.
+The run-time ajv is not strict (`strict: false`, `validateFormats: false`,
+`allErrors: true`). Strict mode checks how a schema is written, not the
+document, so at run time it can only turn a re-pinned schema it dislikes
+into a generic ajv error on every Ossie import. The export test keeps
+strict mode and its own `iri` format by passing an ajv it configured to
+`compileOssieSchema`, so a schema strict mode refuses still fails CI.
+
+`compileOssieSchema` registers `ossie-schema.json` as imported, its `$id`
+kept, under the URL the `$ref`s name. The export test deletes the `$id`
+first; that would mutate the imported JSON module, which the run-time
+validator shares, and keeping it compiles and validates the same
+(measured).
+
+The path is rendered by walking the raw document along ajv's
+`instancePath`, decoding each JSON-pointer segment (`~1` to `/`, `~0` to
+`~`): a segment over an array is an index (`[0]`), over a mapping a key.
+A key that is not a plain identifier is written as a JSON string in
+brackets (`["a/b"]`), whether it is the unknown field or a key on the way
+to it. The unknown key itself is `params.additionalProperty`.
 
 One assumption is checked rather than stated: an `additionalProperties`
-error under a `oneOf` or `anyOf` branch that failed would name a field the
-document's matching branch does define. The pinned schemas put
-`additionalProperties: false` under no such branch (AIContext's object
-branch sets `true`), and a test walks both files and fails if a later pin
-does.
+error under a `oneOf`, `anyOf`, `not`, `if`/`then`/`else` or
+`dependentSchemas` branch that failed would name a field the document's
+matching branch does define. The pinned schemas reach no closed object
+from any such branch (AIContext's object branch sets
+`additionalProperties: true`). A test walks both schemas from
+`ontology.json`'s root, following `$ref` into either file, and fails if a
+closed object is reachable from inside a branch.
 
 ## Workstreams
 
@@ -169,29 +199,38 @@ does.
 
 One PR: move the schemas, add `ossieSchema.ts`, change `parseOssie`'s
 return and the adapter, point the export test at the moved files and at
-`compileOssieSchema`, update the formats `CLAUDE.md` (layout and allowed
-dependencies), and edit the ADR's Consequences bullets for decisions 3 and
-4 in place so they no longer describe the gap as open.
+`compileOssieSchema`, and update the formats `CLAUDE.md` (layout and
+allowed dependencies). In the ADR, edit in place: decision 3's statement
+(the files are vendored under `formats/schemas/ossie/`, not as test
+fixtures), its Consequences bullet (an added field is now named at run
+time; any other change under the same version string still is not), and
+decision 4's Consequences bullet (the unknown-field gap is closed).
 
-Tests, each seen failing before the change:
+Tests seen failing before the change:
 
 - an unknown field at the top level, in a concept, in a relationship and in
   a role, each named by path, with the rest of the document imported;
 - an unknown field inside `ontology_mappings` named as well;
-- a key that is not an identifier rendered in brackets;
-- the flights example's warnings unchanged (existing test);
-- no `additionalProperties: false` under `oneOf` or `anyOf` in either
-  vendored schema.
+- a key that is not an identifier, and a numeric key, rendered in brackets.
+
+Tests that pass before the change by construction, and how each is shown
+able to fail:
+
+- the flights example's warnings unchanged: the existing `toEqual` test,
+  which fails if the check reports anything on the example;
+- no closed object reachable from a branch: the walker is also run on a
+  small synthetic schema that reaches one through a `$ref` under `oneOf`,
+  and must report it.
 
 ## Risks and testing
 
 - **Bundle size and start-up.** ajv's 2020 dialect and the 24 KB of schema
   join the CLI, MCP and VS Code bundles; the compile runs only when an
   Ossie document is imported.
-- **A re-pinned schema strict mode refuses.** The run-time compile uses
-  strict mode, so a schema ajv cannot compile would make every Ossie import
-  throw. The import and export tests compile it, so moving the pin to such
-  a schema fails CI first.
+- **A re-pinned schema ajv cannot compile.** Strict mode is off at run
+  time (Target architecture), so only a schema that is not valid JSON
+  Schema could throw there; the import tests compile it, and the export
+  test compiles it strictly, so moving the pin to either fails CI first.
 - Run the monorepo build and tests: `@barwise/formats` is bundled by three
   surfaces.
 
