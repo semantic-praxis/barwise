@@ -78,3 +78,14 @@ listed. An impact report now words a constraint "states constraint X",
 not "enforces". A constraint over subtypes that an export reports also
 carries an example of the instance it forbids: "one Party in both
 LegalEntity and NaturalPerson".
+
+### The dbt export writes the current test syntax
+
+`schema.yml` now lists tests under `data_tests:` and puts each test's
+inputs under `arguments:`, such as a relationships test's `to` and
+`field`. dbt 1.10.8 and later warn on the old form, and dbt requires that
+warning resolved before the move to Fusion (dbt 2.x). A project on dbt
+1.10.5 to 1.10.7 reads the new form without a warning once it sets
+`require_generic_test_arguments_property: true`. One before 1.10.5
+cannot read it. Re-importing a project in either form gives the same
+model.

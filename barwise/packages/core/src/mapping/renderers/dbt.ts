@@ -130,13 +130,25 @@ export function dbtKeyTestColumns(table: Table): readonly string[] | undefined {
 interface SchemaModel {
   name: string;
   columns: SchemaColumn[];
-  tests?: Array<Record<string, unknown>>;
+  data_tests?: Array<Record<string, unknown>>;
 }
 
 interface SchemaColumn {
   name: string;
   data_type: string;
-  tests?: Array<string | Record<string, unknown>>;
+  data_tests?: Array<string | Record<string, unknown>>;
+}
+
+/**
+ * A generic test with its arguments under `arguments:`. From dbt 1.10.8
+ * (the flag `require_generic_test_arguments_property`, true by default
+ * there) arguments beside the test name raise a deprecation, and dbt
+ * requires every deprecation resolved before the move to Fusion
+ * (dbt-export-current-test-syntax.spec.md, barwise-fnt). The importer reads
+ * both forms.
+ */
+function genericTest(name: string, args: Record<string, unknown>): Record<string, unknown> {
+  return { [name]: { arguments: args } };
 }
 
 function renderSchemaYaml(
@@ -161,7 +173,7 @@ function buildSchemaModel(table: Table, genRelTests: boolean): SchemaModel {
       data_type: col.dataType,
     };
     if (tests.length > 0) {
-      entry.tests = tests;
+      entry.data_tests = tests;
     }
     return entry;
   });
@@ -174,7 +186,9 @@ function buildSchemaModel(table: Table, genRelTests: boolean): SchemaModel {
   return {
     name: table.name,
     columns,
-    ...(key ? { tests: [{ [DBT_KEY_TEST]: { combination_of_columns: [...key] } }] } : {}),
+    ...(key
+      ? { data_tests: [genericTest(DBT_KEY_TEST, { combination_of_columns: [...key] })] }
+      : {}),
   };
 }
 
@@ -202,12 +216,10 @@ function buildColumnTests(
   if (genRelTests) {
     const fk = findForeignKeyForColumn(col.name, table.foreignKeys);
     if (fk) {
-      tests.push({
-        relationships: {
-          to: `ref('${fk.referencedTable}')`,
-          field: fk.referencedColumns[0],
-        },
-      });
+      tests.push(genericTest("relationships", {
+        to: `ref('${fk.referencedTable}')`,
+        field: fk.referencedColumns[0],
+      }));
     }
   }
 

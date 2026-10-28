@@ -146,7 +146,7 @@ describe("dbt renderer", () => {
       const parsed = parse(dbt.schemaYaml) as {
         models: Array<{
           name: string;
-          columns: Array<{ name: string; tests?: unknown[]; }>;
+          columns: Array<{ name: string; data_tests?: unknown[]; }>;
         }>;
       };
 
@@ -156,7 +156,7 @@ describe("dbt renderer", () => {
       const pkCol = customerModel.columns.find(
         (c) => c.name === "customer_id",
       )!;
-      expect(pkCol.tests).toContain("not_null");
+      expect(pkCol.data_tests).toContain("not_null");
     });
 
     it("generates unique tests for single-column PKs", () => {
@@ -169,7 +169,7 @@ describe("dbt renderer", () => {
       const parsed = parse(dbt.schemaYaml) as {
         models: Array<{
           name: string;
-          columns: Array<{ name: string; tests?: unknown[]; }>;
+          columns: Array<{ name: string; data_tests?: unknown[]; }>;
         }>;
       };
 
@@ -179,7 +179,7 @@ describe("dbt renderer", () => {
       const pkCol = customerModel.columns.find(
         (c) => c.name === "customer_id",
       )!;
-      expect(pkCol.tests).toContain("unique");
+      expect(pkCol.data_tests).toContain("unique");
     });
 
     it("generates relationship tests for FK columns", () => {
@@ -199,7 +199,7 @@ describe("dbt renderer", () => {
       const parsed = parse(dbt.schemaYaml) as {
         models: Array<{
           name: string;
-          columns: Array<{ name: string; tests?: unknown[]; }>;
+          columns: Array<{ name: string; data_tests?: unknown[]; }>;
         }>;
       };
 
@@ -207,13 +207,15 @@ describe("dbt renderer", () => {
       const fkCol = orderModel.columns.find(
         (c) => c.name === "customer_id",
       )!;
-      const relTest = fkCol.tests?.find(
+      const relTest = fkCol.data_tests?.find(
         (t) => typeof t === "object" && t !== null && "relationships" in t,
-      ) as { relationships: { to: string; field: string; }; } | undefined;
+      );
 
-      expect(relTest).toBeDefined();
-      expect(relTest!.relationships.to).toBe("ref('customer')");
-      expect(relTest!.relationships.field).toBe("customer_id");
+      // Arguments under `arguments:`, as dbt 1.10.8 reads them without a
+      // deprecation (barwise-fnt).
+      expect(relTest).toEqual({
+        relationships: { arguments: { to: "ref('customer')", field: "customer_id" } },
+      });
     });
 
     it("omits relationship tests when disabled", () => {
@@ -233,7 +235,7 @@ describe("dbt renderer", () => {
       const parsed = parse(dbt.schemaYaml) as {
         models: Array<{
           name: string;
-          columns: Array<{ name: string; tests?: unknown[]; }>;
+          columns: Array<{ name: string; data_tests?: unknown[]; }>;
         }>;
       };
 
@@ -241,11 +243,34 @@ describe("dbt renderer", () => {
       const fkCol = orderModel.columns.find(
         (c) => c.name === "customer_id",
       )!;
-      const relTest = fkCol.tests?.find(
+      const relTest = fkCol.data_tests?.find(
         (t) => typeof t === "object" && t !== null && "relationships" in t,
       );
 
       expect(relTest).toBeUndefined();
+    });
+
+    it("writes data_tests: with each test's inputs under arguments:, and no tests: key (barwise-fnt)", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .withEntityType("Order", { referenceMode: "order_id" })
+        .withBinaryFactType("Order is placed by Customer", {
+          role1: { player: "Order", name: "is placed by" },
+          role2: { player: "Customer", name: "places" },
+          uniqueness: "role1",
+          mandatory: "role1",
+        })
+        .build();
+      const yaml = renderDbt(mapper.map(model)).schemaYaml;
+      expect(yaml).not.toMatch(/^\s*tests:/m);
+      expect(yaml).toContain(
+        [
+          "          - relationships:",
+          "              arguments:",
+          "                to: ref('customer')",
+          "                field: customer_id",
+        ].join("\n"),
+      );
     });
 
     it("does not add tests to nullable non-key columns", () => {
@@ -264,7 +289,7 @@ describe("dbt renderer", () => {
       const parsed = parse(dbt.schemaYaml) as {
         models: Array<{
           name: string;
-          columns: Array<{ name: string; tests?: unknown[]; }>;
+          columns: Array<{ name: string; data_tests?: unknown[]; }>;
         }>;
       };
 
@@ -275,7 +300,7 @@ describe("dbt renderer", () => {
         (c) => c.name === "nickname",
       )!;
       // Nullable column with no special role -- should have no tests key.
-      expect(nickCol.tests).toBeUndefined();
+      expect(nickCol.data_tests).toBeUndefined();
     });
   });
 
@@ -312,9 +337,9 @@ describe("dbt renderer", () => {
 
       const schema = mapper.map(model);
       const doc = parse(renderDbt(schema).schemaYaml) as {
-        models: Array<{ name: string; tests?: unknown[]; }>;
+        models: Array<{ name: string; data_tests?: unknown[]; }>;
       };
-      const tests = Object.fromEntries(doc.models.map((m) => [m.name, m.tests]));
+      const tests = Object.fromEntries(doc.models.map((m) => [m.name, m.data_tests]));
       const key = schema.tables.find((t) => t.name === "student_enrolls_in_course")!
         .primaryKey.columnNames;
       expect(key).toHaveLength(2);
@@ -322,7 +347,11 @@ describe("dbt renderer", () => {
         student: undefined,
         course: undefined,
         student_enrolls_in_course: [
-          { "dbt_utils.unique_combination_of_columns": { combination_of_columns: key } },
+          {
+            "dbt_utils.unique_combination_of_columns": {
+              arguments: { combination_of_columns: key },
+            },
+          },
         ],
       });
     });

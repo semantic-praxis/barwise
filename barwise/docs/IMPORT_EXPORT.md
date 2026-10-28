@@ -144,7 +144,11 @@ barwise export clinic.orm.yaml --format openapi --output api-spec.json
 
 - One SQL model file per entity (with `SELECT` from `source()`)
 - A consolidated `models/schema.yml` with column descriptions,
-  data types, and tests (not_null, unique, relationships)
+  data types, and tests (not_null, unique, relationships) under
+  `data_tests:`. A test's inputs sit under `arguments:`, which dbt reads
+  without a warning from 1.10.8 (or from 1.10.5 with the flag
+  `require_generic_test_arguments_property: true`) and requires before
+  the move to Fusion. A project on dbt before 1.10.5 cannot read them.
 - Seed CSV files when population data exists
 
 **When to use it**:
