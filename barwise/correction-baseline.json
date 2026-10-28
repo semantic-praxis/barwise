@@ -193,6 +193,12 @@
       "caught_by": "reasoning",
       "note": "A reviewer's objection, in one sentence -- do not build what others have built better -- before anything was re-run. The draft had rejected gitleaks on two grounds that both turn out weak: CLAUDE.md's no-trivial-dependencies rule is about what Node core provides, and the first-party-actions constraint is satisfied by a pinned tarball with a verified digest."
     },
+    "dbt-export-current-test-syntax::a7b541c918f8": {
+      "spec": "dbt-export-current-test-syntax.spec.md",
+      "excerpt": "- renderdbt shall write datatests: on columns and models. - it shall write every test that takes arguments through one helper, generictest(name, args), which re",
+      "caught_by": "reasoning",
+      "note": "The high implementation review read dbt behaviour against the parser: dropping every arguments key lost an older test input of that name, and the top level winning disagreed with dbt from 1.10.8, so both were corrected."
+    },
     "ddl-import-fidelity::0d08b981db76": {
       "spec": "ddl-import-fidelity.spec.md",
       "excerpt": "the existing tests did not catch any of this. ddlimportformat.test.ts asserts that some mandatory constraint exists (tobegreaterthan(0)), never which role it is",

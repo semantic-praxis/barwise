@@ -1,6 +1,6 @@
 # The dbt export writes the current test syntax
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -11,7 +11,8 @@ barwise/packages/core/tests/mapping/dbt.test.ts,
 barwise/packages/dbt/src/DbtSchemaParser.ts,
 barwise/packages/dbt/tests/DbtSchemaParser.test.ts,
 barwise/docs/IMPORT_EXPORT.md,
-barwise/docs/release-notes/unreleased.md
+barwise/docs/release-notes/unreleased.md,
+barwise/trial/lib/generators/dbt.mjs
 
 When barwise exports a dbt project, each generic test that takes
 arguments shall carry them under `arguments:`, and tests shall be listed
@@ -110,6 +111,31 @@ Out of scope:
   today; the implementation re-checks by reading the rendered YAML.
 - barwise-ivl's `constraints:` block, which comes next and uses no
   generic test.
+
+## Implementation notes
+
+- As planned. The export writes `data_tests:` and puts the inputs of
+  `relationships` and `dbt_utils.unique_combination_of_columns` under
+  `arguments:`. The guide and the release note give the version rule
+  (warning-free from 1.10.8, or from 1.10.5 with the flag set). The trial
+  generator keeps the old form on purpose, with a comment saying why.
+- Red check: on the unfixed source, four renderer tests and the parser
+  test fail. With the fix the core, dbt, cli, mcp and formats suites
+  pass, and `compositeKeyExport.test.ts` round-trips unchanged.
+- Implementation review, fixed:
+  - The parser drops the `arguments` key only when it is a block. An
+    older test's own input named `arguments` (a list, say) is kept, as it
+    was before.
+  - Where a half-migrated test names one input both ways, `arguments:`
+    now wins. That is what dbt does from 1.10.8, so the test imports as
+    dbt runs it. barwise-lqj had let the top level win, and no test or
+    spec line depended on that.
+  - A renderer test pins the emitted YAML text of a relationships test and
+    asserts no `tests:` key appears anywhere. That also closes the two
+    tests that could pass with the tests written under the old key.
+  - Parser tests pin a column's `relationships` read from `arguments:`,
+    the precedence, and the kept older input.
+  - The trial generator is in Touches.
 
 ## Open decisions
 

@@ -176,15 +176,18 @@ function parseObjectTest(raw: Record<string, unknown>): DbtTest[] {
       ? (value as Record<string, unknown>)
       : {};
     // dbt 1.10 moves a test's arguments under `arguments:`; read either
-    // spelling, the top level winning where both name one key
-    // (dbt-composite-key-tests.spec.md, barwise-lqj).
-    const { arguments: args, ...rest } = given;
-    // The `arguments` object itself is not an argument: without dropping
-    // it, a test read from the new form kept it in its config, so the two
-    // forms read back differently (barwise-fnt).
-    const config = args !== null && typeof args === "object" && !Array.isArray(args)
-      ? { ...(args as Record<string, unknown>), ...rest }
-      : rest;
+    // spelling (dbt-composite-key-tests.spec.md, barwise-lqj). Where both
+    // name one input, `arguments:` wins, as it does in dbt from 1.10.8, so
+    // a half-migrated test imports as dbt runs it. The block itself is not
+    // an input and is dropped, so the two forms read back alike; anything
+    // else named `arguments` (an older test's own input) is kept
+    // (dbt-export-current-test-syntax.spec.md, barwise-fnt).
+    const args = given["arguments"];
+    const block = args !== null && typeof args === "object" && !Array.isArray(args)
+      ? (args as Record<string, unknown>)
+      : undefined;
+    const { arguments: _block, ...rest } = given;
+    const config = block ? { ...rest, ...block } : given;
 
     switch (key) {
       case "not_null":

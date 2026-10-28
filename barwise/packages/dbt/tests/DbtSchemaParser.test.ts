@@ -288,8 +288,43 @@ ${test}
           arguments:
             combination_of_columns: [student_id, course_id]`;
 
+    const read = (y: string) => parseDbtSchema([yamlOf(y)]).models[0]!.modelTests;
+
+    it("reads a column's relationships test from arguments:", () => {
+      const doc = parseDbtSchema([`
+version: 2
+models:
+  - name: enrollment
+    columns:
+      - name: student_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('student')
+                field: student_id
+`]);
+      expect(doc.models[0]!.columns[0]!.tests).toEqual([
+        { type: "relationships", to: "student", field: "student_id" },
+      ]);
+    });
+
+    it("takes arguments: over the top level where both name one input, as dbt 1.10.8 does", () => {
+      const mixed = `      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [legacy_id]
+          arguments:
+            combination_of_columns: [student_id, course_id]`;
+      expect(read(mixed)).toEqual(read(current));
+    });
+
+    it("keeps an older test's own input named arguments", () => {
+      const own = `      - my_pkg.check:
+          arguments: [a, b]`;
+      expect(read(own)).toEqual([
+        { type: "custom", name: "my_pkg.check", config: { arguments: ["a", "b"] } },
+      ]);
+    });
+
     it("reads back as the top-level form does", () => {
-      const read = (y: string) => parseDbtSchema([yamlOf(y)]).models[0]!.modelTests;
       expect(read(current)).toEqual(read(old));
       expect(read(current)).toEqual([{
         type: "custom",

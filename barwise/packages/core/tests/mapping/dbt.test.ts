@@ -250,6 +250,29 @@ describe("dbt renderer", () => {
       expect(relTest).toBeUndefined();
     });
 
+    it("writes data_tests: with each test's inputs under arguments:, and no tests: key (barwise-fnt)", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Customer", { referenceMode: "customer_id" })
+        .withEntityType("Order", { referenceMode: "order_id" })
+        .withBinaryFactType("Order is placed by Customer", {
+          role1: { player: "Order", name: "is placed by" },
+          role2: { player: "Customer", name: "places" },
+          uniqueness: "role1",
+          mandatory: "role1",
+        })
+        .build();
+      const yaml = renderDbt(mapper.map(model)).schemaYaml;
+      expect(yaml).not.toMatch(/^\s*tests:/m);
+      expect(yaml).toContain(
+        [
+          "          - relationships:",
+          "              arguments:",
+          "                to: ref('customer')",
+          "                field: customer_id",
+        ].join("\n"),
+      );
+    });
+
     it("does not add tests to nullable non-key columns", () => {
       const model = new ModelBuilder("Test")
         .withEntityType("Customer", { referenceMode: "customer_id" })
