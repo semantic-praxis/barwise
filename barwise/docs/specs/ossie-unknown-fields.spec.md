@@ -1,6 +1,6 @@
 # The Ossie importer names every field the pinned schema does not define
 
-Status: Draft -- no workstream implemented
+Status: Implemented -- WS1
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -18,7 +18,9 @@ barwise/packages/formats/tests/OssieExportFormat.test.ts,
 barwise/packages/formats/package.json,
 barwise/packages/formats/CLAUDE.md,
 barwise/package-lock.json,
-barwise/docs/adr/ossie-interchange.md
+barwise/docs/adr/ossie-interchange.md,
+barwise/docs/CLI.md,
++barwise/packages/formats/tests/OssieSchema.test.ts
 
 When an imported Ossie document carries a field the pinned schema does not
 define, the importer shall name that field, by its path, in

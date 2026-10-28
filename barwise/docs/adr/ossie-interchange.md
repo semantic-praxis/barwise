@@ -59,9 +59,10 @@ recorded in barwise-wcg until that issue's spec holds it.
 3. **One pinned version, and any other is refused.** The importer reads
    exactly the version string `@barwise/formats` pins (`OSSIE_VERSION`,
    `0.2.0.dev0`) and refuses any other, naming both. The schema that
-   version means is Ossie commit `01a5488d`, whose files are vendored as
-   the test fixtures. Moving the pin is a spec change, with the fixture
-   diff in the same PR.
+   version means is Ossie commit `01a5488d`: its schema files are vendored
+   in `formats/schemas/ossie/`, which the importer reads at run time and
+   the tests read too, and its example is a test fixture. Moving the pin is
+   a spec change, with the diff of those files in the same PR.
 4. **Nothing is lost silently.** The importer names in
    `ImportResult.warnings` every construct it cannot carry; the exporter
    names every construct it cannot write in the loss comment block at the
@@ -99,17 +100,23 @@ recorded in barwise-wcg until that issue's spec holds it.
   'true'`). Only the string is checked at run time, and `0.2.0.dev0` is a
   development version that upstream can change without renaming, so a
   document written against a later commit that keeps the string passes.
-  The commit pin holds only for the fixtures.
+  One such change is caught at run time: a field the later commit added
+  is not in the pinned schema, so it is named in the warnings (decision 4,
+  below). A changed type, enum or meaning, or a removed field, under the
+  same string is not; for those the commit pin holds only for the tests.
 - Decision 4 is tested on the pinned example and on unit cases.
   `OssieExportFormat.test.ts` imports `flights.ontology.yaml`, exports it,
   and compares the result construct by construct, excluding only what the
   import warned about; it also validates two exports, the example's and a
   small built model's, against the pinned `ontology.json`. That proves
   nothing is dropped silently only for constructs the example and the
-  unit cases contain. Two gaps are known. The importer does not validate
-  against the pinned schema at run time (`@barwise/formats` carries no
-  JSON-schema validator), so a field the schema does not define is
-  ignored without a warning (barwise-pf2.6d0). And the exporter decides
+  unit cases contain. A field the pinned schema does not define is named
+  in the import warnings by its path: the importer validates the document
+  against the vendored schema with ajv at run time
+  (`formats/src/ossie/ossieSchema.ts`, tested in
+  `OssieImportFormat.test.ts`, "Ossie import: fields the pinned schema does
+  not define"; `docs/specs/ossie-unknown-fields.spec.md`, barwise-pf2.6d0).
+  One gap is known: the exporter decides
   what is a loss by predicting what the importer will read back; three
   review rounds on PR #762 each found a prediction that was wrong, and
   re-importing to verify the loss report is barwise-5bv.

@@ -19,8 +19,10 @@ renderers (`renderDdl`, `renderOpenApi`, `renderAvro`),
 and the SQL cascade parser (`parseSqlFile`). It
 does NOT depend on any editor or tool package.
 
-Allowed runtime dependencies: `@barwise/core`, `yaml`, `fast-xml-parser`.
-No others without discussion. The SQL importer uses `node:fs` for its
+Allowed runtime dependencies: `@barwise/core`, `yaml`, `fast-xml-parser`,
+`ajv`. No others without discussion. `ajv` is there for one reason: the
+Ossie importer validates against the pinned schema at run time, to name
+fields it does not define (`docs/specs/ossie-unknown-fields.spec.md`). The SQL importer uses `node:fs` for its
 directory-scan path and spawns an optional short-lived `python3`
 subprocess for the sqlglot structural tier (allowed outside core; the
 cascade degrades to core's pure regex tier when python3 or sqlglot is
@@ -57,6 +59,8 @@ src/
   norma/NormaXmlTypes.ts         NORMA XML types
   ossie/OssieTypes.ts            The Ossie document shape, the pinned version, built-ins
   ossie/parseOssie.ts            Ossie ontology YAML -> OssieDocument (version pin)
+  ossie/ossieSchema.ts           The pinned schema compiled with ajv; fields it
+                                 does not define, named as warnings
   ossie/mapOssieToOrm.ts         OssieDocument -> ORM model + warnings
   ossie/requiresShapes.ts        The requires expressions read as constraints
   ossie/OssieImportFormat.ts     The importer adapter
@@ -64,10 +68,13 @@ src/
   ossie/OssieExportFormat.ts     The exporter adapter (YAML, loss comment block)
   ossie/verifyOssie.ts           The written text read back and diffed against the
                                  source: a line for what the writer's guesses missed
+schemas/
+  ossie/                   The pinned Apache Ossie schemas, read at run time and
+                           by the tests (README: source, license)
 tests/
   helpers/ModelBuilder.ts  Fluent model builder (test-only)
   fixtures/*.orm           NORMA XML fixtures
-  fixtures/ossie/          The pinned Apache Ossie example and schemas (README: source, license)
+  fixtures/ossie/          The pinned Apache Ossie example (README: source, license)
   *.test.ts                Mirrors src/
 ```
 
