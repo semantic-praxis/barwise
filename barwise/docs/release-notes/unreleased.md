@@ -157,3 +157,12 @@ so the next export keyed the table on an invented column. Where the identifier i
 identified by a value of its own, a subtype keyed on its supertype link),
 the barwise annotation names its columns in a new `identifiedBy` field,
 and the import reads it.
+
+### The Ossie import names fields the pinned schema does not define
+
+A field in an Apache Ossie ontology document that the pinned
+`0.2.0.dev0` schema does not define, such as a typo or a field a later
+upstream commit added under the same version string, used to be ignored
+with no warning. Each one is now named in the import warnings by its
+path (`concept Airport.relationships[0].colour`), and the import
+otherwise proceeds as before, at medium confidence.
