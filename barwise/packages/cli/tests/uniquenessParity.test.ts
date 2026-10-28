@@ -14,20 +14,21 @@ import { describe, expect, it } from "vitest";
 /**
  * Every uniqueness in the model, described by players: an internal one by
  * its fact type's players and the players of the roles it spans, an
- * external one by the players of its roles. The preferred identifiers are
- * left out, as they are the key, not what this compares.
+ * external one by the players of its roles. The key's uniqueness is in
+ * both and compared too. Which one each importer stores as preferred is not
+ * compared: the DDL importer prefers a composite key's uniqueness
+ * (annotation-preferred-identifier.spec.md) and the dbt importer does not
+ * yet (barwise-fuo), and leaving preferred ones out made that difference
+ * read as a missing uniqueness.
  */
 function uniquenesses(model: OrmModel): string[] {
   const name = (id: string) => model.getObjectType(id)?.name ?? "?";
   const roleOwner = new Map(
     model.factTypes.flatMap((f) => f.roles.map((r) => [r.id, { f, player: name(r.playerId) }])),
   );
-  const preferred = new Set(
-    model.objectTypes.map((o) => model.preferredIdentifierOf(o.id)).filter((id) => id),
-  );
   const internal = model.factTypes.flatMap((f) =>
     f.internalConstraints
-      .filter((c) => c.type === "internal_uniqueness" && !preferred.has(c.id))
+      .filter((c) => c.type === "internal_uniqueness")
       .map((c) =>
         `internal on ${f.roles.map((r) => name(r.playerId)).join(" / ")}: ${
           (c as { roleIds: readonly string[]; }).roleIds.map((id) => roleOwner.get(id)!.player)
@@ -38,7 +39,7 @@ function uniquenesses(model: OrmModel): string[] {
       )
   );
   const external = model.constraints
-    .filter((c) => c.type === "external_uniqueness" && !preferred.has(c.id))
+    .filter((c) => c.type === "external_uniqueness")
     .map((c) =>
       `external: ${
         (c as { roleIds: readonly string[]; }).roleIds.map((id) => roleOwner.get(id)?.player ?? "?")

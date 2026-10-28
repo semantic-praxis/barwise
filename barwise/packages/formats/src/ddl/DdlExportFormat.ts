@@ -99,7 +99,14 @@ export class DdlExportFormat implements ExportFormatAdapter {
       // Last, so each line sits directly above what it names. The importer
       // reads these instead of guessing names from columns
       // (ddl-round-trip-fixed-point.spec.md, workstream 4).
-      ddlText = injectBarwiseAnnotations(ddlText, model, schema);
+      ddlText = injectBarwiseAnnotations(
+        ddlText,
+        model,
+        schema,
+        routing.clauses.flatMap((c) =>
+          c.columns ? [{ tableName: c.tableName, columns: c.columns }] : []
+        ),
+      );
     }
 
     // Append population INSERT statements if requested.

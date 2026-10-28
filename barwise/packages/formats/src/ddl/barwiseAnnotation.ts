@@ -15,7 +15,7 @@
 
 import { type OrmModel, subtypeFlagsFromConstraints, validateReadingTemplate } from "@barwise/core";
 import type { DerivationKind, DerivationRule, DerivationStorage, FactType } from "@barwise/core";
-import type { RelationalSchema, Table } from "@barwise/core/mapping";
+import type { RelationalSchema, RoutedUnique, Table } from "@barwise/core/mapping";
 
 const PREFIX = "-- barwise:v1 ";
 /** Any version's line, so a version this reader does not know is named, not taken for plain DDL. */
@@ -41,6 +41,15 @@ export interface TableAnnotation {
    * objectification identifies the same entity.
    */
   readonly supertypes?: readonly SupertypeLink[];
+  /**
+   * The columns the entity's stored preferred identifier is over
+   * (annotation-preferred-identifier.spec.md). Written when they are not
+   * the table's key, which the import reads as the identifier by itself:
+   * an objectifier keyed on its relationship and identified by a value.
+   * And written when they are a one-column key that an identifying
+   * supertype link also is, which the import reads as the link alone.
+   */
+  readonly identifiedBy?: readonly string[];
 }
 
 /** One subtype fact, as a table line carries it. */
@@ -136,6 +145,7 @@ function relationshipOf(model: OrmModel, ft: FactType, table: Table): Relationsh
 export function annotateTable(
   model: OrmModel,
   table: Table,
+  uniques: readonly (readonly string[])[] = [],
 ): { table?: TableAnnotation | FactTableAnnotation; columns: Map<string, ColumnAnnotation>; } {
   const columns = new Map<string, ColumnAnnotation>();
   const source = model.factTypes.find((f) => f.id === table.sourceElementId);
@@ -170,6 +180,7 @@ export function annotateTable(
       ...(sf.definingRule ? { definingRule: sf.definingRule } : {}),
     });
   }
+  const identifiedBy = identifierColumns(model, entity.id, table);
   const tableAnnotation: TableAnnotation = {
     kind: "table",
     table: table.name,
@@ -178,6 +189,9 @@ export function annotateTable(
     ...(entity.definition ? { definition: entity.definition } : {}),
     ...(objectifies ? { objectifies } : {}),
     supertypes,
+    ...(identifiedBy && namesIdentifier(identifiedBy, table, supertypes, uniques)
+      ? { identifiedBy }
+      : {}),
   };
 
   // A role spread over several columns (a composite foreign key) is one
@@ -217,6 +231,70 @@ export function annotateTable(
 }
 
 /**
+ * The table's columns the entity's stored preferred identifier is over,
+ * through each column's `sourceRoleId`. A role of the identifier with no
+ * column of its own is the far role of a binary the entity plays, whose
+ * column the mapper tags with the entity's role: a value column, or a
+ * foreign key. Undefined when a role has no column in this table.
+ */
+function identifierColumns(
+  model: OrmModel,
+  entityId: string,
+  table: Table,
+): string[] | undefined {
+  const id = model.preferredIdentifierOf(entityId);
+  const constraint = id === undefined ? undefined : model.getConstraint(id);
+  if (
+    constraint?.type !== "internal_uniqueness" && constraint?.type !== "external_uniqueness"
+  ) {
+    return undefined;
+  }
+  const columns: string[] = [];
+  for (const roleId of constraint.roleIds) {
+    let own = table.columns.filter((c) => c.sourceRoleId === roleId);
+    if (own.length === 0) {
+      const ft = model.factTypes.find((f) => f.arity === 2 && f.roles.some((r) => r.id === roleId));
+      const near = ft?.roles.find((r) => r.id !== roleId);
+      own = near?.playerId === entityId
+        ? table.columns.filter((c) => c.sourceRoleId === near.id)
+        : [];
+    }
+    if (own.length === 0) return undefined;
+    for (const c of own) if (!columns.includes(c.name)) columns.push(c.name);
+  }
+  return columns;
+}
+
+/**
+ * Whether a table line needs `identifiedBy`, and the import can read it.
+ * The key needs no naming, since the import reads it as the identifier,
+ * unless an identifying supertype link is the key and is read as that
+ * link instead. The columns must be the key or a UNIQUE the dialect
+ * wrote: a dialect with no UNIQUE reports the uniqueness as spilled
+ * already, and naming its columns would only add a warning.
+ */
+function namesIdentifier(
+  columns: readonly string[],
+  table: Table,
+  supertypes: readonly SupertypeLink[],
+  uniques: readonly (readonly string[])[],
+): boolean {
+  const key = table.primaryKey.columnNames;
+  if (!sameColumns(columns, key)) return uniques.some((u) => sameColumns(u, columns));
+  // Only a one-column key gets an identifier beside its link on import.
+  return key.length === 1
+    && supertypes.some((s) => s.providesIdentification && sameColumns(s.columns, key));
+}
+
+/**
+ * Whether two column lists name the same columns, in any order. Shared with
+ * the import, which asks the same question of the lines this side writes.
+ */
+export function sameColumns(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((c) => b.includes(c));
+}
+
+/**
  * Insert the annotation lines into rendered DDL: a table's line above its
  * `CREATE TABLE`, a column's line above the column. Lines the rendering
  * does not recognize pass through unchanged.
@@ -225,6 +303,7 @@ export function injectBarwiseAnnotations(
   ddl: string,
   model: OrmModel,
   schema: RelationalSchema,
+  uniques: readonly RoutedUnique[] = [],
 ): string {
   const result: string[] = [];
   let columns: Map<string, ColumnAnnotation> | undefined;
@@ -234,7 +313,13 @@ export function injectBarwiseAnnotations(
       // A quoted name doubles its quotes; the schema holds it undoubled.
       const name = create[1] ?? create[2]!.replace(/""/g, '"');
       const table = schema.tables.find((t) => t.name === name);
-      const annotated = table ? annotateTable(model, table) : undefined;
+      const annotated = table
+        ? annotateTable(
+          model,
+          table,
+          uniques.filter((u) => u.tableName === name).map((u) => u.columns),
+        )
+        : undefined;
       if (annotated?.table) result.push(renderAnnotation(annotated.table));
       columns = annotated?.columns;
     } else if (columns && line.startsWith(");")) {
@@ -296,7 +381,9 @@ export function readAnnotations(input: string, warnings: string[]): ReadAnnotati
       warnings.push(`Annotation "${line.slice(0, 80)}" is not JSON; ignored.`);
       continue;
     }
-    if (isTableAnnotation(value) || isFactTableAnnotation(value)) {
+    if (isTableAnnotation(value)) {
+      tables.set(value.table.toLowerCase(), withReadableIdentifier(value, warnings));
+    } else if (isFactTableAnnotation(value)) {
       tables.set(value.table.toLowerCase(), value);
     } else if (isColumnAnnotation(value)) columns.set(columnKey(value.table, value.column), value);
     else warnings.push(`Annotation "${line.slice(0, 80)}" has an unknown shape; ignored.`);
@@ -329,6 +416,28 @@ function isTableAnnotation(v: unknown): v is TableAnnotation {
     && (v["objectifies"] === undefined || isRelationship(v["objectifies"]))
     && (v["supertypes"] === undefined
       || Array.isArray(v["supertypes"]) && v["supertypes"].every(isSupertypeLink));
+}
+
+/**
+ * The line without an `identifiedBy` that is not a list of distinct
+ * column names, with a warning. A bad optional field costs only itself:
+ * refusing the line would re-guess the entity's name, definition and
+ * supertypes as well.
+ */
+function withReadableIdentifier(line: TableAnnotation, warnings: string[]): TableAnnotation {
+  const v: unknown = line.identifiedBy;
+  if (
+    v === undefined
+    || Array.isArray(v) && v.length > 0 && v.every(isName) && new Set(v).size === v.length
+  ) {
+    return line;
+  }
+  warnings.push(
+    `Table "${line.table}": the annotation's identifiedBy is not a list of distinct column names; `
+      + `ignored (annotation-preferred-identifier.spec.md).`,
+  );
+  const { identifiedBy: _dropped, ...rest } = line;
+  return rest;
 }
 
 function isSupertypeLink(v: unknown): v is SupertypeLink {
