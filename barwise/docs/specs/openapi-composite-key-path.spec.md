@@ -5,6 +5,7 @@ Status: Proposed
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-pki
+Plan-reviewed: 783aafc7 (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/renderers/openapi.ts,
 barwise/packages/core/tests/mapping/openapi.test.ts,
 barwise/packages/cli/tests/characterization/golden/,
