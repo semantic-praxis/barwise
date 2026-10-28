@@ -1,6 +1,7 @@
 # IRI identity: readable names replace UUIDs (format 4.0)
 
-Status: Draft -- no workstream implemented
+Status: In progress -- WS1 implemented 2026-10-28 (the loader reads a minor of the
+current major, barwise-jj8); WS2 to WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-28

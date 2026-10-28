@@ -26,6 +26,20 @@ export const CURRENT_ORM_VERSION = "3.0";
 export const LEGACY_ORM_VERSION = "2.0";
 
 /**
+ * The first version of the current major, derived from
+ * {@link CURRENT_ORM_VERSION} so a major bump moves it. A file from here up
+ * to the current version is read by the current reader after the
+ * registered minor migrations bring it forward, so a minor bump keeps
+ * every earlier file of its major loadable (barwise-jj8).
+ */
+export const CURRENT_MAJOR_FIRST_VERSION = majorFirst(CURRENT_ORM_VERSION);
+
+/** The first version of `version`'s major: "3.1" gives "3.0". */
+export function majorFirst(version: string): string {
+  return `${version.split(".")[0]}.0`;
+}
+
+/**
  * Upgrades a parsed `.orm.yaml` document from one version to the next.
  *
  * A migration MUST set the document's `orm_version` to its `to` value,
@@ -40,7 +54,9 @@ export interface OrmVersionMigration {
 
 /**
  * Registered migrations on the raw document, applied in chain order on
- * load, up to {@link LEGACY_ORM_VERSION}. 2.0 to 3.0 is not one of them:
+ * load: up to {@link LEGACY_ORM_VERSION} for an older major, and from
+ * {@link CURRENT_MAJOR_FIRST_VERSION} to {@link CURRENT_ORM_VERSION} for a
+ * minor of the current one. 2.0 to 3.0 is not one of them:
  * placing a 2.0 preferred-identifier flag needs the model (Open decision
  * 8 reads object type kinds, objectifications and roles), so a 2.0 file is
  * read into the model and the model is what 3.0 states. A raw document
@@ -139,4 +155,56 @@ export function applyMigrations(
     result = step.migrate(result);
   }
   return result;
+}
+
+/** The versions {@link planRead} decides between; injectable for tests. */
+export interface ReadVersions {
+  readonly current: string;
+  readonly legacy: string;
+  readonly migrations: readonly OrmVersionMigration[];
+}
+
+const THIS_BUILD: ReadVersions = {
+  current: CURRENT_ORM_VERSION,
+  legacy: LEGACY_ORM_VERSION,
+  migrations: ORM_VERSION_MIGRATIONS,
+};
+
+/**
+ * How a document stating a version is read: the raw-document steps to
+ * apply first, then the reader -- the current one, or the previous major's
+ * -- and the version the document states once the steps have run. A
+ * refusal is a newer version; a version between the two majors, or one no
+ * chain reaches (`unknown`); a looping registry (`cycle`); or a version
+ * of the current major that a release wrote -- the major's first, or one a
+ * registered step names -- but whose chain does not reach the current one,
+ * which is a missing registration in barwise (`unregistered`).
+ */
+export type ReadPlan =
+  | {
+    readonly ok: true;
+    readonly reader: "current" | "legacy";
+    readonly target: string;
+    readonly steps: readonly OrmVersionMigration[];
+  }
+  | Extract<MigrationPlan, { ok: false; }>
+  | { readonly ok: false; readonly reason: "unregistered"; };
+
+/** Plan the read of a document stating `version`. Pure. */
+export function planRead(version: string, versions: ReadVersions = THIS_BUILD): ReadPlan {
+  const { current, legacy, migrations } = versions;
+  if (compareOrmVersions(version, current) > 0) return { ok: false, reason: "newer" };
+  if (compareOrmVersions(version, majorFirst(current)) >= 0) {
+    const plan = planMigration(version, current, migrations);
+    if (plan.ok) return { ok: true, reader: "current", target: current, steps: plan.steps };
+    // A major's first version, and any version a step names, was written
+    // by a release, so a missing chain from it is a bug; "3.0.0" or "3"
+    // stays an unknown version.
+    const named = version === majorFirst(current)
+      || migrations.some((m) => m.from === version || m.to === version);
+    return plan.reason === "unknown" && named ? { ok: false, reason: "unregistered" } : plan;
+  }
+  if (compareOrmVersions(version, legacy) > 0) return { ok: false, reason: "unknown" };
+  const plan = planMigration(version, legacy, migrations);
+  return plan.ok ? { ok: true, reader: "legacy", target: legacy, steps: plan.steps } : plan;
 }
