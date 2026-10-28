@@ -3,7 +3,7 @@
 Status: Implemented -- WS1 (import) and WS2 (export and round trip)
 
 Created: 2026-10-24
-Last-updated: 2026-10-27
+Last-updated: 2026-10-28
 Tracking: barwise-pf2.1
 Plan-reviewed: 9a7009d1 (code-review, pr-review)
 Touches: +barwise/packages/formats/src/ossie/,
@@ -195,8 +195,10 @@ Out of scope:
 - **Parsing Ossie's expression language.** `derived_by` and `requires` are
   carried as text, with only the three `requires` shapes above recognized.
   A formal expression language is barwise-pf2.2.
-- **IRIs and prefixes as model fields.** barwise has no field for them;
-  barwise-rqb (custom attributes) is where they would go.
+- **IRIs and prefixes as model fields.** barwise has no field for them
+  today. `docs/adr/ossie-interchange.md` decision 5 makes barwise's own
+  identity an IRI (barwise-wcg), whose spec decides where an outside IRI
+  such as `foaf:Agent` goes.
 - **Hyphen binding in verbalization** (`has average- departure {Delay}`),
   which barwise's verbalizer did not implement for any source:
   barwise-iiw (Open decision 4), since implemented in core
