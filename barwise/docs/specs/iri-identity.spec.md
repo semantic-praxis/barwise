@@ -100,8 +100,9 @@ In scope:
   - fact type: decision 2;
   - role: its fact type's local name, `.`, and its role name, which is
     required today;
-  - constraint, subtype fact, objectification: a name minted once from its
-    canonical verbalization and stored (owner decision, 2026-10-28);
+  - constraint, subtype fact, objectification: a name minted from its
+    canonical verbalization the first time the model is saved, and stored
+    (owner decision, 2026-10-28; WS3);
   - population and fact instance: decision 7.
 - When a rule would give an element a local name another element of the
   model already holds, the system shall append `_2`, `_3`, and report it,
@@ -336,27 +337,58 @@ Grounded 2026-10-28. Two choices the owner made that day shape it:
 
 What ships:
 
-- `mintedName` and `mintedFrom` on every constraint kind, `SubtypeFact`
-  and `ObjectifiedFactType`, written as `name` and `minted_from`, optional
-  in the 3.0 schema. The in-memory `subtype:<sub>:<super>` and
-  `objectified:<ft>:<ot>` display names, which nothing parses, stay until
-  WS6, where an element's id is its name.
-- A minted name collides with nothing: the suffix rule runs over object
-  type and fact type local names and every name already minted, in
-  document order.
-- The content key is diff's: a constraint's is the key diff pairs
-  constraints by in its content pass (`elementDiff.ts`, `constraintKey`
-  over `roleKeys`), exported from `diff/` for one model rather than
-  copied; a subtype fact's is its subtype's and supertype's names, an
-  objectification's its fact type's and object type's. Names, not ids, so
-  WS6's change of ids leaves every key as it was.
-- `structural/stale-minted-name` (warning): an element whose stored
-  `minted_from` differs from its current key, naming the verbalization a
-  fresh name would come from (decision 14). A wording change in a later
-  release changes no key, so it warns about nothing.
-- Diff compares neither field: a minted name is derived, and a file saved
-  before this workstream holds none, so comparing it would report every
-  constraint as changed. Reporting renames is WS5's.
+- **Fields.** `mintedName` and `mintedFrom` on every constraint kind,
+  `SubtypeFact` and `ObjectifiedFactType`, written as `name` and
+  `minted_from`, optional in each of the 3.0 schema's branches for them.
+  In memory a subtype fact's and an objectification's `.name` stays the
+  display string `subtype:<sub>:<super>` until WS6; the YAML `name`
+  maps to `mintedName`, never to that setter.
+- **Minting.** `writeDocument` mints for each such element without a name,
+  in document order, and never for one that has a name: the canonical
+  verbalization's text, its closing period dropped, through `localName()`,
+  with the suffix rule run against object type and fact type local names
+  and every name already held or minted. A verbalization that is not of
+  the element -- the verbalizer's "Malformed:" fallback, or one that names
+  an id because a reference dangles -- mints nothing, so a lenient load
+  never stores a name built from an error.
+- **Kept names.** A name read from a file is kept as it is. Two kept names
+  that collide are reported by WS2's `local-name-collision`, which now
+  also reads minted names, and merge, which copies an incoming element's
+  name, takes the suffix rule for one that clashes with the base.
+- **The content key is barwise's own, built from names.** `mintedKey` in
+  `core/src/model/` computes it: for a constraint, its kind, modality,
+  values, and each role it covers as fact type name, role name and player
+  name (a join constraint's paths the same way, step by step); for a
+  subtype fact, both types' names, `provides_identification` and its
+  defining rule; for an objectification, the fact type's name, its first
+  reading and the object type's name. It is not diff's `constraintKey`:
+  that key is built from ids in places (another fact type's role, a join
+  path, an unresolved reference), so WS6 and merge's re-derived ids would
+  change it, and storing it would make every later change to how diff
+  pairs constraints a format change. Built from names, the key changes
+  when what the verbalization says changes -- a player, a reading, a value
+  -- and not when an id or the verbalizer's wording does.
+- **`structural/stale-minted-name` (warning).** An element whose stored
+  `minted_from` differs from its current `mintedKey`, naming the
+  verbalization a fresh name would come from (decision 14). The fix until
+  WS5's rename covers minted names: delete `name` and `minted_from`, and
+  the next save mints again; the message says so. A `name` with no
+  `minted_from` was written by a person, an LLM or another tool, and is
+  never stale. `mintedKey` needs no verbalizer, so validation gains no
+  import from `verbalization/` or `diff/`.
+- **Lineage ignores both fields.** `hashModel` serializes with minting
+  off and without the two fields, so a recorded export does not go stale
+  when names appear, and its hash does not depend on the verbalizer.
+  Minting costs one verbalization per unnamed element; with it off for
+  hashing, the property laws that hash models twice per case (barwise-939)
+  pay nothing.
+- **Diff compares neither field.** A minted name is derived, and a file
+  saved before this workstream holds none, so comparing it would report a
+  constraint named on one side as modified. Reporting renames is WS5's.
+- **Out of scope:** NORMA's constraint `Name` attribute, which the importer
+  drops and the writer leaves empty today; the tracked corpus, which
+  `barwise migrate` does not rewrite while it is current 3.0, so its names
+  are minted at its first save or by WS7.
 
 ### 4. Namespace declarations (provisional: not yet grounded)
 
