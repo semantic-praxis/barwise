@@ -177,8 +177,8 @@ const THIS_BUILD: ReadVersions = {
  * refusal is a newer version; a version between the two majors, or one no
  * chain reaches (`unknown`); a looping registry (`cycle`); or a version
  * of the current major that a release wrote -- the major's first, or one a
- * registered step names -- but whose chain does not reach the current one, which is a missing registration in barwise
- * (`unregistered`).
+ * registered step names -- but whose chain does not reach the current one,
+ * which is a missing registration in barwise (`unregistered`).
  */
 export type ReadPlan =
   | {
