@@ -142,5 +142,4 @@ A table whose entity objectifies a relationship keyed on one column, such
 as a work order keyed on its batch, used to come back from a DDL export
 with barwise annotations carrying a second identifier. The next export
 then wrote an extra column for it, with a UNIQUE. The import now leaves
-the key to the relationship and restores the entity's preferred
-identifier from the column the annotation names.
+the key to the relationship, so the table exports as it did before.

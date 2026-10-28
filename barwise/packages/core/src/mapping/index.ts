@@ -15,7 +15,11 @@ export {
   type DialectCapabilityProfile,
   resolveDialectProfile,
 } from "./dialectCapabilities.js";
-export { RelationalMapper, type RelationalMapperOptions } from "./RelationalMapper.js";
+export {
+  objectificationGivesKey,
+  RelationalMapper,
+  type RelationalMapperOptions,
+} from "./RelationalMapper.js";
 export type {
   Column,
   ForeignKey,

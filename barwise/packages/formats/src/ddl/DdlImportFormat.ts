@@ -37,6 +37,7 @@ import {
   subtypeConstraintsFromFlags,
   type ValueConstraintDef,
 } from "@barwise/core";
+import { objectificationGivesKey } from "@barwise/core/mapping";
 import { parseSqlDataType, parseValuePredicate } from "@barwise/core/sql";
 import {
   type ColumnAnnotation,
@@ -419,9 +420,6 @@ export class DdlImportFormat implements ImportFormat {
     // The v1 annotation's subtype flags, converted to constraints over the
     // subtype facts once every table's are imported (orm-format-3 WS4b).
     const flagged: FlaggedSubtypeFact[] = [];
-    // Tables whose key the objectified relationship gives (barwise-i3r):
-    // step 3 names their preferred identifier from the table line.
-    const objectifiedKeys = new Set<string>();
     for (const table of accepted) {
       const entity = model.getObjectType(entityMap.get(tableKey(table.name)) ?? "");
       const found = annotations.tables.get(tableKey(table.name));
@@ -431,7 +429,6 @@ export class DdlImportFormat implements ImportFormat {
       // on it (barwise-i3r).
       const objectifiedKey = entity !== undefined
         && keyIdentifiedByObjectification(model, table, entity, consumed);
-      if (objectifiedKey) objectifiedKeys.add(tableKey(table.name));
       const declared = entity && found?.kind === "table" && found.entity === entity.name
         ? found.supertypes
         : undefined;
@@ -623,22 +620,6 @@ export class DdlImportFormat implements ImportFormat {
           );
         }
         if (binary) binaries.set(columnKey(table.name, column.name), binary);
-      }
-
-      // The entity whose key the relationship gives is identified by the
-      // column the table line names as its reference mode, as it was before
-      // export (barwise-i3r); the line says which, the column line rebuilt it.
-      const line = annotations.tables.get(tableKey(table.name));
-      if (
-        objectifiedKeys.has(tableKey(table.name)) && line?.kind === "table"
-        && model.preferredIdentifierOf(entityType.id) === undefined
-      ) {
-        const named = binaries.get(columnKey(table.name, line.referenceMode));
-        const identifying = named?.factType.internalConstraints.find((c) =>
-          c.type === "internal_uniqueness" && c.roleIds.length === 1
-          && c.roleIds[0] === named.farRoleId
-        );
-        if (identifying?.id) model.setPreferredIdentifier(entityType.id, identifying.id);
       }
 
       // Step 3b: a combination of columns that is unique is an external
@@ -1820,10 +1801,10 @@ interface CompositeReading {
 /**
  * Whether the table's one key column is a role of the fact type its entity
  * objectifies, built in step 1b, and that fact type gives the table its
- * key: it has a role an entity plays, the rule `RelationalMapper.absorbsAKey`
- * keys an objectified table by. A fact type over values alone does not
- * give the key, so its table keeps its typed identifier. Asked of the
- * model as well as `consumed`, which is keyed by unqualified table name.
+ * key, by the mapper's own rule (`objectificationGivesKey`). A fact type
+ * over values alone does not, so its table keeps its typed identifier.
+ * Asked of the model as well as `consumed`, which is keyed by unqualified
+ * table name.
  */
 function keyIdentifiedByObjectification(
   model: OrmModel,
@@ -1837,8 +1818,7 @@ function keyIdentifiedByObjectification(
   const objectifies = model.objectifiedFactTypes.some((o) =>
     o.objectTypeId === entity.id && o.factTypeId === binary.factType.id
   );
-  return objectifies
-    && binary.factType.roles.some((r) => model.getObjectType(r.playerId)?.kind === "entity");
+  return objectifies && objectificationGivesKey(binary.factType.id, model);
 }
 
 /** Whether two column lists name the same columns, in any order. */

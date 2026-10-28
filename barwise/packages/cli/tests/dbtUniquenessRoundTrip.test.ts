@@ -4,7 +4,8 @@
  * both DDL round trips (objectified-key-identifier.spec.md). Before,
  * the dbt export wrote a test only for each table's key, so all of them
  * were lost: every one of these 24 tracked models came back with none. It
- * lives here because cli is the one package that depends on core and dbt.
+ * lives in cli, the one package that depends on both formats and dbt, so
+ * the three round trips are held to one description of the same models.
  *
  * Each UNIQUE is described without names, which can change on re-import (a
  * relationship's column is renamed for its player): per column, whether it
@@ -100,38 +101,5 @@ describe("a round trip keeps every uniqueness the DDL export writes", () => {
         expect(uniques(trip(model))).toEqual(before);
       });
     }
-  }
-});
-
-/** An entity's preferred identifier, by its fact type's name and the players of its roles. */
-function preferred(model: OrmModel, entityName: string): string {
-  const entity = model.getObjectTypeByName(entityName);
-  const id = entity && model.preferredIdentifierOf(entity.id);
-  const found = id ? model.everyConstraint().find(([c]) => c.id === id) : undefined;
-  if (!found) return "none";
-  const [c, ft] = found;
-  const roles = model.factTypes.flatMap((f) => f.roles);
-  const players = "roleIds" in c
-    ? c.roleIds.map((r) => model.getObjectType(roles.find((x) => x.id === r)!.playerId)!.name)
-    : [];
-  return `${ft?.name ?? "model"}: ${players.join(", ")}`;
-}
-
-describe("an annotated DDL round trip keeps the preferred identifier of an objectifier keyed on one column", () => {
-  // Each entity objectifies a relationship whose one-column key it takes;
-  // the import used to give it a second, typed identifier over that column.
-  const cases: [string, string][] = [
-    ["trial/customers/C05-manufacturer/kernel.orm.yaml", "WorkOrder"],
-    ["trial/customers/C06-logistics/kernel.orm.yaml", "Booking"],
-    ["trial/findings/barwise-nqd/base.orm.yaml", "WorkOrder"],
-    ["trial/findings/barwise-nqd/incoming.orm.yaml", "WorkOrder"],
-  ];
-  for (const [file, entity] of cases) {
-    it(`${file}: ${entity}`, () => {
-      const model = load(file);
-      expect(preferred(model, entity)).not.toBe("none");
-      expect(preferred(ROUND_TRIPS["DDL with annotations"]!(model), entity))
-        .toBe(preferred(model, entity));
-    });
   }
 });

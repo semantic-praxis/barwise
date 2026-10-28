@@ -67,15 +67,6 @@ describe("a key the objectified relationship gives", () => {
       const { model } = ddl.parse(runTable(supertypes));
       expect(factsOf(model, "WorkOrder")).toEqual(["WorkOrder has WorkOrderNumber"]);
       expect(model.objectifiedFactTypes).toHaveLength(1);
-      // Identified by the column the table line names as its reference mode.
-      const work = model.getObjectTypeByName("WorkOrder")!;
-      const id = model.preferredIdentifierOf(work.id);
-      const ft = model.getFactTypeByName("WorkOrder has WorkOrderNumber")!;
-      const valueRole = ft.roles.find((r) => r.playerId !== work.id)!.id;
-      expect(ft.internalConstraints.find((c) => c.id === id)).toMatchObject({
-        type: "internal_uniqueness",
-        roleIds: [valueRole],
-      });
     });
   }
 
