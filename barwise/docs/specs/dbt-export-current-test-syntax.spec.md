@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-fnt
+Plan-reviewed: a22cc134 (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/renderers/dbt.ts,
 barwise/packages/core/tests/mapping/dbt.test.ts,
 barwise/packages/dbt/src/DbtSchemaParser.ts,
