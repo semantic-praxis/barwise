@@ -116,10 +116,10 @@ describe("a single-column key becomes a typed identifier (R4)", () => {
   });
 
   it("imports a composite key over plain columns as mandatory attributes and an external uniqueness", () => {
-    // It used to warn and drop both columns (barwise-1077). The entity still
-    // gets an invented key, because an external uniqueness cannot yet be
-    // its preferred identifier, and the warning says so (barwise-ezn;
-    // ddl-round-trip-fixed-point.spec.md, R7).
+    // It used to warn and drop both columns (barwise-1077). The external
+    // uniqueness is the entity's preferred identifier, as a one-column key's
+    // uniqueness is (annotation-preferred-identifier.spec.md); it used to be
+    // left unpreferred beside an invented reference mode (barwise-ezn).
     const { model, warnings } = importer.parse(`
       CREATE TABLE enrollment (
         student_id INTEGER NOT NULL,
@@ -150,10 +150,11 @@ describe("a single-column key becomes a typed identifier (R4)", () => {
         ).map((id) => model.getObjectType(id!)?.name)
         : [],
     ).toEqual(["StudentId", "CourseId"]);
+    const enrollment = model.getObjectTypeByName("Enrollment")!;
+    expect(model.preferredIdentifierOf(enrollment.id)).toBe(external?.id);
     expect(warnings).toEqual([
       `Table "enrollment": composite PRIMARY KEY (student_id, course_id) is imported as an external `
-      + `uniqueness over its columns; the entity is identified by "enrollment_id", since an external `
-      + `uniqueness cannot yet be preferred (barwise-ezn).`,
+      + `uniqueness over its columns, the entity's preferred identifier.`,
     ]);
   });
 });
