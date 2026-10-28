@@ -24,6 +24,7 @@ barwise/packages/cli/src/commands/,
 barwise/packages/mcp/src/tools/,
 barwise/docs/adr/determinism-in-core.md,
 barwise/docs/adr/schema-versioning.md,
+barwise/docs/adr/ossie-interchange.md,
 barwise/docs/specs/importer-role-ids.spec.md,
 barwise/examples/auction-project/,
 barwise/packages/cli/tests/fixtures/project/,
@@ -85,13 +86,14 @@ In scope:
   local name, for an element of the same model, or `alias:LocalName`, for
   an element of an imported domain. `alias:LocalName` is a QName, as in
   Ossie's `prefixes` and XML, not a relative IRI; `iriOf` expands it.
-- When a model belongs to a project, its namespace shall be the project's
-  declared `iri_base`, the project name, and the domain's context name, most
-  general first (`https://data.acme.com/acme/ordering/`). A standalone model
-  may declare a `namespace` in its header; a domain file in a
-  project that declares one is reported as an error and the project's
-  namespace wins, so the namespace has one source (WS4).
-  A model with no namespace is decision 11.
+- When a model belongs to a project that declares `iri_base`, its namespace
+  shall be that `iri_base`, which carries the base and the project segments,
+  followed by the domain's context name, most general first
+  (`https://data.acme.com/acme/ordering/`). Any other model may declare a
+  `namespace` in its header; a domain that declares one in a project with
+  `iri_base` is reported as an error and the project's namespace wins, so
+  the namespace has one source (WS4). A model with no namespace is decision
+  11.
 - When a model refers to an element of another domain, the model shall
   declare `imports`, each binding an alias to a context name or to an
   absolute namespace IRI; a reference with an undeclared alias is a
@@ -153,8 +155,9 @@ In scope:
 Out of scope:
 
 - **Subprojects.** barwise has none: a project holds a flat list of domains
-  (`OrmProject.ts`). The namespace grammar leaves room for them between
-  project and domain; adding them is its own decision.
+  (`OrmProject.ts`). In an IRI a subproject is one more segment of the
+  project's declared `iri_base` (WS4), so the namespace needs no field for
+  one; subprojects as a project structure are their own decision.
 - **Data products.** Element IRIs never include a product
   (`ossie-interchange.md`, decision 5). A product's own IRI is deferred.
 - **Mapping to an outside vocabulary** beyond the field decision 1
@@ -207,7 +210,7 @@ tracked in the repository, so WS7 has none to migrate.
 .orm-project.yaml                       domains/ordering.orm.yaml (4.0)
   project:                                orm_version: "4.0"
     name: acme                            model:
-    iri_base: https://data.acme.com/        name: Ordering
+    iri_base: https://data.acme.com/acme/   name: Ordering
     domains:                                imports:
       - path: domains/ordering.orm.yaml       billing: billing         # a context name
         context: ordering                   object_types:
@@ -232,11 +235,11 @@ iriOf(ordering, "billing:Invoice") = https://data.acme.com/acme/billing/Invoice
 // @barwise/core
 export function localName(name: string): string; // the one normalizer (WS2)
 export interface DomainRef {
-  readonly project: OrmProject;
+  readonly iriBase?: string; // the project's
   readonly context: string;
 }
 export function namespaceOf(
-  model: OrmModel,
+  model: OrmModel | undefined,
   domain?: DomainRef,
 ): string | undefined; // WS4
 export function iriOf(
@@ -420,50 +423,59 @@ read as 1.0 and that `migrate` gains them with their first step.
 both are unreleased (owner decision, 2026-10-28):
 
 - `iri_base` on the project: an absolute IRI ending in `/` -- a scheme, a
-  colon, no whitespace -- so the project name and context can follow it as
-  path segments.
+  colon, no whitespace. It carries the base **and the project segments**
+  (`https://data.acme.com/acme/`, or `https://data.acme.com/acme/sales/`
+  for a subproject), so the project's display `name` is not part of any
+  IRI. Building the project segment from `localName(project.name)` was the
+  first plan, and plan review rejected it: project names are labels
+  (`Auction Semantic Model`), nothing stored refers to them, so editing one
+  would re-identify every element from WS6 on and no rename could repair
+  it. Declaring the segment keeps the owner's order -- base, project, any
+  subprojects, domain, most general first -- and leaves subprojects needing
+  no field of their own.
 - `namespace` on a model's header: an absolute IRI ending in `/` or `#`, the
   two endings RDF vocabularies use.
 
 The schemas check the shape with one pattern each; core does not
-dereference either.
+dereference either. `OrmProjectConfig` and `OrmProject` gain `iriBase`, and
+`ProjectSerializer`'s document type, `buildProject` and `serialize` each
+carry it, because each lists its fields explicitly and a field one of them
+leaves out is silently dropped (barwise-937's lesson, one file over).
 
-**`namespaceOf(model, domain?)`** in `core/src/model/namespace.ts`, pure,
-where `domain` is `{ project, context }`:
+**`namespaceOf(model?, domain?)`** in `core/src/model/namespace.ts`, pure,
+where `domain` is a `DomainRef`, `{ iriBase?: string; context: string }`,
+which a caller builds from `project.iriBase` and a `DomainModel`'s context:
 
-- the context is the manifest's: `project.getDomain(context)`. A model's
-  own `domain_context` header plays no part, as it plays none in loading a
-  project today. A context the project does not have throws, because that
-  is a caller passing the wrong pair; looking the model up by object
-  identity was rejected because a domain file the editor loads on its own is
-  a different object from the project's;
-- with a project that declares `iri_base`: `iri_base`, then
-  `localName(project.name)`, then `localName(context)`, each followed by `/`
+- with an `iriBase`: `iriBase` + `localName(context)` + `/`
   (`https://data.acme.com/acme/ordering/`). `localName()` is WS2's
-  normalizer, so `Acme Corp` contributes `Acme_Corp`, and neither segment
-  can hold a `/`;
+  normalizer, so the segment cannot hold a `/`, and no model is needed, so
+  a domain whose file failed to load still has a namespace;
 - otherwise, the model's own `namespace`, or `undefined` (decision 11).
 
-The Target architecture's `namespaceOf` and `iriOf` take `domain` in place
-of `project`, for the same reason.
+The context is the manifest's; a model's own `domain_context` header plays
+no part, as it plays none in loading a project today. Nothing throws: the
+ref carries the values, not a project to look them up in. The Target
+architecture's `namespaceOf` and `iriOf` take a `DomainRef` in place of a
+project, for the same reason.
 
 **One source and one owner per namespace**, as `projectRules` errors, not
-load refusals, so a domain stays attached and every surface that validates
-a project reports it, and a project that gains `iri_base` keeps loading:
+load refusals, so a domain stays attached and a project that gains
+`iri_base` keeps loading:
 
 - `project/domain-namespace-overridden`: a domain whose file declares a
   `namespace` in a project that declares `iri_base`. The project's wins in
   `namespaceOf`, which is what the message says; the fix is to delete the
-  domain's line. This amends the Scope's "is refused".
+  domain's line.
 - `project/duplicate-namespace`: two domains with one namespace -- two
   contexts with one `localName()` (`Order Mgmt` and `Order_Mgmt`), or two
   domains of a project without `iri_base` declaring the same `namespace`.
   WS6's `iriOf` would give their elements one IRI.
 
-VS Code runs no project rules today (`DiagnosticsProvider.validateProject`
-only parses the manifest), so the editor shows neither, as it shows none of
-the existing mapping and product rules; `barwise validate` on a project and
-MCP `validate_model` do.
+Only `barwise validate` runs `projectRules` today. MCP `validate_model`
+validates each domain with `ValidationEngine` and nothing else, and VS Code
+only parses the manifest, so neither shows these two or the existing
+mapping and product rules. Closing that is a surface change of its own,
+filed as a tracker issue with this work rather than widened into it.
 
 **What carries the field.** The `.orm.yaml` serializer reads and writes
 `namespace`; `OrmModel` holds it as `namespace?: string` beside
@@ -471,30 +483,39 @@ MCP `validate_model` do.
 writes new domain headers and does not copy the source's namespace, because
 the domains need the project's `iri_base` instead, and a source that had one
 gets a `SplitResult.warnings` entry saying so, which every surface already
-prints. The Ossie writer names `namespace` in its loss block, because
-which IRI an export writes into Ossie's `iri` slot is still open
-(`ossie-interchange.md` decision 5); `writeOssie.ts` checks model-level
-fields by prediction alone, as it does `domainContext`. The 2.0 reader has
-no `namespace` to read. No surface gains a command: the fields are declared
-by editing the file, and `namespaceOf` has no caller outside tests and the
-two rules until WS6's `iriOf`.
+prints. The Ossie writer names `namespace` in its loss block: decision 1
+settles what goes in Ossie's `iri` slot, but the identity IRI needs WS6's
+`iriOf` and local-name ids, so until then the namespace is a loss.
+`writeOssie.ts` checks model-level fields by prediction alone, as it does
+`domainContext`. `ossie-interchange.md` decision 5's "is open in
+barwise-wcg's spec" is updated in place to point at decision 1. The 2.0
+reader has no `namespace` to read. No surface gains a command: the fields
+are declared by editing the file, and `namespaceOf` has no caller outside
+tests and the two rules until WS6's `iriOf`.
+
+Lineage hashes the whole serialized model (`hashModel`), so adding or
+changing a model's `namespace` marks its recorded exports stale once. That
+is kept: from WS6 the namespace is part of every exported IRI, and a
+re-export restamps. `iri_base` is in the manifest, which is not hashed.
 
 **What WS4 leaves to later.** In 3.x a namespace changes no id, so
-`diffModels`, which has no model-level delta, need not report one yet; WS6,
-where a change to `namespace`, `iri_base`, the project name or a context
-re-identifies every element, adds that delta and a breaking level for it,
-and WS5's rename covers renaming a project and a context. Imports and
-`iriOf` wait for WS6, where references become names; in 3.x they would only
-hold UUIDs.
+`diffModels`, which has no model-level delta, need not report one yet. From
+WS6 a change to a model's `namespace`, a project's `iri_base` or a context
+re-identifies elements; `diffModels` compares two `OrmModel`s and cannot see
+the manifest, so WS6 decides between giving it a `DomainRef` per side and a
+project-level diff, and WS5's rename covers renaming a context (a project
+name is no longer in any IRI). Imports and `iriOf` wait for WS6, where
+references become names; in 3.x they would only hold UUIDs.
 
 **Tests**, in core: each serializer stamps its version, reads an unstamped
 file, refuses a newer one with "newer barwise" and not a schema message,
 and its schema `const` equals its constant; the three kinds share each
 reason's advice; `iri_base` and `namespace` round-trip and a malformed one
-fails the schema; `namespaceOf` for each case above; both rules, each
-watched failing first; split's warning; the Ossie loss line. The tracked
-project and mapping files still load. `schema-versioning.md` is edited in
-place, and its y1b Consequences bullet becomes the test that checks it.
+fails the schema; `namespaceOf` for each case above, including a ref with
+no model; both rules, each watched failing first; split's warning; the
+Ossie loss line. The tracked project and mapping files still load.
+`schema-versioning.md` is edited in place, and its y1b Consequences bullet
+becomes the test that checks it.
 
 ### 5. Rename and rename recognition (provisional: not yet grounded)
 
@@ -503,8 +524,7 @@ states, exposed as `barwise rename`, an MCP tool and an editor command, with
 a capability-matrix row in the same PR; `rename` modifies its input, which
 among CLI commands only `migrate` does today, so the row says so. Diff and
 merge add rename recognition after the name pass, by decision 8. Renaming
-a project or a context is a rename too, because WS4's namespace is built
-from both. Built on 3.x, where a rename
+a context is a rename too, because WS4's namespace is built from it. Built on 3.x, where a rename
 keeps the UUID, and exercised again on 4.0 by WS6.
 
 ### 6. Format 4.0: local names are the ids (provisional: not yet grounded)
@@ -647,13 +667,18 @@ accepted. The options stay, so a later reader sees what was weighed.
     with "written by a newer barwise" instead of a schema error. (b) ship
     `iri_base` unversioned and name the break in the release notes.
     **Decided: (a)**, then amended by the owner on 2026-10-28: y1b ships
-    with WS4 as one change, so no build has the version without `iri_base`,
-    and a build from before it -- v1.7.0 or an `edge` build since --
-    refuses a project or mapping file this build writes at the schema, as
-    (b) would. v1.7.0 already refuses every 3.0 domain file such a project
-    refers to; the `edge` builds since read those domains and lose the
-    manifest and mappings. (a)'s "newer barwise" holds for every change
-    to either file after this one.
+    with WS4 as one change. What that gives up, stated plainly: a build from
+    before it -- v1.7.0 or an `edge` build since -- refuses at the schema
+    every project and mapping file this build writes, `iri_base` or not,
+    because each is stamped with `format_version` and both schemas close
+    their root; (b) would have broken only files that use `iri_base`. The
+    same builds refuse a model carrying `namespace`, which joins 3.0 with no
+    bump, as `join_ring` and #767 did (`schema-versioning.md`). Accepted
+    because v1.7.0 already refuses every 3.0 domain file such a project
+    refers to, and `edge` is a moving pre-release. Stamping is kept over
+    leaving 1.0 files unstamped because a file that states its version is
+    `schema-versioning.md` decision 1, and from the next change to either
+    file an older build answers "newer barwise".
 
 ## Risks and testing
 
@@ -665,12 +690,11 @@ accepted. The options stay, so a later reader sees what was weighed.
 - **A content pass pairs the wrong elements.** It runs after the id and name
   passes, on what they left; WS5's tests include two entity types of one
   shape, one removed and one added under new names, in diff and in merge.
-- **A project's display name is in every IRI.** Project names are labels
-  today (`Auction Semantic Model`), and the namespace takes
-  `localName(project.name)`, so from WS6 on, editing the label
-  re-identifies every element. WS4 computes it and changes no id; WS5's
-  rename covers the project and its contexts, and WS6's diff reports the
-  change, before any id depends on it.
+- **A namespace input changes and every IRI moves.** From WS6, editing a
+  project's `iri_base`, a context, or a model's `namespace` re-identifies
+  elements. The project's display name is kept out of the namespace for
+  this reason (WS4); a context rename is WS5's, and WS6's diff reports
+  the other two.
 - Run the full monorepo build and tests after each workstream; WS6 changes
   core's public API.
 
@@ -679,5 +703,5 @@ accepted. The options stay, so a later reader sees what was weighed.
 - No change to verbalization, validation semantics or mapping output beyond
   the identifiers they print.
 - No RDF or OWL export, and no publishing of IRIs.
-- No subprojects, and no IRI for a data product.
+- No subproject structure, and no IRI for a data product.
 - No change to how transcript samples are compared.

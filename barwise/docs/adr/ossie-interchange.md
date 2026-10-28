@@ -79,11 +79,12 @@ recorded in barwise-wcg until that issue's spec holds it.
    prefixes work; Ossie's `prefixes` map is the same abbreviation, which
    Ossie uses only to write `iri` values. Ossie itself identifies an
    element by its local name and treats `iri` as an optional global
-   identifier that can name an outside definition (`foaf:Agent`); how
+   identifier that can name an outside definition (`foaf:Agent`). How
    barwise's identity IRI relates to such an outside IRI, and which of the
-   two an export writes into Ossie's single `iri` slot, is open in
-   barwise-wcg's spec, along with the local name of a fact type, which in
-   barwise belongs to no concept.
+   two an export writes into Ossie's single `iri` slot, is decision 1 of
+   barwise-wcg's spec (`docs/specs/iri-identity.spec.md`), and the local
+   name of a fact type, which in barwise belongs to no concept, is its
+   decision 2.
 6. **Each side keeps its own vocabulary, and the `ossie` format
    translates.** barwise speaks ORM 2 and Ossie speaks Ossie: neither
    renames its terms to match the other, and nothing outside the `ossie`
