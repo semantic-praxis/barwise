@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-4l0
+Plan-reviewed: fce47336 (code-review, pr-review)
 Touches: barwise/packages/formats/src/ddl/barwiseAnnotation.ts,
 barwise/packages/formats/src/ddl/DdlImportFormat.ts,
 barwise/packages/formats/src/ddl/DdlExportFormat.ts,
