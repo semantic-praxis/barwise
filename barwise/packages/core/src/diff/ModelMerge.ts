@@ -72,6 +72,7 @@ export function mergeModels(
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
+    namespace: existing.namespace,
     // The note was dropped for as long as this function has existed:
     // the merge names the fields it carries, so a field nobody listed
     // is a field nobody keeps (barwise-937).

@@ -193,6 +193,10 @@ export type ReadPlan =
 /** Plan the read of a document stating `version`. Pure. */
 export function planRead(version: string, versions: ReadVersions = THIS_BUILD): ReadPlan {
   const { current, legacy, migrations } = versions;
+  // A version that is not dotted numbers is malformed, not newer:
+  // `compareOrmVersions` falls back to string order for it, which would
+  // tell a user with a typo ("3.x") to upgrade barwise.
+  if (!/^\d+(\.\d+)*$/.test(version)) return { ok: false, reason: "unknown" };
   if (compareOrmVersions(version, current) > 0) return { ok: false, reason: "newer" };
   if (compareOrmVersions(version, majorFirst(current)) >= 0) {
     const plan = planMigration(version, current, migrations);
@@ -207,4 +211,56 @@ export function planRead(version: string, versions: ReadVersions = THIS_BUILD): 
   if (compareOrmVersions(version, legacy) > 0) return { ok: false, reason: "unknown" };
   const plan = planMigration(version, legacy, migrations);
   return plan.ok ? { ok: true, reader: "legacy", target: legacy, steps: plan.steps } : plan;
+}
+
+/**
+ * What a reader tells the user for each reason {@link planRead} refuses a
+ * version. One table for every versioned file kind, so `.orm.yaml`,
+ * `.orm-project.yaml` and `.map.yaml` give the same answer to the same
+ * reason (iri-identity WS4).
+ */
+export const READ_PLAN_ADVICE: Readonly<
+  Record<Extract<ReadPlan, { ok: false; }>["reason"], string>
+> = {
+  newer: "the file was written by a newer barwise; upgrade barwise to read it.",
+  unknown: "no migration path is available; re-export from a compatible version.",
+  cycle: "the migration registry loops back on itself, which is a bug in barwise.",
+  unregistered: "no registered migration reaches it, which is a bug in barwise.",
+};
+
+/**
+ * Why a `.orm-project.yaml` or `.map.yaml` document cannot be read at its
+ * stated `format_version`, or `undefined` when it can. Run before schema
+ * validation, so a newer file is refused as newer rather than for a field
+ * this build does not know (`schema-versioning.md` decision 1).
+ *
+ * A file without `format_version` was written before these kinds were
+ * versioned and is read as their first version, whose schema it already
+ * satisfies; a non-string value is left to the schema to report. Neither
+ * kind has a migration step yet, so the only readable version is
+ * `current`; the step shape is decided by the first minor of each kind.
+ */
+export function formatVersionProblem(doc: unknown, current: string): string | undefined {
+  if (typeof doc !== "object" || doc === null) return undefined;
+  const version = (doc as Record<string, unknown>).format_version;
+  if (typeof version !== "string") return undefined;
+  const plan = planRead(version, { current, legacy: majorFirst(current), migrations: [] });
+  if (plan.ok) return undefined;
+  return unsupportedVersionMessage("format_version", version, current, plan.reason);
+}
+
+/**
+ * The refusal for a document whose version this build cannot read, in one
+ * shape for every versioned file kind: the field, the stated and readable
+ * versions, and {@link READ_PLAN_ADVICE} for the reason.
+ */
+export function unsupportedVersionMessage(
+  field: "orm_version" | "format_version",
+  version: string,
+  current: string,
+  reason: Extract<ReadPlan, { ok: false; }>["reason"],
+): string {
+  return `Unsupported ${field} "${version}" (this build reads ${current}): ${
+    READ_PLAN_ADVICE[reason]
+  }`;
 }

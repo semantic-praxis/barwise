@@ -18,7 +18,7 @@ import {
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
   planRead,
-  type ReadPlan,
+  unsupportedVersionMessage,
 } from "./schemaVersion.js";
 import { subtypeConstraintsFromFlags } from "./subtypeFlags.js";
 import { deserializeConstraint, serializeConstraint } from "./yaml/constraint.js";
@@ -50,24 +50,6 @@ export class DeserializationError extends Error {
     super(message);
     this.name = "DeserializationError";
   }
-}
-
-/**
- * Build a clear, actionable message for a document whose `orm_version`
- * cannot be brought to the current version.
- */
-function versionErrorMessage(
-  version: string,
-  plan: Extract<ReadPlan, { ok: false; }>,
-): string {
-  const advice = {
-    newer: "the file was written by a newer barwise; upgrade barwise to read it.",
-    unknown: "no migration path is available; re-export from a compatible version.",
-    cycle: "the migration registry loops back on itself, which is a bug in barwise.",
-    unregistered: "no registered migration reaches it, which is a bug in barwise.",
-  };
-  const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
-  return `${head} ${advice[plan.reason]}`;
 }
 
 /** What reading a file changed beyond its format (`OrmYamlSerializer.migrate`). */
@@ -228,7 +210,11 @@ export class OrmYamlSerializer {
     const version = doc.orm_version;
     if (typeof version !== "string") return { doc: raw, version, stated: undefined };
     const plan = planRead(version);
-    if (!plan.ok) throw new DeserializationError(versionErrorMessage(version, plan));
+    if (!plan.ok) {
+      throw new DeserializationError(
+        unsupportedVersionMessage("orm_version", version, CURRENT_ORM_VERSION, plan.reason),
+      );
+    }
     return {
       doc: applyMigrations(doc, plan.steps),
       version: plan.target,
@@ -251,6 +237,7 @@ export class OrmYamlSerializer {
     const model = new OrmModel({
       name: doc.model.name,
       domainContext: doc.model.domain_context,
+      namespace: doc.model.namespace,
       note: doc.model.note,
     });
 
@@ -366,6 +353,9 @@ export function writeDocument(model: OrmModel): OrmYamlDocument {
 
   if (model.domainContext) {
     doc.model.domain_context = model.domainContext;
+  }
+  if (model.namespace) {
+    doc.model.namespace = model.namespace;
   }
   if (model.note) {
     doc.model.note = model.note;

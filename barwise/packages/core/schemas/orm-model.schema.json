@@ -32,6 +32,11 @@
           "minLength": 1,
           "description": "The bounded context this model represents (e.g. \"ecommerce\")."
         },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:\\S*[/#]$",
+          "description": "The absolute IRI this model's element IRIs start with, ending in / or #. For a model outside a project that declares iri_base; in such a project the project's namespace wins."
+        },
         "note": {
           "type": "string",
           "description": "Free-text model-level note, distinct from formal definitions."

@@ -30,7 +30,10 @@ was a section of the metamodel ADR before this one.
    every file it writes, and the JSON Schema pins the same value as a
    `const`, so a reader given a file whose version exceeds its own
    refuses it with a "written by a newer barwise" error rather than a
-   schema failure on an unknown construct.
+   schema failure on an unknown construct. `.orm-project.yaml` and
+   `.map.yaml` follow the same rule with a `format_version` of their own,
+   one current version per file kind; a file of either kind without one
+   predates versioning and is read as its first version.
 2. **An additive change bumps the minor version; a breaking or
    structural change bumps the major with a real migration.** Adding an
    optional construct or field is a minor change: bump
@@ -106,9 +109,18 @@ was a section of the metamodel ADR before this one.
   (barwise-ok6), and a 2.0 merge fragment's `is_preferred` flags are
   dropped by the lenient load (barwise-n9n.f06). Any surface edit that
   writes an older file has the same comment loss.
-- `.orm-project.yaml` and `.map.yaml` carry no version; the archived
-  spec left them out of scope ("the same pattern can extend to those
-  later") without deciding against it (barwise-y1b).
+- `.orm-project.yaml` and `.map.yaml` follow decisions 1 to 3 with their
+  own `format_version`, each kind on its own version
+  (`CURRENT_PROJECT_FORMAT_VERSION`, `CURRENT_MAPPING_FORMAT_VERSION`, both
+  1.0; barwise-y1b, `docs/specs/iri-identity.spec.md` WS4). Decision 1 is
+  tested for both in core's `formatVersion.test.ts`: each schema `const`
+  equals its constant, every written file is stamped, and a newer file is
+  refused with "newer barwise" before the schema runs. A file without
+  `format_version` predates versioning and is read as 1.0. Decision 4 does
+  not yet apply to them: neither kind has a migration step, and `barwise
+  migrate` takes only `.orm.yaml`, so it gains them with their first step.
+  `planRead` gives all three kinds one answer per refusal reason
+  (`READ_PLAN_ADVICE`).
 - 1.0 includes value ranges (barwise-5t9.1), which shipped before this
   rule; the discipline began with the 1.0 to 1.1 bump.
 - Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states

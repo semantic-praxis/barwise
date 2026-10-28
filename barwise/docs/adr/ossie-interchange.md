@@ -3,7 +3,8 @@
 Scope: architecture
 Date: 2026-10-28
 Tracking: barwise-pf2.4, barwise-pf2, barwise-wcg,
-docs/specs/ossie-ontology-format.spec.md
+docs/specs/ossie-ontology-format.spec.md,
+docs/specs/iri-identity.spec.md
 
 ## Context
 
@@ -32,7 +33,7 @@ alternatives behind decisions 1 to 4. On 2026-10-28 the owner revised
 decision 1 and added decisions 5 and 6, after comparing the two more
 closely: barwise does not try to replace Ossie, takes ideas from it where
 they serve barwise, and leans on it for what Ossie owns. Their reasoning is
-recorded in barwise-wcg until that issue's spec holds it.
+recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
 
 ## Decision
 
@@ -72,19 +73,21 @@ recorded in barwise-wcg until that issue's spec holds it.
    until barwise has an expression language of its own (barwise-pf2.2).
 5. **Identity is a readable IRI, after Ossie's naming.** Every barwise
    element is identified by one IRI, replacing the UUIDs barwise mints
-   today, and by nothing else: a declared base that is a standard IRI, then
-   project, any subprojects and domain as the namespace, then a readable
+   today, and by nothing else: a declared base that is a standard IRI and
+   carries the project and any subprojects, then the domain, as the
+   namespace, then a readable
    local name with no category segment, after Ossie's local names
    (`Customer`, `Customer.places`). A model names the other namespaces it
    references in declared imports with aliases, the way XML namespace
    prefixes work; Ossie's `prefixes` map is the same abbreviation, which
    Ossie uses only to write `iri` values. Ossie itself identifies an
    element by its local name and treats `iri` as an optional global
-   identifier that can name an outside definition (`foaf:Agent`); how
+   identifier that can name an outside definition (`foaf:Agent`). How
    barwise's identity IRI relates to such an outside IRI, and which of the
-   two an export writes into Ossie's single `iri` slot, is open in
-   barwise-wcg's spec, along with the local name of a fact type, which in
-   barwise belongs to no concept.
+   two an export writes into Ossie's single `iri` slot, is decision 1 of
+   barwise-wcg's spec (`docs/specs/iri-identity.spec.md`), and the local
+   name of a fact type, which in barwise belongs to no concept, is its
+   decision 2.
 6. **Each side keeps its own vocabulary, and the `ossie` format
    translates.** barwise speaks ORM 2 and Ossie speaks Ossie: neither
    renames its terms to match the other, and nothing outside the `ossie`
@@ -160,8 +163,9 @@ recorded in barwise-wcg until that issue's spec holds it.
   diff and merge pairing elements by id first) and
   `docs/specs/importer-role-ids.spec.md` R1 (an importer takes a role's id
   from `generateId()`, never from a string built out of names). With identity built from
-  names, a rename changes an element's IRI, so the spec must also say how
-  diff and merge tell a rename from a removal plus an addition.
+  names, a rename changes an element's IRI. barwise-wcg's spec, decision 8,
+  settles what follows: diff reports a content pair whose names differ as a
+  possible rename, and merge never pairs one, adding it instead.
 - Decision 6 has no gate; that barwise keeps its ORM 2 terms is held by
   review. The translation is tested construct by construct in
   `OssieImportFormat.test.ts` and `OssieExportFormat.test.ts`. It is

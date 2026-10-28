@@ -10,6 +10,7 @@ import { parse } from "yaml";
 import { ModelSplitError, splitFiles, splitModel } from "../../src/project/splitModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
+import { ProjectSerializer } from "../../src/serialization/ProjectSerializer.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 
@@ -127,6 +128,35 @@ describe("splitModel", () => {
     ]);
     expect(result.mappings.length).toBeGreaterThan(0);
     expect(splitFiles(result).at(-1)?.content).toBe(result.manifestYaml);
+  });
+
+  it("makes a /-ending source namespace the project's iri_base (iri-identity WS4)", () => {
+    const serializer = new OrmYamlSerializer();
+    const model = serializer.deserialize(SHOP_MODEL);
+    model.namespace = "https://data.acme.com/shop/";
+    const result = splitModel(serializer.serialize(model), {
+      projectName: "Shop",
+      domains: { crm: ["Customer"], billing: ["Invoice"] },
+    });
+    expect(new ProjectSerializer().deserialize(result.manifestYaml).iriBase).toBe(
+      "https://data.acme.com/shop/",
+    );
+    for (const d of result.domains) expect(parse(d.yaml).model.namespace).toBeUndefined();
+    expect(result.warnings.some((w) => w.includes("namespace"))).toBe(false);
+  });
+
+  it("drops a #-ending source namespace with a warning, since it cannot be a base", () => {
+    const serializer = new OrmYamlSerializer();
+    const model = serializer.deserialize(SHOP_MODEL);
+    model.namespace = "https://data.acme.com/shop#";
+    const result = splitModel(serializer.serialize(model), {
+      projectName: "Shop",
+      domains: { crm: ["Customer"], billing: ["Invoice"] },
+    });
+    expect(parse(result.manifestYaml).project.iri_base).toBeUndefined();
+    expect(result.warnings).toContainEqual(
+      expect.stringContaining('namespace "https://data.acme.com/shop#" ends in "#"'),
+    );
   });
 
   it("produces one domain file per configured context", () => {

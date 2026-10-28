@@ -12,6 +12,7 @@ import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
 import { generateId } from "./id.js";
+import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
@@ -37,6 +38,12 @@ export interface OrmModelConfig {
   readonly domainContext?: string;
   /** Free-text note: informal model-level commentary. */
   readonly note?: string;
+  /**
+   * The absolute IRI this model's element IRIs start with, for a model
+   * outside a project that declares `iri_base` (`namespaceOf`,
+   * iri-identity WS4). Ends in `/` or `#`.
+   */
+  readonly namespace?: string;
 }
 
 const quoted = (text: string): string => JSON.stringify(text);
@@ -94,6 +101,7 @@ export class OrmModel {
   private _name: string;
   private _domainContext: string | undefined;
   private _note: string | undefined;
+  private _namespace: string | undefined;
 
   private readonly _objectTypes: Map<string, ObjectType> = new Map();
   private readonly _factTypes: Map<string, FactType> = new Map();
@@ -113,6 +121,7 @@ export class OrmModel {
     this._name = config.name.trim();
     this._domainContext = config.domainContext;
     this._note = config.note;
+    this._namespace = checkedIri(config.namespace, NAMESPACE_PATTERN, "namespace");
   }
 
   get name(): string {
@@ -140,6 +149,14 @@ export class OrmModel {
 
   set domainContext(value: string | undefined) {
     this._domainContext = value;
+  }
+
+  get namespace(): string | undefined {
+    return this._namespace;
+  }
+
+  set namespace(value: string | undefined) {
+    this._namespace = checkedIri(value, NAMESPACE_PATTERN, "namespace");
   }
 
   // ---- Object Types ----

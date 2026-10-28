@@ -1,5 +1,6 @@
 import { ContextMapping, type ContextMappingConfig } from "./ContextMapping.js";
 import { DomainModel, type DomainModelConfig } from "./DomainModel.js";
+import { checkedIri, IRI_BASE_PATTERN } from "./iri.js";
 import type { ObjectType } from "./ObjectType.js";
 import { type ProductConfig, ProductDependency } from "./ProductDependency.js";
 
@@ -70,6 +71,12 @@ export interface OrmProjectConfig {
   readonly mappings?: readonly ContextMappingConfig[];
   readonly products?: readonly ProductConfig[];
   readonly settings?: ProjectSettings;
+  /**
+   * The absolute IRI, ending in `/`, that every domain's namespace starts
+   * with: the base and the project's own segments, so the display `name` is
+   * in no IRI (`namespaceOf`, iri-identity WS4).
+   */
+  readonly iriBase?: string;
 }
 
 /**
@@ -85,6 +92,7 @@ export class OrmProject {
   private readonly _mappings: ContextMapping[] = [];
   private readonly _products: Map<string, ProductDependency> = new Map();
   private _settings: ProjectSettings;
+  private _iriBase: string | undefined;
 
   constructor(config: OrmProjectConfig) {
     if (!config.name || config.name.trim().length === 0) {
@@ -92,6 +100,7 @@ export class OrmProject {
     }
     this._name = config.name.trim();
     this._settings = config.settings ? { ...config.settings } : {};
+    this._iriBase = checkedIri(config.iriBase, IRI_BASE_PATTERN, "iri_base");
 
     for (const dc of config.domains ?? []) {
       this.addDomain(dc);
@@ -106,6 +115,14 @@ export class OrmProject {
 
   get name(): string {
     return this._name;
+  }
+
+  get iriBase(): string | undefined {
+    return this._iriBase;
+  }
+
+  set iriBase(value: string | undefined) {
+    this._iriBase = checkedIri(value, IRI_BASE_PATTERN, "iri_base");
   }
 
   set name(value: string) {
