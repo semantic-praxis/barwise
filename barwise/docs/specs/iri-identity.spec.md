@@ -327,13 +327,12 @@ Grounded 2026-10-28. Two choices the owner made that day shape it:
 - **A name is minted when the model is saved.** Constraints, subtype facts
   and objectifications are built in many places -- every importer, the LLM
   parser (`llm/src/parse/constraints.ts`), merge, the editing surfaces --
-  and core's model classes cannot call the verbalizer, which imports them.
-  So `writeDocument` mints, for each such element that has no name yet,
-  its name from the canonical verbalization through `localName()`, and
-  stores beside it the content key it was minted from. The writer stays
-  pure: it does not change the model, and saving an unchanged model twice
-  writes the same names. Once a file holding names is loaded, the names
-  are the element's and the writer keeps them.
+  so minting at each would take a dozen call sites. Saving goes through
+  one: `serializeForSave(model)` in core mints into the model, then
+  serializes. Every path that writes a model to disk calls it in place of
+  `OrmYamlSerializer.serialize` (about 25 sites across the CLI, MCP and the
+  editor). The serializer itself stays pure and verbalizer-free, so
+  hashing, split and previews, which call it directly, mint nothing.
 
 What ships:
 
@@ -343,48 +342,52 @@ What ships:
   In memory a subtype fact's and an objectification's `.name` stays the
   display string `subtype:<sub>:<super>` until WS6; the YAML `name`
   maps to `mintedName`, never to that setter.
-- **Minting.** `writeDocument` mints for each such element without a name,
-  in document order, and never for one that has a name: the canonical
-  verbalization's text, its closing period dropped, through `localName()`,
-  with the suffix rule run against object type and fact type local names
-  and every name already held or minted. A verbalization that is not of
-  the element -- the verbalizer's "Malformed:" fallback, or one that names
-  an id because a reference dangles -- mints nothing, so a lenient load
-  never stores a name built from an error.
-- **Kept names.** A name read from a file is kept as it is. Two kept names
-  that collide are reported by WS2's `local-name-collision`, which now
-  also reads minted names, and merge, which copies an incoming element's
-  name, takes the suffix rule for one that clashes with the base.
-- **The content key is barwise's own, built from names.** `mintedKey` in
-  `core/src/model/` computes it: for a constraint, its kind, modality,
-  values, and each role it covers as fact type name, role name and player
-  name (a join constraint's paths the same way, step by step); for a
-  subtype fact, both types' names, `provides_identification` and its
-  defining rule; for an objectification, the fact type's name, its first
-  reading and the object type's name. It is not diff's `constraintKey`:
-  that key is built from ids in places (another fact type's role, a join
-  path, an unresolved reference), so WS6 and merge's re-derived ids would
+- **Minting.** `mintNames(model)`, which `serializeForSave` calls, names
+  each such element that has no name, in document order, and never one
+  that has: the canonical verbalization's text, its closing period
+  dropped, through `localName()`, with the suffix rule run against object
+  type and fact type local names and every name already held or minted,
+  and stores `mintedKey` beside it. It mints nothing in a model whose
+  references do not all resolve (`graphOf` refuses it): a lenient load can
+  verbalize a dangling player by its role name, which reads as a normal
+  sentence, so the text cannot tell. Names then exist in memory after a
+  save, so validation sees what the file holds and a second save
+  verbalizes nothing.
+- **Kept names.** A name already held is kept. Two kept names that collide
+  are reported by WS2's `local-name-collision`, which now also reads
+  minted names. Merge keeps the base's name on an accepted modification,
+  as it keeps the base's id; an added element brings its own name, under
+  the suffix rule if it clashes.
+- **The content key is barwise's own, derived from the serializer.**
+  `mintedKey` in `core/src/model/` takes the element's own serialized form
+  -- the authority on what it states -- drops `id`, `name` and
+  `minted_from`, and replaces each reference by name: an object type by its
+  name, a fact type by its name, a role by its fact type's name and its
+  position there, a subtype fact by its two types' names. So ring types,
+  frequency and cardinality ranges, value ranges, comparison operators,
+  subset sides and subtype-fact operands are all in it without being listed
+  again. An objectification's key is its fact type's key (roles by
+  position with their players, readings) and its object type's name; a
+  subtype fact's is its two types' names and its defining rule, not
+  `provides_identification`, which its sentence does not state. It is not
+  diff's `constraintKey`, which keeps ids in places (another fact type's
+  role, a join path, an unresolved reference): WS6's change of ids would
   change it, and storing it would make every later change to how diff
-  pairs constraints a format change. Built from names, the key changes
-  when what the verbalization says changes -- a player, a reading, a value
-  -- and not when an id or the verbalizer's wording does.
+  pairs constraints a format change. Built from names and positions, the
+  key changes when what the verbalization says changes, and not when an
+  id or the verbalizer's wording does.
 - **`structural/stale-minted-name` (warning).** An element whose stored
-  `minted_from` differs from its current `mintedKey`, naming the
-  verbalization a fresh name would come from (decision 14). The fix until
-  WS5's rename covers minted names: delete `name` and `minted_from`, and
-  the next save mints again; the message says so. A `name` with no
-  `minted_from` was written by a person, an LLM or another tool, and is
+  `minted_from` differs from its current `mintedKey` (decision 14). The
+  message names the stored name and says what changed is the element's
+  content; the fix until WS5's rename covers minted names is to delete
+  `name` and `minted_from`, and the next save mints again. A `name` with
+  no `minted_from` was written by a person, an LLM or another tool, and is
   never stale. `mintedKey` needs no verbalizer, so validation gains no
   import from `verbalization/` or `diff/`.
-- **Lineage ignores both fields.** `hashModel` serializes with minting
-  off and without the two fields, so a recorded export does not go stale
-  when names appear, and its hash does not depend on the verbalizer.
-  Minting costs one verbalization per unnamed element; with it off for
-  hashing, the property laws that hash models twice per case (barwise-939)
-  pay nothing.
-- **Diff compares neither field.** A minted name is derived, and a file
-  saved before this workstream holds none, so comparing it would report a
-  constraint named on one side as modified. Reporting renames is WS5's.
+- **Lineage and diff ignore both fields.** `hashModel` drops them before
+  hashing, so a recorded export does not go stale when names appear. Diff
+  compares neither: a minted name is derived, and a file saved before this
+  workstream holds none. Reporting renames is WS5's.
 - **Out of scope:** NORMA's constraint `Name` attribute, which the importer
   drops and the writer leaves empty today; the tracked corpus, which
   `barwise migrate` does not rewrite while it is current 3.0, so its names
