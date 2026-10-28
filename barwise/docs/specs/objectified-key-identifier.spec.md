@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-i3r
+Plan-reviewed: 96d72c85 (code-review, pr-review)
 Touches: barwise/packages/formats/src/ddl/DdlImportFormat.ts,
 barwise/packages/formats/tests/,
 barwise/packages/cli/tests/dbtUniquenessRoundTrip.test.ts,
