@@ -64,28 +64,44 @@ In scope:
   shall exit 1 naming the file. An empty line declares nothing, as an
   absent one does; the existing `Date:` check already treats empty that
   way.
-- When an `Enforced-by:` entry names `npm run <script>`, the check shall
-  exit 1 unless `<script>` is a key of `barwise/package.json` `scripts`
-  and some `ci.yml` step, as `ciSteps()` in
-  `barwise/scripts/lib/ci-gates.mjs` returns it, runs that root script.
-  Which root script a step runs is decided by one new function,
-  `stepScript(args)` in `ci-gates.mjs`: it takes the arguments before any
-  `--`, skips `run`, returns null if any of them is a workspace or prefix
-  flag (a token whose name, the part before `=`, is `--workspace`,
-  `--workspaces`, `-w`, `-ws` or `--prefix`; those run another
-  package.json, wherever npm finds them before `--`), skips other flags
-  (any token starting with `-`), and returns the first remaining token.
-  `resolveNodeGate()` in `scripts/fault-matrix.mjs` answers the same
-  question with its own inline rule today; WS1 makes it call
-  `stepScript()`, so the two cannot drift. On every step `ci.yml` has
-  today the two rules give the same answer, and a test pins that. The
-  match is on the script token alone, because CI writes
-  `run audit:specs -- --check`; a whole-string comparison would call
-  three enforced ADRs unwired. No ADR relies on a workspace step today.
+- When an `Enforced-by:` entry names `npm run <script> [-- <args>]`, the
+  check shall exit 1 unless `<script>` is a key of `barwise/package.json`
+  `scripts` and some `ci.yml` step, as `ciSteps()` in
+  `barwise/scripts/lib/ci-gates.mjs` returns it, runs that root script
+  with exactly those arguments. The arguments are part of the match
+  because they can be what makes a step a gate: `audit:specs`,
+  `audit:duplication` and `audit:corrections` fail CI only under
+  `-- --check`, so a step edited to drop it must stop counting. The
+  entry is written as CI writes the step, `npm run audit:specs --
+  --check`.
+  What a step runs is decided by one new function, `stepScript(args)` in
+  `ci-gates.mjs`, returning `{ script, args }` or null. It splits at the
+  first `--`. Before it, the first token must be the npm subcommand `run`
+  (or its alias `run-script`), so `npm audit` never counts as the
+  `audit` script. Any token whose name, the part before `=`, is
+  `--workspace`, `--workspaces`, `-w`, `-ws`, `--prefix` or `-C` makes
+  the answer null, wherever it sits before `--`: those run another
+  package.json. Other flags (any token starting with `-`) are skipped,
+  and the first remaining token is the script. After `--`, the tokens are
+  the arguments.
+  `resolveNodeGate()` in `scripts/fault-matrix.mjs` names a step's
+  script with its own inline rule today; WS1 makes it take the name from
+  `stepScript()` and return null when that does, before its own
+  node-gate resolution, so the naming cannot drift. The two are not
+  identical functions: `resolveNodeGate` also returns null for every
+  script that is not a single node gate (`lint`, `build`, `dup`), so the
+  pinned property is that wherever `resolveNodeGate` names a script,
+  `stepScript` names the same one, over every `ci.yml` step. One
+  behaviour changes on purpose: a step like `run --silent x` would
+  become auditable by `fault-matrix`, where today it is skipped; no
+  `ci.yml` step has that form now. No ADR relies on a workspace step
+  today.
 - A step marked `continue-on-error: true` is not wired: it cannot fail
   CI. `ciSteps()` does not report that key today, so WS1 extends it to
   return `continueOnError` beside `condition`; `ci:local` and
-  `fault-matrix` ignore the new field, and the shape pinned by
+  `fault-matrix` do not use the new field in this spec (`ci:local`
+  still runs `dup` and `filesize` as blocking, a divergence from CI
+  filed separately as barwise-4vj), and the shape pinned by
   `scripts/tests/ci-conditions.test.mjs` is updated with it. Where the
   same arguments appear in two steps, `ciSteps()` keeps one entry, and
   its `continueOnError` is true only if every occurrence has the key,
@@ -105,9 +121,12 @@ In scope:
   parsed as JSON, has an entry under `hooks.<Event>` whose nested
   `hooks` list holds a `command` that runs the path (the real shape is
   `hooks.<Event>[i].hooks[j].command`). Runs means the command's first
-  word, after an optional `env` prefix and its options, is `node`
-  followed by the path, or is the path itself (as
-  `.claude/hooks/session-start.sh` is run), where the path may be
+  word is `node` followed by the path, or is the path itself (as
+  `.claude/hooks/session-start.sh` is run), after an optional `env`
+  prefix: `env`, then its options, where `-u` and `--unset` consume the
+  next token as a variable name (every hook here is `env -u
+  BARWISE_EXIT_DIR node ...`), then any `NAME=VALUE` assignments. The
+  path may be
   quoted and prefixed with `$CLAUDE_PROJECT_DIR/`, and is followed by a
   quote, whitespace or the end. So `echo <path>`, `echo node <path>` and
   `node <path>.disabled` do not count, the same strictness as the husky
@@ -117,11 +136,18 @@ In scope:
   probes are for.
   `hook barwise/.husky/<name> runs npm run <script>`: the husky file is
   tracked, `<script>` is a key of `barwise/package.json` `scripts`, and
-  the husky file has a line that, after leading whitespace and an
-  optional `if !` or `!`, begins `npm run`, then any flags (as defined
-  for CI steps above), then `<script>`, and the line does not discard
-  the exit status: no `|| true`, `|| :`, `; exit 0` or `; true` after
-  it, mirroring the rule that a `continue-on-error` CI step is not
+  the husky file has a line that invokes the script in one of two
+  shapes, and no other shape counts. Either the line is the invocation
+  alone -- `npm run`, flags as defined for CI steps above, `<script>`,
+  optional `-- <args>` -- optionally followed by `|| exit $?` or
+  `|| exit <non-zero literal>`; or it is `if ! <invocation>; then`, and
+  the `if` block it opens contains `exit $?` or `exit <non-zero
+  literal>` before its `fi`. That is a whitelist rather than a list of
+  forbidden suffixes, because the ways to discard a status (`| tee`,
+  `|| echo`, a trailing `&`, an `if` block with no exit) are open-ended,
+  and root `CLAUDE.md` already names the pipe case: a gate's status
+  read through a pipe is the pipe's. It mirrors the rule that a
+  `continue-on-error` CI step is not
   wired. Comment lines and `echo` strings therefore never match: `barwise/.husky/pre-push` names `npm run ci:local` in an echo
   as well as on the line that runs it. Naming the husky file alone is
   not accepted: it would pass however the hook's body changed, which is
@@ -197,28 +223,28 @@ Out of scope:
 Grounded 2026-10-28 by extracting the npm scripts each ADR names and
 resolving them against `package.json` and `ciSteps()`.
 
-| ADR                            | Enforcers named in prose today                                  | Declared state after WS2                                                    |
-| ------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `baselines-merge-on-write`     | `audit:specs`, `test:scripts`                                   | enforced; `trial:gate` writer is barwise-tko                                |
-| `connector-packages`           | `purity`, `depcruise`                                           | enforced                                                                    |
-| `constraint-coverage-policy`   | none                                                            | `none (deliberate: ...)`, per Open decisions                                |
-| `credential-handling`          | `check:secrets`, gitleaks pre-commit hook                       | enforced, incl. `hook barwise/.husky/pre-commit runs npm run check:secrets` |
-| `determinism-in-core`          | `purity`                                                        | enforced                                                                    |
-| `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others | enforced                                                                    |
-| `gate-refusal-contract`        | `test:scripts`; `fault-matrix` is on demand                     | enforced                                                                    |
-| `keyless-model-access`         | `test:coverage`, `depcruise`                                    | enforced: `depcruise` and named test files                                  |
-| `merge-delegation`             | none; the ADR says so (barwise-zdd)                             | `none` per decision: zdd and new gap issues (WS2)                           |
-| `metamodel-evolution-policy`   | none                                                            | to be determined in WS2                                                     |
-| `must-agree-copies`            | `check:parity`, `audit:duplication`                             | enforced                                                                    |
-| `ossie-interchange`            | `test:coverage`                                                 | enforced, by named test files                                               |
-| `package-graph-authority`      | `check:architecture`, `depcruise`                               | enforced                                                                    |
-| `pinned-runtimes`              | `check:parity`; `check:pins` proposed, not built (barwise-920)  | enforced, plus `none` on a new gap issue                                    |
-| `plan-before-code`             | `check:plan-review`, `check:spec-touches`                       | enforced                                                                    |
-| `production-prompt-resolution` | `test:coverage`                                                 | enforced, by named test files                                               |
-| `python-from-the-lockfile`     | `check:python-uv`, PreToolUse hook; `audit:skips` deferred      | enforced, plus `none` on a new gap issue                                    |
-| `review-policy`                | `check:review-tiers`                                            | enforced                                                                    |
-| `schema-versioning`            | `test:coverage`                                                 | enforced, by named test files                                               |
-| `surface-capability-parity`    | `test:coverage` (the two `toEqual` tool-list tests)             | enforced, by named test files                                               |
+| ADR                            | Enforcers named in prose today                                     | Declared state after WS2                                                    |
+| ------------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `baselines-merge-on-write`     | `audit:specs`, `test:scripts`                                      | enforced; `trial:gate` writer is barwise-tko                                |
+| `connector-packages`           | `purity`, `depcruise`                                              | enforced                                                                    |
+| `constraint-coverage-policy`   | none                                                               | `none (deliberate: ...)`, per Open decisions                                |
+| `credential-handling`          | `check:secrets`, gitleaks pre-commit hook                          | enforced, incl. `hook barwise/.husky/pre-commit runs npm run check:secrets` |
+| `determinism-in-core`          | `purity`                                                           | enforced                                                                    |
+| `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others    | enforced                                                                    |
+| `gate-refusal-contract`        | `test:scripts`; `fault-matrix` is on demand                        | enforced                                                                    |
+| `keyless-model-access`         | `test:coverage`, `depcruise`                                       | enforced: `depcruise` and named test files                                  |
+| `merge-delegation`             | none; the ADR says so (barwise-zdd)                                | `none` per decision: zdd and new gap issues (WS2)                           |
+| `metamodel-evolution-policy`   | none                                                               | to be determined in WS2                                                     |
+| `must-agree-copies`            | `check:parity`, `audit:duplication`                                | enforced                                                                    |
+| `ossie-interchange`            | `test:coverage`; decision 5 not built (barwise-wcg), 6 has no gate | named test files, plus `none` for 1 (part), 5, 6                            |
+| `package-graph-authority`      | `check:architecture`, `depcruise`                                  | enforced                                                                    |
+| `pinned-runtimes`              | `check:parity`; `check:pins` proposed, not built (barwise-920)     | enforced, plus `none` on a new gap issue                                    |
+| `plan-before-code`             | `check:plan-review`, `check:spec-touches`                          | enforced                                                                    |
+| `production-prompt-resolution` | `test:coverage`                                                    | enforced, by named test files                                               |
+| `python-from-the-lockfile`     | `check:python-uv`, PreToolUse hook; `audit:skips` deferred         | enforced, plus `none` on a new gap issue                                    |
+| `review-policy`                | `check:review-tiers`                                               | enforced                                                                    |
+| `schema-versioning`            | `test:coverage`                                                    | enforced, by named test files                                               |
+| `surface-capability-parity`    | `test:coverage` (the two `toEqual` tool-list tests)                | enforced, by named test files                                               |
 
 What this shows:
 
@@ -235,14 +261,25 @@ What this shows:
   (barwise-920, barwise-921, both open). Not the umbrellas themselves:
   barwise-921 is the whole uv rule, which can close while `audit:skips`
   stays unbuilt. WS3's index shows the gap beside the enforcers.
-- `merge-delegation` says none of its four decisions is enforced:
+- `merge-delegation` has five decisions. Its Consequences say four are
+  not enforced:
   1, 3 and 4 outright, and 2 only when the agent passes the SHA, with
   "Nothing requires the pin or the comment (barwise-zdd)". barwise-zdd is
   one mechanism (a check that the steward's review ran), so it cannot
   stand for all four: when it closes, the decisions it does not cover
   would lose their tracked gap. WS2 reads which decisions zdd covers and
   opens a gap issue for each one it does not, one `none` entry per
-  issue.
+  issue. Decision 5, that the owner's instruction overrides the
+  condition, is a grant of authority with nothing to check, and takes
+  `none (deliberate: ...)`.
+- The rule behind both rows, which WS2 applies to every ADR rather than
+  only to the rows above: each decision that an ADR's own Consequences
+  call unenforced, not built, review-only or without a gate gets a
+  `none` entry. An ADR whose header lists enforcers and no gaps, while
+  its prose names an unguarded decision, is the header-and-prose drift
+  this spec exists to remove. `ossie-interchange` is the example the
+  first Inventory pass missed: decision 5 is not built (barwise-wcg),
+  decision 6 has no gate, and part of decision 1 is review-only.
 - Five ADRs cite `test:coverage`, which runs every package test and so
   cannot point at one decision. Their entries name the test
   files that pin the decision instead (for example
@@ -324,8 +361,9 @@ in `scripts/lib/beads-ids.mjs`), and older children are numeric
 
 ```
 npm run <script>
-hook <Event> <repo-rooted path>               -- wired in .claude/settings.json
-hook barwise/.husky/<name> runs npm run <script>
+npm run <script> -- <args>
+hook barwise/.husky/<name> runs npm run <script> [-- <args>]   -- tried before the form below
+hook <Event> <repo-rooted path>               -- Event is one word, no `/`; settings.json
 <repo-rooted path to a test file>
 none (deliberate: <reason>)                   -- per Open decisions; tried first
 none (<issue-id>[: <free text naming which decisions>])
