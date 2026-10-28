@@ -171,3 +171,12 @@ and the import reads it.
 - The example exports under `examples/transcripts/` are gone. They had
   drifted from the exporters, and nothing checked them; the CLI's
   characterization goldens now record and check the same exports.
+
+### The Ossie import names fields the pinned schema does not define
+
+A field in an Apache Ossie ontology document that the pinned
+`0.2.0.dev0` schema does not define, such as a typo or a field a later
+upstream commit added under the same version string, used to be ignored
+with no warning. Each one is now named in the import warnings by its
+path (`concept Airport.relationships[0].colour`), and the import
+otherwise proceeds as before, at medium confidence.

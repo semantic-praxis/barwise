@@ -5,7 +5,7 @@
  * trip of the pinned flights example.
  */
 import { type InternalConstraint, OrmModel } from "@barwise/core";
-import Ajv2020 from "ajv/dist/2020.js";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { OssieExportFormat } from "../src/ossie/OssieExportFormat.js";
 import { OssieImportFormat } from "../src/ossie/OssieImportFormat.js";
+import { compileOssieSchema } from "../src/ossie/ossieSchema.js";
 import type { OssieConcept, OssieDocument, OssieRelationship } from "../src/ossie/OssieTypes.js";
 
 const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/ossie");
@@ -29,13 +30,7 @@ function schemaValidator() {
   // format; an absolute IRI is a scheme, a colon, and no whitespace or
   // characters RFC 3987 excludes.
   ajv.addFormat("iri", /^[A-Za-z][A-Za-z0-9+.-]*:[^\s<>"{}|\\^`]*$/u);
-  const core = JSON.parse(fixture("ossie-schema.json"));
-  delete core.$id;
-  ajv.addSchema(
-    core,
-    "https://raw.githubusercontent.com/apache/ossie/main/core-spec/ossie-schema.json",
-  );
-  return ajv.compile(JSON.parse(fixture("ontology.json")));
+  return compileOssieSchema(ajv);
 }
 
 const exporter = new OssieExportFormat();

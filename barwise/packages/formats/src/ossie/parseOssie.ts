@@ -1,13 +1,16 @@
 /**
- * YAML (or JSON) text to an `OssieDocument`.
+ * YAML (or JSON) text to an `OssieDocument`, plus a warning for each field
+ * the pinned schema does not define.
  *
  * The checks here are the ones the mapper relies on: a field it reads has
- * the type the schema gives it. They are not a full schema validation --
- * `@barwise/formats` carries no JSON-schema validator at run time -- so a
- * document with an extra, unknown field still imports, and the export side
- * is the one validated against the pinned schema (WS2's test).
+ * the type the schema gives it, or the document is refused. A field the
+ * schema does not define at all is not refused but named, by
+ * `unknownOssieFields` against the pinned schema
+ * (`docs/specs/ossie-unknown-fields.spec.md`), after these checks pass, so a
+ * refused document reports none.
  */
 import { parse as parseYaml } from "yaml";
+import { unknownOssieFields } from "./ossieSchema.js";
 import {
   OSSIE_VERSION,
   type OssieConcept,
@@ -16,7 +19,13 @@ import {
   type OssieRelationship,
 } from "./OssieTypes.js";
 
-export function parseOssie(text: string): OssieDocument {
+export interface ParsedOssie {
+  readonly document: OssieDocument;
+  /** One per field the pinned schema does not define, in the order ajv reports them. */
+  readonly warnings: readonly string[];
+}
+
+export function parseOssie(text: string): ParsedOssie {
   let raw: unknown;
   try {
     raw = parseYaml(text);
@@ -40,7 +49,7 @@ export function parseOssie(text: string): OssieDocument {
   const ontology = list(doc["ontology"], "ontology").map((c, i) => concept(c, `ontology[${i}]`));
   if (ontology.length === 0) throw new OssieImportError("ontology must list at least one concept.");
 
-  return {
+  const document: OssieDocument = {
     version: OSSIE_VERSION,
     name,
     ...opt("description", optText(doc["description"], "description")),
@@ -60,6 +69,7 @@ export function parseOssie(text: string): OssieDocument {
         : record(doc["prefixes"], "prefixes") as Record<string, string>,
     ),
   };
+  return { document, warnings: unknownOssieFields(raw) };
 }
 
 function concept(raw: unknown, at: string): OssieConcept {

@@ -903,6 +903,105 @@ ontology:
   });
 });
 
+describe("Ossie import: fields the pinned schema does not define", () => {
+  // docs/specs/ossie-unknown-fields.spec.md: each is named by path, and the
+  // rest of the document imports as it would without it.
+  const unknown = (path: string) =>
+    `${path}: the Ossie 0.2.0.dev0 schema defines no such field; ignored.`;
+
+  it("names one at the top level, in a concept, a relationship and a role", () => {
+    const { model, warnings, confidence } = load(`
+colour: blue
+ontology:
+  - concept: Person
+    type: EntityType
+    shoe_size: 42
+    identify_by: [ has_name ]
+    relationships:
+      - name: has_name
+        multiplicity: OneToOne
+        cardinality: 1
+        roles:
+          - { concept: Name, nickname: n }
+        verbalizes: [ "{Person} has {Name}" ]
+  - { concept: Name, type: ValueType, extends: [ String ] }
+`);
+    expect(warnings).toEqual([
+      unknown("colour"),
+      unknown("concept Person.shoe_size"),
+      unknown("concept Person.relationships[0].cardinality"),
+      unknown("concept Person.relationships[0].roles[0].nickname"),
+    ]);
+    expect(confidence).toBe("medium");
+    // The rest of the document imported as written.
+    expect(model.getObjectTypeByName("Person")?.kind).toBe("entity");
+    expect(factType(model, "Person.has_name").readings.map((r) => r.template))
+      .toEqual(["{0} has {1}"]);
+  });
+
+  it("names one inside ontology_mappings too, beside the block's own drop", () => {
+    const { warnings } = load(`
+ontology_mappings:
+  - { name: m, semantic_model: {}, concept_mappings: [], extra: 1 }
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ] }
+`);
+    expect(warnings).toEqual([
+      unknown("ontology_mappings[0].extra"),
+      "ontology_mappings: embedded mappings (deprecated in Ossie) are not imported; dropped.",
+    ]);
+  });
+
+  it("brackets a key that is not a plain identifier, so it cannot read as an index", () => {
+    const { warnings } = load(`
+ontology:
+  - concept: Code
+    type: ValueType
+    extends: [ String ]
+    "a/b~c": 1
+    0: zero
+`);
+    expect(warnings).toEqual([
+      unknown(`concept Code["0"]`),
+      unknown(`concept Code["a/b~c"]`),
+    ]);
+  });
+
+  it("quotes a concept name that is not a plain identifier, so its dots are not path steps", () => {
+    const { warnings } = load(`
+ontology:
+  - { concept: "x.y", type: ValueType, extends: [ String ], z: 1 }
+`);
+    expect(warnings).toEqual([unknown(`concept "x.y".z`)]);
+  });
+
+  it("still checks the imported part when aliases make a cycle the check cannot walk", () => {
+    // `children` is recursive in the schema, and the alias makes it a real
+    // cycle; ajv overflows the stack on it. The block is dropped either way,
+    // and the fields beside imported ones are still named.
+    const { model, warnings } = load(`
+colour: blue
+ontology_mappings:
+  - name: m
+    semantic_model: {}
+    concept_mappings:
+      - concept: Code
+        link_mappings: [ &l { relationship: r, object_mapping: { expression: x }, children: [ *l ] } ]
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ], shoe_size: 42 }
+`);
+    expect(model.getObjectTypeByName("Code")?.kind).toBe("value");
+    expect(warnings).toEqual([
+      unknown("colour"),
+      unknown("concept Code.shoe_size"),
+      expect.stringMatching(
+        /^ontology_mappings: could not be checked against the Ossie 0\.2\.0\.dev0 schema \(.+\); a field it does not define there would not be named\.$/,
+      ),
+      "ontology_mappings: embedded mappings (deprecated in Ossie) are not imported; dropped.",
+    ]);
+  });
+});
+
 describe("Ossie import: the pinned flights example", () => {
   const { model, warnings } = new OssieImportFormat().parse(readFileSync(fixture, "utf8"));
 
