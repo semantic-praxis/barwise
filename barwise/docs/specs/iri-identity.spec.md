@@ -7,7 +7,7 @@ WS3 folded into WS6; WS4 (with barwise-y1b) planned; WS5 to WS7 to come
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-wcg, barwise-y1b
-Plan-reviewed: e7acea95 (code-review, pr-review; re-pointed after WS3 was folded into WS6)
+Plan-reviewed: 5e108470 (code-review, pr-review; re-pointed after WS4 was grounded with barwise-y1b)
 Touches: barwise/packages/core/src/model/,
 barwise/packages/core/src/serialization/,
 barwise/packages/core/schemas/,
