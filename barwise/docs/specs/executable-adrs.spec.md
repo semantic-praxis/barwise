@@ -67,8 +67,10 @@ In scope:
   exit 1 unless `<script>` is a key of `barwise/package.json` `scripts`
   and some `ci.yml` step's arguments, as `ciSteps()` in
   `barwise/scripts/lib/ci-gates.mjs` returns them, are `run`, then any
-  `--flag` tokens, then `<script>` as the first token that is not a
-  flag. The match is on that token alone, because CI writes
+  flags, then `<script>` as the first token that is not a flag. A flag
+  is any token starting with `-` (`-s` included); `--prefix`,
+  `--workspace` and `-w` written with a space also consume the next
+  token as their value. The match is on that token alone, because CI writes
   `run audit:specs -- --check`; a whole-string comparison would call
   three enforced ADRs unwired. A step with a workspace flag before its
   script -- any token whose name, the part before `=`, is `--workspace`,
@@ -79,7 +81,11 @@ In scope:
 - A step marked `continue-on-error: true` is not wired: it cannot fail
   CI. `ciSteps()` does not report that key today, so WS1 extends it to
   return `continueOnError` beside `condition`; `ci:local` and
-  `fault-matrix` ignore the new field. `npm run dup` and
+  `fault-matrix` ignore the new field, and the shape pinned by
+  `scripts/tests/ci-conditions.test.mjs` is updated with it. Where the
+  same arguments appear in two steps, `ciSteps()` keeps one entry, and
+  its `continueOnError` is true only if every occurrence has the key,
+  so step order cannot decide whether a gate is wired. `npm run dup` and
   `npm run filesize` are such steps now, and `must-agree-copies` names
   `dup` in its prose.
 - A step guarded by an `if:` counts as wired. Most guards are
@@ -92,16 +98,20 @@ In scope:
   shall exit 1 unless its conditions hold.
   `hook <Event> <path>`: the path is tracked, and `.claude/settings.json`,
   parsed as JSON, has an entry under `hooks.<Event>` whose nested
-  `hooks` list holds a `command` that contains the path (the real shape
-  is `hooks.<Event>[i].hooks[j].command`). A path that survives only in a permission rule, or
+  `hooks` list holds a `command` that runs the path (the real shape is
+  `hooks.<Event>[i].hooks[j].command`). Runs means: the command
+  contains `node`, then a space, an optional `"`, an optional
+  `$CLAUDE_PROJECT_DIR/`, the path, and then a `"`, whitespace or the
+  end. So `echo <path>` and `node <path>.disabled` do not count, the
+  same strictness as the husky rule below. A path that survives only in a permission rule, or
   under another event, does not count. The entry's `matcher` is not
   checked; a matcher that never fires is the kind of defect WS4's
   probes are for.
   `hook barwise/.husky/<name> runs npm run <script>`: the husky file is
   tracked, `<script>` is a key of `barwise/package.json` `scripts`, and
   the husky file has a line that, after leading whitespace and an
-  optional `if !` or `!`, begins `npm run`, then any `--flag` tokens,
-  then `<script>`. Comment lines and `echo` strings therefore never
+  optional `if !` or `!`, begins `npm run`, then any flags (as defined
+  for CI steps above), then `<script>`. Comment lines and `echo` strings therefore never
   match: `barwise/.husky/pre-push` names `npm run ci:local` in an echo
   as well as on the line that runs it. Naming the husky file alone is
   not accepted: it would pass however the hook's body changed, which is
@@ -183,7 +193,7 @@ resolving them against `package.json` and `ciSteps()`.
 | `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others | enforced                                                                    |
 | `gate-refusal-contract`        | `test:scripts`; `fault-matrix` is on demand                     | enforced                                                                    |
 | `keyless-model-access`         | `test:coverage`, `depcruise`                                    | enforced: `depcruise` and named test files                                  |
-| `merge-delegation`             | none; the ADR says so (barwise-zdd)                             | `none (barwise-zdd: decisions 1 to 4)`                                      |
+| `merge-delegation`             | none; the ADR says so (barwise-zdd)                             | `none` per decision: zdd and new gap issues (WS2)                           |
 | `metamodel-evolution-policy`   | none                                                            | to be determined in WS2                                                     |
 | `must-agree-copies`            | `check:parity`, `audit:duplication`                             | enforced                                                                    |
 | `ossie-interchange`            | `test:coverage`                                                 | enforced, by named test files                                               |
@@ -214,7 +224,11 @@ What this shows:
 - `merge-delegation` says none of its four decisions is enforced:
   1, 3 and 4 outright, and 2 only when the agent passes the SHA, with
   "Nothing requires the pin or the comment (barwise-zdd)". barwise-zdd is
-  the gap itself, so its entry cites it directly.
+  one mechanism (a check that the steward's review ran), so it cannot
+  stand for all four: when it closes, the decisions it does not cover
+  would lose their tracked gap. WS2 reads which decisions zdd covers and
+  opens a gap issue for each one it does not, one `none` entry per
+  issue.
 - Five ADRs cite `test:coverage`, which runs every package test and so
   cannot point at one decision. Their entries name the test
   files that pin the decision instead (for example
@@ -237,7 +251,13 @@ barwise/docs/adr/<concern>.md
 barwise/scripts/lib/adr-enforcement.mjs       (new)
   parseEnforcedBy(text) -- the one parser of the header, used by the
                            check and by renderSection, so the index and
-                           the check cannot disagree on an entry
+                           the check cannot disagree on an entry;
+                           returns { entries, problems } and never
+                           throws, because renderSection runs outside
+                           the check's refusal handling and in
+                           regen:architecture. The check reports the
+                           problems; the index renders the entries
+                           that parsed.
   splitEntries(value)   -- comma split outside parentheses, newlines
                            read as spaces; reports an unbalanced
                            parenthesis
@@ -256,14 +276,16 @@ barwise/scripts/check-architecture.mjs        (existing; one new pass)
 
 barwise/scripts/lib/architecture-section.mjs  (renderSection)
   - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity, depcruise
-  - [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- declared: check:parity; gap: barwise-920.1
-  - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18 -- unenforced (barwise-zdd)
+  - [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- declared: check:parity; gap: barwise-920.<new>
+  - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18 -- unenforced (barwise-zdd, ...)
 ```
 
 Rendering rule: `declared: ` and the enforcers in declared order,
 joined by `, `; then, after `; `, each `none` entry as `gap: <issue-id>`
-or `gap: deliberate`, joined by `, `. (`barwise-920.1` above stands for
-the child gap issue WS2 opens; its real id is minted then.) An ADR with no
+or `gap: deliberate`, joined by `, `. (`barwise-920.<new>` above stands for
+the child gap issue WS2 opens; its real id is minted then.) An ADR with
+no `Enforced-by:` header, which WS1 still allows, renders with no
+suffix at all, as today, so WS3 can land before WS2 finishes. An ADR with no
 enforcer renders `unenforced (<issue-id or deliberate>, ...)` instead.
 Each entry renders so its kind shows: `npm run x` as `x`; a husky
 entry as `x (pre-commit hook)`; a settings hook as its file name
@@ -273,14 +295,18 @@ file as its file name. So credential-handling renders
 the CI scan from the local hook.
 
 Entry grammar. Entries are separated by commas that sit outside
-parentheses, so `none (barwise-zdd: decisions 1 to 4)` is one entry; an
+parentheses, so `none (barwise-zdd: decisions 1, 3)` is one entry; an
 unbalanced parenthesis is a finding. A newline is read as a space, not
-a separator, because dprint wraps headers at 80 columns and most
-entries contain spaces: `hook barwise/.husky/pre-commit runs npm run
-check:secrets` must survive a wrap anywhere. An `<issue-id>` is
-`barwise-` followed by `[a-z0-9]+(\.[0-9]+)*`, so a child issue such as
-`barwise-920.1` (the shape `beads-crud create --parent` mints) is one id,
-not an umbrella id plus text. Each entry is one of:
+a separator: most entries contain spaces, and a header wrapped by hand
+or by a reflow must not split `hook barwise/.husky/pre-commit runs npm
+run check:secrets` in two. In exchange, every entry must match its form
+exactly, and a token left over is a finding: `npm run purity npm run
+depcruise`, a wrapped line whose comma was dropped, fails rather than
+letting `purity` pass for both. An `<issue-id>` is `barwise-` followed
+by `[a-z0-9]+(\.[a-z0-9]+)*`: `beads-crud create --parent` mints a
+random three-character child suffix (`barwise-920.k3x`, via `mintId`
+in `scripts/lib/beads-ids.mjs`), and older children are numeric
+(`barwise-5t9.4`); either is one id, not an umbrella id plus text. Each entry is one of:
 
 ```
 npm run <script>
@@ -332,8 +358,11 @@ the existing `check-architecture` cases, cover each entry kind's pass
 and fail, the parenthesized comma, a vscode integration-test path (fail),
 the closed-issue case, and the exit-2 refusals; the fixture builder
 gains `ci.yml`, `package.json`, tracker, settings and husky files only in
-the cases that need them. First because it touches only the checker,
-one new library and their tests.
+the cases that need them. The new cases change `gates.test.mjs`'s
+registered test count, so WS1 also updates
+`scripts/tests/expected-counts.json` (`npm run test:scripts -- --write`);
+without it `test:scripts` refuses. First because it touches only the
+checker, one new library and their tests.
 
 The tracker is read with `parseTracker()` from `scripts/lib/beads-merge.mjs`,
 which already exists and refuses malformed lines, missing ids and
