@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-ivl
+Plan-reviewed: ad6f7a0a (code-review, pr-review)
 Touches: barwise/packages/formats/src/ddl/DdlImportFormat.ts,
 barwise/packages/formats/src/ddl/barwiseAnnotation.ts,
 barwise/packages/core/src/mapping/renderers/dbt.ts,
