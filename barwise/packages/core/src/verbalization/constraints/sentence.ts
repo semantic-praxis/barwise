@@ -1,7 +1,9 @@
 /**
  * FORML sentence parts for constraint verbalization: the subject entity
- * a multi-role constraint is about (resolveCommonPlayer) and the predicate
- * phrase between two roles of a binary reading (extractPredicate).
+ * a multi-role constraint is about (resolveCommonPlayer), a reading's parts
+ * as quantified segments (quantifiedReading, forEachReading), and the
+ * predicate phrase between two roles of a binary reading
+ * (extractPredicate), which only the ring sentence still uses.
  */
 import type { FactType } from "../../model/FactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
@@ -106,10 +108,11 @@ export function orderedPredicate(
  * order, the first reading's text between its first two placeholders is
  * used as written, with its binding hyphens removed and no leads: a lead
  * there belongs to whichever noun the reading put after it, which is not
- * the sentence's object. That fallback reads the fact backwards: the ring
- * sentence is unchanged by reversing it, the mandatory and uniqueness
- * sentences ask `orderedPredicate` first, and the frequency sentence
- * still reads backwards (barwise-zx2).
+ * the sentence's object. That fallback reads the fact backwards, which the
+ * ring sentence, its one caller, is unchanged by. The slice drops any text
+ * outside the two placeholders (barwise-7tx); the mandatory, uniqueness and
+ * frequency sentences take the whole reading instead
+ * (binary-constraint-sentences.spec.md).
  */
 export function extractPredicate(
   factType: FactType,
@@ -154,6 +157,43 @@ export function openingReading(
     if (opener?.kind === "role" && opener.index === index && clear) {
       return { lead: opener.lead, rest: parts.slice(first + 1) };
     }
+  }
+  return undefined;
+}
+
+/**
+ * "Each X <rest>" for role `own`'s player X, from the first reading whose
+ * first placeholder is that role: the forward sentence of a binary
+ * mandatory, uniqueness or frequency (binary-constraint-sentences.spec.md).
+ * Text before the placeholder is dropped, as "Each" takes its place ("the
+ * {0} has {1}" is "Each Order has ..."); everything after it stays, which
+ * slicing between the placeholders did not (barwise-m1c). `rest` renders
+ * the parts after the placeholder, so a frequency can render them twice.
+ * Undefined when no reading names the role first.
+ */
+export function eachReading(
+  model: OrmModel,
+  factType: FactType,
+  own: number,
+  rest: (parts: readonly ReadingPart[]) => VerbalizationSegment[],
+): VerbalizationSegment[] | undefined {
+  for (const reading of factType.readings) {
+    const parts = splitReading(reading.template).parts;
+    const first = parts.findIndex((p) => p.kind === "role");
+    const opener = parts[first];
+    if (opener?.kind !== "role" || opener.index !== own) continue;
+    const after = rest(parts.slice(first + 1));
+    // No space before punctuation the reading put flush against the
+    // placeholder ("{0}'s {1}").
+    const head = after[0]?.text ?? "";
+    return [
+      kwSeg("Each "),
+      ...leadSegs(opener.lead),
+      rolePlayer(model, factType, own),
+      ...(/^[\p{L}\p{N}]/u.test(head) ? [textSeg(" ")] : []),
+      ...after,
+      textSeg("."),
+    ];
   }
   return undefined;
 }
@@ -226,23 +266,41 @@ export function quantifiedReading(
  * Customer, some Order is placed by that Customer." -- the reading as the
  * modeller wrote it, where slicing its predicate would read it backwards
  * ("Each Customer is placed by at least one Order").
+ *
+ * With `counted`, the frequency sentence for such a role: "For each
+ * Customer, if some Order is placed by that Customer, then that holds for
+ * exactly 2 instances of Order." -- conditional, because a frequency
+ * constrains only the X that play the role, and counted with "that holds
+ * for", so the reading's verb need not agree with a plural (barwise-zx2).
  */
 export function forEachReading(
   model: OrmModel,
   factType: FactType,
   own: number,
   others: string,
+  counted?: { readonly other: number; readonly count: string; },
 ): VerbalizationSegment[] {
   // The constructor refuses a fact type with no reading.
   const parts = splitReading(factType.readings[0]!.template).parts;
-  const ownPart = parts.find((p) => p.kind === "role" && p.index === own);
+  const lead = (index: number) => {
+    const part = parts.find((p) => p.kind === "role" && p.index === index);
+    return leadSegs(part?.kind === "role" ? part.lead : "");
+  };
   const player = numberedPlayers(model, factType);
+  const reading = quantifiedReading(model, factType, parts, own, others, player);
   return [
     kwSeg("For each "),
-    ...leadSegs(ownPart?.kind === "role" ? ownPart.lead : ""),
+    ...lead(own),
     player(own),
-    textSeg(", "),
-    ...quantifiedReading(model, factType, parts, own, others, player),
+    ...(counted
+      ? [
+        kwSeg(", if "),
+        ...reading,
+        kwSeg(", then that holds for " + counted.count),
+        ...lead(counted.other),
+        player(counted.other),
+      ]
+      : [textSeg(", "), ...reading]),
     textSeg("."),
   ];
 }

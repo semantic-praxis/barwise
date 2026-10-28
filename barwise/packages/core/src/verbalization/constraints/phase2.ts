@@ -18,7 +18,9 @@ import {
   type VerbalizationSegment,
 } from "../Verbalization.js";
 import {
+  eachReading,
   extractPredicate,
+  forEachReading,
   leadSegs,
   localRole,
   openingReading,
@@ -343,7 +345,12 @@ export function verbalizeRing(
 }
 
 /**
- * "Each {Subject} {pred} at least {min} and at most {max} {Object}."
+ * "Each {Subject} that <reading, with some {Object}> <reading, with
+ * <count> instances of {Object}>.", or "For each {Subject}, if <reading>,
+ * then that holds for <count> instances of {Object}." when no reading names
+ * the subject first: conditional, as a frequency constrains only the
+ * instances that play the role (binary-constraint-sentences.spec.md,
+ * barwise-zx2).
  */
 export function verbalizeFrequency(
   roleIds: readonly string[],
@@ -365,33 +372,28 @@ export function verbalizeFrequency(
   const roleIdx = factType.roles.findIndex((r) => r.id === roleId);
   const otherIdx = roleIdx === 0 ? 1 : 0;
 
-  const subjectRole = factType.roles[roleIdx]!;
-  const objectRole = factType.roles[otherIdx]!;
-  const subjectType = model.getObjectType(subjectRole.playerId);
-  const objectType = model.getObjectType(objectRole.playerId);
-  const subjectName = subjectType?.name ?? subjectRole.name;
-  const objectName = objectType?.name ?? objectRole.name;
+  // "instances of" counts without a plural the model does not hold; the
+  // noun agrees with the last number ("at least 1 instance of").
+  const bound = max === "unbounded"
+    ? `at least ${min}`
+    : min === max
+    ? `exactly ${min}`
+    : `at least ${min} and at most ${max}`;
+  const count = `${bound} ${/\b1$/.test(bound) ? "instance" : "instances"} of `;
 
-  const predicate = extractPredicate(factType, roleIdx, otherIdx);
-
-  const segments: VerbalizationSegment[] = [
-    kwSeg("Each "),
-    ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
-    textSeg(" " + predicate.text + " "),
-  ];
-
-  if (max === "unbounded") {
-    segments.push(kwSeg(`at least ${min} `));
-  } else if (min === max) {
-    segments.push(kwSeg(`exactly ${min} `));
-  } else {
-    segments.push(kwSeg(`at least ${min} and at most ${max} `));
-  }
-
-  segments.push(...predicate.object(refSeg(objectName, objectRole.playerId)));
-  segments.push(textSeg("."));
-
-  return buildVerbalization(factType.id, "constraint", segments);
+  // "Each X that <reading> some Y <reading> <count> Y": the frequency
+  // restricts only the X that play the role, so it does not say each X does.
+  const each = eachReading(model, factType, roleIdx, (rest) => [
+    kwSeg("that "),
+    ...quantifiedReading(model, factType, rest, roleIdx),
+    textSeg(" "),
+    ...quantifiedReading(model, factType, rest, roleIdx, count),
+  ]);
+  return buildVerbalization(
+    factType.id,
+    "constraint",
+    each ?? forEachReading(model, factType, roleIdx, "some ", { other: otherIdx, count }),
+  );
 }
 
 export function verbalizeGenericFrequency(

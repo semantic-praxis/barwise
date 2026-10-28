@@ -116,7 +116,7 @@ These rules keep the deck consistent and keep it honest to the tool.
   - Subset: `If ... then ...`
   - Equality: `... if and only if ...`
   - Ring (irreflexive): `No Person manages that same Person.`
-  - Frequency (binary): `Each Team includes exactly 11 Player.`
+  - Frequency (binary): `Each Team that includes some Player includes exactly 11 instances of Player.`
 - **Tabs separate fields.** Front, then a literal TAB, then Back. Use
   `<br>` for line breaks inside a field, never a raw newline.
 - **No emoji** (repo-wide convention).
