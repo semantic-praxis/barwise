@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-5x3, barwise-huw
+Plan-reviewed: 7acdf232 (code-review, pr-review)
 Touches: barwise/packages/formats/src/ossie/writeOssie.ts,
 barwise/packages/formats/src/ossie/verifyOssie.ts,
 barwise/packages/formats/src/ossie/OssieExportFormat.ts,
@@ -107,22 +108,22 @@ not explain hides exactly the defect the check was built to find.
 - The object-type lines are scoped by this table. Each row is every
   call site whose text matches it.
 
-  | Line text                                                                   | Explains              |
-  | --------------------------------------------------------------------------- | --------------------- |
-  | `aliases ... not written`                                                   | `aliases`             |
-  | `independence not written`                                                  | `independent`         |
-  | `population cardinality not written`                                        | `cardinality`         |
-  | `source context ... not written`                                            | `sourceContext`       |
-  | starts `note line not written` (four sites) or `note comes back`            | `note`                |
-  | `default value ... not written`                                             | `defaultValue`        |
-  | `no data type; written as String`                                           | `dataTypeAdded`       |
-  | `data type ... written as ...`, `data type length or scale not written`     | `dataTypeChanged`     |
-  | `value constraint is not a shape ...`                                       | `valueConstraint`     |
-  | `no identifier Ossie can state; reference mode ... not written`             | `referenceMode`, `preferredIdentifier` |
-  | `reference mode ... not written` (two sites)                                | `referenceMode`       |
-  | `its preferred identifier is not one Ossie's identify_by can name`          | `preferredIdentifier` |
-  | `written as <name>, a name Ossie can read back`                             | `name`                |
-  | `a built-in no role uses is not written`                                    | `"all"` (the element does not come back) |
+  | Line text                                                               | Explains                                 |
+  | ----------------------------------------------------------------------- | ---------------------------------------- |
+  | `aliases ... not written`                                               | `aliases`                                |
+  | `independence not written`                                              | `independent`                            |
+  | `population cardinality not written`                                    | `cardinality`                            |
+  | `source context ... not written`                                        | `sourceContext`                          |
+  | starts `note line not written` (four sites) or `note comes back`        | `note`                                   |
+  | `default value ... not written`                                         | `defaultValue`                           |
+  | `no data type; written as String`                                       | `dataTypeAdded`                          |
+  | `data type ... written as ...`, `data type length or scale not written` | `dataTypeChanged`                        |
+  | `value constraint is not a shape ...`                                   | `valueConstraint`                        |
+  | `no identifier Ossie can state; reference mode ... not written`         | `referenceMode`, `preferredIdentifier`   |
+  | `reference mode ... not written` (two sites)                            | `referenceMode`                          |
+  | `its preferred identifier is not one Ossie's identify_by can name`      | `preferredIdentifier`                    |
+  | `written as <name>, a name Ossie can read back`                         | `name`                                   |
+  | `a built-in no role uses is not written`                                | `"all"` (the element does not come back) |
 
 - The table is a copy that must agree with `diffObjectType`, so it
   carries a drift test. There is one case per row: a minimal model on
