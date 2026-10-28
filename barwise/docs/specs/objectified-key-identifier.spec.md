@@ -1,12 +1,14 @@
 # An objectified relationship's key column gets no second identifier
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-i3r
 Plan-reviewed: 96d72c85 (code-review, pr-review)
 Touches: barwise/packages/formats/src/ddl/DdlImportFormat.ts,
+barwise/packages/core/src/mapping/RelationalMapper.ts,
+barwise/packages/core/src/mapping/index.ts,
 barwise/packages/formats/tests/,
 barwise/packages/cli/tests/dbtUniquenessRoundTrip.test.ts,
 barwise/docs/release-notes/unreleased.md
@@ -84,6 +86,32 @@ keep every UNIQUE.
     them: it keeps its typed identifier.
 - The release note says an annotated DDL round trip no longer adds a key
   column to such a table, and keeps its preferred identifier.
+
+## Implementation notes
+
+- Measured with the scratchpad `go4-count.mjs`: all 24 models with a
+  UNIQUE keep every one through the annotated DDL round trip, as through
+  the plain and dbt ones. The re-exported C05 `work_order` table is the
+  original table. Red check: on the unfixed source, two of the three
+  formats tests and eight of the 76 round-trip cases fail.
+- The rule follows the mapper, not the narrower wording above: the key is
+  the relationship's when any role of the objectified fact type is played
+  by an entity, which is when `RelationalMapper` keys the table on its
+  roles. The rule is one exported function, `objectificationGivesKey`,
+  which both call; it was a private method of the mapper.
+- Implementation review, changed scope: the preferred identifier is not
+  restored. The table line's `referenceMode` is not the column's name in
+  general (the export names the column after the value type; Port's
+  reference mode is `unlocode`, its column `un_locode`), so reading it as
+  a column could drop the identifier without a word. The four entities
+  this fixes import with no stored preferred identifier, as the
+  relationship-keyed objectifiers already do: 34 of the corpus's 48
+  objectifiers lose theirs on an annotated round trip. The exported
+  tables are unchanged. The annotation recording which uniqueness is
+  preferred is barwise-4l0. The round-trip test's preferred-identifier
+  check and the release note's claim went with it.
+- The DDL round trips share `dbtUniquenessRoundTrip.test.ts` with the dbt
+  one, so all three are held to one description of the same models.
 
 ## Risks and testing
 
