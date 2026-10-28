@@ -159,8 +159,10 @@ models:
     expect(text).not.toContain("Composite key (");
   });
 
-  it("warns on every combination test except the one read as the key", () => {
-    // A second, nullable combination is not the key, so it is reviewed.
+  it("reads a second combination test as a uniqueness beside the key, not for review", () => {
+    // A second combination is not the key. Over a role of the relationship
+    // and an attribute of its objectifier, it is an external uniqueness, as
+    // DDL step 3b reads the same UNIQUE (dbt-alternate-uniqueness.spec.md).
     const extra = yaml.replace(
       "          combination_of_columns: [course_id, crn]\n",
       "          combination_of_columns: [course_id, crn]\n"
@@ -171,11 +173,19 @@ models:
       "      - name: crn\n        data_tests:\n          - not_null\n          - relationships: { to: \"ref('section')\", field: crn }\n      - name: room\n",
     );
     expect(extra).toContain("- name: room");
-    const { report } = importDbtProject([extra]);
+    const { model, report } = importDbtProject([extra]);
     const text = JSON.stringify(report);
     expect(text).toContain("Composite key (course_id, crn)");
-    expect(text.match(/Model-level custom test \\"dbt_utils\.unique_combination_of_columns\\"/g))
-      .toHaveLength(1);
+    expect(text).not.toContain("Model-level custom test");
+    const name = (id: string) =>
+      model.getObjectType(
+        model.factTypes.flatMap((f) => f.roles).find((r) => r.id === id)!.playerId,
+      )!
+        .name;
+    expect(
+      model.constraints.filter((c) => c.type === "external_uniqueness")
+        .map((c) => c.roleIds.map(name).sort()),
+    ).toEqual([["Room", "Section"]]);
   });
 
   it("keeps an accepted_values test on a value role as its value constraint", () => {

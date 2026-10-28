@@ -393,7 +393,7 @@ describe("dbt renderer", () => {
 
       it("is one model-level foreign_key constraint, and no column test", () => {
         expect(claim()).toMatchObject({
-          constraints: [{
+          constraints: [{ type: "primary_key", columns: ["claim_id"] }, {
             type: "foreign_key",
             columns: ["policy_id", "term_number"],
             to: "ref('policy_period')",
@@ -407,7 +407,9 @@ describe("dbt renderer", () => {
           "not_null",
         ]);
         expect(renderDbt(schema).schemaYaml).toContain(
-          "    constraints:\n"
+          "      - type: primary_key\n"
+            + "        columns:\n"
+            + "          - claim_id\n"
             + "      - type: foreign_key\n"
             + "        columns:\n"
             + "          - policy_id\n"
@@ -417,7 +419,62 @@ describe("dbt renderer", () => {
       });
 
       it("is not written when relationship tests are off: it is a reference too", () => {
-        expect(claim(false)).not.toHaveProperty("constraints");
+        expect(claim(false)).toMatchObject({
+          constraints: [{ type: "primary_key", columns: ["claim_id"] }],
+        });
+      });
+    });
+
+    describe("uniquenesses beside the key (dbt-alternate-uniqueness.spec.md)", () => {
+      const col = (name: string, nullable = false) => ({
+        name,
+        dataType: "INTEGER",
+        dataTypeDefaulted: false,
+        nullable,
+      });
+      const schema = {
+        sourceModelId: "m",
+        tables: [{
+          name: "room",
+          sourceElementId: "r",
+          columns: [col("room_id"), col("building"), col("room_number", true), col("badge")],
+          primaryKey: { columnNames: ["room_id"] },
+          foreignKeys: [],
+        }],
+      };
+      const room = () =>
+        (parse(
+          renderDbt(schema, {
+            uniques: [
+              { tableName: "room", columns: ["badge"] },
+              { tableName: "room", columns: ["building", "room_number"] },
+            ],
+          }).schemaYaml,
+        ) as { models: Array<Record<string, unknown>>; }).models[0]!;
+
+      it("states the key as a primary_key constraint", () => {
+        expect(room()["constraints"]).toEqual([{ type: "primary_key", columns: ["room_id"] }]);
+      });
+
+      it("tests a single column with unique, several with a combination test", () => {
+        const columns = room()["columns"] as Array<{ name: string; data_tests?: unknown[]; }>;
+        expect(columns.find((c) => c.name === "badge")!.data_tests).toEqual(["not_null", "unique"]);
+        expect(columns.find((c) => c.name === "building")!.data_tests).toEqual(["not_null"]);
+        expect(room()["data_tests"]).toEqual([{
+          "dbt_utils.unique_combination_of_columns": {
+            arguments: { combination_of_columns: ["building", "room_number"] },
+            // room_number is nullable: SQL UNIQUE skips such rows, so the test does.
+            config: { where: "building is not null and room_number is not null" },
+          },
+        }]);
+      });
+
+      it("writes no where filter over columns that are all NOT NULL", () => {
+        const yaml = renderDbt(schema, {
+          uniques: [{ tableName: "room", columns: ["building", "badge"] }],
+        }).schemaYaml;
+        expect(yaml).toContain("combination_of_columns:");
+        expect(yaml).not.toContain("where:");
       });
     });
   });

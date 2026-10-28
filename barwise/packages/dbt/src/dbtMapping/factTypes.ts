@@ -43,6 +43,7 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       const role1Id = generateId();
       const role2Id = generateId();
       ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, role1Id);
+      ctx.farRoleIdMap.set(`${m.name}::${col.name}`, role2Id);
 
       // Build constraints from tests.
       const constraints = buildConstraints(col, role1Id, role2Id, ctx.report, m.name);
@@ -127,6 +128,16 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       if (isMandatory) {
         constraints.push({ type: "mandatory", roleId: role2Id });
       }
+      // A unique single-column reference is a one-to-one, as the DDL
+      // importer reads a UNIQUE on a foreign key column
+      // (dbt-alternate-uniqueness.spec.md). Not on the key column, whose
+      // reference the DDL importer does not read at all (barwise-1078).
+      const refCol = rel.columns.length === 1
+        ? m.columns.find((c) => c.name === rel.columns[0])
+        : undefined;
+      if (refCol && refCol.name !== pk?.columnName && hasTest(refCol, "unique")) {
+        constraints.push({ type: "internal_uniqueness", roleIds: [role1Id] });
+      }
       // A combination test over exactly a foreign key's columns: each
       // target row is referenced at most once, as the DDL importer reads a
       // UNIQUE over them (composite-foreign-key-round-trip.spec.md).
@@ -140,6 +151,7 @@ export function createFactTypes(ctx: DbtMapperContext): void {
         constraints.push({ type: "internal_uniqueness", roleIds: [role1Id] });
       }
 
+      for (const c of rel.columns) ctx.farRoleIdMap.set(`${m.name}::${c}`, role1Id);
       ctx.model.addFactType({
         name: factName,
         roles: [

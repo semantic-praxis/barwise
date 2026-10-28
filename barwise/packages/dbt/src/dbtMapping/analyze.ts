@@ -15,10 +15,27 @@ import { type DbtMapperContext, referenceName, type RelationshipInfo } from "./c
 
 export function analyzeModels(ctx: DbtMapperContext): void {
   for (const m of ctx.doc.models) {
-    // Find PK column: has both unique and not_null tests.
-    const pkCol = m.columns.find(
-      (c) => hasTest(c, "unique") && hasTest(c, "not_null"),
-    );
+    // The key column: the one a primary_key constraint declares, else the
+    // first with both unique and not_null tests. Declared, a secondary
+    // unique NOT NULL column is not taken for it (dbt-alternate-uniqueness.spec.md).
+    const declared = m.primaryKey;
+    const declaredCol = declared?.length === 1
+      ? m.columns.find((c) => c.name === declared[0])
+      : undefined;
+    if (declared && declared.some((n) => !m.columns.some((c) => c.name === n))) {
+      ctx.report.warning(
+        "identifier",
+        m.name,
+        `The primary_key constraint names (${
+          declared.join(", ")
+        }), and not every one is a column of the model; the key is found from its tests instead.`,
+      );
+    }
+    const keyDeclared = declared !== undefined
+      && declared.every((n) => m.columns.some((c) => c.name === n));
+    const pkCol = keyDeclared
+      ? declaredCol
+      : m.columns.find((c) => hasTest(c, "unique") && hasTest(c, "not_null"));
 
     // Find references: relationship columns, and foreign keys over
     // several columns, each one reference.
@@ -65,6 +82,10 @@ export function analyzeModels(ctx: DbtMapperContext): void {
     const notNull = (n: string) => m.columns.some((c) => c.name === n && hasTest(c, "not_null"));
     const referenceKey = pkCol || key
       ? undefined
+      : keyDeclared
+      ? (isReferenceUniqueness(m, declared!) && declared!.every(notNull)
+        ? [...declared!]
+        : undefined)
       : m.modelTests.map(combinationOf).find((names) =>
         names !== undefined && isReferenceUniqueness(m, names) && names.every(notNull)
       );
@@ -116,22 +137,12 @@ export function analyzeModels(ctx: DbtMapperContext): void {
       }
     }
 
-    // Report model-level custom tests. The one combination test read as
-    // the model's key is read, not reviewed (compositeKeys.ts); any other,
-    // including a second combination or one beside a single-column key,
-    // still is (PR #621 review). Compared as column sets: the same key
-    // stated again in another order is read too (candidateKeysOf).
-    const asSet = (cols: string[] | undefined) => cols && [...cols].sort().join("\0");
-    // A combination over exactly one foreign key's columns is read too, as
-    // that reference's one-to-one (factTypes.ts).
-    const consumed = pkCol ? undefined : asSet(compositeKeyOf(m));
+    // Report model-level custom tests. A combination test is the key, a
+    // foreign key's one-to-one, or a uniqueness `createUniqueness` reads,
+    // and that phase names any it cannot read (dbt-alternate-uniqueness.spec.md);
+    // any other custom test is reviewed here.
     for (const test of m.modelTests) {
-      const names = combinationOf(test);
-      if (
-        test.type === "custom"
-        && (consumed === undefined || asSet(names) !== consumed)
-        && !(names && isReferenceUniqueness(m, names))
-      ) {
+      if (test.type === "custom" && combinationOf(test) === undefined) {
         ctx.report.warning(
           "macro",
           m.name,

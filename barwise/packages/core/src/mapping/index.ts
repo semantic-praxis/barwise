@@ -5,6 +5,8 @@ export {
   type ConstraintRouting,
   routeConstraints,
   type RoutedClause,
+  type RoutedUnique,
+  routeUniqueOnly,
   type SpilledConstraint,
   unreportedConstraintSpecs,
   withConstraintSpecs,

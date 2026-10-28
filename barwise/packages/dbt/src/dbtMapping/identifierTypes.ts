@@ -62,6 +62,7 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
     const entityRoleId = generateId();
     const valueRoleId = generateId();
     ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, entityRoleId);
+    ctx.farRoleIdMap.set(`${m.name}::${col.name}`, valueRoleId);
     // The value role's uniqueness is the entity's preferred identifier,
     // named on the entity (orm-format-3 WS4b).
     const identifyingId = generateId();

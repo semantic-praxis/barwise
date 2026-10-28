@@ -79,6 +79,13 @@ export interface DbtMapperContext {
    * column it emits, which is how `exportedColumns.ts` finds it.
    */
   readonly columnRoleIdMap: Map<string, string>;
+  /**
+   * "modelName::columnName" -> the role a uniqueness over the column
+   * constrains: a value column's value role, a reference's referenced-entity
+   * role, the key's identifier value role, or a composite role itself, as
+   * DDL step 3b reads `farRoleId` (dbt-alternate-uniqueness.spec.md).
+   */
+  readonly farRoleIdMap: Map<string, string>;
   /** Source table data types: "sourceName.tableName.columnName" -> data_type string. */
   readonly sourceDataTypes: Map<string, string>;
   /** Column-level source data types: "columnName" -> data_type string (if unambiguous). */
@@ -98,6 +105,7 @@ export function createContext(doc: DbtProjectDocument): DbtMapperContext {
     entityIdMap: new Map<string, string>(),
     valueTypeIdMap: new Map<string, string>(),
     columnRoleIdMap: new Map<string, string>(),
+    farRoleIdMap: new Map<string, string>(),
     sourceDataTypes: new Map<string, string>(),
     sourceColumnTypes: new Map<string, string | null>(),
   };

@@ -10,6 +10,7 @@
  */
 
 import { stringify } from "yaml";
+import type { RoutedUnique } from "../constraintRouting.js";
 import type { Column, ForeignKey, RelationalSchema, Table } from "../RelationalSchema.js";
 
 // ---------------------------------------------------------------------------
@@ -51,6 +52,12 @@ export interface DbtRenderOptions {
    * Defaults to true.
    */
   readonly generateRelationshipTests?: boolean;
+  /**
+   * The uniquenesses beside each table's key that the DDL export writes as
+   * UNIQUE clauses (`routeUniqueOnly`): a single column is tested with
+   * `unique`, several with a combination test. Defaults to none.
+   */
+  readonly uniques?: readonly RoutedUnique[];
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +79,7 @@ export function renderDbt(
     sql: renderModelSql(table, sourceName),
   }));
 
-  const schemaYaml = renderSchemaYaml(schema, genRelTests);
+  const schemaYaml = renderSchemaYaml(schema, genRelTests, options.uniques ?? []);
 
   return { models, schemaYaml };
 }
@@ -149,15 +156,22 @@ interface SchemaColumn {
  * (dbt-export-current-test-syntax.spec.md, barwise-fnt). The importer reads
  * both forms.
  */
-function genericTest(name: string, args: Record<string, unknown>): Record<string, unknown> {
-  return { [name]: { arguments: args } };
+function genericTest(
+  name: string,
+  args: Record<string, unknown>,
+  config?: Record<string, unknown>,
+): Record<string, unknown> {
+  return { [name]: { arguments: args, ...(config ? { config } : {}) } };
 }
 
 function renderSchemaYaml(
   schema: RelationalSchema,
   genRelTests: boolean,
+  uniques: readonly RoutedUnique[],
 ): string {
-  const models: SchemaModel[] = schema.tables.map((table) => buildSchemaModel(table, genRelTests));
+  const models: SchemaModel[] = schema.tables.map((table) =>
+    buildSchemaModel(table, genRelTests, uniques.filter((u) => u.tableName === table.name))
+  );
 
   const doc = {
     version: 2,
@@ -167,9 +181,16 @@ function renderSchemaYaml(
   return stringify(doc, { lineWidth: 120 });
 }
 
-function buildSchemaModel(table: Table, genRelTests: boolean): SchemaModel {
+function buildSchemaModel(
+  table: Table,
+  genRelTests: boolean,
+  uniques: readonly RoutedUnique[],
+): SchemaModel {
+  const uniqueColumns = new Set(
+    uniques.filter((u) => u.columns.length === 1).map((u) => u.columns[0]),
+  );
   const columns: SchemaColumn[] = table.columns.map((col) => {
-    const tests = buildColumnTests(col, table, genRelTests);
+    const tests = buildColumnTests(col, table, genRelTests, uniqueColumns.has(col.name));
     const entry: SchemaColumn = {
       name: col.name,
       data_type: col.dataType,
@@ -200,13 +221,35 @@ function buildSchemaModel(table: Table, genRelTests: boolean): SchemaModel {
       to_columns: [...fk.referencedColumns],
     }))
     : [];
+  // Every model states which uniqueness is its key, so the dbt importer
+  // never takes a secondary unique NOT NULL column for it
+  // (dbt-alternate-uniqueness.spec.md, Open decision 1). Metadata without
+  // an enforced contract, as the foreign keys are.
+  const primaryKey = table.primaryKey.columnNames.length > 0
+    ? [{ type: "primary_key", columns: [...table.primaryKey.columnNames] }]
+    : [];
+  const constraints = [...primaryKey, ...references];
+  // A uniqueness over several columns is a combination test after the
+  // key's. dbt's `unique` skips NULLs as SQL UNIQUE does; the combination
+  // test does not, so over a nullable column it is limited to the rows a
+  // SQL UNIQUE constrains.
+  const combinations = uniques.filter((u) => u.columns.length > 1).map((u) => {
+    const nullable = u.columns.some((c) => table.columns.find((col) => col.name === c)?.nullable);
+    return genericTest(
+      DBT_KEY_TEST,
+      { combination_of_columns: [...u.columns] },
+      nullable ? { where: u.columns.map((c) => `${c} is not null`).join(" and ") } : undefined,
+    );
+  });
+  const tests = [
+    ...(key ? [genericTest(DBT_KEY_TEST, { combination_of_columns: [...key] })] : []),
+    ...combinations,
+  ];
   return {
     name: table.name,
     columns,
-    ...(references.length > 0 ? { constraints: references } : {}),
-    ...(key
-      ? { data_tests: [genericTest(DBT_KEY_TEST, { combination_of_columns: [...key] })] }
-      : {}),
+    ...(constraints.length > 0 ? { constraints } : {}),
+    ...(tests.length > 0 ? { data_tests: tests } : {}),
   };
 }
 
@@ -214,6 +257,7 @@ function buildColumnTests(
   col: Column,
   table: Table,
   genRelTests: boolean,
+  unique: boolean,
 ): Array<string | Record<string, unknown>> {
   const tests: Array<string | Record<string, unknown>> = [];
 
@@ -222,10 +266,10 @@ function buildColumnTests(
     tests.push("not_null");
   }
 
-  // unique test for primary key columns (single-column PKs).
+  // unique test for a single-column key, and for a column unique beside it.
   if (
-    table.primaryKey.columnNames.length === 1
-    && table.primaryKey.columnNames[0] === col.name
+    unique
+    || (table.primaryKey.columnNames.length === 1 && table.primaryKey.columnNames[0] === col.name)
   ) {
     tests.push("unique");
   }

@@ -97,6 +97,15 @@ export function candidateKeysOf(m: DbtModel): string[][] {
  */
 export function compositeKeyOf(m: DbtModel): string[] | undefined {
   const keys = candidateKeysOf(m);
+  // A declared primary key over several columns is the key whatever else
+  // qualifies, so every phase that asks reads the same one
+  // (dbt-alternate-uniqueness.spec.md).
+  const declared = m.primaryKey;
+  if (
+    declared && declared.length > 1 && declared.every((n) => m.columns.some((c) => c.name === n))
+  ) {
+    return keys.find((k) => sameColumns(k, declared));
+  }
   return keys.length === 1 ? keys[0] : undefined;
 }
 
@@ -344,7 +353,12 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       // it does for identifier and ordinary columns (PR #621 review).
       // Every column of a multi-column role records it, as the mapper
       // writes it on each of the columns it makes for the role.
-      for (const c of cols) ctx.columnRoleIdMap.set(`${m.name}::${c}`, roleId);
+      for (const c of cols) {
+        ctx.columnRoleIdMap.set(`${m.name}::${c}`, roleId);
+        // A role of the relationship stands for itself in a uniqueness over
+        // the model's columns, as DDL step 3b reads a taken column.
+        ctx.farRoleIdMap.set(`${m.name}::${c}`, roleId);
+      }
       const accepted = rel
         ? undefined
         : col.tests.find((t): t is Extract<DbtTest, { type: "accepted_values"; }> =>

@@ -103,7 +103,31 @@ function parseModel(raw: Record<string, unknown>): DbtModel {
     ? rawModelTests.flatMap((t) => parseTest(t))
     : [];
 
-  return { name, description, columns, modelTests, foreignKeys: parseForeignKeys(raw.constraints) };
+  const primaryKey = parsePrimaryKey(raw.constraints);
+  return {
+    name,
+    description,
+    columns,
+    modelTests,
+    foreignKeys: parseForeignKeys(raw.constraints),
+    ...(primaryKey ? { primaryKey } : {}),
+  };
+}
+
+/**
+ * The columns of the first model-level `primary_key` constraint naming at
+ * least one, or undefined (dbt-alternate-uniqueness.spec.md).
+ */
+function parsePrimaryKey(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  for (const c of raw) {
+    if (c === null || typeof c !== "object") continue;
+    const r = c as Record<string, unknown>;
+    if (r.type === "primary_key" && Array.isArray(r.columns) && r.columns.length > 0) {
+      return r.columns.map(String);
+    }
+  }
+  return undefined;
 }
 
 /**
