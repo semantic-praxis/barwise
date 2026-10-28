@@ -1,6 +1,6 @@
 # A DDL round trip keeps each entity's preferred identifier
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -10,6 +10,7 @@ Touches: barwise/packages/formats/src/ddl/barwiseAnnotation.ts,
 barwise/packages/formats/src/ddl/DdlImportFormat.ts,
 barwise/packages/formats/src/ddl/DdlExportFormat.ts,
 barwise/packages/formats/tests/,
+barwise/packages/cli/tests/uniquenessParity.test.ts,
 barwise/docs/release-notes/unreleased.md
 
 When barwise exports a model to annotated DDL and imports it back, every
@@ -166,6 +167,35 @@ after an annotated DDL round trip.
 - The tests that pin the barwise-ezn warning move to the new text.
 - The release note says a DDL round trip keeps each entity's preferred
   identifier, and that a composite primary key now imports as one.
+
+## Implementation notes
+
+- Measured with the scratchpad `pi.mjs`: all 42 entities keep their
+  preferred identifier through an annotated round trip, and no entity
+  loses one. Ten objectifiers that stored none now gain their key's (7
+  binary, 3 ternary), as the 153 one-column keys already did. Red check:
+  on the unfixed source, the round-trip test fails on the 18 model files
+  holding the 42, and every unit case fails.
+- Changed scope: the writer also names a one-column key that is an
+  identifying supertype link (the nqd subtype). The Scope's "not the
+  table's primary key" contradicted its own step-2 bullet, which needs the
+  line to name that key; the plan review missed it, the implementation
+  review caught it. A wider link key is not named, since the import builds
+  a key identifier for one column only.
+- Changed scope: the key rule skips a key that is one composite foreign
+  key. The export keys that table on an invented column beside the
+  reference's one-to-one, so preferring the one-to-one would disagree with
+  the key the next export writes (implementation review).
+- The composite-key warning says what the import did: preferred, not
+  identifying alone, or overridden by the line.
+- `cli/tests/uniquenessParity.test.ts` now compares every uniqueness,
+  preferred or not. It left preferred ones out as "the key", so the DDL
+  importer preferring a composite key's uniqueness read as a uniqueness
+  the dbt importer had and DDL lacked. The dbt importer does not apply
+  the key rule yet: barwise-fuo.
+- Follow-ups filed: barwise-xgu (a key of two whole foreign keys on a line
+  without `objectifies` reads as an objectifier) and barwise-9zm (the
+  line's reference mode is ignored for a composite key).
 
 ## Risks and testing
 
