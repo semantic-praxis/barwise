@@ -207,7 +207,16 @@ closed object is reachable from inside one; another fails if either uses
 `docs/CLI.md`'s `--format ossie` line names the new warning, and
 `turbo.json` lists `schemas/**` as a test input, since the schemas left
 `tests/`. A concept name that is not a plain identifier is quoted in the
-path (`concept "x.y".z`), so its dots are not read as steps.
+path (`concept "x.y".z`), so its dots are not read as steps. Where
+`parseOssie`'s refusals write such a name bare, the warning quotes it.
+
+When ajv cannot walk the document -- a YAML alias cycle through the
+schema's recursive defs (`LinkMapping.children` inside
+`ontology_mappings`) overflows its stack -- the importer still imports it,
+as it did before this check, with one warning that the document could not
+be checked and so an undefined field would not be named. Refusing it would
+turn a document that imported into one that does not, over a block the
+mapper drops anyway; the code review found the case.
 
 ## Workstreams
 

@@ -15,10 +15,11 @@
  * `unevaluatedProperties`, which closes an object without an
  * `additionalProperties` error the importer would read.
  */
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import ontologySchema from "../schemas/ossie/ontology.json" with { type: "json" };
 import ossieCoreSchema from "../schemas/ossie/ossie-schema.json" with { type: "json" };
-import { OSSIE_CORE_SCHEMA_URL } from "../src/ossie/ossieSchema.js";
+import { compileOssieSchema, OSSIE_CORE_SCHEMA_URL } from "../src/ossie/ossieSchema.js";
 
 type Schema = Record<string, unknown>;
 
@@ -36,8 +37,11 @@ const BRANCHES = new Set([
 
 /**
  * Every closed object reachable from `root`, as the chain of keywords that
- * reached it, split by whether a branch was on the way. `$ref` is followed into `root` itself
- * (`#/...`) or into any schema in `external`, keyed by URL.
+ * reached it, split by whether a branch was on the way. `$ref` is followed
+ * into `root` itself (`#/...`) or into any schema in `external`, keyed by
+ * URL. A schema this resolution would get wrong -- a nested `$id`, which
+ * rebases the refs under it, or an anchor or dynamic ref -- is refused, so
+ * a re-pin that uses one fails here instead of passing unwalked.
  */
 function closedObjects(
   root: Schema,
@@ -65,6 +69,10 @@ function closedObjects(
       return;
     }
     const schema = node as Schema;
+    if (schema !== doc && "$id" in schema) throw new Error(`nested $id at ${trail}`);
+    for (const k of ["$anchor", "$dynamicAnchor", "$dynamicRef", "$recursiveRef"]) {
+      if (k in schema) throw new Error(`${k} at ${trail}`);
+    }
     if (schema["additionalProperties"] === false || schema["unevaluatedProperties"] === false) {
       all.push(trail);
       if (inBranch) underBranch.push(trail);
@@ -92,6 +100,14 @@ function closedObjects(
 }
 
 describe("the pinned Ossie schemas", () => {
+  it("compile twice on one ajv, and refuse another schema under the core URL", () => {
+    const ajv = new Ajv2020({ strict: false });
+    expect(compileOssieSchema(ajv)).toBe(compileOssieSchema(ajv));
+    const other = new Ajv2020({ strict: false });
+    other.addSchema({ type: "object" }, OSSIE_CORE_SCHEMA_URL);
+    expect(() => compileOssieSchema(other)).toThrow(/another schema is registered/);
+  });
+
   it("close no object under a branch that may fail", () => {
     const { all, underBranch } = closedObjects(ontologySchema, {
       [OSSIE_CORE_SCHEMA_URL]: ossieCoreSchema,
@@ -126,5 +142,20 @@ describe("the pinned Ossie schemas", () => {
     expect(closedObjects(planted).underBranch).toEqual([
       "#.properties.ai_context.oneOf[1] -> #/$defs/Closed",
     ]);
+  });
+
+  it("the check finds one reached under contains", () => {
+    const planted: Schema = {
+      type: "array",
+      contains: { type: "object", additionalProperties: false },
+    };
+    expect(closedObjects(planted).underBranch).toEqual(["#.contains"]);
+  });
+
+  it("the check refuses a schema its ref resolution would misread", () => {
+    expect(() => closedObjects({ $defs: {}, properties: { a: { $id: "x", type: "object" } } }))
+      .toThrow(/nested \$id/);
+    expect(() => closedObjects({ properties: { a: { $dynamicRef: "#meta" } } }))
+      .toThrow(/\$dynamicRef/);
   });
 });

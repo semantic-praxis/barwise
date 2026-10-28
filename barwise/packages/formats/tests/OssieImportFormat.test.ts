@@ -974,6 +974,28 @@ ontology:
 `);
     expect(warnings).toEqual([unknown(`concept "x.y".z`)]);
   });
+
+  it("still imports a document whose aliases make a cycle the check cannot walk, and says so", () => {
+    // `children` is recursive in the schema, and the alias makes it a real
+    // cycle; ajv overflows the stack on it. The block is dropped either way.
+    const { model, warnings } = load(`
+ontology_mappings:
+  - name: m
+    semantic_model: {}
+    concept_mappings:
+      - concept: Code
+        link_mappings: [ &l { relationship: r, object_mapping: { expression: x }, children: [ *l ] } ]
+ontology:
+  - { concept: Code, type: ValueType, extends: [ String ] }
+`);
+    expect(model.getObjectTypeByName("Code")?.kind).toBe("value");
+    expect(warnings).toEqual([
+      expect.stringMatching(
+        /^the document could not be checked against the Ossie 0\.2\.0\.dev0 schema \(.+\); a field the schema does not define would not be named\.$/,
+      ),
+      "ontology_mappings: embedded mappings (deprecated in Ossie) are not imported; dropped.",
+    ]);
+  });
 });
 
 describe("Ossie import: the pinned flights example", () => {

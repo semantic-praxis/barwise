@@ -20,6 +20,7 @@ import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 import ontologySchema from "../../schemas/ossie/ontology.json" with { type: "json" };
 import ossieCoreSchema from "../../schemas/ossie/ossie-schema.json" with { type: "json" };
 import { OSSIE_VERSION } from "./OssieTypes.js";
+import { IDENT_PATTERN } from "./requiresShapes.js";
 
 /**
  * The URL `ontology.json`'s `$ref`s name for the core schema, on Ossie's
@@ -40,8 +41,14 @@ export function compileOssieSchema(ajv: Ajv2020): ValidateFunction {
   // The core schema keeps its own `$id`; it is registered under the URL as
   // well. Deleting the `$id`, as an earlier copy of this did, would mutate
   // the imported JSON module every importer of it shares.
-  // Registered once per `ajv`, so a second compile on it does not throw.
-  if (!ajv.getSchema(OSSIE_CORE_SCHEMA_URL)) ajv.addSchema(ossieCoreSchema, OSSIE_CORE_SCHEMA_URL);
+  // Registered once per `ajv`, so a second compile on it does not throw;
+  // a different schema already under the URL is refused, not validated
+  // against in the pinned one's place.
+  const registered = ajv.getSchema(OSSIE_CORE_SCHEMA_URL);
+  if (registered === undefined) ajv.addSchema(ossieCoreSchema, OSSIE_CORE_SCHEMA_URL);
+  else if (registered.schema !== ossieCoreSchema) {
+    throw new Error(`another schema is registered under ${OSSIE_CORE_SCHEMA_URL}`);
+  }
   return ajv.compile(ontologySchema);
 }
 
@@ -71,7 +78,20 @@ function validator(): ValidateFunction {
  */
 export function unknownOssieFields(raw: unknown): string[] {
   const validate = validator();
-  if (validate(raw)) return [];
+  try {
+    if (validate(raw)) return [];
+  } catch (err) {
+    // ajv recurses over the document, so a YAML alias cycle through the
+    // schema's recursive defs (`LinkMapping.children`, inside the
+    // `ontology_mappings` nothing else reads) overflows the stack. The
+    // document imported before this check existed, so it still does; what
+    // is lost is only the check, and the warning says so.
+    const why = err instanceof Error ? err.message : String(err);
+    return [
+      `the document could not be checked against the Ossie ${OSSIE_VERSION} schema (${why}); `
+      + `a field the schema does not define would not be named.`,
+    ];
+  }
   return (validate.errors ?? [])
     .filter((e) => e.keyword === "additionalProperties")
     .map((e) => {
@@ -83,7 +103,9 @@ export function unknownOssieFields(raw: unknown): string[] {
 
 /**
  * A JSON pointer as the path `parseOssie`'s refusals write: `concept <name>`
- * for a path under `ontology[i]`, else from the root. Each segment is read
+ * for a path under `ontology[i]`, else from the root -- except that a name
+ * or key that is not a plain identifier is quoted here, where the refusals
+ * write it bare, because a warning's path is read as steps. Each segment is read
  * against the document, so an index into a list (`[0]`) and a key that
  * happens to be numeric (`["0"]`) cannot be confused.
  */
@@ -95,10 +117,13 @@ function renderPath(raw: unknown, pointer: string, field: string): string {
     if (Array.isArray(at)) {
       const index = Number(segment);
       const item: unknown = at[index];
-      const conceptName = i === 1 && segments[0] === "ontology" ? nameOf(item) : undefined;
-      path = conceptName === undefined
-        ? `${path}[${index}]`
-        : `concept ${isPlain(conceptName) ? conceptName : JSON.stringify(conceptName)}`;
+      if (i === 1 && segments[0] === "ontology") {
+        // parseOssie has refused any component without a string `concept`.
+        const name = (item as { concept: string; }).concept;
+        path = `concept ${IDENT_PATTERN.test(name) ? name : JSON.stringify(name)}`;
+      } else {
+        path = `${path}[${index}]`;
+      }
       at = item;
     } else {
       path += key(segment, path === "");
@@ -108,19 +133,8 @@ function renderPath(raw: unknown, pointer: string, field: string): string {
   return path + key(field, path === "");
 }
 
-/** The concept a component names; `parseOssie` has already refused one without. */
-function nameOf(component: unknown): string | undefined {
-  const name = (component as { concept?: unknown; } | undefined)?.concept;
-  return typeof name === "string" ? name : undefined;
-}
-
-/** A name that cannot be mistaken for path punctuation. */
-function isPlain(name: string): boolean {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
-}
-
 function key(name: string, first: boolean): string {
-  if (!isPlain(name)) return `[${JSON.stringify(name)}]`;
+  if (!IDENT_PATTERN.test(name)) return `[${JSON.stringify(name)}]`;
   return first ? name : `.${name}`;
 }
 
