@@ -799,6 +799,12 @@
       "caught_by": "reasoning",
       "note": "Noticed while writing the check, by reading the path template domains/${ctx}.orm.yaml: the suffix turns '..' into a file name, so the dot rule guarded nothing. A test now pins '..' as accepted."
     },
+    "surrogate-key-export::3f0a5cab6799": {
+      "spec": "surrogate-key-export.spec.md",
+      "excerpt": "- changed scope: a table's key can change without a generated key. a shared-key subtype of a table that got one collapses to its one link column. every referenc",
+      "caught_by": "reasoning",
+      "note": "Implementation review: references to a shared-key subtype whose key collapsed were left multi-column, and a generated key hashed a different column order than references to it; the first was then shown by a test that went red on the earlier code."
+    },
     "test-quality::7422006b91c7": {
       "spec": "test-quality.spec.md",
       "excerpt": "the draft said: build an arbitrary that makes exactly one invalid choice reachable per draw, and assert structuralrules reports that rule. the objection: an arb",

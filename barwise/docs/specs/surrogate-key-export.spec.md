@@ -1,6 +1,6 @@
 # A warehouse export option gives a multi-column-keyed table a generated key
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -229,6 +229,37 @@ Explicit over implicit, at two levels:
    - Alternative: compute the hash per dialect in each `INSERT`
      (`MD5(...)`). That puts dialect SQL in the population renderer for
      a combination nobody has asked for.
+
+## Implementation notes
+
+- Changed scope: a table's key can change without a generated key. A
+  shared-key subtype of a table that got one collapses to its one link
+  column. Every reference to such a table is rewritten too, to its new
+  key, or it would point at columns that are no longer a key, which a
+  strict dialect refuses. The implementation review caught it, and a
+  test went red on the first implementation.
+- Changed scope: a generated key hashes the table's original key, in its
+  order. That is the order a reference hashes its columns in, and every
+  column of it is a source column. Expanding the rewritten key in place
+  put a collapsed reference's columns where the reference stood, so a key
+  and a reference to it could hash different orders.
+- A nullable generated reference is NULL in the dbt model when any column
+  it hashes is: `generate_surrogate_key` hashes a NULL as a placeholder
+  string, which matches no row.
+- On a dialect with no UNIQUE, the DDL export names the natural keys it
+  cannot enforce, in a comment after the tables, since no constraint
+  stands behind them for the spill report.
+- Populations are withheld only when the schema has a generated column
+  (`hasGeneratedKeys`), not whenever the option is set. dbt writes the
+  note into `schema.yml`, so an export written to a directory says it
+  too. One note, `SURROGATE_POPULATION_NOTE`, serves both formats.
+- A model whose SQL computes a generated key gets the dbt_utils
+  dependency note even when it has no combination test.
+- `surrogateKeyFormats()` lists the formats that take the option, for the
+  MCP parameter's description and the refusal both.
+- The spec's byte-identical check without the option is held by the
+  existing CLI characterization goldens and DDL tests, which run the
+  same code path. No new test was written for it.
 
 ## Risks and testing
 
