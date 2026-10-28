@@ -5,7 +5,6 @@ export {
   type ConstraintRouting,
   routeConstraints,
   type RoutedClause,
-  type RoutedUnique,
   routeUniqueOnly,
   type SpilledConstraint,
   unreportedConstraintSpecs,
@@ -22,6 +21,7 @@ export type {
   ForeignKey,
   PrimaryKey,
   RelationalSchema,
+  RoutedUnique,
   Table,
 } from "./RelationalSchema.js";
 export {

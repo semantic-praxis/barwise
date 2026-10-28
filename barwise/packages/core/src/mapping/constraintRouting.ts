@@ -26,7 +26,7 @@ import { subtypeOperands } from "../model/subtypeOperands.js";
 import { renderValuePredicate } from "../sql/valuePredicate.js";
 import { ConstraintVerbalizer } from "../verbalization/index.js";
 import { DIALECT_PROFILES, type DialectCapabilityProfile } from "./dialectCapabilities.js";
-import type { RelationalSchema, Table } from "./RelationalSchema.js";
+import type { RelationalSchema, RoutedUnique, Table } from "./RelationalSchema.js";
 
 /** A constraint clause to inject into a rendered CREATE TABLE. */
 export interface RoutedClause {
@@ -41,12 +41,6 @@ export interface RoutedClause {
    * CHECK.
    */
   readonly columns?: readonly string[];
-}
-
-/** A UNIQUE the DDL export writes, as a table and its columns. */
-export interface RoutedUnique {
-  readonly tableName: string;
-  readonly columns: readonly string[];
 }
 
 /** A constraint that degrades to the ConstraintSpec spillway. */

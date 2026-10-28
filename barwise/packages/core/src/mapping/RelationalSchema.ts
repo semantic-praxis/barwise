@@ -64,6 +64,17 @@ export interface Table {
   readonly sourceElementId: string;
 }
 
+/**
+ * A UNIQUE the DDL export writes, as a table and its columns: what
+ * `routeUniqueOnly` decides and the dbt renderer writes. Here, beside the
+ * schema it names, so the renderers need not import the router, which
+ * reaches them through the export types.
+ */
+export interface RoutedUnique {
+  readonly tableName: string;
+  readonly columns: readonly string[];
+}
+
 export interface RelationalSchema {
   readonly tables: readonly Table[];
   readonly sourceModelId: string;

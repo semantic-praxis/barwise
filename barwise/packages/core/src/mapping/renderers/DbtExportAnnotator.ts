@@ -20,8 +20,7 @@ import {
 } from "../../annotation/ExportAnnotationCollector.js";
 import { formatBarwiseComment, stripBarwiseComments } from "../../annotation/helpers.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import type { RoutedUnique } from "../constraintRouting.js";
-import type { RelationalSchema } from "../RelationalSchema.js";
+import type { RelationalSchema, RoutedUnique } from "../RelationalSchema.js";
 import { DBT_KEY_TEST, dbtKeyTestColumns } from "./dbt.js";
 
 // ---------------------------------------------------------------------------

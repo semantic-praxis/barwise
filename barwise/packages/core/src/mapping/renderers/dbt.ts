@@ -10,8 +10,13 @@
  */
 
 import { stringify } from "yaml";
-import type { RoutedUnique } from "../constraintRouting.js";
-import type { Column, ForeignKey, RelationalSchema, Table } from "../RelationalSchema.js";
+import type {
+  Column,
+  ForeignKey,
+  RelationalSchema,
+  RoutedUnique,
+  Table,
+} from "../RelationalSchema.js";
 
 // ---------------------------------------------------------------------------
 // Public types
