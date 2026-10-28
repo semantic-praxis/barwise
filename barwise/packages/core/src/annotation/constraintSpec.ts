@@ -201,19 +201,30 @@ function subtypeInstance(c: SubtypeConstraint, model: OrmModel): string | undefi
   const name = (id: string | undefined) => (id && model.getObjectType(id)?.name) || undefined;
   const supertype = name(supertypeId);
   const subtypes = subtypeIds.map(name);
-  // A list with one left out would forbid an allowed instance.
-  if (!supertype || subtypes.length === 0 || subtypes.includes(undefined)) return undefined;
-  // A disjunctive mandatory over one subtype is legal; the "both" forms
-  // need two.
-  if (subtypes.length < 2 && c.type !== "disjunctive_mandatory") return undefined;
-  const both = `one ${supertype} in both ${subtypes[0]} and ${subtypes[1]}`;
+  // A list with one left out would forbid an allowed instance, and one
+  // naming a subtype twice, or one under another supertype, states an
+  // instance the rule says nothing about. Validation reports both shapes;
+  // an export can still run on them.
+  const sameSupertype = c.subtypeFactIds.every((id) =>
+    model.getSubtypeFact(id)?.supertypeId === supertypeId
+  );
+  if (
+    !supertype || subtypes.length === 0 || subtypes.includes(undefined)
+    || new Set(subtypes).size !== subtypes.length || !sameSupertype
+  ) {
+    return undefined;
+  }
   const neither = `one ${supertype} in none of: ${subtypes.join(", ")}`;
+  // The "both" form needs two subtypes; over one, only "none of" forbids.
+  const both = subtypes.length >= 2
+    ? `one ${supertype} in both ${subtypes[0]} and ${subtypes[1]}`
+    : undefined;
   switch (c.type) {
     case "exclusion":
       return both;
     case "disjunctive_mandatory":
       return neither;
     case "exclusive_or":
-      return `${both}, or ${neither}`;
+      return both ? `${both}, or ${neither}` : neither;
   }
 }

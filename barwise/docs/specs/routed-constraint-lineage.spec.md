@@ -1,6 +1,6 @@
 # A routed constraint is a source of its table, and a subtype rule has an example
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -14,7 +14,8 @@ barwise/packages/mcp/tests/tools/impactAnalysis.test.ts,
 barwise/packages/core/src/annotation/constraintSpec.ts,
 barwise/packages/formats/src/ddl/DdlExportFormat.ts,
 +barwise/packages/core/tests/lineage/routedConstraints.test.ts,
-barwise/packages/core/tests/mapping/ConstraintRouting.test.ts
+barwise/packages/core/tests/mapping/ConstraintRouting.test.ts,
+barwise/docs/release-notes/unreleased.md
 
 This spec fixes two gaps in what the DDL export reports.
 
@@ -134,6 +135,40 @@ test) is left as it is.
 - Tests: one per kind, the single-subtype disjunctive mandatory, and the
   unresolved case, at `buildConstraintSpec`. Each new-example test fails
   on today's code.
+
+## Implementation notes
+
+- As planned. Measured over the 84 tracked models that load, through
+  the DDL export (scratchpad `j7j-measure.mjs`):
+  - DDL lineage gains 372 constraint sources across 205 tables;
+  - the 14 spilled subtype constraints get an example;
+  - the other 14 "No concrete example" specs are the kinds the generator
+    leaves out on purpose;
+  - no CLI golden changes.
+- The example reads "one Party in both LegalEntity and NaturalPerson",
+  with no article, since "a InpatientEncounter" does not read.
+- Red check: the new tests fail on the unfixed source (5 of them), and
+  the counterexample law passes unchanged.
+- Implementation review, fixed:
+  - an exclusive-or over one subtype gets its "none of" half;
+  - no example when two subtype facts name one subtype, or one is under
+    another supertype;
+  - the naming helper falls back to "the supertype" rather than
+    asserting one exists;
+  - placements are made unique per table in one pass, not a quadratic
+    scan;
+  - one helper adds a constraint and its fact types, for the foreign
+    key and the placement alike;
+  - the impact test builds a typed manifest.
+- Implementation review, declined:
+  - recording placements after the text dedupe. Two constraints that
+    write the same clause are both sources: changing either one changes
+    the table;
+  - the source map keyed by element id across kinds, which is the
+    existing design;
+  - sharing name resolution with `subtypePseudocode`. The pseudocode
+    falls back to a fact id it can show, and the example gives up rather
+    than forbid an instance under a guessed name.
 
 ## Open decisions
 

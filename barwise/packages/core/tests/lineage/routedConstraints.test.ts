@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { generateDdlLineage } from "../../src/lineage/generate.js";
 import { analyzeImpact } from "../../src/lineage/impact.js";
+import type { LineageManifest } from "../../src/lineage/types.js";
 import { routeConstraints } from "../../src/mapping/constraintRouting.js";
 import { resolveDialectProfile } from "../../src/mapping/dialectCapabilities.js";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
@@ -83,11 +84,18 @@ describe("DDL lineage lists the constraints the routing placed", () => {
   });
 
   it("words a placed constraint as stated, not enforced, in an impact report", () => {
-    const exports = lineage(reporting()).map((e) => ({ ...e, format: "ddl" }));
-    const impact = analyzeImpact(
-      { version: 1, sourceModel: "m.orm.yaml", sourceModelHash: "h", exports } as never,
-      "ring",
-    );
+    const manifest: LineageManifest = {
+      version: 1,
+      sourceModel: "m.orm.yaml",
+      sourceModelHash: "h",
+      exports: lineage(reporting()).map((e) => ({
+        ...e,
+        format: "ddl",
+        exportedAt: "2026-10-28T00:00:00Z",
+        modelHash: "h",
+      })),
+    };
+    const impact = analyzeImpact(manifest, "ring");
     expect(impact.affectedArtifacts.map((a) => a.relationship)).toEqual([
       expect.stringMatching(/^states constraint /),
     ]);

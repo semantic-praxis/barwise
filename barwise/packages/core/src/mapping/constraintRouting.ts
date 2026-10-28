@@ -127,10 +127,10 @@ export function routeConstraints(
   const { clauses, spilled, placements } = routeAll(model, schema, profile, dialectName);
   return {
     // Once per table and constraint: a constraint can spill twice at one
-    // table (a mandatory and its column), and is still one source.
-    placements: placements.filter((p, i) =>
-      placements.findIndex((q) => q.tableName === p.tableName && q.inView[0] === p.inView[0]) === i
-    ),
+    // table (a mandatory and its column), and is still one source. Before
+    // the text dedupe, deliberately: two constraints that write the same
+    // clause are both sources, since changing either changes the table.
+    placements: onePerTable(placements),
     clauses: dedupeBy(clauses, (c) => JSON.stringify([c.tableName, c.sql])),
     spilled: dedupeBy(spilled, (s) => JSON.stringify([s.tableName ?? "", s.spec.verbalization]))
       .map(({ tableName, reason, spec }) => ({ tableName, reason, spec })),
@@ -371,6 +371,17 @@ function routeAll(
 }
 
 /** Keep the first occurrence of each key, preserving order. */
+function onePerTable(placements: readonly ConstraintPlacement[]): ConstraintPlacement[] {
+  const seen = new Map<string, Set<unknown>>();
+  return placements.filter(({ tableName, inView }) => {
+    const placed = seen.get(tableName) ?? new Set();
+    seen.set(tableName, placed);
+    if (placed.has(inView[0])) return false;
+    placed.add(inView[0]);
+    return true;
+  });
+}
+
 function dedupeBy<T>(items: readonly T[], key: (item: T) => string): T[] {
   const seen = new Set<string>();
   const out: T[] = [];

@@ -760,6 +760,27 @@ describe("constraints over subtypes", () => {
     );
   });
 
+  it("gives a one-subtype exclusive-or only its 'none of' half, and a one-subtype exclusion none", () => {
+    expect(parties("exclusive_or", ["LegalEntity"])[0]!.spec.example).toBe(
+      "Forbidden: one Party in none of: LegalEntity",
+    );
+    expect(parties("exclusion", ["LegalEntity"])[0]!.spec.example).toBe(
+      "No concrete example available; see the verbalization.",
+    );
+  });
+
+  it("gives no example when two subtype facts name one subtype", () => {
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "p", name: "Party", kind: "entity", referenceMode: "party_id" });
+    model.addObjectType({ id: "s", name: "Person", kind: "entity", referenceMode: "s_id" });
+    model.addSubtypeFact({ id: "sf-1", subtypeId: "s", supertypeId: "p" });
+    model.addConstraint({ id: "c", type: "exclusion", subtypeFactIds: ["sf-1", "sf-1"] });
+    const schema = new RelationalMapper().map(model);
+    expect(routeConstraints(model, schema, postgres, "postgres").spilled[0]!.spec.example).toBe(
+      "No concrete example available; see the verbalization.",
+    );
+  });
+
   it("gives no example when a subtype does not resolve, as a shorter list would forbid an allowed one", () => {
     const model = new OrmModel({ name: "Test" });
     model.addObjectType({ id: "p", name: "Party", kind: "entity", referenceMode: "party_id" });

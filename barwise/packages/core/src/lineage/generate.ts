@@ -97,8 +97,7 @@ export function generateDdlLineage(
           // internal uniqueness (or, below, a subtype fact or fact type)
           // today, so the second case is the placement-correct reading,
           // not one an export reaches yet.
-          sources.set(fk.sourceConstraintId, constraintSource(model, inView));
-          for (const ft of model.factTypesNaming(inView)) addFactTypeSources(sources, model, ft);
+          addConstraintSources(sources, model, inView);
         }
 
         // RelationalMapper also stores a subtype fact id here (the subtype
@@ -128,8 +127,7 @@ export function generateDdlLineage(
       const id = inView[0].id;
       // A source needs an id; one with none cannot be named in impact.
       if (id === undefined || sources.has(id)) continue;
-      sources.set(id, constraintSource(model, inView));
-      for (const ft of model.factTypesNaming(inView)) addFactTypeSources(sources, model, ft);
+      addConstraintSources(sources, model, inView);
     }
 
     // Create lineage entry for this table
@@ -350,12 +348,24 @@ function constraintSource(model: OrmModel, inView: ConstraintInView): SourceRefe
   const subtypeFacts = subtypeFactIdsOf(c);
   let named: readonly { readonly name: string; }[];
   if (subtypeFacts.length > 0) {
-    const supertypeId = subtypeOperands(subtypeFacts, model).supertypeId!;
-    named = [{ name: `subtypes of ${model.getObjectType(supertypeId)?.name ?? supertypeId}` }];
+    const supertypeId = subtypeOperands(subtypeFacts, model).supertypeId;
+    const supertype = supertypeId && (model.getObjectType(supertypeId)?.name ?? supertypeId);
+    named = [{ name: `subtypes of ${supertype ?? "the supertype"}` }];
   } else {
     named = model.factTypesNaming(inView);
   }
+  // Every caller has checked the id: a source with none cannot be matched.
   return { elementId: c.id!, elementType: "Constraint", elementName: getConstraintName(c, named) };
+}
+
+/** A constraint source and the fact types it names, as a table lists them. */
+function addConstraintSources(
+  sources: Map<string, SourceReference>,
+  model: OrmModel,
+  inView: ConstraintInView,
+): void {
+  sources.set(inView[0].id!, constraintSource(model, inView));
+  for (const ft of model.factTypesNaming(inView)) addFactTypeSources(sources, model, ft);
 }
 
 /** "Customer is a subtype of Person", by the names of its two entities. */
