@@ -16,11 +16,32 @@ export interface PkInfo {
   readonly modelName: string;
 }
 
-/** Tracks a relationship (FK) column. */
+/**
+ * One reference (FK): a column's `relationships` test, or a model-level
+ * `foreign_key` constraint over several columns, which is one reference
+ * however many columns it has (composite-foreign-key-round-trip.spec.md).
+ * Every phase asks which reference a column is in through this, never
+ * through one column's test, so the two forms read alike.
+ */
 export interface RelationshipInfo {
-  readonly columnName: string;
+  readonly columns: readonly string[];
   readonly targetModelName: string;
-  readonly targetField: string;
+  readonly targetFields: readonly string[];
+}
+
+/** How a reference is named in the report: its column, or its columns. */
+export function referenceName(rel: RelationshipInfo): string {
+  return rel.columns.join(", ");
+}
+
+/**
+ * Whether a model's reference is read as a fact type. A multi-column one
+ * whose target has no entity keeps the reading it had before such a
+ * reference was read at all: its columns are values, so nothing is lost.
+ * A single-column one is a reference whatever its target, as before.
+ */
+export function readsAsReference(ctx: DbtMapperContext, rel: RelationshipInfo): boolean {
+  return rel.columns.length === 1 || ctx.entityIdMap.has(rel.targetModelName);
 }
 
 /** A model keyed by a combination of columns, read as the fact type it states. */
@@ -38,7 +59,7 @@ export interface DbtMapperContext {
   readonly model: OrmModel;
   /** model name -> PK info (if identifiable). */
   readonly pkMap: Map<string, PkInfo>;
-  /** model name -> relationship columns. */
+  /** model name -> its references (relationships tests and multi-column foreign keys). */
   readonly relMap: Map<string, RelationshipInfo[]>;
   /** model name -> its composite-key reading (composite-key-tables.spec.md). */
   readonly compositeMap: Map<string, CompositeInfo>;

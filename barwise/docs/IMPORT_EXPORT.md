@@ -149,6 +149,13 @@ barwise export clinic.orm.yaml --format openapi --output api-spec.json
   without a warning from 1.10.8 (or from 1.10.5 with the flag
   `require_generic_test_arguments_property: true`) and requires before
   the move to Fusion. A project on dbt before 1.10.5 cannot read them.
+- A foreign key over several columns, which no `relationships` test can
+  state, as a model-level `foreign_key` constraint
+  (`constraints: [{ type: foreign_key, columns, to: ref(...), to_columns }]`),
+  which needs dbt 1.9 or later. The export writes no contract, and dbt
+  applies a constraint only under an enforced one, so it states the
+  reference for readers and for re-import without changing how the model
+  builds. Re-importing reads it back as one reference.
 - Seed CSV files when population data exists
 
 **When to use it**:
@@ -171,7 +178,8 @@ barwise export clinic.orm.yaml --format dbt --output dbt_project/
 **Format-specific options**:
 
 - `sourceName` -- dbt source name in `schema.yml` (defaults to `"raw"`)
-- `generateRelationshipTests` -- include dbt relationship tests
+- `generateRelationshipTests` -- include dbt relationship tests, and the
+  `foreign_key` constraints for multi-column foreign keys
   (defaults to `true`)
 - `modelsDir` -- the directory the model files and `schema.yml` are
   written under (defaults to `"models"`; the editor uses
@@ -288,14 +296,14 @@ barwise import model schema.sql --format ddl --name "Clinic Model"
 
 **What it infers**:
 
-| SQL construct | ORM concept                   |
-| ------------- | ----------------------------- |
-| Table         | Entity type                   |
-| Column        | Binary fact type (has-a)      |
-| PRIMARY KEY   | Preferred identifier          |
-| FOREIGN KEY   | Relationship between entities |
-| NOT NULL      | Mandatory constraint          |
-| UNIQUE        | Uniqueness constraint         |
+| SQL construct | ORM concept                                    |
+| ------------- | ---------------------------------------------- |
+| Table         | Entity type                                    |
+| Column        | Binary fact type (has-a)                       |
+| PRIMARY KEY   | Preferred identifier                           |
+| FOREIGN KEY   | One relationship per foreign key, of any width |
+| NOT NULL      | Mandatory constraint                           |
+| UNIQUE        | Uniqueness constraint                          |
 
 **Confidence**: `medium` -- structural mapping is deterministic but
 naming uses heuristics (e.g. `patient_name` becomes a fact type

@@ -313,9 +313,8 @@ describe("a composite-key table imports as the fact type it states", () => {
   it("a key that is one composite foreign key is not this rule: it is one role, not several", () => {
     // (tenant_id, order_id) is one reference to orders; read as a fact type
     // it would have one role (PR #620 review). It is the key-is-reference
-    // shape (key-reference-tables.spec.md). Not round-tripped: it keeps
-    // today's reading, which does not round-trip on main either (barwise-3pc;
-    // requirement 6 covers only the shapes this rule reads).
+    // shape (key-reference-tables.spec.md). Not round-tripped: the entity
+    // gets a key of its own on export (barwise-3pc).
     const { model } = ddl.parse(`CREATE TABLE orders (tenant_id INT, order_id INT,
         PRIMARY KEY (tenant_id, order_id));
       CREATE TABLE order_note (
@@ -324,13 +323,22 @@ describe("a composite-key table imports as the fact type it states", () => {
         FOREIGN KEY (tenant_id, order_id) REFERENCES orders (tenant_id, order_id));`);
     expect(model.objectifiedFactTypes).toEqual([]);
     expect(model.factTypes.every((f) => f.roles.length >= 2)).toBe(true);
-    // Kept as today: an entity whose key is an external uniqueness over its
-    // two references to orders, one per column (barwise-3pc; PR #621 review).
+    // An entity with one reference to orders, not one per column; the key
+    // is that reference's one-to-one, so no external uniqueness
+    // (composite-foreign-key-round-trip.spec.md).
     expect(shape(model).entities).toContain("OrderNote");
-    expect(shape(model).externalUniques).toContain("Orders,Orders");
+    expect(
+      shape(model).factTypes.filter((f) =>
+        f.players.includes("OrderNote")
+        && f.players.includes("Orders")
+      ),
+    ).toEqual([
+      { players: ["Orders", "OrderNote"], uniques: [[1], [0]] },
+    ]);
+    expect(shape(model).externalUniques).toEqual(["OrderId,TenantId"]);
   });
 
-  it("two foreign keys in the key that share a column keep today's reading", () => {
+  it("two foreign keys in the key that share a column are declined, and read as two references", () => {
     const { model, warnings } = ddl.parse(`CREATE TABLE tenant (tenant_id INT PRIMARY KEY);
       CREATE TABLE orders (tenant_id INT, order_id INT, PRIMARY KEY (tenant_id, order_id));
       CREATE TABLE order_flag (
@@ -339,16 +347,22 @@ describe("a composite-key table imports as the fact type it states", () => {
         FOREIGN KEY (tenant_id) REFERENCES tenant (tenant_id),
         FOREIGN KEY (tenant_id, order_id) REFERENCES orders (tenant_id, order_id));`);
     expect(model.factTypes.some((f) => / order flag$/.test(f.name))).toBe(false);
-    // Kept as today: the entity, keyed by an external uniqueness over its
-    // two references (PR #621 review).
+    // The entity, with one reference per foreign key, the column they share
+    // in both; the key is the orders reference's one-to-one
+    // (composite-foreign-key-round-trip.spec.md).
     expect(shape(model).entities).toContain("OrderFlag");
-    expect(shape(model).externalUniques).toContain("Orders,Tenant");
+    const refs = shape(model).factTypes.filter((f) => f.players.includes("OrderFlag"));
+    expect(refs).toEqual([
+      { players: ["Orders", "OrderFlag"], uniques: [[1], [0]] },
+      { players: ["Tenant", "OrderFlag"], uniques: [[1]] },
+    ]);
+    expect(shape(model).externalUniques).toEqual(["OrderId,TenantId"]);
     // Not even attempted: without the guard the rule tried two roles over
     // one column, failed, and fell back with a warning.
     expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
   });
 
-  it("a foreign key lying partly inside the key keeps today's reading, beside one wholly inside", () => {
+  it("a foreign key lying partly inside the key is declined, and read as one reference, beside one wholly inside", () => {
     // (order_id) is wholly inside the key; (warehouse_id, bin_id) has
     // bin_id inside and warehouse_id outside (PR #621 review). This pins the
     // outcome, not compositeReading's guard alone: with the guard removed,
@@ -365,10 +379,21 @@ describe("a composite-key table imports as the fact type it states", () => {
         FOREIGN KEY (warehouse_id, bin_id) REFERENCES bin (warehouse_id, bin_id));`);
     expect(model.objectifiedFactTypes).toEqual([]);
     expect(model.factTypes.some((f) => / pick$/.test(f.name))).toBe(false);
-    // Kept as today: the entity, keyed by an external uniqueness over the
-    // two references its key columns make (PR #621 review).
+    // The entity, with one reference to bin over both its columns. The key
+    // names bin_id alone, part of that reference, which no role stands for,
+    // so it is refused rather than widened
+    // (composite-foreign-key-round-trip.spec.md).
     expect(shape(model).entities).toContain("Pick");
-    expect(shape(model).externalUniques).toContain("Bin,Orders");
+    expect(shape(model).factTypes.filter((f) => f.players.includes("Pick")).map((f) => f.players))
+      .toEqual([["Bin", "Pick"], ["Orders", "Pick"]]);
+    expect(shape(model).externalUniques).not.toContain("Bin,Orders");
+    expect(
+      warnings.filter((w) =>
+        /"pick": composite PRIMARY KEY \(order_id, bin_id\) covers only part of the composite foreign key \(warehouse_id, bin_id\)/
+          .test(w)
+      ),
+    )
+      .toHaveLength(1);
     expect(warnings.filter((w) => /reads as a fact type over its key/.test(w))).toEqual([]);
   });
 

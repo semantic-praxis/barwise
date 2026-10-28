@@ -15,6 +15,7 @@
 import { parse } from "yaml";
 import type {
   DbtColumn,
+  DbtForeignKey,
   DbtModel,
   DbtProjectDocument,
   DbtSource,
@@ -102,7 +103,26 @@ function parseModel(raw: Record<string, unknown>): DbtModel {
     ? rawModelTests.flatMap((t) => parseTest(t))
     : [];
 
-  return { name, description, columns, modelTests };
+  return { name, description, columns, modelTests, foreignKeys: parseForeignKeys(raw.constraints) };
+}
+
+/**
+ * The model-level `foreign_key` constraints over two or more columns, each
+ * one reference (composite-foreign-key-round-trip.spec.md). A constraint of
+ * another type, over one column (a `relationships` test states those), or
+ * without a `to:` is not one and is left out, as every constraint was
+ * before.
+ */
+function parseForeignKeys(raw: unknown): DbtForeignKey[] {
+  if (!Array.isArray(raw)) return [];
+  const strings = (v: unknown) => Array.isArray(v) ? v.map(String) : [];
+  return raw.flatMap((c): DbtForeignKey[] => {
+    if (c === null || typeof c !== "object") return [];
+    const r = c as Record<string, unknown>;
+    const columns = strings(r.columns);
+    if (r.type !== "foreign_key" || columns.length < 2 || typeof r.to !== "string") return [];
+    return [{ columns, to: extractRefModelName(r.to), toColumns: strings(r.to_columns) }];
+  });
 }
 
 // ---------------------------------------------------------------------------

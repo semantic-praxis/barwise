@@ -3,7 +3,12 @@
  */
 
 import { DBT_KEY_TEST } from "@barwise/core/mapping";
-import { candidateKeysOf, combinationOf, compositeKeyOf } from "./compositeKeys.js";
+import {
+  candidateKeysOf,
+  combinationOf,
+  compositeKeyOf,
+  isReferenceUniqueness,
+} from "./compositeKeys.js";
 import { findRelationshipTest, hasTest } from "./constraints.js";
 import { type DbtMapperContext, type RelationshipInfo } from "./context.js";
 
@@ -38,17 +43,21 @@ export function analyzeModels(ctx: DbtMapperContext): void {
       );
     }
 
-    // Find relationship columns.
+    // Find references: relationship columns, and foreign keys over
+    // several columns, each one reference.
     const rels: RelationshipInfo[] = [];
     for (const col of m.columns) {
       const relTest = findRelationshipTest(col);
       if (relTest) {
         rels.push({
-          columnName: col.name,
+          columns: [col.name],
           targetModelName: relTest.to,
-          targetField: relTest.field,
+          targetFields: [relTest.field],
         });
       }
+    }
+    for (const fk of m.foreignKeys) {
+      rels.push({ columns: fk.columns, targetModelName: fk.to, targetFields: fk.toColumns });
     }
     if (rels.length > 0) {
       ctx.relMap.set(m.name, rels);
@@ -74,11 +83,15 @@ export function analyzeModels(ctx: DbtMapperContext): void {
     // still is (PR #621 review). Compared as column sets: the same key
     // stated again in another order is read too (candidateKeysOf).
     const asSet = (cols: string[] | undefined) => cols && [...cols].sort().join("\0");
+    // A combination over exactly one foreign key's columns is read too, as
+    // that reference's one-to-one (factTypes.ts).
     const consumed = pkCol ? undefined : asSet(compositeKeyOf(m));
     for (const test of m.modelTests) {
+      const names = combinationOf(test);
       if (
         test.type === "custom"
-        && (consumed === undefined || asSet(combinationOf(test)) !== consumed)
+        && (consumed === undefined || asSet(names) !== consumed)
+        && !(names && isReferenceUniqueness(m, names))
       ) {
         ctx.report.warning(
           "macro",

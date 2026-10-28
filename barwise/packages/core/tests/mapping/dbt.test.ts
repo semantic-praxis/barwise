@@ -355,5 +355,70 @@ describe("dbt renderer", () => {
         ],
       });
     });
+
+    describe("a foreign key over several columns (composite-foreign-key-round-trip.spec.md)", () => {
+      const col = (name: string, nullable = false) => ({
+        name,
+        dataType: "INTEGER",
+        dataTypeDefaulted: false,
+        nullable,
+      });
+      const schema = {
+        sourceModelId: "m",
+        tables: [
+          {
+            name: "policy_period",
+            sourceElementId: "pp",
+            columns: [col("policy_id"), col("term_number")],
+            primaryKey: { columnNames: ["policy_id", "term_number"] },
+            foreignKeys: [],
+          },
+          {
+            name: "claim",
+            sourceElementId: "c",
+            columns: [col("claim_id"), col("policy_id"), col("term_number")],
+            primaryKey: { columnNames: ["claim_id"] },
+            foreignKeys: [{
+              columnNames: ["policy_id", "term_number"],
+              referencedTable: "policy_period",
+              referencedColumns: ["policy_id", "term_number"],
+            }],
+          },
+        ],
+      };
+      const claim = (generateRelationshipTests?: boolean) =>
+        (parse(renderDbt(schema, { generateRelationshipTests }).schemaYaml) as {
+          models: Array<{ name: string; columns: Array<{ data_tests?: unknown[]; }>; }>;
+        }).models.find((m) => m.name === "claim")!;
+
+      it("is one model-level foreign_key constraint, and no column test", () => {
+        expect(claim()).toMatchObject({
+          constraints: [{
+            type: "foreign_key",
+            columns: ["policy_id", "term_number"],
+            to: "ref('policy_period')",
+            to_columns: ["policy_id", "term_number"],
+          }],
+        });
+        expect(claim().columns.flatMap((c) => c.data_tests ?? [])).toEqual([
+          "not_null",
+          "unique",
+          "not_null",
+          "not_null",
+        ]);
+        expect(renderDbt(schema).schemaYaml).toContain(
+          "    constraints:\n"
+            + "      - type: foreign_key\n"
+            + "        columns:\n"
+            + "          - policy_id\n"
+            + "          - term_number\n"
+            + "        to: ref('policy_period')\n",
+        );
+      });
+
+      it("is not written when relationship tests are off: it is a reference too", () => {
+        expect(claim(false)).not.toHaveProperty("constraints");
+      });
+    });
   });
 });
