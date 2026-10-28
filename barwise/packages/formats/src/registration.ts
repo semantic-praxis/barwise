@@ -23,6 +23,7 @@ import { SqlImportFormat } from "./sql/SqlImportFormat.js";
 /** DDL format: bidirectional (import SQL CREATE TABLE, export DDL). */
 export const ddlFormat: FormatDescriptor = {
   name: "ddl",
+  surrogateKeys: true,
   description: "SQL DDL (CREATE TABLE statements)",
   extension: "sql",
   importer: new DdlImportFormat(),

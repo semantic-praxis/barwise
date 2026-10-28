@@ -278,5 +278,7 @@ export {
   listFormats,
   listImporters,
   registerFormat,
+  surrogateKeyFormats,
+  surrogateKeysRefusal,
 } from "./format/registry.js";
 export type { FormatDescriptor } from "./format/types.js";

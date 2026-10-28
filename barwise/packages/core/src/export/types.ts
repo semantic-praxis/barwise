@@ -88,6 +88,13 @@ export interface ExportOptions {
   readonly preferredIdentifierStrategy?: PreferredIdentifierStrategy;
 
   /**
+   * Give every table keyed on several columns a generated key, honoured by
+   * a format whose descriptor declares `surrogateKeys`
+   * (surrogate-key-export.spec.md).
+   */
+  readonly surrogateKeys?: boolean;
+
+  /**
    * Format-specific options.
    * Examples:
    * - ddl: { dialect: "ansi" | "postgres" | "mysql" | "snowflake" | "bigquery" | "redshift" | "databricks" }

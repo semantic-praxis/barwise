@@ -393,6 +393,30 @@ function routeAll(
     }
   }
 
+  // A key a generated key replaced is still a uniqueness of its table,
+  // which the schema states rather than the model: a many-to-many table's
+  // spanning uniqueness is realized by its key, and no constraint is
+  // routed as a UNIQUE for it (surrogate-key-export.spec.md). Written once:
+  // an external identifier's own uniqueness is already a clause over the
+  // same columns once they are no longer the key.
+  if (profile.unique !== "absent") {
+    for (const table of schema.tables) {
+      const key = table.naturalKey;
+      if (!key) continue;
+      const same = clauses.some((c) =>
+        c.tableName === table.name && c.columns?.length === key.length
+        && key.every((k) => c.columns!.includes(k))
+      );
+      if (same) continue;
+      clauses.push({
+        tableName: table.name,
+        sql: `UNIQUE (${key.join(", ")})`,
+        channel: profile.unique,
+        columns: key,
+      });
+    }
+  }
+
   return { clauses, spilled, placements };
 
   function routeValueConstraint(

@@ -156,7 +156,19 @@ function dbtKeyNotes(
   return schema.tables.flatMap((t): ExportAnnotation[] => {
     const key = dbtKeyTestColumns(t) !== undefined;
     const unique = uniques.some((u) => u.tableName === t.name && u.columns.length > 1);
-    if (!key && !unique) return [];
+    if (!key && !unique) {
+      // The model's SQL calls dbt_utils for a generated key, test or no
+      // test (surrogate-key-export.spec.md).
+      return t.columns.some((c) => c.generatedFrom)
+        ? [{
+          tableName: t.name,
+          severity: "note",
+          category: "constraint",
+          message: "Generated keys are computed with dbt_utils.generate_surrogate_key: the "
+            + "project must declare the dbt_utils package.",
+        }]
+        : [];
+    }
     const what = key && unique ? "Key and uniqueness" : key ? "Key" : "Uniqueness";
     return [{
       tableName: t.name,

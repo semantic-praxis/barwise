@@ -44,6 +44,7 @@ import {
 import type { OrmModel } from "../model/OrmModel.js";
 import type { PreferredIdentifierStrategy } from "../model/OrmProject.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { freeColumnName } from "./columnNames.js";
 import type {
   Column,
   ForeignKey,
@@ -51,6 +52,7 @@ import type {
   RelationalSchema,
   Table,
 } from "./RelationalSchema.js";
+import { withSurrogateKeys } from "./surrogateKeys.js";
 
 /**
  * Options for relational mapping.
@@ -65,6 +67,12 @@ export interface RelationalMapperOptions {
    * - undefined -- falls back to TEXT (legacy behavior).
    */
   readonly preferredIdentifierStrategy?: PreferredIdentifierStrategy;
+  /**
+   * Give every table keyed on several columns a generated key, and make
+   * every reference to one a single column: a warehouse export's physical
+   * choice, applied last (`withSurrogateKeys`, surrogate-key-export.spec.md).
+   */
+  readonly surrogateKeys?: boolean;
 }
 
 /**
@@ -251,10 +259,8 @@ export class RelationalMapper {
       (t) => freezeTable(t),
     );
 
-    return {
-      tables: allTables,
-      sourceModelId: model.name,
-    };
+    const schema = { tables: allTables, sourceModelId: model.name };
+    return options?.surrogateKeys ? withSurrogateKeys(schema) : schema;
   }
 
   /**
@@ -895,13 +901,7 @@ function freezeTable(t: MutableTable): Table {
  * exactly as it did before (barwise-961).
  */
 function pushColumn(columns: Column[], column: Column, alternative?: string): string {
-  const taken = new Set(columns.map((c) => c.name));
-  let name = column.name;
-  if (taken.has(name)) {
-    const stem = alternative ?? name;
-    name = stem;
-    for (let i = 2; taken.has(name); i += 1) name = `${stem}_${i}`;
-  }
+  const name = freeColumnName(columns, column.name, alternative);
   columns.push({ ...column, name });
   return name;
 }
