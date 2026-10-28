@@ -39,9 +39,7 @@ back.
 
 ## Principle
 
-A finding closes with a mechanism, not a note. Upgrading fixes today's
-leak, but nothing would notice if a later version or a config change
-brought it back. The leak only shows up as a full disk days later, in a
+A finding closes with a mechanism, not a note. Upgrading fixes today's leak, but nothing would notice if a later vitest version brought it back. The leak only shows up as a full disk days later, in a
 gate that then cannot answer. So the bump comes with a test that runs
 vitest and checks that the temp directory is empty afterwards.
 
@@ -126,10 +124,26 @@ The changes above. Each item below is pinned or measured:
   installed `--no-save`, the test fails with "vitest 5.0.1 left these in
   its temp directory". After `npm ci` restores 5.0.5, it passes.
 
-- `knip.json` ignores `scripts/tests/fixtures/**`. The fixture imports
+- `knip.json` ignores `scripts/tests/fixtures/vitest-tmp/**`. The fixture imports
   `vitest`, which the root workspace does not declare, so knip reported
   it as an unlisted dependency. The fixture is data that vitest runs, not
   code of the root workspace.
+
+- Implementation review:
+  - The test resolves vitest from `@barwise/learn`, as a package does,
+    not from whatever npm hoists to `barwise/node_modules`.
+  - The run passes `--no-cache`, so vitest writes no results cache into
+    the fixture folder, and it has a two-minute timeout and reports a
+    failure to start.
+  - The knip ignore is scoped to this fixture.
+  - The guard covers vitest's version, not the repository's vitest
+    config. A config change that leaks (another pool, typecheck,
+    coverage) would need a package's real config, which needs `dist`.
+    The Principle now claims only the version.
+  - Declined: squashing the commit that added the fixture before the knip
+    ignore. The PR is squash-merged, so main receives one commit.
+  - Declined: closing barwise-fvi here. Tracker closes go in their own PR
+    after the merge.
 
 ## Open decisions
 
