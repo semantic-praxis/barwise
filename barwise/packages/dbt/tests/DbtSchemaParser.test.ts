@@ -270,4 +270,32 @@ models:
       ).toBe("customers");
     });
   });
+
+  // barwise-fnt: dbt 1.10.8 reads a test's arguments under `arguments:`,
+  // which the export now writes; the parsed test must be the one the older
+  // top-level form gives, with no `arguments` key left in its config.
+  describe("a test's arguments under arguments:", () => {
+    const yamlOf = (test: string) => `
+version: 2
+models:
+  - name: enrollment
+    data_tests:
+${test}
+`;
+    const old = `      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [student_id, course_id]`;
+    const current = `      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [student_id, course_id]`;
+
+    it("reads back as the top-level form does", () => {
+      const read = (y: string) => parseDbtSchema([yamlOf(y)]).models[0]!.modelTests;
+      expect(read(current)).toEqual(read(old));
+      expect(read(current)).toEqual([{
+        type: "custom",
+        name: "dbt_utils.unique_combination_of_columns",
+        config: { combination_of_columns: ["student_id", "course_id"] },
+      }]);
+    });
+  });
 });

@@ -178,10 +178,13 @@ function parseObjectTest(raw: Record<string, unknown>): DbtTest[] {
     // dbt 1.10 moves a test's arguments under `arguments:`; read either
     // spelling, the top level winning where both name one key
     // (dbt-composite-key-tests.spec.md, barwise-lqj).
-    const args = given["arguments"];
+    const { arguments: args, ...rest } = given;
+    // The `arguments` object itself is not an argument: without dropping
+    // it, a test read from the new form kept it in its config, so the two
+    // forms read back differently (barwise-fnt).
     const config = args !== null && typeof args === "object" && !Array.isArray(args)
-      ? { ...(args as Record<string, unknown>), ...given }
-      : given;
+      ? { ...(args as Record<string, unknown>), ...rest }
+      : rest;
 
     switch (key) {
       case "not_null":
