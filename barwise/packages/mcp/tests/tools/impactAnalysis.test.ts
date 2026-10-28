@@ -232,7 +232,7 @@ describe("impact_analysis tool", () => {
     const constraintResult = executeImpactAnalysis(modelPath, constraintId);
     const constraintParsed = JSON.parse(constraintResult.content[0]!.text);
     expect(constraintParsed.affectedArtifacts).toHaveLength(1);
-    expect(constraintParsed.affectedArtifacts[0].relationship).toContain("enforces constraint");
+    expect(constraintParsed.affectedArtifacts[0].relationship).toContain("states constraint");
 
     // Test value type impact
     const valueTypeResult = executeImpactAnalysis(modelPath, valueTypeId);

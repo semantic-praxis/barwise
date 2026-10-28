@@ -55,3 +55,62 @@ the path named only the first column, which addresses many rows.
 **Clients generated from an earlier OpenAPI export call the old, shorter
 path for these resources and need regenerating.** Resources keyed on one
 column are unchanged.
+
+### Binary constraint sentences state the whole reading
+
+A binary mandatory or uniqueness sentence now keeps the reading's words
+after the second role: "Each Patient has at most one Doctor as primary
+doctor." Before, it kept only the words between the two roles, so "as
+primary doctor" was dropped. A single-role frequency sentence now says
+only what the constraint says: "Each Customer that rates some Product
+rates at least 1 and at most 10 instances of Product." The old "Each
+Customer rates at least 1 and at most 10 Product" also claimed that every
+Customer rates something. These sentences appear in DDL comments and in
+the dbt, OpenAPI, Avro and Ossie constraint reports, so those files change
+text on the next export.
+
+### DDL lineage names the constraints a table states
+
+`barwise lineage impact <constraint id>` now reports the DDL table a
+constraint is written on, as a UNIQUE or CHECK clause or as a comment the
+dialect could not enforce. Before, only a foreign key's constraint was
+listed. An impact report now words a constraint "states constraint X",
+not "enforces". A constraint over subtypes that an export reports also
+carries an example of the instance it forbids: "one Party in both
+LegalEntity and NaturalPerson".
+
+### The dbt export writes the current test syntax
+
+`schema.yml` now lists tests under `data_tests:` and puts each test's
+inputs under `arguments:`, such as a relationships test's `to` and
+`field`. dbt 1.10.8 and later warn on the old form, and dbt requires that
+warning resolved before the move to Fusion (dbt 2.x). A project on dbt
+1.10.5 to 1.10.7 reads the new form without a warning once it sets
+`require_generic_test_arguments_property: true`. One before 1.10.5
+cannot read it. Re-importing a project in either form gives the same
+model.
+
+### A foreign key over several columns round-trips as one reference
+
+- **dbt export.** A foreign key over several columns used to be dropped,
+  because dbt's `relationships` test takes one column. It is now written
+  as a model-level `foreign_key` constraint, which needs dbt 1.9 or later.
+  No contract is written, so dbt records the constraint without enforcing
+  it, and the models build as before. Re-importing the project reads it as
+  one reference.
+- **DDL import.** A foreign key over several columns outside the table's
+  key used to import as one reference per column, so
+  `claim (policy_id, term_number)` gained two references to
+  `policy_period`. It now imports as one. It is mandatory when every
+  column is NOT NULL, and one-to-one when its columns are a UNIQUE of the
+  table. A model imported earlier keeps its extra references until it is
+  imported again.
+- **Some UNIQUEs and keys are now refused with a warning.** A UNIQUE, or a
+  composite PRIMARY KEY, over part of such a foreign key, or over a column
+  two foreign keys share, used to import as a constraint on a reference
+  that did not exist. It is now refused with a warning naming the
+  columns, as a UNIQUE over part of a relationship's role already was.
+- **A key that is one foreign key.** A DDL table or dbt model whose key is
+  exactly one multi-column foreign key imports as an entity with a key of
+  its own and a one-to-one reference. The dbt importer used to find no
+  identifier and skip such a model.

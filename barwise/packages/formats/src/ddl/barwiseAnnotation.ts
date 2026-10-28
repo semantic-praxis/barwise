@@ -180,17 +180,17 @@ export function annotateTable(
     supertypes,
   };
 
-  // A role spread over several columns (a composite foreign key) is read
-  // one column at a time by the importer, so naming its fact type on each
-  // would build it twice. It gets no line.
-  const perRole = new Map<string, number>();
-  for (const c of table.columns) {
-    if (c.sourceRoleId) perRole.set(c.sourceRoleId, (perRole.get(c.sourceRoleId) ?? 0) + 1);
-  }
+  // A role spread over several columns (a composite foreign key) is one
+  // reference, which the importer builds once and reads its line from any
+  // of its columns (composite-foreign-key-round-trip.spec.md). The line is
+  // written on the first, so naming the fact type on each cannot read as a
+  // fact type already taken.
+  const lined = new Set<string>();
 
   for (const column of table.columns) {
     const roleId = column.sourceRoleId;
-    if (!roleId || perRole.get(roleId) !== 1) continue;
+    if (!roleId || lined.has(roleId)) continue;
+    lined.add(roleId);
     const ft = model.factTypes.find((f) => f.roles.some((r) => r.id === roleId));
     if (!ft || ft.arity !== 2) continue;
     const rowRole = ft.roles[0]!.id === roleId ? 0 : 1;

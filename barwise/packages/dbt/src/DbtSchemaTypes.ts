@@ -55,12 +55,26 @@ export interface DbtColumn {
 // Models
 // ---------------------------------------------------------------------------
 
+/**
+ * A model-level `foreign_key` constraint over two or more columns (dbt 1.9
+ * and later): one reference, which no single-column `relationships` test
+ * can state (composite-foreign-key-round-trip.spec.md).
+ */
+export interface DbtForeignKey {
+  readonly columns: readonly string[];
+  /** Model name extracted from ref('model_name'). */
+  readonly to: string;
+  readonly toColumns: readonly string[];
+}
+
 export interface DbtModel {
   readonly name: string;
   readonly description?: string;
   readonly columns: readonly DbtColumn[];
   /** Model-level tests (e.g. expression_is_true). */
   readonly modelTests: readonly DbtTest[];
+  /** Model-level foreign_key constraints over two or more columns. */
+  readonly foreignKeys: readonly DbtForeignKey[];
 }
 
 // ---------------------------------------------------------------------------

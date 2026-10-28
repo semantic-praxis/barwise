@@ -61,6 +61,12 @@
       "caught_by": "not-a-correction",
       "note": "An Inventory note about what the diff does to the baseline files. The detector matched `caught it` inside prose NAMING the verdict vocabulary, which is the same over-match this spec's first row records."
     },
+    "binary-constraint-sentences::02355d2c915c": {
+      "spec": "binary-constraint-sentences.spec.md",
+      "excerpt": "- measured over the tracked corpus with barwise verbalize, before and after: 20 sentences change. that is the 8 mandatory and uniqueness sentences that regain t",
+      "caught_by": "execution",
+      "note": "The plan sent a reading with text before its subject to the reverse frame; the high implementation review ran such a reading through the verbalizer and got \"the that Order\", so the forward builder lets Each replace that text instead."
+    },
     "ci-local-condition-parity::0bc9b629f788": {
       "spec": "ci-local-condition-parity.spec.md",
       "excerpt": "- ws1. scripts/lib/changed-class.mjs owns classify, and ci.yml's detect step is one line that runs it. it was checked against the last 40 merges to main, runnin",
@@ -78,6 +84,12 @@
       "excerpt": "making the drift testable needed one refactor the workstream did not anticipate: classifychange returned the literal \"caution\" both for a deliberate caution and",
       "caught_by": "execution",
       "note": "Writing the test is what surfaced it: classifyChange returned the literal \"caution\" for both a deliberate caution and an unrecognized string, so no test could distinguish them. Split into classifyKnownChange returning BreakingLevel | undefined."
+    },
+    "composite-foreign-key-round-trip::f6798b7cf08e": {
+      "spec": "composite-foreign-key-round-trip.spec.md",
+      "excerpt": "- models imported from ddl with a multi-column foreign key outside the key change shape: one reference instead of several. that is the fix, and the release note",
+      "caught_by": "not-a-correction",
+      "note": "A Risks bullet describing the intended change of shape, not a correction of the draft."
     },
     "core-branching-load::09caa79b9010": {
       "spec": "core-branching-load.spec.md",
@@ -186,6 +198,12 @@
       "excerpt": "no, and this is the spec's largest correction. the first version of this gate shipped ten hand-written vendor-prefix regexes and an entropy argument for preferr",
       "caught_by": "reasoning",
       "note": "A reviewer's objection, in one sentence -- do not build what others have built better -- before anything was re-run. The draft had rejected gitleaks on two grounds that both turn out weak: CLAUDE.md's no-trivial-dependencies rule is about what Node core provides, and the first-party-actions constraint is satisfied by a pinned tarball with a verified digest."
+    },
+    "dbt-export-current-test-syntax::a7b541c918f8": {
+      "spec": "dbt-export-current-test-syntax.spec.md",
+      "excerpt": "- renderdbt shall write datatests: on columns and models. - it shall write every test that takes arguments through one helper, generictest(name, args), which re",
+      "caught_by": "not-a-correction",
+      "note": "A Scope requirement (the export writes data_tests: through one helper), not a correction to the spec."
     },
     "ddl-import-fidelity::0d08b981db76": {
       "spec": "ddl-import-fidelity.spec.md",
@@ -673,17 +691,23 @@
       "caught_by": "reasoning",
       "note": "Corrections to the WS4b draft. The compiler showed the llm parser never wrote the flags the draft listed it as writing. A dangling subtype fact id would make a model unloadable, so removal prunes the operand; two code review rounds then caught that pruning every kind made a disjunctive mandatory or exclusive-or stronger, that NORMA wrote partitions over every subtype of a supertype, and that reading NORMA partitions back as flags merged two exclusions and dropped modality, which moved the one-to-one NORMA mapping forward into 4b-i."
     },
+    "ossie-export-precise-losses::f3d7c8ecfba7": {
+      "spec": "ossie-export-precise-losses.spec.md",
+      "excerpt": "over the corpus, dropping it changes no output. a narrower row can only add a line, never hide one, so the row explains referencemode alone. - measured through ",
+      "caught_by": "execution",
+      "note": "The planned no-identifier row also explained preferredIdentifier; re-running the corpus export with it dropped changed no output, and reading the writer showed the other identifier line always fires, so the row was narrowed. Implementation review then added the cases the drift test lacked."
+    },
     "ossie-export-verified-by-reimport::0fd9b18a7d2f": {
       "spec": "ossie-export-verified-by-reimport.spec.md",
       "excerpt": "when the ossie exporter has written a document, it shall read the written text back through the ossie importer, compare the result with the source model, and ad",
       "caught_by": "not-a-correction",
       "note": "The spec's opening requirement. It says the writer's predictions were wrong in earlier review rounds, which is the problem statement, not a correction to this spec."
     },
-    "ossie-export-verified-by-reimport::ee418e5d7c13": {
+    "ossie-export-verified-by-reimport::a6a4b03c52cd": {
       "spec": "ossie-export-verified-by-reimport.spec.md",
       "excerpt": "- as planned in the revised plan. the first draft claimed the read-back found an external uniqueness the import adds. the high plan review showed that was an ar",
       "caught_by": "execution",
-      "note": "The high plan review re-ran the prototype with roles restored to source order: the claimed added external uniqueness paired away, leaving a preferred identifier on Model, and readings compared equal, so ignoring them was wrong."
+      "note": "The high plan review re-ran the prototype with roles restored to source order: the claimed added external uniqueness paired away, leaving a preferred identifier on Model, and readings compared equal, so ignoring them was wrong. (Row re-keyed when barwise-huw added a pointer to its decision.)"
     },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",

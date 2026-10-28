@@ -22,10 +22,16 @@ import type { DbtMapperContext } from "./context.js";
 
 export function reportColumnRenames(ctx: DbtMapperContext): void {
   const schema = new RelationalMapper().map(ctx.model);
-  const exportedNameByRole = new Map<string, string>();
+  // A role spread over several columns (a multi-column foreign key) is
+  // exported as several columns, so a role names a list, and a dbt column of
+  // it is renamed only when none of them has its name
+  // (composite-foreign-key-round-trip.spec.md).
+  const exportedNamesByRole = new Map<string, string[]>();
   for (const table of schema.tables) {
     for (const column of table.columns) {
-      if (column.sourceRoleId) exportedNameByRole.set(column.sourceRoleId, column.name);
+      if (!column.sourceRoleId) continue;
+      const names = exportedNamesByRole.get(column.sourceRoleId) ?? [];
+      exportedNamesByRole.set(column.sourceRoleId, [...names, column.name]);
     }
   }
 
@@ -33,14 +39,17 @@ export function reportColumnRenames(ctx: DbtMapperContext): void {
     const pk = ctx.pkMap.get(m.name);
     for (const col of m.columns) {
       const roleId = ctx.columnRoleIdMap.get(`${m.name}::${col.name}`);
-      const exportedName = roleId ? exportedNameByRole.get(roleId) : undefined;
-      if (!exportedName || exportedName === col.name) continue;
+      const exportedNames = roleId ? exportedNamesByRole.get(roleId) : undefined;
+      if (!exportedNames || exportedNames.includes(col.name)) continue;
+      const exportedAs = exportedNames.length === 1
+        ? `"${exportedNames[0]}"`
+        : `one of ${exportedNames.map((n) => `"${n}"`).join(", ")}`;
       ctx.report.warning(
         col.name === pk?.columnName ? "identifier" : "data_type",
         m.name,
         `${
           col.name === pk?.columnName ? "Key column" : "Column"
-        } "${col.name}" will export as "${exportedName}".`,
+        } "${col.name}" will export as ${exportedAs}.`,
         col.name,
       );
     }

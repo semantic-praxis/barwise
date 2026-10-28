@@ -80,7 +80,9 @@ function buildRelationshipDescription(sourceRef: {
     case "FactType":
       return `derived from fact type ${sourceRef.elementName}`;
     case "Constraint":
-      return `enforces constraint ${sourceRef.elementName}`;
+      // "states", not "enforces": a DDL table also lists a constraint its
+      // dialect could not enforce and only comments (barwise-20o).
+      return `states constraint ${sourceRef.elementName}`;
     case "SubtypeFact":
       return `involves subtype relationship ${sourceRef.elementName}`;
     case "Role":

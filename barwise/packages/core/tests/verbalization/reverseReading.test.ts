@@ -101,3 +101,33 @@ describe("a binary constraint on the role no reading names first", () => {
     ]);
   });
 });
+
+describe("a binary constraint on the role a reading opens with (barwise-m1c)", () => {
+  // The forward sentence used to keep only the text between the two
+  // placeholders, dropping "online" and a repeated placeholder
+  // (binary-constraint-sentences.spec.md).
+  it("keeps the text after the second placeholder", () => {
+    expect(
+      placed(["{0} is placed by {1} online"], { type: "internal_uniqueness", roleIds: ["ro"] }),
+    )
+      .toEqual(["Each Order is placed by at most one Customer online."]);
+    expect(placed(["{0} is placed by {1} online"], { type: "mandatory", roleId: "ro" }))
+      .toEqual(["Each Order is placed by at least one Customer online."]);
+  });
+
+  it("keeps a repeated placeholder as 'that'", () => {
+    expect(placed(["{0} is placed by {1} for {0}"], { type: "mandatory", roleId: "ro" }))
+      .toEqual(["Each Order is placed by at least one Customer for that Order."]);
+  });
+
+  it("lets 'Each' take the place of text before the subject", () => {
+    // Through the reverse frame it read "For each Order, the that Order ...".
+    expect(placed(["the {0} is placed by {1}"], { type: "internal_uniqueness", roleIds: ["ro"] }))
+      .toEqual(["Each Order is placed by at most one Customer."]);
+  });
+
+  it("writes no space before punctuation flush against the subject", () => {
+    expect(placed(["{0}'s buyer is {1}"], { type: "mandatory", roleId: "ro" }))
+      .toEqual(["Each Order's buyer is at least one Customer."]);
+  });
+});

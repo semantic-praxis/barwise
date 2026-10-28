@@ -84,8 +84,9 @@ Out of scope: the ring sentence (direction-symmetric, above); the
 single-role frequency sentence, which reads backwards the same way
 (barwise-zx2: the frame would make the counted noun the subject of a
 singular verb, "exactly 2 Order is placed by", and "For each X" asserts
-that every X plays the role, which a frequency does not); and the
-fact-type verbalization, which prints readings as written.
+that every X plays the role, which a frequency does not; since decided
+in `binary-constraint-sentences.spec.md`); and the fact-type
+verbalization, which prints readings as written.
 
 ## Workstreams
 
@@ -127,7 +128,7 @@ the monorepo passes; the corpus effect is recorded here.
   has always done this, and an article belongs in a hyphen-bound lead.
 - Filed: the forward sentence drops reading text outside its two
   placeholders (barwise-m1c). That predates this change, but now the two
-  directions can differ.
+  directions can differ. Since decided: `binary-constraint-sentences.spec.md`.
 
 ## Open decisions
 

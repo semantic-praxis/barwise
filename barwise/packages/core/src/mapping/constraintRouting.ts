@@ -46,10 +46,23 @@ export interface SpilledConstraint {
   readonly spec: ConstraintSpec;
 }
 
+/** A constraint the routing put on a table, as a clause or a spilled comment. */
+export interface ConstraintPlacement {
+  readonly tableName: string;
+  /** The constraint placed, as the router saw it: not an id to look up again. */
+  readonly inView: ConstraintInView;
+}
+
 /** The routing decision for a whole model. */
 export interface ConstraintRouting {
   readonly clauses: readonly RoutedClause[];
   readonly spilled: readonly SpilledConstraint[];
+  /**
+   * Each constraint the routing wrote on a table, once per table: what
+   * DDL lineage lists as that table's source, since changing the
+   * constraint changes the table's text (barwise-20o).
+   */
+  readonly placements: readonly ConstraintPlacement[];
 }
 
 /**
@@ -111,8 +124,13 @@ export function routeConstraints(
   profile: DialectCapabilityProfile,
   dialectName: string,
 ): ConstraintRouting {
-  const { clauses, spilled } = routeAll(model, schema, profile, dialectName);
+  const { clauses, spilled, placements } = routeAll(model, schema, profile, dialectName);
   return {
+    // Once per table and constraint: a constraint can spill twice at one
+    // table (a mandatory and its column), and is still one source. Before
+    // the text dedupe, deliberately: two constraints that write the same
+    // clause are both sources, since changing either changes the table.
+    placements: onePerTable(placements),
     clauses: dedupeBy(clauses, (c) => JSON.stringify([c.tableName, c.sql])),
     spilled: dedupeBy(spilled, (s) => JSON.stringify([s.tableName ?? "", s.spec.verbalization]))
       .map(({ tableName, reason, spec }) => ({ tableName, reason, spec })),
@@ -129,12 +147,17 @@ function routeAll(
   schema: RelationalSchema,
   profile: DialectCapabilityProfile,
   dialectName: string,
-): { clauses: RoutedClause[]; spilled: RoutedSpill[]; } {
+): { clauses: RoutedClause[]; spilled: RoutedSpill[]; placements: ConstraintPlacement[]; } {
   const clauses: RoutedClause[] = [];
   const spilled: RoutedSpill[] = [];
+  const placements: ConstraintPlacement[] = [];
+  const place = (inView: ConstraintInView, tableName: string | undefined): void => {
+    if (tableName !== undefined) placements.push({ tableName, inView });
+  };
   const verbalizer = new ConstraintVerbalizer();
 
   const spill = (inView: ConstraintInView, reason: string, tableName?: string): void => {
+    place(inView, tableName);
     spilled.push({
       tableName,
       reason,
@@ -158,6 +181,7 @@ function routeAll(
       );
       return;
     }
+    place(inView, tableName);
     clauses.push({ tableName, sql: clauseSql, channel });
   };
 
@@ -328,7 +352,7 @@ function routeAll(
     }
   }
 
-  return { clauses, spilled };
+  return { clauses, spilled, placements };
 
   function routeValueConstraint(
     c: Extract<Constraint, { type: "value_constraint"; }>,
@@ -344,6 +368,18 @@ function routeAll(
       spill(inView, "the constrained role maps to no single column", col?.table);
     }
   }
+}
+
+/** Each placement once per table and constraint, in order: one pass. */
+function onePerTable(placements: readonly ConstraintPlacement[]): ConstraintPlacement[] {
+  const seen = new Map<string, Set<unknown>>();
+  return placements.filter(({ tableName, inView }) => {
+    const placed = seen.get(tableName) ?? new Set();
+    seen.set(tableName, placed);
+    if (placed.has(inView[0])) return false;
+    placed.add(inView[0]);
+    return true;
+  });
 }
 
 /** Keep the first occurrence of each key, preserving order. */

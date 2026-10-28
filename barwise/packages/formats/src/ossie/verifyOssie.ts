@@ -17,7 +17,7 @@ import {
   writeDocument,
 } from "@barwise/core";
 import { buildConstraintSpec } from "@barwise/core/annotation";
-import { deltaLabel, diffModels, type ModelDelta } from "@barwise/core/diff";
+import { type ChangeKind, deltaLabel, diffModels, type ModelDelta } from "@barwise/core/diff";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
 import { stringify } from "yaml";
 import { lossKey, type OssieCorrespondence } from "./writeOssie.js";
@@ -30,14 +30,16 @@ export interface OssieVerifyResult {
 
 /**
  * Compare `source` with `back`, the document the export wrote read back
- * through the Ossie importer, and report what `reported` (the keys of the
- * writer's own loss lines) does not already cover.
+ * through the Ossie importer, and report what `covers` (what the writer's
+ * own loss lines explain, by element) does not already cover. A line that
+ * names the changes it explains covers only those, so a modified element
+ * is reported with whatever changes remain.
  */
 export function verifyOssie(
   source: OrmModel,
   back: OrmModel,
   written: OssieCorrespondence,
-  reported: ReadonlySet<string>,
+  covers: ReadonlyMap<string, ReadonlySet<ChangeKind> | "all">,
 ): OssieVerifyResult {
   const aligned = align(source, back, written);
   const losses: string[] = [];
@@ -46,8 +48,16 @@ export function verifyOssie(
   for (const delta of diffModels(source, aligned).deltas) {
     if (delta.kind === "unchanged") continue;
     const key = sourceKey(delta);
-    if (key !== undefined && reported.has(key)) continue;
-    losses.push(line(delta));
+    const covered = key === undefined ? undefined : covers.get(key);
+    if (covered === "all") continue;
+    let changes = delta.changeDescriptions;
+    // A scoped line explains changes, never an element that does not come
+    // back or comes back added.
+    if (covered !== undefined && delta.kind === "modified") {
+      changes = delta.changeDescriptions.filter((_, i) => !covered.has(delta.changes[i]!.change));
+      if (changes.length === 0) continue;
+    }
+    losses.push(line(delta, changes));
     if (delta.kind === "removed" && delta.elementType === "constraint" && delta.existing) {
       specs.push(
         buildConstraintSpec([delta.existing as ExternalConstraint, undefined], source, verbalizer),
@@ -124,12 +134,12 @@ function sourceKey(delta: ModelDelta): string | undefined {
   return id === undefined ? undefined : lossKey({ kind: delta.elementType, id });
 }
 
-function line(delta: ModelDelta): string {
+function line(delta: ModelDelta, changes: readonly string[]): string {
   const label = deltaLabel(delta);
   const text = delta.kind === "removed"
     ? `${label}: does not come back`
     : delta.kind === "added"
     ? `${label}: comes back added, though the model does not have it`
-    : `${label}: comes back changed: ${delta.changeDescriptions.join("; ")}`;
+    : `${label}: comes back changed: ${changes.join("; ")}`;
   return text.replace(/\s+/g, " ").trim();
 }
