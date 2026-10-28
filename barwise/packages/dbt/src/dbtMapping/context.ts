@@ -63,6 +63,12 @@ export interface DbtMapperContext {
   readonly relMap: Map<string, RelationshipInfo[]>;
   /** model name -> its composite-key reading (composite-key-tables.spec.md). */
   readonly compositeMap: Map<string, CompositeInfo>;
+  /**
+   * Models keyed by exactly one multi-column foreign key: an entity with a
+   * one-to-one reference and a key of its own, as the DDL importer reads
+   * such a table (composite-foreign-key-round-trip.spec.md).
+   */
+  readonly referenceKeyed: Set<string>;
   /** model name -> entity type id in OrmModel. */
   readonly entityIdMap: Map<string, string>;
   /** "modelName::columnName" -> value type id. */
@@ -88,6 +94,7 @@ export function createContext(doc: DbtProjectDocument): DbtMapperContext {
     pkMap: new Map<string, PkInfo>(),
     relMap: new Map<string, RelationshipInfo[]>(),
     compositeMap: new Map<string, CompositeInfo>(),
+    referenceKeyed: new Set<string>(),
     entityIdMap: new Map<string, string>(),
     valueTypeIdMap: new Map<string, string>(),
     columnRoleIdMap: new Map<string, string>(),

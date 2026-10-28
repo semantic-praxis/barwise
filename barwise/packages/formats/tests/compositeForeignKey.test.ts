@@ -120,6 +120,56 @@ describe("a multi-column foreign key outside the key", () => {
 });
 
 describe("the exceptions the per-column reading kept", () => {
+  it("a foreign key that includes a single-column key is no reference either (barwise-1078)", () => {
+    const { model, warnings } = ddl.parse(`${PERIOD}
+      CREATE TABLE claim (policy_id INT PRIMARY KEY, term_number INT NOT NULL,
+        FOREIGN KEY (policy_id, term_number) REFERENCES policy_period (policy_id, term_number));`);
+    const claimId = model.getObjectTypeByName("Claim")!.id;
+    const period = model.getObjectTypeByName("PolicyPeriod")!.id;
+    expect(
+      model.factTypes.filter((f) =>
+        f.roles.some((r) => r.playerId === claimId) && f.roles.some((r) => r.playerId === period)
+      ),
+    ).toEqual([]);
+    expect(
+      warnings.some((w) => /the key is imported, the reference is not \(barwise-1078\)/.test(w)),
+    )
+      .toBe(true);
+  });
+
+  it("a foreign key naming a column the table does not declare is no reference, and no crash", () => {
+    const { model } = ddl.parse(`${PERIOD}
+      CREATE TABLE claim (claim_id INT PRIMARY KEY, policy_id INT NOT NULL, term_number INT NOT NULL,
+        FOREIGN KEY (POLICY_ID, term_number) REFERENCES policy_period (policy_id, term_number));`);
+    expect(references(model, "PolicyPeriod")).toEqual([]);
+  });
+
+  it("a multi-column foreign key to a table imported as no entity keeps its columns, with a warning", () => {
+    const { model, warnings } = ddl.parse(`CREATE TABLE claim (claim_id INT PRIMARY KEY,
+        policy_id INT NOT NULL, term_number INT NOT NULL,
+        FOREIGN KEY (policy_id, term_number) REFERENCES elsewhere (policy_id, term_number));`);
+    const claimId = model.getObjectTypeByName("Claim")!.id;
+    expect(model.factTypes.filter((f) => f.roles.some((r) => r.playerId === claimId)))
+      .toHaveLength(3);
+    expect(warnings).toContain(
+      `Table "claim": the foreign key (policy_id, term_number) references "elsewhere", imported as `
+        + `no entity; its columns are kept as columns instead (composite-foreign-key-round-trip.spec.md).`,
+    );
+  });
+
+  it("a column's foreign keys to no entity decide alike in either declared order", () => {
+    const read = (fks: string[]) => {
+      const { model } = ddl.parse(`CREATE TABLE claim (claim_id INT PRIMARY KEY,
+          policy_id INT NOT NULL, term_number INT NOT NULL, ${fks.join(", ")});`);
+      return model.factTypes.map((f) => f.name).sort();
+    };
+    const single = "FOREIGN KEY (policy_id) REFERENCES nowhere (policy_id)";
+    const multi =
+      "FOREIGN KEY (policy_id, term_number) REFERENCES elsewhere (policy_id, term_number)";
+    expect(read([single, multi])).toEqual(read([multi, single]));
+    expect(read([single, multi])).toContain("Claim has PolicyId");
+  });
+
   it("a single-column key that is a foreign key stays the typed key, with no reference (barwise-1078)", () => {
     const { model, warnings } = ddl.parse(`CREATE TABLE person (person_id INT PRIMARY KEY);
       CREATE TABLE employee (person_id INT PRIMARY KEY REFERENCES person (person_id), grade INT);`);

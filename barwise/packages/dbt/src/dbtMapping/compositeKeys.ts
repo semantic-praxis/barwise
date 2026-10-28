@@ -38,7 +38,7 @@ export function combinationOf(test: DbtModel["modelTests"][number]): string[] | 
 /**
  * Whether two column lists name the same columns, in any order.
  */
-function sameColumns(a: readonly string[], b: readonly string[]): boolean {
+export function sameColumns(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((c) => b.includes(c));
 }
 
@@ -131,18 +131,22 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
     if (!key) continue;
     const rels = ctx.relMap.get(m.name) ?? [];
     const relOf = (c: string) => rels.filter((r) => r.columns.includes(c));
-    if (!key.some((c) => relOf(c).length > 0)) continue;
-    const keyRoles = keyRolesOf(key, rels);
-    if (!keyRoles) {
+    if (!key.some((c) => relOf(c).length > 0)) {
+      // Its only reference column was in a foreign key analyzeModels set
+      // aside, so nothing in it is a reference read here.
       ctx.report.gap(
         "identifier",
         m.name,
         `Composite key (${
           key.join(", ")
-        }): a reference lies only partly inside it, two share a column, or it is one reference, so it reads as no fact type and the model is skipped.`,
+        }): none of its columns is a reference read here, so the model is skipped.`,
       );
       continue;
     }
+    // analyzeModels set aside every reference keyRolesOf would decline, so
+    // what is left always reads; the fallback is the one-column-per-role
+    // reading those models had before.
+    const keyRoles = keyRolesOf(key, rels) ?? key.map((c) => [c]);
     const others = m.columns.filter((c) => !key.includes(c.name));
     const candidates = others.filter((c) => !hasTest(c, "unique"));
     // The units an extra role could be: a column, or the columns of the one
@@ -183,7 +187,7 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
   const unreachable = (name: string) => {
     const { roles } = pending.get(name)!;
     const rels = ctx.relMap.get(name) ?? [];
-    return roles.flat().map((c) => rels.find((r) => r.columns.includes(c))).find((rel) =>
+    return roles.map((cols) => rels.find((r) => sameColumns(r.columns, cols))).find((rel) =>
       rel !== undefined && !ctx.pkMap.has(rel.targetModelName) && !pending.has(rel.targetModelName)
     );
   };
@@ -195,8 +199,8 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
   const targets = (name: string) => {
     const { roles } = pending.get(name)!;
     const rels = ctx.relMap.get(name) ?? [];
-    return roles.flat().flatMap((c) => {
-      const rel = rels.find((r) => r.columns.includes(c));
+    return roles.flatMap((cols) => {
+      const rel = rels.find((r) => sameColumns(r.columns, cols));
       return rel && pending.has(rel.targetModelName) ? [rel.targetModelName] : [];
     });
   };
@@ -264,7 +268,7 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
  * reference partly inside the key, two references sharing a key column,
  * or a key that is one reference.
  */
-function keyRolesOf(
+export function keyRolesOf(
   key: readonly string[],
   rels: readonly RelationshipInfo[],
 ): string[][] | undefined {
@@ -302,7 +306,9 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     for (const cols of info.roles) {
       const colName = cols[0]!;
       const col = m.columns.find((c) => c.name === colName)!;
-      const rel = rels.find((r) => r.columns.includes(colName));
+      // The reference this role is, by its columns: its first column may
+      // carry a single-column reference of its own as well.
+      const rel = rels.find((r) => sameColumns(r.columns, cols));
       let playerId: string | undefined;
       if (rel) {
         playerId = ctx.entityIdMap.get(rel.targetModelName);

@@ -171,28 +171,62 @@ ${columns}`;
     expect(report.entries.filter((e) => / will export as /.test(e.message))).toEqual([]);
   });
 
-  it("declines the key, with a gap, when the reference lies only partly inside it", () => {
+  it("as the one role beside the key, is played by its own target, though its first column has another reference", () => {
+    const { model } = importDbtProject([`${PERIOD}  - name: coverage
+    columns:
+      - name: coverage_code
+        data_tests: [unique, not_null]
+  - name: coverage_applies
+${FK}    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [coverage_code, note]
+    columns:
+      - name: coverage_code
+        data_tests: [not_null, { relationships: { to: "ref('coverage')", field: coverage_code } }]
+${col("note")}      - name: policy_id
+        data_tests: [not_null, { relationships: { to: "ref('policy')", field: policy_id } }]
+${col("term_number")}`]);
+    expect(factsOf(model, "PolicyPeriod").map((f) => f.players)).toContainEqual([
+      "Coverage",
+      "Note",
+      "PolicyPeriod",
+    ]);
+  });
+
+  it("sets the reference aside when it lies only partly inside the key, keeping the earlier reading", () => {
+    // policy_id also has a relationships test, so the key reads as it did
+    // before foreign_key constraints were read: one role per key column.
     const { model, report } = importDbtProject([applies(
-      col("coverage_code") + col("policy_id") + col("term_number"),
+      col("coverage_code")
+        + "      - name: policy_id\n        data_tests: [not_null, { relationships: { to: \"ref('policy')\", field: policy_id } }]\n"
+        + col("term_number"),
       "coverage_code, policy_id",
     )]);
-    expect(model.getObjectTypeByName("CoverageApplies")).toBeUndefined();
+    // term_number, the one column left, is the third role, as before.
+    expect(factsOf(model, "Policy").map((f) => f.players)).toContainEqual([
+      "CoverageCode",
+      "Policy",
+      "TermNumber",
+    ]);
     expect(report.entries.map((e) => e.message)).toContain(
-      "Composite key (coverage_code, policy_id): a reference lies only partly inside it, two share a column, or it is one reference, so it reads as no fact type and the model is skipped.",
+      "Foreign key (policy_id, term_number) lies partly inside the composite key (coverage_code, policy_id) or shares a key column with another reference; it is not read, and its columns are kept as values.",
     );
   });
 
-  it("is no key when the key is exactly that one reference", () => {
-    const { report } = importDbtProject([applies(
+  it("is an entity with a one-to-one reference when the key is exactly that one reference", () => {
+    // As the DDL importer reads a table whose key is one foreign key.
+    const { model, report } = importDbtProject([applies(
       col("policy_id") + col("term_number") + col("note"),
       "policy_id, term_number",
     )]);
-    // Not a candidate key: its columns are exactly the foreign key's.
+    expect(model.getObjectTypeByName("CoverageApplies")?.referenceMode).toBe("coverage_applies_id");
+    expect(factsOf(model, "CoverageApplies")).toContainEqual({
+      players: ["PolicyPeriod", "CoverageApplies"],
+      constraints: ["internal_uniqueness 1", "mandatory 1", "internal_uniqueness 0"],
+    });
     expect(
       report.entries.filter((e) => e.modelName === "coverage_applies" && e.severity === "gap")
-        .map((e) => e.message),
-    ).toContain(
-      "No column with both unique and not_null tests found. Cannot determine primary identifier.",
-    );
+        .map((e) => e.message).filter((m) => /identifier/.test(m)),
+    ).toEqual([]);
   });
 });

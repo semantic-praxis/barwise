@@ -505,11 +505,16 @@ export class DdlImportFormat implements ImportFormat {
       // same table. Two stay out, as the column loop below keeps their
       // columns out: one over a single-column key, which step 2 made the
       // typed key (barwise-1078), and a declared subtype link, which is the
-      // subtype fact.
+      // subtype fact. A foreign key naming a column the table does not
+      // declare (in another case, say) is not one either: the per-column
+      // reading never matched it, and building it would read a column that
+      // is not there.
+      const columnNamed = (c: string) => table.columns.find((tc) => tc.name === c);
       const references = table.foreignKeys.filter((fk) =>
         !fk.columns.some((c) => taken?.has(c))
-        && !(table.primaryKey.length === 1 && fk.columns.every((c) => c === table.primaryKey[0]))
+        && !(table.primaryKey.length === 1 && fk.columns.includes(table.primaryKey[0]!))
         && !(links && fk.columns.every((c) => links.has(c.toLowerCase())))
+        && fk.columns.every((c) => columnNamed(c) !== undefined)
         && entityMap.has(tableKey(fk.referencedTable))
       );
       const referenceBinaries = new Map<ParsedForeignKey, Binary | undefined>();
@@ -540,7 +545,7 @@ export class DdlImportFormat implements ImportFormat {
               model,
               entityType,
               entityMap.get(tableKey(fk.referencedTable))!,
-              fk.columns.map((c) => readColumn(table.columns.find((tc) => tc.name === c)!)),
+              fk.columns.map((c) => readColumn(columnNamed(c)!)),
               table,
               annotations,
               warnings,
@@ -554,33 +559,46 @@ export class DdlImportFormat implements ImportFormat {
           continue;
         }
 
-        // Check if this column is a foreign key
-        const fk = table.foreignKeys.find((fk) => fk.columns.includes(column.name));
+        // A column no reference reads. Among the foreign keys naming it,
+        // those to a table imported as no entity decide, whatever order they
+        // were declared in: a declared single-column one alone drops it, as
+        // before references were read whole; an inferred one, or one over
+        // several columns, keeps it as a column with a warning, so the dbt
+        // importer and this one keep the same columns.
+        const toNone = table.foreignKeys.filter((f) =>
+          f.columns.includes(column.name) && !entityMap.has(tableKey(f.referencedTable))
+        );
+        const kept = toNone.find((f) => f.inferred || f.columns.length > 1);
 
         let binary: Binary | undefined;
-        if (fk && !entityMap.has(tableKey(fk.referencedTable))) {
-          // A foreign key to a table imported as no entity: the inferred
-          // one is kept as a column, the declared one is dropped, as
-          // before references were read whole.
-          if (fk.inferred) {
+        if (toNone.length > 0 && !kept) {
+          // Dropped, as before.
+        } else if (kept) {
+          if (kept.inferred) {
             // Inference predicts which tables become entities; when it
             // predicted wrong (two table names that read as one entity, say)
             // the guess is withdrawn and the column kept, never dropped
             // (PR #628 review).
             warnings.push(
               `Table "${table.name}": the reference inferred for column "${column.name}" has no `
-                + `entity to point at ("${fk.referencedTable}" imported as none); it is kept as a `
+                + `entity to point at ("${kept.referencedTable}" imported as none); it is kept as a `
                 + `column instead.`,
             );
-            binary = this.createColumnFactType(
-              model,
-              entityType,
-              read,
-              table,
-              annotations,
-              warnings,
+          } else if (kept.columns[0] === column.name) {
+            warnings.push(
+              `Table "${table.name}": the foreign key (${kept.columns.join(", ")}) references `
+                + `"${kept.referencedTable}", imported as no entity; its columns are kept as `
+                + `columns instead (composite-foreign-key-round-trip.spec.md).`,
             );
           }
+          binary = this.createColumnFactType(
+            model,
+            entityType,
+            read,
+            table,
+            annotations,
+            warnings,
+          );
         } else {
           // A regular column, or one of a foreign key no reference reads:
           // one that shares a column with a relationship step 1b built.
@@ -621,22 +639,24 @@ export class DdlImportFormat implements ImportFormat {
           ? `covers only part of the composite foreign key (${partial.roleColumns!.join(", ")})`
           : undefined;
       };
-      /** Undefined when imported, "reference" when it is one reference's columns, else why not. */
-      const external = (cols: readonly string[]): string | undefined => {
+      type External =
+        | { readonly kind: "imported"; }
+        | { readonly kind: "reference"; }
+        | { readonly kind: "refused"; readonly reason: string; };
+      const external = (cols: readonly string[]): External => {
         // Asked first: a column of this reference may be in another too.
-        const own = [...referenceBinaries].find(([fk, built]) =>
-          built && fk.columns.length > 1 && fk.columns.length === cols.length
-          && fk.columns.every((c) => cols.includes(c))
+        const own = [...referenceBinaries].some(([fk, built]) =>
+          built && fk.columns.length > 1 && sameColumns(fk.columns, cols)
         );
-        if (own) return "reference";
+        if (own) return { kind: "reference" };
         const reason = unexpressible(cols);
-        if (reason) return reason;
+        if (reason) return { kind: "refused", reason };
         const parts = cols.map((c) => partOf(c)!);
         model.addConstraint({
           type: "external_uniqueness",
           roleIds: [...new Set(parts.map((p) => p.farRoleId))],
         });
-        return undefined;
+        return { kind: "imported" };
       };
       for (const cols of table.uniqueConstraints) {
         // One column: its own fact type read it (a value's or a reference's
@@ -645,10 +665,15 @@ export class DdlImportFormat implements ImportFormat {
         if (cols.length < 2 && !partOf(cols[0]!)?.roleColumns) continue;
         // Wholly inside the relationship: step 1b made it an internal
         // uniqueness when it falls on whole roles, and dropped it otherwise.
-        const result = cols.every((c) => taken?.has(c)) ? unexpressible(cols) : external(cols);
-        if (result && result !== "reference") {
+        let reason: string | undefined;
+        if (cols.every((c) => taken?.has(c))) reason = unexpressible(cols);
+        else {
+          const result = external(cols);
+          if (result.kind === "refused") reason = result.reason;
+        }
+        if (reason) {
           warnings.push(
-            `Table "${table.name}": UNIQUE (${cols.join(", ")}) ${result}, and was not imported `
+            `Table "${table.name}": UNIQUE (${cols.join(", ")}) ${reason}, and was not imported `
               + `(barwise-1077).`,
           );
         }
@@ -660,14 +685,14 @@ export class DdlImportFormat implements ImportFormat {
           entityType.kind === "entity" ? entityType.referenceMode : ""
         }"`;
         warnings.push(
-          result === undefined
+          result.kind === "imported"
             ? `Table "${table.name}": composite PRIMARY KEY (${key}) is imported as an external `
               + `uniqueness over its columns; ${identified}, since an external uniqueness cannot yet `
               + `be preferred (barwise-ezn).`
-            : result === "reference"
+            : result.kind === "reference"
             ? `Table "${table.name}": composite PRIMARY KEY (${key}) is one foreign key, imported `
               + `as a one-to-one reference; ${identified} (composite-foreign-key-round-trip.spec.md).`
-            : `Table "${table.name}": composite PRIMARY KEY (${key}) ${result}, and was not `
+            : `Table "${table.name}": composite PRIMARY KEY (${key}) ${result.reason}, and was not `
               + `imported (barwise-1077).`,
         );
       }
@@ -1209,8 +1234,7 @@ export class DdlImportFormat implements ImportFormat {
     const referencedEntity = model.getObjectType(referencedEntityId);
     if (!referencedEntity) return undefined;
     const names = fkColumns.map((c) => c.name);
-    const sameSet = (cols: readonly string[]) =>
-      cols.length === names.length && cols.every((c) => names.includes(c));
+    const sameSet = (cols: readonly string[]) => sameColumns(cols, names);
     // A foreign key whose columns are, by themselves, a UNIQUE of the table
     // or its whole key: each referenced row appears at most once, the
     // one-to-one the export writes for an absorbed binary
@@ -1764,6 +1788,11 @@ function skipDefaultExpression(text: string): string {
 interface CompositeReading {
   readonly roles: readonly string[][];
   readonly objectified: boolean;
+}
+
+/** Whether two column lists name the same columns, in any order. */
+function sameColumns(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((c) => b.includes(c));
 }
 
 function compositeReading(table: ParsedTable, referenced: boolean): CompositeReading | undefined {

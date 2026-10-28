@@ -105,8 +105,12 @@ model.
   column is NOT NULL, and one-to-one when its columns are a UNIQUE of the
   table. A model imported earlier keeps its extra references until it is
   imported again.
-- **Some UNIQUEs are now refused with a warning.** A UNIQUE over part of
-  such a foreign key, or over a column two foreign keys share, used to
-  import as a constraint on a reference that did not exist. It is now
-  refused with a warning naming the columns, as a UNIQUE over part of a
-  relationship's role already was.
+- **Some UNIQUEs and keys are now refused with a warning.** A UNIQUE, or a
+  composite PRIMARY KEY, over part of such a foreign key, or over a column
+  two foreign keys share, used to import as a constraint on a reference
+  that did not exist. It is now refused with a warning naming the
+  columns, as a UNIQUE over part of a relationship's role already was.
+- **A key that is one foreign key.** A DDL table or dbt model whose key is
+  exactly one multi-column foreign key imports as an entity with a key of
+  its own and a one-to-one reference. The dbt importer used to find no
+  identifier and skip such a model.

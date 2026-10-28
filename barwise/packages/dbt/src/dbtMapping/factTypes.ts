@@ -3,7 +3,7 @@
  */
 
 import { generateId, type InternalConstraint } from "@barwise/core";
-import { combinationOf, compositeRoleColumns } from "./compositeKeys.js";
+import { combinationOf, compositeRoleColumns, sameColumns } from "./compositeKeys.js";
 import { buildConstraints, hasTest } from "./constraints.js";
 import { type DbtMapperContext, readsAsReference, referenceName } from "./context.js";
 import { toPascalCase } from "./naming.js";
@@ -134,8 +134,7 @@ export function createFactTypes(ctx: DbtMapperContext): void {
         rel.columns.length > 1
         && m.modelTests.some((t) => {
           const names = combinationOf(t);
-          return names !== undefined && names.length === rel.columns.length
-            && names.every((n) => rel.columns.includes(n));
+          return names !== undefined && sameColumns(names, rel.columns);
         })
       ) {
         constraints.push({ type: "internal_uniqueness", roleIds: [role1Id] });
