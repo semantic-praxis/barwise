@@ -68,3 +68,13 @@ Customer rates at least 1 and at most 10 Product" also claimed that every
 Customer rates something. These sentences appear in DDL comments and in
 the dbt, OpenAPI, Avro and Ossie constraint reports, so those files change
 text on the next export.
+
+### DDL lineage names the constraints a table states
+
+`barwise lineage impact <constraint id>` now reports the DDL table a
+constraint is written on, as a UNIQUE or CHECK clause or as a comment the
+dialect could not enforce. Before, only a foreign key's constraint was
+listed. An impact report now words a constraint "states constraint X",
+not "enforces". A constraint over subtypes that an export reports also
+carries an example of the instance it forbids: "one Party in both
+LegalEntity and NaturalPerson".
