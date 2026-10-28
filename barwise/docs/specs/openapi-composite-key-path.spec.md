@@ -8,8 +8,6 @@ Tracking: barwise-pki
 Touches: barwise/packages/core/src/mapping/renderers/openapi.ts,
 barwise/packages/core/tests/mapping/openapi.test.ts,
 barwise/packages/cli/tests/characterization/golden/,
-barwise/examples/transcripts/clinic-appointments.openapi.json,
-barwise/examples/transcripts/pii-redaction.openapi.json,
 barwise/docs/IMPORT_EXPORT.md
 
 When a table's primary key spans several columns, the OpenAPI export
@@ -29,34 +27,50 @@ claims an identity the model does not state.
 ## Observed today (at cf334d86)
 
 - `primaryKeyParam` (`core/src/mapping/renderers/openapi.ts:410`) returns
-  `table.primaryKey.columnNames[0] ?? "id"`.
-- `renderOpenApi` builds `${resourcePath}/{${primaryKeyParam(table)}}`,
-  and `renderItemPaths` gives `get`, `put` and `delete` one shared path
-  parameter.
-- The OpenAPI importer (`formats/src/openapi/`) reads no `paths`, so the
-  change has no effect on import.
-- `formatDefects.ts` does not list this defect, so no test pins today's
-  behaviour.
-- Committed outputs with a composite-key table: the CLI goldens
-  `clinic-appointments.openapi.txt` (two tables) and
-  `constraints-showcase.openapi.txt` (one), and the example outputs under
-  `examples/transcripts/`.
-- `IMPORT_EXPORT.md` names the gap as barwise-pki.
+  `table.primaryKey.columnNames[0] ?? "id"`. `renderOpenApi` calls it
+  twice: once for the path string (line 117) and once for
+  `renderItemPaths` (line 120), which gives `get`, `put` and `delete` one
+  shared path parameter.
+- The OpenAPI importer (`formats/src/openapi/`) reads only
+  `components.schemas`, never `paths`. No tool, MCP, editor or lineage
+  code reads item paths either.
+- The CLI golden test compares bytes, so it pins today's first-column
+  paths. Two goldens have a composite-key table:
+  - `clinic-appointments.openapi.txt`:
+    `doctor_is_assigned_to_exam_room_on_appointment_date`, keyed on
+    `(provider_id, appointment_date)`;
+  - `constraints-showcase.openapi.txt`: `person_is_parent_of_person`.
+
+  In `external-uniqueness.openapi.txt` the composite key is a UNIQUE
+  constraint, not the primary key, so that golden is unaffected.
+- The committed `examples/transcripts/*.openapi.json` are already out of
+  date with the exporter, by 187 lines for `clinic-appointments`. Nothing
+  regenerates them. That is barwise-om4, and they are left alone here.
+- `IMPORT_EXPORT.md` names this gap as barwise-pki.
 
 ## Scope
 
+- `primaryKeyParams(table)` shall return the key's column names in key
+  order, or `["id"]` when the key is empty, as today's fallback does. The
+  path and every item operation's parameters shall both be built from
+  that one list, so they cannot disagree.
 - When a table's primary key has several columns, the item path shall
-  end in one `{column}` segment per key column, in key order, and each
-  item operation shall declare one required string path parameter per
-  key column, in the same order.
-- When the key has one column, or none, the path is unchanged: one
-  `{column}` segment, or `{id}`.
-- `IMPORT_EXPORT.md` drops its barwise-pki sentence.
+  end in one `{column}` segment per key column, in key order. `get`,
+  `put` and `delete` shall each declare one required string path
+  parameter per key column, in the same order.
+- When the key has one column, the path and its parameter are unchanged.
+- `IMPORT_EXPORT.md`: the barwise-pki sentence becomes "OpenAPI writes
+  it as the item path's parameters." That is the reason the OpenAPI
+  export reports no key spec.
 
 Out of scope:
 
-- Parameter types. They stay `string`, as today's single parameter is.
-- The collection path, which is unchanged.
+- Reading the key back on import. The importer reads no paths for any
+  key, single or composite.
+- Parameter names that are not valid template variables, such as a
+  column named `(ambiguous)` (barwise-9g3).
+- Parameter types. They stay `string`, as today.
+- The stale example outputs (barwise-om4).
 
 ## Workstreams
 
@@ -64,13 +78,23 @@ Out of scope:
 
 The changes above. Each item below is pinned by a test:
 
-- A many-to-many table's item path has both key columns, in key order,
-  and its `get` operation lists both as required path parameters.
+- A table keyed on three columns gets an item path with all three, in
+  key order, and `get`, `put` and `delete` each list all three as
+  required path parameters, in the same order.
 - A single-column key's path and parameter are unchanged.
 - With the fix removed, the first test fails.
 
-Measured, not pinned: the CLI goldens and example outputs regenerate,
-and only composite-key item paths and their parameters change.
+The two CLI goldens are regenerated with `UPDATE_GOLDEN=1`. Each changes
+only in its composite-key table's item path and its three parameter
+lists. That diff is checked by hand.
+
+## API and migration impact
+
+For a composite-key resource, the item path gains one segment per key
+column after the first, and each item operation gains the matching
+parameters. A client generated from an earlier export calls the old,
+shorter path, which addressed many rows. Single-column resources are
+unchanged.
 
 ## Open decisions
 
@@ -87,6 +111,5 @@ and only composite-key item paths and their parameters change.
 
 ## Risks and testing
 
-Consumers of the generated OpenAPI see a changed path for composite-key
-resources, one segment longer. That is the fix. Single-column resources
-are unchanged.
+The change alters generated APIs only where the old path was wrong. The
+golden diff is the measurement of what changed.
