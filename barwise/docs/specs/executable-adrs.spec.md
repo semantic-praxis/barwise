@@ -8,7 +8,8 @@ Tracking: barwise-ym8
 Touches: barwise/scripts/check-architecture.mjs,
 barwise/scripts/lib/architecture-section.mjs,
 +barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/lib/ci-gates.mjs,
-barwise/scripts/mutate.mjs, barwise/scripts/tests/,
+barwise/scripts/mutate.mjs, barwise/scripts/fault-matrix.mjs,
+barwise/scripts/tests/,
 barwise/docs/adr/, barwise/docs/ARCHITECTURE.md,
 .claude/skills/spec-writer/template.adr.md
 
@@ -65,19 +66,22 @@ In scope:
   way.
 - When an `Enforced-by:` entry names `npm run <script>`, the check shall
   exit 1 unless `<script>` is a key of `barwise/package.json` `scripts`
-  and some `ci.yml` step's arguments, as `ciSteps()` in
-  `barwise/scripts/lib/ci-gates.mjs` returns them, are `run`, then any
-  flags, then `<script>` as the first token that is not a flag. A flag
-  is any token starting with `-` (`-s` included); `--prefix`,
-  `--workspace` and `-w` written with a space also consume the next
-  token as their value. The match is on that token alone, because CI writes
+  and some `ci.yml` step, as `ciSteps()` in
+  `barwise/scripts/lib/ci-gates.mjs` returns it, runs that root script.
+  Which root script a step runs is decided by one new function,
+  `stepScript(args)` in `ci-gates.mjs`: it takes the arguments before any
+  `--`, skips `run`, returns null if any of them is a workspace or prefix
+  flag (a token whose name, the part before `=`, is `--workspace`,
+  `--workspaces`, `-w`, `-ws` or `--prefix`; those run another
+  package.json, wherever npm finds them before `--`), skips other flags
+  (any token starting with `-`), and returns the first remaining token.
+  `resolveNodeGate()` in `scripts/fault-matrix.mjs` answers the same
+  question with its own inline rule today; WS1 makes it call
+  `stepScript()`, so the two cannot drift. On every step `ci.yml` has
+  today the two rules give the same answer, and a test pins that. The
+  match is on the script token alone, because CI writes
   `run audit:specs -- --check`; a whole-string comparison would call
-  three enforced ADRs unwired. A step with a workspace flag before its
-  script -- any token whose name, the part before `=`, is `--workspace`,
-  `--workspaces`, `-w` or `-ws` (CI writes `--workspace=barwise-vscode`)
-  -- runs package scripts, not a root one, so it is never a match, even
-  if a root script of the same name exists later; no ADR relies on one
-  today.
+  three enforced ADRs unwired. No ADR relies on a workspace step today.
 - A step marked `continue-on-error: true` is not wired: it cannot fail
   CI. `ciSteps()` does not report that key today, so WS1 extends it to
   return `continueOnError` beside `condition`; `ci:local` and
@@ -85,9 +89,10 @@ In scope:
   `scripts/tests/ci-conditions.test.mjs` is updated with it. Where the
   same arguments appear in two steps, `ciSteps()` keeps one entry, and
   its `continueOnError` is true only if every occurrence has the key,
-  so step order cannot decide whether a gate is wired. `npm run dup` and
-  `npm run filesize` are such steps now, and `must-agree-copies` names
-  `dup` in its prose.
+  so step order cannot decide whether a gate is wired. Separately,
+  `npm run dup` and `npm run filesize` each run once in `ci.yml`, with
+  `continue-on-error: true`, and `must-agree-copies` names `dup` in its
+  prose, so WS2 must not declare it.
 - A step guarded by an `if:` counts as wired. Most guards are
   `docs_only != 'true'`, which skips only changes that cannot violate a
   code decision; the narrower ones (`test:optimizer`, `pull_request`
@@ -99,11 +104,14 @@ In scope:
   `hook <Event> <path>`: the path is tracked, and `.claude/settings.json`,
   parsed as JSON, has an entry under `hooks.<Event>` whose nested
   `hooks` list holds a `command` that runs the path (the real shape is
-  `hooks.<Event>[i].hooks[j].command`). Runs means: the command
-  contains `node`, then a space, an optional `"`, an optional
-  `$CLAUDE_PROJECT_DIR/`, the path, and then a `"`, whitespace or the
-  end. So `echo <path>` and `node <path>.disabled` do not count, the
-  same strictness as the husky rule below. A path that survives only in a permission rule, or
+  `hooks.<Event>[i].hooks[j].command`). Runs means the command's first
+  word, after an optional `env` prefix and its options, is `node`
+  followed by the path, or is the path itself (as
+  `.claude/hooks/session-start.sh` is run), where the path may be
+  quoted and prefixed with `$CLAUDE_PROJECT_DIR/`, and is followed by a
+  quote, whitespace or the end. So `echo <path>`, `echo node <path>` and
+  `node <path>.disabled` do not count, the same strictness as the husky
+  rule below. A path that survives only in a permission rule, or
   under another event, does not count. The entry's `matcher` is not
   checked; a matcher that never fires is the kind of defect WS4's
   probes are for.
@@ -111,8 +119,10 @@ In scope:
   tracked, `<script>` is a key of `barwise/package.json` `scripts`, and
   the husky file has a line that, after leading whitespace and an
   optional `if !` or `!`, begins `npm run`, then any flags (as defined
-  for CI steps above), then `<script>`. Comment lines and `echo` strings therefore never
-  match: `barwise/.husky/pre-push` names `npm run ci:local` in an echo
+  for CI steps above), then `<script>`, and the line does not discard
+  the exit status: no `|| true`, `|| :`, `; exit 0` or `; true` after
+  it, mirroring the rule that a `continue-on-error` CI step is not
+  wired. Comment lines and `echo` strings therefore never match: `barwise/.husky/pre-push` names `npm run ci:local` in an echo
   as well as on the line that runs it. Naming the husky file alone is
   not accepted: it would pass however the hook's body changed, which is
   the decay this spec exists to catch. Both rules are lexical; they show
@@ -131,9 +141,13 @@ In scope:
   defines `test:coverage` and the root `test:coverage` is wired as above.
   Tracked is not enough: `packages/vscode/tests/integration/` is tracked,
   vscode's `testInclude` is `tests/unit/**/*.test.ts`, and no `ci.yml`
-  step runs the integration suite. A `vitest.config.ts` whose
-  `testInclude` the check cannot read as a string-array literal is a
-  refusal (exit 2), not a pass. Other suites CI runs (`test:trial`,
+  step runs the integration suite. The two arrays are read by key path,
+  not by the first `include:` the reader meets: `testInclude` as a
+  property of the options object passed to `barwiseVitestConfig`, and
+  `include` inside its `typecheck` object. `named-files` packages
+  (vscode, diagram-ui) also have a `coverage.include`, which is never
+  read as a test list. A config where either key is present but is not a
+  string-array literal is a refusal (exit 2), not a pass. Other suites CI runs (`test:trial`,
   `test:optimizer`) are declared by their npm script.
   Both discovery rules restate code owned elsewhere -- the
   non-recursive `.test.mjs` filter in `run-script-tests.mjs` and the
@@ -275,7 +289,7 @@ barwise/scripts/check-architecture.mjs        (existing; one new pass)
   exit 0 / 1 any finding / 2 a refusal and no finding
 
 barwise/scripts/lib/architecture-section.mjs  (renderSection)
-  - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity, depcruise
+  - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity
   - [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- declared: check:parity; gap: barwise-920.<new>
   - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18 -- unenforced (barwise-zdd, ...)
 ```
@@ -385,8 +399,12 @@ into its fixture, so the fixture also carries the inputs the real
 entries read: `ci.yml`, the root `package.json`, the tracker, settings,
 husky files, the vitest configs and the named test files. Without that,
 every existing `check:architecture` case exits 2 once the ADRs carry
-entries. The fixture's synthetic `ADR_OK` gains an `Enforced-by:` line
-as well. In the same PR, make an absent header a finding. Update `template.adr.md` so a new
+entries. The fixture is built and committed once per test file and
+copied per case, so the tracker (over a megabyte) is not re-copied and
+re-committed about ten times. The fixture's synthetic `ADR_OK` gains an `Enforced-by:` line
+as well. In the same PR, run `npm run regen:architecture` if WS3 has
+landed, since the backfill changes what the index renders, and make an
+absent header a finding. Update `template.adr.md` so a new
 ADR starts with the line. Coupled into one PR because requiring the
 header without the backfill would turn CI red.
 
@@ -466,10 +484,14 @@ gate run. Ungrounded: where probes live, and whether process ADRs
   reviewer's red-before-green demonstration, not the test. One case plants an input outside `--root`
   only (a real `ci.yml` step missing from the fixture's) to prove the
   check reads the fixture, not the checkout.
-- Reading `testInclude` out of a TypeScript config is a narrow parse.
-  It is bounded by refusing (exit 2) any `testInclude` that is not a
-  string-array literal, so a config rewritten into another shape stops
-  the check rather than passing it.
+- Reading `testInclude` and `typecheck.include` out of a TypeScript
+  config is a narrow parse. It is bounded by refusing (exit 2) either key
+  when it is not a string-array literal, so a config rewritten into
+  another shape stops the check rather than passing it.
+- Free text inside a `none (...)` entry must not start a wrapped line
+  with `Word: `, because `header()` ends a header value at such a line.
+  The check reports the resulting unbalanced parenthesis with the hint
+  that a wrapped line may have been read as a new header field.
 - After WS2 and WS3, run `npm run check:architecture` and
   `npm run regen:architecture`, then `npm run ci:local`.
 
