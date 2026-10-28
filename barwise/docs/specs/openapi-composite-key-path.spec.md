@@ -38,7 +38,8 @@ claims an identity the model does not state.
   paths. Two goldens have a composite-key table:
   - `clinic-appointments.openapi.txt`:
     `doctor_is_assigned_to_exam_room_on_appointment_date`, keyed on
-    `(provider_id, appointment_date)`;
+    `(provider_id, appointment_date)`. Its other n-ary table is keyed on
+    one column, `confirmation_number`, so it keeps its path;
   - `constraints-showcase.openapi.txt`: `person_is_parent_of_person`.
 
   In `external-uniqueness.openapi.txt` the composite key is a UNIQUE
@@ -84,9 +85,11 @@ The changes above. Each item below is pinned by a test:
 - A single-column key's path and parameter are unchanged.
 - With the fix removed, the first test fails.
 
-The two CLI goldens are regenerated with `UPDATE_GOLDEN=1`. Each changes
-only in its composite-key table's item path and its three parameter
-lists. That diff is checked by hand.
+Not pinned by a new test: the two CLI goldens are regenerated with
+`UPDATE_GOLDEN=1`, after which the golden test pins the new paths. The
+regeneration is expected to change only each composite-key table's item
+path and its three parameter lists, and the PR shows that diff for
+review.
 
 ## API and migration impact
 
@@ -111,5 +114,7 @@ unchanged.
 
 ## Risks and testing
 
-The change alters generated APIs only where the old path was wrong. The
-golden diff is the measurement of what changed.
+A client generated from an earlier export breaks on composite-key
+resources, as the API section says. The path it called addressed many
+rows, so it was already wrong, but it changes without a version signal.
+The release notes for the version that ships this should name it.
