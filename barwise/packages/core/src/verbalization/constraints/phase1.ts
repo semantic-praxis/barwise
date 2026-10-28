@@ -20,7 +20,6 @@ import {
   leadSegs,
   localRole,
   openingReading,
-  orderedPredicate,
   quantifiedReading,
   rolePlayer,
 } from "./sentence.js";
@@ -69,8 +68,10 @@ export function verbalizeBinaryUniqueness(
 }
 
 /**
- * "Each {Subject} {predicate} {forward} {Object}." from the reading that
- * names the constrained role first, else "For each {Subject}, {reverse}
+ * "Each {Subject} <the rest of the reading, {Object} quantified {forward}>."
+ * from a reading that opens with the constrained role, so the words after
+ * the object stay ("Each Patient has at most one Doctor as primary
+ * doctor", barwise-m1c), else "For each {Subject}, {reverse}
  * {Object} ... that {Subject}." from the reading as given
  * (binary-reverse-reading-verbalization.spec.md, barwise-wsl). The binary
  * uniqueness and mandatory sentences differ only in their quantifiers.
@@ -83,28 +84,22 @@ function binarySentence(
   reverse: string,
 ): Verbalization {
   const own = factType.roles.findIndex((r) => r.id === roleId);
-  const other = own === 0 ? 1 : 0;
 
-  const predicate = orderedPredicate(factType, own, other);
-  if (!predicate) {
+  const opening = openingReading(factType, own);
+  if (!opening) {
     return buildVerbalization(
       factType.id,
       "constraint",
       forEachReading(model, factType, own, reverse),
     );
   }
-
-  const subjectRole = factType.roles[own]!;
-  const objectRole = factType.roles[other]!;
-  const subjectName = model.getObjectType(subjectRole.playerId)?.name ?? subjectRole.name;
-  const objectName = model.getObjectType(objectRole.playerId)?.name ?? objectRole.name;
-
+  const rest = quantifiedReading(model, factType, opening.rest, own, forward);
   return buildVerbalization(factType.id, "constraint", [
     kwSeg("Each "),
-    ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
-    textSeg(" " + predicate.text + " "),
-    kwSeg(forward),
-    ...predicate.object(refSeg(objectName, objectRole.playerId)),
+    ...leadSegs(opening.lead),
+    rolePlayer(model, factType, own),
+    textSeg(" "),
+    ...rest,
     textSeg("."),
   ]);
 }

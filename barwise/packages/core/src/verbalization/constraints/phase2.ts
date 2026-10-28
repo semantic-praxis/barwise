@@ -19,6 +19,7 @@ import {
 } from "../Verbalization.js";
 import {
   extractPredicate,
+  forEachReading,
   leadSegs,
   localRole,
   openingReading,
@@ -365,33 +366,35 @@ export function verbalizeFrequency(
   const roleIdx = factType.roles.findIndex((r) => r.id === roleId);
   const otherIdx = roleIdx === 0 ? 1 : 0;
 
-  const subjectRole = factType.roles[roleIdx]!;
-  const objectRole = factType.roles[otherIdx]!;
-  const subjectType = model.getObjectType(subjectRole.playerId);
-  const objectType = model.getObjectType(objectRole.playerId);
-  const subjectName = subjectType?.name ?? subjectRole.name;
-  const objectName = objectType?.name ?? objectRole.name;
+  // "instances of" counts without a plural the model does not hold; the
+  // noun agrees with the last number ("at least 1 instance of").
+  const bound = max === "unbounded"
+    ? `at least ${min}`
+    : min === max
+    ? `exactly ${min}`
+    : `at least ${min} and at most ${max}`;
+  const count = `${bound} ${/\b1$/.test(bound) ? "instance" : "instances"} of `;
 
-  const predicate = extractPredicate(factType, roleIdx, otherIdx);
-
-  const segments: VerbalizationSegment[] = [
-    kwSeg("Each "),
-    ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
-    textSeg(" " + predicate.text + " "),
-  ];
-
-  if (max === "unbounded") {
-    segments.push(kwSeg(`at least ${min} `));
-  } else if (min === max) {
-    segments.push(kwSeg(`exactly ${min} `));
-  } else {
-    segments.push(kwSeg(`at least ${min} and at most ${max} `));
+  const opening = openingReading(factType, roleIdx);
+  if (!opening) {
+    return buildVerbalization(
+      factType.id,
+      "constraint",
+      forEachReading(model, factType, roleIdx, "some ", { other: otherIdx, count }),
+    );
   }
-
-  segments.push(...predicate.object(refSeg(objectName, objectRole.playerId)));
-  segments.push(textSeg("."));
-
-  return buildVerbalization(factType.id, "constraint", segments);
+  // "Each X that <reading> some Y <reading> <count> Y": the frequency
+  // restricts only the X that play the role, so it does not say each X does.
+  return buildVerbalization(factType.id, "constraint", [
+    kwSeg("Each "),
+    ...leadSegs(opening.lead),
+    rolePlayer(model, factType, roleIdx),
+    kwSeg(" that "),
+    ...quantifiedReading(model, factType, opening.rest, roleIdx),
+    textSeg(" "),
+    ...quantifiedReading(model, factType, opening.rest, roleIdx, count),
+    textSeg("."),
+  ]);
 }
 
 export function verbalizeGenericFrequency(

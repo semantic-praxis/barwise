@@ -121,7 +121,9 @@ describe("constraint sentences place a lead after the quantifier", () => {
     const { model, ft } = listing(["{0} has sale- {1}"], [
       { type: "frequency", roleIds: ["rl"], min: 2, max: 2 },
     ]);
-    expect(texts(model, ft)).toEqual(["Each Listing has exactly 2 sale Currency."]);
+    expect(texts(model, ft)).toEqual([
+      "Each Listing that has some sale Currency has exactly 2 instances of sale Currency.",
+    ]);
   });
 
   it("keeps every lead on its own noun when no reading has the needed order", () => {

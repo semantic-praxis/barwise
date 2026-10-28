@@ -101,3 +101,27 @@ describe("a binary constraint on the role no reading names first", () => {
     ]);
   });
 });
+
+describe("a binary constraint on the role a reading opens with (barwise-m1c)", () => {
+  // The forward sentence used to keep only the text between the two
+  // placeholders, dropping "online" and a repeated placeholder
+  // (binary-constraint-sentences.spec.md).
+  it("keeps the text after the second placeholder", () => {
+    expect(
+      placed(["{0} is placed by {1} online"], { type: "internal_uniqueness", roleIds: ["ro"] }),
+    )
+      .toEqual(["Each Order is placed by at most one Customer online."]);
+    expect(placed(["{0} is placed by {1} online"], { type: "mandatory", roleId: "ro" }))
+      .toEqual(["Each Order is placed by at least one Customer online."]);
+  });
+
+  it("keeps a repeated placeholder as 'that'", () => {
+    expect(placed(["{0} is placed by {1} for {0}"], { type: "mandatory", roleId: "ro" }))
+      .toEqual(["Each Order is placed by at least one Customer for that Order."]);
+  });
+
+  it("writes a reading with text before its subject from the reading as given", () => {
+    expect(placed(["today {0} is placed by {1}"], { type: "internal_uniqueness", roleIds: ["ro"] }))
+      .toEqual(["For each Order, today that Order is placed by at most one Customer."]);
+  });
+});

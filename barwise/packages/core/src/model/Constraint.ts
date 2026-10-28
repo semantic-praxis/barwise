@@ -309,7 +309,8 @@ export interface RingConstraint extends ConstraintBase {
  * sequence bounds a combination ("each (Room, TimeSlot) pair is booked
  * 0..1 times").
  *
- * Example: "Each Customer places at least 2 and at most 5 Orders."
+ * Example: "Each Customer that places some Order places at least 2 and at
+ * most 5 instances of Order."
  */
 export interface FrequencyConstraint extends ConstraintBase {
   readonly type: "frequency";
