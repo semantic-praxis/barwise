@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-go4
+Plan-reviewed: addd6d6d (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/constraintRouting.ts,
 barwise/packages/core/src/mapping/index.ts,
 barwise/packages/core/src/mapping/renderers/dbt.ts,
