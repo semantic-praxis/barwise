@@ -1,6 +1,6 @@
 # A binary mandatory, uniqueness or frequency sentence states the whole reading
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -140,6 +140,38 @@ Every copy of a changed sentence is updated in the same change:
 - the `FrequencyConstraint` JSDoc example;
 - the barwise-wsl spec's notes on m1c and zx2, which gain "Since
   decided".
+
+## Implementation notes
+
+- Measured over the tracked corpus with `barwise verbalize`, before and
+  after: 20 sentences change. That is the 8 mandatory and uniqueness
+  sentences that regain their dropped words, and the 12 single-role
+  frequencies, as planned. The CLI golden, the tutorial render, the C08
+  trial check, the Anki cards and the JSDoc example are updated to match.
+- One deviation. The plan sent a reading with text before its subject
+  ("the {0} has {1}") to the `forEachReading` frame, and implementation
+  review showed that gives "For each Order, the that Order has ...". The
+  forward sentence now uses the first reading whose first placeholder is
+  the role, and "Each" takes the place of the text before it ("Each Order
+  has ..."), as the sliced sentence always did. Text after the subject
+  stays. No corpus sentence changes from this.
+- `eachReading` (`sentence.ts`) builds the forward sentence for the
+  mandatory, uniqueness and frequency sentences alike, and
+  `forEachReading` with its counted tail builds the reverse one. The
+  forward builder writes no space before punctuation flush against the
+  subject ("Each Order's buyer is ...").
+- Red check: the new and tightened tests fail on the unfixed source
+  (11 of them) and pass with it.
+- Implementation review, declined:
+  - numbering a ring's players in the forward sentences. They have never
+    been numbered, and numbering them would change every forward ring
+    mandatory and uniqueness in the corpus. It belongs with barwise-7tx,
+    the ring sentence's own reading defect;
+  - a reading that repeats the counted role ("{0} pays {1} to {1}") reads
+    "... exactly 2 instances of Customer to that Customer". No tracked
+    model repeats a placeholder, the same finding barwise-wsl recorded;
+  - a reading with no words at all ("{0}{1}") gives a sentence with no
+    verb, as every sentence built from it does.
 
 ## Open decisions
 

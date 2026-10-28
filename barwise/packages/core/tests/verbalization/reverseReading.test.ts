@@ -120,8 +120,14 @@ describe("a binary constraint on the role a reading opens with (barwise-m1c)", (
       .toEqual(["Each Order is placed by at least one Customer for that Order."]);
   });
 
-  it("writes a reading with text before its subject from the reading as given", () => {
-    expect(placed(["today {0} is placed by {1}"], { type: "internal_uniqueness", roleIds: ["ro"] }))
-      .toEqual(["For each Order, today that Order is placed by at most one Customer."]);
+  it("lets 'Each' take the place of text before the subject", () => {
+    // Through the reverse frame it read "For each Order, the that Order ...".
+    expect(placed(["the {0} is placed by {1}"], { type: "internal_uniqueness", roleIds: ["ro"] }))
+      .toEqual(["Each Order is placed by at most one Customer."]);
+  });
+
+  it("writes no space before punctuation flush against the subject", () => {
+    expect(placed(["{0}'s buyer is {1}"], { type: "mandatory", roleId: "ro" }))
+      .toEqual(["Each Order's buyer is at least one Customer."]);
   });
 });

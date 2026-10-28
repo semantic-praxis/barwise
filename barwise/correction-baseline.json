@@ -61,6 +61,12 @@
       "caught_by": "not-a-correction",
       "note": "An Inventory note about what the diff does to the baseline files. The detector matched `caught it` inside prose NAMING the verdict vocabulary, which is the same over-match this spec's first row records."
     },
+    "binary-constraint-sentences::02355d2c915c": {
+      "spec": "binary-constraint-sentences.spec.md",
+      "excerpt": "- measured over the tracked corpus with barwise verbalize, before and after: 20 sentences change. that is the 8 mandatory and uniqueness sentences that regain t",
+      "caught_by": "execution",
+      "note": "The plan sent a reading with text before its subject to the reverse frame; the high implementation review ran such a reading through the verbalizer and got \"the that Order\", so the forward builder lets Each replace that text instead."
+    },
     "ci-local-condition-parity::0bc9b629f788": {
       "spec": "ci-local-condition-parity.spec.md",
       "excerpt": "- ws1. scripts/lib/changed-class.mjs owns classify, and ci.yml's detect step is one line that runs it. it was checked against the last 40 merges to main, runnin",

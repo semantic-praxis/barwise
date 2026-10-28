@@ -55,3 +55,16 @@ the path named only the first column, which addresses many rows.
 **Clients generated from an earlier OpenAPI export call the old, shorter
 path for these resources and need regenerating.** Resources keyed on one
 column are unchanged.
+
+### Binary constraint sentences state the whole reading
+
+A binary mandatory or uniqueness sentence now keeps the reading's words
+after the second role: "Each Patient has at most one Doctor as primary
+doctor." Before, it kept only the words between the two roles, so "as
+primary doctor" was dropped. A single-role frequency sentence now says
+only what the constraint says: "Each Customer that rates some Product
+rates at least 1 and at most 10 instances of Product." The old "Each
+Customer rates at least 1 and at most 10 Product" also claimed that every
+Customer rates something. These sentences appear in DDL comments and in
+the dbt, OpenAPI, Avro and Ossie constraint reports, so those files change
+text on the next export.

@@ -16,6 +16,7 @@ import {
   type VerbalizationSegment,
 } from "../Verbalization.js";
 import {
+  eachReading,
   forEachReading,
   leadSegs,
   localRole,
@@ -57,7 +58,7 @@ export function verbalizeInternalUniqueness(
 }
 
 /**
- * "Each {Subject} {predicate} at most one {Object}."
+ * "Each {Subject} <reading, with at most one {Object}>." (binarySentence).
  */
 export function verbalizeBinaryUniqueness(
   constrainedRoleId: string,
@@ -85,23 +86,17 @@ function binarySentence(
 ): Verbalization {
   const own = factType.roles.findIndex((r) => r.id === roleId);
 
-  const opening = openingReading(factType, own);
-  if (!opening) {
-    return buildVerbalization(
-      factType.id,
-      "constraint",
-      forEachReading(model, factType, own, reverse),
-    );
-  }
-  const rest = quantifiedReading(model, factType, opening.rest, own, forward);
-  return buildVerbalization(factType.id, "constraint", [
-    kwSeg("Each "),
-    ...leadSegs(opening.lead),
-    rolePlayer(model, factType, own),
-    textSeg(" "),
-    ...rest,
-    textSeg("."),
-  ]);
+  const each = eachReading(
+    model,
+    factType,
+    own,
+    (rest) => quantifiedReading(model, factType, rest, own, forward),
+  );
+  return buildVerbalization(
+    factType.id,
+    "constraint",
+    each ?? forEachReading(model, factType, own, reverse),
+  );
 }
 
 /**
@@ -185,7 +180,8 @@ export function verbalizeGenericUniqueness(
 }
 
 /**
- * "Each {Subject} {predicate} at least one {Object}."
+ * "Each {Subject} <reading, with at least one {Object}>." for a binary
+ * (binarySentence); the unary and n-ary sentences are verbalizeNaryMandatory's.
  */
 export function verbalizeMandatory(
   roleId: string,

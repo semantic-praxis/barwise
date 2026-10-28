@@ -18,6 +18,7 @@ import {
   type VerbalizationSegment,
 } from "../Verbalization.js";
 import {
+  eachReading,
   extractPredicate,
   forEachReading,
   leadSegs,
@@ -344,7 +345,12 @@ export function verbalizeRing(
 }
 
 /**
- * "Each {Subject} {pred} at least {min} and at most {max} {Object}."
+ * "Each {Subject} that <reading, with some {Object}> <reading, with
+ * <count> instances of {Object}>.", or "For each {Subject}, if <reading>,
+ * then that holds for <count> instances of {Object}." when no reading names
+ * the subject first: conditional, as a frequency constrains only the
+ * instances that play the role (binary-constraint-sentences.spec.md,
+ * barwise-zx2).
  */
 export function verbalizeFrequency(
   roleIds: readonly string[],
@@ -375,26 +381,19 @@ export function verbalizeFrequency(
     : `at least ${min} and at most ${max}`;
   const count = `${bound} ${/\b1$/.test(bound) ? "instance" : "instances"} of `;
 
-  const opening = openingReading(factType, roleIdx);
-  if (!opening) {
-    return buildVerbalization(
-      factType.id,
-      "constraint",
-      forEachReading(model, factType, roleIdx, "some ", { other: otherIdx, count }),
-    );
-  }
   // "Each X that <reading> some Y <reading> <count> Y": the frequency
   // restricts only the X that play the role, so it does not say each X does.
-  return buildVerbalization(factType.id, "constraint", [
-    kwSeg("Each "),
-    ...leadSegs(opening.lead),
-    rolePlayer(model, factType, roleIdx),
-    kwSeg(" that "),
-    ...quantifiedReading(model, factType, opening.rest, roleIdx),
+  const each = eachReading(model, factType, roleIdx, (rest) => [
+    kwSeg("that "),
+    ...quantifiedReading(model, factType, rest, roleIdx),
     textSeg(" "),
-    ...quantifiedReading(model, factType, opening.rest, roleIdx, count),
-    textSeg("."),
+    ...quantifiedReading(model, factType, rest, roleIdx, count),
   ]);
+  return buildVerbalization(
+    factType.id,
+    "constraint",
+    each ?? forEachReading(model, factType, roleIdx, "some ", { other: otherIdx, count }),
+  );
 }
 
 export function verbalizeGenericFrequency(

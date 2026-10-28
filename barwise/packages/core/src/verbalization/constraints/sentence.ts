@@ -161,6 +161,43 @@ export function openingReading(
   return undefined;
 }
 
+/**
+ * "Each X <rest>" for role `own`'s player X, from the first reading whose
+ * first placeholder is that role: the forward sentence of a binary
+ * mandatory, uniqueness or frequency (binary-constraint-sentences.spec.md).
+ * Text before the placeholder is dropped, as "Each" takes its place ("the
+ * {0} has {1}" is "Each Order has ..."); everything after it stays, which
+ * slicing between the placeholders did not (barwise-m1c). `rest` renders
+ * the parts after the placeholder, so a frequency can render them twice.
+ * Undefined when no reading names the role first.
+ */
+export function eachReading(
+  model: OrmModel,
+  factType: FactType,
+  own: number,
+  rest: (parts: readonly ReadingPart[]) => VerbalizationSegment[],
+): VerbalizationSegment[] | undefined {
+  for (const reading of factType.readings) {
+    const parts = splitReading(reading.template).parts;
+    const first = parts.findIndex((p) => p.kind === "role");
+    const opener = parts[first];
+    if (opener?.kind !== "role" || opener.index !== own) continue;
+    const after = rest(parts.slice(first + 1));
+    // No space before punctuation the reading put flush against the
+    // placeholder ("{0}'s {1}").
+    const head = after[0]?.text ?? "";
+    return [
+      kwSeg("Each "),
+      ...leadSegs(opener.lead),
+      rolePlayer(model, factType, own),
+      ...(/^[\p{L}\p{N}]/u.test(head) ? [textSeg(" ")] : []),
+      ...after,
+      textSeg("."),
+    ];
+  }
+  return undefined;
+}
+
 /** Role `index`'s player as a reference: its object type's name, else the role's. */
 export function rolePlayer(
   model: OrmModel,
