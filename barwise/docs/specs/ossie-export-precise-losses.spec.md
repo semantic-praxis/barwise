@@ -5,7 +5,7 @@ Status: Implemented
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-5x3, barwise-huw
-Plan-reviewed: 7acdf232 (code-review, pr-review)
+Plan-reviewed: bb3a787b (code-review, pr-review)
 Touches: barwise/packages/formats/src/ossie/writeOssie.ts,
 barwise/packages/formats/src/ossie/verifyOssie.ts,
 barwise/packages/formats/src/ossie/OssieExportFormat.ts,
@@ -184,6 +184,10 @@ Out of scope:
   - adding `name` to the aliases row fails that row;
   - keeping the stray constraint fails the barwise-5x3 case.
 
+- Plan-reviewed names bb3a787b, not 7acdf232, the commit the reviews read.
+  The spec commit skipped the pre-commit hook, so the next commit's
+  dprint pass realigned its table; the two differ only in that
+  whitespace and the header line (`git diff -w 7acdf232 bb3a787b`).
 - Implementation review:
   - The stray-role line explains `constraintsRemoved` only. Covering its
     fact type whole would have silenced any other difference there, the
