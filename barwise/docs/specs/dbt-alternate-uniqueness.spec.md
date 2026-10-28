@@ -1,6 +1,6 @@
 # The dbt export keeps every uniqueness the DDL export writes
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -55,8 +55,7 @@ the 84 tracked models that load.
   | DDL with annotations    | 20          | 4 (each gains one)  |
   | dbt                     | 0           | 24 (each loses all) |
 
-  The annotated DDL gain is a separate defect, filed when this spec
-  lands. Column names can change on re-import (a relationship's column
+  The annotated DDL gain is a separate defect, filed as barwise-i3r. Column names can change on re-import (a relationship's column
   is renamed for its player), so names are not compared.
 - `renderDbt` writes `unique` only on a single-column key and
   `dbt_utils.unique_combination_of_columns` only for a multi-column key.
@@ -187,6 +186,43 @@ the 84 tracked models that load.
 
 Out of scope: CHECK clauses, which dbt can state only through a test
 package; the annotated DDL gain above.
+
+## Implementation notes
+
+- Measured with the scratchpad `go4-count.mjs`, now comparing each
+  UNIQUE's description as the round-trip test does: through
+  `DbtExportFormat` and the dbt importer, all 24 models keep every
+  UNIQUE. All 84 tracked models re-import without throwing, and none has
+  more validation errors than its plain DDL round trip. The composite
+  foreign key count (barwise-ivl) is unchanged: 21 kept, 0 tables differ.
+- Red check: the round-trip test names `routeUniqueOnly`, so on the
+  unfixed source it fails on the missing function rather than the
+  behaviour. The behaviour is the measurement above: every one of the 24
+  models came back with no UNIQUE.
+- The plan missed one case, which the measurement found: a combination
+  test over exactly one foreign key that is a role of the composite fact
+  type. It is read as that role's uniqueness. Without it, the four models
+  with a relationship keyed on two multi-column foreign keys lost both
+  one-to-ones.
+- Implementation review, fixed:
+  - A combination test resolving to one role (one column, or a repeat) is
+    that role's uniqueness. Read as an external uniqueness over one role,
+    it failed validation.
+  - A combination test filtered to some rows, by any `where` but the
+    export's own null filter, is named for review. It holds for those rows
+    only, and is no uniqueness of the model.
+  - A declared key over several columns that is neither a composite key
+    nor one foreign key (values alone, barwise-alg) leaves the key to the
+    tests, with a warning, rather than dropping the model. One
+    `declaredKeyOf` decides which declared key counts.
+  - A column of two references is refused, as DDL refuses it. A key
+    column with a `relationships` test keeps its identifier's role.
+  - The report says when the key was declared. An empty combination test
+    is reported. The column-level `primary_key` form is read too.
+- Implementation review, kept: `renderDbt` and `annotateDbtExport` each
+  take the uniques, rather than the renderer reporting which models need
+  dbt_utils. Their one caller passes the same list to both, three lines
+  apart, and the note is advice, not a gate.
 
 ## Open decisions
 
