@@ -3,7 +3,12 @@
  */
 
 import { generateId, type InternalConstraint } from "@barwise/core";
-import { combinationOf, compositeRoleColumns, sameColumns } from "./compositeKeys.js";
+import {
+  combinationOf,
+  compositeRoleColumns,
+  holdsForEveryRow,
+  sameColumns,
+} from "./compositeKeys.js";
 import { buildConstraints, hasTest } from "./constraints.js";
 import { type DbtMapperContext, readsAsReference, referenceName } from "./context.js";
 import { toPascalCase } from "./naming.js";
@@ -145,13 +150,21 @@ export function createFactTypes(ctx: DbtMapperContext): void {
         rel.columns.length > 1
         && m.modelTests.some((t) => {
           const names = combinationOf(t);
-          return names !== undefined && sameColumns(names, rel.columns);
+          return names !== undefined && sameColumns(names, rel.columns) && holdsForEveryRow(t);
         })
       ) {
         constraints.push({ type: "internal_uniqueness", roleIds: [role1Id] });
       }
 
-      for (const c of rel.columns) ctx.farRoleIdMap.set(`${m.name}::${c}`, role1Id);
+      // The key column keeps its identifier's role, as DDL step 3b reads the
+      // key; a column of two references stands for neither, as DDL refuses
+      // a UNIQUE naming one (`shared`).
+      for (const c of rel.columns) {
+        const at = `${m.name}::${c}`;
+        if (c === pk?.columnName) continue;
+        if (ctx.farRoleIdMap.has(at)) ctx.sharedReferenceColumns.add(at);
+        else ctx.farRoleIdMap.set(at, role1Id);
+      }
       ctx.model.addFactType({
         name: factName,
         roles: [

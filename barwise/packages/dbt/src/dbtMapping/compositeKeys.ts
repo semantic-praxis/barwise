@@ -97,16 +97,39 @@ export function candidateKeysOf(m: DbtModel): string[][] {
  */
 export function compositeKeyOf(m: DbtModel): string[] | undefined {
   const keys = candidateKeysOf(m);
-  // A declared primary key over several columns is the key whatever else
-  // qualifies, so every phase that asks reads the same one
-  // (dbt-alternate-uniqueness.spec.md).
-  const declared = m.primaryKey;
-  if (
-    declared && declared.length > 1 && declared.every((n) => m.columns.some((c) => c.name === n))
-  ) {
-    return keys.find((k) => sameColumns(k, declared));
-  }
+  // A declared primary key is the key whatever else qualifies, so every
+  // phase that asks reads the same one; one that is not a candidate is no
+  // composite key (dbt-alternate-uniqueness.spec.md).
+  const declared = declaredKeyOf(m);
+  if (declared) return declared.length > 1 ? keys.find((k) => sameColumns(k, declared)) : undefined;
   return keys.length === 1 ? keys[0] : undefined;
+}
+
+/**
+ * Whether a combination test holds over every row SQL UNIQUE constrains:
+ * it has no `where` filter, or only the one the export writes over nullable
+ * columns, `<each column> is not null`, which skips the rows SQL UNIQUE
+ * skips (dbt-alternate-uniqueness.spec.md). Any other filter makes it a
+ * uniqueness over some rows only, which is no ORM uniqueness.
+ */
+export function holdsForEveryRow(test: DbtModel["modelTests"][number]): boolean {
+  if (test.type !== "custom") return true;
+  const where = (test.config["config"] as { where?: unknown; } | undefined)?.where;
+  if (where === undefined) return true;
+  const names = combinationOf(test) ?? [];
+  return where === names.map((c) => `${c} is not null`).join(" and ");
+}
+
+/**
+ * The model's `primary_key` constraint's columns, when every one is a
+ * column of the model; a constraint naming another is set aside, and the
+ * key is found from the tests as without one.
+ */
+export function declaredKeyOf(m: DbtModel): readonly string[] | undefined {
+  const declared = m.primaryKey;
+  return declared && declared.every((n) => m.columns.some((c) => c.name === n))
+    ? declared
+    : undefined;
 }
 
 /**

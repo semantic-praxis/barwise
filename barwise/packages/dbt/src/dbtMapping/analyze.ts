@@ -7,6 +7,7 @@ import {
   candidateKeysOf,
   combinationOf,
   compositeKeyOf,
+  declaredKeyOf,
   isReferenceUniqueness,
   keyRolesOf,
 } from "./compositeKeys.js";
@@ -15,26 +16,40 @@ import { type DbtMapperContext, referenceName, type RelationshipInfo } from "./c
 
 export function analyzeModels(ctx: DbtMapperContext): void {
   for (const m of ctx.doc.models) {
-    // The key column: the one a primary_key constraint declares, else the
-    // first with both unique and not_null tests. Declared, a secondary
+    // The key: the one a primary_key constraint declares, else the first
+    // column with both unique and not_null tests. Declared, a secondary
     // unique NOT NULL column is not taken for it (dbt-alternate-uniqueness.spec.md).
-    const declared = m.primaryKey;
-    const declaredCol = declared?.length === 1
-      ? m.columns.find((c) => c.name === declared[0])
-      : undefined;
-    if (declared && declared.some((n) => !m.columns.some((c) => c.name === n))) {
+    // A declared key over several columns counts only as a key this
+    // importer reads: a composite key, or exactly one foreign key. Any
+    // other (values alone, barwise-alg) leaves the key to the tests.
+    const notNull = (n: string) => m.columns.some((c) => c.name === n && hasTest(c, "not_null"));
+    const declaredAny = declaredKeyOf(m);
+    if (m.primaryKey && !declaredAny) {
       ctx.report.warning(
         "identifier",
         m.name,
         `The primary_key constraint names (${
-          declared.join(", ")
+          m.primaryKey.join(", ")
         }), and not every one is a column of the model; the key is found from its tests instead.`,
       );
     }
-    const keyDeclared = declared !== undefined
-      && declared.every((n) => m.columns.some((c) => c.name === n));
-    const pkCol = keyDeclared
-      ? declaredCol
+    const declaredReference = declaredAny !== undefined && declaredAny.length > 1
+      && isReferenceUniqueness(m, declaredAny) && declaredAny.every(notNull);
+    const declared = declaredAny
+        && (declaredAny.length === 1 || compositeKeyOf(m) !== undefined || declaredReference)
+      ? declaredAny
+      : undefined;
+    if (declaredAny && !declared) {
+      ctx.report.warning(
+        "identifier",
+        m.name,
+        `The primary_key constraint (${
+          declaredAny.join(", ")
+        }) is no key this importer reads; the key is found from its tests instead.`,
+      );
+    }
+    const pkCol = declared
+      ? (declared.length === 1 ? m.columns.find((c) => c.name === declared[0]) : undefined)
       : m.columns.find((c) => hasTest(c, "unique") && hasTest(c, "not_null"));
 
     // Find references: relationship columns, and foreign keys over
@@ -79,13 +94,10 @@ export function analyzeModels(ctx: DbtMapperContext): void {
     // A model keyed only by a combination over exactly one foreign key's
     // columns is an entity with a key of its own and a one-to-one reference,
     // as the DDL importer reads a table whose key is one foreign key.
-    const notNull = (n: string) => m.columns.some((c) => c.name === n && hasTest(c, "not_null"));
     const referenceKey = pkCol || key
       ? undefined
-      : keyDeclared
-      ? (isReferenceUniqueness(m, declared!) && declared!.every(notNull)
-        ? [...declared!]
-        : undefined)
+      : declared
+      ? (declaredReference ? [...declared] : undefined)
       : m.modelTests.map(combinationOf).find((names) =>
         names !== undefined && isReferenceUniqueness(m, names) && names.every(notNull)
       );
@@ -98,7 +110,9 @@ export function analyzeModels(ctx: DbtMapperContext): void {
       ctx.report.info(
         "identifier",
         m.name,
-        `Primary identifier "${pkCol.name}" detected from unique + not_null tests.`,
+        declared
+          ? `Primary identifier "${pkCol.name}" declared by the primary_key constraint.`
+          : `Primary identifier "${pkCol.name}" detected from unique + not_null tests.`,
         pkCol.name,
       );
     } else if (referenceKey) {

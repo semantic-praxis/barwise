@@ -21,6 +21,7 @@ import {
   combinationOf,
   compositeKeyOf,
   compositeRoleColumns,
+  holdsForEveryRow,
   isReferenceUniqueness,
   sameColumns,
 } from "./compositeKeys.js";
@@ -54,15 +55,27 @@ export function createUniqueness(ctx: DbtMapperContext): void {
     const sets: { columns: string[]; test: string; }[] = [];
     for (const test of m.modelTests) {
       const names = combinationOf(test);
-      if (!names || names.length === 0) continue;
+      if (!names) continue;
+      const testName = test.type === "custom" ? test.name : "";
+      if (names.length === 0) {
+        review(ctx, m.name, testName, names, "names no column");
+        continue;
+      }
       if (key && sameColumns(names, key)) continue;
+      if (!holdsForEveryRow(test)) {
+        review(
+          ctx,
+          m.name,
+          testName,
+          names,
+          "is filtered to some rows, so it is no uniqueness of the model",
+        );
+        continue;
+      }
       // Read with the reference (factTypes.ts), unless the foreign key is a
       // role of the composite fact type, which no reference fact type reads.
       if (isReferenceUniqueness(m, names) && !names.every((c) => roleCols.has(c))) continue;
-      if (ctx.referenceKeyed.has(m.name) && m.primaryKey && sameColumns(names, m.primaryKey)) {
-        continue;
-      }
-      sets.push({ columns: names, test: test.type === "custom" ? test.name : "" });
+      sets.push({ columns: names, test: testName });
     }
     for (const col of m.columns) {
       if (!hasTest(col, "unique")) continue;
@@ -75,20 +88,28 @@ export function createUniqueness(ctx: DbtMapperContext): void {
       const reason = info && columns.every((c) => roleCols.has(c))
         ? overRoles(ctx, m.name, columns)
         : external(ctx, m.name, columns, references);
-      if (reason) {
-        ctx.report.warning(
-          "constraint",
-          m.name,
-          `${
-            test === "unique"
-              ? `Unique test on column "${columns[0]}"`
-              : `Model-level custom test "${test}"`
-          } (${columns.join(", ")}) ${reason} -- manual review needed.`,
-          columns.length === 1 ? columns[0] : undefined,
-        );
-      }
+      if (reason) review(ctx, m.name, test, columns, reason);
     }
   }
+}
+
+/** Name a uniqueness this phase cannot read, for review. */
+function review(
+  ctx: DbtMapperContext,
+  modelName: string,
+  test: string,
+  columns: readonly string[],
+  reason: string,
+): void {
+  const what = test === "unique"
+    ? `Unique test on column "${columns[0]}"`
+    : `Model-level custom test "${test}"`;
+  ctx.report.warning(
+    "constraint",
+    modelName,
+    `${what} (${columns.join(", ")}) ${reason} -- manual review needed.`,
+    columns.length === 1 ? columns[0] : undefined,
+  );
 }
 
 /** A uniqueness over whole roles of the model's composite fact type; why not, else. */
@@ -119,6 +140,9 @@ function external(
   columns: readonly string[],
   references: readonly RelationshipInfo[],
 ): string | undefined {
+  // Asked first, as DDL step 3b asks it first.
+  const named = columns.find((c) => ctx.sharedReferenceColumns.has(`${modelName}::${c}`));
+  if (named) return `names "${named}", a column of two foreign keys`;
   const partial = references.find((r) =>
     r.columns.length > 1 && r.columns.some((c) => columns.includes(c))
     && !r.columns.every((c) => columns.includes(c))
@@ -128,9 +152,17 @@ function external(
   if (roleIds.some((r) => r === undefined)) {
     return "spans a column that imported as no fact type of the model's entity";
   }
-  ctx.model.addConstraint({
-    type: "external_uniqueness",
-    roleIds: [...new Set(roleIds as string[])],
-  });
+  const distinct = [...new Set(roleIds as string[])];
+  if (distinct.length > 1) {
+    ctx.model.addConstraint({ type: "external_uniqueness", roleIds: distinct });
+    return undefined;
+  }
+  // One role (a combination over one column): that role's own uniqueness,
+  // as `unique` on the column reads, not an external one over one role.
+  const factType = ctx.model.factTypes.find((f) => f.roles.some((r) => r.id === distinct[0]));
+  const held = factType?.internalConstraints.some((c) =>
+    c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === distinct[0]
+  );
+  if (factType && !held) factType.addConstraint({ type: "internal_uniqueness", roleIds: distinct });
   return undefined;
 }

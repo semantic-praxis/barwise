@@ -103,7 +103,7 @@ function parseModel(raw: Record<string, unknown>): DbtModel {
     ? rawModelTests.flatMap((t) => parseTest(t))
     : [];
 
-  const primaryKey = parsePrimaryKey(raw.constraints);
+  const primaryKey = parsePrimaryKey(raw.constraints) ?? columnPrimaryKey(raw.columns);
   return {
     name,
     description,
@@ -112,6 +112,25 @@ function parseModel(raw: Record<string, unknown>): DbtModel {
     foreignKeys: parseForeignKeys(raw.constraints),
     ...(primaryKey ? { primaryKey } : {}),
   };
+}
+
+/**
+ * The columns that carry a column-level `primary_key` constraint, dbt's
+ * usual form for a key of one column, or undefined when none does.
+ */
+function columnPrimaryKey(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const names = raw.flatMap((c) => {
+    if (c === null || typeof c !== "object") return [];
+    const col = c as Record<string, unknown>;
+    const constraints = Array.isArray(col.constraints) ? col.constraints : [];
+    return constraints.some((k) =>
+        k !== null && typeof k === "object" && (k as Record<string, unknown>).type === "primary_key"
+      )
+      ? [String(col.name ?? "")]
+      : [];
+  });
+  return names.length > 0 ? names : undefined;
 }
 
 /**
