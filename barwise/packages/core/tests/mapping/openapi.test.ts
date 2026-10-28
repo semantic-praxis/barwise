@@ -588,6 +588,37 @@ describe("OpenAPI renderer", () => {
       expect(itemPath["get"]).toBeDefined();
       expect(itemPath["put"]).toBeDefined();
       expect(itemPath["delete"]).toBeDefined();
+      // One key column, one required path parameter, on each operation.
+      for (const op of ["get", "put", "delete"]) {
+        const params =
+          (itemPath[op] as { parameters: { name: string; in: string; required: boolean; }[]; })
+            .parameters;
+        expect(params.map((p) => [p.name, p.in, p.required])).toEqual([[
+          "customer_id",
+          "path",
+          true,
+        ]]);
+      }
+    });
+
+    it("gives a many-to-many table, as the mapper keys it, both key columns in the item path", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Student", { referenceMode: "student_id" })
+        .withEntityType("Course", { referenceMode: "course_id" })
+        .withBinaryFactType("Student enrolls in Course", {
+          role1: { player: "Student", name: "enrolls in" },
+          role2: { player: "Course", name: "has enrolled" },
+          uniqueness: "spanning",
+        })
+        .build();
+      const relSchema = mapper.map(placeFlags(model));
+      const table = relSchema.tables.find((t) => t.name === "student_enrolls_in_course")!;
+      const key = table.primaryKey.columnNames;
+      expect(key).toHaveLength(2);
+      const spec = renderOpenApi(relSchema);
+      expect(Object.keys(spec.paths)).toContain(
+        `/student-enrolls-in-course/${key.map((c) => `{${c}}`).join("/")}`,
+      );
     });
 
     it("uses kebab-case for path segments", () => {
@@ -732,6 +763,41 @@ describe("OpenAPI renderer", () => {
       const pathKeys = Object.keys(spec.paths);
 
       expect(pathKeys).toContain("/log-entry/{id}");
+    });
+
+    it("names every column of a key over several columns, in key order, in the path and every item operation", () => {
+      // openapi-composite-key-path.spec.md (barwise-pki): the first column
+      // alone addresses many rows.
+      const column = (name: string) => ({
+        name,
+        dataType: "TEXT",
+        dataTypeDefaulted: false,
+        nullable: false,
+      });
+      const relSchema: RelationalSchema = {
+        sourceModelId: "test",
+        tables: [{
+          name: "seat_booking",
+          columns: [column("flight_id"), column("seat_no"), column("leg_no"), column("passenger")],
+          primaryKey: { columnNames: ["flight_id", "leg_no", "seat_no"] },
+          foreignKeys: [],
+          sourceElementId: "ft-seat-booking",
+        }],
+      };
+      const spec = renderOpenApi(relSchema);
+      const itemPath = "/seat-booking/{flight_id}/{leg_no}/{seat_no}";
+      expect(Object.keys(spec.paths)).toEqual(["/seat-booking", itemPath]);
+      const item = spec.paths[itemPath] as Record<
+        string,
+        { parameters: { name: string; in: string; required: boolean; }[]; }
+      >;
+      for (const op of ["get", "put", "delete"]) {
+        expect(item[op]!.parameters.map((p) => [p.name, p.in, p.required])).toEqual([
+          ["flight_id", "path", true],
+          ["leg_no", "path", true],
+          ["seat_no", "path", true],
+        ]);
+      }
     });
   });
 
