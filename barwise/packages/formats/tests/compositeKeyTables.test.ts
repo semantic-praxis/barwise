@@ -415,8 +415,8 @@ describe("a composite-key table imports as the fact type it states", () => {
   });
 
   it("a key of values alone keeps today's reading: an entity with an external uniqueness", () => {
-    // Not round-tripped: today's reading does not round-trip on main either,
-    // since an external uniqueness cannot yet be preferred (barwise-ezn).
+    // Not round-tripped here; the external uniqueness is now the entity's
+    // preferred identifier (annotation-preferred-identifier.spec.md).
     const { model } = ddl.parse(`CREATE TABLE exchange_rate (
       currency VARCHAR(3) NOT NULL, rate_date DATE NOT NULL, rate DECIMAL(12,6) NOT NULL,
       PRIMARY KEY (currency, rate_date));`);

@@ -1,6 +1,12 @@
 {
   "$comment": "Correction records in docs/specs, from scripts/audit-corrections.mjs (npm run audit:corrections -- --check; CI runs it). A spec that records what its draft got wrong carries a verdict here saying what CAUGHT it -- execution, reasoning, or provenance -- or not-a-correction when the detector over-matched. --check fails on a detected record missing here AND on a row no longer detected, so the file always enumerates exactly the corpus. The detector is deliberately over-inclusive; the markers are in the script, which is their only home. Seed and method: docs/spec-correction-taxonomy-2026-09-11.md. Spec: docs/specs/correction-record-ratchet.spec.md.",
   "records": {
+    "annotation-preferred-identifier::9e8dda8979f3": {
+      "spec": "annotation-preferred-identifier.spec.md",
+      "excerpt": "- measured with the scratchpad pi.mjs: all 42 entities keep their preferred identifier through an annotated round trip, and no entity loses one. ten objectifier",
+      "caught_by": "reasoning",
+      "note": "Implementation review: the Scope's writer rule (omit the key) contradicted its own subtype bullet, and the key rule would have preferred a composite foreign key's one-to-one the export does not key on."
+    },
     "artifact-resolution-in-production::1867a6666050": {
       "spec": "artifact-resolution-in-production.spec.md",
       "excerpt": "shipped as specified. llmclient gained provider: string and model: string | undefined; processtranscript resolves against builtinartifacts and falls back to the",
