@@ -23,9 +23,10 @@ import {
   type PreferredIdentifiers,
   preferredIdentifiers,
   resolvePreferredIdentifier,
+  roleIdsOf,
 } from "@barwise/core";
 import { buildConstraintSpec } from "@barwise/core/annotation";
-import type { ElementType } from "@barwise/core/diff";
+import type { ChangeDescription, ElementType } from "@barwise/core/diff";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
 import { snakeCase } from "../naming.js";
 import {
@@ -58,8 +59,12 @@ export interface OssieWriteResult {
   /** One line per construct not written, for the document's comment block. */
   readonly losses: readonly string[];
   readonly constraintSpecs: readonly ConstraintSpec[];
-  /** The source element of each loss line, by `lossKey`, for `verifyOssie`. */
-  readonly reported: ReadonlySet<string>;
+  /**
+   * What the loss lines cover, by `lossKey`, for `verifyOssie`: every
+   * difference on the element, or only the changes its lines name
+   * (ossie-export-precise-losses.spec.md, barwise-huw).
+   */
+  readonly covers: ReadonlyMap<string, ReadonlySet<ChangeKind> | "all">;
   /** Where each source element was written, for `verifyOssie`. */
   readonly written: OssieCorrespondence;
 }
@@ -69,11 +74,18 @@ export interface OssieWriteResult {
  * internal constraint under its fact type, a definition by term, anything
  * else by its source id (ossie-export-verified-by-reimport.spec.md).
  */
-export type LossKey =
-  | { readonly kind: ElementType; readonly id: string; }
+export type LossKey = ObjectTypeLossKey | OtherLossKey;
+type ObjectTypeLossKey = { readonly kind: "object_type"; readonly id: string; };
+type OtherLossKey =
+  | { readonly kind: Exclude<ElementType, "object_type">; readonly id: string; }
   // `diffModels` has no model-level delta, so the model's own fields (name,
   // note, domain context) are checked by the writer's predictions alone.
   | { readonly kind: "model"; };
+
+/** A kind of change `diffModels` reports on an element. */
+export type ChangeKind = ChangeDescription["change"];
+/** The changes a loss line explains: some kinds, or every difference on its element. */
+type Explains = readonly ChangeKind[] | "all";
 
 export function lossKey(key: LossKey): string {
   return key.kind === "model" ? "model" : `${key.kind}:${key.id}`;
@@ -91,7 +103,19 @@ export interface OssieCorrespondence {
   }[];
 }
 
-type Lose = (element: string, what: string, key: LossKey) => void;
+/**
+ * Records a loss line. An object-type line must say which changes it
+ * explains, so that it cannot silence an unrelated difference on its
+ * object type, which is what one line did before (barwise-huw). Other
+ * lines cover their element whole.
+ */
+interface Lose {
+  (element: string, what: string, key: ObjectTypeLossKey, explains: Explains): void;
+  (element: string, what: string, key: OtherLossKey, explains?: Explains): void;
+}
+
+/** The written fact type's own internal constraints: every role is one of its roles. */
+type OwnConstraints = FactType["internalConstraints"];
 
 /** The built-in each barwise data type is written as; the second field marks a loss. */
 const DATA_TYPES: Record<ConceptualDataTypeName, readonly [OssieBuiltinValueType, boolean]> = {
@@ -114,6 +138,8 @@ const DATA_TYPES: Record<ConceptualDataTypeName, readonly [OssieBuiltinValueType
 /** One fact type as it is written: its role order and where it is declared. */
 interface Written {
   readonly ft: FactType;
+  /** Its internal constraints over its own roles; the writer reads only these. */
+  readonly own: OwnConstraints;
   /** Barwise role indexes in written order; position 0 is the declaring concept. */
   readonly order: readonly number[];
   readonly name: string;
@@ -125,16 +151,23 @@ interface Written {
 
 export function writeOssie(model: OrmModel): OssieWriteResult {
   const losses: string[] = [];
-  const reported = new Set<string>();
+  const covers = new Map<string, Set<ChangeKind> | "all">();
   const specs: ConstraintSpec[] = [];
   const verbalizer = new ConstraintVerbalizer();
-  const lose: Lose = (element, what, key) => {
+  const lose: Lose = (element: string, what: string, key: LossKey, explains: Explains = "all") => {
     losses.push(`${element}: ${what}`.replace(/\s+/g, " ").trim());
-    reported.add(lossKey(key));
+    const k = lossKey(key);
+    const held = covers.get(k);
+    covers.set(
+      k,
+      explains === "all" || held === "all" ? "all" : new Set([...(held ?? []), ...explains]),
+    );
   };
   const loseConstraint = (inView: ConstraintInView, element: string, what: string): void => {
     const [c, ft] = inView;
-    const key: LossKey = ft ? { kind: "fact_type", id: ft.id } : { kind: "constraint", id: c.id! };
+    const key: OtherLossKey = ft
+      ? { kind: "fact_type", id: ft.id }
+      : { kind: "constraint", id: c.id! };
     lose(element, what, key);
     specs.push(buildConstraintSpec(inView, model, verbalizer));
   };
@@ -150,7 +183,21 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   const written: Written[] = [];
   const usedNames = new Map<string, Set<string>>();
   for (const ft of model.factTypes) {
-    const order = roleOrder(ft, model, isBuiltin, identifiers);
+    // A constraint naming another fact type's role is reported here, once,
+    // and read by nothing else: its role has no index in this fact type,
+    // and looking one up crashed the writer (barwise-5x3).
+    const own = ft.internalConstraints.filter((c) =>
+      roleIdsOf(c).every((id) => ft.roles.some((r) => r.id === id))
+    );
+    for (const c of ft.internalConstraints) {
+      if (own.includes(c)) continue;
+      loseConstraint(
+        [c, ft],
+        `fact type ${ft.name}`,
+        `${c.type} names a role that is not one of this fact type's roles; not written`,
+      );
+    }
+    const order = roleOrder(ft, own, model, isBuiltin, identifiers);
     if (!order) {
       lose(
         `fact type ${ft.name}`,
@@ -174,7 +221,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       });
     }
     const { keys, roleNames } = roleKeys(ft, order, declaringName, model, nameOf);
-    written.push({ ft, order, name: relName.name, keys, roleNames });
+    written.push({ ft, own, order, name: relName.name, keys, roleNames });
   }
 
   // identify_by, decided before relationships are written so a covered
@@ -198,8 +245,8 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     const pid = model.preferredIdentifierOf(ot.id);
     if (pid !== undefined) {
       const resolved = resolvePreferredIdentifier(model, ot.id);
-      const w = written.find((x) => x.ft.internalConstraints.some((c) => c.id === pid));
-      const c = w?.ft.internalConstraints.find((k) => k.id === pid);
+      const w = written.find((x) => x.own.some((c) => c.id === pid));
+      const c = w?.own.find((k) => k.id === pid);
       const external = resolved.ok && resolved.at.kind === "external" ? resolved.at : undefined;
       const rels = external && componentRelationships(external.components, written);
       if (external && rels) {
@@ -217,7 +264,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
         lose(ot.name, "its preferred identifier is not one Ossie's identify_by can name", {
           kind: "object_type",
           id: ot.id,
-        });
+        }, ["preferredIdentifier"]);
       }
       continue;
     }
@@ -275,7 +322,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       lose(ot.name, "a built-in no role uses is not written; Ossie declares none", {
         kind: "object_type",
         id: ot.id,
-      });
+      }, "all");
     }
     if (isBuiltin(ot.id)) continue;
     ontology.push(writeConcept(ot, {
@@ -343,7 +390,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       order: w.order,
     })),
   };
-  return { document, losses, constraintSpecs: specs, reported, written: correspondence };
+  return { document, losses, constraintSpecs: specs, covers, written: correspondence };
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +429,7 @@ function conceptNames(model: OrmModel, lose: Lose): ConceptNames {
       lose(ot.name, `written as ${name}, a name Ossie can read back`, {
         kind: "object_type",
         id: ot.id,
-      });
+      }, ["name"]);
     }
   }
   return { written, builtins };
@@ -467,6 +514,7 @@ function roleKeys(
 
 function roleOrder(
   ft: FactType,
+  own: OwnConstraints,
   model: OrmModel,
   isBuiltin: (id: string) => boolean,
   identifiers: PreferredIdentifiers,
@@ -474,7 +522,7 @@ function roleOrder(
   const n = ft.roles.length;
   const all = ft.roles.map((_, i) => i);
   const first = (i: number): number[] => [i, ...all.filter((j) => j !== i)];
-  const singles = ft.internalConstraints
+  const singles = own
     .filter((c) => c.type === "internal_uniqueness" && c.roleIds.length === 1)
     .map((c) =>
       ft.roles.findIndex((r) => r.id === (c as { roleIds: readonly string[]; }).roleIds[0])
@@ -495,14 +543,12 @@ function roleOrder(
   });
   if (xRole >= 0) {
     order = first(xRole);
-  } else if (n === 2 && identifierRole(ft, model, identifiers) !== undefined) {
-    order = first(1 - identifierRole(ft, model, identifiers)!);
+  } else if (n === 2 && identifierRole(ft, own, model, identifiers) !== undefined) {
+    order = first(1 - identifierRole(ft, own, model, identifiers)!);
   } else if (n === 2 && new Set(singles).size === 1) {
     order = first(singles[0]!);
   } else if (n >= 3) {
-    const wide = ft.internalConstraints.find((c) =>
-      c.type === "internal_uniqueness" && c.roleIds.length === n - 1
-    );
+    const wide = own.find((c) => c.type === "internal_uniqueness" && c.roleIds.length === n - 1);
     if (wide && wide.type === "internal_uniqueness") {
       const uncovered = ft.roles.findIndex((r) => !wide.roleIds.includes(r.id));
       order = [...all.filter((j) => j !== uncovered), uncovered];
@@ -526,10 +572,11 @@ function roleOrder(
  */
 function identifierRole(
   ft: FactType,
+  own: OwnConstraints,
   model: OrmModel,
   identifiers: PreferredIdentifiers,
 ): number | undefined {
-  for (const c of ft.internalConstraints) {
+  for (const c of own) {
     if (c.type !== "internal_uniqueness" || c.roleIds.length !== 1) continue;
     const far = ft.roles.findIndex((r) => r.id === c.roleIds[0]);
     const near = ft.roles[1 - far];
@@ -589,13 +636,13 @@ function writeRelationship(
 ): OssieRelationship {
   const { ft, order } = w;
   const element = `fact type ${ft.name}`;
-  const key: LossKey = { kind: "fact_type", id: ft.id };
+  const key: OtherLossKey = { kind: "fact_type", id: ft.id };
   const position = (roleId: string): number =>
     order.indexOf(ft.roles.findIndex((r) => r.id === roleId));
   const n = order.length;
 
   let multiplicity: OssieRelationship["multiplicity"];
-  const ucs = ft.internalConstraints.filter((c) => c.type === "internal_uniqueness");
+  const ucs = w.own.filter((c) => c.type === "internal_uniqueness");
   const on = (positions: readonly number[]) =>
     ucs.find((c) =>
       c.type === "internal_uniqueness" && c.roleIds.length === positions.length
@@ -621,7 +668,7 @@ function writeRelationship(
   if (multiplicity === undefined && !spanning) {
     lose(element, "has no uniqueness spanning every role; Ossie's set semantics add one", key);
   }
-  for (const c of ft.internalConstraints) {
+  for (const c of w.own) {
     if (covered.has(c.id!)) continue;
     // Implied: by set semantics with no multiplicity written, and by the
     // narrower uniqueness a multiplicity writes otherwise. Dropping it on
@@ -694,7 +741,7 @@ function reading(
   w: Written,
   nameOf: (id: string) => string,
   element: string,
-  key: LossKey,
+  key: OtherLossKey,
   lose: Lose,
 ): string {
   // Split at role positions: even parts are text, odd parts are indexes.
@@ -734,21 +781,23 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
   const { lose, name } = ctx;
   const key: LossKey = { kind: "object_type", id: ot.id };
   if (ot.aliases.length > 0) {
-    lose(ot.name, `aliases ${ot.aliases.join(", ")} not written`, key);
+    lose(ot.name, `aliases ${ot.aliases.join(", ")} not written`, key, ["aliases"]);
   }
-  if (ot.independent) lose(ot.name, "independence not written", key);
+  if (ot.independent) lose(ot.name, "independence not written", key, ["independent"]);
   if (ot.cardinality) {
-    lose(ot.name, "population cardinality not written", key);
+    lose(ot.name, "population cardinality not written", key, ["cardinality"]);
   }
   if (ot.sourceContext) {
-    lose(ot.name, `source context ${ot.sourceContext} not written`, key);
+    lose(ot.name, `source context ${ot.sourceContext} not written`, key, ["sourceContext"]);
   }
   const { requires: noteRequires, derivedBy: noteDerivedBy, rest } = splitNoteLines(ot.note);
   for (const line of rest) {
-    lose(ot.name, `note line not written: ${line}`, key);
+    lose(ot.name, `note line not written: ${line}`, key, ["note"]);
   }
   if (!noteReadsBack(ot.note)) {
-    lose(ot.name, "note comes back reordered or with its whitespace or blank lines changed", key);
+    lose(ot.name, "note comes back reordered or with its whitespace or blank lines changed", key, [
+      "note",
+    ]);
   }
 
   const base = {
@@ -757,18 +806,20 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
   };
   if (ot.kind === "value") {
     if (ot.defaultValue !== undefined) {
-      lose(ot.name, `default value ${ot.defaultValue} not written`, key);
+      lose(ot.name, `default value ${ot.defaultValue} not written`, key, ["defaultValue"]);
     }
     const [builtin, lossy] = ot.dataType
       ? DATA_TYPES[ot.dataType.name]
       : (["String", true] as const);
     if (!ot.dataType) {
-      lose(ot.name, "no data type; written as String", key);
+      lose(ot.name, "no data type; written as String", key, ["dataTypeAdded"]);
     } else if (lossy) {
-      lose(ot.name, `data type ${ot.dataType.name} written as ${builtin}`, key);
+      lose(ot.name, `data type ${ot.dataType.name} written as ${builtin}`, key, [
+        "dataTypeChanged",
+      ]);
     }
     if (ot.dataType?.length !== undefined || ot.dataType?.scale !== undefined) {
-      lose(ot.name, "data type length or scale not written", key);
+      lose(ot.name, "data type length or scale not written", key, ["dataTypeChanged"]);
     }
     const constraintItems = valueConstraintItems(ot, name, lose);
     const requires = [...constraintItems];
@@ -783,6 +834,7 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
           ot.name,
           `note line not written, it would read back as a constraint: requires: ${line}`,
           key,
+          ["note"],
         );}
     }
     return {
@@ -804,15 +856,16 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
       ot.name,
       `no identifier Ossie can state; reference mode ${ot.referenceMode} not written`,
       key,
+      ["referenceMode"],
     );
   } else if (!identified && ot.referenceMode !== `${snakeCase(name)}_id`) {
-    lose(ot.name, `reference mode ${ot.referenceMode} not written`, key);
+    lose(ot.name, `reference mode ${ot.referenceMode} not written`, key, ["referenceMode"]);
   }
   // The importer reads a single identifier's name back as the reference
   // mode, and gives a composite one `<snake_name>_id`; any other is lost.
   const readBack = ctx.identifyBy?.length === 1 ? ctx.identifyBy[0] : `${snakeCase(name)}_id`;
   if (identified && ot.referenceMode !== readBack) {
-    lose(ot.name, `reference mode ${ot.referenceMode} not written`, key);
+    lose(ot.name, `reference mode ${ot.referenceMode} not written`, key, ["referenceMode"]);
   }
   // A subtype's derived_by is its subtype facts' defining rule on import,
   // so note lines there would become one; the importer only writes them
@@ -820,7 +873,7 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
   const hasSupertypes = (ctx.supertypes?.names.length ?? 0) > 0;
   if (hasSupertypes) {
     for (const line of noteDerivedBy) {
-      lose(ot.name, `note line not written: derived_by: ${line}`, key);
+      lose(ot.name, `note line not written: derived_by: ${line}`, key, ["note"]);
     }
   }
   const derivedBy = hasSupertypes ? ctx.supertypes?.derivedBy ?? [] : noteDerivedBy;
@@ -833,6 +886,7 @@ function writeConcept(ot: ObjectType, ctx: ConceptContext): OssieConcept {
         ot.name,
         `note line not written, it would read back as a mandatory role: requires: ${line}`,
         key,
+        ["note"],
       );
     } else requires.push(line);
   }
@@ -873,7 +927,9 @@ function valueConstraintItems(
       : { values: [], ranges: range ? [normalRange(range)] : [] };
     if (back.unrecognized.length === 0 && sameShapes(back, expected)) return items;
   }
-  lose(ot.name, "value constraint is not a shape Ossie's requires can state", key);
+  lose(ot.name, "value constraint is not a shape Ossie's requires can state", key, [
+    "valueConstraint",
+  ]);
   return [];
 }
 
