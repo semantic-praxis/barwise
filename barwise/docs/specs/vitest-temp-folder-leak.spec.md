@@ -21,7 +21,8 @@ barwise/packages/promptlab/package.json,
 barwise/packages/vscode/package.json,
 +barwise/scripts/tests/vitest-tmp.test.mjs,
 +barwise/scripts/tests/fixtures/vitest-tmp/one.test.mjs,
-barwise/scripts/tests/expected-counts.json
+barwise/scripts/tests/expected-counts.json,
+barwise/knip.json
 
 When a vitest run completes, it shall leave nothing behind in the temp
 directory. Today every run leaves one `/tmp/<21-character id>/ssr/` folder,
@@ -124,6 +125,11 @@ The changes above. Each item below is pinned or measured:
 - Red check: with `vitest@5.0.1` and `@vitest/coverage-v8@5.0.1`
   installed `--no-save`, the test fails with "vitest 5.0.1 left these in
   its temp directory". After `npm ci` restores 5.0.5, it passes.
+
+- `knip.json` ignores `scripts/tests/fixtures/**`. The fixture imports
+  `vitest`, which the root workspace does not declare, so knip reported
+  it as an unlisted dependency. The fixture is data that vitest runs, not
+  code of the root workspace.
 
 ## Open decisions
 
