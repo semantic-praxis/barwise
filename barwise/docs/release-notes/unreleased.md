@@ -45,3 +45,13 @@ server and VS Code extension) before anyone saves a file with it.
   full view, even if it leaves out some fact types, so exporting it again
   draws all of them. An empty NORMA diagram is skipped on import, so an
   exported empty view does not come back.
+
+### OpenAPI item paths carry the whole key
+
+A table keyed on several columns, such as the table for a many-to-many
+fact type, now gets an item path with one parameter per key column, in
+key order: `/student-enrolls-in-course/{student_id}/{course_id}`. Before,
+the path named only the first column, which addresses many rows.
+**Clients generated from an earlier OpenAPI export call the old, shorter
+path for these resources and need regenerating.** Resources keyed on one
+column are unchanged.

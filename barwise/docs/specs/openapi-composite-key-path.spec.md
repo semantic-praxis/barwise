@@ -9,7 +9,8 @@ Plan-reviewed: 783aafc7 (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/renderers/openapi.ts,
 barwise/packages/core/tests/mapping/openapi.test.ts,
 barwise/packages/cli/tests/characterization/golden/,
-barwise/docs/IMPORT_EXPORT.md
+barwise/docs/IMPORT_EXPORT.md,
+barwise/docs/release-notes/unreleased.md
 
 When a table's primary key spans several columns, the OpenAPI export
 shall write its item path with one path parameter per key column, in key
@@ -105,6 +106,24 @@ review.
   changed 2 files, 50 lines added and 2 removed: each composite-key
   table's item path, plus one added parameter on each of its three
   operations.
+
+- Implementation review:
+  - `docs/release-notes/unreleased.md` names the client-visible path
+    change, as Risks says the release notes should.
+  - Each item operation gets its own parameter list, so editing one does
+    not edit all three.
+  - The single-column parameter list is now asserted on all three
+    operations, and a ModelBuilder many-to-many test shows the mapper's
+    own key reaching the path.
+  - The comment over the shared key list says what it guarantees: both
+    the path and the parameters read it, so a renaming step must apply
+    there.
+  - Declined: the keyless `{id}` fallback. It predates this change and
+    is out of scope.
+  - Declined: a guard against repeated key column names. The mapper
+    names columns uniquely.
+  - Declined: claiming barwise-pki here. It is closed in its own PR after
+    the merge.
 
 ## API and migration impact
 

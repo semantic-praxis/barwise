@@ -114,7 +114,8 @@ export function renderOpenApi(
     schemas[schemaName] = renderComponentSchema(table, example);
 
     const resourcePath = `${basePath}${toKebabCase(table.name)}`;
-    // One list feeds the path and the parameters, so they cannot disagree.
+    // The path's segments and the operations' parameters come from this one
+    // list; a step that renames a key column (barwise-9g3) must apply here.
     const keyParams = primaryKeyParams(table);
     const idPath = `${resourcePath}/${keyParams.map((name) => `{${name}}`).join("/")}`;
 
@@ -244,18 +245,20 @@ function renderItemPaths(
   schemaName: string,
   paramNames: readonly string[],
 ): Record<string, unknown> {
-  const parameters = paramNames.map((name) => ({
-    name,
-    in: "path",
-    required: true,
-    schema: { type: "string" },
-  }));
+  // A fresh list per operation, so a caller editing one does not edit all three.
+  const parameters = () =>
+    paramNames.map((name) => ({
+      name,
+      in: "path",
+      required: true,
+      schema: { type: "string" },
+    }));
 
   return {
     get: {
       summary: `Get a ${schemaName} by ID`,
       operationId: `get${schemaName}`,
-      parameters,
+      parameters: parameters(),
       responses: {
         "200": {
           description: `A ${schemaName} resource`,
@@ -271,7 +274,7 @@ function renderItemPaths(
     put: {
       summary: `Update a ${schemaName}`,
       operationId: `update${schemaName}`,
-      parameters,
+      parameters: parameters(),
       requestBody: {
         required: true,
         content: {
@@ -295,7 +298,7 @@ function renderItemPaths(
     delete: {
       summary: `Delete a ${schemaName}`,
       operationId: `delete${schemaName}`,
-      parameters,
+      parameters: parameters(),
       responses: {
         "204": { description: `${schemaName} deleted` },
         "404": { description: `${schemaName} not found` },
