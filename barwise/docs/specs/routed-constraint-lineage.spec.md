@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-20o, barwise-j7j
+Plan-reviewed: 72344ba4 (code-review, pr-review)
 Touches: barwise/packages/core/src/mapping/constraintRouting.ts,
 barwise/packages/core/src/mapping/index.ts,
 barwise/packages/core/src/lineage/generate.ts,
