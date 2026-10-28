@@ -44,6 +44,11 @@ import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
  */
 export const PLAIN_DDL_OPTIONS = { annotate: false, includeExamples: false } as const;
 
+/** What an export with generated keys says in place of its population rows. */
+export const SURROGATE_POPULATION_NOTE =
+  "Population rows are not written with generated keys: barwise computes no hash, and a\n"
+  + "row without its key would violate its table (surrogate-key-export.spec.md).";
+
 /**
  * DDL (SQL CREATE TABLE) export format.
  *
@@ -77,6 +82,7 @@ export class DdlExportFormat implements ExportFormatAdapter {
     const mapper = new RelationalMapper();
     const schema = mapper.map(model, {
       preferredIdentifierStrategy: options?.preferredIdentifierStrategy,
+      surrogateKeys: options?.surrogateKeys === true,
     });
 
     // Collect annotations from the model and schema.
@@ -109,10 +115,14 @@ export class DdlExportFormat implements ExportFormatAdapter {
       );
     }
 
-    // Append population INSERT statements if requested.
+    // Append population INSERT statements if requested. Not with generated
+    // keys: barwise computes no hash, and a row without its key violates
+    // its table (surrogate-key-export.spec.md, open decision 4).
     if (includeExamples) {
       const populationSql = renderPopulationAsSql(model, schema);
-      if (populationSql) {
+      if (populationSql && options?.surrogateKeys === true) {
+        ddlText += `\n${SURROGATE_POPULATION_NOTE.replace(/^/gm, "-- ")}\n`;
+      } else if (populationSql) {
         ddlText += populationSql;
       }
     }

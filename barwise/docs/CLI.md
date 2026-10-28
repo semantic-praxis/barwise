@@ -132,6 +132,14 @@ Options:
 - `--no-annotate` -- exclude TODO/NOTE annotations
 - `--strict` -- fail on validation errors
 - `--no-examples` -- exclude population example data
+- `--surrogate-keys` -- for `ddl` and `dbt`: give every table keyed
+  on several columns a generated key (`<table>_key`, `VARCHAR(32)`, the
+  hash `dbt_utils.generate_surrogate_key` computes), and make every
+  reference to one a single column beside the natural columns it is
+  hashed from. The natural key stays a UNIQUE (a combination test in
+  dbt), the dbt model SQL computes each generated column, and no
+  population rows are written, since barwise computes no hash. Refused
+  for any other format.
 
 When the format reports constraints it could not express (`ddl`, which
 spills them per dialect; `openapi`, `avro` and `dbt`, which carry only

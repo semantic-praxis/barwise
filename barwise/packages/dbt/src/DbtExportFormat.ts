@@ -58,6 +58,7 @@ export class DbtExportFormat implements ExportFormatAdapter {
     const mapper = new RelationalMapper();
     const schema = mapper.map(model, {
       preferredIdentifierStrategy: options?.preferredIdentifierStrategy,
+      surrogateKeys: options?.surrogateKeys === true,
     });
 
     // Extract dbt-specific options.
@@ -108,9 +109,11 @@ export class DbtExportFormat implements ExportFormatAdapter {
       content: schemaYaml,
     });
 
-    // Add seed CSV files from populations if requested.
-    if (includeExamples) {
-      const seedFiles = renderPopulationAsSeeds(model, schema);
+    // Add seed CSV files from populations if requested. Not with generated
+    // keys, which barwise computes no value for (surrogate-key-export.spec.md).
+    const seedFiles = includeExamples ? renderPopulationAsSeeds(model, schema) : [];
+    const seedsWithheld = seedFiles.length > 0 && options?.surrogateKeys === true;
+    if (!seedsWithheld) {
       for (const seed of seedFiles) {
         files.push(seed);
       }
@@ -123,6 +126,13 @@ export class DbtExportFormat implements ExportFormatAdapter {
     if (errors.length > 0) {
       sections.push(
         `# Validation warnings:\n${errors.map((e) => `# ERROR: ${e.message}`).join("\n")}`,
+      );
+    }
+
+    if (seedsWithheld) {
+      sections.push(
+        "# Seeds are not written with generated keys: barwise computes no hash, and a\n"
+          + "# row without its key would violate its model (surrogate-key-export.spec.md).",
       );
     }
 

@@ -7,7 +7,7 @@
  */
 
 import type { ExportFormatAdapter } from "@barwise/core";
-import { getExporter, listExporters } from "@barwise/core";
+import { getExporter, listExporters, surrogateKeysRefusal } from "@barwise/core";
 import { hashModel, type ManifestExport, updateManifest } from "@barwise/core/lineage";
 import { SQL_DIALECTS } from "@barwise/core/sql";
 import { registerDbtFormats } from "@barwise/dbt";
@@ -33,6 +33,7 @@ interface ExportOptions {
   examples: boolean;
   domain?: string;
   dialect?: string;
+  surrogateKeys?: boolean;
 }
 
 export function registerExportCommand(program: Command): void {
@@ -52,6 +53,11 @@ export function registerExportCommand(program: Command): void {
         + "routes each constraint to a native clause, an informational "
         + "clause, or a constraint-spec comment",
     )
+    .option(
+      "--surrogate-keys",
+      "Give every table keyed on several columns a generated key, the hash of its "
+        + "natural key, and make every reference to one a single column (ddl, dbt)",
+    )
     .action(async (source: string, opts: ExportOptions) => {
       try {
         const exporter = getExporter(opts.format);
@@ -61,6 +67,8 @@ export function registerExportCommand(program: Command): void {
             `Unknown export format: "${opts.format}". Available formats: ${available}`,
           );
         }
+        const refusal = opts.surrogateKeys ? surrogateKeysRefusal(opts.format) : undefined;
+        if (refusal) throw new Error(refusal);
 
         if (isProjectFile(source)) {
           exportProject(source, exporter, opts);
@@ -116,6 +124,7 @@ function exportOpts(opts: ExportOptions) {
     strict: opts.strict,
     includeExamples: opts.examples,
     ...(opts.dialect ? { dialect: opts.dialect } : {}),
+    ...(opts.surrogateKeys ? { surrogateKeys: true } : {}),
   };
 }
 

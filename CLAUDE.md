@@ -239,6 +239,7 @@ default on). The rules, what is pinned and what is not checked are in
 | multi-sample import (`--samples`)                     | yes | yes | no      | deliberate: an editor wants one quick pass                                                                                                                                                     |
 | thinking-budget override (`--thinking-budget`)        | yes | no  | no      | deliberate: an experiment dimension, recorded per history row                                                                                                                                  |
 | reference inference (`--infer-references`)            | yes | no  | no      | deliberate: a warehouse-import option, no use elsewhere yet                                                                                                                                    |
+| generated keys on export (`--surrogate-keys`)         | yes | yes | no      | deliberate pending barwise-0wa: the editor's export takes no per-export option, and its language-model export tool has its own schema (surrogate-key-export.spec.md)                           |
 | content-only matching on diff (`--matching content`)  | yes | yes | yes     | none on diff (VS Code as a language-model tool); merge stays id-first on every surface, since its id lookups assume a shared id is one element; its hazard under coinciding ids is barwise-xv1 |
 
 Gaps marked `deliberate` are being re-decided under the owner's

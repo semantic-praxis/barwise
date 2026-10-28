@@ -197,3 +197,14 @@ upstream commit added under the same version string, used to be ignored
 with no warning. Each one is now named in the import warnings by its
 path (`concept Airport.relationships[0].colour`), and the import
 otherwise proceeds as before, at medium confidence.
+
+### Generated keys on a warehouse export
+
+`barwise export --format ddl|dbt --surrogate-keys` (and `surrogateKeys`
+on the MCP server's `export_model`) gives every table keyed on several
+columns one generated key, the hash `dbt_utils.generate_surrogate_key`
+computes, and makes every reference to such a table a single column. The
+natural key stays enforced as a UNIQUE, or a combination test in dbt, and
+the dbt models compute each generated column from the natural columns
+kept beside it. The option is off by default; without it, nothing in an
+export changes.

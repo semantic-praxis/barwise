@@ -54,3 +54,4 @@ export {
   openApiToJson,
   renderOpenApi,
 } from "./renderers/openapi.js";
+export { SURROGATE_KEY_TYPE, withSurrogateKeys } from "./surrogateKeys.js";

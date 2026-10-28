@@ -98,7 +98,13 @@ function renderModelSql(table: Table, sourceName: string): string {
   lines.push(`SELECT`);
 
   const columnLines = table.columns.map((col, i) => {
-    const cast = `CAST(${col.name} AS ${sqlTypeToDbtType(col.dataType)})`;
+    // A generated key is computed here, from the source columns it hashes:
+    // the source has no such column (surrogate-key-export.spec.md).
+    const cast = col.generatedFrom
+      ? `{{ dbt_utils.generate_surrogate_key([${
+        col.generatedFrom.map((c) => `'${c}'`).join(", ")
+      }]) }}`
+      : `CAST(${col.name} AS ${sqlTypeToDbtType(col.dataType)})`;
     const alias = ` AS ${col.name}`;
     const comma = i < table.columns.length - 1 ? "," : "";
     return `  ${cast}${alias}${comma}`;
