@@ -3,7 +3,8 @@
 Scope: architecture
 Date: 2026-10-28
 Tracking: barwise-pf2.4, barwise-pf2, barwise-wcg,
-docs/specs/ossie-ontology-format.spec.md
+docs/specs/ossie-ontology-format.spec.md,
+docs/specs/iri-identity.spec.md
 
 ## Context
 
@@ -71,8 +72,9 @@ recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
    until barwise has an expression language of its own (barwise-pf2.2).
 5. **Identity is a readable IRI, after Ossie's naming.** Every barwise
    element is identified by one IRI, replacing the UUIDs barwise mints
-   today, and by nothing else: a declared base that is a standard IRI, then
-   project, any subprojects and domain as the namespace, then a readable
+   today, and by nothing else: a declared base that is a standard IRI and
+   carries the project and any subprojects, then the domain, as the
+   namespace, then a readable
    local name with no category segment, after Ossie's local names
    (`Customer`, `Customer.places`). A model names the other namespaces it
    references in declared imports with aliases, the way XML namespace
@@ -148,8 +150,9 @@ recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
   diff and merge pairing elements by id first) and
   `docs/specs/importer-role-ids.spec.md` R1 (an importer takes a role's id
   from `generateId()`, never from a string built out of names). With identity built from
-  names, a rename changes an element's IRI, which that spec's decision 8
-  answers: diff and merge tell a rename from a removal plus an addition.
+  names, a rename changes an element's IRI. barwise-wcg's spec, decision 8,
+  settles what follows: diff reports a content pair whose names differ as a
+  possible rename, and merge never pairs one, adding it instead.
 - Decision 6 has no gate; that barwise keeps its ORM 2 terms is held by
   review. The translation is tested construct by construct in
   `OssieImportFormat.test.ts` and `OssieExportFormat.test.ts`. It is

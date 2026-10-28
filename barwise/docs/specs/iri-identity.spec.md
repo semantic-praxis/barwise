@@ -407,8 +407,9 @@ A stated version goes through `planRead`, the `.orm.yaml` planner since
 barwise-jj8, given the file kind's own versions: current `"1.0"`, no earlier
 major (its `legacy` is its current major's first), no steps. So a newer
 version is refused with "written by a newer barwise" before schema
-validation, and "unknown" and "unregistered" mean what they mean for a
-model. The advice text for each reason moves from `OrmYamlSerializer`'s
+validation, and "unknown" means what it means for a model. "unregistered"
+keeps its meaning too, but cannot occur at 1.0 with no steps; it first
+becomes reachable at a 1.1 whose 1.0 step was not registered. The advice text for each reason moves from `OrmYamlSerializer`'s
 `versionErrorMessage` to `schemaVersion.ts`, so the three file kinds give
 one answer per reason. No step exists for either kind, and
 `OrmVersionMigration`'s contract names `orm_version`; the step shape for
@@ -485,25 +486,33 @@ project before `iriOf` depends on it.
 
 Only `barwise validate` runs `projectRules` today. MCP `validate_model`
 validates each domain with `ValidationEngine` and nothing else, and VS Code
-only parses the manifest, so neither shows these two or the existing
-mapping and product rules. Closing that is a surface change of its own,
-already filed as barwise-0wa.qh3, and not widened into this one.
+has two paths: its `barwise_validate_model` language-model tool wraps that
+same MCP function, and its editor diagnostics only parse the manifest. So
+none of them shows these two or the existing mapping and product rules.
+Closing that is a surface change of its own, not widened into this one:
+barwise-0wa.qh3 covers `validate_model` and the tool, and barwise-0wa.xeh
+the editor's diagnostics.
 
 **What carries the field.** The `.orm.yaml` serializer reads and writes
-`namespace`; `OrmModel` holds it as `namespace?: string` beside
-`domainContext`; merge keeps the base's, as it keeps `domainContext`; split
-writes new domain headers and does not copy the source's namespace into
-them; it writes a `/`-ending source namespace as the new manifest's
-`iri_base`, so each domain's namespace is that plus its context, and a
-`#`-ending one, which cannot be a base, gets a `SplitResult.warnings` entry
-saying it was dropped, which every surface already prints. The Ossie writer names `namespace` in its loss block: decision 1
-settles what goes in Ossie's `iri` slot, but the identity IRI needs WS6's
-`iriOf` and local-name ids, so until then the namespace is a loss.
-`writeOssie.ts` checks model-level fields by prediction alone, as it does
-`domainContext`. `ossie-interchange.md` was updated with this plan: decision 5 points at
+`namespace`, and `OrmModel` holds it as `namespace?: string` beside
+`domainContext`; the 2.0 reader has none to read. Merge keeps the base's, as
+it keeps `domainContext`.
+
+Split writes new domain headers and does not copy the source's namespace
+into them. A `/`-ending source namespace becomes the new manifest's
+`iri_base`, so each domain's namespace is that plus its context. A
+`#`-ending one cannot be a base, so split drops it with a
+`SplitResult.warnings` entry, which every surface already prints.
+
+The Ossie writer names `namespace` in its loss block. Decision 1 settles
+what goes in Ossie's `iri` slot, but the identity IRI needs WS6's `iriOf`
+and local-name ids, so until then the namespace is a loss. `writeOssie.ts`
+checks model-level fields by prediction alone, as it does `domainContext`.
+`ossie-interchange.md` was updated with this plan: decision 5 points at
 decisions 1 and 2, and its Context and Consequences no longer describe this
-spec as still to come. The 2.0
-reader has no `namespace` to read. No surface gains a command: the fields
+spec as still to come.
+
+No surface gains a command: the fields
 are declared by editing the file, and `namespaceOf` has no caller outside
 tests and the two rules until WS6's `iriOf`.
 
@@ -534,8 +543,9 @@ reason's advice; `iri_base` and `namespace` round-trip and a malformed one
 fails the schema; `namespaceOf` for each case above, including a ref with
 no model; both rules, each watched failing first; split's warning; the
 Ossie loss line. The tracked project and mapping files still load.
-`schema-versioning.md` is edited in place, and its y1b Consequences bullet
-becomes the test that checks it.
+`schema-versioning.md` is edited in place: its y1b Consequences bullet,
+which says these files carry no version, is replaced by one naming the test
+that checks each schema `const` against its `CURRENT_*_FORMAT_VERSION`.
 
 ### 5. Rename and rename recognition (provisional: not yet grounded)
 
