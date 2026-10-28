@@ -100,7 +100,10 @@ function renderTableSchema(
   table: Table,
   namespace?: string,
 ): AvroSchema {
-  const fields: AvroField[] = table.columns.map((col) => renderField(col, table));
+  const names = fieldNames(table);
+  const fields: AvroField[] = table.columns.map((col) =>
+    renderField(col, table, names.get(col.name)!)
+  );
 
   const schema: AvroSchema = {
     type: "record",
@@ -112,17 +115,49 @@ function renderTableSchema(
   return schema;
 }
 
-function renderField(col: Column, table: Table): AvroField {
+function renderField(col: Column, table: Table, name: string): AvroField {
   const avroType = sqlTypeToAvro(col.dataType);
   const isPk = table.primaryKey.columnNames.includes(col.name);
+  const docs = [
+    ...(isPk ? ["Primary key"] : []),
+    ...(name !== col.name ? [`The column "${col.name}".`] : []),
+  ];
 
   const field: AvroField = {
-    name: col.name,
+    name,
     type: col.nullable ? ["null", avroType] : avroType,
-    ...(isPk ? { doc: "Primary key" } : {}),
+    ...(docs.length > 0 ? { doc: docs.join(". ") } : {}),
   };
 
   return field;
+}
+
+/** An Avro name: a letter or `_`, then letters, digits and `_`. */
+const AVRO_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * Each column's field name. A column whose name Avro refuses, such as
+ * `(ambiguous)` from an unresolved reference mode, was written as is, and
+ * the schema did not parse (barwise-9g3, found by the characterization
+ * golden's format check). Each character outside the alphabet becomes
+ * `_`, with `_` before a leading digit; a name another column holds gets
+ * `_2`, `_3`, and so on. Valid names are kept and reserved first, as the
+ * OpenAPI path parameters are.
+ */
+function fieldNames(table: Table): Map<string, string> {
+  const names = new Map(
+    table.columns.filter((c) => AVRO_NAME.test(c.name)).map((c) => [c.name, c.name]),
+  );
+  const taken = new Set(names.values());
+  for (const col of table.columns) {
+    if (names.has(col.name)) continue;
+    const base = col.name.replace(/[^A-Za-z0-9_]/g, "_").replace(/^(?=[0-9])/, "_");
+    let name = base;
+    for (let n = 2; taken.has(name); n++) name = `${base}_${n}`;
+    names.set(col.name, name);
+    taken.add(name);
+  }
+  return names;
 }
 
 /**

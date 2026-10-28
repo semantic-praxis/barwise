@@ -801,6 +801,67 @@ describe("OpenAPI renderer", () => {
     });
   });
 
+  describe("path parameters are valid template variables (barwise-9g3)", () => {
+    const column = (name: string) => ({
+      name,
+      dataType: "TEXT",
+      dataTypeDefaulted: false,
+      nullable: false,
+    });
+    /** The item path and its get operation's parameters, for one table. */
+    function item(columns: string[], key: string[]) {
+      const spec = renderOpenApi({
+        sourceModelId: "test",
+        tables: [{
+          name: "finding",
+          columns: columns.map(column),
+          primaryKey: { columnNames: key },
+          foreignKeys: [],
+          sourceElementId: "ot-finding",
+        }],
+      });
+      const path = Object.keys(spec.paths)[1]!;
+      const ops = spec.paths[path] as Record<
+        string,
+        { parameters: { name: string; description?: string; }[]; }
+      >;
+      return { path, parameters: ops["get"]!.parameters };
+    }
+
+    it("renames a column outside the alphabet, and says which column it carries", () => {
+      const { path, parameters } = item(["(ambiguous)", "note"], ["(ambiguous)"]);
+      expect(path).toBe("/finding/{_ambiguous_}");
+      expect(parameters).toEqual([
+        expect.objectContaining({
+          name: "_ambiguous_",
+          description: 'The key column "(ambiguous)".',
+        }),
+      ]);
+    });
+
+    it("keeps a valid name as it is, with no description", () => {
+      const { path, parameters } = item(["order__id", "_id"], ["order__id", "_id"]);
+      expect(path).toBe("/finding/{order__id}/{_id}");
+      expect(parameters.map((p) => p.description)).toEqual([undefined, undefined]);
+    });
+
+    it("never takes a valid key column's name, whatever the key order", () => {
+      // "x(y" maps to "x_y", which the later, valid column holds.
+      const { path } = item(["x(y", "x_y"], ["x(y", "x_y"]);
+      expect(path).toBe("/finding/{x_y_2}/{x_y}");
+    });
+
+    it("never takes another column's name", () => {
+      const { path } = item(["(ambiguous)", "_ambiguous_"], ["(ambiguous)"]);
+      expect(path).toBe("/finding/{_ambiguous__2}");
+    });
+
+    it("gives two columns that map to one name distinct names", () => {
+      const { path } = item(["a(b", "a)b"], ["a(b", "a)b"]);
+      expect(path).toBe("/finding/{a_b}/{a_b_2}");
+    });
+  });
+
   describe("openApiToJson", () => {
     it("produces valid formatted JSON", () => {
       const model = new ModelBuilder("Test")

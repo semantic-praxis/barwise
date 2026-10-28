@@ -1,0 +1,35 @@
+<REPO>/examples/transcripts/pii-redaction.orm.yaml: 0 error(s), 21 warning(s)
+
+  WARNING Fact type "Document receivedAt ReceivedTimestamp" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Document has RawText" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Document has Scan" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Scan produced Finding" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Finding has ConfidenceScore" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Reviewer has EmployeeId" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Reviewer has ReviewerName" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "AuditEntry performedBy Reviewer" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "AuditEntry has ActionType" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Document releasedTo DownstreamSystem via Release" has no constraints. Most fact types need at least a uniqueness constraint.
+  WARNING Fact type "Document originatesFrom SourceSystem" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "Document has DocumentStatus" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "Finding has EndPosition" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "Finding has PIICategory" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "Finding reviewedBy Reviewer" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "ReviewDecision isDecisionOf Finding" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "Reviewer has ClearanceLevel" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "Document has RedactedText" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "AuditEntry about Document" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "Scan has ModelVersion" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  WARNING Fact type "Release has ReleaseTimestamp" has constraints but no internal uniqueness constraint. Without one, any combination of role values can repeat freely -- state the intended cardinality.
+  INFO    Object type "ScanVersion" does not participate in any fact type.
+  INFO    Object type "DecisionType" does not participate in any fact type.
+  INFO    Object type "DecisionTimestamp" does not participate in any fact type.
+  INFO    Object type "DecisionNote" does not participate in any fact type.
+  INFO    Object type "AuditId" does not participate in any fact type.
+  INFO    Object type "AuditTimestamp" does not participate in any fact type.
+  INFO    Object type "AuditDetail" does not participate in any fact type.
+  INFO    Entity type "Finding" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Reviewer" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "ReviewDecision" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "AuditEntry" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
+  INFO    Entity type "Scan" has no preferred identifier. The relational mapper will use a heuristic to determine the primary key.
