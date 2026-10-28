@@ -134,7 +134,9 @@ recorded in barwise-wcg until that issue's spec holds it.
 - Decision 1's list of what barwise leans on Ossie for is review-only:
   nothing stops barwise growing its own metric language or an
   `ai_context` field. Whether barwise adopts `OSSIE_SQL_2026` for
-  governed metrics is barwise-pf2.xil's question. Decision 2's exclusion
+  governed metrics is barwise-pf2.xil's question. The research for it is in
+  `docs/ossie-expressions-research-2026-10-28.md`, beside barwise-pf2.m2w's
+  comparison of subtype and derivation rules with `derived_by`. Decision 2's exclusion
   of mapping documents is likewise not final: whether barwise reads them
   for barwise-pf2.3 is open.
 - Decision 5 is not built. barwise mints UUIDs (`generateId()` in
