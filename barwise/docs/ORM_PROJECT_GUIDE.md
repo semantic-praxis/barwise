@@ -190,8 +190,8 @@ followed by each domain's context, so `catalog` above would be
 `https://data.acme.com/auctions/catalog/`. The project's `name` is a
 display label and is not part of any IRI. A domain file outside such a
 project can declare its own `namespace` in its model header instead; a
-domain that declares one inside a project with `iri_base` is reported by
-`barwise validate`, and the project's namespace is the one used. Until
+domain that declares a different one inside a project with `iri_base` is
+reported by `barwise validate`, and the project's namespace is the one used. Until
 format 4.0 a namespace changes no element id
 (`docs/specs/iri-identity.spec.md`).
 

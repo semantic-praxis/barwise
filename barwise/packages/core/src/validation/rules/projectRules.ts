@@ -183,9 +183,9 @@ function checkProductDependencies(project: OrmProject): Diagnostic[] {
 function checkNamespaces(project: OrmProject): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const byNamespace = new Map<string, DomainModel[]>();
+  const iriBase = project.iriBase;
 
   for (const domain of project.domains) {
-    const iriBase = project.iriBase;
     const namespace = namespaceOf(domain.model, { iriBase, context: domain.context });
     const own = domain.model?.namespace;
     if (iriBase !== undefined && own !== undefined) {
@@ -219,7 +219,7 @@ function checkNamespaces(project: OrmProject): Diagnostic[] {
     diagnostics.push(
       report(
         RULE_ID.duplicateNamespace,
-        "default",
+        iriBase === undefined ? "default" : "fromIriBase",
         domains[0]!.path,
         namespace,
         domains.map((d) => JSON.stringify(d.context)).join(", "),

@@ -1416,3 +1416,13 @@ describe("mergeModels follows a preferred identifier across sides with different
     expect(c?.type === "internal_uniqueness" && c.roleIds).toEqual(["i-r-cid"]);
   });
 });
+
+describe("mergeModels: the model header", () => {
+  it("keeps the base's namespace, as it keeps the domain context (iri-identity WS4)", () => {
+    const existing = new OrmModel({ name: "M", namespace: "https://data.acme.com/acme/m/" });
+    const incoming = new OrmModel({ name: "M", namespace: "https://other.example/m/" });
+    const diff = diffModels(existing, incoming);
+    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+    expect(merged.namespace).toBe("https://data.acme.com/acme/m/");
+  });
+});

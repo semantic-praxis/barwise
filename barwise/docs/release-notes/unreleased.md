@@ -1,3 +1,20 @@
+## Project and mapping files state their format version
+
+`.orm-project.yaml` and `.map.yaml` files now start with
+`format_version: "1.0"`, which barwise writes on every such file it saves.
+Files without it still open and are read as 1.0. A file from a newer
+barwise is refused with "the file was written by a newer barwise".
+
+**Older barwise cannot read project or mapping files this release
+writes.** barwise 1.7.0 and earlier, and earlier `edge` builds, refuse
+them with a schema error ("must NOT have additional properties"), not the
+"newer barwise" message, because they read no format version. The same
+builds refuse a model that declares a `namespace`.
+
+Two optional fields arrive with it: `iri_base` on a project and
+`namespace` on a model, which say where element IRIs start. They change no
+element id yet; see `docs/ORM_PROJECT_GUIDE.md`.
+
 ## Model file format 2.0
 
 This release writes `.orm.yaml` files at `orm_version: "2.0"`. Files from

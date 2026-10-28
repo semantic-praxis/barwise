@@ -107,6 +107,11 @@ describe("format_version", () => {
     }
   });
 
+  it("calls a malformed orm_version unknown too, not newer", () => {
+    const typo = `orm_version: "3.x"\nmodel:\n  name: M\n`;
+    expect(() => new OrmYamlSerializer().deserialize(typo)).toThrow(READ_PLAN_ADVICE.unknown);
+  });
+
   it("gives a model the same advice for the same reason", () => {
     const newerModel = `orm_version: "99.0"\nmodel:\n  name: M\n`;
     expect(() => new OrmYamlSerializer().deserialize(newerModel)).toThrow(READ_PLAN_ADVICE.newer);

@@ -63,5 +63,9 @@ describe("the IRI patterns", () => {
     }).toThrow(/namespace/);
     model.namespace = undefined;
     expect(model.namespace).toBeUndefined();
+    const project = new OrmProject({ name: "P" });
+    expect(() => {
+      project.iriBase = "https://x.example/acme";
+    }).toThrow(/iri_base/);
   });
 });

@@ -193,6 +193,10 @@ export type ReadPlan =
 /** Plan the read of a document stating `version`. Pure. */
 export function planRead(version: string, versions: ReadVersions = THIS_BUILD): ReadPlan {
   const { current, legacy, migrations } = versions;
+  // A version that is not dotted numbers is malformed, not newer:
+  // `compareOrmVersions` falls back to string order for it, which would
+  // tell a user with a typo ("3.x") to upgrade barwise.
+  if (!/^\d+(\.\d+)*$/.test(version)) return { ok: false, reason: "unknown" };
   if (compareOrmVersions(version, current) > 0) return { ok: false, reason: "newer" };
   if (compareOrmVersions(version, majorFirst(current)) >= 0) {
     const plan = planMigration(version, current, migrations);
@@ -240,12 +244,6 @@ export function formatVersionProblem(doc: unknown, current: string): string | un
   if (typeof doc !== "object" || doc === null) return undefined;
   const version = (doc as Record<string, unknown>).format_version;
   if (typeof version !== "string") return undefined;
-  // A version that is not dotted numbers is malformed, not newer:
-  // `compareOrmVersions` falls back to string order for it, which would
-  // tell a user with a typo to upgrade barwise.
-  if (!/^\d+(\.\d+)*$/.test(version)) {
-    return unsupportedVersionMessage("format_version", version, current, "unknown");
-  }
   const plan = planRead(version, { current, legacy: majorFirst(current), migrations: [] });
   if (plan.ok) return undefined;
   return unsupportedVersionMessage("format_version", version, current, plan.reason);

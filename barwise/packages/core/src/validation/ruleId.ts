@@ -801,7 +801,7 @@ const RULE_DESCRIPTORS = {
   [RULE_ID.domainNamespaceOverridden]: {
     severity: "error",
     description:
-      "A domain declares its own namespace in a project whose iri_base already gives it one.",
+      "A domain declares a namespace other than the one its project's iri_base gives it.",
     messages: {
       default: (domainPath: string, context: string, own: string, projects: string): string =>
         `Domain "${context}" (${domainPath}) declares namespace "${own}", but the project's iri_base gives it "${projects}", which is the one used. Delete the domain's namespace line.`,
@@ -812,7 +812,11 @@ const RULE_DESCRIPTORS = {
     description: "Two domains of a project have one namespace, so their elements would share IRIs.",
     messages: {
       default: (namespace: string, contexts: string): string =>
-        `Domains ${contexts} have the same namespace "${namespace}", so their elements would share IRIs. Rename a context, or give each domain its own namespace.`,
+        `Domains ${contexts} have the same namespace "${namespace}", so their elements would share IRIs. Give each domain its own namespace.`,
+      // With iri_base the project's namespace wins over a domain's own
+      // (namespaceOf), so the context is the only thing to change.
+      fromIriBase: (namespace: string, contexts: string): string =>
+        `Domains ${contexts} have the same namespace "${namespace}" from the project's iri_base, so their elements would share IRIs. Rename a context so the two differ.`,
     },
   },
   [RULE_ID.entityMappingSourceMissing]: {

@@ -18,7 +18,6 @@ import {
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
   planRead,
-  type ReadPlan,
   unsupportedVersionMessage,
 } from "./schemaVersion.js";
 import { subtypeConstraintsFromFlags } from "./subtypeFlags.js";
@@ -51,17 +50,6 @@ export class DeserializationError extends Error {
     super(message);
     this.name = "DeserializationError";
   }
-}
-
-/**
- * Build a clear, actionable message for a document whose `orm_version`
- * cannot be brought to the current version.
- */
-function versionErrorMessage(
-  version: string,
-  plan: Extract<ReadPlan, { ok: false; }>,
-): string {
-  return unsupportedVersionMessage("orm_version", version, CURRENT_ORM_VERSION, plan.reason);
 }
 
 /** What reading a file changed beyond its format (`OrmYamlSerializer.migrate`). */
@@ -222,7 +210,11 @@ export class OrmYamlSerializer {
     const version = doc.orm_version;
     if (typeof version !== "string") return { doc: raw, version, stated: undefined };
     const plan = planRead(version);
-    if (!plan.ok) throw new DeserializationError(versionErrorMessage(version, plan));
+    if (!plan.ok) {
+      throw new DeserializationError(
+        unsupportedVersionMessage("orm_version", version, CURRENT_ORM_VERSION, plan.reason),
+      );
+    }
     return {
       doc: applyMigrations(doc, plan.steps),
       version: plan.target,

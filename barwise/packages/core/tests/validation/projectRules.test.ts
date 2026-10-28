@@ -329,6 +329,9 @@ describe("projectRules: namespaces (iri-identity WS4)", () => {
     const [d] = projectRules(project).filter((x) => x.ruleId === "project/duplicate-namespace");
     expect(d?.elementId).toBe("a.orm.yaml");
     expect(d?.message).toContain("https://data.acme.com/acme/Order_Mgmt/");
+    // Only renaming a context helps here: a domain's own namespace is overridden.
+    expect(d?.message).toContain("Rename a context");
+    expect(d?.message).not.toContain("own namespace");
     expect(d?.message).toContain('"Order Mgmt", "Order_Mgmt"');
   });
 
