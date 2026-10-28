@@ -7,7 +7,7 @@ Last-updated: 2026-10-28
 Tracking: barwise-ym8
 Touches: barwise/scripts/check-architecture.mjs,
 barwise/scripts/lib/architecture-section.mjs,
-barwise/scripts/tests/,
++barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/tests/,
 barwise/docs/adr/, barwise/docs/ARCHITECTURE.md,
 .claude/skills/spec-writer/template.adr.md
 
@@ -56,7 +56,10 @@ is gone.
 In scope:
 
 - When an ADR under `barwise/docs/adr/` has no `Enforced-by:` header
-  line, `check:architecture` shall exit 1 naming the file.
+  line, or one whose value parses to zero entries, `check:architecture`
+  shall exit 1 naming the file. An empty line declares nothing, as an
+  absent one does; the existing `Date:` check already treats empty that
+  way.
 - When an `Enforced-by:` entry names `npm run <script>`, the check shall
   exit 1 unless `<script>` is a key of `barwise/package.json` `scripts`
   and some `ci.yml` step's arguments, as `ciSteps()` in
@@ -64,9 +67,10 @@ In scope:
   `--flag` tokens, then `<script>` as the first token that is not a
   flag. The match is on that token alone, because CI writes
   `run audit:specs -- --check`; a whole-string comparison would call
-  three enforced ADRs unwired. A step carrying `--workspace=...` runs a
-  package's script, not a root one, and is not declarable in this
-  grammar; no ADR relies on one today.
+  three enforced ADRs unwired. A step with a `--workspace` or `-w` flag
+  before its script runs a package's script, not a root one, so it is
+  never a match, even if a root script of the same name exists later;
+  no ADR relies on one today.
 - A step guarded by an `if:` counts as wired. Most guards are
   `docs_only != 'true'`, which skips only changes that cannot violate a
   code decision; the narrower ones (`test:optimizer`, `pull_request`
@@ -74,14 +78,24 @@ In scope:
   the classifier is the authority on that, not this check. An ADR whose
   enforcer is narrowly guarded says so in its Consequences.
 - When an entry names a hook, it takes one of two forms, and the check
-  shall exit 1 unless its conditions hold. `hook <path>`: the path is
-  tracked and appears in `.claude/settings.json` (the PreToolUse guard
-  is wired this way). `hook barwise/.husky/<name> runs npm run <script>`:
-  the husky file is tracked, `<script>` is a key of
-  `barwise/package.json` `scripts`, and the husky file contains
-  `npm run`, then any `--flag` tokens, then `<script>`. Naming the husky
-  file alone is not accepted: it would pass however the hook's body
-  changed, which is the decay this spec exists to catch.
+  shall exit 1 unless its conditions hold.
+  `hook <Event> <path>`: the path is tracked, and `.claude/settings.json`,
+  parsed as JSON, has a `hooks.<Event>` entry with a `command` that
+  contains the path. A path that survives only in a permission rule, or
+  under another event, does not count. The entry's `matcher` is not
+  checked; a matcher that never fires is the kind of defect WS4's
+  probes are for.
+  `hook barwise/.husky/<name> runs npm run <script>`: the husky file is
+  tracked, `<script>` is a key of `barwise/package.json` `scripts`, and
+  the husky file has a line that, after leading whitespace and an
+  optional `if !` or `!`, begins `npm run`, then any `--flag` tokens,
+  then `<script>`. Comment lines and `echo` strings therefore never
+  match: `barwise/.husky/pre-push` names `npm run ci:local` in an echo
+  as well as on the line that runs it. Naming the husky file alone is
+  not accepted: it would pass however the hook's body changed, which is
+  the decay this spec exists to catch. Both rules are lexical; they show
+  the hook is wired and invokes the script, not that the line is
+  reachable, which again is WS4's question.
 - When an entry names a test file, the check shall exit 1 unless the
   path is tracked and a CI step runs its suite. Two places qualify. A
   `.test.mjs` directly in `barwise/scripts/tests/` (not a subdirectory:
@@ -97,6 +111,11 @@ In scope:
   `testInclude` the check cannot read as a string-array literal is a
   refusal (exit 2), not a pass. Other suites CI runs (`test:trial`,
   `test:optimizer`) are declared by their npm script.
+  Both discovery rules restate code owned elsewhere -- the
+  non-recursive `.test.mjs` filter in `run-script-tests.mjs` and the
+  default include in `vitest.shared.ts` -- so WS1 adds a drift test in
+  `gates.test.mjs` that reads both sources and fails when either differs
+  from what the check assumes, per `docs/adr/must-agree-copies.md`.
 - When an entry is `none (deliberate: <reason>)`, the check shall accept
   it with no tracker lookup -- subject to the Open decision on that form,
   which WS1 waits on. The parser tries this form first, so `deliberate`
@@ -201,9 +220,16 @@ barwise/docs/adr/<concern>.md
   Tracking: ...
   Enforced-by: npm run purity, npm run depcruise
 
+barwise/scripts/lib/adr-enforcement.mjs       (new)
+  parseEnforcedBy(text) -- the one parser of the header, used by the
+                           check and by renderSection, so the index and
+                           the check cannot disagree on an entry
+  splitEntries(value)   -- comma/newline split outside parentheses;
+                           reports an unbalanced parenthesis
+
 barwise/scripts/check-architecture.mjs        (existing; one new pass)
   adrs           -- already read
-  enforcement    -- new: parse Enforced-by:, resolve each entry
+  enforcement    -- new: resolve each parsed entry
        uses ciSteps()        from scripts/lib/ci-gates.mjs   (existing)
        uses parseTracker()   from scripts/lib/beads-merge.mjs (existing)
        uses trackedPaths()   from scripts/lib/architecture-section.mjs
@@ -219,7 +245,12 @@ barwise/scripts/lib/architecture-section.mjs  (renderSection)
 Rendering rule: the enforcers in declared order, then each `none`
 entry as `gap: <issue-id>` or `gap: deliberate`. An ADR with no
 enforcer renders `unenforced (<issue-id or deliberate>, ...)` instead.
-A hook entry renders as its script name, a test entry as its file name.
+Each entry renders so its kind shows: `npm run x` as `x`; a husky
+entry as `x (pre-commit hook)`; a settings hook as its file name
+without extension and its event, `python-uv-guard (PreToolUse)`; a test
+file as its file name. So credential-handling renders
+`check:secrets, check:secrets (pre-commit hook)`, and a reader can tell
+the CI scan from the local hook.
 
 Entry grammar. Entries are separated by commas or newlines that sit
 outside parentheses, so `none (barwise-zdd: decisions 1, 3, 4)` is one
@@ -227,20 +258,17 @@ entry; an unbalanced parenthesis is a finding. Each entry is one of:
 
 ```
 npm run <script>
-hook <repo-rooted path>                       -- wired in .claude/settings.json
+hook <Event> <repo-rooted path>               -- wired in .claude/settings.json
 hook barwise/.husky/<name> runs npm run <script>
 <repo-rooted path to a test file>
 none (deliberate: <reason>)                   -- per Open decisions; tried first
 none (<issue-id>[: <free text naming which decisions>])
 ```
 
-The split differs from `touches()` in `spec-reader.mjs`, which splits on
-every comma; reusing it would break the `none` form above.
-`segments()` in `check-book-citations.mjs` is the same
-parenthesis-aware loop over semicolons; WS1 may lift it to a shared
-helper with the separator as a parameter, or write the eight lines
-again, and either is acceptable under DRY-secondary, because the two
-splitters need not agree.
+The split cannot reuse `touches()` in `spec-reader.mjs`, which splits on
+every comma, nor `segments()` in `check-book-citations.mjs`, which splits
+on one separator and clamps an unmatched `)` rather than reporting it.
+`splitEntries()` is new and small; it need not agree with either.
 
 ## Alternatives considered
 
@@ -269,7 +297,9 @@ splitters need not agree.
 Waits on the Open decision about `none (deliberate: ...)`, because the
 grammar WS1 ships has to know whether that form exists.
 
-Add the enforcement pass to `check-architecture.mjs`, validating every `Enforced-by:` entry that is
+Add `scripts/lib/adr-enforcement.mjs` (the header parser and the
+entry splitter), then the enforcement pass to `check-architecture.mjs`,
+validating every `Enforced-by:` entry that is
 present. An ADR with no header is not yet a finding, so this lands green
 before any ADR changes. Tests in `scripts/tests/gates.test.mjs`, beside
 the existing `check-architecture` cases, cover each entry kind's pass
@@ -277,7 +307,7 @@ and fail, the parenthesized comma, a vscode integration-test path (fail),
 the closed-issue case, and the exit-2 refusals; the fixture builder
 gains `ci.yml`, `package.json`, tracker, settings and husky files only in
 the cases that need them. First because it touches only the checker,
-one library and their tests.
+one new library and their tests.
 
 The tracker is read with `parseTracker()` from `scripts/lib/beads-merge.mjs`,
 which already exists and refuses malformed lines, missing ids and
@@ -308,6 +338,7 @@ header without the backfill would turn CI red.
 ### 3. Show enforcement in the generated index
 
 Extend `renderSection` per the rendering rule under Target architecture,
+reading entries through `parseEnforcedBy()` rather than a second parser,
 and regenerate `ARCHITECTURE.md`. Separate from
 WS2 because it changes generated output a reviewer reads byte for byte.
 
@@ -366,8 +397,10 @@ gate run. Ungrounded: where probes live, and whether process ADRs
   throws on an empty workflow).
 - WS1 tests run the check over temporary fixture trees (`--root`), as
   the existing `check-architecture` cases in `gates.test.mjs` do, and
-  include one mutation run per failure kind through `scripts/mutate.mjs`
-  to show each is caught. One case plants an input outside `--root`
+  assert each failure kind's exit code directly: 1 for a finding, 2 for
+  an unreadable input. `scripts/mutate.mjs` counts any non-zero exit as
+  caught, so it cannot tell a finding from a refusal; it stays the
+  reviewer's red-before-green demonstration, not the test. One case plants an input outside `--root`
   only (a real `ci.yml` step missing from the fixture's) to prove the
   check reads the fixture, not the checkout.
 - Reading `testInclude` out of a TypeScript config is a narrow parse.
