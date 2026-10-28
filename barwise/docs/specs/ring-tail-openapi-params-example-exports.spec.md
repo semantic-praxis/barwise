@@ -1,6 +1,6 @@
 # Ring sentences keep a reading's tail, OpenAPI path parameters are valid, example exports cannot drift
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
@@ -9,6 +9,12 @@ Plan-reviewed: 5ab23120 (code-review, pr-review)
 Touches: barwise/packages/core/src/verbalization/constraints/sentence.ts,
 barwise/packages/core/src/verbalization/constraints/phase2.ts,
 barwise/packages/core/src/mapping/renderers/openapi.ts,
+barwise/packages/core/src/mapping/renderers/avro.ts,
++barwise/packages/core/src/mapping/renderers/names.ts,
+barwise/packages/core/src/mapping/index.ts,
+barwise/packages/formats/src/avro/,
+barwise/packages/formats/tests/,
+barwise/docs/specs/dbt-composite-key-tests.spec.md,
 barwise/packages/core/tests/,
 barwise/packages/cli/tests/characterization/,
 barwise/examples/transcripts/,
@@ -147,6 +153,34 @@ two regenerations for every exporter change, kept in step by hand.
    reader browsing `examples/transcripts/` no longer sees an export
    beside the transcript. `barwise export` produces one, and the
    goldens hold the recorded output.
+
+## Implementation notes
+
+- Changed scope: the Avro export had the same defect. Adding
+  `pii-redaction` to the goldens ran the Avro format check over it, and
+  six field names such as `(ambiguous)` were illegal. The Avro renderer
+  now renames a field the same way, under Avro's stricter rule (no dots,
+  no leading digit), with the field's `doc` naming the column. The
+  implementation review found that the exporter matched column
+  annotations by field name, so a renamed field lost its notes; it now
+  maps each column to its field.
+- One core module (`mapping/renderers/names.ts`) owns the Avro name rule,
+  its repair and the renaming loop the OpenAPI parameters also use.
+  Formats' namespace check (`avroNames.ts`) reads the same rule, which
+  it used to hold a copy of.
+- The fallback ring reading keeps each lead with the name in its slot.
+  The old slice kept only the object's lead, in the predicate text.
+- A reading's extra whitespace, and whitespace before its closing period,
+  no longer reach the sentence (implementation review).
+- `ringClause` keeps its own spacing rather than sharing
+  `quantifiedReading`'s: that one writes "that" before a repeated
+  placeholder, which a ring sentence must not.
+- `dbt-composite-key-tests.spec.md` named two of the deleted files in its
+  Touches, which `check:spec-touches` refused. It now names their
+  directory.
+- Red checks: the new ring tests fail on the slicing renderer, and the
+  renamed-field annotation test fails on the exporter without the
+  column map.
 
 ## Risks and testing
 
