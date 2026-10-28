@@ -64,6 +64,7 @@ function versionErrorMessage(
     newer: "the file was written by a newer barwise; upgrade barwise to read it.",
     unknown: "no migration path is available; re-export from a compatible version.",
     cycle: "the migration registry loops back on itself, which is a bug in barwise.",
+    unregistered: "no registered migration reaches it, which is a bug in barwise.",
   };
   const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
   return `${head} ${advice[plan.reason]}`;
@@ -230,7 +231,7 @@ export class OrmYamlSerializer {
     if (!plan.ok) throw new DeserializationError(versionErrorMessage(version, plan));
     return {
       doc: applyMigrations(doc, plan.steps),
-      version: plan.reader === "current" ? CURRENT_ORM_VERSION : LEGACY_ORM_VERSION,
+      version: plan.target,
       stated: version,
     };
   }

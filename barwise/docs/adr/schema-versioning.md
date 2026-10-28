@@ -69,14 +69,17 @@ was a section of the metamodel ADR before this one.
 - Decision 2 has no gate: whether a change is additive or structural is
   a judgment each spec makes and its review checks, as
   `diagram-references-by-id.spec.md` D1 and `orm-format-3.spec.md` did.
-  Its mechanism is tested without a real minor: `planRead` in
+  Its loader is tested without a real minor: `planRead` in
   `serialization/schemaVersion.ts` takes the build's versions as a
   parameter, and `schemaVersion.test.ts` reads a 3.0 document in a
-  synthetic 3.1 build through a 3.0-to-3.1 step, refuses a 3.0 file no
-  step reaches, and still refuses a version between the two majors
-  (barwise-jj8). Nothing checks that a real minor bump registers its step;
-  without one, the planner refuses the earlier minor as unknown rather
-  than misreading it.
+  synthetic 3.1 build through a 3.0-to-3.1 step, calls a 3.0 file no step
+  reaches a bug in barwise, and still refuses a version between the two
+  majors (barwise-jj8). Against this build's own versions it checks that
+  registered steps reach the current version from its major's first, so a
+  minor bump that forgets its step fails. A step that skips a minor (3.0 to
+  3.2 in a 3.2 build) still passes and leaves every 3.1 file unreadable;
+  nothing checks that, and the serializer's own path through a real minor
+  first runs at that bump.
 - Decision 3 has no gate: a change to `orm-model.schema.json` that
   leaves `CURRENT_ORM_VERSION` equal to the last tagged release's passes
   CI (barwise-vvg, which waits on barwise-6om for what "released"
