@@ -2,11 +2,11 @@
 
 Status: In progress -- WS1 and WS2 implemented 2026-10-28 (the loader reads a
 minor of the current major, barwise-jj8; `localName()` and the name checks);
-WS3 folded into WS6; WS4 to WS7 to come
+WS3 folded into WS6; WS4 (with barwise-y1b) planned; WS5 to WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-28
-Tracking: barwise-wcg
+Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: e7acea95 (code-review, pr-review; re-pointed after WS3 was folded into WS6)
 Touches: barwise/packages/core/src/model/,
 barwise/packages/core/src/serialization/,
@@ -369,16 +369,88 @@ design. What the reviews established, for WS6 to start from:
   silently or judged by its wording.
 - **Lineage and diff ignore the stored key**, which is derived.
 
-### 4. Namespace declarations (provisional: not yet grounded)
+### 4. Versioned project and mapping files, and namespace declarations (with barwise-y1b)
 
-`iri_base` on the project and `namespace` on a standalone model's header,
-optional, with `namespaceOf` in core. Imports and `iriOf` wait for WS6,
-where references become names; in 3.x they would only hold UUIDs. The
-model fields join 3.0 while 3.0 is unreleased (owner decision, 2026-10-28), and a minor
-bump once it is (`schema-versioning.md`, decisions 2 and 3). Every current build refuses a project file carrying
-`iri_base`, because `orm-project.schema.json` closes `project` with
-`additionalProperties: false`, so this workstream waits on barwise-y1b,
-which versions the project file (decision 16).
+Grounded 2026-10-28, and merged with barwise-y1b by the owner the same day:
+both change the project file's schema, and WS4 cannot ship without y1b, so
+they ship as one change.
+
+**The version (barwise-y1b).** `.orm-project.yaml` and `.map.yaml` each gain
+a top-level `format_version`, beside `project:` or `mapping:` the way
+`orm_version` sits beside `model:`. It is `format_version`, not
+`project_version`, because a user reads "project version" as the version of
+their own project. Each file kind has its own current version
+(`CURRENT_PROJECT_FORMAT_VERSION`, `CURRENT_MAPPING_FORMAT_VERSION`, both
+`"1.0"`), and its schema pins the same value as a `const`, so the two
+evolve independently, as `orm_version` does. The serializers stamp it on
+every file they write (`schema-versioning.md` decision 1). It is optional on
+read: a file without it was written before this change and is read as 1.0,
+whose schema it already satisfies, because every 1.0 addition is optional.
+A file stating a newer version is refused with "written by a newer barwise"
+before schema validation; any other version this build cannot reach is
+refused naming it. The check is the `.orm.yaml` one: `planMigration` with
+the file kind's version and an empty step list, so "newer" and "no path"
+mean what they mean for a model, and a future minor registers a step the
+same way. The nine tracked project files and twelve mapping files are left
+unstamped: they load as 1.0 and are stamped when a surface next writes
+them.
+
+What the version does not buy: released v1.7.0 closes both files with
+`additionalProperties: false` and reads no version, so it refuses a stamped
+file with a schema error, not "newer barwise". That costs nothing extra,
+because v1.7.0 already refuses every 3.0 domain file a current project
+refers to. Decision 16 holds for every build from this one on.
+
+**The namespace fields.** Optional, and joining 3.0 and project 1.0 while
+both are unreleased (owner decision, 2026-10-28):
+
+- `iri_base` on the project: an absolute IRI ending in `/` -- a scheme, a
+  colon, no whitespace -- so the project name and context can follow it as
+  path segments.
+- `namespace` on a model's header: an absolute IRI ending in `/` or `#`, the
+  two endings RDF vocabularies use.
+
+The schemas check the shape with one pattern each; core does not
+dereference either.
+
+**`namespaceOf(model, project?)`** in `core/src/model/namespace.ts`, pure:
+
+- with a project that declares `iri_base`: `iri_base`, then
+  `localName(project.name)`, then `localName(domain.context)`, each followed
+  by `/` (`https://data.acme.com/acme/ordering/`). `localName()` is WS2's
+  normalizer, so a project named `Acme Corp` contributes `Acme_Corp`, and
+  neither segment can hold a `/`;
+- otherwise, the model's own `namespace`, or `undefined` (decision 11);
+- given a project the model is not a domain of, it throws: that is a caller
+  passing the wrong pair, not a model without a namespace.
+
+**One source per domain.** `assembleProject` refuses a domain file that
+declares a `namespace` when the manifest declares `iri_base`, reporting it
+in `problems` as it reports any domain that fails to load ("declares a
+namespace, but the project's iri_base gives it one"), so the domain is not
+attached. A project without `iri_base` keeps each domain's own namespace.
+
+**What carries the field.** The `.orm.yaml` serializer reads and writes
+`namespace`; `OrmModel` holds it as `namespace?: string` beside
+`domainContext`; merge keeps the base's, as it keeps `domainContext`; split
+writes new domain headers and does not copy the source's namespace, because
+the domains need the project's `iri_base` instead; a source that had one gets
+a `SplitResult.warnings` entry saying so, which every surface already prints. The 2.0 reader has
+no `namespace` to read. No surface gains a command: the fields are declared
+by editing the file, and `namespaceOf` has no caller outside tests until
+WS6's `iriOf`.
+
+**Tests**, in core: each serializer stamps its version, reads an unstamped
+file, refuses a newer one with "newer barwise" and not a schema message,
+and its schema `const` equals its constant; `iri_base` and `namespace`
+round-trip and a malformed one fails the schema; `namespaceOf` for each of
+its three cases; `assembleProject` reports the double declaration and
+attaches neither half of it silently. `schema-versioning.md` is edited in
+place: its decisions cover all three file kinds, and the y1b Consequences
+bullet becomes the test that checks it.
+
+Imports and `iriOf` wait for WS6, where references become names; in 3.x
+they would only hold UUIDs.
 
 ### 5. Rename and rename recognition (provisional: not yet grounded)
 
