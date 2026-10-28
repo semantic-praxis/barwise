@@ -25,6 +25,7 @@ import { generateDdlLineage } from "@barwise/core/lineage";
 import {
   type ConstraintRouting,
   type DialectCapabilityProfile,
+  hasGeneratedKeys,
   RelationalMapper,
   renderDdl,
   renderPopulationAsSql,
@@ -32,6 +33,7 @@ import {
   routeConstraints,
   type RoutedClause,
   type SpilledConstraint,
+  SURROGATE_POPULATION_NOTE,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
 import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
@@ -44,10 +46,6 @@ import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
  */
 export const PLAIN_DDL_OPTIONS = { annotate: false, includeExamples: false } as const;
 
-/** What an export with generated keys says in place of its population rows. */
-export const SURROGATE_POPULATION_NOTE =
-  "Population rows are not written with generated keys: barwise computes no hash, and a\n"
-  + "row without its key would violate its table (surrogate-key-export.spec.md).";
 
 /**
  * DDL (SQL CREATE TABLE) export format.
@@ -120,11 +118,24 @@ export class DdlExportFormat implements ExportFormatAdapter {
     // its table (surrogate-key-export.spec.md, open decision 4).
     if (includeExamples) {
       const populationSql = renderPopulationAsSql(model, schema);
-      if (populationSql && options?.surrogateKeys === true) {
+      if (populationSql && hasGeneratedKeys(schema)) {
         ddlText += `\n${SURROGATE_POPULATION_NOTE.replace(/^/gm, "-- ")}\n`;
       } else if (populationSql) {
         ddlText += populationSql;
       }
+    }
+
+    // A dialect with no UNIQUE cannot state a natural key a generated key
+    // replaced; said here, as a spilled constraint is, rather than dropped
+    // without a word (surrogate-key-export.spec.md).
+    const unstated = profile.unique === "absent"
+      ? schema.tables.filter((t) => t.naturalKey)
+      : [];
+    if (unstated.length > 0) {
+      ddlText += `\n-- ${dialect} has no UNIQUE, so these natural keys, which generated keys replaced, `
+        + `are not enforced:\n${
+          unstated.map((t) => `--   ${t.name} (${t.naturalKey!.join(", ")})`).join("\n")
+        }\n`;
     }
 
     // Include validation diagnostics as warnings in the result if present.

@@ -101,9 +101,7 @@ function renderModelSql(table: Table, sourceName: string): string {
     // A generated key is computed here, from the source columns it hashes:
     // the source has no such column (surrogate-key-export.spec.md).
     const cast = col.generatedFrom
-      ? `{{ dbt_utils.generate_surrogate_key([${
-        col.generatedFrom.map((c) => `'${c}'`).join(", ")
-      }]) }}`
+      ? generatedKeySql(col.generatedFrom, col.nullable)
       : `CAST(${col.name} AS ${sqlTypeToDbtType(col.dataType)})`;
     const alias = ` AS ${col.name}`;
     const comma = i < table.columns.length - 1 ? "," : "";
@@ -114,6 +112,19 @@ function renderModelSql(table: Table, sourceName: string): string {
   lines.push(`FROM {{ source('${sourceName}', '${table.name}') }}`);
 
   return lines.join("\n") + "\n";
+}
+
+/**
+ * A generated key's SELECT expression. `generate_surrogate_key` hashes a
+ * NULL as a placeholder string, so an absent optional reference would get
+ * a hash that matches no row; it is NULL when any column it hashes is, as
+ * a composite foreign key with a NULL column references nothing.
+ */
+function generatedKeySql(columns: readonly string[], nullable: boolean): string {
+  const hash = `{{ dbt_utils.generate_surrogate_key([${columns.map((c) => `'${c}'`).join(", ")}]) }}`;
+  return nullable
+    ? `CASE WHEN ${columns.map((c) => `${c} IS NULL`).join(" OR ")} THEN NULL ELSE ${hash} END`
+    : hash;
 }
 
 /**

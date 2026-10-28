@@ -19,18 +19,47 @@ import type { Column, ForeignKey, RelationalSchema, Table } from "./RelationalSc
 export const SURROGATE_KEY_TYPE = "VARCHAR(32)";
 
 /**
+ * What an export with generated keys writes in place of its population
+ * rows or seeds: barwise computes no hash, so a row would lack its key.
+ */
+export const SURROGATE_POPULATION_NOTE =
+  "Population rows are not written with generated keys: barwise computes no hash, and a\n"
+  + "row without its key would violate its table (surrogate-key-export.spec.md).";
+
+/** Whether a schema has a generated column, which a population row cannot fill. */
+export function hasGeneratedKeys(schema: RelationalSchema): boolean {
+  return schema.tables.some((t) => t.columns.some((c) => c.generatedFrom));
+}
+
+/**
  * The schema with generated keys. Its input is not modified, and a schema
  * with no table keyed on several columns comes back as it was.
  */
 export function withSurrogateKeys(schema: RelationalSchema): RelationalSchema {
   const byName = new Map(schema.tables.map((t) => [t.name, t]));
-  const { generated, collapsed } = decide(schema.tables, byName);
-  if (generated.size === 0) return schema;
+  const { changed, generated, collapsed, order } = decide(schema.tables, byName);
+  if (changed.size === 0) return schema;
+  // Each table in decision order; a rewritten reference names its target's
+  // new key once every table has one, since a reference outside the key
+  // can point at a table decided later.
+  const rewritten = new Map<string, Table>();
+  const pending = new Set<ForeignKey>();
+  for (const name of order) {
+    const table = byName.get(name)!;
+    rewritten.set(name, rewrite(table, changed, generated, collapsed.get(name)!, byName, pending));
+  }
+  const keyOf = (name: string) => rewritten.get(name)!.primaryKey.columnNames[0]!;
   return {
     ...schema,
-    tables: schema.tables.map((t) =>
-      rewrite(t, generated, collapsed.get(t.name) ?? new Set(), byName)
-    ),
+    tables: schema.tables.map((t) => {
+      const table = rewritten.get(t.name)!;
+      return {
+        ...table,
+        foreignKeys: table.foreignKeys.map((fk) =>
+          pending.has(fk) ? { ...fk, referencedColumns: [keyOf(fk.referencedTable)] } : fk
+        ),
+      };
+    }),
   };
 }
 
@@ -40,41 +69,50 @@ function inKey(fk: ForeignKey, table: Table): boolean {
 }
 
 /**
- * Which tables get a generated key, and for each table the references in
- * its key that collapse to one column. A table is decided after every
- * table its key references, since a key that is one reference to a table
- * with a generated key collapses to one column and needs none of its own.
- * A cycle of key references comes only from an invalid model; its tables
- * are decided in declaration order, and a reference to one not yet
- * decided is left as it is.
+ * Which tables get a generated key, which have their key changed at all
+ * (a generated one, or one reference collapsed to its one column: a
+ * shared-key subtype of a table with a generated key), and for each table
+ * the references in its key that collapse. Every reference to a table
+ * whose key changed must become one column, since the old columns are no
+ * longer its key. A table is decided after every table its key
+ * references. A cycle of key references comes only from an invalid model;
+ * its tables are decided in declaration order, and a reference to one not
+ * yet decided is left as it is.
  */
 function decide(
   tables: readonly Table[],
   byName: ReadonlyMap<string, Table>,
-): { generated: Set<string>; collapsed: Map<string, Set<ForeignKey>>; } {
+): {
+  changed: Set<string>;
+  generated: Set<string>;
+  collapsed: Map<string, Set<ForeignKey>>;
+  order: string[];
+} {
+  const changed = new Set<string>();
   const generated = new Set<string>();
   const collapsed = new Map<string, Set<ForeignKey>>();
-  const done = new Set<string>();
+  const order: string[] = [];
   const visiting = new Set<string>();
   const visit = (table: Table): void => {
-    if (done.has(table.name) || visiting.has(table.name)) return;
+    if (collapsed.has(table.name) || visiting.has(table.name)) return;
     visiting.add(table.name);
     const fold = new Set<ForeignKey>();
     for (const fk of table.foreignKeys) {
       const target = byName.get(fk.referencedTable);
       if (!target || target === table || !inKey(fk, table)) continue;
       visit(target);
-      if (done.has(target.name) && generated.has(target.name)) fold.add(fk);
+      if (changed.has(target.name)) fold.add(fk);
     }
     const folded = new Set([...fold].flatMap((fk) => fk.columnNames));
     const width = table.primaryKey.columnNames.filter((c) => !folded.has(c)).length + fold.size;
-    collapsed.set(table.name, fold);
     if (width > 1) generated.add(table.name);
+    if (width > 1 || fold.size > 0) changed.add(table.name);
+    collapsed.set(table.name, fold);
     visiting.delete(table.name);
-    done.add(table.name);
+    order.push(table.name);
   };
   for (const table of tables) visit(table);
-  return { generated, collapsed };
+  return { changed, generated, collapsed, order };
 }
 
 /**
@@ -93,14 +131,15 @@ function rolePrefix(fk: ForeignKey): string {
 
 function rewrite(
   table: Table,
+  changed: ReadonlySet<string>,
   generated: ReadonlySet<string>,
   collapsedKeyRefs: ReadonlySet<ForeignKey>,
   byName: ReadonlyMap<string, Table>,
+  pending: Set<ForeignKey>,
 ): Table {
   const columns: Column[] = [...table.columns];
   let key = [...table.primaryKey.columnNames];
   const foreignKeys: ForeignKey[] = [];
-  const keyName = (name: string) => `${name}_key`;
   // The table's own generated key is named first, so a reference to the
   // table itself cannot take its name.
   const own = generated.has(table.name) ? generatedKeyName(table) : undefined;
@@ -110,31 +149,31 @@ function rewrite(
     const target = byName.get(fk.referencedTable);
     // A reference in the key that the decision did not collapse (one in a
     // cycle) is left as it is, so the key's width matches the decision.
-    const rewritten = target && generated.has(target.name)
+    const rewritten = target && changed.has(target.name)
       && (!inKey(fk, table) || collapsedKeyRefs.has(fk));
     if (!rewritten) {
       foreignKeys.push(fk);
       continue;
     }
     const replaced = columns.filter((c) => fk.columnNames.includes(c.name));
-    const name = freeColumnName(
-      [...columns, ...reserved],
-      `${rolePrefix(fk)}${keyName(target.name)}`,
-    );
+    const name = freeColumnName([...columns, ...reserved], `${rolePrefix(fk)}${target.name}_key`);
     const at = columns.findIndex((c) => fk.columnNames.includes(c.name));
     columns.splice(at < 0 ? columns.length : at, 0, {
       name,
       dataType: SURROGATE_KEY_TYPE,
       dataTypeDefaulted: false,
       nullable: replaced.some((c) => c.nullable),
+      // In the target's key order, the order its own key is hashed in.
       generatedFrom: [...fk.columnNames],
     });
-    foreignKeys.push({
+    const reference: ForeignKey = {
       columnNames: [name],
       referencedTable: target.name,
-      referencedColumns: [generatedKeyName(target)],
+      referencedColumns: [],
       ...(fk.sourceConstraintId ? { sourceConstraintId: fk.sourceConstraintId } : {}),
-    });
+    };
+    pending.add(reference);
+    foreignKeys.push(reference);
     if (fk.columnNames.every((c) => key.includes(c))) {
       const first = key.findIndex((c) => fk.columnNames.includes(c));
       key = key.filter((c) => !fk.columnNames.includes(c));
@@ -145,15 +184,16 @@ function rewrite(
   if (own === undefined) {
     return { ...table, columns, primaryKey: { columnNames: key }, foreignKeys };
   }
-  // Hashed from source columns only: a generated reference column is
-  // computed in the same SELECT, which cannot read its own alias.
-  const natural = key.flatMap((c) => columns.find((col) => col.name === c)?.generatedFrom ?? [c]);
-  const name = own;
+  // Hashed from the table's original key, in its order: those are source
+  // columns (a generated reference is computed in the same SELECT, which
+  // cannot read its own alias), and a reference to this table hashes its
+  // columns in this same order (`referencedColumns`), so the two agree.
+  const natural = [...table.primaryKey.columnNames];
   return {
     ...table,
     columns: [
       {
-        name,
+        name: own,
         dataType: SURROGATE_KEY_TYPE,
         dataTypeDefaulted: false,
         nullable: false,
@@ -161,7 +201,7 @@ function rewrite(
       },
       ...columns,
     ],
-    primaryKey: { columnNames: [name] },
+    primaryKey: { columnNames: [own] },
     foreignKeys,
     naturalKey: natural,
   };
@@ -169,8 +209,7 @@ function rewrite(
 
 /**
  * The generated key's name in a table that gets one: `<table>_key`, or a
- * free variant against the table's own columns. Both the table and every
- * reference to it ask this, so they agree.
+ * free variant against the table's own columns.
  */
 function generatedKeyName(table: Table): string {
   return freeColumnName(table.columns, `${table.name}_key`);

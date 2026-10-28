@@ -176,6 +176,11 @@ export function listExporters(): readonly FormatDescriptor[] {
   return formatRegistry.listExporters();
 }
 
+/** The exporters whose descriptors declare `surrogateKeys`, by name. */
+export function surrogateKeyFormats(): string[] {
+  return listExporters().filter((f) => f.surrogateKeys).map((f) => f.name);
+}
+
 /**
  * Why a format cannot take `surrogateKeys`, or undefined when its
  * descriptor declares it can. The CLI and MCP both refuse with this, so
@@ -184,7 +189,7 @@ export function listExporters(): readonly FormatDescriptor[] {
  */
 export function surrogateKeysRefusal(formatName: string): string | undefined {
   if (getFormat(formatName)?.surrogateKeys) return undefined;
-  const taking = listExporters().filter((f) => f.surrogateKeys).map((f) => f.name);
+  const taking = surrogateKeyFormats();
   return `The ${formatName} format does not take surrogate keys; ${
     taking.length > 0 ? `${taking.join(" and ")} do` : "no registered format does"
   }.`;

@@ -2,7 +2,12 @@
  * export_model tool: exports an ORM model to a specified format.
  */
 
-import { getExporter, listExporters, surrogateKeysRefusal } from "@barwise/core";
+import {
+  getExporter,
+  listExporters,
+  surrogateKeyFormats,
+  surrogateKeysRefusal,
+} from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { formatConstraintReport, registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -75,7 +80,7 @@ export function registerExportModelTool(server: McpServer): void {
                 "Give every table keyed on several columns a generated key, the hash of "
                   + "its natural key, and make every reference to one a single column "
                   + `(${
-                    listExporters().filter((f) => f.surrogateKeys).map((f) => f.name).join(", ")
+                    surrogateKeyFormats().join(", ")
                   })`,
               ),
           })
