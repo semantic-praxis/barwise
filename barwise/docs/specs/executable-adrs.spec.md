@@ -7,7 +7,6 @@ Last-updated: 2026-10-28
 Tracking: barwise-ym8
 Touches: barwise/scripts/check-architecture.mjs,
 barwise/scripts/lib/architecture-section.mjs,
-+barwise/scripts/lib/beads-read.mjs, barwise/scripts/beads-crud.mjs,
 barwise/scripts/tests/,
 barwise/docs/adr/, barwise/docs/ARCHITECTURE.md,
 .claude/skills/spec-writer/template.adr.md
@@ -61,36 +60,57 @@ In scope:
 - When an `Enforced-by:` entry names `npm run <script>`, the check shall
   exit 1 unless `<script>` is a key of `barwise/package.json` `scripts`
   and some `ci.yml` step's arguments, as `ciSteps()` in
-  `barwise/scripts/lib/ci-gates.mjs` returns them, split on whitespace
-  into `run`, `<script>`, then anything. The match is on the script
-  token alone, because CI writes `run audit:specs -- --check` and
-  `run build --workspace=barwise-vscode`; a whole-string comparison
-  would call three enforced ADRs unwired.
-- When an entry names a hook (`hook <path>`), the check shall exit 1
-  unless `<path>` is tracked and one of: the path appears in
-  `.claude/settings.json`; the path is itself a git hook file under
-  `barwise/.husky/` (husky runs those by directory, and nothing names
-  them); or the path with its `barwise/` prefix removed appears in a
-  file under `barwise/.husky/`, because those hooks `cd barwise` before
-  calling their scripts by relative path.
+  `barwise/scripts/lib/ci-gates.mjs` returns them, are `run`, then any
+  `--flag` tokens, then `<script>` as the first token that is not a
+  flag. The match is on that token alone, because CI writes
+  `run audit:specs -- --check`; a whole-string comparison would call
+  three enforced ADRs unwired. A step carrying `--workspace=...` runs a
+  package's script, not a root one, and is not declarable in this
+  grammar; no ADR relies on one today.
+- A step guarded by an `if:` counts as wired. Most guards are
+  `docs_only != 'true'`, which skips only changes that cannot violate a
+  code decision; the narrower ones (`test:optimizer`, `pull_request`
+  only) enforce on exactly the changes CI's classifier sends them, and
+  the classifier is the authority on that, not this check. An ADR whose
+  enforcer is narrowly guarded says so in its Consequences.
+- When an entry names a hook, it takes one of two forms, and the check
+  shall exit 1 unless its conditions hold. `hook <path>`: the path is
+  tracked and appears in `.claude/settings.json` (the PreToolUse guard
+  is wired this way). `hook barwise/.husky/<name> runs npm run <script>`:
+  the husky file is tracked, `<script>` is a key of
+  `barwise/package.json` `scripts`, and the husky file contains
+  `npm run`, then any `--flag` tokens, then `<script>`. Naming the husky
+  file alone is not accepted: it would pass however the hook's body
+  changed, which is the decay this spec exists to catch.
 - When an entry names a test file, the check shall exit 1 unless the
-  path is tracked and a CI suite runs it: either it is a `.test.mjs`
-  under `barwise/scripts/tests/` (run by `test:scripts`), or it is under
-  `barwise/packages/<pkg>/` and matches that package's test include --
+  path is tracked and a CI step runs its suite. Two places qualify. A
+  `.test.mjs` directly in `barwise/scripts/tests/` (not a subdirectory:
+  `run-script-tests.mjs` reads that directory with a non-recursive
+  `readdirSync`), with `test:scripts` wired as above. Or a file under
+  `barwise/packages/<pkg>/` that matches that package's test include --
   the `testInclude` literal in its `vitest.config.ts`, else the default
-  `tests/**/*.test.ts` in `barwise/vitest.shared.ts`. Tracked is not
-  enough: `packages/vscode/tests/integration/` is tracked, vscode's
-  `testInclude` is `tests/unit/**/*.test.ts`, and no `ci.yml` step runs
-  the integration suite. A `vitest.config.ts` whose `testInclude` the
-  check cannot read as a string-array literal is a refusal (exit 2), not
-  a pass.
+  `tests/**/*.test.ts` in `barwise/vitest.shared.ts` -- where the package
+  defines `test:coverage` and the root `test:coverage` is wired as above.
+  Tracked is not enough: `packages/vscode/tests/integration/` is tracked,
+  vscode's `testInclude` is `tests/unit/**/*.test.ts`, and no `ci.yml`
+  step runs the integration suite. A `vitest.config.ts` whose
+  `testInclude` the check cannot read as a string-array literal is a
+  refusal (exit 2), not a pass. Other suites CI runs (`test:trial`,
+  `test:optimizer`) are declared by their npm script.
+- When an entry is `none (deliberate: <reason>)`, the check shall accept
+  it with no tracker lookup -- subject to the Open decision on that form,
+  which WS1 waits on. The parser tries this form first, so `deliberate`
+  is never read as an issue id.
 - When an entry is `none (<issue-id>[: <which decisions>])`, the check
   shall exit 1 unless `<issue-id>` exists in `.beads/issues.jsonl` with
-  a status other than `closed`. A closed issue with the ADR still saying
-  `none` means one of the two is out of date, and the check says which
-  ADR and which issue. When an entry is `none (deliberate: <reason>)`,
-  the check shall accept it with no tracker lookup -- subject to the
-  Open decision on that form, which WS1 waits on.
+  a status other than `closed`. Each `none` names a gap issue, one whose
+  title is the missing enforcer, never an umbrella issue that can close
+  for unrelated reasons. The order that keeps CI green: the PR that
+  builds an enforcer also replaces the ADR's `none` entry with it, and
+  the gap issue closes afterwards in a tracker-only PR, as
+  `check:tracker-closes` requires. Closing a gap issue while the ADR
+  still says `none` fails the check, which is intended: it means the
+  enforcer was never declared.
 - When the check needs an input (`ci.yml`, `barwise/package.json`, the
   tracker, `.claude/settings.json`, `barwise/.husky/`, a
   `vitest.config.ts`) and cannot read it, it shall exit 2, per
@@ -98,7 +118,11 @@ In scope:
   `--root` (`ciSteps(join(root, ".github/workflows/ci.yml"))`, not the
   default `WORKFLOW` path), and only when an entry of the kind that
   needs it is present, so the existing `check:architecture` fixtures in
-  `gates.test.mjs`, which carry none of these files, stay green.
+  `gates.test.mjs`, which carry none of these files, stay green through
+  WS1. They do not stay green through WS2 on their own:
+  `architectureRepo()` copies every real ADR into the fixture, so once
+  the real ADRs carry entries, the fixture needs the inputs those
+  entries read. WS2 owns that change.
 - When `npm run regen:architecture` renders the generated section of
   `barwise/docs/ARCHITECTURE.md`, each ADR line shall show its enforcers
   or `unenforced`, so a reader (or an agent session) sees which
@@ -116,28 +140,28 @@ Out of scope:
 Grounded 2026-10-28 by extracting the npm scripts each ADR names and
 resolving them against `package.json` and `ciSteps()`.
 
-| ADR                            | Enforcers named in prose today                                  | Declared state after WS2                         |
-| ------------------------------ | --------------------------------------------------------------- | ------------------------------------------------ |
-| `baselines-merge-on-write`     | `audit:specs`, `test:scripts`                                   | enforced; `trial:gate` writer is barwise-tko     |
-| `connector-packages`           | `purity`, `depcruise`                                           | enforced                                         |
-| `constraint-coverage-policy`   | none                                                            | `none (deliberate: ...)`, per Open decisions     |
-| `credential-handling`          | `check:secrets`, gitleaks pre-commit hook                       | enforced                                         |
-| `determinism-in-core`          | `purity`                                                        | enforced                                         |
-| `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others | enforced                                         |
-| `gate-refusal-contract`        | `test:scripts`; `fault-matrix` is on demand                     | enforced                                         |
-| `keyless-model-access`         | `test:coverage`, `depcruise`                                    | enforced: `depcruise` and named test files       |
-| `merge-delegation`             | none; the ADR says so (barwise-zdd)                             | `none (barwise-zdd: decisions 1, 3, 4)`          |
-| `metamodel-evolution-policy`   | none                                                            | to be determined in WS2                          |
-| `must-agree-copies`            | `check:parity`, `audit:duplication`                             | enforced                                         |
-| `ossie-interchange`            | `test:coverage`                                                 | enforced, by named test files                    |
-| `package-graph-authority`      | `check:architecture`, `depcruise`                               | enforced                                         |
-| `pinned-runtimes`              | `check:parity`; `check:pins` proposed, not built (barwise-920)  | enforced, plus `none (barwise-920)`              |
-| `plan-before-code`             | `check:plan-review`, `check:spec-touches`                       | enforced                                         |
-| `production-prompt-resolution` | `test:coverage`                                                 | enforced, by named test files                    |
-| `python-from-the-lockfile`     | `check:python-uv`, PreToolUse hook; `audit:skips` deferred      | enforced, plus `none (barwise-921: audit:skips)` |
-| `review-policy`                | `check:review-tiers`                                            | enforced                                         |
-| `schema-versioning`            | `test:coverage`                                                 | enforced, by named test files                    |
-| `surface-capability-parity`    | `test:coverage` (the two `toEqual` tool-list tests)             | enforced, by named test files                    |
+| ADR                            | Enforcers named in prose today                                  | Declared state after WS2                                                    |
+| ------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `baselines-merge-on-write`     | `audit:specs`, `test:scripts`                                   | enforced; `trial:gate` writer is barwise-tko                                |
+| `connector-packages`           | `purity`, `depcruise`                                           | enforced                                                                    |
+| `constraint-coverage-policy`   | none                                                            | `none (deliberate: ...)`, per Open decisions                                |
+| `credential-handling`          | `check:secrets`, gitleaks pre-commit hook                       | enforced, incl. `hook barwise/.husky/pre-commit runs npm run check:secrets` |
+| `determinism-in-core`          | `purity`                                                        | enforced                                                                    |
+| `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others | enforced                                                                    |
+| `gate-refusal-contract`        | `test:scripts`; `fault-matrix` is on demand                     | enforced                                                                    |
+| `keyless-model-access`         | `test:coverage`, `depcruise`                                    | enforced: `depcruise` and named test files                                  |
+| `merge-delegation`             | none; the ADR says so (barwise-zdd)                             | `none (barwise-zdd: decisions 1 to 4)`                                      |
+| `metamodel-evolution-policy`   | none                                                            | to be determined in WS2                                                     |
+| `must-agree-copies`            | `check:parity`, `audit:duplication`                             | enforced                                                                    |
+| `ossie-interchange`            | `test:coverage`                                                 | enforced, by named test files                                               |
+| `package-graph-authority`      | `check:architecture`, `depcruise`                               | enforced                                                                    |
+| `pinned-runtimes`              | `check:parity`; `check:pins` proposed, not built (barwise-920)  | enforced, plus `none` on a new gap issue                                    |
+| `plan-before-code`             | `check:plan-review`, `check:spec-touches`                       | enforced                                                                    |
+| `production-prompt-resolution` | `test:coverage`                                                 | enforced, by named test files                                               |
+| `python-from-the-lockfile`     | `check:python-uv`, PreToolUse hook; `audit:skips` deferred      | enforced, plus `none` on a new gap issue                                    |
+| `review-policy`                | `check:review-tiers`                                            | enforced                                                                    |
+| `schema-versioning`            | `test:coverage`                                                 | enforced, by named test files                                               |
+| `surface-capability-parity`    | `test:coverage` (the two `toEqual` tool-list tests)             | enforced, by named test files                                               |
 
 What this shows:
 
@@ -149,10 +173,15 @@ What this shows:
   `Enforced-by:` line: the check would correctly fail them. So nothing
   is broken now; the check is a ratchet against future drift.
 - Two named checks do not exist (`check:pins`, `audit:skips`), and both
-  ADRs already say so honestly. Under this spec those become
-  `none (barwise-920)` and `none (barwise-921: audit:skips)` entries,
-  each tied to an issue that is open today, and WS3's index shows the
-  gap beside the enforcers.
+  ADRs already say so honestly. Each becomes a `none` entry on a new gap
+  issue that WS2 opens as a child of the umbrella that proposed it
+  (barwise-920, barwise-921, both open). Not the umbrellas themselves:
+  barwise-921 is the whole uv rule, which can close while `audit:skips`
+  stays unbuilt. WS3's index shows the gap beside the enforcers.
+- `merge-delegation` says none of its four decisions is enforced:
+  1, 3 and 4 outright, and 2 only when the agent passes the SHA, with
+  "Nothing requires the pin or the comment (barwise-zdd)". barwise-zdd is
+  the gap itself, so its entry cites it directly.
 - Five ADRs cite `test:coverage`, which runs every package test and so
   cannot point at one decision. Their entries name the test
   files that pin the decision instead (for example
@@ -176,9 +205,7 @@ barwise/scripts/check-architecture.mjs        (existing; one new pass)
   adrs           -- already read
   enforcement    -- new: parse Enforced-by:, resolve each entry
        uses ciSteps()        from scripts/lib/ci-gates.mjs   (existing)
-       uses readIssues()     from scripts/lib/beads-read.mjs  (new; lifted
-                             from beads-crud.mjs readAll, which then
-                             imports it)
+       uses parseTracker()   from scripts/lib/beads-merge.mjs (existing)
        uses trackedPaths()   from scripts/lib/architecture-section.mjs
   every input read under --root, and only when an entry needs it
   exit 0 / 1 finding / 2 could not read
@@ -189,10 +216,10 @@ barwise/scripts/lib/architecture-section.mjs  (renderSection)
   - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18 -- unenforced (barwise-zdd)
 ```
 
-Rendering rule: the enforcers in declared order, then each `none` entry
-as `gap: <issue-id>`; an ADR whose only entries are `none` renders
-`unenforced (<issue-id>, ...)`, and a `deliberate` entry renders
-`unenforced (deliberate)`.
+Rendering rule: the enforcers in declared order, then each `none`
+entry as `gap: <issue-id>` or `gap: deliberate`. An ADR with no
+enforcer renders `unenforced (<issue-id or deliberate>, ...)` instead.
+A hook entry renders as its script name, a test entry as its file name.
 
 Entry grammar. Entries are separated by commas or newlines that sit
 outside parentheses, so `none (barwise-zdd: decisions 1, 3, 4)` is one
@@ -200,14 +227,20 @@ entry; an unbalanced parenthesis is a finding. Each entry is one of:
 
 ```
 npm run <script>
-hook <repo-rooted path>
+hook <repo-rooted path>                       -- wired in .claude/settings.json
+hook barwise/.husky/<name> runs npm run <script>
 <repo-rooted path to a test file>
+none (deliberate: <reason>)                   -- per Open decisions; tried first
 none (<issue-id>[: <free text naming which decisions>])
-none (deliberate: <reason>)          -- per Open decisions
 ```
 
 The split differs from `touches()` in `spec-reader.mjs`, which splits on
 every comma; reusing it would break the `none` form above.
+`segments()` in `check-book-citations.mjs` is the same
+parenthesis-aware loop over semicolons; WS1 may lift it to a shared
+helper with the separator as a parameter, or write the eight lines
+again, and either is acceptable under DRY-secondary, because the two
+splitters need not agree.
 
 ## Alternatives considered
 
@@ -236,12 +269,7 @@ every comma; reusing it would break the `none` form above.
 Waits on the Open decision about `none (deliberate: ...)`, because the
 grammar WS1 ships has to know whether that form exists.
 
-Lift `beads-crud.mjs`'s `readAll` parse into a new
-`scripts/lib/beads-read.mjs` exporting `readIssues(path)`, and have
-`beads-crud.mjs` import it. A new module, not an export from
-`beads-jsonl.mjs`, because that module documents itself as the line
-format shared by the tracker's writers. Then add the enforcement pass to
-`check-architecture.mjs`, validating every `Enforced-by:` entry that is
+Add the enforcement pass to `check-architecture.mjs`, validating every `Enforced-by:` entry that is
 present. An ADR with no header is not yet a finding, so this lands green
 before any ADR changes. Tests in `scripts/tests/gates.test.mjs`, beside
 the existing `check-architecture` cases, cover each entry kind's pass
@@ -251,18 +279,29 @@ gains `ci.yml`, `package.json`, tracker, settings and husky files only in
 the cases that need them. First because it touches only the checker,
 one library and their tests.
 
-`check-tracker-closes.mjs` and `audit-spec-status.mjs` still parse the
-tracker inline after this; migrating them to `readIssues()` is filed as
-its own issue rather than widening WS1.
+The tracker is read with `parseTracker()` from `scripts/lib/beads-merge.mjs`,
+which already exists and refuses malformed lines, missing ids and
+duplicate ids. A duplicate id from a bad merge would otherwise resolve a
+`none` entry against whichever record came first. No new tracker
+reader is added. `beads-crud.mjs`, `check-tracker-closes.mjs` and
+`audit-spec-status.mjs` keep their own inline parsers; converging them
+is a separate `audit:duplication` question, not this spec's.
 
 ### 2. Backfill all twenty ADRs, then require the header
 
 Add `Enforced-by:` to each ADR per the Inventory, replacing every
 `test:coverage` citation with the test files that pin the decision.
-Where WS2 finds no enforcer for `metamodel-evolution-policy`, it opens an
-issue for a `none` entry, or uses the `deliberate` form if the decision
-admits no check. In the same
-PR make an absent header a finding. Update `template.adr.md` so a new
+Open the gap issues the Inventory calls for (children of barwise-920
+and barwise-921). Where WS2 finds no enforcer for
+`metamodel-evolution-policy`, it opens a gap issue for a `none` entry,
+or uses the `deliberate` form if the decision admits no check. Extend
+`architectureRepo()` in `gates.test.mjs`, which copies every real ADR
+into its fixture, so the fixture also carries the inputs the real
+entries read: `ci.yml`, the root `package.json`, the tracker, settings,
+husky files, the vitest configs and the named test files. Without that,
+every existing `check:architecture` case exits 2 once the ADRs carry
+entries. The fixture's synthetic `ADR_OK` gains an `Enforced-by:` line
+as well. In the same PR, make an absent header a finding. Update `template.adr.md` so a new
 ADR starts with the line. Coupled into one PR because requiring the
 header without the backfill would turn CI red.
 
