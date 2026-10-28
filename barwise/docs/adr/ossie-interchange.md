@@ -1,8 +1,9 @@
 # Ossie interchange
 
 Scope: architecture
-Date: 2026-10-27
-Tracking: barwise-pf2.4, barwise-pf2, docs/specs/ossie-ontology-format.spec.md
+Date: 2026-10-28
+Tracking: barwise-pf2.4, barwise-pf2, barwise-wcg,
+docs/specs/ossie-ontology-format.spec.md
 
 ## Context
 
@@ -27,20 +28,27 @@ role, and any uniqueness other than what a multiplicity or an identifier
 states (the spec's Scope) -- and multi-domain projects with context
 mappings. Both Ossie specifications are at `0.2.0.dev0`, unreleased, and say
 their schema will change. The spec in Tracking holds the reasoning and the
-alternatives; this ADR records the rules that came out of it.
+alternatives; this ADR records the rules that came out of it. Decisions 1,
+5 and 6 were revised on 2026-10-28 by the owner, after comparing the two
+more closely: barwise does not try to replace Ossie, takes ideas from it
+where they serve barwise, and leans on it for what Ossie owns.
 
 ## Decision
 
-1. **Ossie is an interchange format, not a metamodel barwise adopts.**
-   barwise's model stays the ORM 2 metamodel stored as `.orm.yaml`. Ossie
-   documents enter and leave only through the `ossie` descriptor in
-   `@barwise/formats` (`docs/adr/connector-packages.md`), and core holds
-   nothing specific to Ossie. A construct Ossie has and barwise lacks is a
-   candidate under `docs/adr/metamodel-evolution-policy.md` and its
-   filters, not an obligation, and Ossie alone does not justify a
-   metamodel or core-interface change: the spec deferred value-type
-   subtyping and an `ExportResult` warnings field until a second format
-   needs them (its Open decisions 1 and 5).
+1. **Ossie is a peer standard; barwise neither replaces nor absorbs it.**
+   barwise's model stays the ORM 2 metamodel stored as `.orm.yaml`, and
+   Ossie documents enter and leave only through the `ossie` descriptor in
+   `@barwise/formats` (`docs/adr/connector-packages.md`). barwise takes
+   an idea from Ossie when it serves barwise, as a barwise capability in
+   barwise's own terms that passes `docs/adr/metamodel-evolution-policy.md`
+   and its filters, so core still holds nothing specific to Ossie: identity
+   (decision 5) is the first. barwise leans on Ossie, rather than building
+   its own, for what Ossie owns: its core layer (datasets, fields, metrics),
+   the metric expression language `OSSIE_SQL_2026` while it is a pending
+   standard (barwise-pf2.xil), `ai_context`, which is not used for
+   anything until Ossie settles it, and its vendor converters. The spec's
+   deferral of value-type subtyping and an `ExportResult` warnings field
+   until a second format needs them stands (its Open decisions 1 and 5).
 2. **Only the ontology layer.** barwise does not read or write Ossie's core
    layer or its mapping documents. Reading a logical schema up into a
    model, which is what those mapping documents describe, is
@@ -58,6 +66,36 @@ alternatives; this ADR records the rules that came out of it.
    entry where the shared builder can describe it. Ossie expressions are
    kept as text: only three `requires` shapes are read as constraints,
    until barwise has an expression language of its own (barwise-pf2.2).
+5. **Identity follows Ossie's naming.** Every barwise element is
+   identified by one readable IRI, replacing the UUIDs barwise mints today:
+   a declared base that is a standard IRI, then project, any subprojects and
+   domain as the namespace, then a dotted local name after Ossie's
+   `Concept.relationship` (`Customer`, `Customer.places`), with
+   cross-namespace references through declared imports and aliases, as
+   Ossie's `prefixes` map does. Ossie's `iri` is a link to an outside
+   vocabulary (`foaf:Agent`), which barwise keeps as a separate
+   cross-reference, never as a second identifier. The design is
+   barwise-wcg's spec.
+6. **Each side keeps its own vocabulary, and the `ossie` format
+   translates.** barwise speaks ORM 2 and Ossie speaks Ossie; neither
+   renames its terms to match the other, and the translation lives once,
+   in the descriptor. This table is that translation:
+
+   | barwise (ORM 2)                                              | Ossie                                                           |
+   | ------------------------------------------------------------ | --------------------------------------------------------------- |
+   | model                                                        | ontology document                                               |
+   | object type: entity type, value type                         | concept: `EntityType`, `ValueType`                              |
+   | fact type                                                    | relationship, declared under the concept playing its first role |
+   | role                                                         | role                                                            |
+   | reading                                                      | `verbalizes` pattern                                            |
+   | preferred identifier                                         | `identify_by`                                                   |
+   | subtype fact                                                 | `extends`                                                       |
+   | internal uniqueness, in the shapes a multiplicity states     | `multiplicity`                                                  |
+   | value constraint (enumeration, bounds); mandatory first role | the three recognized `requires` shapes                          |
+   | derivation rule, kind derived                                | `derived_by`                                                    |
+   | definition (element); note (model)                           | `description`                                                   |
+   | aliases                                                      | none per element; `synonyms` exists only inside `ai_context`    |
+   | (none yet; barwise-wcg)                                      | `iri`, `prefixes`                                               |
 
 ## Consequences
 
@@ -98,8 +136,23 @@ alternatives; this ADR records the rules that came out of it.
   Core's two mentions of Ossie today are comments naming it as one
   consumer of shared, format-neutral helpers
   (`annotation/constraintSpec.ts`, `isUniqueAlone` in
-  `model/identification.ts`). IRIs and prefixes have nowhere to go until
-  custom attributes exist (barwise-rqb).
+  `model/identification.ts`).
+- Decision 1's list of what barwise leans on Ossie for is review-only:
+  nothing stops barwise growing its own metric language or an
+  `ai_context` field. Whether barwise adopts `OSSIE_SQL_2026` for
+  governed metrics is barwise-pf2.xil's question, and whether it reads
+  Ossie's mapping documents for barwise-pf2.3 is still open.
+- Decision 5 is not built. barwise mints UUIDs (`generateId()` in
+  `core/src/model/id.ts`) until barwise-wcg ships, so today an Ossie
+  `iri` or `prefixes` map is named in the import warnings and dropped.
+  The change is a major `.orm.yaml` version with a migration
+  (`docs/adr/schema-versioning.md`).
+- Decision 6's table is the decision, and the code follows it: the
+  construct-by-construct tests in `OssieImportFormat.test.ts` and
+  `OssieExportFormat.test.ts` exercise each pairing. No check ties a row
+  of the table to those tests; one would only test how the terms are
+  spelled, which the tests already fix. Renaming a barwise term to an
+  Ossie one is what the decision rules out, and review is what holds it.
 - These places also state a rule here: `docs/CLI.md` (the version pin and
   its refusal, and decision 4 for both import and export),
   `cli/tests/importerIds.test.ts` (the version in its fixture), and the
