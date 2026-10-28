@@ -46,7 +46,8 @@ export interface DbtRenderOptions {
    */
   readonly sourceName?: string;
   /**
-   * Whether to generate relationship tests for foreign keys.
+   * Whether to state foreign keys: a relationship test for a single-column
+   * one, a model-level foreign_key constraint for one over several columns.
    * Defaults to true.
    */
   readonly generateRelationshipTests?: boolean;
