@@ -5,6 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-pf2.6d0
+Plan-reviewed: 2f246712 (code-review, pr-review)
 Touches: barwise/packages/formats/src/ossie/parseOssie.ts,
 barwise/packages/formats/src/ossie/OssieImportFormat.ts,
 +barwise/packages/formats/src/ossie/ossieSchema.ts,
