@@ -117,6 +117,9 @@ export const RULE_ID = {
   duplicateObjectification: "structural/duplicate-objectification",
   duplicateObjectificationTarget: "structural/duplicate-objectification-target",
   duplicateRoleId: "structural/duplicate-role-id",
+  duplicateRoleName: "structural/duplicate-role-name",
+  encodedLocalName: "structural/encoded-local-name",
+  localNameCollision: "structural/local-name-collision",
   duplicateSubtypeFact: "structural/duplicate-subtype-fact",
   objectifiedDanglingFactType: "structural/objectified-dangling-fact-type",
   objectifiedDanglingObjectType: "structural/objectified-dangling-object-type",
@@ -937,6 +940,37 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (otName: string, existing: string): string =>
         `Duplicate object type name "${otName}". Another object type with this name already exists (id: ${existing}).`,
+    },
+  },
+  [RULE_ID.localNameCollision]: {
+    severity: "warning",
+    description:
+      "Two elements whose names differ would take one id in format 4.0, where an element's id is its local name (iri-identity.spec.md).",
+    messages: {
+      default: (name: string, kind: string, other: string, otherKind: string, id: string): string =>
+        `The ${kind} "${name}" and the ${otherKind} "${other}" would both take the id "${id}" in format 4.0; rename one, or the migration will add a suffix.`,
+      objectified: (name: string, objectType: string, id: string): string =>
+        `The fact type "${name}" and the object type "${objectType}" that objectifies it would both take the id "${id}" in format 4.0; the migration will rename the fact type to its first reading.`,
+      population: (factType: string, id: string): string =>
+        `Fact type "${factType}" has a role named "population" and a population, which would both take the id "${id}" in format 4.0; the migration will add a suffix to the population. Rename the role to avoid it.`,
+    },
+  },
+  [RULE_ID.duplicateRoleName]: {
+    severity: "warning",
+    description:
+      "Two roles of one fact type share a role name, so in format 4.0, where a role's id is its fact type's and its role name, they would take one id.",
+    messages: {
+      default: (factType: string, roles: string, id: string): string =>
+        `Fact type "${factType}" has roles ${roles} that would all take the id "${id}" in format 4.0, so the migration will add a suffix to all but the first and new authoring will refuse them. Give each a different role name.`,
+    },
+  },
+  [RULE_ID.encodedLocalName]: {
+    severity: "info",
+    description:
+      "A name holds characters an id cannot hold as written, so its format 4.0 id percent-encodes them.",
+    messages: {
+      default: (kind: string, name: string, id: string): string =>
+        `The ${kind} "${name}" will take the id "${id}" in format 4.0, with its reserved or unsafe characters percent-encoded.`,
     },
   },
   [RULE_ID.duplicateObjectification]: {

@@ -118,6 +118,7 @@ export {
   storePreferredFlags,
 } from "./model/identification.js";
 export { ModelElement } from "./model/ModelElement.js";
+export { localName } from "./model/name.js";
 export {
   ObjectifiedFactType,
   type ObjectifiedFactTypeConfig,
