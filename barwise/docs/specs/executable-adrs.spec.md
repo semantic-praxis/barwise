@@ -251,7 +251,8 @@ Out of scope:
 
 - Rewriting Consequences prose. The prose keeps the reasoning and the
   gaps; the header is the list a tool reads. They overlap by design (see
-  Open decisions, "Does the header duplicate Consequences?").
+  "Decisions resolved in review", "Does the header duplicate
+  Consequences?").
 - Proving discrimination on every PR (workstream 4 is on demand).
 
 ## Inventory
@@ -528,31 +529,36 @@ gate run. Ungrounded: where probes live, and whether process ADRs
 - Every future ADR must carry the header, which `template.adr.md`
   states.
 
-## Open decisions (for review)
+## Decisions resolved in review
 
-- **Extend `check:architecture`, or a new `check:adr-enforcement`?** A
+All three were resolved by the owner on 2026-10-28, each as recommended.
+None remains open.
+
+- **Extend `check:architecture`, or a new `check:adr-enforcement`?
+  (resolved: extend)** A
   new script keeps the package-graph check about the graph (orthogonality)
   and gives the failure its own name in CI; it costs a `ci.yml` step, a
   root forwarder and a second reader of the ADR set. Extending reuses the
   ADR reader and lives where the other ADR-shape checks already live.
-  Recommend: extend, because the ADR checks are already in that script,
+  Extended, because the ADR checks are already in that script,
   and the graph check and ADR checks already report under separate
   headings. The cost of extending is coupling the graph gate to the
   tracker's and settings' health; the Target architecture contains it
   (the enforcement pass reads its inputs in its own try, after the other
-  passes, and a refusal there never hides their findings). If the
-  reviewer judges that containment not enough, the new script is the
-  answer.
-- **Does the header duplicate Consequences?** Yes, partly: the
+  passes, and a refusal there never hides their findings). If that
+  containment proves not enough in practice, the new script is the
+  fallback.
+- **Does the header duplicate Consequences? (resolved: keep both)** Yes,
+  partly: the
   enforcer's name appears in both. The header is checked and the prose is
   not, so the prose can still drift. Options: leave the prose as is, or
   have WS2 trim each Consequences to the reasoning and point at the
-  header. Recommend: leave it; the prose explains what the gate covers
+  header. Kept as is: the prose explains what the gate covers
   and where it does not, which a list of names cannot.
-- **Do test files earn a place in the grammar?** Without them, five ADRs
+- **Do test files earn a place in the grammar? (resolved: yes)** Without them, five ADRs
   could only cite `test:coverage`, which any PR runs and which cannot
   point at one decision. With them, a test can be renamed and the check
-  catches it. Recommend: include them.
+  catches it. Included.
 
 ## Risks and testing
 
