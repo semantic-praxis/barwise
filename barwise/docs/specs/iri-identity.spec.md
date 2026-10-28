@@ -101,7 +101,7 @@ In scope:
   - role: its fact type's local name, `.`, and its role name, which is
     required today;
   - constraint, subtype fact, objectification: a name minted from its
-    canonical verbalization when the element is created, and stored, with
+    canonical verbalization when the element is given its id, and stored, with
     the content key it was minted from (owner decision, 2026-10-28; WS6);
   - population and fact instance: decision 7.
 - When a rule would give an element a local name another element of the
