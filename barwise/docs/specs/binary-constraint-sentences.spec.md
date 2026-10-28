@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-28
 Last-updated: 2026-10-28
 Tracking: barwise-m1c, barwise-zx2
+Plan-reviewed: b66a7f1f (code-review, pr-review)
 Touches: barwise/packages/core/src/verbalization/constraints/phase1.ts,
 barwise/packages/core/src/verbalization/constraints/phase2.ts,
 barwise/packages/core/src/verbalization/constraints/sentence.ts,
