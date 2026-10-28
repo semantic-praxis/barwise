@@ -129,6 +129,31 @@ describe("withSurrogateKeys", () => {
     expect(shape(get(out, "experiment")).foreignKeys).toEqual(["lab_key->lab(room_key)"]);
   });
 
+  it("hashes a reference in its target's key order, whatever order it lists its columns in", () => {
+    const visit = table("visit", ["visit_id", "nr", "code"], ["visit_id"], [
+      fk(["nr", "code"], "room", ["room_nr", "building_code"]),
+    ]);
+    const out = withSurrogateKeys(schemaOf(room(), visit));
+    expect(get(out, "visit").columns.find((c) => c.name === "room_key")?.generatedFrom).toEqual([
+      "code",
+      "nr",
+    ]);
+  });
+
+  it("hashes a reference to a collapsed key in the order that key hashes", () => {
+    const lab = table("lab", ["building_code", "room_nr"], ["room_nr", "building_code"], [
+      fk(["building_code", "room_nr"], "room", ["building_code", "room_nr"]),
+    ]);
+    const use = table("use", ["use_id", "r", "b"], ["use_id"], [
+      fk(["r", "b"], "lab", ["room_nr", "building_code"]),
+    ]);
+    const out = withSurrogateKeys(schemaOf(room(), lab, use));
+    expect(get(out, "use").columns.find((c) => c.name === "lab_key")?.generatedFrom).toEqual([
+      "b",
+      "r",
+    ]);
+  });
+
   it("settles a chain, hashing a key from source columns only", () => {
     const seat = table(
       "seat",

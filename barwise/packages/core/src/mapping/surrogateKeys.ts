@@ -43,18 +43,52 @@ export function withSurrogateKeys(schema: RelationalSchema): RelationalSchema {
   // new key once every table has one, since a reference outside the key
   // can point at a table decided later.
   const rewritten = new Map<string, Table>();
-  const pending = new Set<ForeignKey>();
+  // Each rewritten reference, to the foreign key it replaced.
+  const pending = new Map<ForeignKey, ForeignKey>();
   for (const name of order) {
     const table = byName.get(name)!;
     rewritten.set(name, rewrite(table, changed, generated, collapsed.get(name)!, byName, pending));
   }
   const keyOf = (name: string) => rewritten.get(name)!.primaryKey.columnNames[0]!;
+
+  // The columns a changed table's key hashes, in hashing order: a generated
+  // key's natural key, or, for a key collapsed to one reference, that
+  // reference's hash. A reference hashes its own columns in the order its
+  // target's key hashes the columns they stand for, so the two agree
+  // whatever order the foreign key listed them in.
+  const hashes = new Map<string, readonly string[]>();
+  const through = (target: readonly string[], replaced: ForeignKey): readonly string[] => {
+    const mapped = target.map((c) => replaced.columnNames[replaced.referencedColumns.indexOf(c)]);
+    return mapped.every((c) => c !== undefined) ? mapped as string[] : replaced.columnNames;
+  };
+  const keyHash = (name: string): readonly string[] => {
+    const known = hashes.get(name);
+    if (known) return known;
+    const table = rewritten.get(name)!;
+    const ref = table.foreignKeys.find((fk) =>
+      fk.columnNames[0] === keyOf(name) && pending.has(fk)
+    );
+    const cols = table.naturalKey
+      ?? (ref ? through(keyHash(ref.referencedTable), pending.get(ref)!) : []);
+    hashes.set(name, cols);
+    return cols;
+  };
+
   return {
     ...schema,
     tables: schema.tables.map((t) => {
       const table = rewritten.get(t.name)!;
+      const hashOf = new Map(
+        table.foreignKeys.filter((fk) => pending.has(fk)).map((fk) => [
+          fk.columnNames[0]!,
+          through(keyHash(fk.referencedTable), pending.get(fk)!),
+        ]),
+      );
       return {
         ...table,
+        columns: table.columns.map((c) =>
+          hashOf.has(c.name) ? { ...c, generatedFrom: [...hashOf.get(c.name)!] } : c
+        ),
         foreignKeys: table.foreignKeys.map((fk) =>
           pending.has(fk) ? { ...fk, referencedColumns: [keyOf(fk.referencedTable)] } : fk
         ),
@@ -135,7 +169,7 @@ function rewrite(
   generated: ReadonlySet<string>,
   collapsedKeyRefs: ReadonlySet<ForeignKey>,
   byName: ReadonlyMap<string, Table>,
-  pending: Set<ForeignKey>,
+  pending: Map<ForeignKey, ForeignKey>,
 ): Table {
   const columns: Column[] = [...table.columns];
   let key = [...table.primaryKey.columnNames];
@@ -163,7 +197,7 @@ function rewrite(
       dataType: SURROGATE_KEY_TYPE,
       dataTypeDefaulted: false,
       nullable: replaced.some((c) => c.nullable),
-      // In the target's key order, the order its own key is hashed in.
+      // Put in the target's hashing order once every key is settled.
       generatedFrom: [...fk.columnNames],
     });
     const reference: ForeignKey = {
@@ -172,7 +206,7 @@ function rewrite(
       referencedColumns: [],
       ...(fk.sourceConstraintId ? { sourceConstraintId: fk.sourceConstraintId } : {}),
     };
-    pending.add(reference);
+    pending.set(reference, fk);
     foreignKeys.push(reference);
     if (fk.columnNames.every((c) => key.includes(c))) {
       const first = key.findIndex((c) => fk.columnNames.includes(c));
