@@ -121,7 +121,7 @@ export class DdlExportFormat implements ExportFormatAdapter {
       text,
       // What each artifact was built from, for `lineage impact`. No format
       // set it, so every manifest recorded `sources: []` (barwise-ofb).
-      lineage: generateDdlLineage(model, schema),
+      lineage: generateDdlLineage(model, schema, routing.placements),
       annotations: annotations.length > 0 ? annotations : undefined,
       ...withConstraintSpecs(routing.spilled.map((s) => s.spec)),
     };

@@ -742,6 +742,45 @@ describe("constraints over subtypes", () => {
     );
   });
 
+  // The instance each forbids, though no population can be minted for it
+  // (routed-constraint-lineage.spec.md, barwise-j7j).
+  it("gives each kind over subtypes an example of the instance it forbids", () => {
+    expect(parties("exclusion")[0]!.spec.example).toBe(
+      "Forbidden: one Party in both LegalEntity and NaturalPerson",
+    );
+    expect(parties("disjunctive_mandatory")[0]!.spec.example).toBe(
+      "Forbidden: one Party in none of: LegalEntity, NaturalPerson",
+    );
+    expect(parties("disjunctive_mandatory", ["LegalEntity"])[0]!.spec.example).toBe(
+      "Forbidden: one Party in none of: LegalEntity",
+    );
+    expect(parties("exclusive_or")[0]!.spec.example).toBe(
+      "Forbidden: one Party in both LegalEntity and NaturalPerson, or one Party in none of: "
+        + "LegalEntity, NaturalPerson",
+    );
+  });
+
+  it("gives no example when a subtype does not resolve, as a shorter list would forbid an allowed one", () => {
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "p", name: "Party", kind: "entity", referenceMode: "party_id" });
+    const sub = model.addObjectType({
+      id: "s",
+      name: "Person",
+      kind: "entity",
+      referenceMode: "s_id",
+    });
+    const sf = model.addSubtypeFact({ id: "sf-s", subtypeId: sub.id, supertypeId: "p" });
+    model.addConstraint({
+      id: "c",
+      type: "disjunctive_mandatory",
+      subtypeFactIds: [sf.id, "sf-gone"],
+    });
+    const schema = new RelationalMapper().map(model);
+    expect(routeConstraints(model, schema, postgres, "postgres").spilled[0]!.spec.example).toBe(
+      "No concrete example available; see the verbalization.",
+    );
+  });
+
   it("names the supertype generically, and places no table, when no subtype fact resolves", () => {
     const model = new OrmModel({ name: "Test" });
     model.addObjectType({ id: "p", name: "Party", kind: "entity", referenceMode: "party_id" });

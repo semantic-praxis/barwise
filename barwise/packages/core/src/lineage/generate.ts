@@ -2,10 +2,11 @@
  * Lineage generation: traces exported artifacts back to source ORM elements.
  */
 
+import type { ConstraintPlacement } from "../mapping/constraintRouting.js";
 import type { RelationalSchema } from "../mapping/RelationalSchema.js";
 import { type Constraint, subtypeFactIdsOf } from "../model/Constraint.js";
 import type { FactType } from "../model/FactType.js";
-import type { OrmModel } from "../model/OrmModel.js";
+import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { subtypeOperands } from "../model/subtypeOperands.js";
 import type { LineageEntry, SourceReference } from "./types.js";
@@ -18,13 +19,24 @@ import type { LineageEntry, SourceReference } from "./types.js";
  *
  * @param model - The source ORM model
  * @param schema - The relational schema produced by RelationalMapper
+ * @param placements - The constraints the DDL's routing wrote on each
+ *   table, as a clause or a spilled comment (`routeConstraints`): each is
+ *   a source of that table, since changing it changes the table's text
+ *   (barwise-20o). A format that writes no routed constraint passes none.
  * @returns Lineage entries, one per table artifact
  */
 export function generateDdlLineage(
   model: OrmModel,
   schema: RelationalSchema,
+  placements: readonly ConstraintPlacement[] = [],
 ): readonly LineageEntry[] {
   const entries: LineageEntry[] = [];
+  const placedOn = new Map<string, ConstraintInView[]>();
+  for (const { tableName, inView } of placements) {
+    const list = placedOn.get(tableName);
+    if (list) list.push(inView);
+    else placedOn.set(tableName, [inView]);
+  }
 
   for (const table of schema.tables) {
     const sources = new Map<string, SourceReference>();
@@ -79,21 +91,14 @@ export function generateDdlLineage(
       if (fk.sourceConstraintId) {
         const inView = model.getConstraintInView(fk.sourceConstraintId);
         if (inView) {
-          const [constraint] = inView;
           // The fact types the constraint is named by (orm-format-3, Open
           // decision 9): its own for an internal one, every one it spans
           // for one across fact types. RelationalMapper sets this id to an
           // internal uniqueness (or, below, a subtype fact or fact type)
           // today, so the second case is the placement-correct reading,
           // not one an export reaches yet.
-          const named = model.factTypesNaming(inView);
-          sources.set(fk.sourceConstraintId, {
-            elementId: fk.sourceConstraintId,
-            elementType: "Constraint",
-            elementName: getConstraintName(constraint, named),
-          });
-
-          for (const ft of named) addFactTypeSources(sources, model, ft);
+          sources.set(fk.sourceConstraintId, constraintSource(model, inView));
+          for (const ft of model.factTypesNaming(inView)) addFactTypeSources(sources, model, ft);
         }
 
         // RelationalMapper also stores a subtype fact id here (the subtype
@@ -117,6 +122,14 @@ export function generateDdlLineage(
           });
         }
       }
+    }
+
+    for (const inView of placedOn.get(table.name) ?? []) {
+      const id = inView[0].id;
+      // A source needs an id; one with none cannot be named in impact.
+      if (id === undefined || sources.has(id)) continue;
+      sources.set(id, constraintSource(model, inView));
+      for (const ft of model.factTypesNaming(inView)) addFactTypeSources(sources, model, ft);
     }
 
     // Create lineage entry for this table
@@ -150,13 +163,7 @@ export function generateModelLineage(
   for (const c of model.constraints) {
     const facts = subtypeFactIdsOf(c).flatMap((id) => model.getSubtypeFact(id) ?? []);
     if (!c.id || facts.length === 0) continue;
-    const supertypeId = subtypeOperands(subtypeFactIdsOf(c), model).supertypeId!;
-    const supertype = model.getObjectType(supertypeId)?.name ?? supertypeId;
-    const source: SourceReference = {
-      elementId: c.id,
-      elementType: "Constraint",
-      elementName: getConstraintName(c, [{ name: `subtypes of ${supertype}` }]),
-    };
+    const source = constraintSource(model, [c, undefined]);
     for (const id of new Set(facts.flatMap((sf) => [sf.subtypeId, sf.supertypeId]))) {
       const list = subtypeConstraintSources.get(id);
       if (list) list.push(source);
@@ -214,14 +221,7 @@ export function generateModelLineage(
     // roles at all, which only code can build, is reported for every kind
     // but subset and equality, which have no role-count rule.
     for (const inView of model.constraintsTouchingAny(relatedFactTypes.map((ft) => ft.id))) {
-      const [constraint] = inView;
-      if (constraint.id) {
-        sources.push({
-          elementId: constraint.id,
-          elementType: "Constraint",
-          elementName: getConstraintName(constraint, model.factTypesNaming(inView)),
-        });
-      }
+      if (inView[0].id) sources.push(constraintSource(model, inView));
     }
 
     // Add subtype relationships
@@ -337,6 +337,25 @@ function getConstraintName(
       return of("Constraint");
     }
   }
+}
+
+/**
+ * A constraint as a lineage source, named by the fact types it names, or
+ * by its supertype for one over subtypes, which names no fact type. One
+ * helper, so every constraint source is named alike: a foreign key's, one
+ * the DDL routing placed, and the model lineage's.
+ */
+function constraintSource(model: OrmModel, inView: ConstraintInView): SourceReference {
+  const [c] = inView;
+  const subtypeFacts = subtypeFactIdsOf(c);
+  let named: readonly { readonly name: string; }[];
+  if (subtypeFacts.length > 0) {
+    const supertypeId = subtypeOperands(subtypeFacts, model).supertypeId!;
+    named = [{ name: `subtypes of ${model.getObjectType(supertypeId)?.name ?? supertypeId}` }];
+  } else {
+    named = model.factTypesNaming(inView);
+  }
+  return { elementId: c.id!, elementType: "Constraint", elementName: getConstraintName(c, named) };
 }
 
 /** "Customer is a subtype of Person", by the names of its two entities. */
