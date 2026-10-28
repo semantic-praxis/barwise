@@ -975,10 +975,12 @@ ontology:
     expect(warnings).toEqual([unknown(`concept "x.y".z`)]);
   });
 
-  it("still imports a document whose aliases make a cycle the check cannot walk, and says so", () => {
+  it("still checks the imported part when aliases make a cycle the check cannot walk", () => {
     // `children` is recursive in the schema, and the alias makes it a real
-    // cycle; ajv overflows the stack on it. The block is dropped either way.
+    // cycle; ajv overflows the stack on it. The block is dropped either way,
+    // and the fields beside imported ones are still named.
     const { model, warnings } = load(`
+colour: blue
 ontology_mappings:
   - name: m
     semantic_model: {}
@@ -986,12 +988,14 @@ ontology_mappings:
       - concept: Code
         link_mappings: [ &l { relationship: r, object_mapping: { expression: x }, children: [ *l ] } ]
 ontology:
-  - { concept: Code, type: ValueType, extends: [ String ] }
+  - { concept: Code, type: ValueType, extends: [ String ], shoe_size: 42 }
 `);
     expect(model.getObjectTypeByName("Code")?.kind).toBe("value");
     expect(warnings).toEqual([
+      unknown("colour"),
+      unknown("concept Code.shoe_size"),
       expect.stringMatching(
-        /^the document could not be checked against the Ossie 0\.2\.0\.dev0 schema \(.+\); a field the schema does not define would not be named\.$/,
+        /^ontology_mappings: could not be checked against the Ossie 0\.2\.0\.dev0 schema \(.+\); a field it does not define there would not be named\.$/,
       ),
       "ontology_mappings: embedded mappings (deprecated in Ossie) are not imported; dropped.",
     ]);

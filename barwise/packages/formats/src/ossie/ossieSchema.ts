@@ -77,26 +77,48 @@ function validator(): ValidateFunction {
  * for a given document, an object's own unknown keys before its children's.
  */
 export function unknownOssieFields(raw: unknown): string[] {
+  const whole = check(raw);
+  if (Array.isArray(whole)) return whole;
+  // ajv recurses over the document, so a YAML alias cycle through the
+  // schema's recursive defs overflows its stack. The only recursive defs
+  // are inside `ontology_mappings` (`LinkMapping.children`,
+  // `ReferentMapping.referent_mappings`), which the mapper drops whole; the
+  // rest is checked without it, so the fields that are imported are still
+  // named. The document imported before this check existed, so it still
+  // does: what is lost is the check of the dropped block, and the warning
+  // says so.
+  const doc = raw as Record<string, unknown>;
+  if ("ontology_mappings" in doc) {
+    const { ontology_mappings: _dropped, ...rest } = doc;
+    const others = check(rest);
+    if (Array.isArray(others)) {
+      return [
+        ...others,
+        `ontology_mappings: could not be checked against the Ossie ${OSSIE_VERSION} schema `
+        + `(${whole.message}); a field it does not define there would not be named.`,
+      ];
+    }
+  }
+  return [
+    `the document could not be checked against the Ossie ${OSSIE_VERSION} schema `
+    + `(${whole.message}); a field the schema does not define would not be named.`,
+  ];
+}
+
+/** The warnings for `doc`, or the stack overflow that stopped ajv walking it. */
+function check(doc: unknown): string[] | RangeError {
   const validate = validator();
   try {
-    if (validate(raw)) return [];
+    if (validate(doc)) return [];
   } catch (err) {
-    // ajv recurses over the document, so a YAML alias cycle through the
-    // schema's recursive defs (`LinkMapping.children`, inside the
-    // `ontology_mappings` nothing else reads) overflows the stack. The
-    // document imported before this check existed, so it still does; what
-    // is lost is only the check, and the warning says so.
-    const why = err instanceof Error ? err.message : String(err);
-    return [
-      `the document could not be checked against the Ossie ${OSSIE_VERSION} schema (${why}); `
-      + `a field the schema does not define would not be named.`,
-    ];
+    if (err instanceof RangeError) return err;
+    throw err;
   }
   return (validate.errors ?? [])
     .filter((e) => e.keyword === "additionalProperties")
     .map((e) => {
       const field = (e.params as { additionalProperty: string; }).additionalProperty;
-      return `${renderPath(raw, e.instancePath, field)}: the Ossie ${OSSIE_VERSION} schema `
+      return `${renderPath(doc, e.instancePath, field)}: the Ossie ${OSSIE_VERSION} schema `
         + `defines no such field; ignored.`;
     });
 }

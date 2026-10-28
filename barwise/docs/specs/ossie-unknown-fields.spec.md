@@ -211,12 +211,15 @@ path (`concept "x.y".z`), so its dots are not read as steps. Where
 `parseOssie`'s refusals write such a name bare, the warning quotes it.
 
 When ajv cannot walk the document -- a YAML alias cycle through the
-schema's recursive defs (`LinkMapping.children` inside
-`ontology_mappings`) overflows its stack -- the importer still imports it,
-as it did before this check, with one warning that the document could not
-be checked and so an undefined field would not be named. Refusing it would
-turn a document that imported into one that does not, over a block the
-mapper drops anyway; the code review found the case.
+schema's recursive defs, which all sit inside `ontology_mappings`
+(`LinkMapping.children`, `ReferentMapping.referent_mappings`), overflows
+its stack -- the importer checks the document again without that block,
+names the unknown fields in the rest, and adds one warning that
+`ontology_mappings` could not be checked. Refusing the document would turn
+one that imported into one that does not, over a block the mapper drops
+anyway. If the rest overflows too, which a later pin with recursion
+elsewhere could cause, one warning says the document could not be checked.
+Code review found the cycle.
 
 ## Workstreams
 
