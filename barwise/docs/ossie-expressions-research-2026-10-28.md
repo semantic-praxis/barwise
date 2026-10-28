@@ -56,9 +56,9 @@ subtypes, and does not hold for the rules themselves.**
   roles and paths, though it has not specified that syntax formally. Ossie
   also lets a value type extend another value type, which barwise flattens.
 - **Role paths go part of the way.** barwise's stored role path can carry
-  the path in three of the eight `derived_by` items in Ossie's specification
-  and flights example: both cases of `ancestor_of`, and
-  `EXISTS ( Person.earns )`. The other five need comparisons, literals or
+  the path in three of the nine explicit `derived_by` items in Ossie's
+  specification and flights example: both cases of `ancestor_of`, and
+  `EXISTS ( Person.earns )`. The other six need comparisons, literals or
   aggregation. Recursion needs a container that holds a union of paths, not
   a different kind of path. This should reshape barwise-pf2.2 (see "What
   this means for barwise-pf2.2").
@@ -81,7 +81,10 @@ subtypes, and does not hold for the rules themselves.**
   identifiers name columns of the dataset's `source`. In a dataset-scoped
   metric, they name that dataset's fields. In a model-scoped metric, they
   name `dataset.field`. Nothing in it names a concept, a role or a
-  relationship of the ontology.
+  relationship of the ontology. One table row ("Supported SQL Constructs",
+  line 128) says column and metric references vary "based on whether in
+  Ontology or Semantic models" and defers to "future Ontology
+  documentation", but the scope statement on line 39 still governs.
 - It declares a model and does not query one ("Model Declaration vs.
   Querying"). Querying is Layers 2 and 3 in `core-spec/spec_layers.md`.
 
@@ -123,7 +126,11 @@ in the specification.
   `main` (`89e2e17f`, 2026-10-27), `core-spec/ossie-schema.json` changed
   `Dialect` from a closed enum of twelve names, `OSSIE_SQL_2026` among them,
   to "any non-empty string". `expression_language.md` gained the sentence
-  saying so (commit `a498fce`, apache/ossie#617). Since 2026-09-21 the file
+  saying so (commit `a498fce`, apache/ossie#617). The same commit added an
+  optional top-level `sql` expression form, written in `OSSIE_SQL_2026` and
+  authoritative over a `dialects` entry, and replaced
+  `required: ["dialects"]` with `anyOf` `sql` or `dialects`. Since
+  2026-09-21 `expression_language.md`
   has had ten commits. Two of them changed semantics: `NOT` now ranks below
   comparison (#614), and `FILTER (WHERE ...)` was added (#382).
 - The first grammar is apache/ossie#657, "add ANTLR4 grammar for
@@ -240,15 +247,16 @@ type, used today only by the join constraints. The archived spec
 (`docs/specs/archive/role-path-model.spec.md`) left derivation bodies,
 branching paths, negation, and comparison along a path out of scope.
 
-| Source and item                                                                                                                               | What it needs                                                            | RolePath today                                                                                                                                                                   |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ontology.md`, `ancestor_of`: `Person.parent_of(descendant)`                                                                                  | One hop, projecting (Person, descendant)                                 | Yes (inferred: root Person, one step through `parent_of`, projection `[0, 1]`)                                                                                                   |
-| `ontology.md`, `ancestor_of`: `Person.ancestor_of.parent_of(descendant)`                                                                      | Two hops, one through the fact type being defined                        | The path, yes. A path can traverse any fact type, including the one being defined. What is missing is somewhere to hold "the union of these paths" and a stated fixpoint meaning |
-| `ontology.md`, `taxed_at`: `Person.files_single AND Person.earns <= 11925 AND TaxRate == 10.0`                                                | Conjunction, comparison with a literal, binding a value to the last role | No                                                                                                                                                                               |
-| `ontology.md`, `Employee`: `EXISTS ( Person.earns )`                                                                                          | Existence of a one-hop path from the supertype                           | The path, yes. Reading "exists" as the defining condition would need a new field                                                                                                 |
-| `flights`, `Airport.average_departure_delay`: `Delay == AVG[Flight.departure_delay WHERE Airport == Flight.route.departure GROUP BY Airport]` | Aggregation, a two-hop path, correlation to the root                     | No                                                                                                                                                                               |
-| `flights`, `Airport.average_arrival_delay`                                                                                                    | Same, through `route.destination`                                        | No                                                                                                                                                                               |
-| `flights`, `Route.average_departure_delay` and `Route.average_arrival_delay`                                                                  | Aggregation over a one-hop correlation                                   | No                                                                                                                                                                               |
+| Source and item                                                                                                                                  | What it needs                                                            | RolePath today                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ontology.md`, `ancestor_of`: `Person.parent_of(descendant)`                                                                                     | One hop, projecting (Person, descendant)                                 | Yes (inferred: root Person, one step through `parent_of`, projection `[0, 1]`)                                                                                                   |
+| `ontology.md`, `ancestor_of`: `Person.ancestor_of.parent_of(descendant)`                                                                         | Two hops, one through the fact type being defined                        | The path, yes. A path can traverse any fact type, including the one being defined. What is missing is somewhere to hold "the union of these paths" and a stated fixpoint meaning |
+| `ontology.md`, `taxed_at`: `Person.files_single AND Person.earns <= 11925 AND TaxRate == 10.0`                                                   | Conjunction, comparison with a literal, binding a value to the last role | No                                                                                                                                                                               |
+| `ontology.md`, `taxed_at`: `Person.files_married_joint AND Person.earns <= 23850 AND TaxRate == 10.0` (the list then ends in `...`, not counted) | The same shape as the item above                                         | No                                                                                                                                                                               |
+| `ontology.md`, `Employee`: `EXISTS ( Person.earns )`                                                                                             | Existence of a one-hop path from the supertype                           | The path, yes. Reading "exists" as the defining condition would need a new field                                                                                                 |
+| `flights`, `Airport.average_departure_delay`: `Delay == AVG[Flight.departure_delay WHERE Airport == Flight.route.departure GROUP BY Airport]`    | Aggregation, a two-hop path, correlation to the root                     | No                                                                                                                                                                               |
+| `flights`, `Airport.average_arrival_delay`                                                                                                       | Same, through `route.destination`                                        | No                                                                                                                                                                               |
+| `flights`, `Route.average_departure_delay` and `Route.average_arrival_delay`                                                                     | Aggregation over a one-hop correlation                                   | No                                                                                                                                                                               |
 
 **Verified:** today the importer keeps every one of these as text, in
 `derivation.expression` or `definingRule.expression`, joined one per line
@@ -289,7 +297,7 @@ evidence suggests three changes:
 2. **Make the rule structured data over role paths.** Start with what the
    role-path model already almost carries: a defining rule or derivation
    that is a union of projected role paths, with optional "exists". That
-   covers three of the eight `derived_by` items above, recursion included,
+   covers three of the nine `derived_by` items above, recursion included,
    and it verbalizes. Comparisons with literals come next, then
    aggregation, which is where metrics start.
 3. **Drop "evaluator" from core.** The determinism filter admits rules "as
@@ -325,9 +333,12 @@ evidence suggests three changes:
    repository. One option is to ask on `dev@ossie.apache.org` whether it can
    be published.
 8. **The fixture README says the files were "copied unchanged".**
-   `packages/formats/tests/fixtures/ossie/ontology.json` differs from
-   `01a5488d:ontology/ontology.json` in whitespace on three lines, probably
-   from the formatter. Should the README say so, or should the formatter
+   Two of the three files differ from the pin in whitespace, probably from
+   the formatter: `packages/formats/tests/fixtures/ossie/ontology.json`
+   from `01a5488d:ontology/ontology.json` on three lines, and
+   `fixtures/ossie/ossie-schema.json` from
+   `01a5488d:core-spec/ossie-schema.json`, where the `Dialect` enum on line
+   40 is reflowed onto 14 lines. Both parse to the same JSON. Should the README say so, or should the formatter
    exclude the directory?
 
 ## Sources
