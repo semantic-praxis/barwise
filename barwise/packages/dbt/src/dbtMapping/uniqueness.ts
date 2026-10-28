@@ -163,6 +163,7 @@ function external(
   const held = factType?.internalConstraints.some((c) =>
     c.type === "internal_uniqueness" && c.roleIds.length === 1 && c.roleIds[0] === distinct[0]
   );
-  if (factType && !held) factType.addConstraint({ type: "internal_uniqueness", roleIds: distinct });
+  if (!factType) return "names a role of a fact type that was not built";
+  if (!held) factType.addConstraint({ type: "internal_uniqueness", roleIds: distinct });
   return undefined;
 }

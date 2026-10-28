@@ -124,10 +124,13 @@ function columnPrimaryKey(raw: unknown): string[] | undefined {
     if (c === null || typeof c !== "object") return [];
     const col = c as Record<string, unknown>;
     const constraints = Array.isArray(col.constraints) ? col.constraints : [];
+    // A column with no name cannot be the key; it is no column of the
+    // model to declare.
+    if (typeof col.name !== "string" || col.name === "") return [];
     return constraints.some((k) =>
         k !== null && typeof k === "object" && (k as Record<string, unknown>).type === "primary_key"
       )
-      ? [String(col.name ?? "")]
+      ? [col.name]
       : [];
   });
   return names.length > 0 ? names : undefined;
