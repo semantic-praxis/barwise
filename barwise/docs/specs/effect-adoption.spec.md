@@ -724,7 +724,8 @@ not because a gate failed.
   spike as Open decision 4 says. A pass continues with WS1b parts B3, C,
   D and E as written, on the spike branch.
 
-**Branch.** The spike is built on its own branch,
+**Branch.** The spike is built on its own branch (confirmed by the owner
+2026-10-29),
 `experiment/effect-adoption-3.0`, from `main` after this section and R0
 merge, and opened as a PR that never merges, as #672 was. #672 stays open
 as the 2.0 evidence until the restart's WS1 reading is recorded, and is
@@ -1255,7 +1256,9 @@ entry only records that it follows.
       extension get as-you-type errors and key completion from the
       schema, at the cost of duplicate reports.
 
-13. **Files below 3.0 on the spike (added 2026-10-29).**
+13. **Files below 3.0 on the spike (added 2026-10-29) -- resolved
+    2026-10-29 by the owner: option (a), with decision 10 amended as
+    stated there.**
     - **(a)** The 2.0 reader stays as it is: ajv against the frozen
       `orm-model-2.0.schema.json`, reading straight into the model, with
       the element deserializers it shares with today's 3.0 reader moved
@@ -1268,13 +1271,14 @@ entry only records that it follows.
       runtime dependency for as long as core reads 2.0. That amends Open
       decision 10, which the owner resolved as test-only: under (a), ajv
       moves to a dev dependency only when 2.0 reading is retired, which is
-      its own decision. The owner decides whether the amendment stands.
+      its own decision. The owner accepted the amendment on 2026-10-29.
     - **(b)** Write a 2.0-to-3.0 document migration and decode every file
       with Effect. ajv leaves core's runtime entirely. Cost: a migration
       `main` does not have and does not need, written for the spike, and
       a second reading of the 2.0 rules that would have to agree with
       `readLegacy`'s.
-14. **The Effect version (added 2026-10-29).** Recommend 4.0.5, exact:
+14. **The Effect version (added 2026-10-29) -- resolved 2026-10-29 by
+    the owner: 4.0.5, exact.** The reasons:
     two weeks old at the restart, and the version WS2 named. #672 used
     4.0.4. 4.0.6 and 4.0.7 are under two weeks old. M1 is re-read on the
     pinned version, since derivation is marked unstable.
