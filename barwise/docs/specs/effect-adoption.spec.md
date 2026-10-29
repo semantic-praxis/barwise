@@ -1,12 +1,11 @@
 # Adopting Effect Schema for the rest of the sealed-record metamodel
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
-see WS0); the spike (WS1) amended 2026-10-15 to measure derived test
-generators and property tests (see WS1 and Reported measures); the spike
-in progress on `experiment/effect-adoption-facttype` (#672, never merges);
-WS1b added 2026-10-16 for review, not started; WS2 onward not started
+see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
+restarted on format 3.0 2026-10-29 (1r), R0 onward not started; WS1b
+follows the restart's WS1 reading; WS2 onward not started
 Created: 2026-10-15
-Last-updated: 2026-10-17
+Last-updated: 2026-10-29
 Tracking: barwise-jo5 (this spec); barwise-4r3 (Effect alone on load,
 WS1b part B); barwise-r27 (the blind-spot harness, part A); barwise-wia (generated JSON
 Schema, part C); barwise-5ly (one format definition, part E); barwise-s6q
@@ -543,6 +542,199 @@ Not yet measured: M1 on the 16-kind union, M4 on any kind, M5 for the
 spike's derived generators, and whether the union needs `Schema.suspend`
 to derive. Those are the spike's first readings.
 
+### 1r. The restart on format 3.0 (added 2026-10-29)
+
+In one sentence: the spike is rebuilt from current `main` on format 3.0,
+porting what #672 showed still applies, and the 3.0 load path is decoded
+by Effect alone once every key in it has a decoder, so the two-validator
+merge layer #672 built and WS1b part B would have removed is never
+written. The
+owner chose the restart on 2026-10-29 over merging `main` into #672.
+
+**WS1's reading on format 2.0, recorded from #672 at `55c56671`.**
+Every gate held, `main` read back to back on the same machine:
+
+| Gate | `main`                          | Spike                                                                                              |
+| ---- | ------------------------------- | -------------------------------------------------------------------------------------------------- |
+| S1   | suite green                     | all 12 packages green; 3,074 constraints and 1,502 fact types in 85 files read to the same records |
+| S2   | layout tests green              | layout tests green                                                                                 |
+| S3   | --                              | the Schema type is the frozen `ConstraintRecord`, kind by kind; a planted widening fails it        |
+| S4   | combined 19/28 reported         | 28/28 reported and named, constraints named 11/11, 0 silent losses                                 |
+| S5   | `validate` bundle 438-451 ms    | 471-483 ms, under the 1 s limit; 430 modules and 4.12 MB loaded, against 302 and 1.47 MB           |
+| S6   | 2,730 ms, 25,382 instantiations | 3,590 ms, 70,036 instantiations (reported, no limit)                                               |
+| M1   | --                              | derives for all 16 kinds and both object type codecs; P1 to P3 1,000 of 1,000 (seed 1)             |
+
+M5 and the shrinking reading were not taken. The spike therefore passed
+WS1 on the format of its day. It is restarted because that format is gone,
+not because a gate failed.
+
+**What format 3.0 changed under the spike (verified on `main` at
+`a91fe22c`).**
+
+- **There are 17 constraint kinds, not 16.** `join_ring` joined the
+  union after #672, and `disjunctive_mandatory`, `exclusion` and
+  `exclusive_or` now take an operand over roles or over subtype facts
+  (orm-format-3 WS4b). #672's Schemas have neither. The frozen
+  `ConstraintRecord` on `main` already has both, so S3 refuses a port that
+  lacks them.
+- **A constraint lives where its kind says.** `PLACEMENT` in
+  `model/Constraint.ts` splits the kinds into internal ones, under
+  `fact_types[].constraints`, and external ones, under
+  `model.constraints`. `refuseMisplacedConstraints` refuses a kind in the
+  wrong list by name, before validation, and stops at the first one.
+- **A 3.0 file states every constraint id.** The 3.0 schema requires it,
+  so Open decision 8's fill for file loading never runs on 3.0: the 3.0
+  loader fills nothing. Ids are filled only by construction, and the 2.0
+  reader derives the ones a 2.0 file omits (`derivedId.ts`). The
+  optional-id stage WS1b part C described is not written.
+- **The preferred identifier is the entity's.** An entity carries
+  `preferred_identifier` (a constraint id), and no constraint carries
+  `is_preferred`. #672's refusal of `isPreferred: false` goes with the
+  field.
+- **A file below 3.0 has its own reader.** `readLegacy` reads 2.0 (and
+  1.x, migrated to 2.0 first) straight into the model, validated against
+  the frozen `orm-model-2.0.schema.json`. There is no 2.0-to-3.0 document
+  migration. It shares the element deserializers (`yaml/objectType.ts`,
+  `yaml/factType.ts`, `yaml/constraint.ts`) with the 3.0 reader.
+- **The header gained `namespace`** beside `name`, `domain_context` and
+  `note`, and a document with no `orm_version` reaches the 3.0 path,
+  which reports it missing.
+- **The corpus.** Of the 119 tracked models, 13 are 3.0 and 106 older;
+  28 of the 2.0 files are the S4 fixtures, which `main` refuses on
+  purpose.
+- **The WS0 instruments still hold on `main`:** the layout tests pin the
+  3.0 writer's output (S2), and the frozen `ConstraintRecord` matches the
+  union with its two narrowings (S3). The 28 malformed fixtures and the
+  scorer's combined file are 2.0 (S4), and the scorer knows only
+  `object_types` and `fact_types`.
+
+**What the restart changes in the plan.**
+
+- **ajv leaves the 3.0 path once, when every key has a decoder.** Until
+  then the loader is `main`'s, unchanged. Each new decoder is held by its
+  own tests, and a test runs the 3.0 S4 fixtures for its element kind
+  through it, requiring each problem at the fixture's path and naming its
+  field, so a decoder regression shows in the step that made it. The
+  scorer reads whole documents, so S4 itself is read on the R4 head. Dropping ajv
+  one element kind at a time would leave the keys not yet decoded checked
+  by nothing, or need the merge layer #672 built. So the rest of the
+  document, which WS1b's B2 scheduled after the WS1 reading, moves before
+  it (R4).
+- **No merge layer.** With one validator on the 3.0 path, `elementRecheck.ts`,
+  the `merge*Problems` functions, the branch validators and
+  `schemaErrorOf` are not ported, and WS1b's B1 and B4 have nothing to
+  delete. Part A's harness is what keeps the reports complete, so it is
+  built first (R1) and every later rule is written against it.
+  `withPresence`, `readingsOf` and the range supplement are not ported.
+- **One owner for placement.** Each constraint list's Schema accepts any
+  kind and the decoder refuses a kind outside its placement, in the
+  wording `format30.test.ts` pins today ("move it to model.constraints"),
+  in the same pass as every other problem. The decoder reads
+  `PLACEMENT`, so placement is stated once. `refuseMisplacedConstraints`
+  is deleted in R4, the commit that puts the decoder on the load path; it
+  owns the refusal on the load path until then.
+- **The hand-written JSON Schema stays the shipped file until part C,**
+  so each Effect Schema is a copy that must agree with it. Each kind gets
+  a drift test against the hand-written 3.0 schema in the commit that adds
+  its Schema, as #672's `objectTypeSchemaDrift.test.ts` did, comparing
+  fields, required fields and enumerated values, and for the two
+  constraint lists which kinds each accepts. Part C deletes them when it
+  generates the file.
+- **S1 compares two heads, not one.** Read on the spike, "`main`'s reader"
+  for a 3.0 file would be the decoder under test, and a decoder that
+  dropped `namespace` would agree with itself. S1 is therefore read the
+  way S5 and S6 are, by a new `measure:comparison -- corpus` subcommand
+  (R0) run on `main` and on the spike head:
+  - It loads every tracked model, strictly and leniently, writes each one
+    it accepts as 3.0, and prints per file and per mode either the 3.0
+    bytes or "refused". The two heads' outputs must match file for file.
+    Refusal wording is not compared; that is S4's to read. Every file is
+    admitted by `main`'s own reader, with no path filter, so a file the
+    spike wrongly refuses shows as a difference, and the S4 fixtures show
+    as refused on both.
+  - `--write <dir>`, run on `main`, also writes each 3.0 output to a file;
+    `--read <dir>`, run on the spike, decodes those files and prints the
+    same listing, which must equal `main`'s. So the 2.0 files, read by
+    `readLegacy` on `main`, test the Effect decoder against the 2.0
+    reader's model through the one writer.
+- **S4 is re-baselined on 3.0 fixtures** (R0).
+  - The 28 cases are restated at 3.0, each gaining the constraint ids 3.0
+    requires so it still has exactly one problem, and each external-kind
+    case sits under `model.constraints`.
+  - New cases cover what 3.0 added and what R4 moves off ajv: a
+    constraint with no id; an external kind under a fact type and an
+    internal kind in `model.constraints`; a value type with
+    `preferred_identifier`; an operand giving both `roles` and
+    `subtype_facts`; a malformed `join_ring`; a header without `name`
+    and one with an invalid `namespace`; and one each for
+    `subtype_facts`, `objectified_fact_types`, `populations`,
+    `definitions` and `diagrams`.
+  - The scorer gains a case kind for each new collection. It anchors a
+    positional match to the collection, so `model/constraints/0` and
+    `fact_types/5/constraints/0` are different elements, and carries into
+    the combined file the fact types and subtype facts a model-level case
+    names. `lostKeys` walks every collection, and the combined file is
+    written at 3.0. Each change is shown to catch a planted scorer defect.
+  - The 2.0 fixtures stay for the 2.0 reader, which the spike does not
+    change.
+- **S3 is tightened first** (R0). The frozen `ConstraintRecord` still
+  declares `isPreferred` on `internal_uniqueness`, which 3.0 removed, and
+  `KindsMatch` treats optional keys as matching whether present or not, so
+  a port that kept #672's `isPreferred`, or dropped an optional field, would
+  pass. R0 drops the field and makes `KindsMatch` compare each kind's key
+  set, optional keys included, with a planted extra optional key shown to
+  fail it.
+- **M4's wrapper follows placement.** An internal kind is checked inside an
+  enclosing fact type, as WS1 says. An external kind is checked in
+  `model.constraints`, beside the fact types and subtype facts its roles
+  name, each built as WS1's wrapper builds a fact type.
+
+**Work, in order.** Each item keeps the full suite green on its own head.
+
+- **R0, on `main`: the 3.0 instruments.** The 3.0 malformed fixtures and
+  the scorer as above, each new scorer path shown to catch a planted
+  defect; S3's tightening; the `corpus` subcommand; and S1, S4, S5 and S6
+  baselines taken on `main`. An instrument change, which the Non-goals
+  allow as amended below.
+- **R1, on the spike branch: Effect, the harness and object types.**
+  `effect` pinned at 4.0.5 (Open decision 14); the object type Schema with
+  `preferred_identifier` and Open decision 5's config leaf link; the
+  decoder in Open decision 8's shape; part A's harness and its
+  planted-defect test; the drift test.
+- **R2: constraints.** All 17 kinds, the operand over roles or subtype
+  facts, the two lists with placement read from `PLACEMENT`, ported where
+  #672's `constraintSchema.ts` and `valueRangeSchema.ts` still apply.
+  S3 and M1 re-read.
+- **R3: fact types and roles,** from #672's `factTypeSchema.ts`, with the
+  reading rule as a harness check on the Schema.
+- **R4: the rest of the document, and ajv off the 3.0 path.** The header
+  (`orm_version`, `name`, `domain_context`, `namespace`, `note`) and
+  `subtype_facts`, `objectified_fact_types`, `populations`, `definitions`
+  and `diagrams`; the 3.0 loader then runs the Effect decoders alone, and
+  the cross-element checks (repeated ids, references between elements, the
+  lenient option) run after decoding as they do today, and
+  `refuseMisplacedConstraints` is deleted. The 3.0 reader builds the model
+  from decoded records. The `deserialize*` functions in `yaml/*.ts`, and
+  `readTail`, become the 2.0 reader's alone, moved unchanged into a module
+  beside it; the `serialize*` functions stay where they are for the writer.
+  So the two readers share no code that only one of them is meant to
+  change (Open decision 13).
+- **The WS1 reading on 3.0.** S1 to S6 and M1 to M4 are read on the R4
+  head, `main` back to back, and recorded here. A failed gate ends the
+  spike as Open decision 4 says. A pass continues with WS1b parts B3, C,
+  D and E as written, on the spike branch.
+
+**Branch.** The spike is built on its own branch,
+`experiment/effect-adoption-3.0`, from `main` after this section and R0
+merge, and opened as a PR that never merges, as #672 was. #672 stays open
+as the 2.0 evidence until the restart's WS1 reading is recorded, and is
+then closed with a pointer here.
+
+**Estimate.** R0 is one session. R1 to R4 are four to five: the port is
+mostly Schemas, and the merge layer that took most of #672's 14 review
+rounds is not rebuilt, but R4 brings B2's work forward. WS1b after that is
+B3, C, D and E, about 4 to 7 sessions of the 8 to 12 estimated.
+
 ### 1b. The spike, continued: one harness, Effect alone on load, derived generators (added 2026-10-16)
 
 In one sentence: on the spike branch, replace the four hand-made
@@ -980,7 +1172,7 @@ entry only records that it follows.
    - **(c)** An Effect service (`IdSource`, what the Effect arm built). Rejected: still a port, now in core's public types.
    - **(d)** Chosen. The decoder requires every id and refuses an element without one. The synchronous boundaries fill missing ids from the installed generator, then decode, and they differ by source:
      - **Config construction** (`createObjectType`, `addObjectType`, importers, the LLM) fills a missing id for any kind.
-     - **File loading** fills a missing id only where the file format lets one be omitted. Today that is every constraint kind: `orm-model.schema.json` requires no constraint id, the shipped `examples/getting-started/shop.orm.yaml` omits them, and `FactType` mints them. Filling these keeps gate S1. Where the file format requires an id (object types, roles, fact types, subtype facts, objectifications, populations, instances), a missing one is refused as it is today. Construction-time minting cannot repair it, because the schema and the decoder refuse the file before any object is constructed.
+     - **File loading** fills a missing id only where the file format lets one be omitted. (Amended 2026-10-29: under format 3.0 the schema requires every constraint id, so the 3.0 loader fills none, and the 2.0 reader derives the ids a 2.0 file omits, `derivedId.ts`. The rest of this bullet describes format 2.0 as it stood when decided.) Today that is every constraint kind: `orm-model.schema.json` requires no constraint id, the shipped `examples/getting-started/shop.orm.yaml` omits them, and `FactType` mints them. Filling these keeps gate S1. Where the file format requires an id (object types, roles, fact types, subtype facts, objectifications, populations, instances), a missing one is refused as it is today. Construction-time minting cannot repair it, because the schema and the decoder refuse the file before any object is constructed.
 
    Consequences. The decoder is a pure function of its input, with no parameter or service for ids. The one place that mints ids is the global generator core already has (`setIdGenerator`, 2026-07-25), now confined to the boundary; barwise-e8m gets a note saying so. The serializer no longer needs to recognise ajv's missing-`id` message, because the decoder reports a missing id itself (barwise-k8y). The spike converts the brought-forward ObjectType slice from `IdSource` to this shape before it builds the constraint decoder. If core should later hold no generator at all, minting moves out to the callers in the outer packages; the decoder does not change for that.
 
@@ -1063,6 +1255,30 @@ entry only records that it follows.
       extension get as-you-type errors and key completion from the
       schema, at the cost of duplicate reports.
 
+13. **Files below 3.0 on the spike (added 2026-10-29).**
+    - **(a)** The 2.0 reader stays as it is: ajv against the frozen
+      `orm-model-2.0.schema.json`, reading straight into the model, with
+      the element deserializers it shares with today's 3.0 reader moved
+      beside it unchanged (R4). Recommended: the 2.0 format is frozen, so
+      its reader has no reason to change, and the spike measures the
+      format that grows. The two readers then decode the same element
+      shapes in two ways, and S1's second pass is what holds them to one
+      model: each 2.0 file read by `readLegacy`, written at 3.0 and
+      decoded by Effect must give `main`'s bytes. Cost: ajv stays a
+      runtime dependency for as long as core reads 2.0. That amends Open
+      decision 10, which the owner resolved as test-only: under (a), ajv
+      moves to a dev dependency only when 2.0 reading is retired, which is
+      its own decision. The owner decides whether the amendment stands.
+    - **(b)** Write a 2.0-to-3.0 document migration and decode every file
+      with Effect. ajv leaves core's runtime entirely. Cost: a migration
+      `main` does not have and does not need, written for the spike, and
+      a second reading of the 2.0 rules that would have to agree with
+      `readLegacy`'s.
+14. **The Effect version (added 2026-10-29).** Recommend 4.0.5, exact:
+    two weeks old at the restart, and the version WS2 named. #672 used
+    4.0.4. 4.0.6 and 4.0.7 are under two weeks old. M1 is re-read on the
+    pinned version, since derivation is marked unstable.
+
 ## Risks and testing
 
 - Derivation is unstable in the pinned Effect version. The spike records
@@ -1086,7 +1302,8 @@ entry only records that it follows.
 
 ## Non-goals
 
-- No change to `main` beyond WS0's instruments before the spike passes.
+- No change to `main` beyond WS0's and R0's instruments before the spike
+  passes (R0 added 2026-10-29).
 - No Effect in `llm`, `cli`, `mcp` or `vscode` beyond declaring the
   dependency where a package imports a core decoder.
 - No new capability: this restyles how core holds and decodes a model,
