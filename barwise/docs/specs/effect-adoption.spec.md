@@ -2,7 +2,7 @@
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
-restarted on format 3.0 2026-10-29 (1r), R0 done, R1 onward not started; WS1b
+restarted on format 3.0 2026-10-29 (1r), R0 and R1 done, R2 onward not started; WS1b
 follows the restart's WS1 reading; WS2 onward not started
 Created: 2026-10-15
 Last-updated: 2026-10-29
@@ -787,6 +787,117 @@ The 2.0 reading is unchanged by the scorer's extension: `malformed` on the
 - S6 rose from 25,382 instantiations at WS0 to 38,363 on `main` today,
   with no Effect: format 3.0's placement types. The spike is read against
   today's number.
+
+**R1, done 2026-10-29: Effect, the harness and object types**, in
+`core/src/decode/`, which nothing on the load path imports and core's
+barrel does not export.
+
+- Changed scope: the Schemas are written in the file's own keys and make
+  no transformation, and a plain `toRecord` maps a decoded value to
+  `main`'s `ObjectType` record. #672 decoded through renamed keys
+  (`encodeKeys`), which needed every reported path re-spelled into the
+  file's keys (`spelledAs`) and gave the harness a decoded shape that
+  differed from the raw one. Here a decoded value is the raw value, so a
+  rule runs on raw input exactly, and a problem's path is the file's.
+  #672's record-producing codec for configs (`createObjectType`'s input)
+  is not ported: it replaces the constructor, which is WS2 to WS4's.
+- Part A's two probes, on Effect 4.0.5: a failed decode reports a check
+  it ran as a `Filter` issue carrying that filter, so a rule Effect
+  reported is recognised by identity; and a filter's `run` takes the raw
+  value. The harness is therefore the design part A described, with no
+  fallback: a rule marked by `crossField` runs wherever none of the
+  fields it reads failed, and a failure Effect reported at the same path
+  for the same rule is not reported twice.
+- Held to `main` by tests, not by being on the load path: all 1,547
+  object types in the 85 corpus models decode to the record
+  `createObjectType(deserializeObjectType(...))` builds, with the same
+  preferred identifier; 500 derived values each pass the hand-written 3.0
+  schema and the constructor, to the same record; and the 12 3.0
+  malformed object type cases are refused at their field, named with the
+  element.
+- The planted-defect test plants six structural defects and three
+  cross-field ones into every corpus and derived object type, requiring
+  exactly the declared paths. Three pairs put each rule beside a field
+  error in its own struct; each pair's rule goes unreported without the
+  harness, and every rule the Schema marks has a pair.
+- Planted against, each failing its test: the harness off, a rule that
+  reads a failing field, no dedupe, a record that drops `note`, aliases
+  allowed empty, a Schema missing `note`, a Schema adding a field, and a
+  required `preferred_identifier`. The version-agreement test refuses a
+  range, another version, and a core that does not pin exactly.
+- S5 is unchanged by construction and was checked: `validate` loads 313
+  modules on `main` and on R1's head alike.
+- The first implementation review found four design flaws, each fixed
+  with a test that fails when it is planted back:
+  - a union's member was chosen by any single-literal field, so a tag
+    written with `Literals`, a suspended or nested member, or an optional
+    literal two members share left the rule unreported; a member is now the
+    one whose required literal fields all hold;
+  - the walk did not enter a record's entries, a tuple's elements, or the
+    one struct of an untagged union (`NullOr`, a union with a string);
+  - agreement with `main` was tested one way only, so a decoder refusing an
+    empty `definition` passed: a generator over the hand-written schema
+    (`tests/helpers/jsonSchemaArbitrary.ts`) now draws 3,000 values, 592
+    of them valid, and the decoder must accept exactly what `main` accepts.
+    Its first run found the decoder refusing integers above 2^53, which
+    `main` accepts (`Schema.Int` is a safe-integer check), now fixed;
+  - nothing checked that a rule's `reads` covers what its predicate reads,
+    or that the walked Schemas make no transformation, and a rule that
+    threw was skipped without a word: a proxy now records each rule's
+    reads, an AST check refuses a transformation, and a throw surfaces.
+- Detail findings from the same review, each now a test: a record is
+  frozen; every problem a fixture reports is at its declared field; a
+  value that is not a mapping is one problem worded as that; the lockfile
+  installs one `effect`, at core's version. The harness builds its issues
+  with Effect's own `Filter` constructor.
+- The second implementation review found six design flaws in the first
+  review's fixes, each fixed with a test that fails when it is planted
+  back. The first two supersede the first review's member choice and
+  record walk, which no longer exist:
+  - choosing a union's member from the Schema, by its literal fields,
+    still guessed: the harness now walks Effect's own issue tree, visiting
+    exactly the structs and lists Effect reported as failed, and a failed
+    union's issue names the member Effect tried;
+  - a rule was skipped wherever a field it reads held any error: it is now
+    skipped only where one is missing or of the wrong kind, and a field
+    that failed a check, or holds an error deeper down, no longer silences
+    it;
+  - a rule's own issues are reported where they point, and several of
+    them as several problems, not one problem at the rule's node;
+  - a list's rules (`Array(...).check`) were never run beside an item's
+    error, and now are, with `reads` taking `*.type`-style paths;
+  - which element a problem belongs to was fixed at the decoder's root, so
+    a problem deep in a document would be labelled by the document: an
+    element's Schema now carries an `element` annotation (`elementOf`)
+    the walk meets on the way down, and one generic shell
+    (`decode/decoder.ts`: `decoderFor`, `DecodeProblems`,
+    `DecodeError`) replaces the object-type-specific one R2 to R4 would
+    have copied;
+  - the hand-written-schema generator read a `oneOf` beside `properties`
+    as nothing, so every constraint it drew was `{}`, and ignored
+    `anyOf` presence, `minimum`, `minLength` and `minItems`. It now
+    honours each, and a test holds it to drawing constraints of more than
+    five kinds, at least 30% of them valid, for R2; the object type
+    property now accepts 715 of its 3,000 values (floor 600, raised after the third review).
+- Detail findings from the same review: the reads check follows only
+  top-level keys, which is exact for R1's three rules and is required
+  before R2's first list-level rule (barwise-nh5); the member-choice
+  caching and recursion guard, and a record member matching any object,
+  went with the member choice itself.
+- The third implementation review found no flaw in the design and five
+  defects in the walk, each fixed with a test that fails when it is
+  planted back: a rule returning several issues was walked as a failure of
+  its own node, re-running every rule there (without end, for a rule
+  pointing below a field it reads); a broken parent of a dotted read did
+  not stop the rule, which then threw on `null.type`; a rule Effect had
+  already run and passed was run again; Effect's several-line text broke a
+  problem's one line; and a struct element that is not a mapping was not
+  worded as one. A problem now carries `at`, where its element sits, and
+  an element with no name is named by that position. The decoder shell
+  lost its test-only `harness` switch, and the generator now honours
+  `if/then/else` (the side's requirements and forbidden fields), so the
+  object type property accepts 1,896 of its 3,000 values (floor 1,600).
+  Running a rule under the decode's parse options is barwise-yn2.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,

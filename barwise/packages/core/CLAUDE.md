@@ -10,8 +10,13 @@ This package has ZERO runtime dependencies on VS Code or any other
 editor/platform API. It must remain consumable by CLI tools, CI
 pipelines, and test harnesses without launching an editor.
 
-Allowed runtime dependencies: `yaml`, `ajv`. No others without
-discussion.
+Allowed runtime dependencies: `yaml`, `ajv`, and `effect`, pinned to an
+exact version (`tests/effectVersion.test.ts` fails a range, and any other
+workspace package that declares it at a different version). No others
+without discussion. `effect` arrived with the decoders in `src/decode/`
+(`docs/specs/effect-adoption.spec.md`, 1r, R1): until R4 nothing on the
+load path imports them, and core's barrel does not export them, so a
+surface that starts does not load Effect.
 
 ## Package Layout
 
@@ -24,6 +29,9 @@ src/
   mapping/        Relational mapper (ORM -> tables/columns/keys), DDL renderer,
                   and constraint routing: what the schema realized, and what a
                   dialect adds as UNIQUE/CHECK or spills as a ConstraintSpec
+  decode/         Effect Schemas and decoders for the 3.0 file format, with
+                  the cross-field harness; off the load path until
+                  effect-adoption R4
   diff/           Model diffing and three-way merge
   rename/         Renaming an element: renameInModel, and renameInProject with
                   its cascade into shadows, reference modes, definitions and
