@@ -126,8 +126,9 @@ In scope:
 - When a rule would give an element a local name another element of the
   model already holds, the system shall append `_2`, `_3`, and report it,
   except where decision 5 refuses instead. The order is a function of
-  the input: object types before fact types before everything else, then
-  document order, so two builds of one input agree.
+  the input: add order, which on load is object types, then each fact type
+  with its internal constraints, then everything else, in document order
+  (decision 17), so two builds of one input agree.
 - When an element's stored id no longer matches the name it was made from,
   validation shall warn, naming both (decisions 13 and 14). Neither
   changes on its own.
@@ -601,13 +602,11 @@ duplicates), so a role named by a name that two roles share is refused,
 naming their positions, and the position form renames either -- which is
 how a duplicate decision 5 asks the author to resolve gets resolved.
 
-**An objectified pair is one name.** An object type that objectifies a fact
-type of the same name -- 22 such pairs in the corpus (decision 4) -- is
-renamed with that fact type, whichever of the two is the target, and both
-appear in `changes`. Renamed one at a time, the second rename would be
-refused for taking a name the first holds, and the pair could never share
-a name again; WS2's collision rule already exempts the pair for the same
-reason.
+**An objectified pair is renamed one side at a time.** An object type that
+objectifies a fact type of the same name -- 22 pairs in the corpus -- is the
+collision decision 4 resolves by giving the fact type its own name, so
+renaming either side is the fix, and the usual refusals apply to the new
+name.
 
 **`renameInModel(model, target, to): RenameResult`**, pure, in
 `core/src/rename/`. It returns a new model and leaves its input alone: the
@@ -624,19 +623,21 @@ rewrite in plain words, for the surfaces to print.
 Beyond the element's own name, a model-level rename rewrites:
 
 - **The definition** whose `term` equals the old name, when no other object
-  type or fact type in the model holds that name: the element's glossary
-  entry, which diff pairs by term. (An objectified pair shares its
-  definition and is renamed together, so its term is rewritten.)
-- **Reference modes derived from a renamed name**, because
-  `RelationalMapper` reads them as names: an entity whose `reference_mode`
-  equals `toSnake(old)` of a renamed value type gets `toSnake(new)`, since
-  the mapper finds the key type by exactly that match and would otherwise
-  silently untype the key column; and a renamed entity whose
-  `reference_mode` is `toSnake(old)_id` gets `toSnake(new)_id`, the shape
-  NORMA's importer writes and 217 of 660 corpus entities use, from which the
-  mapper names the key column when no preferred identifier is declared.
-  `toSnake` is private to `RelationalMapper.ts`; it moves to a shared
-  module both import, not a second copy.
+  type or fact type in the model holds that name and no definition already
+  has the new term: the element's glossary entry, which diff pairs by term
+  (a second definition with one term would vanish from diff, which keys
+  them in a map). When either condition fails the definition is left and
+  the reason is in `changes`.
+- **The reference mode that names a renamed value type**: an entity whose
+  `reference_mode` equals `toSnake(old)` gets `toSnake(new)`, because
+  `RelationalMapper` finds an entity's key type by exactly that match
+  (`toSnake(vp.name) === ot.referenceMode`) and would otherwise silently
+  untype the key column. `toSnake` is private to `RelationalMapper.ts`; it
+  moves to a shared module both import, not a second copy. An entity's own
+  rename leaves its reference mode alone, even one shaped like
+  `customer_id`: that string is also matched against a value type of its
+  own name (103 corpus entities pair `X_id` with a value type `X_id`), so
+  changing it without that value type would break the same match.
 - Nothing else, by decision: aliases, notes, definitions' text, derivation
   expressions, a mapping's `description`, and a semantic conflict's `term`
   are free text, and editing prose by string match is inference. Readings
@@ -645,10 +646,9 @@ Beyond the element's own name, a model-level rename rewrites:
 
 It refuses, with the reason: a target that does not exist, or a role name
 two roles share; an empty or unchanged name; a new name another object type
-or fact type holds, other than its objectified partner, as `addObjectType`
-and `addFactType` do; a new name whose `localName()` another element already
-holds across kinds (WS2's `local-name-collision`), with the same exemption,
-because a rename should not create what 4.0's migration would suffix; a
+or fact type holds, as `addObjectType` and `addFactType` do; a new name
+whose `localName()` another element already holds across kinds (WS2's
+`local-name-collision`), because a rename should not create what 4.0's migration would suffix; a
 role name whose local name another role of its fact type holds, or
 `population` on a populated fact type (decisions 5 and 7); a model whose
 3.0 form would not load (two constraints sharing an id, which a 2.0 file
@@ -688,13 +688,19 @@ changed.
 
 **5b, the surfaces.**
 
-- **CLI.** `barwise rename <file> (--object-type <name> | --fact-type
-  <name> [--role <name> | --role-position <n>]) --to <name> [--project
-  <manifest> --domain <context> | --standalone] [--check] [--format json]`.
-  A file whose model declares a `domain_context` is refused without
-  `--project`, naming the flag, because renaming a domain on its own leaves
-  its shadows and mappings behind; `--standalone` says the file is not part
-  of a project.
+- **CLI.** Two forms: `barwise rename <file> <target> --to <name>` for a
+  model file, and `barwise rename --project <manifest> --domain <context>
+  <target> --to <name>` for a project, where `<target>` is
+  `--object-type <name>`, or `--fact-type <name>` with `--role <name>` or
+  `--role-position <n>`; both take `--check` and `--format json`. Naming
+  the file and the project at once is refused. A model file that declares
+  a `domain_context` gets a warning, not a refusal -- 47 of 119 tracked
+  models declare one and the editor's scaffold writes one into every new
+  model, most of them standalone -- saying that a project's domain is
+  renamed through `--project` so its shadows and mappings follow. A project
+  whose load reported a problem (a domain or mapping file that did not
+  load) is refused, naming it, because the pure cascade cannot see a file
+  that never loaded.
 - **The write.** Every changed file is staged (written beside its target)
   before any target is replaced, and only then are the staged files renamed
   over their targets, so a failure while staging changes nothing. A failure
@@ -702,8 +708,8 @@ changed.
   the files before it replaced, which the command reports by name.
   `migrate`'s `replace()` writes and renames in one call, so it is split
   into stage and commit, in a module both commands use.
-- **MCP** `rename_element`, with the same `domain_context` refusal and the
-  same staged write. `@barwise/mcp` does not depend on `@barwise/cli`, so the
+- **MCP** `rename_element`, with the same warning, the same refusal of a
+  project that loaded with problems, and the same staged write. `@barwise/mcp` does not depend on `@barwise/cli`, so the
   staged write is a second copy there, registered with the CLI's in
   `parity.manifest.json` in the same PR. It returns the YAML for an inline
   source.
@@ -724,17 +730,19 @@ changed.
   listed in the cli and mcp `CLAUDE.md` layout tables.
 
 **Tests.** 5a, in core: each kind renamed and the result round-tripping;
-an objectified pair renamed through either side; each refusal, including
-one raised in a shadow's domain and the shared-role-name case resolved by
-position; both reference-mode rewrites; the definition rewrite, in the
-owner's domain and in a split project's first domain; free text left
-alone; the project cascade over a split project (shadows, both mapping
-sides, `files` exact), then the whole project validating as before; an
-unloaded domain refused. Each watched failing first. 5b: the CLI's
-`--check` and json contract and exit codes as `migrate`'s; the staged write
-with a planted failure while staging the second file changing nothing; the
-`domain_context` refusal on both surfaces; the MCP tool's write-back and
-inline result; the parity pair; the pins.
+each refusal, including one raised in a shadow's domain and the
+shared-role-name case resolved by position; the reference-mode rewrite,
+and an entity's own rename leaving its reference mode; the definition
+rewrite, in the owner's domain and in a split project's first domain, and
+left when the new term exists; free text left alone; the project cascade
+over a split project (shadows, both mapping sides, `files` exact), then the
+whole project validating as before; an unloaded domain refused. Each
+watched failing first. 5b: the CLI's two forms, `--check` and json
+contract and exit codes as `migrate`'s; the staged write with a planted
+failure while staging the second file changing nothing; the
+`domain_context` warning and the project-with-problems refusal on both
+surfaces; the MCP tool's write-back and inline result; the parity pair; the
+pins.
 
 ### 6. Format 4.0: local names are the ids (provisional: not yet grounded)
 
@@ -742,6 +750,10 @@ The 4.0 schema, the 3.x reader, and `barwise migrate`, which keeps its
 `--check` and `--format json` contract and, given a project, migrates its
 domains in one run, which also settles a suffixed owner's shadows. Lineage follows the Scope: `migrate` restamps only exports that were fresh,
 and an edit-path upgrade reports "ids changed to 4.0".
+
+The rename surfaces rewrite the lineage manifests they can see with
+`RenameResult.ids`, which WS6 makes non-empty, so impact analysis still
+finds a renamed element's exports.
 
 Diff and merge add decision 8's rename recognition, moved here from WS5:
 a content pass after the id and name passes, over identity keys (as
@@ -927,14 +939,13 @@ accepted. The options stay, so a later reader sees what was weighed.
     What follows from it, for WS6 to build:
 
     - An id a person or tool wrote is kept and is never stale.
-    - The reader mints after its last add, in one internal step, so every id
-      the file states is known before any name is minted, and a collision
-      takes the suffix rule in the Scope's order (object types, then fact
-      types, then the rest, each in document order). Adding each fact type
-      with its internal constraints, as the reader does, would otherwise
-      hand a minted name to a constraint before a later fact type's stated
-      id is seen. An element added to a model already built is minted as it
-      joins.
+    - A collision takes the suffix rule in add order: the later element
+      takes `_2`. The reader adds object types, then each fact type with its
+      internal constraints, then the rest, in document order, so a fact
+      type can take a suffix behind an earlier fact type's minted
+      constraint. That needs a fact type named like a constraint's
+      sentence, and is reported like any suffix. A pass that minted after
+      the last add would avoid it, and is option (b) inside the reader.
     - Nothing is minted where the verbalization is not of the element.
       `addConstraint` does not check roles, and a lenient load
       (`skipPlayerValidation`: validate, migrate, merge's incoming side,
@@ -946,8 +957,10 @@ accepted. The options stay, so a later reader sees what was weighed.
       typed without an id is re-minted on every load, and decision 14's
       stale check, which compares against the stored key, cannot fire on
       it. WS6 gives such an element a diagnostic saying its id is not yet
-      stored, and a way to store it (`barwise migrate`, or an editor
-      action); until it is stored, nothing else may refer to it by id.
+      stored, and a way to store it: an editor action, and `barwise
+      migrate` writing a current-version file whose ids are unstored, which
+      it does not do today (it skips a current file). Until it is stored,
+      nothing else may refer to it by id.
 
 ## Risks and testing
 
