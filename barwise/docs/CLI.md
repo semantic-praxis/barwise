@@ -720,6 +720,39 @@ mapping, and NORMA lists the model's own elements. An export in a
 format that records nothing still writes its manifest entry, but warns
 that `lineage impact` cannot see that artifact.
 
+One manifest serves every model in its directory (`project init` puts
+all domains in one `domains/` directory), so each export records the
+model file it came from, and `status` and `impact` read only the named
+model's exports. An export written before exports recorded their model
+belongs to the model if it is the only `.orm.yaml` in the directory, and
+otherwise to the model that holds every element it lists and owns at least
+one (a shadow type that `project split` leaves does not own). The next
+`barwise export` from that model records all of them, and says which on
+stderr. A copy of the model in the same directory would claim them too,
+and whichever exports first keeps them (barwise-wcg.t0i). An export that
+writes over another model's artifact path says so: that model's lineage no
+longer lists it.
+
+`status` exits 1, as it does for a stale artifact, on two kinds of export
+it cannot check:
+
+- one that names no model and that this model does not own, in a
+  directory with other models: another domain's export not re-exported
+  since this change, one with no recorded elements, or one listing an
+  element the model no longer has. Upgrading a shared directory can turn
+  one CI run red until each model exports once; an entry whose model is
+  gone is removed from `.barwise/lineage.yaml` by hand.
+- one naming a model file that no longer exists, because the model was
+  renamed or moved; re-export it from the model where it now lives.
+  `impact` reads such an export, since it is likely the renamed model's.
+
+With `--format json`, `status` prints the report (`staleArtifacts`,
+`unattributedArtifacts`, `orphanedArtifacts`) and exits 0, as it always
+has; a gate on the JSON reads those fields.
+
+A model with no artifacts of its own prints that, rather than that all are
+fresh. `show` prints each export's model, and the model that exported last.
+
 Options:
 
 - `--element <id>` -- (`impact` only) element ID to analyze (required)

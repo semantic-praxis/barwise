@@ -197,6 +197,48 @@
           "symbol": "preferredId"
         }
       ]
+    },
+    {
+      "name": "lineage-read-manifest",
+      "why": "the CLI and the MCP server must read one .barwise/lineage.yaml the same way, or a manifest one surface wrote reads differently on the other; each package owns its own filesystem I/O, so the reader is deliberately parallel (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "readManifest"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "readManifest"
+        }
+      ]
+    },
+    {
+      "name": "lineage-models-beside",
+      "why": "the CLI and the MCP server must agree on which model files sit beside a manifest: it decides whether an export is orphaned and whether a model is alone in its directory, so the two would report one manifest differently (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "modelsBeside"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "modelsBeside"
+        }
+      ]
+    },
+    {
+      "name": "lineage-model-location",
+      "why": "the CLI and the MCP server must find a model's manifest and name the model the same way, from one real path, or one surface matches a model to its exports and the other refuses it (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "modelLocation"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "modelLocation"
+        }
+      ]
     }
   ]
 }
