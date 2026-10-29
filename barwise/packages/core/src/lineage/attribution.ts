@@ -68,7 +68,25 @@ export interface ModelScope {
   readonly modelsBeside: readonly string[];
 }
 
-/** Whether the model is the only one its manifest can serve. */
+/**
+ * Refuse a scope whose model is not among the files beside the manifest.
+ * A model reached by another name -- a symlink, or another letter case on
+ * a case-insensitive filesystem -- would match none of its own exports,
+ * read every one as another model's, and report no artifacts at all: a
+ * stale artifact passing silently. The caller names the file as the
+ * directory lists it; this holds every caller to that.
+ */
+export function checkScope(scope: ModelScope): void {
+  if (!scope.modelsBeside.includes(scope.sourceModel)) {
+    throw new Error(
+      `Lineage: "${scope.sourceModel}" is not one of the model files beside its manifest `
+        + `(${scope.modelsBeside.join(", ") || "none"}); name the model by its file, not a link `
+        + "or another spelling.",
+    );
+  }
+}
+
+/** Whether the model is the only one beside its manifest. */
 function alone(scope: ModelScope): boolean {
   return scope.modelsBeside.length === 1 && scope.modelsBeside[0] === scope.sourceModel;
 }
@@ -90,6 +108,7 @@ export function exportsForModel(
   readonly unattributed: readonly ManifestExport[];
   readonly orphaned: readonly ManifestExport[];
 } {
+  checkScope(scope);
   const own: ManifestExport[] = [];
   const unattributed: ManifestExport[] = [];
   const orphaned: ManifestExport[] = [];
@@ -114,6 +133,7 @@ export function claimExports(
   scope: ModelScope,
   model: OrmModel,
 ): { readonly manifest: LineageManifest; readonly claimed: readonly ManifestExport[]; } {
+  checkScope(scope);
   const claimed: ManifestExport[] = [];
   const exports = manifest.exports.map((exp) => {
     if (exp.sourceModel !== undefined || !(alone(scope) || claimsExport(model, exp))) return exp;

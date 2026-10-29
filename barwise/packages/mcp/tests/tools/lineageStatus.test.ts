@@ -149,7 +149,7 @@ describe("lineage_status tool", () => {
       exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("b.sql", "b.orm.yaml")],
     });
     const out = JSON.parse(executeLineageStatus(yaml).content[0]!.text);
-    expect(out.error).toMatch(/more than one model \(a\.orm\.yaml, b\.orm\.yaml\)/);
+    expect(out.error).toMatch(/holds the exports of a\.orm\.yaml, b\.orm\.yaml\./);
     expect(out.error).toMatch(/file path/);
   });
 
@@ -177,7 +177,7 @@ describe("lineage_status tool", () => {
       exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("legacy.sql", undefined)],
     });
     const out = JSON.parse(executeLineageStatus(yaml).content[0]!.text);
-    expect(out.error).toMatch(/\(a\.orm\.yaml, and exports naming none\)/);
+    expect(out.error).toMatch(/holds the exports of a\.orm\.yaml and exports naming no model\./);
   });
 
   it("reads inline content as before when the exports name one model, or none", () => {

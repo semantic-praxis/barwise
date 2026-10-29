@@ -163,6 +163,20 @@ describe("one model's exports", () => {
     expect(exportsForModel(m, shared("sales.orm.yaml"), sales()).orphaned).toEqual([]);
   });
 
+  it("refuses a model the directory does not list under that name", () => {
+    // A symlink or another letter case would match none of its exports and
+    // report no artifacts, a stale one passing silently.
+    const alias = {
+      sourceModel: "Sales.orm.yaml",
+      modelsBeside: ["billing.orm.yaml", "sales.orm.yaml"],
+    };
+    const refused = /"Sales\.orm\.yaml" is not one of the model files beside its manifest/;
+    expect(() => exportsForModel(m, alias, sales())).toThrow(refused);
+    expect(() => checkStaleness(m, sales(), alias)).toThrow(refused);
+    expect(() => claimExports(m, alias, sales())).toThrow(refused);
+    expect(() => analyzeImpact(m, "cust", alias)).toThrow(refused);
+  });
+
   it("names the models the exports name, sorted", () => {
     expect(exportModels(m)).toEqual(["billing.orm.yaml", "sales.orm.yaml"]);
   });

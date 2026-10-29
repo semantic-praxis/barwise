@@ -1106,14 +1106,18 @@ build differs from the bullet above:
   `describe_domain` on an older artifact can load the wrong domain until
   that artifact is re-exported (barwise-wcg.t0i).
 - A model alone in its directory owns every export that names none, with
-  sources or without: the manifest can serve no other model, so the
-  top-level field the bullet rules out is safe there, and without it an
-  older export with no sources, or listing an element since deleted,
-  stayed unattributed forever with no command to clear it. The lineage
-  core takes the model's file and the model files beside it together
-  (`ModelScope`), so a caller cannot give one without the other; the CLI
-  and MCP read the directory with a `modelsBeside` registered in
-  `parity.manifest.json`. Inline `lineage_status` also refuses a manifest
+  sources or without: the manifest serves no other model now, and
+  without this an older export with no sources, or listing an element
+  since deleted, stayed unattributed forever with no command to clear it.
+  A model deleted from a shared directory leaves its older exports to the
+  survivor, which reports them stale, as before, and names them on stderr
+  when it stamps them. The lineage core takes the model's file and the
+  model files beside it together (`ModelScope`) and refuses a model the
+  directory does not list under that name: reached through a symlink or
+  another letter case, a model matched none of its exports and reported
+  no artifacts. The CLI and MCP name the model by its real path
+  (`modelFileName`) and read the directory with `modelsBeside`, both
+  registered in `parity.manifest.json`. Inline `lineage_status` also refuses a manifest
   where one model's exports sit beside exports naming none.
 - An export naming a model file that no longer exists is reported by
   status as orphaned and fails it, and `impact` reads it as the renamed

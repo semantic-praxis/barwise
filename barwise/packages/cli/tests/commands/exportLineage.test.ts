@@ -14,6 +14,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -277,5 +278,18 @@ describe("two models, one manifest", () => {
     const again = await runCli(["export", a, "--format", "ddl", "--output", out]);
     expect(again.exitCode).toBe(0);
     expect(again.stderr).not.toContain("older export");
+  });
+
+  it("reads a model reached through a symlink as the file it links to", async () => {
+    // Named by the link, its exports (which name a.orm.yaml) would be read
+    // as another model's, and status would report no artifacts.
+    expect(
+      (await runCli(["export", a, "--format", "ddl", "--output", join(dir, "a.sql")])).exitCode,
+    )
+      .toBe(0);
+    const alias = join(dir, "alias.orm.yaml");
+    symlinkSync("a.orm.yaml", alias);
+    const status = await json(["lineage", "status", alias]);
+    expect(status.freshArtifacts).toEqual([resolve(join(dir, "a.sql"))]);
   });
 });

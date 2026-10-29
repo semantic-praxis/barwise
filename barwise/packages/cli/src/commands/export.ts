@@ -19,11 +19,16 @@ import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import type { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { reportConstraintSpecs } from "../workspace/constraintReport.js";
 import { resolveDomainModels } from "../workspace/domainModels.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
-import { modelsBeside, readManifest, writeManifest } from "../workspace/lineageIo.js";
+import {
+  modelFileName,
+  modelsBeside,
+  readManifest,
+  writeManifest,
+} from "../workspace/lineageIo.js";
 
 // Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
 registerStandardFormats();
@@ -110,7 +115,7 @@ export function registerExportCommand(program: Command): void {
           // Exports written before exports named their model are claimed
           // by this one where it owns them, so this write records whose
           // they are (iri-identity 6a).
-          const sourceModel = basename(resolve(source));
+          const sourceModel = modelFileName(source);
           const existing = readManifest(modelDir);
           const claim = existing
             && claimExports(existing, { sourceModel, modelsBeside: modelsBeside(modelDir) }, model);

@@ -13,8 +13,8 @@ import {
   parseManifest,
   resolveArtifactInManifest,
 } from "@barwise/core/lineage";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, parse, resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, parse, resolve } from "node:path";
 
 /** Read the lineage manifest for a directory, or undefined if absent. */
 export function readManifest(dir: string): LineageManifest | undefined {
@@ -36,6 +36,15 @@ export function modelsBeside(dir: string): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * A model's file name as its directory lists it: through any symlink, and
+ * in the case the filesystem stores, so lineage matches the model's own
+ * exports (`checkScope` refuses any other spelling).
+ */
+export function modelFileName(path: string): string {
+  return basename(realpathSync.native(resolve(path)));
 }
 
 /**

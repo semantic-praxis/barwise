@@ -4,8 +4,8 @@
 
 import { checkStaleness, exportModels } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { basename, dirname, resolve } from "node:path";
-import { modelsBeside, readManifest } from "../workspace/lineageIo.js";
+import { dirname, resolve } from "node:path";
+import { modelFileName, modelsBeside, readManifest } from "../workspace/lineageIo.js";
 import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
@@ -55,8 +55,8 @@ export function executeLineageStatus(
           type: "text" as const,
           text: JSON.stringify(
             {
-              error: `The lineage manifest in ${dir} holds the exports of more than one `
-                + `model (${models.join(", ")}${mixed ? ", and exports naming none" : ""}). `
+              error: `The lineage manifest in ${dir} holds the exports of ${models.join(", ")}`
+                + `${mixed ? " and exports naming no model" : ""}. `
                 + "Pass the model as a file path so its own exports are read.",
             },
             null,
@@ -70,7 +70,7 @@ export function executeLineageStatus(
   const report = checkStaleness(
     manifest,
     model,
-    path ? { sourceModel: basename(resolve(path)), modelsBeside: modelsBeside(dir) } : undefined,
+    path ? { sourceModel: modelFileName(path), modelsBeside: modelsBeside(dir) } : undefined,
   );
 
   return {

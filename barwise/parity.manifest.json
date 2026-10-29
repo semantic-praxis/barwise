@@ -225,6 +225,20 @@
           "symbol": "modelsBeside"
         }
       ]
+    },
+    {
+      "name": "lineage-model-file-name",
+      "why": "the CLI and the MCP server must name a model by the same file the directory lists, or one surface matches a model to its exports and the other refuses it (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "modelFileName"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "modelFileName"
+        }
+      ]
     }
   ]
 }

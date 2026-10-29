@@ -2,7 +2,7 @@
  * Impact analysis: determine which artifacts depend on a changed model element.
  */
 
-import type { ModelScope } from "./attribution.js";
+import { checkScope, type ModelScope } from "./attribution.js";
 import type { LineageManifest } from "./types.js";
 
 /**
@@ -53,6 +53,7 @@ export function analyzeImpact(
     };
   }
 
+  if (scope) checkScope(scope);
   const affectedArtifacts: AffectedArtifact[] = [];
 
   // Check each export to see if it references the changed element

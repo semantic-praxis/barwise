@@ -6,9 +6,9 @@
 
 import { analyzeImpact, checkStaleness } from "@barwise/core/lineage";
 import type { Command } from "commander";
-import { basename, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { loadModel } from "../workspace/io.js";
-import { modelsBeside, readManifest } from "../workspace/lineageIo.js";
+import { modelFileName, modelsBeside, readManifest } from "../workspace/lineageIo.js";
 
 export function registerLineageCommand(program: Command): void {
   const lineage = program
@@ -26,7 +26,7 @@ export function registerLineageCommand(program: Command): void {
         const model = loadModel(source);
         const dir = dirname(resolve(source));
         const report = checkStaleness(readManifest(dir), model, {
-          sourceModel: basename(resolve(source)),
+          sourceModel: modelFileName(source),
           modelsBeside: modelsBeside(dir),
         });
 
@@ -63,7 +63,8 @@ export function registerLineageCommand(program: Command): void {
         if (report.orphanedArtifacts.length > 0) {
           process.stdout.write(
             `${report.orphanedArtifacts.length} artifact(s) name a model file that no longer `
-              + "exists; re-export each from the model it now lives in:\n",
+              + "exists; re-export each from the model it now lives in, or remove its entry from "
+              + ".barwise/lineage.yaml if its model is gone:\n",
           );
           for (const artifact of report.orphanedArtifacts) {
             process.stdout.write(`  ${artifact}\n`);
@@ -127,7 +128,7 @@ export function registerLineageCommand(program: Command): void {
         try {
           const dir = dirname(resolve(source));
           const report = analyzeImpact(readManifest(dir), opts.element, {
-            sourceModel: basename(resolve(source)),
+            sourceModel: modelFileName(source),
             modelsBeside: modelsBeside(dir),
           });
 
