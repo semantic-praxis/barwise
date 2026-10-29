@@ -7,7 +7,15 @@
  */
 import { registerFormat } from "@barwise/core";
 import { type LineageManifest, parseManifest, serializeManifest } from "@barwise/core/lineage";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -198,10 +206,10 @@ describe("two models, one manifest", () => {
       } as LineageManifest),
     );
 
-    expect(
-      (await runCli(["export", a, "--format", "ddl", "--output", join(dir, "a.sql")])).exitCode,
-    )
-      .toBe(0);
+    const claimed = await runCli(["export", a, "--format", "ddl", "--output", join(dir, "a.sql")]);
+    expect(claimed.exitCode).toBe(0);
+    // Said aloud: a copy of a in this directory would claim the same.
+    expect(claimed.stderr).toContain("Recorded 1 older export(s) as a.orm.yaml's: old-a.sql");
     const written = parseManifest(readFileSync(manifestFile(), "utf-8"));
     expect(
       written.exports.map((e: { artifact: string; sourceModel?: string; }) => [
@@ -220,5 +228,24 @@ describe("two models, one manifest", () => {
     // Neither fresh nor stale can be said of it, so the check fails as a
     // stale artifact fails it.
     expect(status.exitCode).toBe(1);
+  });
+
+  it("fails status for a renamed model, whose exports name its old file", async () => {
+    const exported = await runCli(["export", a, "--format", "ddl", "--output", join(dir, "a.sql")]);
+    expect(exported.exitCode).toBe(0);
+    const renamed = join(dir, "renamed.orm.yaml");
+    renameSync(a, renamed);
+    const status = await runCli(["lineage", "status", renamed]);
+    expect(status.stdout).toContain("1 artifact(s) name a model file that no longer exists");
+    expect(status.stdout).not.toContain("All artifacts are fresh.");
+    expect(status.exitCode).toBe(1);
+  });
+
+  it("says a model has no recorded artifacts rather than that all are fresh", async () => {
+    const exported = await runCli(["export", b, "--format", "ddl", "--output", join(dir, "b.sql")]);
+    expect(exported.exitCode).toBe(0);
+    const status = await runCli(["lineage", "status", a]);
+    expect(status.stdout).toContain("No artifacts are recorded for this model.");
+    expect(status.exitCode).toBe(0);
   });
 });

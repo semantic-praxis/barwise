@@ -206,5 +206,7 @@ describe("lineage_status tool", () => {
     });
     const out = JSON.parse(executeLineageStatus(modelPath).content[0]!.text);
     expect(out.staleArtifacts.map((s: { artifact: string; }) => s.artifact)).toEqual(["a.sql"]);
+    // b.orm.yaml is not on disk: its export names a file that is gone.
+    expect(out.orphanedArtifacts).toEqual(["b.sql"]);
   });
 });

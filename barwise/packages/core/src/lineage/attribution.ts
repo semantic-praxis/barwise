@@ -55,24 +55,35 @@ export function exportModels(manifest: LineageManifest): readonly string[] {
 }
 
 /**
- * One model's exports, and the exports nobody is known to own. An export
- * names its model, or names none and is claimed by `model` when one is
- * given; one naming another model is in neither list.
+ * One model's exports, the exports nobody is known to own, and the exports
+ * naming a model file that is gone. An export names its model, or names
+ * none and is claimed by `model` when one is given. One naming another
+ * model is that model's, unless `presentModels` is given and does not
+ * hold it: then its model was renamed, moved or deleted, and leaving it out
+ * would let the renamed model's stale artifacts pass as no artifacts at
+ * all.
  */
 export function exportsForModel(
   manifest: LineageManifest,
   sourceModel: string,
   model?: OrmModel,
-): { readonly own: readonly ManifestExport[]; readonly unattributed: readonly ManifestExport[]; } {
+  presentModels?: readonly string[],
+): {
+  readonly own: readonly ManifestExport[];
+  readonly unattributed: readonly ManifestExport[];
+  readonly orphaned: readonly ManifestExport[];
+} {
   const own: ManifestExport[] = [];
   const unattributed: ManifestExport[] = [];
+  const orphaned: ManifestExport[] = [];
   for (const exp of manifest.exports) {
     if (exp.sourceModel === sourceModel) own.push(exp);
-    else if (exp.sourceModel !== undefined) continue;
-    else if (model && claimsExport(model, exp)) own.push(exp);
+    else if (exp.sourceModel !== undefined) {
+      if (presentModels && !presentModels.includes(exp.sourceModel)) orphaned.push(exp);
+    } else if (model && claimsExport(model, exp)) own.push(exp);
     else unattributed.push(exp);
   }
-  return { own, unattributed };
+  return { own, unattributed, orphaned };
 }
 
 /**

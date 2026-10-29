@@ -726,11 +726,22 @@ model file it came from, and `status` and `impact` read only the named
 model's exports. An export written before exports recorded their model
 belongs to the model that holds every element it lists and owns at least
 one (a shadow type that `project split` leaves does not own); the next
-`barwise export` from that model records it. `status` lists an export
-no model can be placed by -- one with no recorded elements, or listing an
-element the model no longer has -- as naming no model, and exits 1 as it
-does for a stale artifact, until its model re-exports it. `show` prints
-each export's model.
+`barwise export` from that model records all of them, and says which on
+stderr. A copy of the model in the same directory would claim them too,
+and whichever exports first keeps them (barwise-wcg.t0i).
+
+`status` exits 1, as it does for a stale artifact, on two kinds of export
+it cannot check:
+
+- one that names no model and that this model does not own: another
+  domain's export not re-exported since this change, one with no recorded
+  elements, or one listing an element the model no longer has. Upgrading
+  can therefore turn one CI run red until the artifact is re-exported.
+- one naming a model file that no longer exists, because the model was
+  renamed or moved; re-export it from the model where it now lives.
+
+A model with no artifacts of its own prints that, rather than that all are
+fresh. `show` prints each export's model, and the model that exported last.
 
 Options:
 

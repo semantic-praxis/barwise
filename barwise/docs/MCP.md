@@ -784,9 +784,10 @@ YAML it falls back to the server's working directory. Only the CLI's
 `barwise export` records artifacts in the manifest; `export_model` does
 not, so artifacts exported through this server are not reported.
 
-Given a path, only that model's exports are read, and
-`unattributedArtifacts` lists exports that name no model and that this
-model does not own (see `barwise lineage` in CLI.md). Given inline YAML
+Given a path, only that model's exports are read; `unattributedArtifacts`
+lists exports that name no model and that this model does not own, and
+`orphanedArtifacts` exports naming a model file that no longer exists
+(see `barwise lineage` in CLI.md). Given inline YAML
 there is no file to read for: the tool reads every export when they name
 one model, and otherwise returns an `error` naming the models and asking
 for a path.

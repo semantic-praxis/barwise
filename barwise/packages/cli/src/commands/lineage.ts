@@ -4,9 +4,10 @@
  * Lineage tracking and staleness detection.
  */
 
-import { analyzeImpact, checkStaleness } from "@barwise/core/lineage";
+import { analyzeImpact, checkStaleness, exportModels } from "@barwise/core/lineage";
 import type { Command } from "commander";
-import { basename, dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { loadModel } from "../workspace/io.js";
 import { readManifest } from "../workspace/lineageIo.js";
 
@@ -25,7 +26,13 @@ export function registerLineageCommand(program: Command): void {
       try {
         const model = loadModel(source);
         const dir = dirname(resolve(source));
-        const report = checkStaleness(readManifest(dir), model, basename(resolve(source)));
+        const manifest = readManifest(dir);
+        // Which named models are still on disk, so an export naming a
+        // renamed or deleted file is reported rather than passed over.
+        const present = manifest
+          ? exportModels(manifest).filter((name) => existsSync(join(dir, name)))
+          : [];
+        const report = checkStaleness(manifest, model, basename(resolve(source)), present);
 
         if (opts.format === "json") {
           process.stdout.write(JSON.stringify(report, null, 2) + "\n");
@@ -54,9 +61,28 @@ export function registerLineageCommand(program: Command): void {
           process.exitCode = 1;
         }
 
+        // A renamed or moved model's exports still name its old file; its
+        // artifacts cannot be checked until it re-exports them.
+        if (report.orphanedArtifacts.length > 0) {
+          process.stdout.write(
+            `${report.orphanedArtifacts.length} artifact(s) name a model file that no longer `
+              + "exists; re-export each from the model it now lives in:\n",
+          );
+          for (const artifact of report.orphanedArtifacts) {
+            process.stdout.write(`  ${artifact}\n`);
+          }
+          process.stdout.write("\n");
+          process.exitCode = 1;
+        }
+
+        if (report.staleArtifacts.length === 0 && report.freshArtifacts.length === 0) {
+          process.stdout.write("No artifacts are recorded for this model.\n");
+          return;
+        }
+
         if (report.staleArtifacts.length === 0) {
           process.stdout.write(
-            report.unattributedArtifacts.length > 0
+            report.unattributedArtifacts.length > 0 || report.orphanedArtifacts.length > 0
               ? "All of this model's artifacts are fresh.\n"
               : "All artifacts are fresh.\n",
           );
@@ -169,7 +195,7 @@ export function registerLineageCommand(program: Command): void {
 
         process.stdout.write(`Lineage Manifest\n`);
         process.stdout.write(`================\n\n`);
-        process.stdout.write(`Source Model: ${manifest.sourceModel}\n`);
+        process.stdout.write(`Last exported from: ${manifest.sourceModel}\n`);
         process.stdout.write(
           `Model Hash: ${manifest.sourceModelHash.substring(0, 16)}...\n`,
         );

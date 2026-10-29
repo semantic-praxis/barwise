@@ -30,6 +30,12 @@ export interface StalenessReport {
    * them; re-exporting from their model records whose they are.
    */
   readonly unattributedArtifacts: readonly string[];
+  /**
+   * Exports naming a model file the caller reports gone (renamed, moved or
+   * deleted). Their staleness cannot be checked against any model; listing
+   * them keeps a renamed model from reading as having no artifacts.
+   */
+  readonly orphanedArtifacts: readonly string[];
   readonly manifestFound: boolean;
 }
 
@@ -43,24 +49,29 @@ export interface StalenessReport {
  *   directory: only that model's exports are read. Without it every
  *   export is, which is right only when the exports name one model; the
  *   caller checks that with `exportModels`.
+ * @param presentModels - The model files, of those `exportModels` names,
+ *   that still exist beside the manifest; the caller reads the directory.
+ *   An export naming any other is reported orphaned.
  * @returns Staleness report with stale and fresh artifacts
  */
 export function checkStaleness(
   manifest: LineageManifest | undefined,
   model: OrmModel,
   sourceModel?: string,
+  presentModels?: readonly string[],
 ): StalenessReport {
   if (!manifest) {
     return {
       staleArtifacts: [],
       freshArtifacts: [],
       unattributedArtifacts: [],
+      orphanedArtifacts: [],
       manifestFound: false,
     };
   }
-  const { own, unattributed } = sourceModel === undefined
-    ? { own: manifest.exports, unattributed: [] }
-    : exportsForModel(manifest, sourceModel, model);
+  const { own, unattributed, orphaned } = sourceModel === undefined
+    ? { own: manifest.exports, unattributed: [], orphaned: [] }
+    : exportsForModel(manifest, sourceModel, model, presentModels);
 
   const currentHash = hashModel(model);
   const staleArtifacts: StaleArtifact[] = [];
@@ -86,6 +97,7 @@ export function checkStaleness(
     staleArtifacts,
     freshArtifacts,
     unattributedArtifacts: unattributed.map((exp) => exp.artifact),
+    orphanedArtifacts: orphaned.map((exp) => exp.artifact),
     manifestFound: true,
   };
 }

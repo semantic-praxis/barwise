@@ -4,7 +4,8 @@
 
 import { checkStaleness, exportModels } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { basename, dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { readManifest } from "../workspace/lineageIo.js";
 import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
@@ -64,7 +65,17 @@ export function executeLineageStatus(
     }
   }
 
-  const report = checkStaleness(manifest, model, path ? basename(resolve(path)) : undefined);
+  // Which named models are still on disk, so an export naming a renamed
+  // or deleted file is reported rather than passed over.
+  const present = manifest
+    ? exportModels(manifest).filter((name) => existsSync(join(dir, name)))
+    : [];
+  const report = checkStaleness(
+    manifest,
+    model,
+    path ? basename(resolve(path)) : undefined,
+    present,
+  );
 
   return {
     content: [{ type: "text" as const, text: JSON.stringify(report, null, 2) }],

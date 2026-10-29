@@ -131,6 +131,16 @@ describe("one model's exports", () => {
     expect(unattributed.map((e) => e.artifact)).toEqual(["nolineage.sql"]);
   });
 
+  it("reports an export whose named model file is gone, given which files remain", () => {
+    // A renamed model's exports still name its old file; without the list
+    // of files that remain they are another model's and are skipped.
+    const { orphaned } = exportsForModel(m, "sales.orm.yaml", sales(), ["sales.orm.yaml"]);
+    expect(orphaned.map((e) => e.artifact)).toEqual(["invoices.sql"]);
+    expect(exportsForModel(m, "sales.orm.yaml", sales()).orphaned).toEqual([]);
+    const report = checkStaleness(m, sales(), "store.orm.yaml", ["billing.orm.yaml"]);
+    expect(report.orphanedArtifacts).toEqual(["orders.sql"]);
+  });
+
   it("names the models the exports name, sorted", () => {
     expect(exportModels(m)).toEqual(["billing.orm.yaml", "sales.orm.yaml"]);
   });

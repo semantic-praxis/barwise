@@ -1101,7 +1101,19 @@ build differs from the bullet above:
   naming none, because impact never loads the model and so cannot claim
   them; each affected artifact carries the `sourceModel` its export
   names. `resolveArtifactInManifest` answers with the export's model
-  rather than the manifest's, which names the last model to export.
+  rather than the manifest's, which names the last model to export; for
+  an export naming none it still falls back to the manifest's, so
+  `describe_domain` on an older artifact can load the wrong domain until
+  that artifact is re-exported (barwise-wcg.t0i).
+- An export naming a model file that no longer exists is reported by
+  status as orphaned and fails it. The review of this step found that
+  reading "only this model's exports" let a renamed model pass with no
+  artifacts at all, where reading every export had reported them stale;
+  the caller says which named files remain, so core stays free of I/O.
+- With one model loaded, a copy of it in the same directory claims the
+  original's older exports first, and the claim is written. `export`
+  names what it claims on stderr; settling it by loading every model in
+  the directory, the plan review's suggestion, is barwise-wcg.t0i.
 
 **6b to 6f, the 4.0 series: no release between them**, as
 `orm-format-3`'s 4a/4b, because a build that writes 4.0 must already

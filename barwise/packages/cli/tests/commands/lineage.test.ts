@@ -266,7 +266,7 @@ describe("barwise lineage", () => {
       const result = await runCli(["lineage", "status", modelPath]);
 
       expect(result.stdout).toContain("1 artifact(s) name no model");
-      expect(result.stdout).toContain("All of this model's artifacts are fresh.");
+      expect(result.stdout).toContain("No artifacts are recorded for this model.");
       expect(result.exitCode).toBe(1);
     });
   });
@@ -448,7 +448,7 @@ describe("barwise lineage", () => {
       const result = await runCli(["lineage", "show", modelPath]);
 
       expect(result.stdout).toContain("Lineage Manifest");
-      expect(result.stdout).toContain("Source Model: test.orm.yaml");
+      expect(result.stdout).toContain("Last exported from: test.orm.yaml");
       expect(result.stdout).toContain("Exports: 1");
       expect(result.stdout).toContain("schema.sql");
       expect(result.stdout).toContain("Format: ddl");

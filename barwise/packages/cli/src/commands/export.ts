@@ -10,6 +10,7 @@ import type { ExportFormatAdapter } from "@barwise/core";
 import { getExporter, listExporters, surrogateKeysRefusal } from "@barwise/core";
 import {
   claimExports,
+  claimsExport,
   hashModel,
   type ManifestExport,
   updateManifest,
@@ -112,6 +113,15 @@ export function registerExportCommand(program: Command): void {
           // they are (iri-identity 6a).
           const sourceModel = basename(resolve(source));
           const existing = readManifest(modelDir);
+          // Said aloud because it cannot be undone: a copy of this model
+          // in the same directory would claim the same exports.
+          const claimed = existing?.exports.filter((e) => claimsExport(model, e)) ?? [];
+          if (claimed.length > 0) {
+            process.stderr.write(
+              `Recorded ${claimed.length} older export(s) as ${sourceModel}'s: `
+                + `${claimed.map((e) => e.artifact).join(", ")}\n`,
+            );
+          }
           writeManifest(
             modelDir,
             updateManifest(
