@@ -37,6 +37,13 @@
       ],
       "note": "Genuinely unimplemented, and the header is right: no calibrated transcript has been authored. 31ec97ad (join-ring-constraint WS1) touched CounterexampleGenerator.ts, which this spec names as context, to stop three generators emitting counterexamples that satisfy their own constraint under a one-value domain; it builds nothing this spec plans. Remove this row when a workstream ships and the Status says so."
     },
+    "executable-adrs.spec.md": {
+      "status": "Draft -- no workstream implemented",
+      "commits": [
+        "c53226cc"
+      ],
+      "note": "Genuinely unimplemented, and the header is right: there is no adr-enforcement.mjs, no check:adr-tests script, no ciStepOccurrences() in ci-gates.mjs, and no ADR carries an Enforced-by: header. c53226cc (the Ossie unknown-fields code-review fix) adds schemas/** to the formats package test inputs in barwise/turbo.json, which this spec names because its WS2 changes test:coverage inputs there; it builds nothing this spec plans. Remove this row when WS1 ships and the Status says so."
+    },
     "functional-design-quality.spec.md": {
       "status": "Draft -- the five open decisions resolved in review 2026-09-09\n(see Decisions); no workstream implemented",
       "commits": [
