@@ -7,10 +7,11 @@ project and mapping files, `iri_base`, `namespace`, `namespaceOf` and two
 project rules); decision 17 taken; WS5 implemented 2026-10-29 (5a: `renameInModel`,
 `renameInProject`; 5b: `barwise rename`, MCP `rename_element`, the VS Code
 tool); rename recognition moved to WS6; WS6 grounded 2026-10-29 (6a to 6f,
-decision 15 amended, decisions 18 to 20); 6a in progress (diff recognizes renames,
-merge refuses content and rename pairings, implemented 2026-10-29; the verbalization
-interface, `model/mint.ts` and `FactType.addConstraint`'s return, implemented
-2026-10-29; the test builders off `::` ids, implemented 2026-10-29); WS7 to come
+decision 15 amended, decisions 18 to 20); 6a implemented 2026-10-29 (diff
+recognizes renames and merge refuses content and rename pairings; the
+verbalization interface, `model/mint.ts` and `FactType.addConstraint`'s
+return; the test builders off `::` ids; lineage exports name their model);
+6b to 6f and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-29
@@ -1066,6 +1067,41 @@ build differs from the bullet above:
   can mint one name from different keys (an external uniqueness over
   `[a, b]` and over `[b, a]` reads the same), which is the suffix rule's
   case, not the guard's.
+- The test builders' ids go through `roleId(ft, 1 | 2)` and
+  `preferredId(ft)`, giving `<name>#roleN` and `<name>#preferred`, and
+  `parity.manifest.json` ties all four builders' copies, so 6b changes the
+  format in one place each. The name is kept as written because
+  `localName` merges names that differ only in whitespace and `_`, which
+  gave two fact types one role id; and the `#`, which `localName` always
+  encodes, keeps a builder id from ever reading as a 4.0 role id
+  (`<localName>.roleN` was exactly that shape). One test outside any
+  builder, `RelationalMapper.test.ts`, built `::r1` ids by hand; the
+  survey grepped `::role1/2` and could not see it.
+- Lineage attribution claims an export that names no model when the
+  loaded model holds every source id and owns at least one, as the bullet
+  says, and not the stricter rule the plan review proposed for a write that
+  loads one model (claim only when no source id is a shadow,
+  barwise-wcg.3i8). The worry was uniqueness: with one model loaded, a
+  second qualifying model cannot be seen. But `split` homes each fact type
+  and subtype fact in one domain (`splitModel.ts`, `pickFactTypeHome`),
+  and a shadow is the only copy of an id it makes, so an owned id has one
+  owner and two models cannot both own one of an export's sources. The
+  stricter rule would protect nothing more and would leave unattributed
+  every export that references a shadow -- the usual case, a table with a
+  foreign key to another domain's type. A model copied whole into a second
+  file defeats both rules equally. No write loads every domain today:
+  `barwise export` takes one model file.
+- An export that names no model and that the model does not claim is
+  listed by `lineage status` as naming no model, and the status exits 1,
+  as for a stale artifact: neither fresh nor stale can be said of it, and
+  a CI gate that passed it would vouch for an artifact nothing checked.
+  This includes an older export listing an element the model has since
+  deleted, which status used to report as stale.
+- `analyzeImpact` given a model reads that model's exports and those
+  naming none, because impact never loads the model and so cannot claim
+  them; each affected artifact carries the `sourceModel` its export
+  names. `resolveArtifactInManifest` answers with the export's model
+  rather than the manifest's, which names the last model to export.
 
 **6b to 6f, the 4.0 series: no release between them**, as
 `orm-format-3`'s 4a/4b, because a build that writes 4.0 must already

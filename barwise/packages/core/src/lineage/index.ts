@@ -1,4 +1,5 @@
 // Lineage: manifest, impact, staleness.
+export { claimExports, claimsExport, exportModels, exportsForModel } from "./attribution.js";
 export { generateDdlLineage, generateModelLineage } from "./generate.js";
 export { type AffectedArtifact, analyzeImpact, type ImpactReport } from "./impact.js";
 export {

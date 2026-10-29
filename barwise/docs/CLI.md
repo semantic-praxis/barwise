@@ -720,6 +720,18 @@ mapping, and NORMA lists the model's own elements. An export in a
 format that records nothing still writes its manifest entry, but warns
 that `lineage impact` cannot see that artifact.
 
+One manifest serves every model in its directory (`project init` puts
+all domains in one `domains/` directory), so each export records the
+model file it came from, and `status` and `impact` read only the named
+model's exports. An export written before exports recorded their model
+belongs to the model that holds every element it lists and owns at least
+one (a shadow type that `project split` leaves does not own); the next
+`barwise export` from that model records it. `status` lists an export
+no model can be placed by -- one with no recorded elements, or listing an
+element the model no longer has -- as naming no model, and exits 1 as it
+does for a stale artifact, until its model re-exports it. `show` prints
+each export's model.
+
 Options:
 
 - `--element <id>` -- (`impact` only) element ID to analyze (required)

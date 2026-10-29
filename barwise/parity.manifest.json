@@ -197,6 +197,20 @@
           "symbol": "preferredId"
         }
       ]
+    },
+    {
+      "name": "lineage-read-manifest",
+      "why": "the CLI and the MCP server must read one .barwise/lineage.yaml the same way, or a manifest one surface wrote reads differently on the other; each package owns its own filesystem I/O, so the reader is deliberately parallel (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "readManifest"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "readManifest"
+        }
+      ]
     }
   ]
 }

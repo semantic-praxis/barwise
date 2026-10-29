@@ -11,6 +11,8 @@ export interface AffectedArtifact {
   readonly artifact: string;
   readonly format: string;
   readonly relationship: string;
+  /** The model the export names; absent when it names none. */
+  readonly sourceModel?: string;
 }
 
 /**
@@ -30,11 +32,17 @@ export interface ImpactReport {
  * @param manifest - The lineage manifest (read by the caller), or
  *   undefined when no manifest exists
  * @param elementId - ID of the changed element (entity, fact type, constraint, etc.)
+ * @param sourceModel - The model's file, relative to the manifest's
+ *   directory. Exports naming another model are skipped, because two
+ *   models can each have an element with one id once ids are local
+ *   names. An export naming no model is read either way, and the report
+ *   says which model each export names.
  * @returns Impact report with affected artifacts
  */
 export function analyzeImpact(
   manifest: LineageManifest | undefined,
   elementId: string,
+  sourceModel?: string,
 ): ImpactReport {
   if (!manifest) {
     return {
@@ -47,6 +55,10 @@ export function analyzeImpact(
 
   // Check each export to see if it references the changed element
   for (const exp of manifest.exports) {
+    if (
+      sourceModel !== undefined && exp.sourceModel !== undefined
+      && exp.sourceModel !== sourceModel
+    ) continue;
     const sourceRef = exp.sources.find(src => src.elementId === elementId);
 
     if (sourceRef) {
@@ -54,6 +66,7 @@ export function analyzeImpact(
         artifact: exp.artifact,
         format: exp.format,
         relationship: buildRelationshipDescription(sourceRef),
+        ...(exp.sourceModel !== undefined ? { sourceModel: exp.sourceModel } : {}),
       });
     }
   }

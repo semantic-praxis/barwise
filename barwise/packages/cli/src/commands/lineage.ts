@@ -6,7 +6,7 @@
 
 import { analyzeImpact, checkStaleness } from "@barwise/core/lineage";
 import type { Command } from "commander";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { loadModel } from "../workspace/io.js";
 import { readManifest } from "../workspace/lineageIo.js";
 
@@ -25,7 +25,7 @@ export function registerLineageCommand(program: Command): void {
       try {
         const model = loadModel(source);
         const dir = dirname(resolve(source));
-        const report = checkStaleness(readManifest(dir), model);
+        const report = checkStaleness(readManifest(dir), model, basename(resolve(source)));
 
         if (opts.format === "json") {
           process.stdout.write(JSON.stringify(report, null, 2) + "\n");
@@ -40,8 +40,26 @@ export function registerLineageCommand(program: Command): void {
           return;
         }
 
+        // Neither fresh nor stale can be said of these, so they fail the
+        // check as a stale one does, until their model re-exports them.
+        if (report.unattributedArtifacts.length > 0) {
+          process.stdout.write(
+            `${report.unattributedArtifacts.length} artifact(s) name no model, and this model `
+              + "does not own them; re-export each from its model:\n",
+          );
+          for (const artifact of report.unattributedArtifacts) {
+            process.stdout.write(`  ${artifact}\n`);
+          }
+          process.stdout.write("\n");
+          process.exitCode = 1;
+        }
+
         if (report.staleArtifacts.length === 0) {
-          process.stdout.write("All artifacts are fresh.\n");
+          process.stdout.write(
+            report.unattributedArtifacts.length > 0
+              ? "All of this model's artifacts are fresh.\n"
+              : "All artifacts are fresh.\n",
+          );
           if (report.freshArtifacts.length > 0) {
             process.stdout.write(
               `${report.freshArtifacts.length} artifact(s) up to date.\n`,
@@ -85,7 +103,11 @@ export function registerLineageCommand(program: Command): void {
       async (source: string, opts: { element: string; format: string; }) => {
         try {
           const dir = dirname(resolve(source));
-          const report = analyzeImpact(readManifest(dir), opts.element);
+          const report = analyzeImpact(
+            readManifest(dir),
+            opts.element,
+            basename(resolve(source)),
+          );
 
           if (opts.format === "json") {
             process.stdout.write(JSON.stringify(report, null, 2) + "\n");
@@ -110,6 +132,9 @@ export function registerLineageCommand(program: Command): void {
               `  ${affected.artifact} (${affected.format})\n`,
             );
             process.stdout.write(`    ${affected.relationship}\n`);
+            if (affected.sourceModel === undefined) {
+              process.stdout.write("    (names no model; re-export it to record one)\n");
+            }
           }
         } catch (err) {
           process.stderr.write(`Error: ${(err as Error).message}\n`);
@@ -153,6 +178,7 @@ export function registerLineageCommand(program: Command): void {
         for (const exp of manifest.exports) {
           process.stdout.write(`${exp.artifact}\n`);
           process.stdout.write(`  Format: ${exp.format}\n`);
+          process.stdout.write(`  Model: ${exp.sourceModel ?? "(none recorded)"}\n`);
           process.stdout.write(`  Exported: ${exp.exportedAt}\n`);
           process.stdout.write(
             `  Model Hash: ${exp.modelHash.substring(0, 16)}...\n`,

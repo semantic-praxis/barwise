@@ -47,13 +47,16 @@ export function parseManifest(yamlContent: string): LineageManifest {
  *
  * `sourceModel` names the model file relative to the manifest's
  * directory, which is how `resolveArtifact` finds it. It was never
- * passed, so every manifest recorded "" (barwise-ofb).
+ * passed, so every manifest recorded "" (barwise-ofb). The entry records
+ * it too, because a manifest serves every model in its directory and the
+ * top-level field names only the last to export (iri-identity 6a).
  */
 export function updateManifest(
-  entry: ManifestExport,
+  given: ManifestExport,
   existingManifest?: LineageManifest,
   sourceModel?: string,
 ): LineageManifest {
+  const entry = sourceModel !== undefined ? { ...given, sourceModel } : given;
   if (!existingManifest) {
     return {
       version: 1,

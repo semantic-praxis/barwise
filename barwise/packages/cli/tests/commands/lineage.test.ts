@@ -104,6 +104,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -136,6 +137,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash: oldHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
           {
             artifact: "models/game.sql",
@@ -143,6 +145,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash: oldHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -176,6 +179,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -217,6 +221,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash: oldHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
           {
             artifact: "fresh.sql",
@@ -224,6 +229,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -233,6 +239,34 @@ describe("barwise lineage", () => {
 
       expect(result.stdout).toContain("1 stale artifact(s) found");
       expect(result.stdout).toContain("1 artifact(s) still fresh.");
+      expect(result.exitCode).toBe(1);
+    });
+
+    it("fails on an artifact it cannot place, though nothing is stale", async () => {
+      // An export written before exports named their model, with no sources
+      // to attribute it by (iri-identity 6a): neither fresh nor stale.
+      const modelPath = path.join(tempDir, "test.orm.yaml");
+      fs.writeFileSync(modelPath, DETERMINISTIC_MODEL);
+      const modelHash = hashModel(loadModel(modelPath));
+      writeManifest(tempDir, {
+        version: 1,
+        sourceModel: "test.orm.yaml",
+        sourceModelHash: modelHash,
+        exports: [
+          {
+            artifact: "schema.sql",
+            format: "ddl",
+            exportedAt: "2026-03-06T12:00:00Z",
+            modelHash,
+            sources: [],
+          },
+        ],
+      });
+
+      const result = await runCli(["lineage", "status", modelPath]);
+
+      expect(result.stdout).toContain("1 artifact(s) name no model");
+      expect(result.stdout).toContain("All of this model's artifacts are fresh.");
       expect(result.exitCode).toBe(1);
     });
   });
@@ -256,6 +290,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };
@@ -417,6 +452,8 @@ describe("barwise lineage", () => {
       expect(result.stdout).toContain("Exports: 1");
       expect(result.stdout).toContain("schema.sql");
       expect(result.stdout).toContain("Format: ddl");
+      // Written before exports named their model (iri-identity 6a).
+      expect(result.stdout).toContain("Model: (none recorded)");
       expect(result.stdout).toContain("Sources: 1 element(s)");
       expect(result.exitCode).toBe(0);
     });
@@ -439,6 +476,7 @@ describe("barwise lineage", () => {
             exportedAt: "2026-03-06T12:00:00Z",
             modelHash,
             sources: [],
+            sourceModel: "test.orm.yaml",
           },
         ],
       };

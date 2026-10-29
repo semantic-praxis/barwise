@@ -16,7 +16,10 @@ import type { LineageManifest, ManifestExport, SourceReference } from "./types.j
 export interface ArtifactResolution {
   /** Directory containing the .barwise/lineage.yaml manifest. */
   readonly manifestDir: string;
-  /** Path to the source ORM model (from manifest.sourceModel). */
+  /**
+   * Path to the source ORM model: the export's own, or for an export that
+   * names none, the manifest's, which names the last model to export.
+   */
   readonly sourceModel: string;
   /** The matching export entry from the manifest. */
   readonly exportEntry: ManifestExport;
@@ -51,7 +54,7 @@ export function resolveArtifactInManifest(
 
   return {
     manifestDir,
-    sourceModel: manifest.sourceModel,
+    sourceModel: match.sourceModel ?? manifest.sourceModel,
     exportEntry: match,
     sources: match.sources,
   };

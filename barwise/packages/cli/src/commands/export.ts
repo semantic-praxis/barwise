@@ -8,7 +8,12 @@
 
 import type { ExportFormatAdapter } from "@barwise/core";
 import { getExporter, listExporters, surrogateKeysRefusal } from "@barwise/core";
-import { hashModel, type ManifestExport, updateManifest } from "@barwise/core/lineage";
+import {
+  claimExports,
+  hashModel,
+  type ManifestExport,
+  updateManifest,
+} from "@barwise/core/lineage";
 import { SQL_DIALECTS } from "@barwise/core/sql";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
@@ -102,9 +107,18 @@ export function registerExportCommand(program: Command): void {
             modelHash: hashModel(model),
             sources: result.lineage?.flatMap((l) => l.sources) ?? [],
           };
+          // Exports written before exports named their model are claimed
+          // by this one where it owns them, so this write records whose
+          // they are (iri-identity 6a).
+          const sourceModel = basename(resolve(source));
+          const existing = readManifest(modelDir);
           writeManifest(
             modelDir,
-            updateManifest(entry, readManifest(modelDir), basename(resolve(source))),
+            updateManifest(
+              entry,
+              existing && claimExports(existing, sourceModel, model),
+              sourceModel,
+            ),
           );
         } else {
           process.stdout.write(result.text);

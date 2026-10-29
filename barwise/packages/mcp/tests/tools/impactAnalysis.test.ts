@@ -265,4 +265,43 @@ describe("impact_analysis tool", () => {
     expect(typeof result.content[0]!.text).toBe("string");
     expect(() => JSON.parse(result.content[0]!.text)).not.toThrow();
   });
+
+  // iri-identity 6a: with a path, only that model's exports; inline, every
+  // export holding the id, each naming its model.
+  it("reads one model's exports given a path, and names each export's model inline", () => {
+    const exportOf = (artifact: string, sourceModel: string | undefined) => ({
+      artifact,
+      format: "ddl",
+      exportedAt: "2026-10-29T00:00:00Z",
+      modelHash: "h",
+      sources: [{
+        elementId: "ot-customer",
+        elementType: "EntityType" as const,
+        elementName: "Customer",
+      }],
+      ...(sourceModel !== undefined ? { sourceModel } : {}),
+    });
+
+    const modelPath = path.join(tempDir, "a.orm.yaml");
+    fs.copyFileSync(`${fixtures}/simple.orm.yaml`, modelPath);
+    const manifest = {
+      version: 1 as const,
+      sourceModel: "b.orm.yaml",
+      sourceModelHash: "h",
+      exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("b.sql", "b.orm.yaml")],
+    };
+    writeManifest(tempDir, manifest);
+    const byPath = JSON.parse(executeImpactAnalysis(modelPath, "ot-customer").content[0]!.text);
+    expect(byPath.affectedArtifacts.map((a: { artifact: string; }) => a.artifact)).toEqual([
+      "a.sql",
+    ]);
+
+    writeManifest(ws.dir(), manifest);
+    const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
+    const inline = JSON.parse(executeImpactAnalysis(yaml, "ot-customer").content[0]!.text);
+    expect(inline.affectedArtifacts.map((a: { sourceModel: string; }) => a.sourceModel)).toEqual([
+      "a.orm.yaml",
+      "b.orm.yaml",
+    ]);
+  });
 });

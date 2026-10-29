@@ -4,7 +4,7 @@
 
 import { analyzeImpact } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { z } from "zod";
 import { readManifest } from "../workspace/lineageIo.js";
 import { type SourceInput, sourcePath } from "../workspace/resolve.js";
@@ -41,7 +41,14 @@ export function executeImpactAnalysis(
   const path = sourcePath(source);
   const dir = path ? dirname(resolve(path)) : process.cwd();
 
-  const report = analyzeImpact(readManifest(dir), elementId);
+  // With a path, only that model's exports are read. Without one there is
+  // no model to read for, so every export holding the id is, and the
+  // report names each export's model (iri-identity 6a).
+  const report = analyzeImpact(
+    readManifest(dir),
+    elementId,
+    path ? basename(resolve(path)) : undefined,
+  );
 
   return {
     content: [{ type: "text" as const, text: JSON.stringify(report, null, 2) }],
