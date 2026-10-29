@@ -2,19 +2,12 @@ import type { ExportAnnotation } from "../annotation/ExportAnnotationCollector.j
 import type { DerivationRule, FactType } from "../model/FactType.js";
 import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
-import { expandReading } from "../model/ReadingOrder.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { verbalizeObjectCardinality } from "./constraints/phase2.js";
 import { ConstraintVerbalizer } from "./ConstraintVerbalizer.js";
+import { verbalizeObjectifiedFactType, verbalizeSubtypeFact } from "./elementSentences.js";
 import { FactTypeVerbalizer } from "./FactTypeVerbalizer.js";
-import {
-  buildVerbalization,
-  kwSeg,
-  refSeg,
-  textSeg,
-  type Verbalization,
-  type VerbalizationSegment,
-} from "./Verbalization.js";
+import { buildVerbalization, kwSeg, textSeg, type Verbalization } from "./Verbalization.js";
 
 /** The taxonomy phrase for a derivation: "derived", "semiderived and stored", etc. */
 function derivationPhrase(d: DerivationRule): string {
@@ -180,66 +173,13 @@ export class Verbalizer {
     ]);
   }
 
-  /**
-   * Verbalize a subtype fact: "{Subtype} is a subtype of {Supertype}." When
-   * the subtype is defined by a rule, the rule is appended: "..., defined as:
-   * {expression}."
-   */
-  verbalizeSubtypeFact(
-    sf: SubtypeFact,
-    model: OrmModel,
-  ): Verbalization {
-    const subtype = model.getObjectType(sf.subtypeId);
-    const supertype = model.getObjectType(sf.supertypeId);
-    const subtypeName = subtype?.name ?? sf.subtypeId;
-    const supertypeName = supertype?.name ?? sf.supertypeId;
-
-    const segments: VerbalizationSegment[] = [
-      refSeg(subtypeName, sf.subtypeId),
-      textSeg(" is a subtype of "),
-      refSeg(supertypeName, sf.supertypeId),
-    ];
-    if (sf.definingRule) {
-      segments.push(textSeg(`, defined as: ${sf.definingRule.expression}`));
-    }
-    segments.push(textSeg("."));
-
-    return buildVerbalization(sf.id, "subtype", segments);
+  /** A subtype fact's sentence; `elementSentences.ts` builds it. */
+  verbalizeSubtypeFact(sf: SubtypeFact, model: OrmModel): Verbalization {
+    return verbalizeSubtypeFact(sf, model);
   }
 
-  /**
-   * Verbalize an objectified fact type:
-   * "{EntityType} is where {primary reading of fact type}."
-   *
-   * For example: "Marriage is where Person marries Person."
-   */
-  verbalizeObjectifiedFactType(
-    oft: ObjectifiedFactType,
-    model: OrmModel,
-  ): Verbalization {
-    const objectType = model.getObjectType(oft.objectTypeId);
-    const factType = model.getFactType(oft.factTypeId);
-    const entityName = objectType?.name ?? oft.objectTypeId;
-
-    const segments: import("./Verbalization.js").VerbalizationSegment[] = [
-      refSeg(entityName, oft.objectTypeId),
-      textSeg(" is where "),
-    ];
-
-    if (factType && factType.readings.length > 0) {
-      const reading = factType.readings[0]!;
-      const roleNames = factType.roles.map((r) => {
-        const player = model.getObjectType(r.playerId);
-        return player?.name ?? r.name;
-      });
-      const expanded = expandReading(reading.template, roleNames);
-      segments.push(textSeg(expanded));
-    } else {
-      segments.push(textSeg(factType?.name ?? oft.factTypeId));
-    }
-
-    segments.push(textSeg("."));
-
-    return buildVerbalization(oft.id, "objectification", segments);
+  /** An objectification's sentence; `elementSentences.ts` builds it. */
+  verbalizeObjectifiedFactType(oft: ObjectifiedFactType, model: OrmModel): Verbalization {
+    return verbalizeObjectifiedFactType(oft, model);
   }
 }

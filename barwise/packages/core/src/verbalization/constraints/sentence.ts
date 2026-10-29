@@ -4,8 +4,8 @@
  * as quantified segments (quantifiedReading, forEachReading), and the
  * clause of a ring sentence (ringReading, ringClause).
  */
+import type { ConstraintModel } from "../../model/constraintModel.js";
 import type { FactType } from "../../model/FactType.js";
-import type { OrmModel } from "../../model/OrmModel.js";
 import { leadOf, type ReadingPart, splitReading } from "../../model/ReadingOrder.js";
 import type { Role } from "../../model/Role.js";
 import { kwSeg, refSeg, textSeg, type VerbalizationSegment } from "../Verbalization.js";
@@ -42,7 +42,7 @@ export function localRole(factType: FactType, roleId: string): Role {
 
 export function resolveCommonPlayer(
   roleIds: readonly string[],
-  model: OrmModel,
+  model: ConstraintModel,
 ): { name: string; id: string; } {
   // Model-wide: the roles of a constraint across fact types belong to
   // several fact types, and none of them is the constraint's own
@@ -182,7 +182,7 @@ export function openingReading(
  * Undefined when no reading names the role first.
  */
 export function eachReading(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
   own: number,
   rest: (parts: readonly ReadingPart[]) => VerbalizationSegment[],
@@ -210,7 +210,7 @@ export function eachReading(
 
 /** Role `index`'s player as a reference: its object type's name, else the role's. */
 export function rolePlayer(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
   index: number,
 ): VerbalizationSegment {
@@ -236,7 +236,7 @@ export function rolePlayer(
  * writes what goes before and after it.
  */
 export function quantifiedReading(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
   parts: readonly ReadingPart[],
   own: number,
@@ -284,7 +284,7 @@ export function quantifiedReading(
  * for", so the reading's verb need not agree with a plural (barwise-zx2).
  */
 export function forEachReading(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
   own: number,
   others: string,
@@ -323,7 +323,7 @@ export function forEachReading(
  * one person reporting to themself.
  */
 function numberedPlayers(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
 ): (index: number) => VerbalizationSegment {
   return (index) => {

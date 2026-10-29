@@ -2,7 +2,6 @@ import { groupRepeats } from "../util/groupRepeats.js";
 import {
   type Constraint,
   type ExternalConstraint,
-  type InternalConstraint,
   isOverSubtypes,
   roleIdsOf,
   subtypeFactIdsOf,
@@ -19,15 +18,8 @@ import { Population, type PopulationConfig } from "./Population.js";
 import type { Role } from "./Role.js";
 import { SubtypeFact, type SubtypeFactConfig, subtypePairKey } from "./SubtypeFact.js";
 
-/**
- * A constraint in a view of fact types: an internal one with the fact type
- * it lives in, one across fact types with none. The second has no host
- * (orm-format-3, Open decision 9), so a reader that wants to name its fact
- * types asks for the ones it spans rather than being handed one.
- */
-export type ConstraintInView =
-  | readonly [constraint: InternalConstraint, factType: FactType]
-  | readonly [constraint: ExternalConstraint, factType: undefined];
+import type { ConstraintInView, ConstraintModel } from "./constraintModel.js";
+export type { ConstraintInView } from "./constraintModel.js";
 
 /**
  * Configuration for creating a new OrmModel.
@@ -97,7 +89,7 @@ export class DuplicateIdError extends Error {
  * The OrmModel enforces referential integrity: roles in fact types must
  * reference object types that exist in the model.
  */
-export class OrmModel {
+export class OrmModel implements ConstraintModel {
   private _name: string;
   private _domainContext: string | undefined;
   private _note: string | undefined;

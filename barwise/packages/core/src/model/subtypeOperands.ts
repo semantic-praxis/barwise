@@ -5,7 +5,7 @@
  * model lineage (schema-export-subtype-constraints.spec.md, barwise-lwy).
  * Before this the verbalizer and lineage each held the rule.
  */
-import type { OrmModel } from "./OrmModel.js";
+import type { ConstraintModel } from "./constraintModel.js";
 
 /**
  * The supertype a constraint's subtype facts name, taken from the first
@@ -15,7 +15,7 @@ import type { OrmModel } from "./OrmModel.js";
  */
 export function subtypeOperands(
   subtypeFactIds: readonly string[],
-  model: OrmModel,
+  model: ConstraintModel,
 ): {
   readonly supertypeId: string | undefined;
   readonly subtypeIds: readonly (string | undefined)[];

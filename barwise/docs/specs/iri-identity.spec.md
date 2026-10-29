@@ -8,7 +8,9 @@ project rules); decision 17 taken; WS5 implemented 2026-10-29 (5a: `renameInMode
 `renameInProject`; 5b: `barwise rename`, MCP `rename_element`, the VS Code
 tool); rename recognition moved to WS6; WS6 grounded 2026-10-29 (6a to 6f,
 decision 15 amended, decisions 18 to 20); 6a in progress (diff recognizes renames,
-merge refuses content and rename pairings, implemented 2026-10-29); WS7 to come
+merge refuses content and rename pairings, implemented 2026-10-29; the verbalization
+interface, `model/mint.ts` and `FactType.addConstraint`'s return, implemented
+2026-10-29); WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-29
@@ -1013,6 +1015,57 @@ build differs from the bullet above:
   decides otherwise.
 - The constraint keys moved to a leaf module, `diff/constraintKey.ts`,
   because `elementDiff.ts` imports `identity.ts`.
+- The verbalization cycle runs through five modules, found by making
+  `OrmModel` import the constraint verbalizer and reading dependency-cruiser's
+  report: `ConstraintVerbalizer.ts`, `constraints/phase1.ts`, `phase2.ts`,
+  `sentence.ts` and `model/subtypeOperands.ts`. `ExportAnnotationCollector`
+  is reached only from the whole-model `Verbalizer` and is not on it. The
+  interface is `ConstraintModel` (`model/constraintModel.ts`, with
+  `ConstraintInView` moved there and re-exported); `OrmModel` declares it
+  implements it. The same probe, run after the change, reports no cycle.
+- The subtype-fact and objectification sentences moved from `Verbalizer`
+  into `verbalization/elementSentences.ts`, over `ConstraintModel`, so
+  `mint.ts` can read them; the `Verbalizer` methods delegate.
+- `mintedKey` walks the constraint's serialized form by field: references
+  (roles, subtype facts, a join path's root and steps) become what the
+  sentence names, stated fields are kept, the id is dropped, and a field
+  the walk does not know throws, so a constraint kind added later must say
+  which of its fields are references. The guard and the key share that
+  walk. The guard also requires every player of a role's fact type, which
+  the sentence names, to resolve. The key keeps the serializer's field
+  names, not the model's, because `minted_from` sits beside that form in
+  the file and a reader comparing the two reads one vocabulary.
+- Resolving is not enough for the guard: a disjunctive mandatory over roles
+  of two players resolves, and its sentence names the first role's player
+  as the one every instance plays. What each sentence assumes of its
+  constraint's shape -- one shared player, each role named once in a list,
+  a unary fact type under a cardinality, an exclusion over two roles or
+  more, a join path that chains, operands that share a root type and
+  project the same column types, something to constrain -- is stated once,
+  in `verbalization/constraints/assumptions.ts`, beside the sentences, and
+  the guard refuses a constraint whose shape breaks it. The first version
+  listed six shapes and review found eight more, so the list is not trusted
+  to be complete by inspection: it restates part of what validation's
+  constraint rules check, and `mintAgreesWithValidation.test.ts` classifies
+  every `constraint/*` rule as one the guard refuses (with a model that
+  rule reports and the guard refuses) or one whose report the sentence
+  still states, and fails on an unclassified rule. What it cannot see is a
+  phrasing guess no rule reports: a role list naming one role twice
+  (barwise-ik3) and join operands rooted at different types (barwise-sq2)
+  were two, and such a shape is caught only by reading the phrasing paths.
+- The key holds what the sentence prints: a role is its position, its name
+  and its fact type's name, readings and players; an internal constraint
+  also carries its host fact type, which its sentence names even where no
+  role does (a value constraint on the whole fact type); a subtype fact's
+  defining rule is its expression alone. `mint()` returns the name and key
+  from one check; `mintedName` and `mintedKey` read it.
+- Two consequences for 6b. A key can still hold something no sentence
+  prints (every reading of a role's fact type, where a sentence uses one),
+  so a name is stale only when the key differs and the name minted now
+  differs too; otherwise the key is refreshed in place. And two constraints
+  can mint one name from different keys (an external uniqueness over
+  `[a, b]` and over `[b, a]` reads the same), which is the suffix rule's
+  case, not the guard's.
 
 **6b to 6f, the 4.0 series: no release between them**, as
 `orm-format-3`'s 4a/4b, because a build that writes 4.0 must already

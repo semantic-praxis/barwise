@@ -351,7 +351,8 @@ function pairedByJson(delta: ModelDelta): { readonly pairedBy?: RenamePairing; }
  * `barwise history`, which render deltas separately.
  */
 export function pairingNote(delta: ModelDelta): string | undefined {
-  switch (renamePairing(delta)) {
+  const pairing = renamePairing(delta);
+  switch (pairing) {
     case "recognized":
       // "Possible": two elements of one shape pair the same way (decision 8).
       return "Possibly a rename: paired by what it says, not by its id or name.";
@@ -359,6 +360,13 @@ export function pairingNote(delta: ModelDelta): string | undefined {
       return "Paired as a declared rename.";
     case undefined:
       return undefined;
+    default: {
+      // A pairing added to `PairedBy` must say what its note is: merge
+      // already refuses it and the JSON shows it, so a silent text line
+      // here would be the one surface that hides it.
+      const unhandled: never = pairing;
+      throw new Error(`pairingNote: no note for pairing "${String(unhandled)}".`);
+    }
   }
 }
 
