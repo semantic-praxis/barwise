@@ -175,6 +175,14 @@ identified by a value of its own, a subtype keyed on its supertype link),
 the barwise annotation names its columns in a new `identifiedBy` field,
 and the import reads it.
 
+The dbt import now does the same for a model keyed on several columns
+that it objectifies: the key's uniqueness is the objectifier's preferred
+identifier, where it used to store none (24 entities in the tracked
+models). And an annotated DDL table now follows its barwise line: it is an
+objectifier only when the line says so, so an entity identified by two
+references no longer returns as the objectifier of an invented fact type,
+and it keeps the line's reference mode whatever its key's width.
+
 ### Ring sentences, OpenAPI path parameters and Avro field names
 
 - A ring constraint's sentence keeps the reading's text after its second

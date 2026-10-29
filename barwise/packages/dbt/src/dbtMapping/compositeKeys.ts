@@ -10,7 +10,7 @@
  * skipped and named on stderr (barwise-nkn, three trial imports).
  */
 
-import { generateId, type InternalConstraint } from "@barwise/core";
+import { generateId, type InternalConstraint, resolvePreferredIdentifier } from "@barwise/core";
 import { DBT_KEY_TEST } from "@barwise/core/mapping";
 import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
 import {
@@ -414,8 +414,11 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       [c],
       i,
     ) => (info.key.includes(c!) ? [roles[i]!.id] : []));
+    // The key's uniqueness identifies the objectifier, as the DDL import
+    // reads it (import-key-identifier-follow-ups.spec.md, barwise-fuo).
+    const keyId = generateId();
     const constraints: InternalConstraint[] = [
-      { type: "internal_uniqueness", roleIds: keyRoleIds },
+      { id: keyId, type: "internal_uniqueness", roleIds: keyRoleIds },
       ...valueConstraints,
     ];
     const factType = ctx.model.addFactType({
@@ -430,6 +433,13 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     });
     if (info.objectified && entityId) {
       ctx.model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: entityId });
+      // Checked as the DDL import checks it (`preferUniquenessOver`), so a
+      // key the reading ever widens past a reference scheme stores nothing
+      // rather than an identifier validation refuses.
+      ctx.model.setPreferredIdentifier(entityId, keyId);
+      if (!resolvePreferredIdentifier(ctx.model, entityId).ok) {
+        ctx.model.setPreferredIdentifier(entityId, undefined);
+      }
     }
   }
 }
