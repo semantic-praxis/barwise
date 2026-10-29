@@ -12,7 +12,7 @@ decision 15 amended, decisions 18 to 20), not started; WS7 to come
 Created: 2026-10-28
 Last-updated: 2026-10-29
 Tracking: barwise-wcg, barwise-y1b
-Plan-reviewed: e9714f47 (code-review x5, pr-review; re-pointed after WS5 was grounded and decision 17 taken)
+Plan-reviewed: 15d6f18e (pr-review x5, code-review x3; re-pointed after WS6 was grounded and decisions 18 to 20 taken)
 Touches: barwise/packages/core/src/model/,
 barwise/packages/core/src/serialization/,
 barwise/packages/core/schemas/,
