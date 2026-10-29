@@ -270,6 +270,17 @@ describe("the import reads identifiedBy", () => {
         referenceMode: "booking_id",
         supertypes: [],
         identifiedBy: ["guest_id"],
+        // Stated: an objectification the line does not name is no longer
+        // guessed from the key on a line with supertypes (barwise-xgu).
+        objectifies: {
+          factType: "Guest books Room on Night",
+          readings: ["{0} books {1} on {2}"],
+          roles: [
+            { name: "books", player: "Guest", columns: ["guest_id"] },
+            { name: "is booked", player: "Room", columns: ["room_id"] },
+            { name: "is on", player: "Night", columns: ["night_id"] },
+          ],
+        },
       })
     }`;
     const { model, warnings } = parse(`

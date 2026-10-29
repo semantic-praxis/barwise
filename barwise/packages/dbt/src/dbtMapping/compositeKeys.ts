@@ -414,8 +414,11 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       [c],
       i,
     ) => (info.key.includes(c!) ? [roles[i]!.id] : []));
+    // The key's uniqueness identifies the objectifier, as the DDL import
+    // reads it (import-key-identifier-follow-ups.spec.md, barwise-fuo).
+    const keyId = generateId();
     const constraints: InternalConstraint[] = [
-      { type: "internal_uniqueness", roleIds: keyRoleIds },
+      { id: keyId, type: "internal_uniqueness", roleIds: keyRoleIds },
       ...valueConstraints,
     ];
     const factType = ctx.model.addFactType({
@@ -430,6 +433,7 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     });
     if (info.objectified && entityId) {
       ctx.model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: entityId });
+      ctx.model.setPreferredIdentifier(entityId, keyId);
     }
   }
 }

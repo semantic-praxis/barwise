@@ -12,6 +12,7 @@ barwise/packages/formats/src/ddl/DdlImportFormat.ts,
 barwise/packages/formats/tests/,
 barwise/packages/cli/tests/uniquenessParity.test.ts,
 barwise/packages/cli/tests/compositeKeyParity.test.ts,
++barwise/packages/cli/tests/workspace/preferred.ts,
 barwise/docs/release-notes/unreleased.md
 
 This spec covers three follow-ups to annotation-preferred-identifier.spec.md:

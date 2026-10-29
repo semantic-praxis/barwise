@@ -10,6 +10,7 @@ import type { OrmModel } from "@barwise/core";
 import { importDbtProject } from "@barwise/dbt";
 import { DdlImportFormat } from "@barwise/formats";
 import { describe, expect, it } from "vitest";
+import { describePreferred } from "./workspace/preferred.js";
 
 /**
  * What the rule decides, compared without names or readings, which the two
@@ -56,6 +57,7 @@ function composite(model: OrmModel) {
         ),
     ),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
+    preferred: describePreferred(model),
   };
 }
 
