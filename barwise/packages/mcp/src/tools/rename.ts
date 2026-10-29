@@ -10,20 +10,26 @@
  * `parity.manifest.json`).
  */
 
-import { MappingSerializer, OrmYamlSerializer } from "@barwise/core";
-import { renameInModel, renameInProject, type RenameTarget } from "@barwise/core/rename";
+import { OrmYamlSerializer } from "@barwise/core";
+import {
+  modelForRename,
+  projectRenameWrites,
+  renameInModel,
+  renameInProject,
+  type RenameTarget,
+} from "@barwise/core/rename";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
 import { loadProject } from "../workspace/projectLoader.js";
-import {
-  isProjectSource,
-  resolveSource,
-  type SourceInput,
-  sourcePath,
-} from "../workspace/resolve.js";
+import { isProjectSource, readSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
-import { type FileWrite, writeFilesAtomically } from "../workspace/stagedWrite.js";
+import {
+  type FileWrite,
+  PartialWriteError,
+  writeFilesAtomically,
+} from "../workspace/stagedWrite.js";
 
 type TextResult = { content: Array<{ type: "text"; text: string; }>; };
 
@@ -107,9 +113,8 @@ function targetOf(input: RenameElementInput): RenameTarget {
 }
 
 function renameModelSource(input: RenameElementInput, target: RenameTarget): TextResult {
-  // Leniently, as renameInModel expects: a model with a dangling reference
-  // renames, and validation reports what it reported before.
-  const model = resolveSource(input.source, { lenient: true });
+  const path = sourcePath(input.source);
+  const model = modelForRename(readSource(input.source), path ?? "The model");
   const warnings = model.domainContext === undefined ? [] : [
     `The model declares domain "${model.domainContext}". If it is a domain of a project, `
     + `rename it through the .orm-project.yaml and domain instead, so its shadows and mapping `
@@ -117,7 +122,6 @@ function renameModelSource(input: RenameElementInput, target: RenameTarget): Tex
   ];
   const { model: renamed, changes } = renameInModel(model, target, input.to);
   const yaml = new OrmYamlSerializer().serialize(renamed);
-  const path = sourcePath(input.source);
   if (path === undefined) return json({ yaml, changes, warnings });
   return writeBack([{ path, text: yaml }], changes, warnings, input.check === true);
 }
@@ -134,16 +138,15 @@ function renameProjectSource(input: RenameElementInput, target: RenameTarget): T
         + `did not load: ${problems.join("; ")}`,
     });
   }
-  const result = renameInProject(project, input.domain, target, input.to);
   const base = dirname(manifest);
-  const models = new OrmYamlSerializer();
-  const mappings = new MappingSerializer();
-  const writes: FileWrite[] = result.files.map((path) => {
-    const owner = result.project.domains.find((d) => d.path === path);
-    if (owner) return { path: resolve(base, path), text: models.serialize(owner.model!) };
-    const mapping = result.project.mappings.find((m) => m.path === path)!;
-    return { path: resolve(base, path), text: mappings.serialize(mapping) };
-  });
+  for (const d of project.domains) {
+    modelForRename(readFileSync(resolve(base, d.path), "utf-8"), d.path);
+  }
+  const result = renameInProject(project, input.domain, target, input.to);
+  const writes = projectRenameWrites(result).map((w) => ({
+    path: resolve(base, w.path),
+    text: w.text,
+  }));
   return writeBack(writes, result.changes, [], input.check === true);
 }
 
@@ -155,7 +158,18 @@ function writeBack(
 ): TextResult {
   const files = writes.map((w) => w.path);
   if (check) return json({ written: false, files, changes, warnings });
-  writeFilesAtomically(writes);
+  try {
+    writeFilesAtomically(writes);
+  } catch (err) {
+    // A write that stopped part-way names what it replaced, so the result
+    // says which files are in their new state rather than claiming none are.
+    const replaced = err instanceof PartialWriteError ? err.replaced : [];
+    return json({
+      error: (err as Error).message,
+      written: replaced.length > 0,
+      writtenTo: replaced,
+    });
+  }
   return json({ written: true, writtenTo: files, changes, warnings });
 }
 

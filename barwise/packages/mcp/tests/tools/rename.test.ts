@@ -4,7 +4,8 @@
  * follows the rename into its other files, and every refusal is an
  * `error` in the result, never a write.
  */
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { OrmYamlSerializer } from "@barwise/core";
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,22 @@ import { executeRename } from "../../src/tools/rename.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_FIXTURE = join(__dirname, "../fixtures/project");
+
+/**
+ * The project fixture is format 1.0, shared with tests that read it as it
+ * is, and rename refuses a file that is not current (it would rewrite the
+ * format silently). So the copy is migrated first, as a user would.
+ */
+function migrateDomains(project: string): void {
+  const domains = join(project, "domains");
+  for (const name of readdirSync(domains)) {
+    const path = join(domains, name);
+    const { model } = new OrmYamlSerializer().migrate(readFileSync(path, "utf-8"), {
+      lenient: true,
+    });
+    writeFileSync(path, new OrmYamlSerializer().serialize(model), "utf-8");
+  }
+}
 
 const MODEL = `orm_version: "3.0"
 model:
@@ -95,11 +112,21 @@ describe("rename_element", () => {
     expect(result.error).toMatch(reason);
   });
 
+  it("refuses a 2.x file rather than migrating it silently, writing nothing", () => {
+    const old = MODEL.replace(`orm_version: "3.0"`, `orm_version: "2.0"`);
+    const path = join(dir, "shop.orm.yaml");
+    writeFileSync(path, old, "utf-8");
+    const result = body(executeRename({ source: path, objectType: "Order", to: "Purchase" }));
+    expect(result.error).toContain("is format 2.0. Run `barwise migrate` on it first");
+    expect(readFileSync(path, "utf-8")).toBe(old);
+  });
+
   describe("a project source", () => {
     let project: string;
     beforeEach(() => {
       project = join(dir, "project");
       cpSync(PROJECT_FIXTURE, project, { recursive: true });
+      migrateDomains(project);
     });
 
     it("renames through the project and writes the files it changed", () => {

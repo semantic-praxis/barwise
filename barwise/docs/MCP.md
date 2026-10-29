@@ -67,7 +67,7 @@ the whole workflow, see
 
 ### Option 1: VS Code Extension (recommended)
 
-Install the **Barwise ORM Modeler** extension. Fifteen of the server's
+Install the **Barwise ORM Modeler** extension. Sixteen of the server's
 tools are registered with VS Code's Language Model Tool API and appear
 automatically in Copilot Chat -- no configuration needed. The gym tools and
 `analyze_repository` are not among them; repository analysis is the
@@ -82,6 +82,7 @@ You can reference any tool directly in Copilot Chat using `#`:
 - `#barwiseDiagram` -- generate an SVG diagram
 - `#barwiseImport` -- extract a model from a transcript
 - `#barwiseMerge` -- merge two models (writes the base file)
+- `#barwiseRename` -- rename an element, across a project (writes the files)
 - `#barwiseExport` -- export to any registered format
 - `#barwiseDescribe` -- summarize entities and rules
 - `#barwiseQuery` -- run a structural query

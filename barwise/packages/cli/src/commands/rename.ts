@@ -10,20 +10,30 @@
  * as `migrate` loses them (barwise-ok6).
  */
 
-import { MappingSerializer, OrmYamlSerializer } from "@barwise/core";
-import { renameInModel, renameInProject, type RenameTarget } from "@barwise/core/rename";
+import { OrmYamlSerializer } from "@barwise/core";
+import {
+  modelForRename,
+  projectRenameWrites,
+  renameInModel,
+  renameInProject,
+  type RenameTarget,
+} from "@barwise/core/rename";
 import type { Command } from "commander";
 import { dirname, resolve } from "node:path";
-import { loadModel } from "../workspace/io.js";
+import { readFile } from "../workspace/io.js";
 import { loadProject } from "../workspace/projectLoader.js";
-import { type FileWrite, writeFilesAtomically } from "../workspace/stagedWrite.js";
+import {
+  type FileWrite,
+  PartialWriteError,
+  writeFilesAtomically,
+} from "../workspace/stagedWrite.js";
 
 interface RenameOptions {
   objectType?: string;
   factType?: string;
   role?: string;
   rolePosition?: string;
-  to: string;
+  to?: string;
   project?: string;
   domain?: string;
   check?: boolean;
@@ -54,7 +64,9 @@ export function registerRenameCommand(program: Command): void {
       "--role-position <n>",
       "With --fact-type: the role to rename, by its position (0-based)",
     )
-    .requiredOption("--to <name>", "The new name")
+    // Checked in the action, not by commander: a missing --to must exit 2
+    // (could not answer), never commander's 1, which --check uses.
+    .option("--to <name>", "The new name (required)")
     .option("--project <manifest>", "A .orm-project.yaml; the rename follows into its other files")
     .option("--domain <context>", "With --project: the domain that holds the element")
     .option("--check", "Write nothing; exit 1 if any file would be rewritten")
@@ -80,6 +92,7 @@ export function registerRenameCommand(program: Command): void {
 function run(file: string | undefined, opts: RenameOptions): Outcome {
   try {
     const target = targetOf(opts);
+    if (opts.to === undefined) return failure("--to is required.");
     if (file !== undefined && opts.project !== undefined) {
       return failure("Name a model file or --project, not both.");
     }
@@ -107,10 +120,12 @@ function targetOf(opts: RenameOptions): RenameTarget {
     if (opts.factType === undefined || opts.objectType !== undefined) {
       throw new UsageError("A role is named with --fact-type and --role or --role-position.");
     }
-    const role = opts.rolePosition === undefined ? opts.role! : Number(opts.rolePosition);
-    if (typeof role === "number" && !Number.isInteger(role)) {
-      throw new UsageError(`--role-position must be a whole number, not "${opts.rolePosition}".`);
+    if (opts.rolePosition !== undefined && !/^\d+$/.test(opts.rolePosition)) {
+      throw new UsageError(
+        `--role-position must be a whole number from 0, not "${opts.rolePosition}".`,
+      );
     }
+    const role = opts.rolePosition === undefined ? opts.role! : Number(opts.rolePosition);
     return { kind: "role", factType: opts.factType, role };
   }
   if ((opts.objectType === undefined) === (opts.factType === undefined)) {
@@ -122,14 +137,12 @@ function targetOf(opts: RenameOptions): RenameTarget {
 }
 
 function renameFile(file: string, target: RenameTarget, opts: RenameOptions): Outcome {
-  // Leniently, as `renameInModel` expects: a model with a dangling
-  // reference renames, and validation reports what it reported before.
-  const model = loadModel(file, { lenient: true });
+  const model = modelForRename(readFile(file), file);
   const warnings = model.domainContext === undefined ? [] : [
     `${file} declares domain "${model.domainContext}". If it is a domain of a project, rename `
     + `it with --project and --domain instead, so its shadows and mapping files follow.`,
   ];
-  const { model: renamed, changes } = renameInModel(model, target, opts.to);
+  const { model: renamed, changes } = renameInModel(model, target, opts.to!);
   return write(
     [{ path: file, text: new OrmYamlSerializer().serialize(renamed) }],
     changes,
@@ -154,16 +167,13 @@ function renameProject(
       }`,
     );
   }
-  const result = renameInProject(project, domain, target, opts.to);
   const base = dirname(manifest);
-  const models = new OrmYamlSerializer();
-  const mappings = new MappingSerializer();
-  const writes: FileWrite[] = result.files.map((path) => {
-    const owner = result.project.domains.find((d) => d.path === path);
-    if (owner) return { path: resolve(base, path), text: models.serialize(owner.model!) };
-    const mapping = result.project.mappings.find((m) => m.path === path)!;
-    return { path: resolve(base, path), text: mappings.serialize(mapping) };
-  });
+  for (const d of project.domains) modelForRename(readFile(resolve(base, d.path)), d.path);
+  const result = renameInProject(project, domain, target, opts.to!);
+  const writes = projectRenameWrites(result).map((w) => ({
+    path: resolve(base, w.path),
+    text: w.text,
+  }));
   return write(writes, result.changes, [], opts);
 }
 
@@ -175,7 +185,14 @@ function write(
 ): Outcome {
   const files = writes.map((w) => w.path);
   if (opts.check) return { status: "would-rename", files, changes, warnings };
-  writeFilesAtomically(writes);
+  try {
+    writeFilesAtomically(writes);
+  } catch (err) {
+    // A write that stopped part-way names what it replaced, so `files` says
+    // which files are in their new state rather than claiming none are.
+    const replaced = err instanceof PartialWriteError ? err.replaced : [];
+    return { ...failure((err as Error).message), files: replaced };
+  }
   return { status: "renamed", files, changes, warnings };
 }
 

@@ -3,12 +3,15 @@
  * `--check` and json contract and exit codes as `migrate`'s, the
  * `domain_context` warning, the refusals, and the staged write.
  */
+import { OrmYamlSerializer } from "@barwise/core";
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -16,11 +19,27 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { writeFilesAtomically } from "../../src/workspace/stagedWrite.js";
+import { PartialWriteError, writeFilesAtomically } from "../../src/workspace/stagedWrite.js";
 import { runCli } from "../workspace/run.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_FIXTURE = join(__dirname, "../fixtures/project");
+
+/**
+ * The project fixture is format 1.0, shared with tests that read it as it
+ * is, and rename refuses a file that is not current (it would rewrite the
+ * format silently). So the copy is migrated first, as a user would.
+ */
+function migrateDomains(project: string): void {
+  const domains = join(project, "domains");
+  for (const name of readdirSync(domains)) {
+    const path = join(domains, name);
+    const { model } = new OrmYamlSerializer().migrate(readFileSync(path, "utf-8"), {
+      lenient: true,
+    });
+    writeFileSync(path, new OrmYamlSerializer().serialize(model), "utf-8");
+  }
+}
 
 const MODEL = `orm_version: "3.0"
 model:
@@ -145,6 +164,38 @@ describe("barwise rename", () => {
     expect(readFileSync(path, "utf-8")).toBe(MODEL);
   });
 
+  it("refuses a 2.x file rather than migrating it silently, writing nothing", async () => {
+    const old = MODEL.replace(`orm_version: "3.0"`, `orm_version: "2.0"`);
+    const path = file("shop.orm.yaml", old);
+    const result = await runCli(["rename", path, "--object-type", "Order", "--to", "Purchase"]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain("is format 2.0. Run `barwise migrate` on it first");
+    expect(readFileSync(path, "utf-8")).toBe(old);
+  });
+
+  it("refuses a missing --to with exit 2, not commander's 1", async () => {
+    const path = file("shop.orm.yaml", MODEL);
+    const result = await runCli(["rename", path, "--object-type", "Order"]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain("--to is required.");
+  });
+
+  it.each(["-1", "0x1", "1.5", "one"])("refuses --role-position %j", async (position) => {
+    const path = file("shop.orm.yaml", MODEL);
+    const result = await runCli([
+      "rename",
+      path,
+      "--fact-type",
+      "Customer places Order",
+      `--role-position=${position}`,
+      "--to",
+      "x",
+    ]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain("--role-position must be a whole number from 0");
+    expect(readFileSync(path, "utf-8")).toBe(MODEL);
+  });
+
   it("refuses a model file and --project together", async () => {
     const path = file("shop.orm.yaml", MODEL);
     const result = await runCli([
@@ -168,6 +219,7 @@ describe("barwise rename", () => {
     beforeEach(() => {
       project = join(dir, "project");
       cpSync(PROJECT_FIXTURE, project, { recursive: true });
+      migrateDomains(project);
     });
 
     it("renames through the project and writes exactly the files that name the element", async () => {
@@ -211,8 +263,8 @@ describe("barwise rename", () => {
       ]);
       expect(result.exitCode).toBe(2);
       expect(result.stdout).toContain("did not load cleanly");
-      expect(readFileSync(join(project, "domains/crm.orm.yaml"), "utf-8")).toContain(
-        'name: "Customer"',
+      expect(readFileSync(join(project, "domains/crm.orm.yaml"), "utf-8")).not.toContain(
+        "Client",
       );
     });
   });
@@ -237,6 +289,50 @@ describe("barwise rename", () => {
       writeFilesAtomically([{ path: a, text: "a1\n" }, { path: b, text: "b1\n" }]);
       expect([readFileSync(a, "utf-8"), readFileSync(b, "utf-8")]).toEqual(["a1\n", "b1\n"]);
       expect(readdirSync(dir).sort()).toEqual(["a.orm.yaml", "b.orm.yaml"]);
+    });
+
+    it("refuses two writes that name one file, writing nothing", () => {
+      const a = file("a.orm.yaml", "a0\n");
+      expect(() =>
+        writeFilesAtomically([{ path: a, text: "a1\n" }, {
+          path: join(dir, ".", "a.orm.yaml"),
+          text: "a2\n",
+        }])
+      ).toThrow(/Two writes name one file/);
+      expect(readFileSync(a, "utf-8")).toBe("a0\n");
+      expect(readdirSync(dir)).toEqual(["a.orm.yaml"]);
+    });
+
+    it("leaves a staged file it did not create alone, writing nothing", () => {
+      const a = file("a.orm.yaml", "a0\n");
+      const b = file("b.orm.yaml", "b0\n");
+      file("b.orm.yaml.barwise-staged", "someone else's\n");
+      expect(() => writeFilesAtomically([{ path: a, text: "a1\n" }, { path: b, text: "b1\n" }]))
+        .toThrow(/A staged file already exists beside .*b\.orm\.yaml/);
+      expect(readFileSync(a, "utf-8")).toBe("a0\n");
+      expect(readFileSync(b, "utf-8")).toBe("b0\n");
+      expect(readFileSync(join(dir, "b.orm.yaml.barwise-staged"), "utf-8")).toBe(
+        "someone else's\n",
+      );
+      expect(existsSync(join(dir, "a.orm.yaml.barwise-staged"))).toBe(false);
+    });
+
+    it("names the files it replaced when a rename fails part-way", () => {
+      const a = file("a.orm.yaml", "a0\n");
+      // A non-empty directory stages (its temp is a file beside it) but
+      // cannot be renamed over, so the second replacement fails.
+      const blocked = join(dir, "blocked");
+      mkdirSync(blocked);
+      writeFileSync(join(blocked, "keep"), "x", "utf-8");
+      let caught: unknown;
+      try {
+        writeFilesAtomically([{ path: a, text: "a1\n" }, { path: blocked, text: "b1\n" }]);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(PartialWriteError);
+      expect((caught as PartialWriteError).replaced).toEqual([realpathSync(a)]);
+      expect(readFileSync(a, "utf-8")).toBe("a1\n");
     });
   });
 });

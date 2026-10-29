@@ -282,6 +282,28 @@ function runExportModel(input: ExportModelInput): vscode.LanguageModelToolResult
  * holding the source (else the first folder), never the extension host's
  * working directory -- resolveWriteDir says why.
  */
+/**
+ * Rename, refusing a model whose editor has unsaved changes: the rename is
+ * written to disk, so it would save the unsaved edits with it, and the
+ * dirty buffer would then disagree with the file until the user chose one.
+ */
+function runRename(input: RenameInput): vscode.LanguageModelToolResult {
+  const source = resolveSourceParam(input.source);
+  const path = sourcePath(source);
+  const open = path === undefined
+    ? undefined
+    : vscode.workspace.textDocuments.find((d) => d.uri.fsPath === path);
+  if (open?.isDirty && input.check !== true) {
+    return new vscode.LanguageModelToolResult([
+      new vscode.LanguageModelTextPart(JSON.stringify({
+        error: `${path} has unsaved changes. Save it first, then rename: the rename writes the `
+          + "file, and the editor reloads a saved file when it changes on disk.",
+      })),
+    ]);
+  }
+  return toToolResult(executeRename({ ...input, source }));
+}
+
 function runSplitModel(input: SplitModelInput): vscode.LanguageModelToolResult {
   const source = resolveSourceParam(input.source);
   let outDir: string | undefined;
@@ -403,7 +425,7 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
   register<RenameInput>(
     context,
     "barwise_rename_element",
-    (i) => toToolResult(executeRename({ ...i, source: resolveSourceParam(i.source) })),
+    runRename,
     (i) => (i.check ? "Previewing Barwise rename..." : "Renaming in Barwise model..."),
   );
   register<SplitModelInput>(
