@@ -3,11 +3,17 @@
  * the field at fault (docs/specs/effect-adoption.spec.md, S4).
  *
  * The decoders read the file's own spelling, so a problem's path is the
- * path in the file (`value_constraint.ranges.0`), and a message is written
- * around it. Shared by every element kind's decoder, so one rule reads one
- * way whichever element reported it.
+ * path in the file (`value_constraint.ranges.0`). One walk over Effect's
+ * issue tree turns it into problems: it knows which element each problem
+ * belongs to, because an element's Schema carries an `element` annotation
+ * (`elementOf`) that the walk meets on the way down, so a problem deep in a
+ * document is labelled by the constraint or object type it sits in, not by
+ * the document (second review of R1). At each failed struct or list it adds
+ * the cross-field rules Effect did not run (`harness.ts`).
  */
+import type * as SchemaAST from "effect/SchemaAST";
 import * as SchemaIssue from "effect/SchemaIssue";
+import { extraChecks } from "./harness.js";
 
 /** One thing wrong with one element. */
 export interface DecodeProblem {
@@ -24,98 +30,168 @@ export function fieldPath(path: readonly PropertyKey[]): string {
   return path.map(String).join(".");
 }
 
-/** One failure in an issue tree, with the path that leads to it. */
-export interface Located {
-  readonly path: readonly PropertyKey[];
-  readonly issue: SchemaIssue.Issue;
+/** How a message names an element, read from its raw value. */
+export interface ElementLabel {
+  readonly label: string;
+  readonly identity: string;
 }
 
 /**
- * The failures in an issue tree, one per problem.
- *
- * A union is descended only when one member was tried: that is a
- * discriminated union picking its variant by its tag (`kind`, `type`), and
- * the problems are that variant's. A union none of whose members applied,
- * or several, is one problem at its own position -- `max: "lots"` is one bad
- * value, not one per member it failed to match. A failed check with its own
- * message is one problem where it ran; one without is reported by what it
- * points at.
+ * The annotation an element's Schema carries: how to name one from its
+ * raw value, and the sentence for a union of variants none of which the
+ * value's tag selects.
  */
-export function locate(issue: SchemaIssue.Issue, path: readonly PropertyKey[] = []): Located[] {
-  switch (issue._tag) {
-    case "Pointer":
-      return locate(issue.issue, [...path, ...issue.path]);
-    case "Composite":
-      return issue.issues.flatMap((child) => locate(child, path));
-    case "Encoding":
-      return locate(issue.issue, path);
-    case "Filter": {
-      const inner = issue.issue;
-      if (issue.filter.annotations?.message !== undefined) {
-        return inner._tag === "Pointer"
-          ? [{ path: [...path, ...inner.path], issue }]
-          : [{ path, issue }];
-      }
-      return inner._tag === "Pointer" || inner._tag === "Composite"
-        ? locate(inner, path)
-        : [{ path, issue }];
-    }
-    case "AnyOf":
-      return issue.issues.length === 1 ? locate(issue.issues[0]!, path) : [{ path, issue }];
-    default:
-      return [{ path, issue }];
-  }
+export interface ElementAnnotation {
+  readonly describe: (raw: unknown) => ElementLabel;
+  readonly badTag: string;
+  /** What a value that is not a mapping is called: "Object type". */
+  readonly noun: string;
 }
+
+/** Mark a Schema as an element, for `problemsOf`. */
+export function elementOf(annotation: ElementAnnotation) {
+  return { element: annotation } as const;
+}
+
+const elementAt = (ast: SchemaAST.AST | undefined): ElementAnnotation | undefined =>
+  (ast?.annotations as { element?: ElementAnnotation; } | undefined)?.element;
+
+const isMapping = (v: unknown): boolean => typeof v === "object" && v !== null && !Array.isArray(v);
 
 const defaultFormat = SchemaIssue.makeFormatterDefault();
 
-/**
- * The rest of the sentence after the element's label and its field's path.
- *
- * A rule a Schema states carries its predicate as a `message` annotation,
- * used as it is. What is left is Effect's own structural refusals -- an
- * unknown key, a missing key, a wrong type -- phrased here, because
- * Effect's text names neither the element nor the field. `atRoot` words a
- * union that matched no variant at the element itself: its tag is wrong.
- */
-export function predicateOf(
-  issue: SchemaIssue.Issue,
-  path: readonly PropertyKey[],
-  atRoot: string,
-): string {
-  switch (issue._tag) {
-    case "UnexpectedKey":
-      return "is not a field this element has.";
-    case "MissingKey":
-      return issue.annotations?.messageMissingKey ?? "is missing.";
-    case "AnyOf": {
-      const message = issue.ast.annotations?.message;
-      if (typeof message === "string") return message;
-      if (path.length === 0) return atRoot;
-      break;
-    }
-    case "Filter": {
-      const message = issue.filter.annotations?.message;
-      if (typeof message === "string") return message;
-      break;
-    }
-    case "InvalidType":
-    case "InvalidValue": {
-      const message = issue._tag === "InvalidType"
-        ? issue.ast.annotations?.message
-        : issue.annotations?.message;
-      if (typeof message === "string") return message;
-      break;
-    }
-  }
-  return `is invalid: ${defaultFormat(issue)}.`;
+/** The message an issue carries itself, if it has one. */
+function ownMessage(issue: SchemaIssue.Issue): string | undefined {
+  const message = issue._tag === "InvalidType"
+    ? issue.ast.annotations?.message
+    : issue._tag === "InvalidValue" || issue._tag === "MissingKey"
+    ? issue.annotations?.message
+    : issue._tag === "Filter"
+    ? issue.filter.annotations?.message
+    : issue._tag === "AnyOf"
+    ? issue.ast.annotations?.message
+    : undefined;
+  return typeof message === "string" ? message : undefined;
 }
 
 /**
- * The sentence for one problem: the element's label, the field's path when
- * the problem is below the element, and the predicate.
- * `Entity type "Customer": reference_mode is missing.`
+ * The rest of the sentence after the element's label and the field's path.
+ * A rule's own message is used as it is; Effect's structural refusals -- an
+ * unknown key, a missing key, a wrong type -- are phrased here, because its
+ * text names neither the element nor the field. `fallback` is the message of
+ * a rule whose failure this leaf is part of.
  */
-export function sentence(label: string, path: readonly PropertyKey[], predicate: string): string {
-  return path.length === 0 ? `${label} ${predicate}` : `${label}: ${fieldPath(path)} ${predicate}`;
+function predicateOf(issue: SchemaIssue.Issue, fallback: string | undefined): string {
+  if (issue._tag === "UnexpectedKey") return "is not a field this element has.";
+  if (issue._tag === "MissingKey") {
+    return issue.annotations?.messageMissingKey ?? ownMessage(issue) ?? "is missing.";
+  }
+  return ownMessage(issue) ?? fallback ?? `is invalid: ${defaultFormat(issue)}.`;
+}
+
+interface Context {
+  readonly label: ElementLabel;
+  /** Where the element starts: a problem's path is reported below it. */
+  readonly base: number;
+}
+
+const ROOTLESS: ElementLabel = { label: "The document", identity: "" };
+
+/** Every problem in an issue tree, the harness's included unless `harness` is off. */
+export function problemsOf(
+  issue: SchemaIssue.Issue,
+  raw: unknown,
+  { harness = true }: { readonly harness?: boolean; } = {},
+): DecodeProblem[] {
+  const out: DecodeProblem[] = [];
+  const push = (context: Context, path: readonly PropertyKey[], predicate: string) => {
+    const below = path.slice(context.base);
+    out.push({
+      element: context.label.identity,
+      path: below,
+      message: below.length === 0
+        ? `${context.label.label} ${predicate}`
+        : `${context.label.label}: ${fieldPath(below)} ${predicate}`,
+    });
+  };
+
+  const enter = (
+    ast: SchemaAST.AST | undefined,
+    value: unknown,
+    path: readonly PropertyKey[],
+    context: Context,
+  ): Context => {
+    const element = elementAt(ast);
+    return element ? { label: element.describe(value), base: path.length } : context;
+  };
+
+  const walk = (
+    node: SchemaIssue.Issue,
+    value: unknown,
+    path: readonly PropertyKey[],
+    context: Context,
+    fallback: string | undefined,
+  ): void => {
+    switch (node._tag) {
+      case "Pointer": {
+        let inner = value;
+        for (const segment of node.path) {
+          inner = isMapping(inner) || Array.isArray(inner)
+            ? (inner as Record<PropertyKey, unknown>)[segment]
+            : undefined;
+        }
+        walk(node.issue, inner, [...path, ...node.path], context, fallback);
+        return;
+      }
+      case "Composite": {
+        const here = enter(node.ast, value, path, context);
+        const children = harness ? [...node.issues, ...extraChecks(node, value)] : node.issues;
+        for (const child of children) walk(child, value, path, here, fallback);
+        return;
+      }
+      case "Encoding":
+        walk(node.issue, value, path, context, fallback);
+        return;
+      case "AnyOf": {
+        const element = elementAt(node.ast);
+        const here = enter(node.ast, value, path, context);
+        if (node.issues.length === 1) {
+          walk(node.issues[0]!, value, path, here, fallback);
+          return;
+        }
+        // No member, or several, took the value. At an element that is a
+        // wrong tag -- or, for a value that is not a mapping at all, that.
+        if (element) {
+          if (isMapping(value)) push(here, path, element.badTag);
+          else {
+            push(
+              { label: { label: element.noun, identity: "" }, base: path.length },
+              path,
+              "must be a mapping of fields.",
+            );
+          }
+          return;
+        }
+        push(context, path, predicateOf(node, fallback));
+        return;
+      }
+      case "Filter": {
+        // A rule's own failure: its issues are reported where they point,
+        // each in its own words or, lacking any, the rule's.
+        const message = ownMessage(node) ?? fallback;
+        const inner = node.issue;
+        if (inner._tag === "Pointer" || inner._tag === "Composite") {
+          walk(inner, value, path, context, message);
+        } else {
+          push(context, path, ownMessage(inner) ?? message ?? predicateOf(inner, undefined));
+        }
+        return;
+      }
+      default:
+        push(context, path, predicateOf(node, fallback));
+    }
+  };
+
+  walk(issue, raw, [], { label: ROOTLESS, base: 0 }, undefined);
+  return out;
 }

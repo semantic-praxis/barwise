@@ -1,51 +1,63 @@
 /**
- * Rules that span several fields of one struct, reported whatever else is
- * wrong (docs/specs/effect-adoption.spec.md, WS1b part A; 1r, R1).
+ * Rules that span several fields, reported whatever else is wrong
+ * (docs/specs/effect-adoption.spec.md, WS1b part A; 1r, R1).
  *
- * Effect runs a struct's `.check` filters only once every field of that
- * struct has decoded. A rule over two fields -- a cardinality's `max >= min`,
- * a range's "a min or a max" -- therefore goes unreported beside any field
- * error in the same struct, and a file with two problems would be fixed
- * one at a time. #672 compensated in four places, each written for its
- * case. This is the one mechanism instead:
+ * Effect runs a struct's or a list's `.check` filters only once every field
+ * or item of it has decoded. A rule over two fields -- a cardinality's
+ * `max >= min`, a range's "a min or a max" -- therefore goes unreported
+ * beside any field error in the same struct, and a file with two problems
+ * is fixed one at a time. This is the one mechanism that closes it:
  *
- * - A rule is stated once, on the struct, by `crossField`, which marks the
- *   filter with an identity and the fields it reads.
- * - When a decode fails, `crossFieldProblems` walks the Schema's AST beside
- *   the raw input -- struct properties by key, arrays by index, a union by
- *   the member its literal tag selects -- and runs every marked rule at a
- *   node where none of the fields it reads failed.
- * - A failure Effect already reported, at the same path for the same rule,
- *   is not reported again, so a rule is reported once whether or not
- *   Effect ran it, and two rules failing at one node are both kept.
+ * - A rule is stated once, on the struct or list, by `crossField`, which
+ *   marks the filter with an identity and the fields it reads.
+ * - `extraChecks` is asked, at each struct or list Effect reports as
+ *   failed, which of its marked rules Effect did not run, and runs them on
+ *   the raw value. It reads Effect's own issue tree, so it visits exactly
+ *   the nodes that failed, and follows every union, record, tuple and
+ *   suspension the way Effect resolved it -- a failed union's issue names
+ *   the member Effect tried -- rather than guessing a path through the
+ *   Schema (first review of R1).
+ * - A rule is skipped only where a field it reads is missing or of the
+ *   wrong kind: there its own error is the report, and the rule could
+ *   misread it. A field that failed a check, or holds an error deeper
+ *   down, is still the right shape, and the rule runs (second review of
+ *   R1).
  *
- * Two facts make this exact, both probed on Effect 4.0.5 before it was
- * written: a failed check comes back as a `Filter` issue carrying the
- * filter it ran, so a rule Effect reported is recognised by identity; and a
- * filter's `run` takes the raw value. The Schemas it walks are written in
- * the file's own keys with no transformations, so a struct whose fields
- * decoded is the raw value, and running a rule on the raw value is running
- * it on what Effect would have checked.
+ * The Schemas this runs over are written in the file's own keys with no
+ * transformation, so a raw value is what Effect would have checked; a test
+ * walks each Schema and refuses a transformation.
  */
-import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
-import * as SchemaAST from "effect/SchemaAST";
 import * as SchemaIssue from "effect/SchemaIssue";
-import { type Located } from "./problems.js";
 
 /** The mark a cross-field rule carries on its filter. */
 export interface CrossFieldMark {
-  /** Stable identity: what the planted-defect test and the dedupe key on. */
+  /** Stable identity: what the planted-defect test keys on. */
   readonly id: string;
-  /** The struct's fields the rule reads; it runs only where none failed. */
+  /**
+   * The fields the rule reads, as paths below its node: `min`, or `*.type`
+   * for every item of a list. It is skipped where one of them is missing
+   * or of the wrong kind.
+   */
   readonly reads: readonly string[];
 }
 
-/** One rule over several fields, as a filter `Struct(...).check` takes. */
-export function crossField<T>(mark: CrossFieldMark, holds: (value: T) => boolean, message: string) {
+/**
+ * One rule over several fields, as `Struct(...).check` or
+ * `Array(...).check` takes it. The predicate returns what an Effect filter
+ * may: `true` or `undefined` when it holds, `false` to fail with `message`,
+ * or issues of its own -- `{ path, issue }` to point below the node, an
+ * array for several -- which are reported where they point, by Effect and
+ * by the harness alike.
+ */
+export function crossField<T>(
+  mark: CrossFieldMark,
+  holds: (value: T) => Schema.FilterOutput,
+  message: string,
+) {
   // The mark rides on the filter's annotations, which Effect hands back on
   // the issue it reports.
-  return Schema.makeFilter(holds, { message, crossField: mark });
+  return Schema.makeFilter((value: T) => holds(value), { message, crossField: mark });
 }
 
 /** The cross-field mark on a check, if it has one. */
@@ -55,127 +67,61 @@ export function markOf(check: unknown): CrossFieldMark | undefined {
   return mark && typeof mark.id === "string" ? mark : undefined;
 }
 
-const startsWith = (path: readonly PropertyKey[], prefix: readonly PropertyKey[]) =>
-  prefix.every((segment, i) => path[i] === segment);
-
-const samePath = (a: readonly PropertyKey[], b: readonly PropertyKey[]) =>
-  a.length === b.length && startsWith(a, b);
+/** Issue tags that mean a field is missing or of the wrong kind. */
+const STRUCTURAL = new Set(["MissingKey", "InvalidType", "InvalidValue", "AnyOf"]);
 
 /**
- * The cross-field failures Effect did not report, as located issues beside
- * the ones it did. `located` is what Effect reported for this decode.
+ * The paths below a failed node where a field is missing or of the wrong
+ * kind. A check's failure is not one: its value had the right shape.
  */
-export function crossFieldProblems(
-  ast: SchemaAST.AST,
-  raw: unknown,
-  located: readonly Located[],
-): Located[] {
-  const found: Located[] = [];
-  walk(ast, raw, [], located, found);
-  return found;
-}
-
-function walk(
-  ast: SchemaAST.AST,
-  raw: unknown,
-  path: readonly PropertyKey[],
-  located: readonly Located[],
-  found: Located[],
-): void {
-  switch (ast._tag) {
-    case "Objects": {
-      if (!Predicate.isObject(raw) || Array.isArray(raw)) return;
-      const value = raw as Record<PropertyKey, unknown>;
-      for (const check of ast.checks ?? []) {
-        const mark = markOf(check);
-        if (!mark || check._tag !== "Filter") continue;
-        // A rule reads only fields that decoded: on one that did not, its
-        // own error is the report, and the rule could misread it.
-        if (located.some((l) => mark.reads.some((f) => startsWith(l.path, [...path, f])))) {
-          continue;
-        }
-        // Not caught: every field the rule reads decoded, so a rule that
-        // throws here has a bug, and a silent skip would hide it.
-        const issue = check.run(raw, ast, {});
-        if (issue === undefined) continue;
-        const reported = located.some((l) =>
-          samePath(l.path, path) && l.issue._tag === "Filter"
-          && markOf(l.issue.filter)?.id === mark.id
-        );
-        if (!reported) found.push({ path, issue: new SchemaIssue.Filter(check, issue, raw) });
-      }
-      const named = new Set<PropertyKey>();
-      for (const ps of ast.propertySignatures) {
-        named.add(ps.name);
-        if (ps.name in value) walk(ps.type, value[ps.name], [...path, ps.name], located, found);
-      }
-      // A record's entries: every key no property names, under the
-      // signature's value type.
-      for (const sig of ast.indexSignatures) {
-        for (const key of Object.keys(value)) {
-          if (!named.has(key)) walk(sig.type, value[key], [...path, key], located, found);
-        }
-      }
-      return;
-    }
-    case "Arrays": {
-      if (!Array.isArray(raw)) return;
-      raw.forEach((element, i) => {
-        const item = i < ast.elements.length ? ast.elements[i] : ast.rest[0];
-        if (item !== undefined) walk(item, element, [...path, i], located, found);
-      });
-      return;
-    }
-    case "Union": {
-      const member = memberFor(ast, raw);
-      if (member) walk(member, raw, path, located, found);
-      return;
-    }
-    case "Suspend":
-      walk(ast.thunk(), raw, path, located, found);
-      return;
+function structuralPaths(
+  issue: SchemaIssue.Issue,
+  path: readonly PropertyKey[] = [],
+): PropertyKey[][] {
+  switch (issue._tag) {
+    case "Pointer":
+      return structuralPaths(issue.issue, [...path, ...issue.path]);
+    case "Composite":
+      return issue.issues.flatMap((child) => structuralPaths(child, path));
+    case "Encoding":
+      return structuralPaths(issue.issue, path);
+    case "Filter":
+      return [];
+    case "AnyOf":
+      return issue.issues.length === 1 ? structuralPaths(issue.issues[0]!, path) : [[...path]];
     default:
-      return;
+      return STRUCTURAL.has(issue._tag) ? [[...path]] : [];
   }
 }
 
-/** A union's members with nested unions and suspensions opened. */
-function membersOf(ast: SchemaAST.AST): SchemaAST.AST[] {
-  if (ast._tag === "Suspend") return membersOf(ast.thunk());
-  if (ast._tag === "Union") return ast.types.flatMap(membersOf);
-  return [ast];
-}
-
-/** The literal values a type admits, or undefined when it is not literal. */
-function literalsOf(ast: SchemaAST.AST): readonly unknown[] | undefined {
-  if (SchemaAST.isLiteral(ast)) return [ast.literal];
-  if (ast._tag === "Union") {
-    const each = ast.types.map(literalsOf);
-    return each.every((l) => l !== undefined) ? each.flat() : undefined;
-  }
-  return undefined;
+/** Whether a read path (`min`, `*.type`) names a concrete path. */
+function names(read: string, path: readonly PropertyKey[]): boolean {
+  const segments = read.split(".");
+  return segments.length === path.length
+    && segments.every((s, i) => s === "*" || s === String(path[i]));
 }
 
 /**
- * The one member of a union the raw value belongs to. A member is a
- * candidate when it is the right shape for the value -- a struct for an
- * object, an array for an array -- and every required field of it that
- * admits only literals (`kind`, `type`, whether `Literal` or `Literals`)
- * holds one of them; an optional literal field is no tag. None when no
- * member or several fit, which is a union mismatch Effect has already
- * reported.
+ * The marked rules of a failed struct or list that Effect did not run,
+ * each run on the raw value, as issues to report beside Effect's own.
+ * `failed` is the Composite issue Effect reported for the node.
  */
-function memberFor(ast: SchemaAST.Union, raw: unknown): SchemaAST.AST | undefined {
-  const candidates = membersOf(ast).filter((member) => {
-    if (member._tag === "Arrays") return Array.isArray(raw);
-    if (member._tag !== "Objects") return false;
-    if (!Predicate.isObject(raw) || Array.isArray(raw)) return false;
-    const value = raw as Record<PropertyKey, unknown>;
-    return member.propertySignatures.every((ps) => {
-      if (ps.type.context?.isOptional === true) return true;
-      const literals = literalsOf(ps.type);
-      return literals === undefined || literals.includes(value[ps.name]);
-    });
-  });
-  return candidates.length === 1 ? candidates[0] : undefined;
+export function extraChecks(failed: SchemaIssue.Composite, raw: unknown): SchemaIssue.Issue[] {
+  const ast = failed.ast;
+  if (ast._tag !== "Objects" && ast._tag !== "Arrays") return [];
+  const ran = new Set(
+    failed.issues.flatMap((child) => (child._tag === "Filter" ? [child.filter] : [])),
+  );
+  const broken = structuralPaths(failed);
+  const extra: SchemaIssue.Issue[] = [];
+  for (const check of ast.checks ?? []) {
+    const mark = markOf(check);
+    if (!mark || check._tag !== "Filter" || ran.has(check)) continue;
+    if (mark.reads.some((read) => broken.some((path) => names(read, path)))) continue;
+    // Not caught: every field the rule reads has the right shape, so a rule
+    // that throws here has a bug, and a silent skip would hide it.
+    const issue = check.run(raw, ast, {});
+    if (issue !== undefined) extra.push(new SchemaIssue.Filter(check, issue, raw));
+  }
+  return extra;
 }

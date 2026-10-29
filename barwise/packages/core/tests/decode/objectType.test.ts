@@ -14,11 +14,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
-import {
-  ObjectTypeError,
-  ObjectTypeFile,
-  runObjectTypeDecode,
-} from "../../src/decode/objectType.js";
+import { DecodeError } from "../../src/decode/decoder.js";
+import { ObjectTypeFile, runObjectTypeDecode } from "../../src/decode/objectType.js";
 import { createObjectType } from "../../src/model/ObjectType.js";
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
 import {
@@ -46,7 +43,7 @@ function decodersReading(value: unknown): { ok: true; record: unknown; } | { ok:
   try {
     return { ok: true, record: runObjectTypeDecode(value).record };
   } catch (e) {
-    if (e instanceof ObjectTypeError) return { ok: false };
+    if (e instanceof DecodeError) return { ok: false };
     throw e;
   }
 }
@@ -77,7 +74,7 @@ describe("the object type decoder, against today's reader", () => {
       { numRuns: 3000, seed: 11 },
     );
     // Not vacuous: a fair share of the drawn values are valid.
-    expect(accepted).toBeGreaterThan(400);
+    expect(accepted).toBeGreaterThan(600);
   });
 
   const objectTypes = modelCorpus().flatMap(({ file, doc }) =>
@@ -135,8 +132,8 @@ describe("the 3.0 malformed object type cases", () => {
       } catch (e) {
         error = e;
       }
-      expect(error).toBeInstanceOf(ObjectTypeError);
-      const problems = (error as ObjectTypeError).problems;
+      expect(error).toBeInstanceOf(DecodeError);
+      const problems = (error as DecodeError).problems;
       // The case's one problem is the field it declares, named in the message
       // with the element; nothing else is wrong with the fixture.
       // Every problem is at the declared field: a fixture holds one problem,
@@ -161,7 +158,7 @@ describe("an object type that is not a mapping", () => {
     } catch (e) {
       error = e;
     }
-    const problems = (error as ObjectTypeError).problems;
+    const problems = (error as DecodeError).problems;
     expect(problems).toHaveLength(1);
     expect(problems[0]!.message).toBe("Object type must be a mapping of fields.");
   });

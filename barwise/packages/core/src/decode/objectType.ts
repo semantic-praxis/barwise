@@ -20,9 +20,7 @@
  * one without is refused.
  */
 import * as Effect from "effect/Effect";
-import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import type * as SchemaAST from "effect/SchemaAST";
 import {
   CONCEPTUAL_DATA_TYPE_NAMES,
   type ConceptualDataTypeName,
@@ -30,8 +28,9 @@ import {
   VALUE_ONLY_FIELDS,
   type ValueRange,
 } from "../model/ObjectType.js";
-import { crossField, crossFieldProblems } from "./harness.js";
-import { type DecodeProblem, locate, type Located, predicateOf, sentence } from "./problems.js";
+import { type DecodeOptions, type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
+import { crossField } from "./harness.js";
+import { type ElementLabel, elementOf } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
 
@@ -122,6 +121,25 @@ const CardinalityFile = Schema.Struct({
   ),
 );
 
+/**
+ * What a message calls an object type: by its name, or by its id when the
+ * name is missing or blank -- which is when the name is the problem.
+ */
+function describeObjectType(raw: unknown): ElementLabel {
+  const doc = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const kind = doc.kind === "entity"
+    ? "Entity type"
+    : doc.kind === "value"
+    ? "Value type"
+    : "Object type";
+  const name = typeof doc.name === "string" ? doc.name.trim() : "";
+  if (name !== "") return { label: `${kind} "${name}"`, identity: name };
+  if (typeof doc.id === "string" && doc.id !== "") {
+    return { label: `${kind} with id "${doc.id}"`, identity: doc.id };
+  }
+  return { label: `${kind} with no name or id`, identity: "" };
+}
+
 // -- The two variants -------------------------------------------------------
 
 const baseFields = {
@@ -186,7 +204,13 @@ const ValueTypeFile = Schema.Struct({
  * An object type as a 3.0 file states it. Discriminated by `kind`, so a
  * malformed object type is checked against its own variant only.
  */
-export const ObjectTypeFile = Schema.Union([EntityTypeFile, ValueTypeFile]);
+export const ObjectTypeFile = Schema.Union([EntityTypeFile, ValueTypeFile]).annotate(
+  elementOf({
+    noun: "Object type",
+    badTag: 'must have kind "entity" or "value".',
+    describe: describeObjectType,
+  }),
+);
 
 /** A decoded file object type: exactly what the file states. */
 export type ObjectTypeFileValue = typeof ObjectTypeFile.Type;
@@ -265,97 +289,17 @@ export function toRecord(file: ObjectTypeFileValue): DecodedObjectType {
 
 // -- Decoding ---------------------------------------------------------------
 
-/** Every problem one decode found; never empty. */
-export class ObjectTypeProblems {
-  readonly _tag = "ObjectTypeProblems";
-  constructor(readonly problems: readonly [DecodeProblem, ...DecodeProblem[]]) {}
-}
+const decodeFile = decoderFor(ObjectTypeFile);
 
-/** Thrown at the synchronous boundary, carrying the list as well as the text. */
-export class ObjectTypeError extends Error {
-  constructor(readonly problems: readonly [DecodeProblem, ...DecodeProblem[]]) {
-    super(problems.map((p) => p.message).join("\n"));
-    this.name = "ObjectTypeError";
-  }
-}
-
-/** A file's unknown field is refused, as its JSON Schema refuses it. */
-const OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "error" };
-const decodeFile = Schema.decodeUnknownEffect(ObjectTypeFile, OPTIONS);
-
-/**
- * Decode one object type as a 3.0 file states it. `harness: false` decodes
- * without the cross-field harness, so its test can show which cases need
- * it; nothing else passes it.
- */
+/** Decode one object type as a 3.0 file states it. */
 export function decodeObjectType(
   doc: unknown,
-  { harness = true }: { readonly harness?: boolean; } = {},
-): Effect.Effect<DecodedObjectType, ObjectTypeProblems> {
-  return decodeFile(doc).pipe(
-    Effect.map(toRecord),
-    Effect.mapError((error) => {
-      // Not a mapping: one problem, worded as that, not as a bad `kind`,
-      // which is how the union's mismatch would otherwise read.
-      if (!isMapping(doc)) {
-        return new ObjectTypeProblems([{
-          element: "",
-          path: [],
-          message: "Object type must be a mapping of fields.",
-        }]);
-      }
-      const located = locate(error.issue);
-      const all = harness
-        ? [...located, ...crossFieldProblems(ObjectTypeFile.ast, doc, located)]
-        : located;
-      return new ObjectTypeProblems(problemsOf(all, doc));
-    }),
-  );
+  options: DecodeOptions = {},
+): Effect.Effect<DecodedObjectType, DecodeProblems> {
+  return decodeFile(doc, options).pipe(Effect.map(toRecord));
 }
-
-const isMapping = (v: unknown): boolean => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** The synchronous boundary: the decoded object type, or every problem thrown at once. */
 export function runObjectTypeDecode(doc: unknown): DecodedObjectType {
-  const result = Effect.runSync(Effect.result(decodeObjectType(doc)));
-  if (Result.isFailure(result)) throw new ObjectTypeError(result.failure.problems);
-  return result.success;
-}
-
-function problemsOf(
-  located: readonly Located[],
-  raw: unknown,
-): [DecodeProblem, ...DecodeProblem[]] {
-  const subject = subjectOf(raw);
-  const problems = located.map(({ path, issue }) => ({
-    element: subject.identity,
-    path,
-    message: sentence(
-      subject.label,
-      path,
-      predicateOf(issue, path, 'must have kind "entity" or "value".'),
-    ),
-  }));
-  return problems.length > 0
-    ? (problems as [DecodeProblem, ...DecodeProblem[]])
-    : [{ element: subject.identity, path: [], message: `${subject.label} is malformed.` }];
-}
-
-/**
- * What a message calls the object type: by its name, or by its id when the
- * name is missing or blank -- which is when the name is the problem.
- */
-function subjectOf(raw: unknown): { readonly label: string; readonly identity: string; } {
-  const doc = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const kind = doc.kind === "entity"
-    ? "Entity type"
-    : doc.kind === "value"
-    ? "Value type"
-    : "Object type";
-  const name = typeof doc.name === "string" ? doc.name.trim() : "";
-  if (name !== "") return { label: `${kind} "${name}"`, identity: name };
-  if (typeof doc.id === "string" && doc.id !== "") {
-    return { label: `${kind} with id "${doc.id}"`, identity: doc.id };
-  }
-  return { label: `${kind} with no name or id`, identity: "" };
+  return runDecode(decodeObjectType(doc));
 }

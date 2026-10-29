@@ -850,6 +850,40 @@ barrel does not export.
   value that is not a mapping is one problem worded as that; the lockfile
   installs one `effect`, at core's version. The harness builds its issues
   with Effect's own `Filter` constructor.
+- The second implementation review found six design flaws in the first
+  review's fixes, each fixed with a test that fails when it is planted
+  back. The first two supersede the first review's member choice and
+  record walk, which no longer exist:
+  - choosing a union's member from the Schema, by its literal fields,
+    still guessed: the harness now walks Effect's own issue tree, visiting
+    exactly the structs and lists Effect reported as failed, and a failed
+    union's issue names the member Effect tried;
+  - a rule was skipped wherever a field it reads held any error: it is now
+    skipped only where one is missing or of the wrong kind, and a field
+    that failed a check, or holds an error deeper down, no longer silences
+    it;
+  - a rule's own issues are reported where they point, and several of
+    them as several problems, not one problem at the rule's node;
+  - a list's rules (`Array(...).check`) were never run beside an item's
+    error, and now are, with `reads` taking `*.type`-style paths;
+  - which element a problem belongs to was fixed at the decoder's root, so
+    a problem deep in a document would be labelled by the document: an
+    element's Schema now carries an `element` annotation (`elementOf`)
+    the walk meets on the way down, and one generic shell
+    (`decode/decoder.ts`: `decoderFor`, `DecodeProblems`,
+    `DecodeError`) replaces the object-type-specific one R2 to R4 would
+    have copied;
+  - the hand-written-schema generator read a `oneOf` beside `properties`
+    as nothing, so every constraint it drew was `{}`, and ignored
+    `anyOf` presence, `minimum`, `minLength` and `minItems`. It now
+    honours each, and a test holds it to drawing constraints of more than
+    five kinds, at least 30% of them valid, for R2; the object type
+    property now accepts 715 of its 3,000 values (floor 600).
+- Detail findings from the same review: the reads check follows only
+  top-level keys, which is exact for R1's three rules and is required
+  before R2's first list-level rule (barwise-nh5); the member-choice
+  caching and recursion guard, and a record member matching any object,
+  went with the member choice itself.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,
