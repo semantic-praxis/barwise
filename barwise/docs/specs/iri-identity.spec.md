@@ -670,15 +670,20 @@ rename runs in the named domain and every domain it reaches:
   object type in another domain whose `source_context` is this context and
   whose name is the old name. Split also gives a shadow its owner's id, but
   a hand-written shadow need not share it, so the match is context and
-  name. Each shadow's domain gets the model-level rewrites (reference modes
-  included) and refusals, except the one refusing a shadow, which is the
+  name. Each shadow's domain gets the model-level rewrites and refusals, except the one refusing a shadow, which is the
   cascade's own target; a domain that already holds the new name refuses
   the whole rename, naming that domain.
+- **Reference modes across domains.** Renaming a value type rewrites the
+  reference mode of each entity that plays it, as in `renameInModel`, and
+  then of every shadow of each such entity, in whichever domain it sits:
+  split copies the reference mode into a shadow, and the mapper names a
+  shadow's key and foreign-key columns from it, so a shadow left behind
+  would give two domains different key names for one entity.
 - **Definitions anywhere.** Split writes every definition into the first
   domain, whatever owns its term, so a definition whose term is the old
-  name is rewritten in any domain where that term names no other element
-  and no definition already has the new term, the same two conditions as in
-  `renameInModel`.
+  name is rewritten in whichever domain holds it, when no element anywhere
+  in the project other than the renamed one and its shadows holds that
+  name, and no definition in that domain already has the new term.
 - **Mapping files.** In each entity mapping, a side is rewritten when its
   context is the owner's or a renamed shadow's and its name is the old
   name; split writes the owner on the source side and the shadow on the
@@ -695,8 +700,9 @@ changed.
 **5b, the surfaces.**
 
 - **CLI.** Two forms: `barwise rename <file> <target> --to <name>` for a
-  model file, and `barwise rename --project <manifest> --domain <context>
-  <target> --to <name>` for a project, where `<target>` is
+  model file, loaded leniently as `renameInModel` expects, and `barwise
+  rename --project <manifest> --domain <context> <target> --to <name>` for a
+  project, where `<target>` is
   `--object-type <name>`, or `--fact-type <name>` with `--role <name>` or
   `--role-position <n>`; both take `--check` and `--format json`. Naming
   the file and the project at once is refused, and so is `--domain` without
@@ -717,8 +723,11 @@ changed.
   the files before it replaced, which the command reports by name.
   `migrate`'s `replace()` writes and renames in one call, so it is split
   into stage and commit, in a module both commands use.
-- **MCP** `rename_element`, with the same warning, the same refusal of a
-  project that loaded with problems, and the same staged write. `@barwise/mcp` does not depend on `@barwise/cli`, so the
+- **MCP** `rename_element`, with the same lenient loads (file and
+  project), the same warning, the same refusal of a project that loaded
+  with problems, and the same staged write. The CLI's and MCP's
+  `projectLoader.ts` doc comments, which say only validate passes
+  `lenient`, are corrected in the same PR. `@barwise/mcp` does not depend on `@barwise/cli`, so the
   staged write is a second copy there, registered with the CLI's in
   `parity.manifest.json` in the same PR. It returns the YAML for an inline
   source.
@@ -741,7 +750,10 @@ changed.
 **Tests.** 5a, in core: each kind renamed and the result round-tripping;
 each refusal, including one raised in a shadow's domain and the
 shared-role-name case resolved by position; the reference-mode rewrite,
-and an entity's own rename leaving its reference mode; the definition
+including an entity's shadow in another domain, an entity that does not
+play the value type left alone, and an entity's own rename leaving its
+reference mode; a definition of an unrelated same-named element in another
+domain left alone; the definition
 rewrite, in the owner's domain and in a split project's first domain, and
 left when the new term exists; free text left alone; the project cascade
 over a split project (shadows, both mapping sides, `files` exact), then the
@@ -780,10 +792,13 @@ a `RenameTarget`, not a bare name.
 
 Every importer builds local names, and an element with no name of its own
 takes a minted one, stored with its `minted_from` key, by the rules WS3
-records, at the moment it joins the model (decision 17): `OrmModel`'s add
-methods give an element without an id its local name or minted name, so
-the loader, importers, the LLM parser, merge and split need no step of
-their own, and an id typed by hand is kept.
+records, as it joins the model (decision 17): `OrmModel` gives an element
+without an id its local name or minted name, so the loader, importers, the
+LLM parser, merge and split need no step of their own, and an id typed by
+hand is kept. Exactly when within the model a minted name is fixed -- at
+the add, or once a load's last add has run -- is WS6's grounding, held to
+decision 17's two requirements (a stated id wins; the result is a function
+of the input).
 
 A constraint added to a fact
 type already in a model goes through `FactType.addConstraint`, not the
@@ -792,7 +807,8 @@ so a fact type learns its model when `addFactType` takes it, and a fact type
 not yet in one holds its constraints unnamed until it joins; how that
 unnamed state is typed is WS6's grounding to settle. Importers stop calling
 `generateId()` for these kinds, and code that needs a minted id, such as a
-preferred identifier's constraint, reads it after the add; exporters follow the Inventory;
+preferred identifier's constraint, reads it from the model once WS6's
+mechanism has fixed it; exporters follow the Inventory;
 `canonicalizeIds` goes; merge's clash rule takes the suffix rule; split's
 shadows take the owner's `alias:Name` and drop `source_context`;
 `cli/tests/importerIds.test.ts` checks the naming rules. The same PR amends
