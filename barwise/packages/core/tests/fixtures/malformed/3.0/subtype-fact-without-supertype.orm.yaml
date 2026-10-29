@@ -11,10 +11,10 @@ model:
       kind: value
       data_type:
         name: integer
-    - id: ot-employee
-      name: Employee
+    - id: ot-staff
+      name: Staff
       kind: entity
-      reference_mode: employee_id
+      reference_mode: staff_id
   subtype_facts:
-    - id: sf-employee
-      subtype: ot-employee
+    - id: sf-staff
+      subtype: ot-staff

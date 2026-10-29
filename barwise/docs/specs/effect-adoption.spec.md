@@ -728,13 +728,13 @@ not because a gate failed.
 instruments added, which change no file under `core/src`; Node v26.7.0, an
 Intel Xeon 2.10 GHz x4):
 
-| Gate | Reading on `main`                                                                                                                                                                             |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| S1   | `corpus`: 119 tracked models; strict 84 loaded, 35 refused (the 28 fixtures and 7 deliberately broken test files); lenient 92 and 27. `--write` then `--read` gives the same bytes for all 84 |
-| S3   | 16 type tests green; a planted `isPreferred?` and a dropped optional `roleId` each fail                                                                                                       |
-| S4   | 3.0, 39 cases: singly 32 reported; combined 26/37 reported, 20 named, constraints named 1/11, 0 silent losses (the two header cases are scored singly)                                        |
-| S5   | `validate` 365 ms npm, 399 ms bundle, 311 modules and 1.69 MB loaded                                                                                                                          |
-| S6   | 2,920 ms median (2,780-3,130), 38,363 instantiations                                                                                                                                          |
+| Gate | Reading on `main`                                                                                                                                                                                                                                                                                                      |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1   | `corpus`: 158 tracked models, the 39 3.0 fixtures among them; strict 85 loaded, 73 refused (the 67 fixtures, whose one loading case at each version is `frequency-max-below-min`, and 7 deliberately broken test files); lenient 93 and 65; none write-failed. `--write` then `--read` gives the same bytes for all 85 |
+| S3   | 16 type tests green; a planted `isPreferred?` and a dropped optional `roleId` each fail                                                                                                                                                                                                                                |
+| S4   | 3.0, 39 cases: singly 32 reported; combined 26/37 reported, 20 named, constraints named 1/11, 0 silent losses (the two header cases are scored singly)                                                                                                                                                                 |
+| S5   | `validate` 365 ms npm, 399 ms bundle, 311 modules and 1.69 MB loaded                                                                                                                                                                                                                                                   |
+| S6   | 2,920 ms median (2,780-3,130), 38,363 instantiations                                                                                                                                                                                                                                                                   |
 
 The 2.0 reading is unchanged by the scorer's extension: `malformed` on the
 2.0 set prints the same lines before and after (combined 19/28).
@@ -767,6 +767,23 @@ The 2.0 reading is unchanged by the scorer's extension: `malformed` on the
   is `scripts/lib/corpus-listing.mjs`, tested with a loader that drops a
   field. The trial prompt in `effect-comparison.spec.md` names the new
   module, as its drift test requires of every module the scorer protects.
+- The implementation review found, and R0 fixed before it merged: the
+  combined 3.0 file held two elements under one id (two new fixtures reused
+  2.0 ids, and the collision check compared supporting elements only with
+  each other), so a message naming one was credited to the other; a header
+  case was credited by any message mentioning the model, so its naming
+  could not fail; a model-level constraint's `subtype_facts` operand
+  matched the model's subtype fact at that position; a write that threw
+  listed the same as a load that refused; and the 2.0 reading rested on a
+  one-time comparison. Each fix has a test, and each test fails with its
+  defect planted. The 2.0 combined file is now pinned by its hash, which
+  `main`'s scorer gives as well.
+- Two fixtures carry a problem that follows from their one defect, the
+  way part A's planted-defect test declares consequences:
+  `fact-type-without-roles` has a reading whose placeholders no role
+  fills, and `value-with-preferred-identifier` names a constraint the
+  file does not define, which is a reference between elements and so
+  validation's, not decoding's (WS0's rule).
 - S6 rose from 25,382 instantiations at WS0 to 38,363 on `main` today,
   with no Effect: format 3.0's placement types. The spike is read against
   today's number.

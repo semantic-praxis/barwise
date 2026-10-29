@@ -12,17 +12,17 @@ model:
       data_type:
         name: integer
   fact_types:
-    - id: ft-claim-has-age
-      name: Claim has Age
+    - id: ft-warrant-has-age
+      name: Warrant has Age
       roles:
-        - id: r-claim-person
+        - id: r-warrant-person
           player: ot-person
           role_name: has
-        - id: r-claim-age
+        - id: r-warrant-age
           player: ot-age
           role_name: is of
       readings:
         - "{0} has {1}"
   objectified_fact_types:
-    - id: of-claim
-      fact_type: ft-claim-has-age
+    - id: of-warrant
+      fact_type: ft-warrant-has-age

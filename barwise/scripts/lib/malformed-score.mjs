@@ -80,7 +80,7 @@ export function namesField(message, field) {
  * a definition is keyed by its term and a diagram by its name, since
  * neither has an id.
  */
-const COLLECTIONS = {
+export const COLLECTIONS = {
   object_type: "object_types",
   fact_type: "fact_types",
   constraint: "constraints",
@@ -93,25 +93,43 @@ const COLLECTIONS = {
 const KEY_FIELD = { definition: "term", diagram: "name" };
 const keyOf = (kind, el) => el?.[KEY_FIELD[kind] ?? "id"];
 
+/** A model's own fields: every key of `model` that is not a collection. */
+export function headerOf(model) {
+  const collections = new Set(Object.values(COLLECTIONS));
+  return Object.fromEntries(Object.entries(model ?? {}).filter(([k]) => !collections.has(k)));
+}
+
 /** A path separator in either spelling: `/`, `.`, or a bracket. */
 const SEP = String.raw`"?\]?(?:/|\.|\[)"?`;
 
 /**
  * Whether a message holds a path to position `index` of `collection`.
  *
- * The model's own `constraints` and a fact type's share a name, so a
- * model-level collection is matched only right after `model`, and a fact
- * type's constraints only when not right after it: `model/constraints/0`
- * and `fact_types/5/constraints/0` are different elements. Every other
- * collection name is unique, and matches wherever it appears.
+ * Format 3.0's collection names are also field names inside elements: a
+ * fact type has `constraints`, and a model-level constraint has
+ * `subtype_facts`. So an element of a collection added at 3.0 is matched
+ * only right after `model` (`modelLevel`), and a fact type's constraint
+ * only when not right after it: `model/constraints/0`,
+ * `fact_types/5/constraints/0` and `model/constraints/1/subtype_facts/0`
+ * are three different elements. `object_types` and `fact_types` are never
+ * field names, and match wherever they appear, as they did at 2.0.
  */
 function atPosition(message, collection, index, { modelLevel = false } = {}) {
   const at = `${collection}"?\\]?(/|\\[)${index}(\\b|\\])`;
+  if (modelLevel) return new RegExp(`model${SEP}${at}`).test(message);
   if (collection !== "constraints") return new RegExp(at).test(message);
-  const afterModel = new RegExp(`model${SEP}${at}`).test(message);
-  if (modelLevel) return afterModel;
-  return new RegExp(at, "g").test(message.replace(new RegExp(`model${SEP}${at}`, "g"), ""));
+  return new RegExp(at).test(message.replace(new RegExp(`model${SEP}${at}`, "g"), ""));
 }
+
+/** The kinds whose collection is matched only right after `model`. */
+const MODEL_LEVEL = new Set([
+  "constraint",
+  "subtype_fact",
+  "objectified",
+  "population",
+  "definition",
+  "diagram",
+]);
 
 /**
  * How a message identifies an element: by its name or id, which a person
@@ -124,16 +142,19 @@ function atPosition(message, collection, index, { modelLevel = false } = {}) {
  * The collection follows the element's kind, so `fact_types/1` never
  * credits the object type at position 1.
  */
-export function identifies(message, { id, name, index, kind = "object_type" }) {
-  // The header is one per document: naming the model is naming it.
+export function identifies(message, { id, name, index, field, kind = "object_type" }) {
+  // The header is one per document: a message identifies it by a path to
+  // the model itself (`/model: must have required property 'name'`) or to
+  // one of its own fields (`/model/namespace`, `["model"]["namespace"]`),
+  // never by a path that continues into a collection.
   if (kind === "header") {
-    const named = namesField(message, "model");
+    const named = new RegExp(`(^|[^\\w])model(${SEP}${field}\\b|"?\\]?\\s*:)`).test(message);
     return { readable: named, any: named };
   }
   const byName = name.trim() !== "" && message.includes(name);
   const byId = id !== "" && message.includes(id);
   const byIndex = atPosition(message, COLLECTIONS[kind], index, {
-    modelLevel: kind === "constraint",
+    modelLevel: MODEL_LEVEL.has(kind),
   });
   return { readable: byName || byId, any: byName || byId || byIndex };
 }
@@ -188,10 +209,8 @@ export function lostKeys(inputYaml, outputYaml) {
   const lost = [];
   const input = parse(inputYaml)?.model ?? {};
   const output = parse(outputYaml)?.model ?? {};
-  // The header's own fields: every key of `model` that is not a collection.
-  const collections = new Set(Object.values(COLLECTIONS));
-  for (const key of Object.keys(input)) {
-    if (!collections.has(key) && !(key in output)) lost.push({ id: "model", key });
+  for (const key of Object.keys(headerOf(input))) {
+    if (!(key in output)) lost.push({ id: "model", key });
   }
   for (const [kind, collection] of Object.entries(COLLECTIONS)) {
     const before = input[collection] ?? [];
@@ -289,12 +308,9 @@ export function caseProblem(c, yamlText, index = 0) {
   const kind = c.kind ?? "object_type";
   const model = parse(yamlText)?.model ?? {};
   if (kind === "header") {
-    const header = Object.fromEntries(
-      Object.entries(model).filter(([k]) => !Object.values(COLLECTIONS).includes(k)),
-    );
     return {
       problem: { kind, id: "", name: String(model.name ?? ""), field: c.field, index: 0 },
-      element: header,
+      element: headerOf(model),
       supporting: {},
     };
   }
@@ -348,6 +364,9 @@ export function combine(cases, readCase, version = "2.0") {
     for (const { c, yaml } of loaded) {
       if ((c.kind ?? "object_type") !== kind) continue;
       const { problem, element, supporting } = caseProblem(c, yaml, own[collection].length);
+      if (own[collection].some((el) => keyOf(kind, el) === problem.id)) {
+        throw new Error(`${c.file}: ${kind} ${problem.id} is another case's element too`);
+      }
       problems.push(problem);
       own[collection].push(element);
       for (const [other, els] of Object.entries(supporting)) {
@@ -364,7 +383,15 @@ export function combine(cases, readCase, version = "2.0") {
     }
   }
   const model = { name: "Malformed" };
-  for (const collection of Object.values(COLLECTIONS)) {
+  for (const [kind, collection] of Object.entries(COLLECTIONS)) {
+    // A case's element and another case's supporting element must not share
+    // a key: the file would hold two elements under one id, and a message
+    // naming it would be credited to the wrong one.
+    for (const el of own[collection]) {
+      if (support[collection].has(keyOf(kind, el))) {
+        throw new Error(`${kind} ${keyOf(kind, el)} is a case's element and supports another`);
+      }
+    }
     const els = [...own[collection], ...support[collection].values()];
     if (els.length > 0 || collection === "object_types") model[collection] = els;
   }

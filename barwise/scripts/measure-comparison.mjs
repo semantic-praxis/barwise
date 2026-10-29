@@ -359,20 +359,31 @@ async function malformed(args) {
   } catch (error) {
     refuse(`@barwise/core could not be loaded (build it first): ${error.message.split("\n")[0]}`);
   }
-  const { cases } = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const { cases } = manifest;
+  // The fixtures say what they are written in; the flag only picks the set.
+  const version = manifest.orm_version ?? "2.0";
+  if (version !== format) refuse(`${manifestPath} states orm_version ${version}, not ${format}.`);
   const read = (file) => readFileSync(join(dir, file), "utf8");
-  const results = cases.map((c) => ({
-    file: c.file,
-    ...scoreDocument(read(c.file), [caseProblem(c, read(c.file)).problem], loader),
-  }));
-  const all = combine(cases, read, format);
+  let results;
+  let all;
+  try {
+    results = cases.map((c) => ({
+      file: c.file,
+      ...scoreDocument(read(c.file), [caseProblem(c, read(c.file)).problem], loader),
+    }));
+    all = combine(cases, read, version);
+  } catch (error) {
+    // A manifest the scorer cannot read is no reading, not a finding.
+    refuse(`the ${format} cases cannot be scored: ${error.message}`);
+  }
   const combined = scoreDocument(all.yaml, all.problems, loader);
   const ambiguity = ambiguityReport([...results, combined]);
   if (ambiguity) refuse(ambiguity);
 
   if (args.includes("--json")) {
     process.stdout.write(
-      `${JSON.stringify({ environment: environment(), results, combined }, null, 2)}\n`,
+      `${JSON.stringify({ environment: environment(), format, results, combined }, null, 2)}\n`,
     );
     return 0;
   }
@@ -414,11 +425,16 @@ async function corpus(args) {
   }
   // Tracked files, asked of git: a checkout holds untracked trial outputs
   // CI never sees, and a listing of them would differ between worktrees.
-  const files = readDir
-    ? filesUnder(resolve(readDir)).map((f) => [f, join(resolve(readDir), f)])
-    : git(["ls-files", "--", "*.orm.yaml"]).trim().split("\n").filter(Boolean)
-      .map((f) => [f, join(REPO_ROOT, f)]);
-  const texts = new Map(files.map(([f, abs]) => [f, readFileSync(abs, "utf8")]));
+  let texts;
+  try {
+    const files = readDir
+      ? filesUnder(resolve(readDir)).map((f) => [f, join(resolve(readDir), f)])
+      : git(["ls-files", "--", "*.orm.yaml"]).trim().split("\n").filter(Boolean)
+        .map((f) => [f, join(REPO_ROOT, f)]);
+    texts = new Map(files.map(([f, abs]) => [f, readFileSync(abs, "utf8")]));
+  } catch (error) {
+    refuse(`the corpus could not be read: ${error.message.split("\n")[0]}`);
+  }
   const written = writeDir ? new Map() : undefined;
   const lines = corpusListing(texts, loader, written);
   for (const [f, text] of written ?? []) {

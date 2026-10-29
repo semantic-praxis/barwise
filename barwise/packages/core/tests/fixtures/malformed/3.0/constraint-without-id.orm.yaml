@@ -12,13 +12,13 @@ model:
       data_type:
         name: integer
   fact_types:
-    - id: ft-badge-has-age
-      name: Badge has Age
+    - id: ft-locker-has-age
+      name: Locker has Age
       roles:
-        - id: r-badge-person
+        - id: r-locker-person
           player: ot-person
           role_name: has
-        - id: r-badge-age
+        - id: r-locker-age
           player: ot-age
           role_name: is of
       readings:
@@ -26,4 +26,4 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - r-badge-person
+            - r-locker-person

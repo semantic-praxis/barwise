@@ -9,9 +9,11 @@
  * the two are compared; the loader is a parameter so the listing's own
  * test can hand it a loader that drops a field and see the line change.
  *
- * A file's line holds a hash of the 3.0 bytes its model writes, or
- * "refused". Refusal wording is not compared: that is S4's to read, and
- * the spike changes it on purpose.
+ * A file's line holds a hash of the 3.0 bytes its model writes,
+ * "refused" when the loader refused it, or "write-failed" when the loader
+ * took it and the writer threw: two heads that fail a file differently
+ * must not print the same line. Refusal wording is not compared: that is
+ * S4's to read, and the spike changes it on purpose.
  */
 import { createHash } from "node:crypto";
 
@@ -20,7 +22,7 @@ export const MODES = ["strict", "lenient"];
 
 /**
  * One line per file and mode: `<file>\t<mode>\t<sha256 of the 3.0 bytes>`,
- * or `refused` in place of the hash. `texts` maps each file's path to its
+ * or `refused` or `write-failed` in place of the hash. `texts` maps each file's path to its
  * text; `loader` has the shape of `OrmYamlSerializer`. `written`, when
  * given, receives each strict load's 3.0 text by path, for `--write`.
  */
@@ -28,11 +30,18 @@ export function corpusListing(texts, loader, written) {
   const lines = [];
   for (const [file, text] of texts) {
     for (const mode of MODES) {
-      let out;
+      let model;
       try {
-        out = loader.serialize(loader.deserialize(text, { lenient: mode === "lenient" }));
+        model = loader.deserialize(text, { lenient: mode === "lenient" });
       } catch {
         lines.push(`${file}\t${mode}\trefused`);
+        continue;
+      }
+      let out;
+      try {
+        out = loader.serialize(model);
+      } catch {
+        lines.push(`${file}\t${mode}\twrite-failed`);
         continue;
       }
       if (mode === "strict" && written) written.set(file, out);
