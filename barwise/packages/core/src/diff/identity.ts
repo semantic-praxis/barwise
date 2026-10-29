@@ -100,8 +100,15 @@ export function diffIdentity(
   let objectTypes = pairElements(existing.objectTypes, incoming.objectTypes, matching);
   let factTypes = pairElements(existing.factTypes, incoming.factTypes, matching);
   for (const r of recognition.renames) {
-    if (r.target.kind === "objectType") objectTypes = declare(objectTypes, r, "object type");
-    else factTypes = declare(factTypes, r, "fact type");
+    // Every kind spelled out: input from a tool call is not checked against
+    // the type, and anything else read as a fact type would pair the wrong
+    // kind of element.
+    const kind: string = r.target.kind;
+    if (kind === "objectType") objectTypes = declare(objectTypes, r, "object type");
+    else if (kind === "factType") factTypes = declare(factTypes, r, "fact type");
+    else {throw new Error(
+        `Declared rename: kind must be objectType or factType, not ${JSON.stringify(kind)}.`,
+      );}
   }
   const otKeyer = (pairs: readonly Paired<ObjectType>[]) =>
     keyer(existing, incoming, pairs, (m, id) => m.getObjectType(id) !== undefined);
@@ -113,20 +120,34 @@ export function diffIdentity(
     // them. Every key below is rebuilt from the final pairs, so a
     // constraint, subtype fact, objectification or population follows a
     // recognized rename with no change of its own.
-    const interimOt = otKeyer(objectTypes);
+    // The fact type pass changes no object type, so one object type keyer
+    // serves both passes; the fact type keyer it leaves is the final one.
+    const otBefore = otKeyer(objectTypes);
     const models = { existing, incoming };
     factTypes = recognize(
       factTypes,
       models,
-      (model, ft) => factTypeContentKey(model, ft, interimOt),
+      (model, ft) => factTypeContentKey(model, ft, otBefore),
     );
-    const finalFt = ftKeyer(factTypes);
-    const interimOtAfter = otKeyer(objectTypes);
+    const ftKey = ftKeyer(factTypes);
+    const plays = { existing: rolesPlayed(existing), incoming: rolesPlayed(incoming) };
     objectTypes = recognize(
       objectTypes,
       models,
-      (model, ot) => objectTypeContentKey(model, ot, interimOtAfter, finalFt),
+      (model, ot) =>
+        objectTypeContentKey(
+          ot,
+          (model === existing ? plays.existing : plays.incoming).get(ot.id),
+          (id) => otBefore(model, id),
+          (id) => ftKey(model, id),
+        ),
     );
+    return {
+      objectTypes,
+      factTypes,
+      objectTypeKey: otKeyer(objectTypes),
+      factTypeKey: ftKey,
+    };
   }
   return {
     objectTypes,
@@ -214,6 +235,34 @@ function recognize<T extends { readonly id: string; }>(
 
 type Keyer = (model: OrmModel, id: string) => string;
 
+/** What an object type takes part in: the roles it plays, the subtype facts it ends. */
+interface Played {
+  readonly roles: { readonly factTypeId: string; readonly position: number; }[];
+  readonly ends: { readonly end: "sub" | "super"; readonly other: string; }[];
+}
+
+/**
+ * Every object type's roles and subtype-fact ends, in one walk of the
+ * model, so keying each unpaired object type is not a scan of the whole
+ * model each (the reason `roleHolders` exists in `elementDiff.ts`).
+ */
+function rolesPlayed(model: OrmModel): ReadonlyMap<string, Played> {
+  const out = new Map<string, Played>();
+  const of = (id: string) => {
+    let p = out.get(id);
+    if (!p) out.set(id, p = { roles: [], ends: [] });
+    return p;
+  };
+  for (const ft of model.factTypes) {
+    ft.roles.forEach((r, position) => of(r.playerId).roles.push({ factTypeId: ft.id, position }));
+  }
+  for (const sf of model.subtypeFacts) {
+    of(sf.subtypeId).ends.push({ end: "sub", other: sf.supertypeId });
+    of(sf.supertypeId).ends.push({ end: "super", other: sf.subtypeId });
+  }
+  return out;
+}
+
 /**
  * What a fact type says, without its name or ids: its arity, each
  * position's player (as the pairing so far keys it) and role name, and
@@ -246,20 +295,15 @@ function factTypeContentKey(
  * by content: the floor for object types.
  */
 function objectTypeContentKey(
-  model: OrmModel,
   ot: ObjectType,
-  otKey: Keyer,
-  ftKey: Keyer,
+  played: Played | undefined,
+  otKey: (id: string) => string,
+  ftKey: (id: string) => string,
 ): string | undefined {
-  const roles = model.factTypes.flatMap((ft) =>
-    ft.roles.flatMap((r, i) =>
-      r.playerId === ot.id ? [JSON.stringify([ftKey(model, ft.id), i])] : []
-    )
+  const roles = (played?.roles ?? []).map(({ factTypeId, position }) =>
+    JSON.stringify([ftKey(factTypeId), position])
   );
-  const subtypes = model.subtypeFacts.flatMap((sf) => [
-    ...(sf.subtypeId === ot.id ? [`sub${otKey(model, sf.supertypeId)}`] : []),
-    ...(sf.supertypeId === ot.id ? [`super${otKey(model, sf.subtypeId)}`] : []),
-  ]);
+  const subtypes = (played?.ends ?? []).map(({ end, other }) => `${end}${otKey(other)}`);
   if (roles.length === 0 && subtypes.length === 0) return undefined;
   return JSON.stringify([
     ot.kind,

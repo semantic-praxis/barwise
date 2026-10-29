@@ -182,6 +182,14 @@ describe("what the content pass leaves alone", () => {
 describe("a declared rename", () => {
   const changed = () => shop("b", { places: "Customer submits Order", role: "submits" });
 
+  it("refuses a kind it does not know, as a tool call can send", () => {
+    // "object-type" is the CLI's spelling; read as anything but an error it
+    // would be applied as a fact-type rename.
+    const target = { kind: "object-type", name: "Customer" } as never;
+    expect(() => diffModels(shop("a"), changed(), { renames: [{ target, to: "Customer" }] }))
+      .toThrow(/kind must be objectType or factType, not "object-type"/);
+  });
+
   it("pairs what the content pass cannot", () => {
     const diff = diffModels(shop("a"), changed(), {
       renames: [{
@@ -225,28 +233,39 @@ describe("merge refuses a pairing that is not evidence", () => {
       expect.objectContaining({ pairedBy: "recognized" }),
     );
     expect(() => mergeModels(existing, incoming, diff, new Set(diff.deltas.keys())))
-      .toThrow(/pairs elements as renames \("Vendor"\).*recognizeRenames: false/s);
+      .toThrow(/rename recognition on.*MERGE_DIFF_OPTIONS/s);
     const result = mergeAndValidate(existing, incoming, diff, new Set(diff.deltas.keys()));
     expect(result.model).toBeNull();
-    expect(result.diagnostics[0]!.message).toMatch(/pairs elements as renames/);
+    expect(result.diagnostics[0]!.message).toMatch(/rename recognition on/);
+  });
+
+  it("refuses a diff built with recognition on even when it found no pair", () => {
+    // So a merge path that forgot MERGE_DIFF_OPTIONS fails on every input,
+    // not only on one that happens to hold two elements of one shape.
+    const diff = diffModels(shop("a"), shop("b"));
+    expect(diff.deltas.some((d) => "pairedBy" in d && d.pairedBy === "recognized")).toBe(false);
+    expect(() => mergeModels(shop("a"), shop("b"), diff, new Set())).toThrow(
+      /rename recognition on/,
+    );
   });
 
   it("refuses a declared rename", () => {
     const existing = shop("a");
     const incoming = shop("b", { places: "Customer submits Order", role: "submits" });
     const diff = diffModels(existing, incoming, {
+      ...MERGE_DIFF_OPTIONS,
       renames: [{
         target: { kind: "factType", name: "Customer places Order" },
         to: "Customer submits Order",
       }],
     });
     expect(() => mergeModels(existing, incoming, diff, new Set())).toThrow(
-      /pairs elements as renames/,
+      /pairs elements as renames \("Customer places Order"\)/,
     );
   });
 
   it("refuses a diff built with matching: content", () => {
-    const diff = diffModels(shop("a"), shop("b"), { matching: "content" });
+    const diff = diffModels(shop("a"), shop("b"), { ...MERGE_DIFF_OPTIONS, matching: "content" });
     expect(() => mergeModels(shop("a"), shop("b"), diff, new Set())).toThrow(/matching: "content"/);
   });
 

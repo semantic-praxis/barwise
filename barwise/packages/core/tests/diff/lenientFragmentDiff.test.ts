@@ -42,7 +42,7 @@
 
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 const lenient = { skipPlayerValidation: true };
@@ -116,7 +116,7 @@ describe("a subtype fact in a lenient fragment", () => {
     const incoming = fragment();
     incoming.addSubtypeFact({ id: "sf-2", subtypeId: "ot-mgr", supertypeId: "ot-emp" }, lenient);
 
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     // The default review policy for a fragment: take what it adds, keep
     // what it does not mention. Accepting the removals instead would
     // empty the model, which is the fragment's own doing and not this
@@ -124,7 +124,11 @@ describe("a subtype fact in a lenient fragment", () => {
     const accepted = new Set(
       deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
     );
-    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
     expect(merged.subtypeFacts).toHaveLength(1);
     expect(merged.getObjectType(merged.subtypeFacts[0]!.subtypeId)?.name).toBe("Manager");
   });
@@ -219,7 +223,7 @@ describe("a subtype fact in a lenient fragment", () => {
       const incoming = fragment();
       incoming.addSubtypeFact({ id: "sf-3", subtypeId, supertypeId }, lenient);
 
-      const { deltas } = diffModels(existing, incoming);
+      const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
       // Accept only what the fragment adds: accepting the removals would
       // empty the base model and confuse what is being asked.
       const accepted = new Set(
@@ -228,7 +232,7 @@ describe("a subtype fact in a lenient fragment", () => {
       const result = mergeAndValidate(
         existing,
         incoming,
-        { deltas, matching: "id-first" },
+        { deltas, matching: "id-first", recognizeRenames: false },
         accepted,
       );
 
@@ -378,11 +382,11 @@ describe("a lenient fragment element the merge used to drop", () => {
       lenient,
     );
 
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const result = mergeAndValidate(
       existing,
       incoming,
-      { deltas, matching: "id-first" },
+      { deltas, matching: "id-first", recognizeRenames: false },
       acceptAdded(deltas),
     );
 
@@ -404,11 +408,11 @@ describe("a lenient fragment element the merge used to drop", () => {
       const incoming = fragment();
       incoming.addObjectifiedFactType({ id: "oft-typo", objectTypeId, factTypeId }, lenient);
 
-      const { deltas } = diffModels(existing, incoming);
+      const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
       const result = mergeAndValidate(
         existing,
         incoming,
-        { deltas, matching: "id-first" },
+        { deltas, matching: "id-first", recognizeRenames: false },
         acceptAdded(deltas),
       );
 
@@ -435,7 +439,7 @@ describe("a lenient fragment element the merge used to drop", () => {
     // An incoming model that simply lacks the fact type, so the diff
     // offers its removal.
     const incoming = objectTypes();
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     // Accept the FACT TYPE's removal but REJECT the population's, so the
     // population is still chosen when the guard runs. Accepting both --
@@ -447,7 +451,11 @@ describe("a lenient fragment element the merge used to drop", () => {
         .map((d, i) => (d.kind === "removed" && d.elementType !== "population" ? i : -1))
         .filter((i) => i >= 0),
     );
-    const result = mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, accepted);
+    const result = mergeAndValidate(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
 
     expect(result.model?.factTypes).toHaveLength(0);
     expect(result.model?.populations).toHaveLength(0);

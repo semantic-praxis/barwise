@@ -23,7 +23,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { ModelDelta } from "../../src/diff/deltas.js";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
 import { hashModel } from "../../src/lineage/manifest.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
@@ -49,8 +49,12 @@ describe("law: merging nothing changes nothing", () => {
   }, () => {
     fc.assert(
       fc.property(arbOrmModel(), (model) => {
-        const { deltas } = diffModels(model, model);
-        const merged = mergeModels(model, model, { deltas, matching: "id-first" }, new Set());
+        const { deltas } = diffModels(model, model, MERGE_DIFF_OPTIONS);
+        const merged = mergeModels(model, model, {
+          deltas,
+          matching: "id-first",
+          recognizeRenames: false,
+        }, new Set());
         expect(hashModel(merged)).toBe(hashModel(model));
       }),
       { seed: SEED, numRuns: RUNS },
@@ -67,8 +71,12 @@ describe("law: merging nothing changes nothing", () => {
   it("every element kind survives the identity merge", { timeout: LAW_TIMEOUT_MS }, () => {
     fc.assert(
       fc.property(arbOrmModel(), (model) => {
-        const { deltas } = diffModels(model, model);
-        const merged = mergeModels(model, model, { deltas, matching: "id-first" }, new Set());
+        const { deltas } = diffModels(model, model, MERGE_DIFF_OPTIONS);
+        const merged = mergeModels(model, model, {
+          deltas,
+          matching: "id-first",
+          recognizeRenames: false,
+        }, new Set());
 
         expect(merged.objectTypes.length).toBe(model.objectTypes.length);
         expect(merged.factTypes.length).toBe(model.factTypes.length);
@@ -306,10 +314,18 @@ describe("law: merging twice gives the same model", () => {
     const yaml = new OrmYamlSerializer();
     fc.assert(
       fc.property(arbOrmModel(), arbOrmModel(), fc.infiniteStream(fc.boolean()), (a, b, coin) => {
-        const { deltas } = diffModels(a, b);
+        const { deltas } = diffModels(a, b, MERGE_DIFF_OPTIONS);
         const accepted = new Set(deltas.flatMap((_, i) => (coin.next().value ? [i] : [])));
-        const once = mergeAndValidate(a, b, { deltas, matching: "id-first" }, accepted);
-        const twice = mergeAndValidate(a, b, { deltas, matching: "id-first" }, accepted);
+        const once = mergeAndValidate(a, b, {
+          deltas,
+          matching: "id-first",
+          recognizeRenames: false,
+        }, accepted);
+        const twice = mergeAndValidate(a, b, {
+          deltas,
+          matching: "id-first",
+          recognizeRenames: false,
+        }, accepted);
         expect(twice.model && yaml.serialize(twice.model)).toBe(
           once.model && yaml.serialize(once.model),
         );
@@ -322,11 +338,16 @@ describe("law: merging twice gives the same model", () => {
 
 /** Merge with every non-unchanged delta accepted. */
 function mergeAll(existing: OrmModel, incoming: OrmModel): OrmModel {
-  const { deltas } = diffModels(existing, incoming);
+  const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
   const accepted = new Set(
     deltas.map((_, index) => index).filter((index) => deltas[index]!.kind !== "unchanged"),
   );
-  return mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
+  return mergeModels(
+    existing,
+    incoming,
+    { deltas, matching: "id-first", recognizeRenames: false },
+    accepted,
+  );
 }
 
 function names(elements: readonly { name: string; }[]): string[] {

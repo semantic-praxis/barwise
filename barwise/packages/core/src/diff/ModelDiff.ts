@@ -103,8 +103,9 @@ export function diffModels(
   options: DiffOptions = {},
 ): ModelDiffResult {
   const matching = options.matching ?? "id-first";
+  const recognizeRenames = options.recognizeRenames ?? true;
   const pairing = constraintPairing(existing, incoming, matching, {
-    recognizeRenames: options.recognizeRenames ?? true,
+    recognizeRenames,
     renames: options.renames ?? [],
   });
   const { identity } = pairing;
@@ -627,7 +628,7 @@ export function diffModels(
 
   const hasChanges = deltas.some((d) => d.kind !== "unchanged");
   const synonymCandidates = detectSynonymCandidates(deltas, existing, incoming, identity);
-  return { deltas, hasChanges, synonymCandidates, matching };
+  return { deltas, hasChanges, synonymCandidates, matching, recognizeRenames };
 }
 
 /** "Male is a Person" for a subtype fact, read against its own model first. */

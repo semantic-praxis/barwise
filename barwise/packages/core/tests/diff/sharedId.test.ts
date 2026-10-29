@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeAndValidate } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 /**
@@ -69,7 +69,7 @@ describe("a shared id is the same element", () => {
     { kind: "object type", existing: model("A", "F"), incoming: model("B", "F"), id: "x" },
     { kind: "fact type", existing: model("A", "F"), incoming: model("A", "G"), id: "f" },
   ])("a $kind renamed under its kept id is one modification", ({ existing, incoming, id }) => {
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const changed = deltas.filter((d) => d.kind !== "unchanged");
     expect(changed.map((d) => [d.kind, d.existing?.id])).toEqual([["modified", id]]);
 
@@ -80,7 +80,7 @@ describe("a shared id is the same element", () => {
       const result = mergeAndValidate(
         existing,
         incoming,
-        { deltas, matching: "id-first" },
+        { deltas, matching: "id-first", recognizeRenames: false },
         accepted,
       );
       expect(result.diagnostics).toEqual([]);
@@ -104,13 +104,13 @@ describe("a shared id is the same element", () => {
     };
     const existing = swapped("Customer", "Client");
     const incoming = swapped("Client", "Customer");
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const renameA = deltas.findIndex((d) => d.existing?.id === "a");
 
     const result = mergeAndValidate(
       existing,
       incoming,
-      { deltas, matching: "id-first" },
+      { deltas, matching: "id-first", recognizeRenames: false },
       new Set([renameA]),
     );
     expect(result.model).toBeNull();
@@ -123,7 +123,11 @@ describe("a shared id is the same element", () => {
     // Deciding both together is fine either way.
     const all = new Set(deltas.map((_, i) => i));
     expect(
-      mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, all).model
+      mergeAndValidate(existing, incoming, {
+        deltas,
+        matching: "id-first",
+        recognizeRenames: false,
+      }, all).model
         ?.getObjectType("a")?.name,
     )
       .toBe("Client");
@@ -139,11 +143,15 @@ describe("a shared id is the same element", () => {
     existing.addObjectType({ id: "2", name: "B", kind: "value" });
     const incoming = new OrmModel({ name: "M" });
     incoming.addObjectType({ id: "1", name: "B", kind: "value" });
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const policy = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
 
     expect(
-      mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, policy).diagnostics
+      mergeAndValidate(existing, incoming, {
+        deltas,
+        matching: "id-first",
+        recognizeRenames: false,
+      }, policy).diagnostics
         .map((d) => d.message),
     )
       .toEqual([
@@ -155,7 +163,11 @@ describe("a shared id is the same element", () => {
       ]);
     const all = new Set(deltas.map((_, i) => i));
     expect(
-      mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, all).model?.objectTypes
+      mergeAndValidate(existing, incoming, {
+        deltas,
+        matching: "id-first",
+        recognizeRenames: false,
+      }, all).model?.objectTypes
         .map((o) => o.id),
     )
       .toEqual(["1"]);

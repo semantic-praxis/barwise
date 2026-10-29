@@ -423,6 +423,13 @@ export interface ModelDiffResult {
    * name alone, which is not evidence two elements are one.
    */
   readonly matching: ElementMatching;
+  /**
+   * Whether the diff paired by content (`DiffOptions.recognizeRenames`).
+   * A merge refuses a diff that did, whether or not it found a pair: a
+   * merge path that forgot to turn it off then fails on every input, not
+   * only on one that holds two elements of one shape.
+   */
+  readonly recognizeRenames: boolean;
   /** Potential synonym pairs detected from removed + added elements. */
   readonly synonymCandidates: readonly SynonymCandidate[];
 }

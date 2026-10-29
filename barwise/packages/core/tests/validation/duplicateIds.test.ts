@@ -8,7 +8,7 @@
  * already refused somewhere else, and the refusing paths are pinned too.
  */
 import { describe, expect, it } from "vitest";
-import { diffModels, mergeAndValidate } from "../../src/diff/index.js";
+import { diffModels, MERGE_DIFF_OPTIONS, mergeAndValidate } from "../../src/diff/index.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
@@ -220,7 +220,7 @@ ${body}`;
       readings: ["{0} swims"],
       constraints: [{ type: "mandatory", id: "c", roleId: "r3" }],
     });
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const additions = new Set(
       diff.deltas.flatMap((d, i) => (d.kind === "added" ? [i] : [])),
     );
@@ -238,7 +238,7 @@ describe("a merge whose base already holds a duplicate constraint id", () => {
     const existing = twoFactTypes("c", "c");
     const incoming = twoFactTypes("c", "c");
     incoming.addObjectType({ id: "y", name: "B", kind: "entity", referenceMode: "b_id" });
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const all = new Set(diff.deltas.map((_, i) => i));
     const result = mergeAndValidate(existing, incoming, diff, all);
     expect(result.isValid).toBe(false);

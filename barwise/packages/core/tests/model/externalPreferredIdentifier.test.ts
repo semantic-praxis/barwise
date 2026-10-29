@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
 import { renderPopulationAsOpenApiExamples } from "../../src/export/populationRenderer.js";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import {
@@ -294,7 +294,7 @@ describe("the other readers of an external identifier", () => {
     // The base never named one; the incoming side, under other ids, does.
     const existing = load(roomYaml("e-", { preferred: false }));
     const incoming = load(roomYaml("i-"));
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const room = deltas.findIndex((d) =>
       d.kind === "modified" && d.elementType === "object_type" && d.incoming?.name === "Room"
     );
@@ -302,7 +302,7 @@ describe("the other readers of an external identifier", () => {
     const merged = mergeModels(
       existing,
       incoming,
-      { deltas, matching: "id-first" },
+      { deltas, matching: "id-first", recognizeRenames: false },
       new Set([room]),
     );
     expect(merged.preferredIdentifierOf("e-ot-room")).toBe("e-c-room-id");

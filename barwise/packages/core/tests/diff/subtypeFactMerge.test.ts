@@ -49,7 +49,7 @@ describe("a subtype fact the incoming model adds", () => {
   it("merges in when its delta is accepted", () => {
     const existing = model(false);
     const incoming = model(true);
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     const added = deltas.find((d) => d.elementType === "subtype_fact");
     expect(added?.kind).toBe("added");
@@ -57,7 +57,7 @@ describe("a subtype fact the incoming model adds", () => {
     const merged = mergeModels(
       existing,
       incoming,
-      { deltas, matching: "id-first" },
+      { deltas, matching: "id-first", recognizeRenames: false },
       all(deltas.length),
     );
     expect(merged.subtypeFacts).toHaveLength(1);
@@ -67,9 +67,13 @@ describe("a subtype fact the incoming model adds", () => {
   it("stays out when its delta is rejected", () => {
     const existing = model(false);
     const incoming = model(true);
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
-    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, new Set());
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, new Set());
     expect(merged.subtypeFacts).toEqual([]);
   });
 });
@@ -92,12 +96,12 @@ describe("a subtype fact the incoming model changes", () => {
     const existing = model(true, true);
     const incoming = model(true, false);
     const existingId = existing.subtypeFacts[0]!.id;
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     const merged = mergeModels(
       existing,
       incoming,
-      { deltas, matching: "id-first" },
+      { deltas, matching: "id-first", recognizeRenames: false },
       all(deltas.length),
     );
     expect(merged.subtypeFacts).toHaveLength(1);
@@ -110,9 +114,13 @@ describe("a subtype fact the incoming model changes", () => {
   it("keeps the existing content when rejected", () => {
     const existing = model(true, true);
     const incoming = model(true, false);
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
-    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, new Set());
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, new Set());
     expect(merged.subtypeFacts).toHaveLength(1);
     expect(merged.subtypeFacts[0]!.providesIdentification).toBe(true);
   });
@@ -147,7 +155,7 @@ describe("an objectified fact type", () => {
   it("merges in when accepted, and never reports as modified", () => {
     const existing = objectified(false);
     const incoming = objectified(true);
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     const oft = deltas.find((d) => d.elementType === "objectified_fact_type");
     expect(oft?.kind).toBe("added");
@@ -160,7 +168,7 @@ describe("an objectified fact type", () => {
     const merged = mergeModels(
       existing,
       incoming,
-      { deltas, matching: "id-first" },
+      { deltas, matching: "id-first", recognizeRenames: false },
       all(deltas.length),
     );
     expect(merged.objectifiedFactTypes).toHaveLength(1);
@@ -169,9 +177,13 @@ describe("an objectified fact type", () => {
   it("stays out when rejected", () => {
     const existing = objectified(false);
     const incoming = objectified(true);
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
-    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, new Set());
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, new Set());
     expect(merged.objectifiedFactTypes).toEqual([]);
   });
 });
@@ -213,12 +225,19 @@ describe("the merge survives states the model refuses", () => {
     // duplicate relationship.
     const existing = withSupertype("Employee");
     const incoming = withSupertype("Staff");
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     const accepted = new Set(
       deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
     );
-    expect(() => mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted)).not
+    expect(() =>
+      mergeModels(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        accepted,
+      )
+    ).not
       .toThrow();
   });
 
@@ -250,7 +269,11 @@ describe("the merge survives states the model refuses", () => {
       deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
     );
 
-    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
     expect(merged.subtypeFacts).toHaveLength(2);
     expect(new Set(merged.subtypeFacts.map((sf) => sf.id)).size).toBe(2);
   });
@@ -261,14 +284,18 @@ describe("the merge survives states the model refuses", () => {
     // the whole merge, so the merge takes a derived id for the second.
     const existing = withSupertype("Employee");
     const incoming = withSupertype("Staff");
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     // Reject the removals, accept the additions: both subtype facts
     // want to be in the result, and both want to be `sf-1`.
     const accepted = new Set(
       deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
     );
-    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
     const ids = merged.subtypeFacts.map((sf) => sf.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -292,12 +319,19 @@ describe("the merge survives states the model refuses", () => {
     // fact type. addObjectifiedFactType allows at most one per fact type.
     const existing = objectifiedBy("Enrolment");
     const incoming = objectifiedBy("Registration");
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     const accepted = new Set(
       deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
     );
-    expect(() => mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted)).not
+    expect(() =>
+      mergeModels(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        accepted,
+      )
+    ).not
       .toThrow();
   });
 });

@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
 import { generateModelLineage } from "../../src/lineage/generate.js";
 import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
@@ -139,11 +139,11 @@ describe("a constraint over subtypes", () => {
     existing.addObjectType({ id: "p", name: "Person", kind: "entity", referenceMode: "id" });
     const { model: incoming, sf } = people();
     incoming.addConstraint(over("exclusive_or", [sf["Male"]!, sf["Female"]!]));
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const merged = mergeModels(
       existing,
       incoming,
-      { deltas, matching: "id-first" },
+      { deltas, matching: "id-first", recognizeRenames: false },
       new Set(deltas.map((_, i) => i)),
     );
     expect(merged.constraints).toHaveLength(1);
@@ -162,11 +162,15 @@ describe("a constraint over subtypes", () => {
     existing.addConstraint(over("exclusive_or", [sf["Male"]!, sf["Female"]!, sf["Other"]!]));
     const { model: incoming } = people();
     incoming.addConstraint(over("exclusive_or", [sf["Male"]!, sf["Female"]!]));
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set(
       deltas.flatMap((d, i) => (d.elementType === "subtype_fact" ? [i] : [])),
     );
-    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
     expect(merged.constraints).toMatchObject([
       { type: "exclusion", subtypeFactIds: [sf["Male"], sf["Female"]] },
     ]);
@@ -194,11 +198,15 @@ describe("a constraint over subtypes", () => {
     existing.addObjectType({ id: "p", name: "Person", kind: "entity", referenceMode: "id" });
     const { model: incoming, sf } = people();
     incoming.addConstraint(over("exclusive_or", [sf["Male"]!, sf["Female"]!]));
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set(
       deltas.flatMap((d, i) => (d.elementType === "subtype_fact" ? [] : [i])),
     );
-    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
     expect(merged.constraints).toEqual([]);
   });
 });

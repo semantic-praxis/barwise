@@ -20,7 +20,7 @@ const LAW_TIMEOUT_MS = 120_000;
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeAndValidate } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate } from "../../src/diff/ModelMerge.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
 import { arbModelPlan, buildModel, type ModelPlan, RUNS, SEED } from "../arbitraries/model.js";
@@ -147,14 +147,14 @@ describe("law: a shared id is the same element", () => {
       fc.assert(
         fc.property(arbRenamedPair, fc.infiniteStream(fc.boolean()), (pair, coin) => {
           const { existing, incoming } = pair;
-          const { deltas } = diffModels(existing, incoming);
+          const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
           const accepted = new Set(
             deltas.flatMap((_, i) => (coin.next().value ? [i] : [])),
           );
           const result = mergeAndValidate(
             existing,
             incoming,
-            { deltas, matching: "id-first" },
+            { deltas, matching: "id-first", recognizeRenames: false },
             accepted,
           );
 

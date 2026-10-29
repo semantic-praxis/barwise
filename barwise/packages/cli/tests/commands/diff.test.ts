@@ -252,6 +252,7 @@ model:
     ["role:places=submits", /--rename must be object-type:<old>=<new> or fact-type:<old>=<new>/],
     ["fact-type:Customer places Order", /--rename must be/],
     ["fact-type:=X", /names both the old and the new name/],
+    ["constructor:Customer=Client", /--rename must be/],
     ["object-type:Nobody=Client", /existing model has no object type named "Nobody"/],
   ])("refuses --rename %j", async (value, reason) => {
     const a = shop("e.orm.yaml", "a", "Customer", "Customer places Order", "places");

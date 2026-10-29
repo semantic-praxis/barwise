@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeAndValidate } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { derivedId, MERGE_ID_TAG } from "../../src/serialization/derivedId.js";
 
@@ -30,9 +30,13 @@ function factType(m: OrmModel, id: string, player: string): void {
 
 /** Keep the existing side and take the incoming additions. */
 function mergeKeeping(existing: OrmModel, incoming: OrmModel): OrmModel {
-  const { deltas } = diffModels(existing, incoming);
+  const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
   const policy = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
-  const result = mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, policy);
+  const result = mergeAndValidate(existing, incoming, {
+    deltas,
+    matching: "id-first",
+    recognizeRenames: false,
+  }, policy);
   expect(result.model).not.toBeNull();
   return result.model!;
 }

@@ -52,9 +52,11 @@ export function registerDiffCommand(program: Command): void {
                 + `not ${JSON.stringify(opts.matching)}.`,
             );
           }
+          // Before the files load, as --matching is: a usage mistake is
+          // reported as one, not hidden behind a file error.
+          const renames = opts.rename.map(parseRename);
           const baseModel = loadModel(base);
           const incomingModel = loadModel(incoming);
-          const renames = opts.rename.map(parseRename);
           const diff = diffModels(baseModel, incomingModel, { matching, renames });
 
           if (opts.format === "json") {
@@ -124,7 +126,12 @@ const RENAME_KINDS = { "object-type": "objectType", "fact-type": "factType" } as
 function parseRename(value: string): DeclaredRename {
   const colon = value.indexOf(":");
   const equals = value.indexOf("=", colon + 1);
-  const kind = RENAME_KINDS[value.slice(0, colon) as keyof typeof RENAME_KINDS];
+  const spelled = value.slice(0, colon);
+  // Own keys only: `constructor` or `toString` would otherwise read a
+  // kind off the prototype.
+  const kind = Object.hasOwn(RENAME_KINDS, spelled)
+    ? RENAME_KINDS[spelled as keyof typeof RENAME_KINDS]
+    : undefined;
   if (colon < 0 || equals < 0 || kind === undefined) {
     throw new Error(
       `--rename must be object-type:<old>=<new> or fact-type:<old>=<new>, not ${

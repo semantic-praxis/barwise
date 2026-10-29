@@ -60,7 +60,7 @@ import type {
  * diff paired its elements and refuse a pairing that is not evidence two
  * elements are one (iri-identity 6a).
  */
-export type MergeInput = Pick<ModelDiffResult, "deltas" | "matching">;
+export type MergeInput = Pick<ModelDiffResult, "deltas" | "matching" | "recognizeRenames">;
 
 /**
  * The options every diff that feeds a merge passes: ids and names only,
@@ -853,6 +853,12 @@ function mergedId(
  * the element means. Before, a comment was the only guard.
  */
 function refuseUnmergeablePairing(diff: MergeInput): void {
+  if (diff.recognizeRenames) {
+    throw new Error(
+      "Cannot merge a diff built with rename recognition on: it may pair two different "
+        + "elements of one shape. Diff with MERGE_DIFF_OPTIONS (recognizeRenames: false) to merge.",
+    );
+  }
   if (diff.matching === "content") {
     throw new Error(
       'Cannot merge a diff built with matching: "content": its ids say nothing, so its '

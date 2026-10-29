@@ -9,9 +9,12 @@ import {
   type ElementMatching,
 } from "@barwise/core/diff";
 
+/** The element kinds a declared rename names; the editor's schema is pinned to it. */
+export const DIFF_RENAME_KINDS = ["objectType", "factType"] as const;
+
 /** A rename the caller declares, as the tool's input takes it. */
 export interface DiffRenameInput {
-  readonly kind: "objectType" | "factType";
+  readonly kind: (typeof DIFF_RENAME_KINDS)[number];
   readonly from: string;
   readonly to: string;
 }
@@ -40,7 +43,7 @@ export function registerDiffTool(server: McpServer): void {
             + "two independent extractions numbered from one counter.",
         ),
         renames: z.array(z.object({
-          kind: z.enum(["objectType", "factType"]),
+          kind: z.enum(DIFF_RENAME_KINDS),
           from: z.string().min(1).describe("Its name in the base model"),
           to: z.string().min(1).describe("Its name in the incoming model"),
         })).optional().describe(
