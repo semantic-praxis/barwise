@@ -4,6 +4,7 @@
  * rule's agreement with the DDL importer is cli's compositeKeyParity
  * test; this covers what only the dbt side reports.
  */
+import { resolvePreferredIdentifier } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { importDbtProject } from "../src/DbtProjectImporter.js";
 
@@ -85,6 +86,17 @@ describe("a composite-key dbt model", () => {
         && f.roles.some((r) => model.getObjectType(r.playerId)?.name === "Waitlist")
       ),
     ).toBe(true);
+  });
+
+  it("names its key's uniqueness as the objectifier's preferred identifier (barwise-fuo)", () => {
+    const { model } = importDbtProject([yaml]);
+    const [objectified] = model.objectifiedFactTypes;
+    const resolved = resolvePreferredIdentifier(model, objectified!.objectTypeId);
+    expect(resolved.ok && resolved.at.constraint.type).toBe("internal_uniqueness");
+    const relationship = model.getFactType(objectified!.factTypeId)!;
+    expect(resolved.ok && [...resolved.at.constraint.roleIds]).toEqual(
+      relationship.roles.map((r) => r.id),
+    );
   });
 
   it("is no key when a column of the combination may be null", () => {

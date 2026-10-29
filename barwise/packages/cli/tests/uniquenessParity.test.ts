@@ -10,16 +10,14 @@ import type { OrmModel } from "@barwise/core";
 import { importDbtProject } from "@barwise/dbt";
 import { DdlImportFormat } from "@barwise/formats";
 import { describe, expect, it } from "vitest";
+import { describePreferred } from "./workspace/preferred.js";
 
 /**
  * Every uniqueness in the model, described by players: an internal one by
  * its fact type's players and the players of the roles it spans, an
  * external one by the players of its roles. The key's uniqueness is in
- * both and compared too. Which one each importer stores as preferred is not
- * compared: the DDL importer prefers a composite key's uniqueness
- * (annotation-preferred-identifier.spec.md) and the dbt importer does not
- * yet (barwise-fuo), and leaving preferred ones out made that difference
- * read as a missing uniqueness.
+ * both and compared too. Which one each importer stores as preferred is
+ * compared beside them (barwise-fuo).
  */
 function uniquenesses(model: OrmModel): string[] {
   const name = (id: string) => model.getObjectType(id)?.name ?? "?";
@@ -156,9 +154,11 @@ const cases: { name: string; ddl: string; dbt: string; }[] = [
 describe("the DDL and dbt importers agree on a uniqueness beside the key", () => {
   for (const c of cases) {
     it(c.name, () => {
-      const fromDdl = uniquenesses(new DdlImportFormat().parse(c.ddl).model);
-      const fromDbt = uniquenesses(importDbtProject([c.dbt]).model);
-      expect(fromDbt).toEqual(fromDdl);
+      const ddl = new DdlImportFormat().parse(c.ddl).model;
+      const dbt = importDbtProject([c.dbt]).model;
+      const fromDdl = uniquenesses(ddl);
+      expect(uniquenesses(dbt)).toEqual(fromDdl);
+      expect(describePreferred(dbt)).toEqual(describePreferred(ddl));
       // Not vacuous: each case states a uniqueness beside the key.
       expect(fromDdl.length).toBeGreaterThan(0);
     });

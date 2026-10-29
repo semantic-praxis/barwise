@@ -295,11 +295,26 @@ export class DdlImportFormat implements ImportFormat {
       // a plain column in it, and is still the relationship (barwise-c65).
       // The older rule (a key made of two or more whole foreign keys) still
       // applies when the composite reading declines a table: requirement 4
-      // keeps that table as it was read before (PR #621 review).
-      const objectifies = reading !== undefined
-        || foreignKeysOfKey(table) !== undefined
-        || annotated?.objectifies !== undefined;
-      const referenceMode = annotated && (table.primaryKey.length === 1 || objectifies)
+      // keeps that table as it was read before (PR #621 review). A line
+      // with `supertypes` is the export's statement and is trusted: an
+      // entity identified by two references is keyed on its foreign keys
+      // and objectifies nothing (barwise-xgu). An older line, from before
+      // that field, keeps the guess, and so does a key with a supertype
+      // link's column in it: step 3 reads no key through a link, so the
+      // guess is what keeps such a table keyed.
+      const trusted = annotated?.supertypes !== undefined
+        && !annotated.supertypes.some((link) =>
+          link.columns.some((c) => table.primaryKey.includes(c))
+        );
+      const objectifies = trusted
+        ? annotated.objectifies !== undefined
+        : reading !== undefined
+          || foreignKeysOfKey(table) !== undefined
+          || annotated?.objectifies !== undefined;
+      // The line names the reference mode whatever the key's width; the
+      // restriction to one-column keys dates from when a wider key kept an
+      // invented column (barwise-9zm).
+      const referenceMode = annotated
         ? annotated.referenceMode
         : objectifies
         ? `${table.name}_id`

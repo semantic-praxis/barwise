@@ -10,6 +10,7 @@ import type { OrmModel } from "@barwise/core";
 import { importDbtProject } from "@barwise/dbt";
 import { DdlImportFormat } from "@barwise/formats";
 import { describe, expect, it } from "vitest";
+import { describePreferred } from "./workspace/preferred.js";
 
 /**
  * What the rule decides, compared without names or readings, which the two
@@ -18,8 +19,9 @@ import { describe, expect, it } from "vitest";
  * an objectifier plays in -- its attributes, alternate identifier and
  * remaining foreign keys' relationships (PR #620 review: a column one side
  * dropped would otherwise pass) -- each by players, internal uniquenesses
- * and mandatory roles; external uniquenesses over them; and what is
- * objectified.
+ * and mandatory roles; external uniquenesses over them; what is
+ * objectified; and the preferred identifier of every entity in the model,
+ * not only the ones the rule builds (barwise-fuo).
  */
 function composite(model: OrmModel) {
   const name = (id: string) => model.getObjectType(id)?.name ?? "?";
@@ -56,6 +58,7 @@ function composite(model: OrmModel) {
         ),
     ),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
+    preferred: describePreferred(model),
   };
 }
 
@@ -422,8 +425,12 @@ describe("the DDL and dbt importers agree on a composite-key table", () => {
       const fromDdl = composite(new DdlImportFormat().parse(c.ddl).model);
       const fromDbt = composite(importDbtProject([c.dbt]).model);
       expect(fromDbt).toEqual(fromDdl);
-      // Not vacuous: each case states a relationship.
+      // Not vacuous: each case states a relationship, and each objectifier
+      // has an identifier, so losing it on both sides does not pass.
       expect(fromDdl.factTypes.length).toBeGreaterThan(0);
+      for (const o of fromDdl.objectified) {
+        expect(fromDdl.preferred.some((p) => p.startsWith(`${o}: `))).toBe(true);
+      }
     });
   }
 });
