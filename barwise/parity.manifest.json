@@ -211,6 +211,20 @@
           "symbol": "readManifest"
         }
       ]
+    },
+    {
+      "name": "lineage-models-beside",
+      "why": "the CLI and the MCP server must agree on which model files sit beside a manifest: it decides whether an export is orphaned and whether a model is alone in its directory, so the two would report one manifest differently (iri-identity 6a)",
+      "members": [
+        {
+          "file": "packages/cli/src/workspace/lineageIo.ts",
+          "symbol": "modelsBeside"
+        },
+        {
+          "file": "packages/mcp/src/workspace/lineageIo.ts",
+          "symbol": "modelsBeside"
+        }
+      ]
     }
   ]
 }

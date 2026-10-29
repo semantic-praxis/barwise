@@ -244,9 +244,11 @@ describe("barwise lineage", () => {
 
     it("fails on an artifact it cannot place, though nothing is stale", async () => {
       // An export written before exports named their model, with no sources
-      // to attribute it by (iri-identity 6a): neither fresh nor stale.
+      // to attribute it by (iri-identity 6a), in a directory with a second
+      // model, so neither can say whose it is: neither fresh nor stale.
       const modelPath = path.join(tempDir, "test.orm.yaml");
       fs.writeFileSync(modelPath, DETERMINISTIC_MODEL);
+      fs.copyFileSync(`${fixtures}/simple.orm.yaml`, path.join(tempDir, "other.orm.yaml"));
       const modelHash = hashModel(loadModel(modelPath));
       writeManifest(tempDir, {
         version: 1,
@@ -268,6 +270,29 @@ describe("barwise lineage", () => {
       expect(result.stdout).toContain("1 artifact(s) name no model");
       expect(result.stdout).toContain("No artifacts are recorded for this model.");
       expect(result.exitCode).toBe(1);
+    });
+
+    it("counts such an artifact as the model's when it is alone in its directory", async () => {
+      const modelPath = path.join(tempDir, "test.orm.yaml");
+      fs.writeFileSync(modelPath, DETERMINISTIC_MODEL);
+      const modelHash = hashModel(loadModel(modelPath));
+      writeManifest(tempDir, {
+        version: 1,
+        sourceModel: "test.orm.yaml",
+        sourceModelHash: modelHash,
+        exports: [{
+          artifact: "schema.sql",
+          format: "ddl",
+          exportedAt: "2026-03-06T12:00:00Z",
+          modelHash,
+          sources: [],
+        }],
+      });
+
+      const result = await runCli(["lineage", "status", modelPath]);
+
+      expect(result.stdout).toContain("All artifacts are fresh.");
+      expect(result.exitCode).toBe(0);
     });
   });
 

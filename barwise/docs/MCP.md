@@ -788,9 +788,10 @@ Given a path, only that model's exports are read; `unattributedArtifacts`
 lists exports that name no model and that this model does not own, and
 `orphanedArtifacts` exports naming a model file that no longer exists
 (see `barwise lineage` in CLI.md). Given inline YAML
-there is no file to read for: the tool reads every export when they name
-one model, and otherwise returns an `error` naming the models and asking
-for a path.
+there is no file to read for: the tool reads every export when they all
+name one model, or all name none (a manifest from before exports named
+their model, read as it always was), and otherwise returns an `error`
+naming the models and asking for a path.
 
 ---
 

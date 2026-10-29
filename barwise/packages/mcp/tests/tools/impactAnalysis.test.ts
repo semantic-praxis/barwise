@@ -284,6 +284,9 @@ describe("impact_analysis tool", () => {
 
     const modelPath = path.join(tempDir, "a.orm.yaml");
     fs.copyFileSync(`${fixtures}/simple.orm.yaml`, modelPath);
+    // b's file is there, so its export is b's and is skipped; were it
+    // gone, the export would be read as a renamed model's.
+    fs.copyFileSync(`${fixtures}/simple.orm.yaml`, path.join(tempDir, "b.orm.yaml"));
     const manifest = {
       version: 1 as const,
       sourceModel: "b.orm.yaml",

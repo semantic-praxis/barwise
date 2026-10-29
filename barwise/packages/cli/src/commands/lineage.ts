@@ -4,12 +4,11 @@
  * Lineage tracking and staleness detection.
  */
 
-import { analyzeImpact, checkStaleness, exportModels } from "@barwise/core/lineage";
+import { analyzeImpact, checkStaleness } from "@barwise/core/lineage";
 import type { Command } from "commander";
-import { existsSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { loadModel } from "../workspace/io.js";
-import { readManifest } from "../workspace/lineageIo.js";
+import { modelsBeside, readManifest } from "../workspace/lineageIo.js";
 
 export function registerLineageCommand(program: Command): void {
   const lineage = program
@@ -26,13 +25,10 @@ export function registerLineageCommand(program: Command): void {
       try {
         const model = loadModel(source);
         const dir = dirname(resolve(source));
-        const manifest = readManifest(dir);
-        // Which named models are still on disk, so an export naming a
-        // renamed or deleted file is reported rather than passed over.
-        const present = manifest
-          ? exportModels(manifest).filter((name) => existsSync(join(dir, name)))
-          : [];
-        const report = checkStaleness(manifest, model, basename(resolve(source)), present);
+        const report = checkStaleness(readManifest(dir), model, {
+          sourceModel: basename(resolve(source)),
+          modelsBeside: modelsBeside(dir),
+        });
 
         if (opts.format === "json") {
           process.stdout.write(JSON.stringify(report, null, 2) + "\n");
@@ -52,7 +48,8 @@ export function registerLineageCommand(program: Command): void {
         if (report.unattributedArtifacts.length > 0) {
           process.stdout.write(
             `${report.unattributedArtifacts.length} artifact(s) name no model, and this model `
-              + "does not own them; re-export each from its model:\n",
+              + "does not own them; re-export each from its model, or remove its entry from "
+              + ".barwise/lineage.yaml if its model is gone:\n",
           );
           for (const artifact of report.unattributedArtifacts) {
             process.stdout.write(`  ${artifact}\n`);
@@ -129,11 +126,10 @@ export function registerLineageCommand(program: Command): void {
       async (source: string, opts: { element: string; format: string; }) => {
         try {
           const dir = dirname(resolve(source));
-          const report = analyzeImpact(
-            readManifest(dir),
-            opts.element,
-            basename(resolve(source)),
-          );
+          const report = analyzeImpact(readManifest(dir), opts.element, {
+            sourceModel: basename(resolve(source)),
+            modelsBeside: modelsBeside(dir),
+          });
 
           if (opts.format === "json") {
             process.stdout.write(JSON.stringify(report, null, 2) + "\n");

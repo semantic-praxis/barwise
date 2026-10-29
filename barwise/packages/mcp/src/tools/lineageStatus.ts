@@ -4,9 +4,8 @@
 
 import { checkStaleness, exportModels } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { existsSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
-import { readManifest } from "../workspace/lineageIo.js";
+import { basename, dirname, resolve } from "node:path";
+import { modelsBeside, readManifest } from "../workspace/lineageIo.js";
 import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
@@ -43,19 +42,22 @@ export function executeLineageStatus(
   const manifest = readManifest(dir);
 
   // Inline YAML names no file, so there is no model to read the exports
-  // for. When they name more than one, comparing this model's hash with
-  // another model's exports would report on artifacts it never made.
+  // for. When they name more than one, or one beside exports that name
+  // none (another domain's, perhaps, from before exports named a model),
+  // comparing this model's hash with them would report on artifacts it
+  // never made. A manifest whose exports all name none is read as before.
   if (!path && manifest) {
     const models = exportModels(manifest);
-    if (models.length > 1) {
+    const mixed = models.length === 1 && manifest.exports.some((e) => e.sourceModel === undefined);
+    if (models.length > 1 || mixed) {
       return {
         content: [{
           type: "text" as const,
           text: JSON.stringify(
             {
-              error: `The lineage manifest in ${dir} holds the exports of ${models.length} `
-                + `models (${models.join(", ")}). Pass the model as a file path so its own `
-                + "exports are read.",
+              error: `The lineage manifest in ${dir} holds the exports of more than one `
+                + `model (${models.join(", ")}${mixed ? ", and exports naming none" : ""}). `
+                + "Pass the model as a file path so its own exports are read.",
             },
             null,
             2,
@@ -65,16 +67,10 @@ export function executeLineageStatus(
     }
   }
 
-  // Which named models are still on disk, so an export naming a renamed
-  // or deleted file is reported rather than passed over.
-  const present = manifest
-    ? exportModels(manifest).filter((name) => existsSync(join(dir, name)))
-    : [];
   const report = checkStaleness(
     manifest,
     model,
-    path ? basename(resolve(path)) : undefined,
-    present,
+    path ? { sourceModel: basename(resolve(path)), modelsBeside: modelsBeside(dir) } : undefined,
   );
 
   return {

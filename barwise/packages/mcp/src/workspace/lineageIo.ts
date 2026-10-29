@@ -26,6 +26,19 @@ export function readManifest(dir: string): LineageManifest | undefined {
 }
 
 /**
+ * The `.orm.yaml` files beside a manifest, sorted: what lineage reads to
+ * tell a renamed model's exports, and whether a model is alone in its
+ * directory (`ModelScope`). Empty when the directory cannot be read.
+ */
+export function modelsBeside(dir: string): string[] {
+  try {
+    return readdirSync(dir).filter((name) => name.endsWith(".orm.yaml")).sort();
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Resolve a generated artifact path back to its source model by walking
  * up parent directories for a `.barwise/lineage.yaml` manifest and
  * matching the artifact against its exports.

@@ -3,7 +3,7 @@
  */
 
 import type { OrmModel } from "../model/OrmModel.js";
-import { exportsForModel } from "./attribution.js";
+import { exportsForModel, type ModelScope } from "./attribution.js";
 import { hashModel } from "./manifest.js";
 import type { LineageManifest } from "./types.js";
 
@@ -31,8 +31,8 @@ export interface StalenessReport {
    */
   readonly unattributedArtifacts: readonly string[];
   /**
-   * Exports naming a model file the caller reports gone (renamed, moved or
-   * deleted). Their staleness cannot be checked against any model; listing
+   * Exports naming a model file that is no longer beside the manifest
+   * (renamed, moved or deleted). Their staleness cannot be checked against any model; listing
    * them keeps a renamed model from reading as having no artifacts.
    */
   readonly orphanedArtifacts: readonly string[];
@@ -45,20 +45,16 @@ export interface StalenessReport {
  * @param manifest - The lineage manifest (read by the caller), or
  *   undefined when no manifest exists
  * @param model - Current ORM model to check against manifest
- * @param sourceModel - The model's file, relative to the manifest's
- *   directory: only that model's exports are read. Without it every
- *   export is, which is right only when the exports name one model; the
- *   caller checks that with `exportModels`.
- * @param presentModels - The model files, of those `exportModels` names,
- *   that still exist beside the manifest; the caller reads the directory.
- *   An export naming any other is reported orphaned.
+ * @param scope - The model's file and the model files beside it: only
+ *   that model's exports are read. Without it every export is, which is
+ *   right only when the exports name one model; the caller checks that
+ *   with `exportModels`.
  * @returns Staleness report with stale and fresh artifacts
  */
 export function checkStaleness(
   manifest: LineageManifest | undefined,
   model: OrmModel,
-  sourceModel?: string,
-  presentModels?: readonly string[],
+  scope?: ModelScope,
 ): StalenessReport {
   if (!manifest) {
     return {
@@ -69,9 +65,9 @@ export function checkStaleness(
       manifestFound: false,
     };
   }
-  const { own, unattributed, orphaned } = sourceModel === undefined
+  const { own, unattributed, orphaned } = scope === undefined
     ? { own: manifest.exports, unattributed: [], orphaned: [] }
-    : exportsForModel(manifest, sourceModel, model, presentModels);
+    : exportsForModel(manifest, scope, model);
 
   const currentHash = hashModel(model);
   const staleArtifacts: StaleArtifact[] = [];

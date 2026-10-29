@@ -55,19 +55,36 @@ export function exportModels(manifest: LineageManifest): readonly string[] {
 }
 
 /**
+ * Which model the lineage commands are reading for, and the model files
+ * beside it. The two travel together because neither answers alone: an
+ * export naming a file that is no longer there is a renamed or deleted
+ * model's, and a model alone in its directory owns every export that names
+ * none. Reading the directory is the caller's; core takes the list.
+ */
+export interface ModelScope {
+  /** The model's file, relative to the manifest's directory. */
+  readonly sourceModel: string;
+  /** The `.orm.yaml` files in the manifest's directory, this one included. */
+  readonly modelsBeside: readonly string[];
+}
+
+/** Whether the model is the only one its manifest can serve. */
+function alone(scope: ModelScope): boolean {
+  return scope.modelsBeside.length === 1 && scope.modelsBeside[0] === scope.sourceModel;
+}
+
+/**
  * One model's exports, the exports nobody is known to own, and the exports
- * naming a model file that is gone. An export names its model, or names
- * none and is claimed by `model` when one is given. One naming another
- * model is that model's, unless `presentModels` is given and does not
- * hold it: then its model was renamed, moved or deleted, and leaving it out
- * would let the renamed model's stale artifacts pass as no artifacts at
- * all.
+ * naming a model file that is gone. An export names this model; or names
+ * none and is this model's when the model is alone in its directory or
+ * claims it; or names another model, which is that model's while its file
+ * is there and orphaned once it is not -- leaving it out would let a
+ * renamed model's stale artifacts pass as no artifacts at all.
  */
 export function exportsForModel(
   manifest: LineageManifest,
-  sourceModel: string,
+  scope: ModelScope,
   model?: OrmModel,
-  presentModels?: readonly string[],
 ): {
   readonly own: readonly ManifestExport[];
   readonly unattributed: readonly ManifestExport[];
@@ -77,29 +94,31 @@ export function exportsForModel(
   const unattributed: ManifestExport[] = [];
   const orphaned: ManifestExport[] = [];
   for (const exp of manifest.exports) {
-    if (exp.sourceModel === sourceModel) own.push(exp);
+    if (exp.sourceModel === scope.sourceModel) own.push(exp);
     else if (exp.sourceModel !== undefined) {
-      if (presentModels && !presentModels.includes(exp.sourceModel)) orphaned.push(exp);
-    } else if (model && claimsExport(model, exp)) own.push(exp);
+      if (!scope.modelsBeside.includes(exp.sourceModel)) orphaned.push(exp);
+    } else if (alone(scope) || (model && claimsExport(model, exp))) own.push(exp);
     else unattributed.push(exp);
   }
   return { own, unattributed, orphaned };
 }
 
 /**
- * The manifest with every export `model` claims stamped with its
- * `sourceModel`, so the first write after exports began naming their model
- * records the attribution. Exports it does not claim are left as they are.
+ * The manifest with every export this model owns but that names no model
+ * stamped with its `sourceModel`, and the exports stamped, so the first
+ * write after exports began naming their model records the attribution.
+ * A model alone in its directory owns them all, sources or none.
  */
 export function claimExports(
   manifest: LineageManifest,
-  sourceModel: string,
+  scope: ModelScope,
   model: OrmModel,
-): LineageManifest {
-  return {
-    ...manifest,
-    exports: manifest.exports.map((exp) =>
-      claimsExport(model, exp) ? { ...exp, sourceModel } : exp
-    ),
-  };
+): { readonly manifest: LineageManifest; readonly claimed: readonly ManifestExport[]; } {
+  const claimed: ManifestExport[] = [];
+  const exports = manifest.exports.map((exp) => {
+    if (exp.sourceModel !== undefined || !(alone(scope) || claimsExport(model, exp))) return exp;
+    claimed.push(exp);
+    return { ...exp, sourceModel: scope.sourceModel };
+  });
+  return { manifest: { ...manifest, exports }, claimed };
 }

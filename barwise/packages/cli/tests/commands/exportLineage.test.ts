@@ -248,4 +248,34 @@ describe("two models, one manifest", () => {
     expect(status.stdout).toContain("No artifacts are recorded for this model.");
     expect(status.exitCode).toBe(0);
   });
+
+  it("warns when an export takes over another model's artifact", async () => {
+    const out = join(dir, "shared.sql");
+    expect((await runCli(["export", a, "--format", "ddl", "--output", out])).exitCode).toBe(0);
+    const taken = await runCli(["export", b, "--format", "ddl", "--output", out]);
+    expect(taken.exitCode).toBe(0);
+    expect(taken.stderr).toContain(
+      `${resolve(out)} was a.orm.yaml's export; it is now b.orm.yaml's`,
+    );
+  });
+
+  it("does not count the entry an export replaces as an older export it keeps", async () => {
+    // One model alone, an older entry at the same path: this write replaces
+    // it, so nothing older is recorded.
+    rmSync(b);
+    mkdirSync(join(dir, ".barwise"));
+    const out = resolve(join(dir, "a.sql"));
+    writeFileSync(
+      manifestFile(),
+      serializeManifest({
+        version: 1,
+        sourceModel: "a.orm.yaml",
+        sourceModelHash: "old",
+        exports: [{ artifact: out, format: "ddl", exportedAt: "x", modelHash: "old", sources: [] }],
+      } as LineageManifest),
+    );
+    const again = await runCli(["export", a, "--format", "ddl", "--output", out]);
+    expect(again.exitCode).toBe(0);
+    expect(again.stderr).not.toContain("older export");
+  });
 });

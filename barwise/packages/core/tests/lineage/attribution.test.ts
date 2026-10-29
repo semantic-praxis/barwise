@@ -82,6 +82,12 @@ function exp(artifact: string, ids: string[], more: Partial<ManifestExport> = {}
   };
 }
 
+/** Sales and Billing share a directory, so neither is alone in it. */
+const shared = (sourceModel: string) => ({
+  sourceModel,
+  modelsBeside: ["billing.orm.yaml", "sales.orm.yaml"],
+});
+
 function manifest(exports: ManifestExport[]): LineageManifest {
   return { version: 1, sourceModel: "billing.orm.yaml", sourceModelHash: "h", exports };
 }
@@ -110,10 +116,23 @@ describe("claiming an export that names no model", () => {
     expect(claimsExport(sales(), named)).toBe(false);
   });
 
-  it("stamps what it claims and leaves the rest", () => {
+  it("stamps what it claims, says which, and leaves the rest", () => {
     const m = manifest([exp("orders.sql", ["ord"]), exp("customers.sql", ["inv"])]);
-    const claimed = claimExports(m, "sales.orm.yaml", sales());
-    expect(claimed.exports.map((e) => e.sourceModel)).toEqual(["sales.orm.yaml", undefined]);
+    const { manifest: stamped, claimed } = claimExports(m, shared("sales.orm.yaml"), sales());
+    expect(stamped.exports.map((e) => e.sourceModel)).toEqual(["sales.orm.yaml", undefined]);
+    expect(claimed.map((e) => e.artifact)).toEqual(["orders.sql"]);
+  });
+
+  it("is every unnamed export's, sources or none, for a model alone in its directory", () => {
+    // The manifest can serve no other model, so an export with no sources,
+    // or listing an element since deleted, is still this model's.
+    const m = manifest([exp("nolineage.sql", []), exp("gone.sql", ["deleted"])]);
+    const alone = { sourceModel: "sales.orm.yaml", modelsBeside: ["sales.orm.yaml"] };
+    expect(claimExports(m, alone, sales()).claimed.map((e) => e.artifact)).toEqual([
+      "nolineage.sql",
+      "gone.sql",
+    ]);
+    expect(exportsForModel(m, alone, sales()).unattributed).toEqual([]);
   });
 });
 
@@ -126,19 +145,22 @@ describe("one model's exports", () => {
   ]);
 
   it("are those naming it, and those it claims; another model's are in neither list", () => {
-    const { own, unattributed } = exportsForModel(m, "sales.orm.yaml", sales());
+    const { own, unattributed } = exportsForModel(m, shared("sales.orm.yaml"), sales());
     expect(own.map((e) => e.artifact)).toEqual(["orders.sql", "legacy-orders.sql"]);
     expect(unattributed.map((e) => e.artifact)).toEqual(["nolineage.sql"]);
   });
 
-  it("reports an export whose named model file is gone, given which files remain", () => {
-    // A renamed model's exports still name its old file; without the list
-    // of files that remain they are another model's and are skipped.
-    const { orphaned } = exportsForModel(m, "sales.orm.yaml", sales(), ["sales.orm.yaml"]);
-    expect(orphaned.map((e) => e.artifact)).toEqual(["invoices.sql"]);
-    expect(exportsForModel(m, "sales.orm.yaml", sales()).orphaned).toEqual([]);
-    const report = checkStaleness(m, sales(), "store.orm.yaml", ["billing.orm.yaml"]);
-    expect(report.orphanedArtifacts).toEqual(["orders.sql"]);
+  it("reports an export whose named model file is gone", () => {
+    // A renamed model's exports still name its old file.
+    const renamed = {
+      sourceModel: "store.orm.yaml",
+      modelsBeside: ["billing.orm.yaml", "store.orm.yaml"],
+    };
+    expect(exportsForModel(m, renamed, sales()).orphaned.map((e) => e.artifact)).toEqual([
+      "orders.sql",
+    ]);
+    expect(checkStaleness(m, sales(), renamed).orphanedArtifacts).toEqual(["orders.sql"]);
+    expect(exportsForModel(m, shared("sales.orm.yaml"), sales()).orphaned).toEqual([]);
   });
 
   it("names the models the exports name, sorted", () => {
@@ -154,7 +176,7 @@ describe("one model's exports", () => {
       exp("legacy-orders.sql", ["cust", "ord"], { modelHash: "old" }),
       exp("nolineage.sql", [], { modelHash: fresh }),
     ]);
-    const report = checkStaleness(withHash, model, "sales.orm.yaml");
+    const report = checkStaleness(withHash, model, shared("sales.orm.yaml"));
     expect(report.freshArtifacts).toEqual(["orders.sql"]);
     expect(report.staleArtifacts.map((s) => s.artifact)).toEqual(["legacy-orders.sql"]);
     expect(report.unattributedArtifacts).toEqual(["nolineage.sql"]);
@@ -177,10 +199,21 @@ describe("impact over a shared manifest", () => {
   ]);
 
   it("reads only the named model's exports, and those naming none", () => {
-    const report = analyzeImpact(m, "cust", "sales.orm.yaml");
+    const report = analyzeImpact(m, "cust", shared("sales.orm.yaml"));
     expect(report.affectedArtifacts.map((a) => [a.artifact, a.sourceModel])).toEqual([
       ["orders.sql", "sales.orm.yaml"],
       ["legacy.sql", undefined],
+    ]);
+  });
+
+  it("reads an export naming a model file that is gone, likely this model's before a rename", () => {
+    const renamed = {
+      sourceModel: "store.orm.yaml",
+      modelsBeside: ["billing.orm.yaml", "store.orm.yaml"],
+    };
+    expect(analyzeImpact(m, "cust", renamed).affectedArtifacts.map((a) => a.artifact)).toEqual([
+      "orders.sql",
+      "legacy.sql",
     ]);
   });
 

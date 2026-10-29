@@ -10,7 +10,6 @@ import type { ExportFormatAdapter } from "@barwise/core";
 import { getExporter, listExporters, surrogateKeysRefusal } from "@barwise/core";
 import {
   claimExports,
-  claimsExport,
   hashModel,
   type ManifestExport,
   updateManifest,
@@ -24,7 +23,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { reportConstraintSpecs } from "../workspace/constraintReport.js";
 import { resolveDomainModels } from "../workspace/domainModels.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
-import { readManifest, writeManifest } from "../workspace/lineageIo.js";
+import { modelsBeside, readManifest, writeManifest } from "../workspace/lineageIo.js";
 
 // Register the standard formats (DDL, OpenAPI, Avro, SQL, NORMA).
 registerStandardFormats();
@@ -113,23 +112,29 @@ export function registerExportCommand(program: Command): void {
           // they are (iri-identity 6a).
           const sourceModel = basename(resolve(source));
           const existing = readManifest(modelDir);
+          const claim = existing
+            && claimExports(existing, { sourceModel, modelsBeside: modelsBeside(modelDir) }, model);
           // Said aloud because it cannot be undone: a copy of this model
-          // in the same directory would claim the same exports.
-          const claimed = existing?.exports.filter((e) => claimsExport(model, e)) ?? [];
-          if (claimed.length > 0) {
+          // in the same directory would claim the same exports. The entry
+          // this write replaces is not an older export it keeps.
+          const kept = claim?.claimed.filter((e) => e.artifact !== entry.artifact) ?? [];
+          if (kept.length > 0) {
             process.stderr.write(
-              `Recorded ${claimed.length} older export(s) as ${sourceModel}'s: `
-                + `${claimed.map((e) => e.artifact).join(", ")}\n`,
+              `Recorded ${kept.length} older export(s) as ${sourceModel}'s: `
+                + `${kept.map((e) => e.artifact).join(", ")}\n`,
             );
           }
-          writeManifest(
-            modelDir,
-            updateManifest(
-              entry,
-              existing && claimExports(existing, sourceModel, model),
-              sourceModel,
-            ),
+          const taken = existing?.exports.find((e) =>
+            e.artifact === entry.artifact && e.sourceModel !== undefined
+            && e.sourceModel !== sourceModel
           );
+          if (taken) {
+            process.stderr.write(
+              `Warning: ${entry.artifact} was ${taken.sourceModel}'s export; it is now `
+                + `${sourceModel}'s, and ${taken.sourceModel}'s lineage no longer lists it.\n`,
+            );
+          }
+          writeManifest(modelDir, updateManifest(entry, claim?.manifest, sourceModel));
         } else {
           process.stdout.write(result.text);
           if (!result.text.endsWith("\n")) process.stdout.write("\n");

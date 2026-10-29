@@ -1105,8 +1105,19 @@ build differs from the bullet above:
   an export naming none it still falls back to the manifest's, so
   `describe_domain` on an older artifact can load the wrong domain until
   that artifact is re-exported (barwise-wcg.t0i).
+- A model alone in its directory owns every export that names none, with
+  sources or without: the manifest can serve no other model, so the
+  top-level field the bullet rules out is safe there, and without it an
+  older export with no sources, or listing an element since deleted,
+  stayed unattributed forever with no command to clear it. The lineage
+  core takes the model's file and the model files beside it together
+  (`ModelScope`), so a caller cannot give one without the other; the CLI
+  and MCP read the directory with a `modelsBeside` registered in
+  `parity.manifest.json`. Inline `lineage_status` also refuses a manifest
+  where one model's exports sit beside exports naming none.
 - An export naming a model file that no longer exists is reported by
-  status as orphaned and fails it. The review of this step found that
+  status as orphaned and fails it, and `impact` reads it as the renamed
+  model's. The review of this step found that
   reading "only this model's exports" let a renamed model pass with no
   artifacts at all, where reading every export had reported them stale;
   the caller says which named files remain, so core stays free of I/O.

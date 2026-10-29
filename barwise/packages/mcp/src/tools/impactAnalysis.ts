@@ -6,7 +6,7 @@ import { analyzeImpact } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { basename, dirname, resolve } from "node:path";
 import { z } from "zod";
-import { readManifest } from "../workspace/lineageIo.js";
+import { modelsBeside, readManifest } from "../workspace/lineageIo.js";
 import { type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
@@ -47,7 +47,7 @@ export function executeImpactAnalysis(
   const report = analyzeImpact(
     readManifest(dir),
     elementId,
-    path ? basename(resolve(path)) : undefined,
+    path ? { sourceModel: basename(resolve(path)), modelsBeside: modelsBeside(dir) } : undefined,
   );
 
   return {

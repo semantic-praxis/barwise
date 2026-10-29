@@ -149,11 +149,13 @@ describe("lineage_status tool", () => {
       exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("b.sql", "b.orm.yaml")],
     });
     const out = JSON.parse(executeLineageStatus(yaml).content[0]!.text);
-    expect(out.error).toMatch(/2 models \(a\.orm\.yaml, b\.orm\.yaml\)/);
+    expect(out.error).toMatch(/more than one model \(a\.orm\.yaml, b\.orm\.yaml\)/);
     expect(out.error).toMatch(/file path/);
   });
 
-  it("reads inline content as before when the exports name one model", () => {
+  it("refuses inline content when one model's exports sit beside exports naming none", () => {
+    // The unnamed ones may be another domain's, from before exports named
+    // their model.
     const exportOf = (artifact: string, sourceModel: string | undefined) => ({
       artifact,
       format: "ddl",
@@ -175,11 +177,37 @@ describe("lineage_status tool", () => {
       exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("legacy.sql", undefined)],
     });
     const out = JSON.parse(executeLineageStatus(yaml).content[0]!.text);
-    expect(out.error).toBeUndefined();
-    expect(out.staleArtifacts.map((s: { artifact: string; }) => s.artifact)).toEqual([
-      "a.sql",
-      "legacy.sql",
-    ]);
+    expect(out.error).toMatch(/\(a\.orm\.yaml, and exports naming none\)/);
+  });
+
+  it("reads inline content as before when the exports name one model, or none", () => {
+    const exportOf = (artifact: string, sourceModel: string | undefined) => ({
+      artifact,
+      format: "ddl",
+      exportedAt: "2026-10-29T00:00:00Z",
+      modelHash: "h",
+      sources: [{
+        elementId: "ot-customer",
+        elementType: "EntityType" as const,
+        elementName: "Customer",
+      }],
+      ...(sourceModel !== undefined ? { sourceModel } : {}),
+    });
+    const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
+    for (const named of ["a.orm.yaml", undefined]) {
+      writeManifest(ws.dir(), {
+        version: 1,
+        sourceModel: "a.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("a.sql", named), exportOf("a2.sql", named)],
+      });
+      const out = JSON.parse(executeLineageStatus(yaml).content[0]!.text);
+      expect(out.error).toBeUndefined();
+      expect(out.staleArtifacts.map((s: { artifact: string; }) => s.artifact)).toEqual([
+        "a.sql",
+        "a2.sql",
+      ]);
+    }
   });
 
   it("reads only the named model's exports given a path", () => {
