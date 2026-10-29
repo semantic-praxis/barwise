@@ -86,4 +86,20 @@ describe("KindsMatch rejects", () => {
     >;
     expectTypeOf<KindsMatch<Extra>["mandatory"]>().toEqualTypeOf<false>();
   });
+
+  it("an optional field one kind does not have", () => {
+    type Extra = Replace<
+      "internal_uniqueness",
+      Of<ConstraintRecord, "internal_uniqueness"> & { readonly isPreferred?: boolean; }
+    >;
+    expectTypeOf<KindsMatch<Extra>["internal_uniqueness"]>().toEqualTypeOf<false>();
+  });
+
+  it("a missing optional field", () => {
+    type Dropped = Replace<
+      "value_constraint",
+      Omit<Of<ConstraintRecord, "value_constraint">, "roleId">
+    >;
+    expectTypeOf<KindsMatch<Dropped>["value_constraint"]>().toEqualTypeOf<false>();
+  });
 });

@@ -2,7 +2,7 @@
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
-restarted on format 3.0 2026-10-29 (1r), R0 onward not started; WS1b
+restarted on format 3.0 2026-10-29 (1r), R0 done, R1 onward not started; WS1b
 follows the restart's WS1 reading; WS2 onward not started
 Created: 2026-10-15
 Last-updated: 2026-10-29
@@ -723,6 +723,53 @@ not because a gate failed.
   head, `main` back to back, and recorded here. A failed gate ends the
   spike as Open decision 4 says. A pass continues with WS1b parts B3, C,
   D and E as written, on the spike branch.
+
+**R0, done 2026-10-29: the readings on `main`** (at `fbade557` with R0's
+instruments added, which change no file under `core/src`; Node v26.7.0, an
+Intel Xeon 2.10 GHz x4):
+
+| Gate | Reading on `main`                                                                                                                                                                             |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1   | `corpus`: 119 tracked models; strict 84 loaded, 35 refused (the 28 fixtures and 7 deliberately broken test files); lenient 92 and 27. `--write` then `--read` gives the same bytes for all 84 |
+| S3   | 16 type tests green; a planted `isPreferred?` and a dropped optional `roleId` each fail                                                                                                       |
+| S4   | 3.0, 39 cases: singly 32 reported; combined 26/37 reported, 20 named, constraints named 1/11, 0 silent losses (the two header cases are scored singly)                                        |
+| S5   | `validate` 365 ms npm, 399 ms bundle, 311 modules and 1.69 MB loaded                                                                                                                          |
+| S6   | 2,920 ms median (2,780-3,130), 38,363 instantiations                                                                                                                                          |
+
+The 2.0 reading is unchanged by the scorer's extension: `malformed` on the
+2.0 set prints the same lines before and after (combined 19/28).
+
+**R0 implementation notes.**
+
+- Changed scope: the two misplacement cases are not S4 cases. Their
+  refusal names the constraint and its home, not a field, so no field
+  could be declared that the message must name; `format30.test.ts` already
+  pins the wording, and S1 keeps it green on the spike. R0 has 39 cases:
+  the 28 restated, and 11 new.
+- The constraint naming reading fell from 4/11 to 1/11 at 3.0, and that is
+  the format, not a regression: 3.0 gives every constraint an id, and S4
+  credits a constraint with an id only for naming it, which `main`'s schema
+  paths never do.
+- The conversion of the 28 was checked by comparing each fixture's schema
+  error paths at 2.0 and at 3.0: they match, the join case's under
+  `model.constraints`. Each new case was checked by fixing its one problem
+  and loading and validating the result: no error. The `join_ring` case
+  first carried a second problem (its path joined Person to Age) and now
+  rings over Person.
+- Planted scorer defects, each failing its test: an unanchored
+  `constraints` position, an unanchored model-level position, a combined
+  file carrying only object types, `lostKeys` over two collections, and
+  `lostKeys` without the header. A combine that took a header case could
+  not be planted: a header case has no collection, so the loop never takes
+  it, and a filter written for it was dead code and was removed.
+- `corpus` prints a hash of each file's 3.0 bytes, not the bytes, so two
+  listings diff line by line; equal hashes are equal bytes. Its listing
+  is `scripts/lib/corpus-listing.mjs`, tested with a loader that drops a
+  field. The trial prompt in `effect-comparison.spec.md` names the new
+  module, as its drift test requires of every module the scorer protects.
+- S6 rose from 25,382 instantiations at WS0 to 38,363 on `main` today,
+  with no Effect: format 3.0's placement types. The spike is read against
+  today's number.
 
 **Branch.** The spike is built on its own branch (confirmed by the owner
 2026-10-29),

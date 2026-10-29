@@ -1,0 +1,225 @@
+{
+  "$comment": "The 2.0 cases restated at format 3.0, plus the rules 3.0 added and the document keys the Effect restart moves off ajv (docs/specs/effect-adoption.spec.md, 1r, R0). Same rules as ../cases.json: one malformed element per file, each carrying exactly one problem, ids and names read from the file. A case's `kind` names its collection: absent for an object type, `fact_type`, `constraint` (the model's own `constraints` list), `subtype_fact`, `objectified`, `population`, `definition` (keyed by `term`), `diagram` (keyed by `name`), or `header` (the model's own fields, scored singly, since a document has one header). Every element in the file outside the case's collection is supporting and well formed. Each case was checked by fixing its one problem and confirming the model loads and validates with no error. `orm_version` is the version the combined file is written at.",
+  "orm_version": "3.0",
+  "cases": [
+    {
+      "file": "value-with-reference-mode.orm.yaml",
+      "field": "reference_mode"
+    },
+    {
+      "file": "entity-without-reference-mode.orm.yaml",
+      "field": "reference_mode",
+      "absent": true
+    },
+    {
+      "file": "entity-with-data-type.orm.yaml",
+      "field": "data_type"
+    },
+    {
+      "file": "entity-with-value-constraint.orm.yaml",
+      "field": "value_constraint"
+    },
+    {
+      "file": "entity-with-default-value.orm.yaml",
+      "field": "default_value"
+    },
+    {
+      "file": "cardinality-max-below-min.orm.yaml",
+      "field": "cardinality"
+    },
+    {
+      "file": "cardinality-negative-min.orm.yaml",
+      "field": "cardinality"
+    },
+    {
+      "file": "empty-value-constraint.orm.yaml",
+      "field": "value_constraint"
+    },
+    {
+      "file": "blank-name.orm.yaml",
+      "field": "name"
+    },
+    {
+      "file": "unknown-data-type.orm.yaml",
+      "field": "data_type"
+    },
+    {
+      "file": "excess-property.orm.yaml",
+      "field": "colour"
+    },
+    {
+      "file": "fact-type-without-roles.orm.yaml",
+      "kind": "fact_type",
+      "field": "roles"
+    },
+    {
+      "file": "fact-type-without-readings.orm.yaml",
+      "kind": "fact_type",
+      "field": "readings",
+      "absent": true
+    },
+    {
+      "file": "fact-type-bad-placeholder.orm.yaml",
+      "kind": "fact_type",
+      "field": "readings"
+    },
+    {
+      "file": "fact-type-excess-property.orm.yaml",
+      "kind": "fact_type",
+      "field": "colour"
+    },
+    {
+      "file": "role-without-player.orm.yaml",
+      "kind": "fact_type",
+      "field": "player",
+      "at": "roles.0.player",
+      "absent": true
+    },
+    {
+      "file": "role-excess-property.orm.yaml",
+      "kind": "fact_type",
+      "field": "colour",
+      "at": "roles.0.colour"
+    },
+    {
+      "file": "constraint-unknown-type.orm.yaml",
+      "kind": "fact_type",
+      "field": "type",
+      "constraint": 0,
+      "at": "constraints.0.type"
+    },
+    {
+      "file": "constraint-empty-roles.orm.yaml",
+      "kind": "fact_type",
+      "field": "roles",
+      "constraint": 0,
+      "at": "constraints.0.roles"
+    },
+    {
+      "file": "mandatory-without-role.orm.yaml",
+      "kind": "fact_type",
+      "field": "role",
+      "constraint": 0,
+      "at": "constraints.0.role",
+      "absent": true
+    },
+    {
+      "file": "ring-unknown-ring-type.orm.yaml",
+      "kind": "fact_type",
+      "field": "ring_type",
+      "constraint": 0,
+      "at": "constraints.0.ring_type"
+    },
+    {
+      "file": "frequency-max-below-min.orm.yaml",
+      "kind": "fact_type",
+      "field": "max",
+      "constraint": 0,
+      "at": "constraints.0.max"
+    },
+    {
+      "file": "frequency-negative-min.orm.yaml",
+      "kind": "fact_type",
+      "field": "min",
+      "constraint": 0,
+      "at": "constraints.0.min"
+    },
+    {
+      "file": "value-comparison-unknown-operator.orm.yaml",
+      "kind": "fact_type",
+      "field": "operator",
+      "constraint": 0,
+      "at": "constraints.0.operator"
+    },
+    {
+      "file": "constraint-unknown-modality.orm.yaml",
+      "kind": "fact_type",
+      "field": "modality",
+      "constraint": 0,
+      "at": "constraints.0.modality"
+    },
+    {
+      "file": "constraint-excess-property.orm.yaml",
+      "kind": "fact_type",
+      "field": "weight",
+      "constraint": 0,
+      "at": "constraints.0.weight"
+    },
+    {
+      "file": "join-equality-one-operand.orm.yaml",
+      "field": "operands",
+      "kind": "constraint",
+      "at": "operands"
+    },
+    {
+      "file": "value-constraint-empty-values.orm.yaml",
+      "kind": "fact_type",
+      "field": "values",
+      "constraint": 0,
+      "at": "constraints.0.values"
+    },
+    {
+      "file": "constraint-without-id.orm.yaml",
+      "kind": "fact_type",
+      "field": "id",
+      "constraint": 0,
+      "at": "constraints.0.id",
+      "absent": true
+    },
+    {
+      "file": "value-with-preferred-identifier.orm.yaml",
+      "field": "preferred_identifier"
+    },
+    {
+      "file": "operand-roles-and-subtype-facts.orm.yaml",
+      "kind": "constraint",
+      "field": "subtype_facts"
+    },
+    {
+      "file": "join-ring-without-ring-type.orm.yaml",
+      "kind": "constraint",
+      "field": "ring_type",
+      "absent": true
+    },
+    {
+      "file": "header-without-name.orm.yaml",
+      "kind": "header",
+      "field": "name",
+      "absent": true
+    },
+    {
+      "file": "header-bad-namespace.orm.yaml",
+      "kind": "header",
+      "field": "namespace"
+    },
+    {
+      "file": "subtype-fact-without-supertype.orm.yaml",
+      "kind": "subtype_fact",
+      "field": "supertype",
+      "absent": true
+    },
+    {
+      "file": "objectification-without-object-type.orm.yaml",
+      "kind": "objectified",
+      "field": "object_type",
+      "absent": true
+    },
+    {
+      "file": "population-without-instances.orm.yaml",
+      "kind": "population",
+      "field": "instances",
+      "absent": true
+    },
+    {
+      "file": "definition-without-definition.orm.yaml",
+      "kind": "definition",
+      "field": "definition",
+      "absent": true
+    },
+    {
+      "file": "diagram-excess-property.orm.yaml",
+      "kind": "diagram",
+      "field": "colour"
+    }
+  ]
+}
