@@ -10,13 +10,14 @@ barwise/scripts/lib/architecture-section.mjs,
 +barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/lib/ci-gates.mjs,
 +barwise/scripts/check-adr-tests.mjs, +barwise/scripts/lib/test-tag-reporter.mjs,
 barwise/scripts/run-script-tests.mjs, barwise/vitest.shared.ts,
+barwise/scripts/lib/changed-class.mjs,
 barwise/turbo.json, barwise/.gitignore, barwise/package.json, package.json,
 .github/workflows/ci.yml, barwise/scripts/mutate.mjs,
 barwise/scripts/tests/, barwise/docs/adr/, barwise/docs/ARCHITECTURE.md,
 .claude/skills/spec-writer/template.adr.md
 
 In one sentence: every ADR carries an `Enforced-by:` header that accounts
-for each of its numbered decisions -- a CI gate, tests tagged with the
+for each of its decisions -- a CI gate, tests tagged with the
 decision, or `none` with an open issue; `check:architecture` checks the
 declarations against the repository, and a new `check:adr-tests` step
 checks, from the test runners' own reports, that a tagged test for each
@@ -58,7 +59,7 @@ rules misjudged, and fixes to one rule opened holes in another
 
 The runners already know the answer. Vitest and `node --test` each
 report every test they executed and its status. So a test declares the
-decision it pins by a tag in its own title, `[adr:<adr-name>#<n>]`, and
+decision it pins by a tag in its own title, `[adr:<adr-name>#<decision-id>]`, and
 the check reads the runners' reports: a decision declared as tested is
 enforced when a test carrying its tag ran and passed in CI. Skips,
 conditional suites, loop-built titles, include globs and comments that
@@ -108,12 +109,19 @@ In scope, `check:architecture` (static; runs early in CI, unguarded):
 - When an ADR under `barwise/docs/adr/` has no `Enforced-by:` header, or
   one whose value parses to zero entries, the check shall exit 1 naming
   the file (from WS3 on; WS1 allows an absent header).
-- When an ADR's `## Decision` section has a numbered decision that no
-  entry lists, or an entry lists a number the section does not have, the
-  check shall exit 1 naming the ADR and the number. Every ADR numbers its
-  decisions today (three to six each). This makes "each decision is
-  accounted for" a property the check holds, not a rule the audit must
-  remember.
+- Decisions are named by id, not by position. Each numbered item in an
+  ADR's `## Decision` section carries an id, `{#<id>}` in kebab case, at
+  the end of its first line (`1. **Ossie is a peer standard.** {#peer}`).
+  Tags, entries and the index use the id, so inserting, retiring or
+  reordering a decision moves nothing: a list position would silently
+  repoint every later tag. When a numbered item has no id, two items share
+  one, an entry lists an id the section does not have, or a decision has
+  no entry, the check shall exit 1 naming the ADR and the decision. Every
+  ADR numbers its decisions today (three to six each); none carries an id
+  yet, so ids arrive with each ADR's header in WS3, and the shape check
+  then requires at least one decision with an id. This makes "each
+  decision is accounted for" a property the check holds, not a rule the
+  audit must remember.
 - When an entry is `npm run <script>[ -- <args>] (<decisions>)`, the
   check shall exit 1 unless all of these hold:
   - `<script>` is a key of `barwise/package.json` `scripts` and is named
@@ -121,7 +129,11 @@ In scope, `check:architecture` (static; runs early in CI, unguarded):
     `adr-enforcement.mjs` (`purity`, `depcruise`, each with its reason).
     Gate scripts are named that way already; test runners (`test:*`),
     `build`, `lint` and `ci:local` are excluded by the name, with no
-    hand-kept list of umbrellas to fall behind.
+    hand-kept list of umbrellas to fall behind. The two gates that check
+    other gates are excluded by name, because each would vouch for any
+    decision: `check:adr-tests` may not be declared at all, and
+    `check:architecture` only by `package-graph-authority`, whose
+    decisions it implements (`META_GATES` in `adr-enforcement.mjs`).
   - Some step occurrence in `.github/workflows/ci.yml` has a `run:` value
     exactly equal to `npm run <script>`, or `npm run <script> -- <args>`.
     String equality, after trimming: a step written any other way (flags,
@@ -150,15 +162,12 @@ In scope, `check:architecture` (static; runs early in CI, unguarded):
   `fault-matrix` and `scripts/tests/ci-conditions.test.mjs` see no
   change. (`ci:local` running `continue-on-error` steps as blocking is
   barwise-4vj, separate.)
-- When an entry is `tests (<decisions>)`, the check shall exit 1 unless,
-  for each listed decision `<n>`, some tracked file matched by the test
-  suites' discovery contains the literal tag `[adr:<this-adr>#<n>]`. This
-  is a presence check only, cheap and run on every PR, docs-only ones
-  included; `check:adr-tests` below holds the real evidence.
-- When any tracked test file contains a tag `[adr:<name>#<n>]` naming an
-  ADR that does not exist, or a decision that ADR does not number, the
-  check shall exit 1: a tag that outlives its decision is the same drift
-  in the other direction.
+- A `tests (<decisions>)` entry is not checked by `check:architecture`.
+  Whether a tagged test exists, and whether a tag names a real decision,
+  is answered from the runners' reports by `check:adr-tests`, which sees
+  only tests that executed. A scan of source text would need to know
+  which files the suites discover, the prediction this design removes,
+  and would count a tag quoted in a test fixture.
 - When an entry is `none (<issue-id>: <decisions>)`, the check shall exit
   1 unless the issue exists in `.beads/issues.jsonl`, read with
   `parseTracker()` from `scripts/lib/beads-merge.mjs`, and is not closed.
@@ -167,7 +176,10 @@ In scope, `check:architecture` (static; runs early in CI, unguarded):
   enforcer replaces the `none` entry, and the gap issue closes afterwards
   in a tracker-only PR, as `check:tracker-closes` requires.
 - When an input the check needs (`ci.yml`, `barwise/package.json`, the
-  tracker) cannot be read, it shall exit 2. Inputs are read under
+  tracker) cannot be read, it shall exit 2. Across all passes the exit is
+  1 if there is any finding, else 2 if there is any refusal, else 0, and
+  the output lists both, so a refusal never hides a finding and never
+  uses the finding code (`docs/adr/gate-refusal-contract.md`). Inputs are read under
   `--root`, and only when an entry needs them. The enforcement pass runs
   after the graph and ADR-shape passes in its own `try`, so a refusal
   there never hides their findings.
@@ -176,10 +188,242 @@ In scope, `check:adr-tests` (new; runs in CI after the test steps):
 
 - When CI's test steps have run, `check:adr-tests` shall read the reports
   they wrote and, for each `tests (<decisions>)` entry, exit 1 unless a
-  test whose own title carries `[adr:<adr>#<n>]` has status passed for
-  each listed `<n>`. A tagged test that was skipped, marked todo, or did
+  test whose own title carries `[adr:<adr>#<id>]` has status passed for
+  each listed id. A tagged test that was skipped, marked todo, or did
   not run does not count; a failed one has already failed its suite's
-  step.
+  step. A suite node (a `describe`) is not a test: vitest's report lists
+  only tests, and the `node --test` reporter records each event's
+  `details.type` and keeps only `test`, because node emits `test:pass`
+  for suites too and a tag on a `describe` would otherwise pass with no
+  test run.
+- When a reported test carries a tag naming an ADR that does not exist,
+  or an id that ADR does not have, the check shall exit 1: a tag that
+  outlives its decision is the same drift in the other direction.
+  Fixture strings that contain tag text are never reported, so they need
+  no exclusion.
+- Exit precedence is the same as `check:architecture`'s: 1 if any
+  finding, else 2 if any refusal, else 0.
+- When an expected report is missing, the check shall exit 2. The
+  expected set is derived, not listed: one vitest report per package
+  whose `package.json` defines `test:coverage`; one per file in
+  `scripts/tests/expected-counts.json`, the manifest
+  `run-script-tests.mjs` already keeps; and one for `test:trial`. A suite
+  that silently produced no report cannot read as a pass.
+- Reports are written by the runners:
+  - vitest: ``barwiseVitestConfig()`` in ``barwise/vitest.shared.ts`` adds
+    the built-in ``json`` reporter beside ``default``, writing
+    ``test-results/vitest.json`` in the package. ``turbo.json`` adds
+    ``test-results/**`` to ``test:coverage``'s ``outputs``, so a turbo cache
+    hit restores the report rather than leaving none. A restored report
+    is only as fresh as turbo's hash, and CI keeps ``barwise/.turbo``
+    between runs (``actions/cache``), while ``test:coverage``'s ``inputs`` are
+    only ``src/**`` and ``tests/**``: a change to ``vitest.config.ts``,
+    ``package.json`` or ``barwise/vitest.shared.ts`` would replay an old
+    report, and an old coverage result with it, which is a latent bug
+    today. WS2 sets the inputs to `$TURBO_DEFAULT# Executable ADRs: each ADR declares what enforces it, and CI checks the declaration
+
+Status: Draft -- no workstream implemented
+
+Created: 2026-10-28
+Last-updated: 2026-10-29
+Tracking: barwise-ym8
+Touches: barwise/scripts/check-architecture.mjs,
+barwise/scripts/lib/architecture-section.mjs,
++barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/lib/ci-gates.mjs,
++barwise/scripts/check-adr-tests.mjs, +barwise/scripts/lib/test-tag-reporter.mjs,
+barwise/scripts/run-script-tests.mjs, barwise/vitest.shared.ts,
+barwise/turbo.json, barwise/.gitignore, barwise/package.json, package.json,
+.github/workflows/ci.yml, barwise/scripts/mutate.mjs,
+barwise/scripts/tests/, barwise/docs/adr/, barwise/docs/ARCHITECTURE.md,
+.claude/skills/spec-writer/template.adr.md
+
+In one sentence: every ADR carries an `Enforced-by:` header that accounts
+for each of its decisions -- a CI gate, tests tagged with the
+decision, or `none` with an open issue; `check:architecture` checks the
+declarations against the repository, and a new `check:adr-tests` step
+checks, from the test runners' own reports, that a tagged test for each
+declared decision ran and passed in CI.
+
+## Principle
+
+Explicit over implicit, and findings close by mechanism
+(`docs/adr/findings-close-by-mechanism.md`). Almost every ADR already
+names its enforcer, but only in Consequences prose, which no tool reads.
+So the claim "this decision is enforced by `npm run purity`" survives
+the gate being renamed, deleted, or dropped from `ci.yml`, and the ADR
+goes on describing a system that no longer exists. That is the silent
+decay the ADR convention was meant to end, moved one level down: the
+decision text is checked (`check:architecture` validates each ADR's
+shape and every reference to it), and the link from decision to enforcer
+is not.
+
+The idea comes from the Aver language, which makes decisions a parse
+node its tooling can index rather than prose it cannot see
+(`aver context --decisions-only`). Aver's records list the components a
+decision impacts, and, as far as its published decisions document shows,
+nothing checks those names against the code. This spec takes Aver's half
+-- the decision is data the tooling reads -- and adds the half it lacks:
+the enforcer named in that data is verified to exist and run.
+
+## Ask the runner, not the text (resolved: yes)
+
+The design turns on one choice: where the evidence that an enforcer runs
+comes from. For a CI gate, the evidence is `ci.yml`, which is small,
+declarative and already parsed by `scripts/lib/ci-gates.mjs`. For tests
+and hooks, an earlier version of this spec read the source text and
+predicted what would run: which files a vitest include matches, whether
+a test is skipped by a modifier on it or on an enclosing suite, which
+title a selector names, whether a husky line can fail its hook. Twelve
+review rounds each found new ways to write a test or hook that those
+rules misjudged, and fixes to one rule opened holes in another
+(Alternatives considered, first entry).
+
+The runners already know the answer. Vitest and `node --test` each
+report every test they executed and its status. So a test declares the
+decision it pins by a tag in its own title, `[adr:<adr-name>#<decision-id>]`, and
+the check reads the runners' reports: a decision declared as tested is
+enforced when a test carrying its tag ran and passed in CI. Skips,
+conditional suites, loop-built titles, include globs and comments that
+look like tests stop mattering, because they never reach a report as a
+passed test. Hooks are declared the same way: a tagged test that runs
+the hook, or asserts the one wiring that hook depends on, is the
+evidence, not a grammar for hooks.
+
+## What does "executable" buy, and what does it not? (resolved: existence and execution, not discrimination)
+
+For a CI gate the check proves the gate exists and runs in CI; for a
+tested decision it proves a tagged test ran and passed. Neither proves
+the enforcer would fail on a violation of the decision. In root
+`CLAUDE.md`'s terms, a gate that runs is the shadow; a gate that goes
+red when the decision is broken is the property. This spec ratchets on
+what can be checked cheaply on every PR, and puts the property in
+workstream 5, an on-demand probe in the shape of `npm run fault-matrix`.
+Gating CI on the shadow alone is safe because it is not used as evidence
+that an ADR is respected; it only stops an ADR claiming an enforcer that
+is gone. The index (WS4) keeps to that: it labels its list `declared`.
+
+Two preconditions sit under even the shadow. A red check blocks a merge
+only if `main` requires the `ci` check, which is unsettled (barwise-raw;
+`docs/adr/merge-delegation.md` says so). And most gates are guarded by
+`docs_only != 'true'`, while `scripts/lib/changed-class.mjs` counts every
+`.md` file and everything under `.beads/` as docs-only, so a process
+decision a docs-only change can break is not enforced, on that change, by
+a guarded gate. The index's section header states both once; WS3's audit
+files a `none` issue for any decision whose only enforcer skips the
+changes that could violate it.
+
+## Does every unguarded decision get an issue? (resolved: yes)
+
+Resolved by the owner on 2026-10-28: a decision that is unenforceable
+as written is filed for follow-up, not marked exempt. The follow-up
+issue asks for one of three outcomes: build an enforcer; restate the
+decision so a check can see it (often by naming the artifact a violation
+would leave); or, if neither is possible, retire it from the ADR into
+prose guidance, where it no longer claims the force of a decision. Any of
+the three removes the `none` entry, and the issue then closes in the
+order Scope gives.
+
+## Scope
+
+In scope, `check:architecture` (static; runs early in CI, unguarded):
+
+- When an ADR under `barwise/docs/adr/` has no `Enforced-by:` header, or
+  one whose value parses to zero entries, the check shall exit 1 naming
+  the file (from WS3 on; WS1 allows an absent header).
+- Decisions are named by id, not by position. Each numbered item in an
+  ADR's `## Decision` section carries an id, `{#<id>}` in kebab case, at
+  the end of its first line (`1. **Ossie is a peer standard.** {#peer}`).
+  Tags, entries and the index use the id, so inserting, retiring or
+  reordering a decision moves nothing: a list position would silently
+  repoint every later tag. When a numbered item has no id, two items share
+  one, an entry lists an id the section does not have, or a decision has
+  no entry, the check shall exit 1 naming the ADR and the decision. Every
+  ADR numbers its decisions today (three to six each); none carries an id
+  yet, so ids arrive with each ADR's header in WS3, and the shape check
+  then requires at least one decision with an id. This makes "each
+  decision is accounted for" a property the check holds, not a rule the
+  audit must remember.
+- When an entry is `npm run <script>[ -- <args>] (<decisions>)`, the
+  check shall exit 1 unless all of these hold:
+  - `<script>` is a key of `barwise/package.json` `scripts` and is named
+    `check:*` or `audit:*`, or is on the exception list in
+    `adr-enforcement.mjs` (`purity`, `depcruise`, each with its reason).
+    Gate scripts are named that way already; test runners (`test:*`),
+    `build`, `lint` and `ci:local` are excluded by the name, with no
+    hand-kept list of umbrellas to fall behind. The two gates that check
+    other gates are excluded by name, because each would vouch for any
+    decision: `check:adr-tests` may not be declared at all, and
+    `check:architecture` only by `package-graph-authority`, whose
+    decisions it implements (`META_GATES` in `adr-enforcement.mjs`).
+  - Some step occurrence in `.github/workflows/ci.yml` has a `run:` value
+    exactly equal to `npm run <script>`, or `npm run <script> -- <args>`.
+    String equality, after trimming: a step written any other way (flags,
+    a quoted value, a trailing comment, a shell operator) does not match,
+    and the fix is to write the gate's step canonically. This replaces a
+    tokenizer the earlier design needed and repeatedly got wrong. The
+    arguments are part of the match because they can be what makes a
+    step a gate: `audit:specs` fails CI only under `-- --check`.
+  - That occurrence runs in `barwise` (its `working-directory:`, else its
+    job's `defaults.run.working-directory`), is not
+    `continue-on-error: true` at step or job level, and has an `if:`
+    (step and job combined) that `shouldRun()` in `ci-gates.mjs`
+    understands and that runs the step on a code change: with
+    `docsOnly: false`, `run` is true for `optimizer: true` or
+    `optimizer: false`. An inverted or contradictory guard is understood
+    and never runs, so it does not count.
+    If the only occurrences with the exact `run:` value have an `if:`
+    `shouldRun()` does not understand, or a `continue-on-error` that is an
+    expression, the check exits 2 for that entry: it cannot tell. Nothing
+    about any other step affects the entry.
+- WS1 extends `ci-gates.mjs` with `ciStepOccurrences()`: every step, not
+  deduplicated, with its raw `run:` value, its combined `condition`, its
+  `continueOnError` and its working directory, tracking jobs (today's
+  `ciSteps()` reads every line after the first `steps:` as one job).
+  `ciSteps()` keeps its shape and is derived from it, so `ci:local`,
+  `fault-matrix` and `scripts/tests/ci-conditions.test.mjs` see no
+  change. (`ci:local` running `continue-on-error` steps as blocking is
+  barwise-4vj, separate.)
+- A `tests (<decisions>)` entry is not checked by `check:architecture`.
+  Whether a tagged test exists, and whether a tag names a real decision,
+  is answered from the runners' reports by `check:adr-tests`, which sees
+  only tests that executed. A scan of source text would need to know
+  which files the suites discover, the prediction this design removes,
+  and would count a tag quoted in a test fixture.
+- When an entry is `none (<issue-id>: <decisions>)`, the check shall exit
+  1 unless the issue exists in `.beads/issues.jsonl`, read with
+  `parseTracker()` from `scripts/lib/beads-merge.mjs`, and is not closed.
+  Each `none` names a gap issue, never an umbrella that can close for
+  unrelated reasons. The order that keeps CI green: the PR that builds an
+  enforcer replaces the `none` entry, and the gap issue closes afterwards
+  in a tracker-only PR, as `check:tracker-closes` requires.
+- When an input the check needs (`ci.yml`, `barwise/package.json`, the
+  tracker) cannot be read, it shall exit 2. Across all passes the exit is
+  1 if there is any finding, else 2 if there is any refusal, else 0, and
+  the output lists both, so a refusal never hides a finding and never
+  uses the finding code (`docs/adr/gate-refusal-contract.md`). Inputs are read under
+  `--root`, and only when an entry needs them. The enforcement pass runs
+  after the graph and ADR-shape passes in its own `try`, so a refusal
+  there never hides their findings.
+
+In scope, `check:adr-tests` (new; runs in CI after the test steps):
+
+- When CI's test steps have run, `check:adr-tests` shall read the reports
+  they wrote and, for each `tests (<decisions>)` entry, exit 1 unless a
+  test whose own title carries `[adr:<adr>#<id>]` has status passed for
+  each listed id. A tagged test that was skipped, marked todo, or did
+  not run does not count; a failed one has already failed its suite's
+  step. A suite node (a `describe`) is not a test: vitest's report lists
+  only tests, and the `node --test` reporter records each event's
+  `details.type` and keeps only `test`, because node emits `test:pass`
+  for suites too and a tag on a `describe` would otherwise pass with no
+  test run.
+- When a reported test carries a tag naming an ADR that does not exist,
+  or an id that ADR does not have, the check shall exit 1: a tag that
+  outlives its decision is the same drift in the other direction.
+  Fixture strings that contain tag text are never reported, so they need
+  no exclusion.
+- Exit precedence is the same as `check:architecture`'s: 1 if any
+  finding, else 2 if any refusal, else 0.
 - When an expected report is missing, the check shall exit 2. The
   expected set is derived, not listed: one vitest report per package
   whose `package.json` defines `test:coverage`; one per file in
@@ -190,8 +434,9 @@ In scope, `check:adr-tests` (new; runs in CI after the test steps):
   - vitest: `barwiseVitestConfig()` in `barwise/vitest.shared.ts` adds
     the built-in `json` reporter beside `default`, writing
     `test-results/vitest.json` in the package. `turbo.json` adds
-    `test-results/**` to `test:coverage`'s `outputs`, so a turbo cache
-    hit restores the report rather than leaving none.
+    (every tracked file in
+    the package) plus `$TURBO_ROOT$/barwise/vitest.shared.ts`, after
+    confirming turbo 2.11 supports both.
   - `node --test`: a small reporter, `scripts/lib/test-tag-reporter.mjs`,
     writes one JSON line per finished test (`name`, `file`, and whether
     it passed, skipped or was todo). `run-script-tests.mjs` passes it as
@@ -201,8 +446,12 @@ In scope, `check:adr-tests` (new; runs in CI after the test steps):
   - Report directories are gitignored.
 - The step is `- run: npm run check:adr-tests`, after `test:coverage` in
   `ci.yml`, with the same `docs_only` guard as the test steps it reads.
-  On a docs-only PR the tests do not run, and the static presence check
-  above still holds the declaration.
+  On a docs-only PR the tests do not run, so an ADR's `tests` entry would
+  go unchecked if the ADR changed alone. WS2 therefore changes
+  `scripts/lib/changed-class.mjs` so that a change under
+  `barwise/docs/adr/` is not docs-only: ADR headers are now inputs to
+  gates, and an ADR change runs the full CI. ADRs change rarely, so the
+  cost is small.
 
 Out of scope:
 
@@ -254,10 +503,10 @@ What this shows:
   are local tools, not CI enforcers, and `dup` runs only with
   `continue-on-error`.
 - Every `test:coverage` and `test:scripts` citation becomes
-  `tests (<n>)`, with tags added to the tests that pin the decision. That
+  `tests (<id>)`, with tags added to the tests that pin the decision. That
   is new work in WS3: today no test carries a tag.
 - The two hook-held decisions (credential-handling's pre-commit scan,
-  python-from-the-lockfile's PreToolUse guard) become `tests (<n>)` on a
+  python-from-the-lockfile's PreToolUse guard) become `tests (<id>)` on a
   tagged test that runs the hook. `scripts/tests/python-uv-guard.test.mjs`
   already exercises the guard, and `scripts/tests/beads-merge.test.mjs`
   already runs the real husky hooks, so the pattern exists. Where no such
@@ -277,20 +526,23 @@ barwise/docs/adr/<concern>.md
   Scope: architecture
   Date: 2026-10-24
   Tracking: ...
-  Enforced-by: npm run purity (1, 2, 4), tests (3), none (barwise-k3x: 5)
+  Enforced-by: npm run purity (no-io, no-clock), tests (pure-ids),
+  none (barwise-k3x: same-output)
 
 tests anywhere a suite discovers them
-  test("refuses Date.now() in core [adr:determinism-in-core#3]", ...)
+  test("refuses Date.now() in core [adr:determinism-in-core#pure-ids]", ...)
 
 barwise/scripts/lib/adr-enforcement.mjs       (new)
   parseEnforcedBy(text)  -> { entries, problems }; never throws
   splitEntries(value)    -- comma split outside parentheses
   GATE_EXCEPTIONS        -- purity, depcruise, each with its reason
-  TAG                    -- /\[adr:([a-z0-9-]+)#(\d+)\]/
+  TAG                    -- /\[adr:([a-z0-9-]+)#([a-z0-9-]+)\]/
+  META_GATES             -- check:adr-tests (never), check:architecture
+                            (package-graph-authority only)
 
 barwise/scripts/check-architecture.mjs        (existing; one new pass)
-  declarations: header shape, decision coverage, npm wiring, tag
-  presence, stale tags, none issues
+  declarations: header shape, decision ids and coverage, npm wiring,
+  none issues
        uses ciStepOccurrences(), shouldRun()  from scripts/lib/ci-gates.mjs
        uses parseTracker()                    from scripts/lib/beads-merge.mjs
 
@@ -298,21 +550,22 @@ barwise/scripts/check-adr-tests.mjs           (new; CI step after tests)
   reads  packages/<pkg>/test-results/vitest.json   (vitest json reporter)
          test-results/script-tests/<file>.jsonl    (test-tag-reporter)
          test-results/trial.jsonl                  (test-tag-reporter)
-  exit 0 / 1 a declared decision has no passing tagged test / 2 a report
-  is missing or unreadable
+  exit 1 a declared decision has no passing tagged test, or a tag is
+  stale / else 2 a report is missing or unreadable / else 0
 
 barwise/scripts/lib/architecture-section.mjs  (renderSection; pure, ADR text only)
-  - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity (1, 2, 4); tests (3); gap: barwise-k3x (5)
+  - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity (no-io, no-clock), tests (pure-ids); gap: barwise-k3x (same-output)
 ```
 
 Entry grammar. `Enforced-by:` is the last field of the header block and
 runs to the blank line that ends it. Entries are separated by commas
-outside parentheses, so the decision list `(1, 2, 4)` stays one entry.
+outside parentheses, so the decision list `(no-io, no-clock)` stays one
+entry.
 A newline is read as a space; every entry must match its form exactly,
 so a dropped comma leaves a token over and is a finding. An `<issue-id>`
 is `barwise-` then `[a-z0-9]+(\.[a-z0-9]+)*` (`beads-crud create
 --parent` mints `barwise-920.k3x`). `<decisions>` is one or more decision
-numbers, comma-separated.
+ids, comma-separated.
 
 ```
 npm run <script> (<decisions>)
@@ -349,7 +602,7 @@ with its decisions, then `; gap: <issue-id> (<decisions>)` for each
   tell a gate the ADR relies on from one it mentions in passing
   (`ci:local`, named in seven ADRs, enforces none of them).
 - **Map ADRs to enforcers only from the enforcer side.** Tags do this for
-  tests, and the header still lists `tests (<n>)` because an ADR with no
+  tests, and the header still lists `tests (<id>)` because an ADR with no
   enforcer needs somewhere to say so, and "which decisions are
   unguarded" is the question this spec most needs to answer.
 
@@ -364,10 +617,11 @@ Add `scripts/lib/adr-enforcement.mjs`, `ciStepOccurrences()` in
 ADR with no header is not yet a finding, so this lands green before any
 ADR changes. Tests in `scripts/tests/gates.test.mjs` beside the existing
 `check-architecture` cases cover each entry kind's pass and fail, decision
-coverage, a non-canonical step (fail), `if: false` (refuse), an inverted
-guard (fail), job-level `continue-on-error` (fail), a stale tag (fail), a
-closed issue (fail) and the exit-2 refusals, asserting exit codes
-directly; and `ciStepOccurrences()` cases in
+ids (missing, duplicate, unknown, uncovered), `npm run check:adr-tests`
+declared (fail), a non-canonical step (fail), `if: false` (refuse), an inverted
+guard (fail), job-level `continue-on-error` (fail), a closed issue (fail), the
+exit-2 refusals, and a finding with a refusal together (exit 1, both
+listed), asserting exit codes directly; and `ciStepOccurrences()` cases in
 `scripts/tests/ci-conditions.test.mjs`. WS1 updates
 `scripts/tests/expected-counts.json` (`npm run test:scripts -- --write`).
 
@@ -376,20 +630,24 @@ directly; and `ciStepOccurrences()` cases in
 Add the vitest `json` reporter in `vitest.shared.ts`, `test-results/**`
 to `turbo.json`'s `test:coverage` outputs, `scripts/lib/test-tag-reporter.mjs`
 wired into `run-script-tests.mjs` and the `test:trial` script, the
-gitignore entries, `scripts/check-adr-tests.mjs`, its npm script and
+gitignore entries, the `test:coverage` inputs fix in `turbo.json`, the
+`changed-class.mjs` change for ADRs (with its cases in
+`scripts/tests/`), `scripts/check-adr-tests.mjs`, its npm script and
 generated root forwarder, and its `ci.yml` step. Before building, ground
 the vitest 5.0.1 json report's shape (the field holding a test's own
 title and its status values) and the Node 26 test-runner event fields
 the reporter reads; this spec has not run either. Tests feed
 `check-adr-tests.mjs` fixture reports, including a missing package
-report (refuse), a skipped tagged test (does not count) and a tag in a
-`describe` title only (does not count: the tag must be in the test's own
-title).
+report (refuse), a skipped tagged test (does not count), a tag in a
+`describe` title only (does not count, in both report formats), a stale
+tag (fail), and a finding with a refusal together (exit 1). The
+reporter has its own test: a `describe` carrying a tag around a skipped
+test writes no passed test.
 
 ### 3. Audit and backfill the ADRs, then require the header
 
-For each ADR, read every numbered decision and its Consequences, and give
-each decision an entry: a gate, `tests` with the tags added to the tests
+For each ADR, give every numbered decision an id, read it and its
+Consequences, and give each decision an entry: a gate, `tests` with the tags added to the tests
 that pin it, or `none` on its own follow-up issue. Hook-held decisions get
 a tagged test that runs the hook, or a `none` issue to write one. Where
 the real enforcer has no form here (another workflow such as
@@ -400,12 +658,15 @@ several PRs, a few ADRs each, while an absent header is still allowed.
 The first WS3 PR also changes `architectureRepo()` in `gates.test.mjs`,
 which copies every real ADR into its fixture: it rewrites each copied
 ADR's `Enforced-by:` to one synthetic `none (barwise-fx1: <every
-decision number the ADR has>)` and writes a one-line tracker holding that
+decision id the ADR has>)` and writes a one-line tracker holding that
 open issue, so graph and shape cases stay independent of the live
 tracker and `ci.yml`. If WS4 has landed, it regenerates the section after
 the rewrite, as `stageAdr()` already does. The last WS3 PR makes an
-absent header a finding and updates `template.adr.md`, with the field
-last in the header block.
+absent header a finding and updates `template.adr.md`: its Decision
+section becomes a numbered example with an id, and the field sits last
+in the header block. The same PR gives `ADR_OK`, the synthetic ADR in
+`gates.test.mjs` that `stageAdr()` stages, a numbered decision with an
+id and a matching header, so the shape tests keep passing.
 
 ### 4. Show enforcement in the generated index
 
@@ -458,10 +719,16 @@ where the redesign of 2026-10-29 changed its basis.
   a wrapped `Enforced-by:` short and drop later entries silently. So the
   field must be last, `parseEnforcedBy()` reads it to the blank line, and
   any `Word: ` line in that span is a finding.
-- A local `npm run check:adr-tests` can read reports from an earlier run.
-  `ci:local` runs in a fresh worktree and CI on a fresh runner, so the
-  gate itself never does; the turbo cache restores vitest reports only
-  for unchanged inputs, which is the same result a re-run would give.
+- A local `npm run check:adr-tests` can read reports from an earlier run,
+  or from a concurrent one: a report path is fixed per package, unlike
+  the run-scoped coverage directory (`BARWISE_COVERAGE_DIR` in
+  `vitest.shared.ts`), because turbo restores declared outputs by fixed
+  path. `ci:local` runs in its own fresh worktree, so a test run in the
+  main checkout (the pre-commit hook, an editor) writes different files,
+  and CI runs once per runner. The residual case is two runs in one
+  checkout at once, which only a person running checks by hand meets.
+  With the inputs fix in WS2, a turbo-restored report is the result a
+  re-run would give.
 - Tags are text in titles, so a tag can be added to a test that does not
   pin its decision. That is the shadow again; review and WS5 are the
   answer, not this check.
