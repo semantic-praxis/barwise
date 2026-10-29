@@ -1047,22 +1047,37 @@ function referenceModePkType(
 
 /**
  * The value type an entity's reference mode names, and the binary that
- * ties them: the first binary in which the entity plays a value type whose
- * `toSnake` name is the entity's `reference_mode`. The mapper types the
- * key column from it, and `renameInModel` asks it which reference modes a
- * value-type rename must follow, so the two cannot disagree.
+ * ties them: the first of `referenceModeCandidates`. The mapper types the
+ * key column from it for an entity with no preferred identifying binary
+ * (an entity that has one is keyed from that binary instead).
  */
-export function referenceModeKey(
+function referenceModeKey(
   ot: ObjectType,
   model: OrmModel,
 ): { readonly valueType: ValueType; readonly factType: FactType; } | undefined {
-  if (ot.kind !== "entity") return undefined;
+  return referenceModeCandidates(ot, model)[0];
+}
+
+/**
+ * Every binary in which an entity plays a value type whose `toSnake` name is
+ * the entity's `reference_mode`, in fact type order; the mapper keys from the
+ * first. `renameInModel` asks it which reference modes a value-type rename
+ * must follow, and refuses a rename that changes the first or adds one, so
+ * the rename and the mapper read one rule. Like the mapper's use of it, this
+ * says nothing about an entity keyed from a preferred identifying binary.
+ */
+export function referenceModeCandidates(
+  ot: ObjectType,
+  model: OrmModel,
+): readonly { readonly valueType: ValueType; readonly factType: FactType; }[] {
+  if (ot.kind !== "entity") return [];
+  const found: { valueType: ValueType; factType: FactType; }[] = [];
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
     const vp = findValuePlayer(ft, ot, model);
-    if (vp && toSnake(vp.name) === ot.referenceMode) return { valueType: vp, factType: ft };
+    if (vp && toSnake(vp.name) === ot.referenceMode) found.push({ valueType: vp, factType: ft });
   }
-  return undefined;
+  return found;
 }
 
 /** A column's SQL type, whether it was declared or a fallback, and which fallback. */

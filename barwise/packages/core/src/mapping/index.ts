@@ -17,7 +17,6 @@ export {
 } from "./dialectCapabilities.js";
 export {
   objectificationGivesKey,
-  referenceModeKey,
   RelationalMapper,
   type RelationalMapperOptions,
 } from "./RelationalMapper.js";

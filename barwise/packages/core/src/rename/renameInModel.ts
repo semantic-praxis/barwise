@@ -13,7 +13,7 @@
 
 import { stringify } from "yaml";
 import { toSnake } from "../mapping/columnNames.js";
-import { referenceModeKey } from "../mapping/RelationalMapper.js";
+import { referenceModeCandidates } from "../mapping/RelationalMapper.js";
 import type { FactType } from "../model/FactType.js";
 import { localName } from "../model/name.js";
 import type { ObjectType } from "../model/ObjectType.js";
@@ -64,7 +64,7 @@ export function renameInModel(model: OrmModel, target: RenameTarget, to: string)
     definitionTermFree: (old) => !holdsName(model, old, plan.elementId),
   });
   const renamed = readBack(doc);
-  refuseKeyShift(model, renamed, plan);
+  if (plan.kind === "objectType") refuseKeyShift(model, renamed);
   return { model: renamed, ids: new Map(), changes };
 }
 
@@ -181,18 +181,29 @@ export function renameDefinition(
   const definitions = doc.model.definitions ?? [];
   const definition = definitions.find((d) => d.term === from);
   if (!definition) return;
-  if (!termFree(from)) {
-    changes.push(
-      `Left the definition of "${from}"${where}: another element is also named "${from}".`,
-    );
-  } else if (definitions.some((d) => d.term === to)) {
-    changes.push(
-      `Left the definition of "${from}"${where}: a definition of "${to}" already exists.`,
-    );
+  const left = definitionLeftBecause(definitions, from, to, termFree);
+  if (left) {
+    changes.push(`Left the definition of "${from}"${where}: ${left}`);
   } else {
     definition.term = to;
     changes.push(`Renamed the definition of "${from}" to "${to}"${where}.`);
   }
+}
+
+/**
+ * Why the definition of `from` is left as it is, or `undefined` when it is
+ * renamed: the one decision both the model and the project paths make, so
+ * the project can decide before opening a domain.
+ */
+export function definitionLeftBecause(
+  definitions: readonly { readonly term: string; }[],
+  from: string,
+  to: string,
+  termFree: (oldName: string) => boolean,
+): string | undefined {
+  if (!termFree(from)) return `another element is also named "${from}".`;
+  if (definitions.some((d) => d.term === to)) return `a definition of "${to}" already exists.`;
+  return undefined;
 }
 
 /** Read an edited document back into a model, as a lenient load would. */
@@ -218,15 +229,6 @@ export function holdsName(model: OrmModel, name: string, exceptId: string): bool
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------
-
-/** Whether an entity and a value type are the two players of a binary. */
-function playsInBinary(model: OrmModel, entityId: string, valueTypeId: string): boolean {
-  return model.factTypes.some((ft) =>
-    ft.arity === 2
-    && ft.roles.some((r) => r.playerId === entityId)
-    && ft.roles.some((r) => r.playerId === valueTypeId)
-  );
-}
 
 function planRoleRename(
   model: OrmModel,
@@ -333,8 +335,8 @@ function takenError(
 
 /**
  * The reference modes that name a renamed value type: each entity whose
- * key the mapper types from it (`referenceModeKey`, the mapper's own rule)
- * gets the new name's `toSnake` form, because a rename that left the
+ * reference-mode key the mapper takes from it (the first of
+ * `referenceModeCandidates`, the mapper's own rule) gets the new name's `toSnake` form, because a rename that left the
  * string would silently untype the key column. An entity that merely holds
  * the same string is left alone, because the mapper never tied the two.
  */
@@ -351,12 +353,14 @@ function renameReferenceModes(
   const to = toSnake(plan.to);
   if (from === to) return [];
   const keyed = new Set(
-    model.objectTypes.filter((ot) => referenceModeKey(ot, model)?.valueType.id === valueType.id)
+    model.objectTypes.filter((ot) =>
+      referenceModeCandidates(ot, model)[0]?.valueType.id === valueType.id
+    )
       .map((ot) => ot.id),
   );
   const changed: string[] = [];
   for (const ot of doc.model.object_types ?? []) {
-    if (!keyed.has(ot.id) || ot.reference_mode !== from) continue;
+    if (!keyed.has(ot.id)) continue;
     ot.reference_mode = to;
     changed.push(ot.id);
     changes.push(`Changed the reference mode of "${ot.name}" from "${from}" to "${to}"${where}.`);
@@ -365,50 +369,42 @@ function renameReferenceModes(
 }
 
 /**
- * Refuse a rename that changes which value type keys an entity. The
- * reference-mode rewrite keeps a renamed key value type's entities keyed
- * by it; this catches the rest, such as a value type renamed into the
- * `toSnake` form an entity's reference mode already names, which would
- * give the mapper a second candidate and make the key column's type depend
- * on fact type order.
+ * Refuse a rename that changes how the mapper keys an entity from its
+ * reference mode (`referenceModeCandidates`): a different first candidate,
+ * which changes the key column's type, or more candidates than before,
+ * which makes that type depend on fact type order. The reference-mode
+ * rewrite keeps a renamed key value type's entities keyed by it; this
+ * catches the rest, judged on the entity's reference mode after the rename,
+ * so the answer does not depend on the order of the fact types. An
+ * ambiguity the model already had is not the rename's, and is not refused.
+ * The check is conservative for an entity keyed from a preferred
+ * identifying binary, which the mapper keys from that binary instead.
  */
-export function refuseKeyShift(
-  before: OrmModel,
-  after: OrmModel,
-  plan: RenamePlan,
-  where = "",
-): void {
-  const renamedValue =
-    plan.kind === "objectType" && before.getObjectType(plan.elementId)?.kind === "value"
-      ? plan.elementId
-      : undefined;
+export function refuseKeyShift(before: OrmModel, after: OrmModel, where = ""): void {
   for (const ot of before.objectTypes) {
-    if (
-      renamedValue !== undefined && ot.kind === "entity" && ot.referenceMode === toSnake(plan.to)
-    ) {
-      // The first binary wins in the mapper, so a renamed value type that
-      // now also matches an entity keyed by another one changes nothing
-      // today and becomes the key if the fact types are reordered.
-      const key = referenceModeKey(ot, after)?.valueType;
-      if (key && key.id !== renamedValue && playsInBinary(after, ot.id, renamedValue)) {
-        throw new RenameError(
-          `${where}"${plan.to}" would be a second value type matching the reference mode "${ot.referenceMode}" `
-            + `of entity "${ot.name}", which is keyed by value type "${key.name}".`,
-        );
-      }
-    }
-    const was = referenceModeKey(ot, before)?.valueType;
-    const now = referenceModeKey(after.getObjectType(ot.id) ?? ot, after)?.valueType;
-    if (was?.id === now?.id) continue;
-    const describe = (
+    if (ot.kind !== "entity") continue;
+    const was = referenceModeCandidates(ot, before);
+    const now = referenceModeCandidates(after.getObjectType(ot.id) ?? ot, after);
+    const first = (c: typeof was) => c[0]?.valueType;
+    const name = (
       v: { name: string; } | undefined,
     ) => (v ? `value type "${v.name}"` : "no value type");
-    throw new RenameError(
-      `${where}The rename would change the key of entity "${ot.name}" from ${describe(was)} to `
-        + `${describe(now)}, because its reference mode "${
-          ot.kind === "entity" ? ot.referenceMode : ""
-        }" `
-        + `would name a different value type.`,
-    );
+    if (first(was)?.id !== first(now)?.id) {
+      throw new RenameError(
+        `${where}The rename would change the key of entity "${ot.name}" from ${
+          name(first(was))
+        } to `
+          + `${name(first(now))}.`,
+      );
+    }
+    if (now.length > was.length) {
+      const mode = (after.getObjectType(ot.id) as { referenceMode?: string; } | undefined)
+        ?.referenceMode;
+      throw new RenameError(
+        `${where}The rename would give entity "${ot.name}" ${now.length} value types matching its `
+          + `reference mode "${mode}" (${now.map((c) => c.valueType.name).join(", ")}), so its key `
+          + `would depend on the order of the fact types.`,
+      );
+    }
   }
 }

@@ -145,8 +145,69 @@ describe("renameInModel", () => {
     // Customer plays Email in a binary and is keyed by CustomerId.
     expect(() => renameInModel(shop(), { kind: "objectType", name: "Email" }, "Customer_Id"))
       .toThrow(
-        /second value type matching the reference mode "customer_id" of entity "Customer"/,
+        /give entity "Customer" 2 value types matching its reference mode "customer_id"/,
       );
+  });
+
+  it.each([false, true])(
+    "refuses a rename whose rewritten reference mode gains a second match, either fact type order (swapped: %s)",
+    (swapped) => {
+      // Customer is keyed by CustomerId; it also plays Client_Key. Renaming
+      // CustomerId to ClientKey rewrites the mode to client_key, which both
+      // value types then match, whichever binary comes first.
+      const binaries = [
+        '    - id: ft-cid\n      name: Customer has CustomerId\n      roles:\n        - { id: r1, player: c, role_name: has }\n        - { id: r2, player: cid, role_name: of }\n      readings: ["{0} has {1}"]\n',
+        '    - id: ft-ck\n      name: Customer has Client_Key\n      roles:\n        - { id: r3, player: c, role_name: has }\n        - { id: r4, player: ck, role_name: of }\n      readings: ["{0} has {1}"]\n',
+      ];
+      const yaml = `orm_version: "3.0"
+model:
+  name: M
+  object_types:
+    - { id: c, name: Customer, kind: entity, reference_mode: customer_id }
+    - { id: cid, name: CustomerId, kind: value, data_type: { name: integer } }
+    - { id: ck, name: Client_Key, kind: value, data_type: { name: text } }
+  fact_types:
+${(swapped ? [...binaries].reverse() : binaries).join("")}`;
+      expect(() =>
+        renameInModel(
+          serializer.deserialize(yaml),
+          { kind: "objectType", name: "CustomerId" },
+          "ClientKey",
+        )
+      ).toThrow(RenameError);
+    },
+  );
+
+  it("refuses a model whose current-version form would not load, in migrate's words", () => {
+    // A 2.0 file can hold two constraints sharing an id, which 3.0 refuses.
+    const twice = serializer.deserialize(`orm_version: "2.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-c, name: Customer, kind: entity, reference_mode: nr }
+    - { id: ot-nr, name: CustomerNr, kind: value }
+    - { id: ot-n, name: Name, kind: value }
+  fact_types:
+    - id: ft-nr
+      name: Customer has CustomerNr
+      roles:
+        - { id: r-c, player: ot-c, role_name: has }
+        - { id: r-nr, player: ot-nr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: u-nr, type: internal_uniqueness, roles: [r-nr], is_preferred: true }
+    - id: ft-n
+      name: Customer has Name
+      roles:
+        - { id: r-cn, player: ot-c, role_name: has }
+        - { id: r-n, player: ot-n, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { id: u-nr, type: internal_uniqueness, roles: [r-cn], is_preferred: true }
+`);
+    expect(() => renameInModel(twice, { kind: "objectType", name: "Name" }, "FullName")).toThrow(
+      /^Not renamed: its 3\.0 form would not load: Constraint ids are held by more than one constraint/,
+    );
   });
 
   it("refuses a rename that gives an entity a key it did not have", () => {

@@ -19,6 +19,7 @@ import { toMappingConfig } from "../serialization/projectAssembly.js";
 import type { OrmYamlDocument } from "../serialization/yaml/document.js";
 import {
   applyToDocument,
+  definitionLeftBecause,
   planRename,
   readBack,
   refuseKeyShift,
@@ -127,8 +128,7 @@ export function renameInProject(
       if (err instanceof RenameError) throw new RenameError(where + err.message);
       throw err;
     }
-    const ctxPlan = renamed.find((r) => r.context === ctx)?.plan ?? plan;
-    refuseKeyShift(models.get(ctx)!, model, ctxPlan, where);
+    if (plan.kind === "objectType") refuseKeyShift(models.get(ctx)!, model, where);
     renamedModels.set(ctx, model);
   }
 
@@ -199,17 +199,9 @@ function renameDefinitionsAnywhere(
     const where = ` in domain "${ctx}"`;
     // Decided on the model first, so a domain whose definition is left is
     // not opened, read back or listed in `files`.
-    if (!termFree(plan.from)) {
-      changes.push(
-        `Left the definition of "${plan.from}"${where}: another element of the project is also named "${plan.from}".`,
-      );
-    } else if (model.definitions.some((d) => d.term === plan.to)) {
-      changes.push(
-        `Left the definition of "${plan.from}"${where}: a definition of "${plan.to}" already exists.`,
-      );
-    } else {
-      renameDefinition(docOf(ctx), plan.from, plan.to, changes, termFree, where);
-    }
+    const left = definitionLeftBecause(model.definitions, plan.from, plan.to, termFree);
+    if (left) changes.push(`Left the definition of "${plan.from}"${where}: ${left}`);
+    else renameDefinition(docOf(ctx), plan.from, plan.to, changes, termFree, where);
   }
 }
 

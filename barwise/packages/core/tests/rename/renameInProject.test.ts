@@ -11,6 +11,7 @@ import { RenameError } from "../../src/rename/renameInModel.js";
 import { renameInProject } from "../../src/rename/renameInProject.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
+import { ProjectSerializer } from "../../src/serialization/ProjectSerializer.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 
@@ -261,6 +262,66 @@ describe("renameInProject", () => {
     expect(renamed.getDomain("billing")!.model!.getObjectType(shadow.id)).toMatchObject({
       referenceMode: "cust_no",
     });
+  });
+
+  it("refuses a key shift raised in another domain, naming it", () => {
+    // In billing, Invoice plays a value type the owner's rename turns into
+    // a second match for Invoice's reference mode.
+    const project = splitShop();
+    const billing = project.getDomain("billing")!.model!;
+    const id = billing.addObjectType({ name: "CustomerId", kind: "value", sourceContext: "crm" });
+    const invoice = billing.getObjectTypeByName("Invoice")!;
+    const nr = billing.addObjectType({ name: "Invoice_Nr", kind: "value" });
+    billing.addFactType({
+      name: "Invoice has Invoice_Nr",
+      roles: [{ name: "has", playerId: invoice.id }, { name: "of", playerId: nr.id }],
+      readings: ["{0} has {1}"],
+    });
+    billing.addFactType({
+      name: "Invoice has CustomerId",
+      roles: [{ name: "has", playerId: invoice.id }, { name: "of", playerId: id.id }],
+      readings: ["{0} has {1}"],
+    });
+    expect(() =>
+      renameInProject(project, "crm", { kind: "objectType", name: "CustomerId" }, "InvoiceNr")
+    )
+      .toThrow(/^In domain "billing": The rename would give entity "Invoice" 2 value types/);
+  });
+
+  it("says that data products were not checked", () => {
+    const project = splitShop();
+    project.addProduct({
+      path: "products/report.orm.yaml",
+      context: "report",
+      dependsOnDomains: ["crm"],
+      dependsOnMappings: [],
+    });
+    const { changes } = renameInProject(
+      project,
+      "crm",
+      { kind: "objectType", name: "Customer" },
+      "Client",
+    );
+    expect(changes).toContain(
+      "Data products are not loaded as models, so any reference to the old name in a product file was not checked.",
+    );
+  });
+
+  it("keeps every manifest field: the rebuilt project serializes as the input did", () => {
+    const project = splitShop();
+    project.iriBase = "https://data.acme.com/shop/";
+    project.addProduct({
+      path: "products/report.orm.yaml",
+      context: "report",
+      dependsOnDomains: ["crm"],
+      dependsOnMappings: [],
+    });
+    const { project: renamed } = renameInProject(project, "crm", {
+      kind: "objectType",
+      name: "Customer",
+    }, "Client");
+    const manifest = new ProjectSerializer();
+    expect(manifest.serialize(renamed)).toBe(manifest.serialize(project));
   });
 
   it("refuses a project with a domain that is not loaded", () => {
