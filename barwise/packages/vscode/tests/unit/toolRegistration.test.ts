@@ -31,6 +31,7 @@
  */
 
 import { ELEMENT_MATCHINGS } from "@barwise/core/diff";
+import { DIFF_RENAME_KINDS } from "@barwise/mcp";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -178,6 +179,24 @@ describe("barwise_diff_models passes matching through", () => {
       (t) => t.name === "barwise_diff_models",
     ) as { inputSchema?: { properties?: { matching?: { enum?: string[]; }; }; }; } | undefined;
     expect(tool?.inputSchema?.properties?.matching?.enum).toEqual([...ELEMENT_MATCHINGS]);
+  });
+
+  it("declares the renames shape the MCP tool takes", () => {
+    // The manifest's JSON schema is a second copy of the MCP tool's zod
+    // schema; this keeps the two agreeing (iri-identity 6a).
+    const tool = (manifest.contributes?.languageModelTools ?? []).find(
+      (t) => t.name === "barwise_diff_models",
+    ) as { inputSchema?: { properties?: Record<string, unknown>; }; } | undefined;
+    const renames = tool?.inputSchema?.properties?.renames as {
+      items: {
+        properties: Record<string, { enum?: string[]; minLength?: number; }>;
+        required: string[];
+      };
+    };
+    expect(renames.items.properties.kind!.enum).toEqual([...DIFF_RENAME_KINDS]);
+    expect(renames.items.properties.from!.minLength).toBe(1);
+    expect(renames.items.properties.to!.minLength).toBe(1);
+    expect(renames.items.required.sort()).toEqual(["from", "kind", "to"]);
   });
 });
 

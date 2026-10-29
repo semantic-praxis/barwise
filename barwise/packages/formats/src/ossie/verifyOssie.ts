@@ -45,7 +45,10 @@ export function verifyOssie(
   const losses: string[] = [];
   const specs: ConstraintSpec[] = [];
   const verbalizer = new ConstraintVerbalizer();
-  for (const delta of diffModels(source, aligned).deltas) {
+  // No rename recognition: `align` already gives the read-back model the
+  // source's ids, so a pair the content pass would add is a real loss to
+  // report, not a rename.
+  for (const delta of diffModels(source, aligned, { recognizeRenames: false }).deltas) {
     if (delta.kind === "unchanged") continue;
     const key = sourceKey(delta);
     const covered = key === undefined ? undefined : covers.get(key);

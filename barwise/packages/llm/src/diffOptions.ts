@@ -9,4 +9,10 @@ import type { DiffOptions } from "@barwise/core/diff";
  * `TranscriptProcessor` diffs an alternative framing, extracted beside the
  * primary rather than from it, against that primary.
  */
-export const UNRELATED_IDS_DIFF = { matching: "content" } as const satisfies DiffOptions;
+export const UNRELATED_IDS_DIFF = {
+  matching: "content",
+  // A recognized rename would pair two samples' differently named elements
+  // and move the agreement metric; samples disagreeing on a name is what
+  // the metric measures (iri-identity 6a).
+  recognizeRenames: false,
+} as const satisfies DiffOptions;

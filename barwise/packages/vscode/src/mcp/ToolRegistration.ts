@@ -23,6 +23,7 @@ import {
 } from "@barwise/llm";
 import type { LlmClient } from "@barwise/llm";
 import {
+  type DiffRenameInput,
   executeDescribeDomain,
   executeDiagram,
   executeDiff,
@@ -78,6 +79,7 @@ interface DiffInput {
   base?: string;
   incoming: string;
   matching?: ElementMatching;
+  renames?: DiffRenameInput[];
 }
 
 interface DiagramInput {
@@ -420,7 +422,7 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
   register<DiffInput>(
     context,
     "barwise_diff_models",
-    (i) => toToolResult(executeDiff(resolveSourceParam(i.base), i.incoming, i.matching)),
+    (i) => toToolResult(executeDiff(resolveSourceParam(i.base), i.incoming, i.matching, i.renames)),
     "Comparing Barwise models...",
   );
   register<DiagramInput>(

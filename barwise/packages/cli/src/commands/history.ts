@@ -9,7 +9,7 @@
  */
 
 import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
-import { deltaLabel, diffModels } from "@barwise/core/diff";
+import { deltaLabel, diffModels, type ModelDiffResult, pairingNote } from "@barwise/core/diff";
 import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
@@ -160,18 +160,24 @@ function renderWorkingTree(absolute: string, head: OrmModel | null): string | un
   }
   const diff = diffModels(head, onDisk);
   if (!diff.hasChanges) return undefined;
-  return `working tree (uncommitted)\n${renderDeltas(head, onDisk)}`;
+  return `working tree (uncommitted)\n${renderDeltas(head, onDisk, diff)}`;
 }
 
 /** Semantic deltas from `older` to `newer`, indented one level. */
-function renderDeltas(older: OrmModel, newer: OrmModel): string {
-  const deltas = diffModels(older, newer).deltas.filter((d) => d.kind !== "unchanged");
+function renderDeltas(
+  older: OrmModel,
+  newer: OrmModel,
+  diff: ModelDiffResult = diffModels(older, newer),
+): string {
+  const deltas = diff.deltas.filter((d) => d.kind !== "unchanged");
   if (deltas.length === 0) {
     return "  no conceptual changes\n";
   }
   let out = "";
   for (const delta of deltas) {
     out += `  ${delta.kind.toUpperCase().padEnd(8)} ${deltaLabel(delta)}\n`;
+    const note = pairingNote(delta);
+    if (note) out += `    ${note}\n`;
     for (const change of delta.changeDescriptions) {
       out += `    ${change}\n`;
     }

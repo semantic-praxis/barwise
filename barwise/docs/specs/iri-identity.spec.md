@@ -7,7 +7,8 @@ project and mapping files, `iri_base`, `namespace`, `namespaceOf` and two
 project rules); decision 17 taken; WS5 implemented 2026-10-29 (5a: `renameInModel`,
 `renameInProject`; 5b: `barwise rename`, MCP `rename_element`, the VS Code
 tool); rename recognition moved to WS6; WS6 grounded 2026-10-29 (6a to 6f,
-decision 15 amended, decisions 18 to 20), not started; WS7 to come
+decision 15 amended, decisions 18 to 20); 6a in progress (diff recognizes renames,
+merge refuses content and rename pairings, implemented 2026-10-29); WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-29
@@ -991,6 +992,27 @@ PR and may be released.
   `TranscriptProcessor.ts:234`) and for `formats/src/ossie/verifyOssie.ts:48`.
   The CLI's `diff` takes `--rename <kind>:<old>=<new>` and `diff_models`
   the same list.
+
+**6a implementation notes** (rename recognition, 2026-10-29). Where the
+build differs from the bullet above:
+
+- Merge also refuses any diff built with `recognizeRenames` on, whether or
+  not it found a pair: `ModelDiffResult` records the option, and
+  `mergeModels` reads it. The bullet refused only the pairs themselves, so
+  a merge path that forgot `MERGE_DIFF_OPTIONS` would have failed only on
+  an input holding two elements of one shape. One consequence is public:
+  `mergeModels(a, b, diffModels(a, b), ...)` always throws, because the two
+  defaults disagree on purpose. `MERGE_DIFF_OPTIONS` is exported from
+  `@barwise/core/diff` for every merge path.
+- A recognized or declared pair is reported as a possible rename, as
+  decision 8 says, and rated no lower than the removal it stands in for:
+  two different elements of one shape pair the same way, and a lower
+  rating would tell a reader less than the unpaired diff did.
+- `pairedBy` is read through one allowlist of the evidence (`id`,
+  `name`), so a pairing added later is shown and refused until someone
+  decides otherwise.
+- The constraint keys moved to a leaf module, `diff/constraintKey.ts`,
+  because `elementDiff.ts` imports `identity.ts`.
 
 **6b to 6f, the 4.0 series: no release between them**, as
 `orm-format-3`'s 4a/4b, because a build that writes 4.0 must already

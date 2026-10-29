@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { stringify } from "yaml";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeAndValidate } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate } from "../../src/diff/ModelMerge.js";
 import { DuplicateIdError, type IdKeyedKind, OrmModel } from "../../src/model/OrmModel.js";
 import {
   DeserializationError,
@@ -190,10 +190,14 @@ describe("merge gives an objectification a fresh id when its own is held", () =>
     const incoming = base();
     incoming.removeObjectifiedFactType("of1");
     incoming.addObjectifiedFactType({ id: "of1", factTypeId: "f2", objectTypeId: "d" });
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const policy = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
 
-    const result = mergeAndValidate(existing, incoming, deltas, policy);
+    const result = mergeAndValidate(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, policy);
     expect(result.diagnostics).toEqual([]);
     const ofts = result.model!.objectifiedFactTypes;
     expect(ofts.map((o) => o.factTypeId).sort()).toEqual(["f1", "f2"]);

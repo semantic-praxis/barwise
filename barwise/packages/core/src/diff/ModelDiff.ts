@@ -15,7 +15,7 @@ import type { Population } from "../model/Population.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { classifyBreakingLevel } from "./breakingLevel.js";
 import { describeChange } from "./changeDescription.js";
-import type { DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
+import type { BreakingLevel, DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
 import {
   constraintPairing,
   diffDefinition,
@@ -31,8 +31,13 @@ import {
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
-import type { ElementMatching } from "./identity.js";
-export { ELEMENT_MATCHINGS, type ElementMatching } from "./identity.js";
+import type { DeclaredRename, ElementMatching, PairedBy } from "./identity.js";
+export {
+  type DeclaredRename,
+  ELEMENT_MATCHINGS,
+  type ElementMatching,
+  type PairedBy,
+} from "./identity.js";
 
 /** Options for {@link diffModels}. */
 export interface DiffOptions {
@@ -41,6 +46,19 @@ export interface DiffOptions {
    * {@link ElementMatching}. Default `"id-first"`.
    */
   readonly matching?: ElementMatching;
+  /**
+   * Pair the object types and fact types that ids and names left by what
+   * they say, reporting each such pair as a rename (`pairedBy:
+   * "recognized"`; iri-identity decision 8). Default on. Every merge path
+   * turns it off: `mergeModels` refuses a recognized pair, because two
+   * different elements can share a shape.
+   */
+  readonly recognizeRenames?: boolean;
+  /**
+   * Renames the caller states, for an edit that renamed an element and
+   * changed it at once (`pairedBy: "declared"`). Merge refuses these too.
+   */
+  readonly renames?: readonly DeclaredRename[];
 }
 
 export {
@@ -50,6 +68,8 @@ export {
   elementLabel,
   elementName,
   type ElementType,
+  pairingNote,
+  renamePairing,
 } from "./deltas.js";
 export type {
   BreakingLevel,
@@ -65,9 +85,30 @@ export type {
   ObjectifiedFactTypeDelta,
   ObjectTypeDelta,
   PopulationDelta,
+  RenamePairing,
   SubtypeFactDelta,
   SynonymCandidate,
 } from "./deltas.js";
+
+/**
+ * The breaking level of a paired object type or fact type. A pair the
+ * content pass recognized, or the caller declared, is rated no lower than
+ * the removal it stands in for: it may be two different elements of one
+ * shape (decision 8), and a reader who acts on a lower rating has been told
+ * less than the unpaired diff would have told them.
+ */
+function pairedLevel(
+  pairedBy: PairedBy,
+  kind: DeltaKind,
+  changes: Parameters<typeof classifyBreakingLevel>[1],
+  type: "object_type" | "fact_type",
+): BreakingLevel {
+  const own = classifyBreakingLevel(kind, changes, type);
+  if (pairedBy === "id" || pairedBy === "name") return own;
+  const removal = classifyBreakingLevel("removed", [], type);
+  const rank: Record<BreakingLevel, number> = { safe: 0, caution: 1, breaking: 2 };
+  return rank[removal] > rank[own] ? removal : own;
+}
 
 /**
  * Diff two ORM models, pairing elements by id and then by name.
@@ -82,14 +123,20 @@ export function diffModels(
   incoming: OrmModel,
   options: DiffOptions = {},
 ): ModelDiffResult {
-  const pairing = constraintPairing(existing, incoming, options.matching ?? "id-first");
+  const matching = options.matching ?? "id-first";
+  const recognizeRenames = options.recognizeRenames ?? true;
+  const pairing = constraintPairing(existing, incoming, matching, {
+    recognizeRenames,
+    renames: options.renames ?? [],
+  });
   const { identity } = pairing;
   const deltas: ModelDelta[] = [];
 
   // --- Object types ---
   // Paired by id first, then name (`DiffIdentity`). A paired delta is
   // labelled with the existing model's name; a rename is its `name` change.
-  for (const { existing: ot, incoming: match } of identity.objectTypes) {
+  for (const pair of identity.objectTypes) {
+    const { existing: ot, incoming: match } = pair;
     if (!ot) {
       deltas.push({
         kind: "added",
@@ -122,16 +169,18 @@ export function diffModels(
         name,
         existing: ot,
         incoming: match,
+        pairedBy: pair.pairedBy!,
         changes,
         changeDescriptions: changes.map(describeChange),
-        breakingLevel: classifyBreakingLevel(kind, changes, "object_type"),
+        breakingLevel: pairedLevel(pair.pairedBy!, kind, changes, "object_type"),
       });
     }
   }
 
   // --- Fact types ---
   const holders = { existing: roleHolders(existing), incoming: roleHolders(incoming) };
-  for (const { existing: ft, incoming: match } of identity.factTypes) {
+  for (const pair of identity.factTypes) {
+    const { existing: ft, incoming: match } = pair;
     if (!ft) {
       deltas.push({
         kind: "added",
@@ -164,9 +213,10 @@ export function diffModels(
         name,
         existing: ft,
         incoming: match,
+        pairedBy: pair.pairedBy!,
         changes,
         changeDescriptions: changes.map(describeChange),
-        breakingLevel: classifyBreakingLevel(kind, changes, "fact_type"),
+        breakingLevel: pairedLevel(pair.pairedBy!, kind, changes, "fact_type"),
       });
     }
   }
@@ -599,7 +649,7 @@ export function diffModels(
 
   const hasChanges = deltas.some((d) => d.kind !== "unchanged");
   const synonymCandidates = detectSynonymCandidates(deltas, existing, incoming, identity);
-  return { deltas, hasChanges, synonymCandidates };
+  return { deltas, hasChanges, synonymCandidates, matching, recognizeRenames };
 }
 
 /** "Male is a Person" for a subtype fact, read against its own model first. */

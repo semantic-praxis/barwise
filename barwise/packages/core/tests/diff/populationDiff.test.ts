@@ -23,7 +23,7 @@
 
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 /**
@@ -244,9 +244,14 @@ describe("a population merges from its delta rather than being carried", () => {
   it("takes the incoming tuples when the delta is accepted", () => {
     const existing = bothKinds("E1", "E2");
     const incoming = bothKinds("E9", "E8");
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
-    const merged = mergeModels(existing, incoming, deltas, all(deltas.length));
+    const merged = mergeModels(
+      existing,
+      incoming,
+      { deltas, matching: "id-first", recognizeRenames: false },
+      all(deltas.length),
+    );
     const significant = merged.populations.find((p) => !p.sample)!;
     expect(significant.instances[0]!.roleValues["r-worker"]).toBe("E9");
   });
@@ -254,18 +259,27 @@ describe("a population merges from its delta rather than being carried", () => {
   it("keeps the existing tuples when the delta is rejected", () => {
     const existing = bothKinds("E1", "E2");
     const incoming = bothKinds("E9", "E8");
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
-    const merged = mergeModels(existing, incoming, deltas, new Set());
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, new Set());
     const significant = merged.populations.find((p) => !p.sample)!;
     expect(significant.instances[0]!.roleValues["r-worker"]).toBe("E1");
   });
 
   it("keeps both kinds through a merge that changes neither", () => {
     const model = bothKinds("E1", "E2");
-    const { deltas } = diffModels(model, bothKinds("E1", "E2"));
+    const { deltas } = diffModels(model, bothKinds("E1", "E2"), MERGE_DIFF_OPTIONS);
 
-    const merged = mergeModels(model, bothKinds("E1", "E2"), deltas, new Set());
+    const merged = mergeModels(
+      model,
+      bothKinds("E1", "E2"),
+      { deltas, matching: "id-first", recognizeRenames: false },
+      new Set(),
+    );
     expect(merged.populations).toHaveLength(2);
     expect(merged.populations.filter((p) => p.sample)).toHaveLength(1);
   });
