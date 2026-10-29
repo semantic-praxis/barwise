@@ -225,6 +225,49 @@ describe("a minted constraint name", () => {
         roleId2: "ak0",
         ringType: "asymmetric",
       }, "ak"],
+      ["a uniqueness naming one role twice", {
+        type: "internal_uniqueness",
+        id: "x",
+        roleIds: ["ad0", "ad0"],
+      }, "ad"],
+      ["a frequency naming one role twice", {
+        type: "frequency",
+        id: "x",
+        roleIds: ["ad0", "ad0"],
+        min: 2,
+        max: 2,
+      }, "ad"],
+      ["a value comparison of one role with itself", {
+        type: "value_comparison",
+        id: "x",
+        roleId1: "ak0",
+        roleId2: "ak0",
+        operator: "<",
+      }, "ak"],
+      ["an exclusion naming one role twice", {
+        type: "exclusion",
+        id: "x",
+        roleIds: ["ad0", "ad0"],
+      }, undefined],
+      ["an external uniqueness naming one role twice", {
+        type: "external_uniqueness",
+        id: "x",
+        roleIds: ["an1", "an1"],
+      }, undefined],
+      ["a join equality over operands rooted at different types", {
+        type: "join_equality",
+        id: "x",
+        operands: [
+          { path: { root: "aP", steps: [{ entry: "ad0", exit: "ad1" }] }, projection: [1] },
+          { path: { root: "aC", steps: [] }, projection: [0] },
+        ],
+      }, undefined],
+      ["a join subset over operands rooted at different types", {
+        type: "join_subset",
+        id: "x",
+        subset: { path: { root: "aP", steps: [{ entry: "ad0", exit: "ad1" }] }, projection: [1] },
+        superset: { path: { root: "aC", steps: [] }, projection: [0] },
+      }, undefined],
       ["a join ring projecting three columns", {
         type: "join_ring",
         id: "x",
@@ -309,6 +352,14 @@ describe("a minted constraint name", () => {
     expect(mintedName(element, m)).toBeUndefined();
     expect(mintedKey(element, m)).toBeUndefined();
     expect(mint(element, m)).toBeUndefined();
+  });
+
+  it("is minted for a subset or equality naming one role on both sides, a tautology it states", () => {
+    const m = people("a");
+    const c = { type: "subset", id: "x", subsetRoleIds: ["ad0"], supersetRoleIds: ["ad0"] };
+    expect(isMintable(asConstraint(m, c as Constraint), m)).toBe(true);
+    const e = { type: "equality", id: "y", roleIds1: ["ad0"], roleIds2: ["ad0"] };
+    expect(isMintable(asConstraint(m, e as Constraint), m)).toBe(true);
   });
 
   it("changes its key when a fact type or role it names is renamed", () => {

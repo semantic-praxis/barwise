@@ -1038,8 +1038,9 @@ build differs from the bullet above:
 - Resolving is not enough for the guard: a disjunctive mandatory over roles
   of two players resolves, and its sentence names the first role's player
   as the one every instance plays. What each sentence assumes of its
-  constraint's shape -- one shared player, two distinct ring roles, a unary
-  fact type under a cardinality, a join path that chains, operands that
+  constraint's shape -- one shared player, each role named once in a list,
+  a unary fact type under a cardinality, an exclusion over two roles or
+  more, a join path that chains, operands that share a root type and
   project the same column types, something to constrain -- is stated once,
   in `verbalization/constraints/assumptions.ts`, beside the sentences, and
   the guard refuses a constraint whose shape breaks it. The first version
@@ -1049,9 +1050,9 @@ build differs from the bullet above:
   every `constraint/*` rule as one the guard refuses (with a model that
   rule reports and the guard refuses) or one whose report the sentence
   still states, and fails on an unclassified rule. What it cannot see is a
-  phrasing guess no rule reports: a ring naming one role twice was one
-  (barwise-ik3), and such a shape is caught only by reading the phrasing
-  paths.
+  phrasing guess no rule reports: a role list naming one role twice
+  (barwise-ik3) and join operands rooted at different types (barwise-sq2)
+  were two, and such a shape is caught only by reading the phrasing paths.
 - The key holds what the sentence prints: a role is its position, its name
   and its fact type's name, readings and players; an internal constraint
   also carries its host fact type, which its sentence names even where no

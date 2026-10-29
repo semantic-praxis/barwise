@@ -95,6 +95,11 @@ const REFUSED: Record<string, Refused> = {
   "constraint/subtype-constraint-unknown-subtype-fact": {
     constraint: { type: "exclusion", id: "x", subtypeFactIds: ["sM", "nope"] } as Constraint,
   },
+  "constraint/exclusion-too-few-roles": {
+    // "No Person both works for ..." forbids what a one-role exclusion
+    // does not constrain at all.
+    constraint: { type: "exclusion", id: "x", roleIds: ["w0"] } as Constraint,
+  },
   "constraint/frequency-empty-roles": {
     constraint: { type: "frequency", id: "x", roleIds: [], min: 1, max: 2 } as Constraint,
     host: "w",
@@ -221,7 +226,6 @@ const STATED: Record<string, string> = {
   "constraint/disjunctive-mandatory-too-few-roles":
     "one role reads as a plain mandatory, which is what is stored",
   "constraint/equality-arity-mismatch": "each side's roles are printed as stored",
-  "constraint/exclusion-too-few-roles": "one role is printed as stored; none is refused as empty",
   "constraint/subtype-constraint-too-few-subtypes": "the subtypes named are printed as stored",
   "constraint/exclusive-or-too-few-roles":
     "one role is printed as stored; none is refused as empty",
@@ -230,7 +234,8 @@ const STATED: Record<string, string> = {
   "constraint/frequency-invalid-min": "the sentence prints the bound as stored",
   "constraint/frequency-max-less-than-min": "the sentence prints both bounds as stored",
   "constraint/join-ring-single-fact-type": "a warning that a plain ring says the same thing",
-  "constraint/spanning-all-roles": "advice about the fact type, not a defect in the constraint",
+  "constraint/spanning-all-roles":
+    "advice about the fact type; a list that spans by naming one role twice is refused for that",
   "constraint/subset-arity-mismatch": "each side's roles are printed as stored",
 };
 

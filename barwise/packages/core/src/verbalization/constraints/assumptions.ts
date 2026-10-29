@@ -19,6 +19,7 @@
 import {
   type Constraint,
   isOverSubtypes,
+  joinOperandsOf,
   roleIdsOf,
   subtypeFactIdsOf,
 } from "../../model/Constraint.js";
@@ -31,6 +32,10 @@ import type { JoinOperand } from "../../model/RolePath.js";
  * first.
  */
 export function sentenceHolds(c: Constraint, model: ConstraintModel): boolean {
+  // A list naming one role twice reads as two of its player ("each
+  // combination of Person and Person"), or as a ring over positions the
+  // constraint does not name. Nothing reports it (barwise-ik3).
+  if (!roleListsDistinct(c)) return false;
   switch (c.type) {
     case "join_subset":
       return comparable([c.subset, c.superset], model);
@@ -47,7 +52,7 @@ export function sentenceHolds(c: Constraint, model: ConstraintModel): boolean {
     }
     case "ring":
       // The sentence names the first role's player for both ends.
-      return c.roleId1 !== c.roleId2 && sharesPlayer([c.roleId1, c.roleId2], model);
+      return sharesPlayer([c.roleId1, c.roleId2], model);
     case "cardinality":
       // "The '<predicate>' role is played by ..." reads a unary's predicate.
       return model.factTypesHolding([c.roleId])[0]!.arity === 1;
@@ -57,6 +62,9 @@ export function sentenceHolds(c: Constraint, model: ConstraintModel): boolean {
   if (isOverSubtypes(c)) return sharesSupertype(subtypeFactIdsOf(c), model);
   const roles = roleIdsOf(c);
   if (roles.length === 0) return c.type === "value_constraint";
+  // "No Person both works for ..." over one role forbids what an
+  // exclusion of one constrains not at all.
+  if (c.type === "exclusion" && roles.length < 2) return false;
   // These three say "each <player> ..." of one player: the verbalizer
   // takes the first role's, so roles of different players would be
   // misstated.
@@ -64,6 +72,23 @@ export function sentenceHolds(c: Constraint, model: ConstraintModel): boolean {
     return sharesPlayer(roles, model);
   }
   return true;
+}
+
+/**
+ * Each list of roles a sentence reads names each role once. Two lists
+ * (a subset's sides, an equality's) are read separately: the same role on
+ * both sides states a tautology, which is what is stored. A join path may
+ * pass through one role twice, and its operands are checked as paths.
+ */
+function roleListsDistinct(c: Constraint): boolean {
+  const lists: readonly (readonly string[])[] = c.type === "subset"
+    ? [c.subsetRoleIds, c.supersetRoleIds]
+    : c.type === "equality"
+    ? [c.roleIds1, c.roleIds2]
+    : joinOperandsOf(c).length > 0
+    ? []
+    : [roleIdsOf(c)];
+  return lists.every((ids) => new Set(ids).size === ids.length);
 }
 
 function sharesPlayer(roleIds: readonly string[], model: ConstraintModel): boolean {
@@ -78,11 +103,13 @@ function sharesSupertype(subtypeFactIds: readonly string[], model: ConstraintMod
 }
 
 /**
- * The sentences over two operands or more read the root and the column
- * types from the first operand alone, so every operand must project the
- * same number of columns of the same types.
+ * The sentences over two operands or more read the root ("For each
+ * <root>") and the column types from the first operand alone, so every
+ * operand must start at the same type and project the same number of
+ * columns of the same types.
  */
 function comparable(operands: readonly JoinOperand[], model: ConstraintModel): boolean {
+  if (new Set(operands.map((o) => o.path.root)).size !== 1) return false;
   const columns = operands.map((o) => projected(o, model));
   const first = columns[0];
   return first !== undefined
