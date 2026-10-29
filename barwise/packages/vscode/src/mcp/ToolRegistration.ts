@@ -32,6 +32,7 @@ import {
   executeLineageStatus,
   executeMerge,
   executeQueryModel,
+  executeRename,
   executeSchema,
   executeSplit,
   executeValidate,
@@ -91,6 +92,17 @@ interface ImportTranscriptInput {
 interface MergeInput {
   base?: string;
   incoming: string;
+}
+
+interface RenameInput {
+  source?: string;
+  domain?: string;
+  objectType?: string;
+  factType?: string;
+  role?: string;
+  rolePosition?: number;
+  to: string;
+  check?: boolean;
 }
 
 interface SplitModelInput {
@@ -387,6 +399,12 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
     "barwise_merge_models",
     (i) => toToolResult(executeMerge(resolveSourceParam(i.base), i.incoming)),
     "Merging Barwise models...",
+  );
+  register<RenameInput>(
+    context,
+    "barwise_rename_element",
+    (i) => toToolResult(executeRename({ ...i, source: resolveSourceParam(i.source) })),
+    (i) => (i.check ? "Previewing Barwise rename..." : "Renaming in Barwise model..."),
   );
   register<SplitModelInput>(
     context,

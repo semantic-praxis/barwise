@@ -21,7 +21,10 @@ import { dirname, resolve } from "node:path";
  * Load a `.orm-project.yaml` manifest and every file it references.
  *
  * @param options.lenient - Forwarded to each domain's deserialization;
- *   see {@link assembleProject}. Only the validate path passes it.
+ *   see {@link assembleProject}. The validate and rename paths pass it:
+ *   validate to report a broken domain, rename so a domain with a
+ *   dangling reference still renames. A write path that passes it writes
+ *   models that loaded leniently, which is what rename intends.
  * @throws {ProjectLoadError} if the manifest cannot be read or parsed.
  */
 export function loadProject(

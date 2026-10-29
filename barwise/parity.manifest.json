@@ -151,6 +151,15 @@
           "symbol": "CREATE_TABLE_PREFIX"
         }
       ]
+    },
+    {
+      "name": "staged-write",
+      "why": "the CLI's migrate and rename and the MCP server's rename_element must write files the same way (stage every file, then rename them, naming what was replaced on a part-way failure); the MCP server does not depend on the CLI, so the module is deliberately parallel and only its header may differ",
+      "ignore": "leading-docblock",
+      "members": [
+        "packages/cli/src/workspace/stagedWrite.ts",
+        "packages/mcp/src/workspace/stagedWrite.ts"
+      ]
     }
   ]
 }

@@ -553,6 +553,43 @@ base as inline YAML to get the result without a write. The CLI's
 
 ---
 
+### rename_element
+
+Rename an object type, a fact type or a role, in a model or across a
+project. Every id is kept. The element's definition, when the term is its
+alone, and the reference mode of each entity keyed by a renamed value type
+follow the rename; free text is left as written. Given a project, the
+rename also follows an owned object type into its shadows in other domains,
+every domain's definitions, and both sides of each mapping file.
+
+| Parameter      | Type    | Required | Description                                                         |
+| -------------- | ------- | -------- | ------------------------------------------------------------------- |
+| `source`       | string  | yes      | File path or inline YAML for a model, or a `.orm-project.yaml` path |
+| `domain`       | string  | no       | For a project source: the domain that holds the element             |
+| `objectType`   | string  | no       | The object type to rename                                           |
+| `factType`     | string  | no       | The fact type to rename, or the one holding the role                |
+| `role`         | string  | no       | With `factType`: the role to rename, by name                        |
+| `rolePosition` | integer | no       | With `factType`: the role to rename, by position (from 0)           |
+| `to`           | string  | yes      | The new name                                                        |
+| `check`        | boolean | no       | Write nothing; report what would change                             |
+
+Name exactly one element: `objectType`, `factType`, or `factType` with
+`role` or `rolePosition`.
+
+**Returns** JSON: for inline YAML, `yaml` (the renamed model), `changes`
+and `warnings`; for a file or project source, `written`, `writtenTo` (or
+`files` under `check`), `changes` and `warnings`; for a refusal, `error`
+and nothing written. A model that declares a `domain_context` gets a
+warning: rename a project's domain through the project so its shadows and
+mapping files follow. A project that did not load cleanly is refused.
+
+**Like `merge_models`, this is an editing tool: a file source is written
+back.** Every changed file is staged before any is replaced, and files are
+written from the model, so YAML comments in them are lost. The CLI's
+`barwise rename` writes the same way.
+
+---
+
 ### split_model
 
 Split one `.orm.yaml` model into a multi-domain project: a

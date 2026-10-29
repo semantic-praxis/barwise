@@ -109,6 +109,7 @@ describe("VS Code language-model tool registration", () => {
       "barwise_lineage_status",
       "barwise_merge_models",
       "barwise_query_model",
+      "barwise_rename_element",
       "barwise_review_model",
       "barwise_split_model",
       "barwise_validate_model",

@@ -15,6 +15,7 @@ import { registerImportModelTool } from "./importModel.js";
 import { registerLineageStatusTool } from "./lineageStatus.js";
 import { registerMergeTool } from "./merge.js";
 import { registerQueryModelTool } from "./queryModel.js";
+import { registerRenameTool } from "./rename.js";
 import { registerReviewTool } from "./review.js";
 import { registerSchemaTool } from "./schema.js";
 import { registerSplitTool } from "./split.js";
@@ -30,6 +31,7 @@ export function registerTools(server: McpServer): void {
   registerImportTool(server);
   registerImportModelTool(server);
   registerMergeTool(server);
+  registerRenameTool(server);
   registerSplitTool(server);
   registerExportModelTool(server);
   registerDescribeDomainTool(server);

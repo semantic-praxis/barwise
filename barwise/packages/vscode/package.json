@@ -488,6 +488,59 @@
         }
       },
       {
+        "name": "barwise_rename_element",
+        "displayName": "Rename Barwise Element",
+        "toolReferenceName": "barwiseRename",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(edit)",
+        "tags": [
+          "orm",
+          "rename"
+        ],
+        "modelDescription": "Rename an object type, a fact type, or a role (name the role with factType plus role or rolePosition). Every id is kept; the element's definition and the reference mode of an entity keyed by a renamed value type follow it. Given a .orm-project.yaml source and a domain, the rename also follows into shadows in other domains and both sides of mapping files. A file source is written back (writtenTo in the result) unless check is true; comments in rewritten files are lost. If no source is provided, automatically uses the .orm.yaml file open in the editor.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "File path to a .orm.yaml or .orm-project.yaml file. Omit to use the currently open .orm.yaml file."
+            },
+            "domain": {
+              "type": "string",
+              "description": "For a .orm-project.yaml source: the domain that holds the element"
+            },
+            "objectType": {
+              "type": "string",
+              "description": "The object type to rename"
+            },
+            "factType": {
+              "type": "string",
+              "description": "The fact type to rename, or the one holding the role"
+            },
+            "role": {
+              "type": "string",
+              "description": "With factType: the role to rename, by name"
+            },
+            "rolePosition": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "With factType: the role to rename, by position (0-based)"
+            },
+            "to": {
+              "type": "string",
+              "description": "The new name"
+            },
+            "check": {
+              "type": "boolean",
+              "description": "Write nothing; report what would change"
+            }
+          },
+          "required": [
+            "to"
+          ]
+        }
+      },
+      {
         "name": "barwise_split_model",
         "displayName": "Split Barwise Model into a Project",
         "toolReferenceName": "barwiseSplit",
