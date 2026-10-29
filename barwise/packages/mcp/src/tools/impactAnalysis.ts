@@ -4,9 +4,8 @@
 
 import { analyzeImpact } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { dirname, resolve } from "node:path";
 import { z } from "zod";
-import { modelFileName, modelsBeside, readManifest } from "../workspace/lineageIo.js";
+import { modelLocation, modelsBeside, readManifest } from "../workspace/lineageIo.js";
 import { type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
@@ -39,7 +38,8 @@ export function executeImpactAnalysis(
   // Locate the manifest next to the model file when the source has a path;
   // otherwise fall back to the current working directory.
   const path = sourcePath(source);
-  const dir = path ? dirname(resolve(path)) : process.cwd();
+  const location = path ? modelLocation(path) : undefined;
+  const dir = location?.dir ?? process.cwd();
 
   // With a path, only that model's exports are read. Without one there is
   // no model to read for, so every export holding the id is, and the
@@ -47,7 +47,7 @@ export function executeImpactAnalysis(
   const report = analyzeImpact(
     readManifest(dir),
     elementId,
-    path ? { sourceModel: modelFileName(path), modelsBeside: modelsBeside(dir) } : undefined,
+    location ? { sourceModel: location.sourceModel, modelsBeside: modelsBeside(dir) } : undefined,
   );
 
   return {

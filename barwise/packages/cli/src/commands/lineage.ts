@@ -6,9 +6,8 @@
 
 import { analyzeImpact, checkStaleness } from "@barwise/core/lineage";
 import type { Command } from "commander";
-import { dirname, resolve } from "node:path";
 import { loadModel } from "../workspace/io.js";
-import { modelFileName, modelsBeside, readManifest } from "../workspace/lineageIo.js";
+import { modelLocation, modelsBeside, readManifest } from "../workspace/lineageIo.js";
 
 export function registerLineageCommand(program: Command): void {
   const lineage = program
@@ -24,9 +23,9 @@ export function registerLineageCommand(program: Command): void {
     .action(async (source: string, opts: { format: string; }) => {
       try {
         const model = loadModel(source);
-        const dir = dirname(resolve(source));
+        const { dir, sourceModel } = modelLocation(source);
         const report = checkStaleness(readManifest(dir), model, {
-          sourceModel: modelFileName(source),
+          sourceModel,
           modelsBeside: modelsBeside(dir),
         });
 
@@ -126,9 +125,9 @@ export function registerLineageCommand(program: Command): void {
     .action(
       async (source: string, opts: { element: string; format: string; }) => {
         try {
-          const dir = dirname(resolve(source));
+          const { dir, sourceModel } = modelLocation(source);
           const report = analyzeImpact(readManifest(dir), opts.element, {
-            sourceModel: modelFileName(source),
+            sourceModel,
             modelsBeside: modelsBeside(dir),
           });
 
@@ -174,7 +173,7 @@ export function registerLineageCommand(program: Command): void {
     .option("--format <format>", "Output format (text or json)", "text")
     .action(async (source: string, opts: { format: string; }) => {
       try {
-        const dir = dirname(resolve(source));
+        const { dir } = modelLocation(source);
         const manifest = readManifest(dir);
 
         if (!manifest) {

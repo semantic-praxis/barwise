@@ -24,7 +24,7 @@ import { reportConstraintSpecs } from "../workspace/constraintReport.js";
 import { resolveDomainModels } from "../workspace/domainModels.js";
 import { isProjectFile, loadModel } from "../workspace/io.js";
 import {
-  modelFileName,
+  modelLocation,
   modelsBeside,
   readManifest,
   writeManifest,
@@ -104,7 +104,7 @@ export function registerExportCommand(program: Command): void {
           }
 
           // Persist lineage manifest adjacent to the source model.
-          const modelDir = dirname(resolve(source));
+          const { dir: modelDir, sourceModel } = modelLocation(source);
           const entry: ManifestExport = {
             artifact: resolve(opts.output),
             format: opts.format,
@@ -115,7 +115,6 @@ export function registerExportCommand(program: Command): void {
           // Exports written before exports named their model are claimed
           // by this one where it owns them, so this write records whose
           // they are (iri-identity 6a).
-          const sourceModel = modelFileName(source);
           const existing = readManifest(modelDir);
           const claim = existing
             && claimExports(existing, { sourceModel, modelsBeside: modelsBeside(modelDir) }, model);

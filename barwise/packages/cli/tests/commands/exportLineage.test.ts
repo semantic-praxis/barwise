@@ -292,4 +292,30 @@ describe("two models, one manifest", () => {
     const status = await json(["lineage", "status", alias]);
     expect(status.freshArtifacts).toEqual([resolve(join(dir, "a.sql"))]);
   });
+
+  it("keeps a model's lineage beside its real file when reached through a link elsewhere", async () => {
+    // The manifest follows the real file, so a link from another directory
+    // reads and writes the same lineage as the file itself.
+    const elsewhere = mkdtempSync(join(tmpdir(), "barwise-lineage-link-"));
+    try {
+      const far = join(elsewhere, "far.orm.yaml");
+      symlinkSync(a, far);
+      const exported = await runCli([
+        "export",
+        far,
+        "--format",
+        "ddl",
+        "--output",
+        join(dir, "a.sql"),
+      ]);
+      expect(exported.exitCode, exported.stderr).toBe(0);
+      expect(parseManifest(readFileSync(manifestFile(), "utf-8")).exports[0]!.sourceModel).toBe(
+        "a.orm.yaml",
+      );
+      const status = await json(["lineage", "status", far]);
+      expect(status.freshArtifacts).toEqual([resolve(join(dir, "a.sql"))]);
+    } finally {
+      rmSync(elsewhere, { recursive: true, force: true });
+    }
+  });
 });

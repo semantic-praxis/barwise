@@ -4,8 +4,7 @@
 
 import { checkStaleness, exportModels } from "@barwise/core/lineage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { dirname, resolve } from "node:path";
-import { modelFileName, modelsBeside, readManifest } from "../workspace/lineageIo.js";
+import { modelLocation, modelsBeside, readManifest } from "../workspace/lineageIo.js";
 import { resolveSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
 
@@ -37,7 +36,8 @@ export function executeLineageStatus(
   // Locate the manifest next to the model file when the source has a path;
   // otherwise fall back to the current working directory.
   const path = sourcePath(source);
-  const dir = path ? dirname(resolve(path)) : process.cwd();
+  const location = path ? modelLocation(path) : undefined;
+  const dir = location?.dir ?? process.cwd();
 
   const manifest = readManifest(dir);
 
@@ -70,7 +70,7 @@ export function executeLineageStatus(
   const report = checkStaleness(
     manifest,
     model,
-    path ? { sourceModel: modelFileName(path), modelsBeside: modelsBeside(dir) } : undefined,
+    location ? { sourceModel: location.sourceModel, modelsBeside: modelsBeside(dir) } : undefined,
   );
 
   return {

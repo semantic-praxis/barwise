@@ -1115,9 +1115,10 @@ build differs from the bullet above:
   model files beside it together (`ModelScope`) and refuses a model the
   directory does not list under that name: reached through a symlink or
   another letter case, a model matched none of its exports and reported
-  no artifacts. The CLI and MCP name the model by its real path
-  (`modelFileName`) and read the directory with `modelsBeside`, both
-  registered in `parity.manifest.json`. Inline `lineage_status` also refuses a manifest
+  no artifacts. The CLI and MCP take the manifest's directory and the
+  model's name from one real path (`modelLocation`), so a link from any
+  directory reads the real file's lineage, and read the directory with
+  `modelsBeside`; both are registered in `parity.manifest.json`. Inline `lineage_status` also refuses a manifest
   where one model's exports sit beside exports naming none.
 - An export naming a model file that no longer exists is reported by
   status as orphaned and fails it, and `impact` reads it as the renamed

@@ -44,12 +44,18 @@ export function modelsBeside(dir: string): string[] {
 }
 
 /**
- * A model's file name as its directory lists it: through any symlink, and
- * in the case the filesystem stores, so lineage matches the model's own
- * exports (`checkScope` refuses any other spelling).
+ * Where a model's lineage lives: the directory of the model's real file,
+ * which holds its manifest, and the file's name as that directory lists
+ * it. Both come from one real path -- through any symlink, in the case the
+ * filesystem stores -- because taking the directory from the link and the
+ * name from its target put the manifest beside the link under a name the
+ * link's directory does not hold (`checkScope` refuses that).
  */
-export function modelFileName(path: string): string {
-  return basename(realpathSync.native(resolve(path)));
+export function modelLocation(
+  path: string,
+): { readonly dir: string; readonly sourceModel: string; } {
+  const real = realpathSync.native(resolve(path));
+  return { dir: dirname(real), sourceModel: basename(real) };
 }
 
 /** Write the lineage manifest for a directory, creating .barwise if needed. */
