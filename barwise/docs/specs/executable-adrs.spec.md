@@ -110,7 +110,12 @@ In scope:
   unwired. Any token whose name, the part before `=`, is
   `--workspace`, `--workspaces`, `-w`, `-ws`, `--prefix` or `-C` makes
   the answer null, wherever it sits before `--`: those run another
-  package.json. Of the other flags, a token with `=` carries its own
+  package.json. So does an effective working directory other than
+  `barwise`: `ciStepOccurrences()` reports each step's `working-directory:`,
+  falling back to its job's `defaults.run.working-directory`, and a step
+  that runs anywhere else runs that directory's package.json, not
+  `barwise/package.json`. `ci.yml` sets `barwise` as the job default
+  today, and on several steps. Of the other flags, a token with `=` carries its own
   value and is skipped, and the boolean flags `--silent`, `-s`,
   `--quiet`, `-q` and `--if-present` are skipped. Any other token
   starting with `-` might take the next token as its value
@@ -138,14 +143,22 @@ In scope:
   `x` with the argument `foo` (today the name `x foo` matches nothing).
   No `ci.yml` step has either form now. No ADR relies on a workspace step
   today.
-- An entry naming an umbrella script -- `test`, `test:coverage`,
-  `test:scripts`, `test:trial`, `test:optimizer`, `build`, `lint`,
-  `ci:local` -- is a finding even when
-  it is wired. Each runs every suite or every package, so it cannot point
-  at one decision; the entry names the test file or the specific gate
-  instead. That turns WS2's "replace every umbrella citation" from
-  a prose instruction into a rule the check enforces. The list lives in
-  `adr-enforcement.mjs`.
+- An npm entry is accepted only for a script that runs exactly one node
+  gate -- its command is a single `node scripts/<file>.mjs` invocation,
+  the definition `resolveNodeGate()` in `fault-matrix.mjs` already
+  applies -- or for a script on a short list of exceptions in
+  `adr-enforcement.mjs`, each with its reason. The one exception today
+  is `depcruise`, whose rules file is the decision it enforces. Any other
+  script is an umbrella and a finding even when it is wired: `test`,
+  `test:coverage`, `test:scripts`, `test:trial`, `test:optimizer`,
+  `build`, `lint`, `ci:local`, and the suite runners `test:cli-checks`,
+  `test:mcp-checks`, `validate:examples`, `oxlint` and `check:beads`.
+  Each runs a whole suite, tool or package set, so it cannot point at one
+  decision; the entry names a test or the specific gate instead, or a
+  `none` issue to make one declarable. Defining the umbrella by what a
+  script runs, not by a hand-kept list, means a new suite-wide script is
+  refused without anyone remembering to add it. That turns WS2's
+  "replace every umbrella citation" into a rule the check enforces.
 - A step marked `continue-on-error: true`, or in a job marked so, is not
   wired: it cannot fail CI. A `continue-on-error` whose value is not the
   literal `true` or `false` (an expression such as
@@ -182,8 +195,16 @@ In scope:
   (`docs_only == 'true' && docs_only == 'false'`) is understood and
   never runs on a code change, so it is not wired. Those
   forms are `docs_only`/`optimizer` comparisons and the
-  `pull_request` event test. Most guards are `docs_only != 'true'`,
-  which skips only changes that cannot violate a code decision; the
+  `pull_request` event test. Most guards are `docs_only != 'true'`.
+  That guard does not run on a docs-only change, and `changed-class.mjs`
+  counts every `.md` file and everything under `.beads/` as docs-only:
+  `CLAUDE.md`, `REVIEW.md`, the skills and the specs included. A process
+  decision a docs-only change can break is therefore not enforced by a
+  `docs_only`-guarded step on the change that breaks it. The check cannot
+  tell which decisions those are, so it does not try: a guarded step
+  counts as wired, the index renders it with `(code changes)` beside its
+  name, and WS2's audit records a `none` issue for any decision whose
+  only enforcer skips the changes that could violate it. The
   narrower ones (`test:optimizer`, `pull_request` only) enforce on
   exactly the changes CI's classifier sends them, and an ADR whose
   enforcer is narrowly guarded says so in its Consequences. Any other
@@ -192,7 +213,10 @@ In scope:
   enforcer.
 - A refusal is scoped to the entry it affects, never to the whole check.
   An occurrence the check cannot read -- `stepScript()` refuses, the
-  `if:` is not understood, `continue-on-error` is an expression --
+  `if:` is not understood, `continue-on-error` is an expression, or the
+  `run:` value mentions `npm` in a shape the line parser does not take
+  literally (quoted, a trailing `# comment`, a shell operator such as
+  `&&`, `||`, `;` or `|`, or a multi-line `run: |` block) --
   matters only to an entry it might satisfy: one whose script it names,
   or any npm entry when `stepScript()` could not tell the script. For
   each npm entry: wired if some readable occurrence proves it; else
@@ -244,8 +268,12 @@ In scope:
   and root `CLAUDE.md` already names the pipe case: a gate's status
   read through a pipe is the pipe's. It mirrors the rule that a
   `continue-on-error` CI step is not
-  wired. Comment lines and `echo` strings therefore never match: `barwise/.husky/pre-push` names `npm run ci:local` in an echo
-  as well as on the line that runs it. Naming the husky file alone is
+  wired. Comment lines and `echo` strings therefore never match:
+  `barwise/.husky/pre-push` names `npm run ci:local` in an echo. Its
+  real invocation captures the status (`status=$?`, then an `if`/`elif`
+  that exits) and so matches neither shape; that is acceptable because
+  `ci:local` is not an enforcer, and a hook an ADR does rely on uses one
+  of the two shapes. Naming the husky file alone is
   not accepted: it would pass however the hook's body changed, which is
   the decay this spec exists to catch. Both rules are lexical; they show
   the hook is wired and invokes the script, not that the line is
@@ -258,11 +286,24 @@ In scope:
   loop-built title such as ``test(`check-secrets fails on a staged
   ${rule}`, ...)`` (`gates.test.mjs:768`) is named by its prefix,
   `check-secrets fails on a staged`, and a `test.each` / `it.each` title
-  the same way. The check exits 1 unless exactly one `test`/`it` call,
-  or one `.each` table, in the file matches, and that call is live: not
-  `.skip`, `.todo`, `.skipIf`, `.runIf` or `.fails`, not passed a
-  `skip` or `todo` option, and not inside a `describe.skip` or
-  `describe.todo`. A test that never runs cannot fail CI, the same reason
+  the same way. Where two tests share a title, the selector qualifies it
+  with its enclosing suites, `<describe title> > <test title>`. The
+  check exits 1 unless exactly one `test`/`it` call, or one `.each`
+  table, in the file matches, and that call is live. Live means no
+  modifier other than `.each` on the call or on any enclosing
+  `describe`/`suite` (so no `.skip`, `.todo`, `.only`, `.skipIf`,
+  `.runIf`, `.fails` or `.concurrent.skip`), and no `skip` or `todo`
+  option on either (node:test passes them as an options object).
+  `packages/promptlab/tests/recordedEvidencePin.test.ts:77` is a real
+  case: a `describe.skipIf` whose block a test inside it would inherit.
+  The file is read with the TypeScript compiler's parser
+  (`ts.createSourceFile`; `typescript` is already a root devDependency),
+  which reads `.mjs` as well, never with a regex: only real call
+  expressions count, so a title quoted in a comment or a fixture string
+  never matches, and enclosing suites come from the syntax tree. A title
+  that is not a string or template literal (a variable) cannot be
+  selected; such a test is declared through a `none` issue to give it a
+  literal title. A test that never runs cannot fail CI, the same reason
   a `continue-on-error` step is not wired. The selector is what makes "a
   test can be renamed and the check catches it" true at the level of one
   test.
@@ -286,12 +327,18 @@ In scope:
   declares it as a root devDependency at that version so the check and
   vitest read a glob the same way, with the options vitest uses for
   discovery: `dot: true`, and vitest's default excludes applied as a
-  second, negative match. The excludes are imported, not copied:
-  `configDefaults.exclude` from `vitest/config` (`**/node_modules/**`
-  and `**/.git/**` today), so a vitest upgrade that changes them changes
-  the check with it. The devDependency uses the range vitest
-  declares (`^4.0.7`), not an exact pin, so one install resolves both
-  to the same copy, and a drift test asserts they did. Node's `path.matchesGlob` is not used:
+  second, negative match. The check keeps those excludes as its own
+  list (`**/node_modules/**` and `**/.git/**`, vitest's
+  `configDefaults.exclude` today), because root code must not import
+  `vitest/config`: `vitest.shared.ts` records that vitest is a
+  dependency of each package and is not hoisted to the root. The copy
+  is held by a drift test in `scripts/tests/` that resolves vitest
+  through a package that declares it
+  (`createRequire("barwise/packages/core/package.json")`), imports
+  `configDefaults`, and compares, and that also asserts the root
+  `picomatch` and the one vitest resolves are the same version. The
+  devDependency uses the range vitest declares (`^4.0.7`), not an exact
+  pin. Node's `path.matchesGlob` is not used:
   `scripts/lib/review-tiers.mjs` records that it is experimental on the
   pinned Node and declines dot-segments.
   Tracked is not enough: `packages/vscode/tests/integration/` is tracked,
@@ -359,28 +406,28 @@ WS2 reads each decision to find them. This spec does not predict each
 ADR's declared state; an earlier draft did, marked most rows
 "enforced", and was wrong for most of them.
 
-| ADR                            | Enforcers named in prose today                                     | Gap phrases in its Consequences |
-| ------------------------------ | ------------------------------------------------------------------ | ------------------------------- |
-| `baselines-merge-on-write`     | `audit:specs`, `test:scripts`                                      | 2                               |
-| `connector-packages`           | `purity`, `depcruise`                                              | 4                               |
-| `constraint-coverage-policy`   | none                                                               | 0                               |
-| `credential-handling`          | `check:secrets`, gitleaks pre-commit hook                          | 2                               |
-| `determinism-in-core`          | `purity`                                                           | 0                               |
-| `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others    | 3                               |
-| `gate-refusal-contract`        | `test:scripts`; `fault-matrix` is on demand                        | 1                               |
-| `keyless-model-access`         | `test:coverage`, `depcruise`                                       | 1                               |
-| `merge-delegation`             | none; the ADR says so (barwise-zdd)                                | 1                               |
-| `metamodel-evolution-policy`   | none                                                               | 1                               |
-| `must-agree-copies`            | `check:parity`, `audit:duplication`                                | 0                               |
-| `ossie-interchange`            | `test:coverage`; decision 5 not built (barwise-wcg), 6 has no gate | 4                               |
-| `package-graph-authority`      | `check:architecture`, `depcruise`                                  | 0                               |
-| `pinned-runtimes`              | `check:parity`; `check:pins` proposed, not built (barwise-920)     | 5                               |
-| `plan-before-code`             | `check:plan-review`, `check:spec-touches`                          | 2                               |
-| `production-prompt-resolution` | `test:coverage`                                                    | 1                               |
-| `python-from-the-lockfile`     | `check:python-uv`, PreToolUse hook; `audit:skips` deferred         | 3                               |
-| `review-policy`                | `check:review-tiers`                                               | 4                               |
-| `schema-versioning`            | `test:coverage`                                                    | 2                               |
-| `surface-capability-parity`    | `test:coverage` (the two `toEqual` tool-list tests)                | 2                               |
+| ADR                            | Enforcers named in prose today                                                  | Gap phrases in its Consequences |
+| ------------------------------ | ------------------------------------------------------------------------------- | ------------------------------- |
+| `baselines-merge-on-write`     | `audit:specs`, `test:scripts`                                                   | 2                               |
+| `connector-packages`           | `purity`, `depcruise`                                                           | 4                               |
+| `constraint-coverage-policy`   | none                                                                            | 0                               |
+| `credential-handling`          | `check:secrets`, gitleaks pre-commit hook                                       | 2                               |
+| `determinism-in-core`          | `purity`                                                                        | 0                               |
+| `findings-close-by-mechanism`  | `audit:specs`, `audit:duplication`, `audit:corrections`, others                 | 3                               |
+| `gate-refusal-contract`        | `test:scripts`, `test:coverage`; `fault-matrix` is on demand                    | 1                               |
+| `keyless-model-access`         | `test:coverage`, `depcruise`                                                    | 1                               |
+| `merge-delegation`             | none; the ADR says so (barwise-zdd)                                             | 1                               |
+| `metamodel-evolution-policy`   | none                                                                            | 1                               |
+| `must-agree-copies`            | `check:parity`, `audit:duplication`                                             | 0                               |
+| `ossie-interchange`            | `test:coverage`; decision 5 not built (barwise-wcg), 6 has no gate              | 4                               |
+| `package-graph-authority`      | `check:architecture`, `depcruise`                                               | 0                               |
+| `pinned-runtimes`              | `check:parity`, `test:coverage`; `check:pins` proposed, not built (barwise-920) | 5                               |
+| `plan-before-code`             | `check:plan-review`, `check:spec-touches`                                       | 2                               |
+| `production-prompt-resolution` | `test:coverage`                                                                 | 1                               |
+| `python-from-the-lockfile`     | `check:python-uv`, PreToolUse hook; `audit:skips` deferred                      | 3                               |
+| `review-policy`                | `check:review-tiers`                                                            | 4                               |
+| `schema-versioning`            | `test:coverage`                                                                 | 2                               |
+| `surface-capability-parity`    | `test:coverage` (the two `toEqual` tool-list tests)                             | 2                               |
 
 What this shows:
 
@@ -422,9 +469,9 @@ What this shows:
   `barwise/packages/mcp/tests/serverSpawn.test.ts` for
   `surface-capability-parity`), which is both sharper and checkable.
 
-Looks affected, is not: `scripts/lib/spec-reader.mjs` `header()` already
-reads a multi-line header value from an ADR (the generated index uses it
-for `Scope:` and `Date:`), so parsing needs no new reader.
+Looks affected, is not: `scripts/lib/spec-reader.mjs` `header()` keeps
+reading `Scope:`, `Date:` and `Tracking:` as it does. `Enforced-by:` is
+the one field it does not read, for the truncation reason under Risks.
 
 ## Target architecture
 
@@ -474,7 +521,8 @@ the child gap issue WS2 opens; its real id is minted then.) An ADR with
 no `Enforced-by:` header, which WS1 still allows, renders with no
 suffix at all, as today, so WS3 can land before WS2 finishes. An ADR with no
 enforcer renders `unenforced (<issue-id>, ...)` instead.
-Each entry renders so its kind shows: `npm run x` as `x`; a husky
+Each entry renders so its kind shows: `npm run x` as `x`, with
+`(code changes)` after it when its step is guarded by `docs_only`; a husky
 entry as `x (pre-commit hook)`; a settings hook as its file name
 without extension and its event, `python-uv-guard (PreToolUse)`; a test
 file as its file name. So credential-handling renders
@@ -602,7 +650,7 @@ so `architectureRepo()` regenerates the section after the rewrite, as
 `stageAdr()` already does for the ADRs it stages.
 
 The last WS2 PR makes an absent header a finding and updates
-`template.adr.md` so a new ADR starts with the line.
+`template.adr.md` so a new ADR starts with the line, placed last in the header block.
 
 ### 3. Show enforcement in the generated index
 
@@ -684,10 +732,14 @@ None remains open.
   config is a narrow parse. It is bounded by refusing (exit 2) either key
   when it is not a string-array literal, so a config rewritten into
   another shape stops the check rather than passing it.
-- Free text inside a `none (...)` entry must not start a wrapped line
-  with `Word: `, because `header()` ends a header value at such a line.
-  The check reports the resulting unbalanced parenthesis with the hint
-  that a wrapped line may have been read as a new header field.
+- `header()` ends a value at any line starting `Word: `, so a wrapped
+  entry could be cut short silently and every entry after it dropped,
+  with no unbalanced parenthesis to show it. The check defines this
+  error out of existence: `Enforced-by:` must be the last field in the
+  header block, and `parseEnforcedBy()` reads from it to the blank line
+  that ends the block, not through `header()`. Any line in that span that
+  starts `Word: ` is a finding naming the line, so a wrap can never
+  silently shorten the value.
 - After WS2 and WS3, run `npm run check:architecture` and
   `npm run regen:architecture`, then `npm run ci:local`.
 
