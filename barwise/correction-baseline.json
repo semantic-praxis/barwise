@@ -457,6 +457,18 @@
       "caught_by": "execution",
       "note": "Running the first port of the gate over the real corpus reported 21 ambiguous CLAUDE.md references the prototype had passed; the missing repo-root step was found by that run, not by reading the spec."
     },
+    "iri-identity::4741eeada45e": {
+      "spec": "iri-identity.spec.md",
+      "excerpt": "- the verbalization cycle. ormmodel cannot call the verbalizer today: every verbalization module type-imports model/ormmodel.js, and dependency-cruiser's no-cir",
+      "caught_by": "not-a-correction",
+      "note": "WS6 grounding: a constraint found by reading .dependency-cruiser.cjs, stated as a design requirement. No earlier draft claimed OrmModel could call the verbalizer; nothing was corrected."
+    },
+    "iri-identity::a3012c87c361": {
+      "spec": "iri-identity.spec.md",
+      "excerpt": "- 6b, the model and the format. - mint at the add, with the file's stated ids reserved for the load. a reader collects every id the file states before its first",
+      "caught_by": "not-a-correction",
+      "note": "WS6 grounding: the chosen minting mechanism and the alternatives weighed against it. \"Rejected\" names design alternatives, not a wrong claim in an earlier draft."
+    },
     "join-ring-constraint::4aa634cf98aa": {
       "spec": "join-ring-constraint.spec.md",
       "excerpt": "- the precondition was settled from norma's schema, not an authored file. no file norma wrote with a join ring was at hand. norma's orm2core.xsd defines ringcon",

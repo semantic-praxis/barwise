@@ -6,7 +6,8 @@ WS3 folded into WS6; WS4 implemented 2026-10-28 with barwise-y1b (versioned
 project and mapping files, `iri_base`, `namespace`, `namespaceOf` and two
 project rules); decision 17 taken; WS5 implemented 2026-10-29 (5a: `renameInModel`,
 `renameInProject`; 5b: `barwise rename`, MCP `rename_element`, the VS Code
-tool); rename recognition moved to WS6; WS6 and WS7 to come
+tool); rename recognition moved to WS6; WS6 grounded 2026-10-29 (6a to 6f,
+decisions 15 amended, 18 and 19), not started; WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-29
@@ -49,7 +50,17 @@ barwise/examples/auction-project/,
 barwise/packages/cli/tests/fixtures/project/,
 barwise/packages/core/tests/integration/fixtures/multi-domain/,
 barwise/packages/mcp/tests/fixtures/project/,
-barwise/packages/vscode/tests/fixtures/project.orm-project.yaml
+barwise/packages/vscode/tests/fixtures/project.orm-project.yaml,
+barwise/packages/promptlab/src/,
+barwise/packages/diagram-ui/src/,
+barwise/packages/core/tests/,
+barwise/packages/formats/tests/,
+barwise/packages/dbt/tests/,
+barwise/packages/diagram/tests/,
+barwise/packages/learn/tests/,
+barwise/packages/diagram-ui/tests/,
+barwise/packages/promptlab/tests/,
+barwise/packages/code-analysis/tests/
 
 Every barwise element gets one identifier built from its name, in place of
 the random UUID it carries today. A file stores each element's local name -- `Customer`, `Customer_places_Order.places` -- and a model's namespace is
@@ -785,70 +796,314 @@ failure while staging the second file changing nothing; the
 surfaces; the MCP tool's write-back and inline result; the parity pair; the
 pins.
 
-### 6. Format 4.0: local names are the ids (provisional: not yet grounded)
+### 6. Format 4.0: local names are the ids (grounded 2026-10-29; ships as 6a to 6f)
 
-The 4.0 schema, the 3.x reader, and `barwise migrate`, which keeps its
-`--check` and `--format json` contract and, given a project, migrates its
-domains in one run, which also settles a suffixed owner's shadows. Lineage follows the Scope: `migrate` restamps only exports that were fresh,
-and an edit-path upgrade reports "ids changed to 4.0".
+Grounded on main at `a3bf9762` by three reads (core id assignment; diff,
+merge and split; importers, exporters, lineage and tests), with the
+owner's answers of 2026-10-29 (decisions 15, 18 and 19, and the order
+against `effect-adoption.spec.md` below). Paths are under
+`barwise/packages/`.
 
-The rename surfaces rewrite the lineage manifests they can see with
-`RenameResult.ids`, which WS6 makes non-empty, so impact analysis still
-finds a renamed element's exports; each manifest is one more staged file
-in WS5's write, so it commits with the models or not at all.
+**Order against the Effect adoption.** `effect-adoption.spec.md` rebuilds
+core's record types and YAML codec, the code this workstream changes. The
+owner chose WS6 first (2026-10-29): the Effect spike (#672) continues on
+its branch to decide adoption, and any Effect rebuild starts from the 4.0
+model, so nothing is built twice. That branch predates format 3.0
+(its base reads `CURRENT_ORM_VERSION = "2.0"`; 3.0 shipped in #708), so
+a format change it proposes is a 3.x minor or waits for this spec.
 
-Diff and merge add decision 8's rename recognition, moved here from WS5:
-a content pass after the id and name passes, over identity keys (as
-`detectSynonymCandidates` and `roleKeys` already use) rather than names,
-with a floor so an element with no roles is never paired (an unpaired
-element's identity key is its side and id, so two renames in one edit --
-an object type and a fact type it plays in -- still defeat the pass, and
-WS6's tests state that limit); a
-`DiffOptions` switch that merge's callers turn off, and `mergeModels` itself
-refusing a delta marked `pairing: "content"`, naming that switch, so a
-caller that forgets fails loudly instead of folding two elements into one; a `pairing: "content"` marker carried through
-`deltaToJson` to the CLI, MCP and editor output; and an override that takes
-a `RenameTarget`, not a bare name.
+**What the code already gives.** Every element in production source is
+constructed inside an `OrmModel` add method: `createObjectType`,
+`new FactType`, `new SubtypeFact`, `new ObjectifiedFactType` and (through
+`FactType`) `new Role` each have exactly one source call site, in
+`core/src/model/OrmModel.ts`. A fact type outside a model exists only in
+tests (18 sites); counterexample populations
+(`CounterexampleGenerator.ts:434,502,634,737,754`) are the one standalone
+element. So decision 17's "when it joins the model" is one place in
+practice, and "a fact type not yet in one holds its constraints unnamed"
+needs no new state: `addFactType` builds the fact type with its model.
+Every kind is also added after everything its sentence reads (the 3.0
+reader adds object types, fact types with internal constraints, subtype
+facts, external constraints, preferred identifiers, then objectifications
+and populations, `OrmYamlSerializer.ts:244-308`), and
+`ConstraintVerbalizer` reads only `getObjectType`, `getFactType`,
+`findRole`, `factTypesNaming`, `factTypesHolding` and `getSubtypeFact`, so
+a name minted at the add reads the same as one minted after the load.
 
-Every importer builds local names, and an element with no name of its own
-takes a minted one, stored with its `minted_from` key, by the rules WS3
-records, as it joins the model (decision 17): `OrmModel` gives an element
-without an id its local name or minted name, so the loader, importers, the
-LLM parser, merge and split need no step of their own, and an id typed by
-hand is kept. Exactly when within the model a minted name is fixed -- at
-the add, or once a load's last add has run -- is WS6's grounding, held to
-decision 17's two requirements (a stated id wins; the result is a function
-of the input).
+**6a, groundwork that ships on 3.0 (nothing on disk changes).** Each
+part is its own PR and may be released.
 
-A constraint added to a fact
-type already in a model goes through `FactType.addConstraint`, not the
-model (the dbt mapping, the Ossie importer, the LLM parser do this today),
-so a fact type learns its model when `addFactType` takes it, and a fact type
-not yet in one holds its constraints unnamed until it joins; how that
-unnamed state is typed is WS6's grounding to settle. Importers stop calling
-`generateId()` for these kinds, and code that needs a minted id, such as a
-preferred identifier's constraint, reads it from the model once WS6's
-mechanism has fixed it; exporters follow the Inventory;
-`canonicalizeIds` goes; merge's clash rule takes the suffix rule; split's
-shadows take the owner's `alias:Name` and drop `source_context`;
-`cli/tests/importerIds.test.ts` checks the naming rules. The same PR amends
-`determinism-in-core.md` decision 4 (identity is assigned from the name at
-creation, stored, and changed only by rename) and supersedes
-`importer-role-ids.spec.md` R1. It may need the 4a/4b split `orm-format-3`
-used, with no release between.
+- **The verbalization cycle.** `OrmModel` cannot call the verbalizer
+  today: every verbalization module type-imports `model/OrmModel.js`, and
+  dependency-cruiser's `no-circular` counts type-only imports
+  (`.dependency-cruiser.cjs:48-58`, `tsPreCompilationDeps`). Verbalization
+  declares the structural interface of the six methods it reads, and
+  `OrmModel` satisfies it.
+- **`model/mint.ts`**: `mintedName` (the canonical sentence, its closing
+  period dropped, through `localName()`), `mintedKey` (section 3's content
+  key, from the serializer's form of the element) and the guard that the
+  sentence is of this element. The guard is a local check at the add --
+  every role resolves, an internal constraint's roles belong to its fact
+  type (the `Malformed` case, `ConstraintVerbalizer.ts:232-234`), every
+  operand exists -- not a call to `graphOf`, which reads the whole model
+  and would make each add linear.
+- **`FactType.addConstraint` returns the stored constraint** (today
+  `void`, storing a copy, `FactType.ts:192-223`). Fourteen
+  `setPreferredIdentifier` calls in dbt, DDL, NORMA, OpenAPI and Ossie,
+  and `llm/src/parse/constraints.ts:54,77`, need a constraint's id right
+  after adding it.
+- **The test builder.** `core/tests/helpers/ModelBuilder.ts` builds role
+  ids `<ft>::role1` (`:289-290`) and preferred ids `::preferred` (`:236`),
+  and `:` is reserved for aliases in 4.0. It is used by 65 test files
+  (core 47, formats 9, diagram 4, dbt 2, learn 2, diagram-ui 1; the draft
+  said 48), and 15 of them hard-code `::role1/2` (97 occurrences). It
+  moves to a `roleId(ft, i)` helper first.
+- **Lineage exports name their model.** One `.barwise/lineage.yaml` serves
+  a directory (`cli/src/commands/export.ts:95-108`), and `project init`
+  puts every domain in one `domains/` directory, while `ManifestExport`
+  has no source model and every export overwrites the manifest's one
+  (`core/src/lineage/manifest.ts:52-85`). UUIDs never collided across
+  models; local names will (two domains each owning `Order`), which would
+  make impact analysis ambiguous and let a rename in one domain rewrite
+  another's exports. Each export gains its own `sourceModel`; worth having
+  on 3.x already. The two identical `lineageIo.readManifest` copies (cli
+  and mcp) are registered in `parity.manifest.json` in the same PR.
+- **Diff recognizes renames (decision 8).** Additive and meaningful on
+  3.x, so it lands before any id changes, as the Workstreams preamble
+  requires. In `diffIdentity` (`core/src/diff/identity.ts:59-74`), after
+  both kinds' id and name passes: fact types first, keyed by arity and,
+  per position, the player's interim key and the role name, plus their
+  internal constraints' `constraintKey`s (not readings, which a rename
+  usually rewrites); the fact type keyer is rebuilt; then object types,
+  keyed by kind, the sorted `f[ftKey,pos]` of the roles they play, their
+  subtype-fact end keys, value constraint and data type (not the
+  reference mode, which follows the name); then both keyers are rebuilt,
+  so constraint, subtype, objectification and population pairing follow
+  with no change. A pair forms only when its key is unique among the
+  unpaired elements on both sides. The floor: an object type that plays
+  no role and is no subtype-fact end is never paired; a fact type needs
+  no floor, because an unpaired player's key is side-tagged
+  (`identity.ts:143`). The limit the tests state: an object type renamed
+  together with a fact type it plays in defeats the pass in either order,
+  even when it plays in others, because its key is the whole set of its
+  roles. `DiffOptions` (one field today, `ModelDiff.ts:38-44`) gains
+  `recognizeRenames` (default on) and `renames`, a list of
+  `{ target, to }` with an object-type or fact-type `RenameTarget`,
+  applied after the name pass; a target that does not resolve is an
+  error, and roles are excluded because they pair by position. Each
+  delta carries `pairedBy: "id" | "name" | "content" | "declared"`
+  (named so it does not read as `matching: "content"`), through
+  `deltaToJson` (`diff/deltas.ts:300-328`) and the two text renderers
+  that bypass it (`cli/src/commands/diff.ts:83-96`,
+  `history.ts:168-178`). `mergeModels` refuses any delta paired by
+  `content` or `declared`, naming `recognizeRenames: false`; this replaces
+  the comment that is the only guard today (`ModelMerge.ts:831-833`), and
+  `mergeAndValidate` already reports a throw as `merge-error`. Recognition
+  is on for `barwise diff`, MCP `diff_models` (and the editor through it)
+  and `barwise history`; off for every merge path (`barwise merge`,
+  transcript import on the CLI and in the editor, MCP `merge_models`),
+  for transcript sample agreement (`llm/src/diffOptions.ts:12`, already
+  `matching: "content"`) and for `formats/src/ossie/verifyOssie.ts:48`.
+  The CLI's `diff` takes `--rename <kind>:<old>=<new>` and `diff_models`
+  the same list.
+
+**6b to 6g, the 4.0 series: no release between them**, as
+`orm-format-3`'s 4a/4b, because a build that writes 4.0 must already
+read it everywhere, and the schema cannot tell a UUID from a local name
+(a UUID matches the local-name pattern), so importers switch with the
+version bump.
+
+- **6b, the model and the format.**
+  - _Mint at the add, with the file's stated ids reserved for the load._
+    A reader collects every id the file states before its first add --
+    the pre-pass the 3.0 reader already runs for constraint repeats
+    (`OrmYamlSerializer.ts:260-279`), and the `taken` set the 2.0 reader
+    already builds for derived ids (`:507`, `derivedId.ts`) -- and passes
+    it to the model as reserved for that load. A minted name, or a
+    derived local name, that meets a reserved or held id takes the next
+    free `_N`, so a stated id wins wherever it sits in the file, and the
+    names given are a function of the input because the add order is the
+    file's. A stated id another element already holds is refused, as
+    `DuplicateIdError` refuses today, now across kinds. A reader that
+    forgot to reserve fails loudly (the later stated id becomes a
+    `DuplicateIdError`, so a `DeserializationError`), never silently.
+    Rejected: minting once a load's last add has run, which needs an
+    unnamed in-store state for map-keyed kinds, gives no id to a caller
+    that needs one inside the load, and is decision 17(b) by another
+    name; and displacing a minted holder when a stated id arrives later,
+    because a caller may already have read the minted id.
+  - _The cross-kind index_ replaces the per-kind `refuseHeldId`
+    (`OrmModel.ts:185-196`) beside the per-kind maps, keyed by id, over
+    object types, fact types, roles, named constraints, subtype facts,
+    objectifications and populations (`Ft.population` can equal a role
+    id, which `structural.ts:311` already reports); the WS2 rule's map
+    (`structural.ts:243-317`) reads it. Decision 5 needs no flag: deriving
+    role ids refuses a repeated role name, the 3.x replay passes a suffix
+    option, and a 4.0 file's stated ids are kept; a suffixed id differs
+    from `localName(name)`, so decision 13's warning reports it.
+  - _Typing._ Constraints are already `id?: string` (`Constraint.ts:23`),
+    handled in 49 places in core. Object types, fact types, roles,
+    populations and fact instances can always be named, so they keep
+    `id: string`. A subtype fact or objectification whose references
+    dangle is left unnamed (decision 19): those two classes allow an
+    absent id, the model keeps them in a side list its getters append,
+    and validation reports each (about 32 reads in core to narrow, plus
+    their readers in `formats` and `diagram`).
+  - _Role ids_ are stated in 4.0 files (`<ft>.<role>`), so a file says
+    what it means without a derivation rule to know.
+  - _The schema_: shared `local_name`, `role_id` and `reference` (a local
+    name or `alias:local`) definitions; a shadow's id admits `alias:`;
+    `id` optional on constraints, subtype facts and objectifications,
+    because a hand-typed one has none until it is stored; `minted_from`
+    only beside an `id`; `imports` as a map from alias to a context name
+    or an absolute IRI; the pattern held once as a constant in
+    `model/name.ts`, drift-tested against the schema as `iri.ts` is. The
+    3.0 schema is frozen as `orm-model-3.0.schema.json`, as 2.0's was.
+  - _The 3.x reader_ reads with today's `fromDocument` against the frozen
+    schema, then replays that model into a fresh 4.0 model through the
+    existing `to*Config` projections, dropping ids and mapping each
+    reference through the growing UUID-to-local-name map (one reference
+    rewriter, shared with rename), with the migration option set:
+    suffix a repeated role name (decision 5a) and rename an objectified
+    fact type to its first reading (decision 4). The inverse map is kept
+    on the model in memory, never written, and diff's id passes
+    (`identity.ts:81-97`, `elementDiff.ts:233-235,635-639`) use it only
+    when both models carry one, so `barwise history` pairs two 3.x
+    revisions exactly with no change to `history.ts`. The 2.0 reader
+    feeds the same replay (decision 18), so `planRead`'s one legacy slot
+    (`schemaVersion.ts:26,194-213`) becomes two.
+  - _Unstored ids_ (decision 17): a constraint typed in the editor
+    without an id is re-minted on each load, so it gets a diagnostic
+    saying its id is not stored, an editor action to store it, and
+    `barwise migrate` writes a current-version file that has unstored
+    ids instead of skipping it.
+  - _Importers switch in the same PR._ Ossie
+    (`formats/src/ossie/mapOssieToOrm.ts:364,381,542,613,639,699,730`) and
+    OpenAPI's unreferenced roles (`OpenApiImportFormat.ts:419,424`) drop
+    `generateId()`. The sites that mint role ids before the fact type
+    exists, because constraints in the same config reference them (dbt
+    `factTypes.ts:48-49,116-117`, `identifierTypes.ts:62-63`,
+    `compositeKeys.ts:373`; DDL `DdlImportFormat.ts:1205-1584`, eight
+    sites; OpenAPI `:354-355,477-478`; Ossie `:522`), add the fact type
+    with no role ids, read `ft.roles[i].id` back and add those
+    constraints through `FactType.addConstraint`. Preferred identifiers
+    read the stored constraint's id. Avro, code-analysis and the rest of
+    the LLM parser rely on the model's default already.
+  - _Retired_: `generateId`, `setIdGenerator`, `createUuidv7Generator`
+    and the three surface installs (`cli/src/index.ts:12`,
+    `mcp/src/index.ts:12`, `vscode/src/client/extension.ts:34`);
+    promptlab's `withDeterministicIds` and `uuidv7FromParts`
+    (`promptlab/src/evalcase/renderReference.ts:43-62`), which exist only
+    because ids were random. `formatUuid` stays for `derivedId`. The
+    id-shape tests (`core/tests/model/id.test.ts` except `formatUuid`,
+    `cli/tests/entryIdGenerator.test.ts`,
+    `mcp/tests/serverSpawn.test.ts:85-102`,
+    `vscode/tests/unit/activateIdGenerator.test.ts`) become assertions of
+    local names or go with what they tested; `cli/tests/importerIds.test.ts`
+    checks the naming rules, with NORMA no longer exempt.
+  - _Tests that look up a 3.x fixture's elements by id_ break here, not
+    in WS7, because the 3.x reader rewrites ids in memory; they are fixed
+    in this PR (about 91 test files hold some 2,046 hand-written id
+    literals; ids stated in code survive under decision 17).
+  - _A namespace input that changes_ (Risks): a stored id is a local name
+    and never holds the namespace, so editing `iri_base`, a context or a
+    model's `namespace` changes no id and no diff pairing; only `iriOf`'s
+    answers move. Diff does not compare a model's header today (merge only
+    carries `namespace` across, `ModelMerge.ts:75`), so 6b adds a header
+    change for `namespace` and `imports`, which makes such an edit visible
+    in `barwise diff` without pairing anything differently. Renaming a
+    context changes the alias in every other domain's shadows and imports;
+    that is a project-level rename of its own, not in this spec, and until
+    it exists a context rename is an edit `validate` reports as unresolved
+    aliases.
+  - Amends `determinism-in-core.md` decision 4 and supersedes
+    `importer-role-ids.spec.md` R1.
+- **6c, NORMA.** Import keeps NORMA's own ids today
+  (`formats/src/norma/mapping/`: `objectTypes.ts:45,60,78`,
+  `factTypes.ts:40,60`, `subtypes.ts:37,70`, `populations.ts:78,104,111`,
+  `context.ts:136`) and resolves constraint role references as model
+  ids; 4.0 needs a NORMA-id-to-local-name map built after each add, the
+  largest importer change. Export changes one seam, `toNormaId`
+  (`normaId.ts:39`, 64 uses), to decision 12(a), and drops its
+  `startsWith("_")` pass-through, which would skip derivation for a local
+  name such as `_internal`. Decision 12(c) is recorded as not viable,
+  subject to confirming NORMA's id type: if it is `xs:ID` (an NCName),
+  `localName()` emits `%`, keeps `! $ & ' ( ) * + , ; = @ ~`, keeps
+  `ucschar` outside XML's NameChar, and a shadow's id holds `:`. The repo
+  models no NORMA id syntax (`NormaId` is a branded string), so the
+  check is against NORMA's XSD before 6c lands.
+- **6d, merge and split.** Merge keeps the base's fact type id on a
+  modification and rewrites the incoming roles to `<base>.<role>`, where
+  today it takes the incoming roles (`ModelMerge.ts:141-151,196`); pairs
+  the internal constraints with the diff's id-then-key pairing, exported
+  from `elementDiff.ts` (`diffConstraints`, `:646-701`, reports only
+  changes), and keeps the base's id and stored key for each pair
+  (section 3). A clash on a minted id (subtype fact, objectification,
+  population) takes the model's suffix rule in place of `mergedId`'s
+  UUIDv8 (`:808-818`, `MERGE_ID_TAG`), reported; a clash between two
+  stated ids, now across kinds, is refused by `refuseNameClashes`
+  (`:835-867`, one kind today). Split gives each shadow the id
+  `<owner>:<localName(name)>`, rewrites every reference to it in the
+  domain (role players, subtype ends, `objectified.object_type`), emits
+  `imports: { <owner>: <owner> }`, drops `source_context`, and writes 4.0
+  (`splitModel.ts:340-360,441-444`); one shadow-id function serves split
+  and the 3.x reader. A core `aliasOf(id)` replaces the field for its
+  readers: `mcp/src/tools/split.ts:168-176`, the diff change kind
+  (`elementDiff.ts:82-83`, `changeDescription.ts:71,218`,
+  `breakingLevel.ts:38`, kept and derived from the alias), and, missing
+  from the draft's Inventory, `rename/renameInModel.ts:114`,
+  `rename/renameInProject.ts:82,230-234`, `ossie/writeOssie.ts:455,803`
+  and `serialization/yaml/objectType.ts:22,61-62,102`. 21 tracked YAML
+  files set `source_context` (WS7).
+- **6e, lineage.** The manifest goes to `version: 2` (`types.ts:40-45`)
+  and `canonicalizeIds` goes (`manifest.ts:106-147`). Under decision 15
+  as amended, every export of a version-1 manifest reads stale once with
+  the reason "ids changed to 4.0" (`staleness.ts:51-61`), and impact
+  analysis given a version-1 manifest says it predates 4.0
+  (`impact.ts:35-67`). A version marks this rather than the shape of
+  `elementId`, which would miss exports with no sources, NORMA `_GUID`
+  ids and hand-written ids. Renames rewrite the manifests they can see
+  through a pure core helper, `renameInManifest(manifest, ids,
+  sourceModel)`, never restamping the hash, because the artifacts really
+  are stale: for a model file, `<dir>/.barwise/lineage.yaml`; for a
+  project, the manifest beside each domain that changed. Each is one more
+  staged file in WS5's write (`cli/src/commands/rename.ts`,
+  `mcp/src/tools/rename.ts`; the editor inherits MCP's).
+  `ProjectRenameResult.ids` (`renameInProject.ts:36`) becomes a map per
+  domain, because a shadow's id changes in each domain that holds it.
+- **6f, the outputs.** DDL comments (`DdlExportFormat.ts:185`), Ossie's
+  loss block (`writeOssie.ts:89,318,347,350`) and SVG `data-id`
+  (`diagram-ui/src/parts/*Node.tsx`) print local names with no code
+  change; their goldens (4 DDL, 5 SVG) change in WS7.
+
+**Sizes, roughly.** 6a: about 400 lines of source for diff, 300 for the
+rest, each with tests. 6b: about 25 core files and 1,500 to 2,000 lines,
+the frozen 3.0 schema (a 1,500-line mechanical copy), 300 to 450 lines
+across the importers, and tests as large again; it may split along
+`orm-format-3`'s lines with no release between. 6c: 250 to 400. 6d:
+about 250 plus tests. 6e: 350 to 500 across 12 files.
 
 ### 7. Migrate the tracked corpus
 
 `barwise migrate` over the 119 tracked `.orm.yaml` files (25 carry UUIDs,
 about 5,100 occurrences), the goldens, and the fixtures with hand-written
-ids (`ot-customer`, `r-places-order`). `core/tests/helpers/ModelBuilder.ts`,
-which builds `<FactType>::role1` ids for 48 test files, moves to local
-names.
+ids (`ot-customer`, `r-places-order`). Grounded counts (2026-10-29): 119
+tracked files, 118 with `id:` lines (6,371); 25 carry UUIDs (5,137, the
+largest `docs/auction.orm.yaml` with 1,562); 21 set `source_context`.
+The goldens that change: 11 `promptlab/evals/*.reference.orm.yaml`,
+regenerated from `renderReference` (`promptlab/tests/referenceDrift.test.ts`)
+rather than migrated; 4 `cli/tests/characterization/golden/*.ddl.txt`; 5
+`diagram-ui/tests/golden/goldens/*.svg`; and the tests holding UUID
+literals (`cli/tests/commands/exportLineage.test.ts`, `lineage.test.ts`,
+`mcp/tests/tools/impactAnalysis.test.ts`,
+`formats/tests/NormaJoinPaths.test.ts`, three in code-analysis) and
+`docs/ORM_PROJECT_GUIDE.md`. The test builder moves in 6a.
 
 ## API and migration impact
 
 - `@barwise/core` gains `localName`, `namespaceOf`, `iriOf`, `renameInModel`
-  and `renameInProject`; `generateId()` stops minting element ids. Every
+  and `renameInProject`; `generateId()`, `setIdGenerator` and
+  `createUuidv7Generator` are removed (6b). Every
   downstream package rebuilds; the id-shape tests
   (`core/tests/model/id.test.ts`, `cli/tests/entryIdGenerator.test.ts`,
   `vscode/tests/unit/activateIdGenerator.test.ts`,
@@ -948,12 +1203,18 @@ accepted. The options stay, so a later reader sees what was weighed.
     -- kind, roles, values -- differs from what it was minted from, which
     needs a stored content key and ignores wording changes. (c) never; a
     minted name is a name. **Decided: (b).**
-15. **Lineage across the format change.** (a) a 3.x manifest reads stale
+15. **Lineage across the format change.** (amended 2026-10-29, below) (a) a 3.x manifest reads stale
     once, with the reason named, and a re-export or `migrate` restamps it.
     (b) keep `canonicalizeIds` in 4.0, fixed to replace only `id` values and
     reference fields, so a 3.x hash and a 4.0 hash of one model agree and
     nothing reads stale. (b) is quieter but keeps code whose reason the
-    format removes. **Decided: (a).**
+    format removes. **Decided: (a).** Amended by the owner on 2026-10-29:
+    `migrate` does not restamp. Restamping only the exports that were
+    fresh needs the 3.x hash of the model before migration, so a frozen
+    copy of the 3.x writer and `canonicalizeIds` kept for that one use;
+    instead every export of a version-1 manifest reads stale once with
+    the reason "ids changed to 4.0", and a re-export restamps it. No
+    lineage manifest is tracked in the repository.
 16. **The project file and older builds.** (a) do barwise-y1b first, so the
     project file carries a version and an older build refuses `iri_base`
     with "written by a newer barwise" instead of a schema error. (b) ship
@@ -1006,6 +1267,15 @@ accepted. The options stay, so a later reader sees what was weighed.
       migrate` writing a current-version file whose ids are unstored, which
       it does not do today (it skips a current file). Until it is stored,
       nothing else may refer to it by id.
+
+18. **Does 4.0 read 2.0?** (a) yes: the 2.0 reader feeds the same replay
+    as 3.x, so a 2.0 file goes to 4.0 in memory. (b) no: a 2.0 file is
+    migrated with a 3.x build first. **Decided: (a)** (owner, 2026-10-29).
+19. **A subtype fact or objectification whose references dangle.** It
+    cannot be verbalized, so it cannot be minted. (a) it is left unnamed:
+    those two classes allow an absent id and validation reports it. (b)
+    it is named from the ids it refers to, so every element has an id.
+    **Decided: (a)** (owner, 2026-10-29), as decision 17 already says.
 
 ## Risks and testing
 
