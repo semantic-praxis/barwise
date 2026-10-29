@@ -289,6 +289,12 @@
       "caught_by": "not-a-correction",
       "note": "Reopens item 3 after a probe of Schema.toJsonSchemaDocument on the spike codecs showed generation works; the owner then chose generation on 2026-10-16, reasoning that a test stating its expected answer directly is a better check than a hand-written schema. Item 3 was a judgement revisited, not an error."
     },
+    "effect-adoption::acf1201087ac": {
+      "spec": "effect-adoption.spec.md",
+      "excerpt": "- changed scope: the two misplacement cases are not s4 cases. their refusal names the constraint and its home, not a field, so no field could be declared that t",
+      "caught_by": "reasoning",
+      "note": "Found while writing the cases: a misplacement refusal names the constraint and its home, not a field, so S4 could not score it; format30.test.ts already pins its wording."
+    },
     "effect-comparison::149864007d79": {
       "spec": "effect-comparison.spec.md",
       "excerpt": "the table above is what survived testing; this is the log of that testing. each criterion stands in for a property through some mechanism, and diverges from it ",
