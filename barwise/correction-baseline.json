@@ -331,17 +331,11 @@
       "caught_by": "reasoning",
       "note": "'Additive' was corrected by reasoning from how the other penalties are surfaced, not from a run."
     },
-    "executable-adrs::4387ed0ac771": {
+    "executable-adrs::3aaa193bfa3a": {
       "spec": "executable-adrs.spec.md",
       "excerpt": "grounded 2026-10-28 by extracting the npm scripts each adr names and resolving them against package.json and cisteps(). the third column counts lines in each ad",
       "caught_by": "reasoning",
-      "note": "The Inventory's first drafts predicted each ADR's declared state and marked most rows enforced. The eighth /code-review pass on the plan read each ADR's Consequences and found decisions with no gate in about ten of them; a keyword count over the ADRs (16 of 20 with gap phrases) confirmed the pattern. The column was replaced with that count, labelled a shadow, and WS2 became a per-decision audit."
-    },
-    "executable-adrs::9a5988716d22": {
-      "spec": "executable-adrs.spec.md",
-      "excerpt": "entry grammar. entries are separated by commas that sit outside parentheses, so none (barwise-zdd: decisions 1, 3) is one entry; an unbalanced parenthesis is a ",
-      "caught_by": "reasoning",
-      "note": "An earlier draft split Enforced-by entries on newlines as well as commas. The /code-review pass on the plan reasoned through a wrapped ADR header and saw that an entry containing spaces (npm run x, hook ... runs npm run x) would split in two. A later pass, reading dprint.json, also refuted the draft rationale that dprint wraps headers. Newlines became spaces, with a strict grammar so a dropped comma still fails."
+      "note": "The Inventory's first drafts predicted each ADR's declared state and marked most rows enforced. The eighth /code-review pass on the plan read each ADR's Consequences and found decisions with no gate in about ten of them; a keyword count over the ADRs (16 of 20 with gap phrases) confirmed the pattern. The column was replaced with that count, labelled a shadow, and the audit workstream became a per-decision audit."
     },
     "export-artifact-validation::72d83b5439a8": {
       "spec": "export-artifact-validation.spec.md",
