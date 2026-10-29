@@ -7,7 +7,7 @@ project and mapping files, `iri_base`, `namespace`, `namespaceOf` and two
 project rules); WS5 grounded (5a core, 5b surfaces; rename recognition moved to WS6) and decision 17 taken; WS5 to WS7 to come
 
 Created: 2026-10-28
-Last-updated: 2026-10-28
+Last-updated: 2026-10-29
 Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: 5e108470 (code-review, pr-review; re-pointed after WS4 was grounded with barwise-y1b)
 Touches: barwise/packages/core/src/model/,
@@ -125,10 +125,10 @@ In scope:
   - population and fact instance: decision 7.
 - When a rule would give an element a local name another element of the
   model already holds, the system shall append `_2`, `_3`, and report it,
-  except where decision 5 refuses instead. The order is a function of
-  the input: add order, which on load is object types, then each fact type
-  with its internal constraints, then everything else, in document order
-  (decision 17), so two builds of one input agree.
+  except where decision 5 refuses instead. Decision 4 renames
+  an objectified fact type before any suffix applies. A stated id always
+  wins over a minted name, and the order is a function of the input, so two
+  builds of one input agree; WS6 grounds the mechanism (decision 17).
 - When an element's stored id no longer matches the name it was made from,
   validation shall warn, naming both (decisions 13 and 14). Neither
   changes on its own.
@@ -628,15 +628,19 @@ Beyond the element's own name, a model-level rename rewrites:
   (a second definition with one term would vanish from diff, which keys
   them in a map). When either condition fails the definition is left and
   the reason is in `changes`.
-- **The reference mode that names a renamed value type**: an entity whose
-  `reference_mode` equals `toSnake(old)` gets `toSnake(new)`, because
-  `RelationalMapper` finds an entity's key type by exactly that match
-  (`toSnake(vp.name) === ot.referenceMode`) and would otherwise silently
-  untype the key column. `toSnake` is private to `RelationalMapper.ts`; it
+- **The reference mode that names a renamed value type**: an entity that plays the
+  renamed value type in a binary fact type and whose `reference_mode`
+  equals `toSnake(old)` gets `toSnake(new)`, because that is exactly the
+  pairing `RelationalMapper` uses to type the entity's key
+  (`referenceModePkType`: a binary, a value player, and
+  `toSnake(vp.name) === ot.referenceMode`), and the key column would
+  otherwise silently lose its type. An entity with the same reference mode
+  that does not play the value type is left alone, because the mapper never
+  tied the two. `toSnake` is private to `RelationalMapper.ts`; it
   moves to a shared module both import, not a second copy. An entity's own
   rename leaves its reference mode alone, even one shaped like
-  `customer_id`: that string is also matched against a value type of its
-  own name (103 corpus entities pair `X_id` with a value type `X_id`), so
+  `customer_id`: that string is also matched against a value type named
+  like it (103 corpus entities pair `X_id` with a value type `X_id`), so
   changing it without that value type would break the same match.
 - Nothing else, by decision: aliases, notes, definitions' text, derivation
   expressions, a mapping's `description`, and a semantic conflict's `term`
@@ -672,7 +676,9 @@ rename runs in the named domain and every domain it reaches:
   the whole rename, naming that domain.
 - **Definitions anywhere.** Split writes every definition into the first
   domain, whatever owns its term, so a definition whose term is the old
-  name is rewritten in any domain where that term names no other element.
+  name is rewritten in any domain where that term names no other element
+  and no definition already has the new term, the same two conditions as in
+  `renameInModel`.
 - **Mapping files.** In each entity mapping, a side is rewritten when its
   context is the owner's or a renamed shadow's and its name is the old
   name; split writes the owner on the source side and the shadow on the
@@ -693,13 +699,16 @@ changed.
   <target> --to <name>` for a project, where `<target>` is
   `--object-type <name>`, or `--fact-type <name>` with `--role <name>` or
   `--role-position <n>`; both take `--check` and `--format json`. Naming
-  the file and the project at once is refused. A model file that declares
+  the file and the project at once is refused, and so is `--domain` without
+  `--project` or `--project` without `--domain`. A model file that declares
   a `domain_context` gets a warning, not a refusal -- 47 of 119 tracked
   models declare one and the editor's scaffold writes one into every new
   model, most of them standalone -- saying that a project's domain is
-  renamed through `--project` so its shadows and mappings follow. A project
-  whose load reported a problem (a domain or mapping file that did not
-  load) is refused, naming it, because the pure cascade cannot see a file
+  renamed through `--project` so its shadows and mappings follow. The project is
+  assembled leniently, as `barwise validate` assembles it, so a domain with a
+  dangling reference loads and renames as it would on its own; a project
+  whose load still reported a problem (a domain or mapping file that could
+  not be read or parsed) is refused, naming it, because the pure cascade cannot see a file
   that never loaded.
 - **The write.** Every changed file is staged (written beside its target)
   before any target is replaced, and only then are the staged files renamed
@@ -753,7 +762,8 @@ and an edit-path upgrade reports "ids changed to 4.0".
 
 The rename surfaces rewrite the lineage manifests they can see with
 `RenameResult.ids`, which WS6 makes non-empty, so impact analysis still
-finds a renamed element's exports.
+finds a renamed element's exports; each manifest is one more staged file
+in WS5's write, so it commits with the models or not at all.
 
 Diff and merge add decision 8's rename recognition, moved here from WS5:
 a content pass after the id and name passes, over identity keys (as
@@ -939,13 +949,12 @@ accepted. The options stay, so a later reader sees what was weighed.
     What follows from it, for WS6 to build:
 
     - An id a person or tool wrote is kept and is never stale.
-    - A collision takes the suffix rule in add order: the later element
-      takes `_2`. The reader adds object types, then each fact type with its
-      internal constraints, then the rest, in document order, so a fact
-      type can take a suffix behind an earlier fact type's minted
-      constraint. That needs a fact type named like a constraint's
-      sentence, and is reported like any suffix. A pass that minted after
-      the last add would avoid it, and is option (b) inside the reader.
+    - Two requirements bind the order in which names are given, and WS6's
+      grounding settles the mechanism: an id the file states always wins
+      over a minted name, wherever the two sit in the file, and the result is
+      a function of the input, so two builds of one input agree. Decision 4
+      (an objectified fact type takes its first reading) and decision 5
+      (refuse for new authoring) apply before any suffix.
     - Nothing is minted where the verbalization is not of the element.
       `addConstraint` does not check roles, and a lenient load
       (`skipPlayerValidation`: validate, migrate, merge's incoming side,
