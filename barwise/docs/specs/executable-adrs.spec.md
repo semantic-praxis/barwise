@@ -7,7 +7,7 @@ Last-updated: 2026-10-29
 Plan-reviewed: e247c807 (code-review, pr-review; the review's ten items are barwise-ym8.7jz, which supersedes this text where they conflict)
 Tracking: barwise-ym8, barwise-ym8.7jz (required implementation items
 from the plan review)
-Touches: barwise/correction-baseline.json, barwise/scripts/check-architecture.mjs,
+Touches: barwise/scripts/check-architecture.mjs,
 barwise/scripts/lib/architecture-section.mjs,
 +barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/lib/ci-gates.mjs,
 +barwise/scripts/check-adr-tests.mjs, +barwise/scripts/lib/test-tag-reporter.mjs,
