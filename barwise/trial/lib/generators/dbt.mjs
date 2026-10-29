@@ -72,6 +72,10 @@ export function generateDbt(doc, skin, dir, { factor = 1, artifactId = "dbt" } =
       sources.sources[0].tables.push({ name: raw, columns: columns.map((c) => ({ name: c })) });
       manifest.sources.push(raw);
       const dropKey = keyless < (skin.models_without_keys ?? 0) && t.entity;
+      // The older test spellings on purpose (`tests:`, arguments beside the
+      // test name): these projects stand in for customer-written ones, many
+      // still written that way, so they keep the importer's old-form path
+      // exercised. barwise's own export writes the current form (barwise-fnt).
       const cols = t.columns.map((c) => {
         const tests = [];
         // A column of a composite key is not unique by itself; a test that

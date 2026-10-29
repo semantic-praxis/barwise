@@ -73,13 +73,63 @@ export function namesField(message, field) {
   );
 }
 
-/** The document collection each element kind lives in. */
-const COLLECTIONS = { object_type: "object_types", fact_type: "fact_types" };
+/**
+ * The document collection each element kind lives in, in the order a
+ * document lists them, and the field that keys an element of it. Format 3.0
+ * added the model's own `constraints` list (effect-adoption.spec.md, 1r);
+ * a definition is keyed by its term and a diagram by its name, since
+ * neither has an id.
+ */
+export const COLLECTIONS = {
+  object_type: "object_types",
+  fact_type: "fact_types",
+  constraint: "constraints",
+  subtype_fact: "subtype_facts",
+  objectified: "objectified_fact_types",
+  population: "populations",
+  definition: "definitions",
+  diagram: "diagrams",
+};
+const KEY_FIELD = { definition: "term", diagram: "name" };
+const keyOf = (kind, el) => el?.[KEY_FIELD[kind] ?? "id"];
 
-/** Whether a message holds a path to position `index` of `collection`. */
-function atPosition(message, collection, index) {
-  return new RegExp(`${collection}"?\\]?(/|\\[)${index}(\\b|\\])`).test(message);
+/** A model's own fields: every key of `model` that is not a collection. */
+export function headerOf(model) {
+  const collections = new Set(Object.values(COLLECTIONS));
+  return Object.fromEntries(Object.entries(model ?? {}).filter(([k]) => !collections.has(k)));
 }
+
+/** A path separator in either spelling: `/`, `.`, or a bracket. */
+const SEP = String.raw`"?\]?(?:/|\.|\[)"?`;
+
+/**
+ * Whether a message holds a path to position `index` of `collection`.
+ *
+ * Format 3.0's collection names are also field names inside elements: a
+ * fact type has `constraints`, and a model-level constraint has
+ * `subtype_facts`. So an element of a collection added at 3.0 is matched
+ * only right after `model` (`modelLevel`), and a fact type's constraint
+ * only when not right after it: `model/constraints/0`,
+ * `fact_types/5/constraints/0` and `model/constraints/1/subtype_facts/0`
+ * are three different elements. `object_types` and `fact_types` are never
+ * field names, and match wherever they appear, as they did at 2.0.
+ */
+function atPosition(message, collection, index, { modelLevel = false } = {}) {
+  const at = `${collection}"?\\]?(/|\\[)${index}(\\b|\\])`;
+  if (modelLevel) return new RegExp(`model${SEP}${at}`).test(message);
+  if (collection !== "constraints") return new RegExp(at).test(message);
+  return new RegExp(at).test(message.replace(new RegExp(`model${SEP}${at}`, "g"), ""));
+}
+
+/** The kinds whose collection is matched only right after `model`. */
+const MODEL_LEVEL = new Set([
+  "constraint",
+  "subtype_fact",
+  "objectified",
+  "population",
+  "definition",
+  "diagram",
+]);
 
 /**
  * How a message identifies an element: by its name or id, which a person
@@ -92,10 +142,20 @@ function atPosition(message, collection, index) {
  * The collection follows the element's kind, so `fact_types/1` never
  * credits the object type at position 1.
  */
-export function identifies(message, { id, name, index, kind = "object_type" }) {
+export function identifies(message, { id, name, index, field, kind = "object_type" }) {
+  // The header is one per document: a message identifies it by a path to
+  // the model itself (`/model: must have required property 'name'`) or to
+  // one of its own fields (`/model/namespace`, `["model"]["namespace"]`),
+  // never by a path that continues into a collection.
+  if (kind === "header") {
+    const named = new RegExp(`(^|[^\\w])model(${SEP}${field}\\b|"?\\]?\\s*:)`).test(message);
+    return { readable: named, any: named };
+  }
   const byName = name.trim() !== "" && message.includes(name);
-  const byId = message.includes(id);
-  const byIndex = atPosition(message, COLLECTIONS[kind], index);
+  const byId = id !== "" && message.includes(id);
+  const byIndex = atPosition(message, COLLECTIONS[kind], index, {
+    modelLevel: MODEL_LEVEL.has(kind),
+  });
   return { readable: byName || byId, any: byName || byId || byIndex };
 }
 
@@ -147,16 +207,22 @@ function missingPaths(before, after, prefix) {
  */
 export function lostKeys(inputYaml, outputYaml) {
   const lost = [];
-  for (const collection of Object.values(COLLECTIONS)) {
-    const before = parse(inputYaml)?.model?.[collection] ?? [];
-    const after = new Map((parse(outputYaml)?.model?.[collection] ?? []).map((o) => [o.id, o]));
+  const input = parse(inputYaml)?.model ?? {};
+  const output = parse(outputYaml)?.model ?? {};
+  for (const key of Object.keys(headerOf(input))) {
+    if (!(key in output)) lost.push({ id: "model", key });
+  }
+  for (const [kind, collection] of Object.entries(COLLECTIONS)) {
+    const before = input[collection] ?? [];
+    const after = new Map((output[collection] ?? []).map((o) => [keyOf(kind, o), o]));
     for (const el of before) {
-      const out = after.get(el.id);
+      const id = keyOf(kind, el);
+      const out = after.get(id);
       if (!out) {
-        for (const key of Object.keys(el)) lost.push({ id: el.id, key });
+        for (const key of Object.keys(el)) lost.push({ id, key });
         continue;
       }
-      for (const path of missingPaths(el, out, "")) lost.push({ id: el.id, key: path.slice(1) });
+      for (const path of missingPaths(el, out, "")) lost.push({ id, key: path.slice(1) });
     }
   }
   return lost;
@@ -219,79 +285,117 @@ export function scoreDocument(yamlText, problems, loader) {
 /**
  * The one element a case's fixture is about, and the problem it carries.
  *
- * An object type case (`kind` absent) holds exactly one object type. A
- * fact type case (`kind: "fact_type"`) holds exactly one fact type, and
- * the object types its roles need, which are well formed and carry no
- * problem of their own.
+ * A case's kind names its collection (`COLLECTIONS`; an object type when
+ * `kind` is absent), and the fixture holds exactly one element there.
+ * Every element in the fixture's other collections is supporting: well
+ * formed, carrying no problem, there so the case's element can name it --
+ * the object types a fact type's roles need, the fact types and subtype
+ * facts a model-level constraint spans.
+ *
+ * A `header` case is about the model's own fields (`name`, `namespace`).
+ * Its element is the header, and it is scored singly: a document has one
+ * header, so two header cases cannot be combined (effect-adoption.spec.md,
+ * 1r).
  *
  * The id and name come from the fixture, not from the manifest: a copy of
  * them in `cases.json` would be a second statement of the fixture that
  * nothing checks, and an edited fixture would then be scored against the
- * wrong element. Only the field, and for a problem inside a constraint that
- * constraint's position, are declared, because they are what the file
- * cannot say about itself.
+ * wrong element. Only the field, and for a problem inside a fact type's
+ * constraint that constraint's position, are declared, because they are
+ * what the file cannot say about itself.
  */
 export function caseProblem(c, yamlText, index = 0) {
   const kind = c.kind ?? "object_type";
   const model = parse(yamlText)?.model ?? {};
-  const elements = model[COLLECTIONS[kind]] ?? [];
+  if (kind === "header") {
+    return {
+      problem: { kind, id: "", name: String(model.name ?? ""), field: c.field, index: 0 },
+      element: headerOf(model),
+      supporting: {},
+    };
+  }
+  const collection = COLLECTIONS[kind];
+  if (!collection) throw new Error(`${c.file}: unknown case kind ${kind}`);
+  const elements = model[collection] ?? [];
   if (elements.length !== 1) {
     throw new Error(
       `${c.file}: a ${kind} case holds exactly one ${kind}, found ${elements.length}`,
     );
   }
   const el = elements[0];
-  const problem = { kind, id: String(el.id), name: String(el.name ?? ""), field: c.field, index };
+  const problem = {
+    kind,
+    id: String(keyOf(kind, el) ?? ""),
+    name: String(el.name ?? el.term ?? ""),
+    field: c.field,
+    index,
+  };
   if (c.constraint !== undefined) {
     const declared = el.constraints?.[c.constraint];
     if (!declared) throw new Error(`${c.file}: no constraint at position ${c.constraint}`);
     problem.constraint = { index: c.constraint, id: declared.id };
   }
-  return {
-    problem,
-    element: el,
-    supporting: kind === "fact_type" ? (model.object_types ?? []) : [],
-  };
+  const supporting = Object.fromEntries(
+    Object.values(COLLECTIONS)
+      .filter((other) => other !== collection && (model[other] ?? []).length > 0)
+      .map((other) => [other, model[other]]),
+  );
+  return { problem, element: el, supporting };
 }
 
 /**
  * One document holding every case's element.
  *
- * Object type cases come first, in case order, so their positions are the
- * ones they are scored at; the object types fact type cases need follow,
- * each once; then the fact types, in case order. Two cases may share a
- * supporting object type only if they define it identically, since the
- * combined file can hold one.
+ * Collections are written in document order. Within each, the elements of
+ * that collection's cases come first, in case order, so their positions
+ * are the ones they are scored at; then the supporting elements other
+ * cases need there, each once. Two cases may share a supporting element
+ * only if they define it identically, since the combined file can hold
+ * one. Header cases are left out (see `caseProblem`). The document states
+ * the version the manifest's fixtures are written in, 2.0 unless given.
  */
-export function combine(cases, readCase) {
+export function combine(cases, readCase, version = "2.0") {
+  // A header case has no collection, so the loop below never takes it.
   const loaded = cases.map((c) => ({ c, yaml: readCase(c.file) }));
-  const objectTypes = [];
-  const factTypes = [];
+  const own = Object.fromEntries(Object.values(COLLECTIONS).map((col) => [col, []]));
+  const support = Object.fromEntries(Object.values(COLLECTIONS).map((col) => [col, new Map()]));
   const problems = [];
-  for (const { c, yaml } of loaded) {
-    if ((c.kind ?? "object_type") !== "object_type") continue;
-    const { problem, element } = caseProblem(c, yaml, objectTypes.length);
-    problems.push(problem);
-    objectTypes.push(element);
-  }
-  const supportingById = new Map();
-  for (const { c, yaml } of loaded) {
-    if (c.kind !== "fact_type") continue;
-    const { problem, element, supporting } = caseProblem(c, yaml, factTypes.length);
-    for (const ot of supporting) {
-      const seen = supportingById.get(ot.id);
-      if (seen && JSON.stringify(seen) !== JSON.stringify(ot)) {
-        throw new Error(`${c.file}: object type ${ot.id} differs from another case's`);
+  for (const [kind, collection] of Object.entries(COLLECTIONS)) {
+    for (const { c, yaml } of loaded) {
+      if ((c.kind ?? "object_type") !== kind) continue;
+      const { problem, element, supporting } = caseProblem(c, yaml, own[collection].length);
+      if (own[collection].some((el) => keyOf(kind, el) === problem.id)) {
+        throw new Error(`${c.file}: ${kind} ${problem.id} is another case's element too`);
       }
-      supportingById.set(ot.id, ot);
+      problems.push(problem);
+      own[collection].push(element);
+      for (const [other, els] of Object.entries(supporting)) {
+        const otherKind = Object.keys(COLLECTIONS).find((k) => COLLECTIONS[k] === other);
+        for (const el of els) {
+          const key = keyOf(otherKind, el);
+          const seen = support[other].get(key);
+          if (seen && JSON.stringify(seen) !== JSON.stringify(el)) {
+            throw new Error(`${c.file}: ${otherKind} ${key} differs from another case's`);
+          }
+          support[other].set(key, el);
+        }
+      }
     }
-    problems.push(problem);
-    factTypes.push(element);
   }
-  objectTypes.push(...supportingById.values());
-  const model = { name: "Malformed", object_types: objectTypes };
-  if (factTypes.length > 0) model.fact_types = factTypes;
-  return { yaml: stringify({ orm_version: "2.0", model }), problems };
+  const model = { name: "Malformed" };
+  for (const [kind, collection] of Object.entries(COLLECTIONS)) {
+    // A case's element and another case's supporting element must not share
+    // a key: the file would hold two elements under one id, and a message
+    // naming it would be credited to the wrong one.
+    for (const el of own[collection]) {
+      if (support[collection].has(keyOf(kind, el))) {
+        throw new Error(`${kind} ${keyOf(kind, el)} is a case's element and supports another`);
+      }
+    }
+    const els = [...own[collection], ...support[collection].values()];
+    if (els.length > 0 || collection === "object_types") model[collection] = els;
+  }
+  return { yaml: stringify({ orm_version: version, model }), problems };
 }
 
 /**

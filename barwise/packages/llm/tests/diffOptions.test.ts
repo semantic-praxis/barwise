@@ -47,7 +47,9 @@ describe("sample comparisons pair elements by content only", () => {
     const model = () => parseExtractionFromJson(json, "sample").model;
     computeSampleAgreement([model(), model(), model()]);
     expect(calls.length).toBeGreaterThan(0);
-    for (const args of calls) expect(args[2]).toEqual({ matching: "content" });
+    for (const args of calls) {
+      expect(args[2]).toEqual({ matching: "content", recognizeRenames: false });
+    }
   });
 
   it("in an alternative framing's diff against the primary", async () => {
@@ -67,6 +69,6 @@ describe("sample comparisons pair elements by content only", () => {
     );
     expect(result.alternatives).toHaveLength(1);
     expect(calls).toHaveLength(1);
-    expect(calls[0]![2]).toEqual({ matching: "content" });
+    expect(calls[0]![2]).toEqual({ matching: "content", recognizeRenames: false });
   });
 });

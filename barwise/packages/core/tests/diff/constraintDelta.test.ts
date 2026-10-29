@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConstraintDelta, ModelDelta } from "../../src/diff/ModelDiff.js";
 import { diffModels, elementName } from "../../src/diff/ModelDiff.js";
-import { mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
 import type { ExternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
@@ -56,11 +56,11 @@ function only(a: OrmModel, b: OrmModel): [ConstraintDelta, number] {
 
 /** Merge with every delta accepted except the constraint's, unless `take`. */
 function merge(a: OrmModel, b: OrmModel, take: boolean): OrmModel {
-  const { deltas } = diffModels(a, b);
+  const { deltas } = diffModels(a, b, MERGE_DIFF_OPTIONS);
   const accepted = new Set(
     deltas.flatMap((d, i) => (d.elementType !== "constraint" || take ? [i] : [])),
   );
-  return mergeModels(a, b, deltas, accepted);
+  return mergeModels(a, b, { deltas, matching: "id-first", recognizeRenames: false }, accepted);
 }
 
 describe("the constraint delta", () => {
@@ -188,11 +188,17 @@ describe("merging the constraint delta", () => {
     // The incoming version spans Room has RoomName, which only the
     // incoming model has; rejecting that fact type must not lose the key.
     const incoming = rooms([key(["r-b", "r-name"])], "r", true);
-    const { deltas } = diffModels(rooms([key()]), incoming);
+    const { deltas } = diffModels(rooms([key()]), incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set(
       deltas.flatMap((d, i) => (d.elementType === "fact_type" && d.kind === "added" ? [] : [i])),
     );
-    expect(mergeModels(rooms([key()]), incoming, deltas, accepted).constraints).toEqual([key()]);
+    expect(
+      mergeModels(rooms([key()]), incoming, {
+        deltas,
+        matching: "id-first",
+        recognizeRenames: false,
+      }, accepted).constraints,
+    ).toEqual([key()]);
   });
 
   it("names the merged model's roles when an incoming one was matched by name", () => {
@@ -208,11 +214,19 @@ describe("merging the constraint delta", () => {
   it("leaves out one whose fact type the merge left out", () => {
     // The key spans Room has RoomName, which only the incoming model has.
     const incoming = rooms([key(["r-b", "r-name"])], "r", true);
-    const { deltas } = diffModels(rooms([]), incoming);
+    const { deltas } = diffModels(rooms([]), incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set(
       deltas.flatMap((d, i) => (d.elementType === "fact_type" && d.kind === "added" ? [] : [i])),
     );
-    expect(mergeModels(rooms([]), incoming, deltas, accepted).constraints).toEqual([]);
+    expect(
+      mergeModels(
+        rooms([]),
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        accepted,
+      ).constraints,
+    )
+      .toEqual([]);
   });
 
   it("carries one whose role no model holds, so validation reports it", () => {

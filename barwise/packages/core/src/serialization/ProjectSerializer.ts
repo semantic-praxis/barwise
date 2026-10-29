@@ -10,13 +10,24 @@ import {
   type ProjectSettings,
 } from "../model/OrmProject.js";
 import type { ProductConfig } from "../model/ProductDependency.js";
+import { formatVersionProblem } from "./schemaVersion.js";
+
+/**
+ * The `format_version` this build reads and writes for `.orm-project.yaml`.
+ * The serializer stamps it on every manifest, and the schema pins its
+ * `const` to the same value. Separate from `CURRENT_ORM_VERSION`: each file
+ * kind evolves on its own (iri-identity WS4, barwise-y1b).
+ */
+export const CURRENT_PROJECT_FORMAT_VERSION = "1.0";
 
 /**
  * The shape of a parsed .orm-project.yaml document.
  */
 interface ProjectYamlDocument {
+  format_version?: string;
   project: {
     name: string;
+    iri_base?: string;
     domains?: Array<{ path: string; context: string; }>;
     mappings?: Array<{ path: string; }>;
     products?: Array<{
@@ -54,10 +65,15 @@ export class ProjectSerializer {
    */
   serialize(project: OrmProject): string {
     const doc: ProjectYamlDocument = {
+      format_version: CURRENT_PROJECT_FORMAT_VERSION,
       project: {
         name: project.name,
       },
     };
+
+    if (project.iriBase) {
+      doc.project.iri_base = project.iriBase;
+    }
 
     if (project.domains.length > 0) {
       doc.project.domains = project.domains.map((d) => ({
@@ -137,6 +153,9 @@ export class ProjectSerializer {
       );
     }
 
+    const versionProblem = formatVersionProblem(parsed, CURRENT_PROJECT_FORMAT_VERSION);
+    if (versionProblem) throw new ProjectDeserializationError(versionProblem);
+
     const valid = this.validate(parsed);
     if (!valid) {
       const messages = (this.validate.errors ?? [])
@@ -182,6 +201,7 @@ export class ProjectSerializer {
 
     const config: OrmProjectConfig = {
       name: doc.project.name,
+      iriBase: doc.project.iri_base,
       domains,
       products,
       settings,

@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
 import type { JoinOperand, JoinRingConstraint, RingType } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
@@ -279,8 +279,13 @@ describe("diff and merge", () => {
       ...ring("acyclic"),
       operand: { ...grandparent, path: { ...grandparent.path, root: "person-2" } },
     });
-    const { deltas } = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, deltas, new Set(deltas.keys()));
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(
+      existing,
+      incoming,
+      { deltas, matching: "id-first", recognizeRenames: false },
+      new Set(deltas.keys()),
+    );
     const jr = merged.getConstraint("jr") as JoinRingConstraint | undefined;
     expect([jr?.ringType, jr?.operand.path.root]).toEqual(["acyclic", "person"]);
   });

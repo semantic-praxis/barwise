@@ -111,6 +111,19 @@ export function collectExportAnnotations(
     // --- Column-level annotations ---
 
     for (const col of table.columns) {
+      // A generated key has no value type to describe it or declare its
+      // type; it says what it hashes (surrogate-key-export.spec.md).
+      if (col.generatedFrom) {
+        annotations.push({
+          tableName: table.name,
+          columnName: col.name,
+          severity: "note",
+          category: "generated_key",
+          message: `Generated key: a hash of (${col.generatedFrom.join(", ")}).`,
+        });
+        continue;
+      }
+
       // Find the value type that sourced this column (via role traceability).
       const sourceValueType = col.sourceRoleId
         ? findValueTypeForRole(col.sourceRoleId, model, valueById)

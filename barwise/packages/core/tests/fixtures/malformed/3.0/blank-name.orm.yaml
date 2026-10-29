@@ -1,0 +1,7 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-blank-name
+      name: "  "
+      kind: value

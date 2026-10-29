@@ -2,9 +2,9 @@
  * Phase 1 constraint verbalizations: uniqueness, mandatory, value, and
  * external uniqueness.
  */
+import type { ConstraintModel } from "../../model/constraintModel.js";
 import type { FactType } from "../../model/FactType.js";
 import type { ValueRange } from "../../model/ObjectType.js";
-import type { OrmModel } from "../../model/OrmModel.js";
 import type { Role } from "../../model/Role.js";
 import {
   buildVerbalization,
@@ -16,11 +16,11 @@ import {
   type VerbalizationSegment,
 } from "../Verbalization.js";
 import {
+  eachReading,
   forEachReading,
   leadSegs,
   localRole,
   openingReading,
-  orderedPredicate,
   quantifiedReading,
   rolePlayer,
 } from "./sentence.js";
@@ -28,7 +28,7 @@ import {
 export function verbalizeInternalUniqueness(
   roleIds: readonly string[],
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   // `factType.hasRole` is not redundant with the arity test. The binary
   // path resolves its role with `findIndex` and then asserts the result
@@ -58,19 +58,21 @@ export function verbalizeInternalUniqueness(
 }
 
 /**
- * "Each {Subject} {predicate} at most one {Object}."
+ * "Each {Subject} <reading, with at most one {Object}>." (binarySentence).
  */
 export function verbalizeBinaryUniqueness(
   constrainedRoleId: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   return binarySentence(constrainedRoleId, factType, model, "at most one ", "at most one ");
 }
 
 /**
- * "Each {Subject} {predicate} {forward} {Object}." from the reading that
- * names the constrained role first, else "For each {Subject}, {reverse}
+ * "Each {Subject} <the rest of the reading, {Object} quantified {forward}>."
+ * from a reading that opens with the constrained role, so the words after
+ * the object stay ("Each Patient has at most one Doctor as primary
+ * doctor", barwise-m1c), else "For each {Subject}, {reverse}
  * {Object} ... that {Subject}." from the reading as given
  * (binary-reverse-reading-verbalization.spec.md, barwise-wsl). The binary
  * uniqueness and mandatory sentences differ only in their quantifiers.
@@ -78,35 +80,23 @@ export function verbalizeBinaryUniqueness(
 function binarySentence(
   roleId: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
   forward: string,
   reverse: string,
 ): Verbalization {
   const own = factType.roles.findIndex((r) => r.id === roleId);
-  const other = own === 0 ? 1 : 0;
 
-  const predicate = orderedPredicate(factType, own, other);
-  if (!predicate) {
-    return buildVerbalization(
-      factType.id,
-      "constraint",
-      forEachReading(model, factType, own, reverse),
-    );
-  }
-
-  const subjectRole = factType.roles[own]!;
-  const objectRole = factType.roles[other]!;
-  const subjectName = model.getObjectType(subjectRole.playerId)?.name ?? subjectRole.name;
-  const objectName = model.getObjectType(objectRole.playerId)?.name ?? objectRole.name;
-
-  return buildVerbalization(factType.id, "constraint", [
-    kwSeg("Each "),
-    ...predicate.subject(refSeg(subjectName, subjectRole.playerId)),
-    textSeg(" " + predicate.text + " "),
-    kwSeg(forward),
-    ...predicate.object(refSeg(objectName, objectRole.playerId)),
-    textSeg("."),
-  ]);
+  const each = eachReading(
+    model,
+    factType,
+    own,
+    (rest) => quantifiedReading(model, factType, rest, own, forward),
+  );
+  return buildVerbalization(
+    factType.id,
+    "constraint",
+    each ?? forEachReading(model, factType, own, reverse),
+  );
 }
 
 /**
@@ -115,7 +105,7 @@ function binarySentence(
 export function verbalizeMultiRoleUniqueness(
   roleIds: readonly string[],
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const constrainedIndices = roleIds
     .map((rid) => factType.roles.findIndex((r) => r.id === rid))
@@ -160,7 +150,7 @@ export function verbalizeMultiRoleUniqueness(
 export function verbalizeGenericUniqueness(
   roleIds: readonly string[],
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const roleNames = roleIds.map((rid) => {
     const role = localRole(factType, rid);
@@ -190,12 +180,13 @@ export function verbalizeGenericUniqueness(
 }
 
 /**
- * "Each {Subject} {predicate} at least one {Object}."
+ * "Each {Subject} <reading, with at least one {Object}>." for a binary
+ * (binarySentence); the unary and n-ary sentences are verbalizeNaryMandatory's.
  */
 export function verbalizeMandatory(
   roleId: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   // See `verbalizeInternalUniqueness` for why `hasRole` guards the
   // binary path (barwise-979).
@@ -213,7 +204,11 @@ export function verbalizeMandatory(
  * else "For each Agreement, some Party ... signs that Agreement." from the
  * first reading. Every other placeholder names its own player.
  */
-function verbalizeNaryMandatory(role: Role, factType: FactType, model: OrmModel): Verbalization {
+function verbalizeNaryMandatory(
+  role: Role,
+  factType: FactType,
+  model: ConstraintModel,
+): Verbalization {
   const own = factType.roles.indexOf(role);
   const subject = rolePlayer(model, factType, own);
 
@@ -239,7 +234,7 @@ function verbalizeNaryMandatory(role: Role, factType: FactType, model: OrmModel)
 export function verbalizeBinaryMandatory(
   roleId: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   return binarySentence(roleId, factType, model, "at least one ", "some ");
 }
@@ -272,7 +267,7 @@ export function verbalizeValueConstraint(
   values: readonly string[],
   ranges: readonly ValueRange[] | undefined,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   let targetName: string;
   let targetId: string;
@@ -309,7 +304,7 @@ export function verbalizeValueConstraint(
 export function verbalizeExternalUniqueness(
   roleIds: readonly string[],
   sourceId: string,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const segments: VerbalizationSegment[] = [
     textSeg("The combination of "),

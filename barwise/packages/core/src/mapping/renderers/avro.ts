@@ -21,6 +21,7 @@
  */
 
 import type { Column, RelationalSchema, Table } from "../RelationalSchema.js";
+import { avroFieldNames } from "./names.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -100,7 +101,10 @@ function renderTableSchema(
   table: Table,
   namespace?: string,
 ): AvroSchema {
-  const fields: AvroField[] = table.columns.map((col) => renderField(col, table));
+  const names = avroFieldNames(table);
+  const fields: AvroField[] = table.columns.map((col) =>
+    renderField(col, table, names.get(col.name)!)
+  );
 
   const schema: AvroSchema = {
     type: "record",
@@ -112,14 +116,18 @@ function renderTableSchema(
   return schema;
 }
 
-function renderField(col: Column, table: Table): AvroField {
+function renderField(col: Column, table: Table, name: string): AvroField {
   const avroType = sqlTypeToAvro(col.dataType);
   const isPk = table.primaryKey.columnNames.includes(col.name);
+  const docs = [
+    ...(isPk ? ["Primary key"] : []),
+    ...(name !== col.name ? [`The column "${col.name}".`] : []),
+  ];
 
   const field: AvroField = {
-    name: col.name,
+    name,
     type: col.nullable ? ["null", avroType] : avroType,
-    ...(isPk ? { doc: "Primary key" } : {}),
+    ...(docs.length > 0 ? { doc: docs.join(". ") } : {}),
   };
 
   return field;

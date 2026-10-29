@@ -10,6 +10,7 @@ import type { OrmModel } from "@barwise/core";
 import { importDbtProject } from "@barwise/dbt";
 import { DdlImportFormat } from "@barwise/formats";
 import { describe, expect, it } from "vitest";
+import { describePreferred } from "./workspace/preferred.js";
 
 /**
  * What the rule decides, compared without names or readings, which the two
@@ -18,8 +19,9 @@ import { describe, expect, it } from "vitest";
  * an objectifier plays in -- its attributes, alternate identifier and
  * remaining foreign keys' relationships (PR #620 review: a column one side
  * dropped would otherwise pass) -- each by players, internal uniquenesses
- * and mandatory roles; external uniquenesses over them; and what is
- * objectified.
+ * and mandatory roles; external uniquenesses over them; what is
+ * objectified; and the preferred identifier of every entity in the model,
+ * not only the ones the rule builds (barwise-fuo).
  */
 function composite(model: OrmModel) {
   const name = (id: string) => model.getObjectType(id)?.name ?? "?";
@@ -56,6 +58,7 @@ function composite(model: OrmModel) {
         ),
     ),
     objectified: model.objectifiedFactTypes.map((o) => name(o.objectTypeId)).sort(),
+    preferred: describePreferred(model),
   };
 }
 
@@ -74,7 +77,117 @@ const keyed = (name: string, key: string[], columns: string) =>
     key.join(", ")
   }]\n    columns:\n${columns}`;
 
+/**
+ * A model's YAML with model-level `foreign_key` constraints added: a
+ * reference over several columns, which dbt states nowhere else
+ * (composite-foreign-key-round-trip.spec.md).
+ */
+const constrained = (model: string, fks: [string[], string, string[]][]) =>
+  model.replace(
+    /^( {2}- name: \w+\n)/,
+    `$1    constraints:\n${
+      fks.map(([cols, to, toCols]) =>
+        `      - type: foreign_key\n        columns: [${cols.join(", ")}]\n`
+        + `        to: ref('${to}')\n        to_columns: [${toCols.join(", ")}]\n`
+      ).join("")
+    }`,
+  );
+const periodDdl = `CREATE TABLE policy (policy_id INT PRIMARY KEY);
+      CREATE TABLE policy_period (
+        policy_id INT NOT NULL REFERENCES policy (policy_id), term_number INT NOT NULL,
+        starts DATE NOT NULL, PRIMARY KEY (policy_id, term_number));`;
+const periodDbt = () =>
+  dbtModel("policy", "policy_id", "")
+  + keyed(
+    "policy_period",
+    ["policy_id", "term_number"],
+    ref("policy_id", "policy", "policy_id") + plain("term_number") + plain("starts"),
+  );
+const period = ["policy_id", "term_number"];
+
 const cases: { name: string; ddl: string; dbt: string; }[] = [
+  {
+    // Two multi-column foreign keys make the key: each is one role, so a
+    // fact type over two periods, not four columns (C03's supersedes shape).
+    name: "a key of two multi-column foreign keys",
+    ddl: `${periodDdl}
+      CREATE TABLE period_supersedes (
+        policy_id INT NOT NULL, term_number INT NOT NULL,
+        prior_policy_id INT NOT NULL, prior_term_number INT NOT NULL,
+        PRIMARY KEY (policy_id, term_number, prior_policy_id, prior_term_number),
+        FOREIGN KEY (policy_id, term_number) REFERENCES policy_period (policy_id, term_number),
+        FOREIGN KEY (prior_policy_id, prior_term_number)
+          REFERENCES policy_period (policy_id, term_number));`,
+    dbt: `models:\n${periodDbt()}${
+      constrained(
+        keyed(
+          "period_supersedes",
+          ["policy_id", "term_number", "prior_policy_id", "prior_term_number"],
+          plain("policy_id") + plain("term_number") + plain("prior_policy_id")
+            + plain("prior_term_number"),
+        ),
+        [[period, "policy_period", period], [
+          ["prior_policy_id", "prior_term_number"],
+          "policy_period",
+          period,
+        ]],
+      )
+    }`,
+  },
+  {
+    // The one unit left beside the key is a whole multi-column foreign key:
+    // it is the third role (C03's coverage-applies-to-risk shape).
+    name: "a multi-column foreign key as the one role beside the key",
+    ddl: `${periodDdl}
+      CREATE TABLE coverage (coverage_id INT PRIMARY KEY);
+      CREATE TABLE risk (risk_id INT PRIMARY KEY);
+      CREATE TABLE coverage_applies (
+        coverage_id INT NOT NULL REFERENCES coverage (coverage_id),
+        risk_id INT NOT NULL REFERENCES risk (risk_id),
+        policy_id INT NOT NULL, term_number INT NOT NULL,
+        PRIMARY KEY (coverage_id, risk_id),
+        FOREIGN KEY (policy_id, term_number) REFERENCES policy_period (policy_id, term_number));`,
+    dbt: `models:\n${periodDbt()}${dbtModel("coverage", "coverage_id", "")}${
+      dbtModel("risk", "risk_id", "")
+    }${
+      constrained(
+        keyed(
+          "coverage_applies",
+          ["coverage_id", "risk_id"],
+          ref("coverage_id", "coverage", "coverage_id") + ref("risk_id", "risk", "risk_id")
+            + plain("policy_id") + plain("term_number"),
+        ),
+        [[period, "policy_period", period]],
+      )
+    }`,
+  },
+  {
+    // With another column beside it, the foreign key is a reference of the
+    // objectifier: one, not one per column (C03's claim shape).
+    name: "a multi-column foreign key outside the key, beside other columns",
+    ddl: `${periodDdl}
+      CREATE TABLE coverage (coverage_id INT PRIMARY KEY);
+      CREATE TABLE risk (risk_id INT PRIMARY KEY);
+      CREATE TABLE coverage_applies (
+        coverage_id INT NOT NULL REFERENCES coverage (coverage_id),
+        risk_id INT NOT NULL REFERENCES risk (risk_id),
+        policy_id INT, term_number INT, note VARCHAR(20) NOT NULL,
+        PRIMARY KEY (coverage_id, risk_id),
+        FOREIGN KEY (policy_id, term_number) REFERENCES policy_period (policy_id, term_number));`,
+    dbt: `models:\n${periodDbt()}${dbtModel("coverage", "coverage_id", "")}${
+      dbtModel("risk", "risk_id", "")
+    }${
+      constrained(
+        keyed(
+          "coverage_applies",
+          ["coverage_id", "risk_id"],
+          ref("coverage_id", "coverage", "coverage_id") + ref("risk_id", "risk", "risk_id")
+            + plain("policy_id", false) + plain("term_number", false) + plain("note"),
+        ),
+        [[period, "policy_period", period]],
+      )
+    }`,
+  },
   {
     // The first shape of the spec: nothing beside the key, nothing
     // referencing it, so an unobjectified many-to-many (PR #621 review).
@@ -312,8 +425,12 @@ describe("the DDL and dbt importers agree on a composite-key table", () => {
       const fromDdl = composite(new DdlImportFormat().parse(c.ddl).model);
       const fromDbt = composite(importDbtProject([c.dbt]).model);
       expect(fromDbt).toEqual(fromDdl);
-      // Not vacuous: each case states a relationship.
+      // Not vacuous: each case states a relationship, and each objectifier
+      // has an identifier, so losing it on both sides does not pass.
       expect(fromDdl.factTypes.length).toBeGreaterThan(0);
+      for (const o of fromDdl.objectified) {
+        expect(fromDdl.preferred.some((p) => p.startsWith(`${o}: `))).toBe(true);
+      }
     });
   }
 });

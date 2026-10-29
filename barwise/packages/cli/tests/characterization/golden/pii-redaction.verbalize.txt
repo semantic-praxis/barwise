@@ -1,0 +1,79 @@
+Document has DocumentId
+DocumentId identifies Document
+  Each Document has at most one DocumentId.
+  Each DocumentId identifies at most one Document.
+  Each Document has at least one DocumentId.
+Document originates from SourceSystem
+SourceSystem is source system of Document
+  The possible values of SourceSystem are: {'customer-support', 'lending', 'health-intake', 'survey'}.
+Document was received at ReceivedTimestamp
+ReceivedTimestamp records Document
+Document has RawText
+RawText is raw text of Document
+Document has status DocumentStatus
+DocumentStatus is status of Document
+  Each Document that has status some DocumentStatus has status exactly 1 instance of DocumentStatus.
+Document has scan Scan
+Scan is scan of Document
+Scan produced Finding
+Finding is produced by Scan
+Finding has start position StartPosition
+StartPosition is start position of Finding
+  Each Finding has start position at most one StartPosition.
+  Each Finding has start position at least one StartPosition.
+Finding has end position EndPosition
+EndPosition is end position of Finding
+  Each Finding has end position at least one EndPosition.
+Finding has category PIICategory
+PIICategory is category of Finding
+  The possible values of PIICategory are: {'full-name', 'email-address', 'phone-number', 'date-of-birth', 'social-security-number', 'credit-card-number', 'mailing-address', 'ip-address', 'passport-number', 'drivers_license_number'}.
+Finding has confidence score ConfidenceScore
+ConfidenceScore is confidence score of Finding
+Finding is reviewed by Reviewer
+Reviewer reviews Finding
+  Each Finding is reviewed by at least one Reviewer.
+ReviewDecision is decision of Finding
+Finding has decision ReviewDecision
+  Each ReviewDecision is decision of at least one Finding.
+Reviewer has EmployeeId
+EmployeeId identifies Reviewer
+Reviewer has name ReviewerName
+ReviewerName is name of Reviewer
+Reviewer has clearance level ClearanceLevel
+ClearanceLevel is clearance level of Reviewer
+  The possible values of ClearanceLevel are: {'standard', 'elevated', 'restricted'}.
+Document has redacted text RedactedText
+RedactedText is redacted text of Document
+  Each Document has redacted text at least one RedactedText.
+AuditEntry is about Document
+Document has audit entry AuditEntry
+  Each AuditEntry is about at least one Document.
+AuditEntry performed by Reviewer
+Reviewer performed AuditEntry
+AuditEntry has action type ActionType
+ActionType is action type of AuditEntry
+Scan uses model version ModelVersion
+ModelVersion is model version of Scan
+  Each Scan uses model version at least one ModelVersion.
+Document is released to DownstreamSystem
+DownstreamSystem receives Document
+Release has timestamp ReleaseTimestamp
+ReleaseTimestamp is timestamp of Release
+  Each Release has timestamp at least one ReleaseTimestamp.
+Release has content hash RedactedContentHash
+RedactedContentHash is content hash of Release
+  Each Release has content hash at most one RedactedContentHash.
+Release is where Document is released to DownstreamSystem.
+== Open questions ==
+[finding.(ambiguous)] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[review_decision.(ambiguous)] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[audit_entry.audit_id] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[scan.scan_version] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[document_has_scan.scan_version] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[scan_produced_finding.scan_version] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[scan_produced_finding.(ambiguous)] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[finding_reviewed_by_reviewer.(ambiguous)] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[review_decision_is_decision_of_finding.(ambiguous)] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[review_decision_is_decision_of_finding.has_decision_about_(ambiguous)] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[audit_entry_about_document.audit_id] Data type was not declared; exported as TEXT. Add a data type to the value type.
+[audit_entry_performed_by_reviewer.audit_id] Data type was not declared; exported as TEXT. Add a data type to the value type.

@@ -1,0 +1,166 @@
+/**
+ * The pinned Ossie ontology schema at run time, and the fields a document
+ * carries that it does not define (`docs/specs/ossie-unknown-fields.spec.md`).
+ *
+ * `parseOssie` checks only the fields the mapper reads, so without this a
+ * field the schema does not define -- a typo, or one upstream added under
+ * the same development version string -- imported with nothing said. The
+ * schema already states which fields exist (`additionalProperties: false`
+ * on every object it closes), so ajv reads that here rather than barwise
+ * restating it: a moved pin moves the answer with it.
+ *
+ * Only `additionalProperties` errors are read. `unevaluatedProperties`
+ * closes an object too; the pinned schemas do not use it, and
+ * `tests/OssieSchema.test.ts` fails if a re-pin does, so this is changed
+ * then rather than missing its fields silently. Every other violation is
+ * either refused by `parseOssie` (a field the mapper reads) or sits in a
+ * subtree the mapper drops whole with a warning (the spec's Out of scope).
+ */
+import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
+import ontologySchema from "../../schemas/ossie/ontology.json" with { type: "json" };
+import ossieCoreSchema from "../../schemas/ossie/ossie-schema.json" with { type: "json" };
+import { OSSIE_VERSION } from "./OssieTypes.js";
+import { IDENT_PATTERN } from "./requiresShapes.js";
+
+/**
+ * The URL `ontology.json`'s `$ref`s name for the core schema, on Ossie's
+ * moving `main`. Written here, not read from the schema: a re-pin that
+ * changed it fails every Ossie test at compile, before it can ship.
+ */
+export const OSSIE_CORE_SCHEMA_URL =
+  "https://raw.githubusercontent.com/apache/ossie/main/core-spec/ossie-schema.json";
+
+/**
+ * Compile the pinned `ontology.json` on `ajv`, with the core schema served
+ * from the vendored copy under the URL its `$ref`s name, so validation
+ * needs no network and cannot drift from the pin. The caller configures
+ * `ajv`: the export test compiles strictly with an `iri` format, the
+ * importer leniently.
+ */
+export function compileOssieSchema(ajv: Ajv2020): ValidateFunction {
+  // The core schema keeps its own `$id`; it is registered under the URL as
+  // well. Deleting the `$id`, as an earlier copy of this did, would mutate
+  // the imported JSON module every importer of it shares.
+  // Registered once per `ajv`, so a second compile on it does not throw;
+  // a different schema already under the URL is refused, not validated
+  // against in the pinned one's place.
+  const registered = ajv.getSchema(OSSIE_CORE_SCHEMA_URL);
+  if (registered === undefined) ajv.addSchema(ossieCoreSchema, OSSIE_CORE_SCHEMA_URL);
+  else if (registered.schema !== ossieCoreSchema) {
+    throw new Error(`another schema is registered under ${OSSIE_CORE_SCHEMA_URL}`);
+  }
+  return ajv.compile(ontologySchema);
+}
+
+let importValidator: ValidateFunction | undefined;
+
+/**
+ * Not strict: strict mode checks how a schema is written, not the document,
+ * so at run time it could only turn a re-pinned schema it dislikes into an
+ * error on every import. The export test compiles strictly, so CI still
+ * sees such a schema. No format is read, so none is validated. Compiled
+ * on first use (about 75 ms) and kept: most processes import no Ossie.
+ * Loading the module is not deferred: `ajv/dist/2020.js` adds about 3 ms
+ * over the ajv core already loads, and deferring it would need an
+ * asynchronous import that `ImportFormat.parse` cannot await.
+ */
+function validator(): ValidateFunction {
+  importValidator ??= compileOssieSchema(
+    new Ajv2020({ allErrors: true, strict: false, validateFormats: false }),
+  );
+  return importValidator;
+}
+
+/**
+ * One warning per field in `raw` (the parsed document, before any of it is
+ * read) that the pinned schema does not define. The order is ajv's: fixed
+ * for a given document, an object's own unknown keys before its children's.
+ */
+export function unknownOssieFields(raw: unknown): string[] {
+  const whole = check(raw);
+  if (Array.isArray(whole)) return whole;
+  // ajv recurses over the document, so a YAML alias cycle through the
+  // schema's recursive defs overflows its stack. The only recursive defs
+  // are inside `ontology_mappings` (`LinkMapping.children`,
+  // `ReferentMapping.referent_mappings`), which the mapper drops whole; the
+  // rest is checked without it, so the fields that are imported are still
+  // named. The document imported before this check existed, so it still
+  // does: what is lost is the check of the dropped block, and the warning
+  // says so.
+  const doc = raw as Record<string, unknown>;
+  if ("ontology_mappings" in doc) {
+    const { ontology_mappings: _dropped, ...rest } = doc;
+    const others = check(rest);
+    if (Array.isArray(others)) {
+      return [
+        ...others,
+        `ontology_mappings: could not be checked against the Ossie ${OSSIE_VERSION} schema `
+        + `(${whole.message}); a field it does not define there would not be named.`,
+      ];
+    }
+  }
+  return [
+    `the document could not be checked against the Ossie ${OSSIE_VERSION} schema `
+    + `(${whole.message}); a field the schema does not define would not be named.`,
+  ];
+}
+
+/** The warnings for `doc`, or the stack overflow that stopped ajv walking it. */
+function check(doc: unknown): string[] | RangeError {
+  const validate = validator();
+  try {
+    if (validate(doc)) return [];
+  } catch (err) {
+    if (err instanceof RangeError) return err;
+    throw err;
+  }
+  return (validate.errors ?? [])
+    .filter((e) => e.keyword === "additionalProperties")
+    .map((e) => {
+      const field = (e.params as { additionalProperty: string; }).additionalProperty;
+      return `${renderPath(doc, e.instancePath, field)}: the Ossie ${OSSIE_VERSION} schema `
+        + `defines no such field; ignored.`;
+    });
+}
+
+/**
+ * A JSON pointer as the path `parseOssie`'s refusals write: `concept <name>`
+ * for a path under `ontology[i]`, else from the root -- except that a name
+ * or key that is not a plain identifier is quoted here, where the refusals
+ * write it bare, because a warning's path is read as steps. Each segment is read
+ * against the document, so an index into a list (`[0]`) and a key that
+ * happens to be numeric (`["0"]`) cannot be confused.
+ */
+function renderPath(raw: unknown, pointer: string, field: string): string {
+  const segments = pointer === "" ? [] : pointer.slice(1).split("/").map(decodeSegment);
+  let at = raw;
+  let path = "";
+  for (const [i, segment] of segments.entries()) {
+    if (Array.isArray(at)) {
+      const index = Number(segment);
+      const item: unknown = at[index];
+      if (i === 1 && segments[0] === "ontology") {
+        // parseOssie has refused any component without a string `concept`.
+        const name = (item as { concept: string; }).concept;
+        path = `concept ${IDENT_PATTERN.test(name) ? name : JSON.stringify(name)}`;
+      } else {
+        path = `${path}[${index}]`;
+      }
+      at = item;
+    } else {
+      path += key(segment, path === "");
+      at = (at as Record<string, unknown>)[segment];
+    }
+  }
+  return path + key(field, path === "");
+}
+
+function key(name: string, first: boolean): string {
+  if (!IDENT_PATTERN.test(name)) return `[${JSON.stringify(name)}]`;
+  return first ? name : `.${name}`;
+}
+
+/** RFC 6901: `~1` is `/`, then `~0` is `~`. */
+function decodeSegment(segment: string): string {
+  return segment.replace(/~1/g, "/").replace(/~0/g, "~");
+}

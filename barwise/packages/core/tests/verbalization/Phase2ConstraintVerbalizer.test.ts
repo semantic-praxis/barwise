@@ -438,16 +438,61 @@ describe("Phase 2 constraint verbalization", () => {
     const { model, ft } = buildBinaryModel();
     const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 2, max: 5 };
     const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toContain("at least 2 and at most 5");
-    expect(v.text).toContain("Customer");
+    // Conditional on playing the role, and counted without a plural the
+    // model does not hold (binary-constraint-sentences.spec.md, barwise-zx2).
+    expect(v.text).toBe(
+      "Each Customer that places some Order places at least 2 and at most 5 instances of Order.",
+    );
   });
 
   it("verbalizes frequency naming the role at index 1 as the subject", () => {
     const { model, ft } = buildBinaryModel();
     const c: Constraint = { type: "frequency", roleIds: ["r2"], min: 1, max: 1 };
     const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toContain("Each Order");
-    expect(v.text).toContain("Customer");
+    expect(v.text).toBe(
+      "Each Order that is placed by some Customer is placed by exactly 1 instance of Customer.",
+    );
+  });
+
+  it("verbalizes frequency on a role no reading opens with, from the reading as written", () => {
+    // Only "{0} places {1}"; the frequency is on Order's role. Sliced, the
+    // reading read backwards ("Each Order places ... Customer", barwise-zx2).
+    const model = new OrmModel({ name: "Test" });
+    const customer = model.addObjectType({
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "c_id",
+    });
+    const order = model.addObjectType({ name: "Order", kind: "entity", referenceMode: "o_id" });
+    const ft = model.addFactType({
+      name: "Customer places Order",
+      roles: [
+        { id: "r1", name: "places", playerId: customer.id },
+        { id: "r2", name: "is placed by", playerId: order.id },
+      ],
+      readings: ["{0} places {1}"],
+      constraints: [{ type: "frequency", roleIds: ["r2"], min: 2, max: 2 }],
+    });
+    expect(verbalizer.verbalizeAll(ft.id, model)[0]!.text).toBe(
+      "For each Order, if some Customer places that Order, then that holds for exactly 2 instances of Customer.",
+    );
+  });
+
+  it("numbers a ring's players in the reverse frequency sentence", () => {
+    const model = new OrmModel({ name: "Test" });
+    const person = model.addObjectType({ name: "Person", kind: "entity", referenceMode: "p_id" });
+    const ft = model.addFactType({
+      name: "Person reports to Person",
+      roles: [
+        { id: "r1", name: "reports to", playerId: person.id },
+        { id: "r2", name: "manages", playerId: person.id },
+      ],
+      readings: ["{0} reports to {1}"],
+      constraints: [{ type: "frequency", roleIds: ["r2"], min: 1, max: 9 }],
+    });
+    expect(verbalizer.verbalizeAll(ft.id, model)[0]!.text).toBe(
+      "For each Person2, if some Person1 reports to that Person2, then that holds for at least 1 and at most 9 instances of Person1.",
+    );
   });
 
   it("verbalizes frequency falling back to the role name when the player type is not in the model", () => {
@@ -504,15 +549,26 @@ describe("Phase 2 constraint verbalization", () => {
     const { model, ft } = buildBinaryModel();
     const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 3, max: "unbounded" };
     const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toContain("at least 3");
-    expect(v.text).not.toContain("at most");
+    expect(v.text).toBe(
+      "Each Customer that places some Order places at least 3 instances of Order.",
+    );
+  });
+
+  it("agrees the counted noun with a last number of 1", () => {
+    const { model, ft } = buildBinaryModel();
+    const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 1, max: "unbounded" };
+    expect(verbalizer.verbalize(c, ft, model).text).toBe(
+      "Each Customer that places some Order places at least 1 instance of Order.",
+    );
   });
 
   it("verbalizes frequency with exact count", () => {
     const { model, ft } = buildBinaryModel();
     const c: Constraint = { type: "frequency", roleIds: ["r1"], min: 3, max: 3 };
     const v = verbalizer.verbalize(c, ft, model);
-    expect(v.text).toContain("exactly 3");
+    expect(v.text).toBe(
+      "Each Customer that places some Order places exactly 3 instances of Order.",
+    );
   });
 
   it("verbalizes frequency on a non-binary fact type", () => {
@@ -799,30 +855,28 @@ describe("Phase 2 constraint verbalization", () => {
       expect(v[0]!.text).toContain("'Promotion is active' role");
     });
 
-    it("extractPredicate uses fallback when reading order does not match subject/object", () => {
+    it("the ring reading falls back to placeholder order when no reading names the subject first", () => {
       // Build a fact type where the reading template has {1} before {0}.
       const model = new OrmModel({ name: "Test" });
       const a = model.addObjectType({ name: "Alpha", kind: "entity", referenceMode: "a_id" });
-      const b = model.addObjectType({ name: "Beta", kind: "entity", referenceMode: "b_id" });
       const ft = model.addFactType({
-        name: "Alpha and Beta",
+        name: "Alpha is linked from Alpha",
         roles: [
           { id: "r1", name: "role1", playerId: a.id },
-          { id: "r2", name: "role2", playerId: b.id },
+          { id: "r2", name: "role2", playerId: a.id },
         ],
         // Only an inverse reading (object before subject).
         readings: ["{1} is linked from {0}"],
         constraints: [
-          { type: "internal_uniqueness", roleIds: ["r1"] },
+          { type: "ring", roleId1: "r1", roleId2: "r2", ringType: "irreflexive" },
         ],
       });
 
-      // This triggers extractPredicate with subjectIdx=0 and objectIdx=1,
-      // but the reading has {1} before {0}, so the primary path fails.
-      // The fallback extracts the predicate between the two placeholders.
+      // With subjectIdx=0 and objectIdx=1 and only {1} before {0}, no reading
+      // names the subject first, and ringReading takes the first reading by
+      // placeholder position.
       const v = verbalizer.verbalizeAll(ft.id, model);
-      expect(v).toHaveLength(1);
-      expect(v[0]!.text).toBeDefined();
+      expect(v.map((x) => x.text)).toEqual(["No Alpha is linked from that same Alpha."]);
     });
   });
 

@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { mergeAndValidate } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 /**
@@ -69,7 +69,7 @@ describe("a shared id is the same element", () => {
     { kind: "object type", existing: model("A", "F"), incoming: model("B", "F"), id: "x" },
     { kind: "fact type", existing: model("A", "F"), incoming: model("A", "G"), id: "f" },
   ])("a $kind renamed under its kept id is one modification", ({ existing, incoming, id }) => {
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const changed = deltas.filter((d) => d.kind !== "unchanged");
     expect(changed.map((d) => [d.kind, d.existing?.id])).toEqual([["modified", id]]);
 
@@ -77,7 +77,12 @@ describe("a shared id is the same element", () => {
     for (
       const [accepted, side] of [[new Set([at]), incoming], [new Set<number>(), existing]] as const
     ) {
-      const result = mergeAndValidate(existing, incoming, deltas, accepted);
+      const result = mergeAndValidate(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        accepted,
+      );
       expect(result.diagnostics).toEqual([]);
       const merged = result.model!;
       expect(counts(merged)).toEqual(counts(existing));
@@ -99,10 +104,15 @@ describe("a shared id is the same element", () => {
     };
     const existing = swapped("Customer", "Client");
     const incoming = swapped("Client", "Customer");
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const renameA = deltas.findIndex((d) => d.existing?.id === "a");
 
-    const result = mergeAndValidate(existing, incoming, deltas, new Set([renameA]));
+    const result = mergeAndValidate(
+      existing,
+      incoming,
+      { deltas, matching: "id-first", recognizeRenames: false },
+      new Set([renameA]),
+    );
     expect(result.model).toBeNull();
     expect(result.diagnostics.map((d) => d.message)).toEqual([
       'Merge failed: two elements would take one name: object type "Client": '
@@ -112,7 +122,14 @@ describe("a shared id is the same element", () => {
     ]);
     // Deciding both together is fine either way.
     const all = new Set(deltas.map((_, i) => i));
-    expect(mergeAndValidate(existing, incoming, deltas, all).model?.getObjectType("a")?.name)
+    expect(
+      mergeAndValidate(existing, incoming, {
+        deltas,
+        matching: "id-first",
+        recognizeRenames: false,
+      }, all).model
+        ?.getObjectType("a")?.name,
+    )
       .toBe("Client");
   });
 
@@ -126,10 +143,17 @@ describe("a shared id is the same element", () => {
     existing.addObjectType({ id: "2", name: "B", kind: "value" });
     const incoming = new OrmModel({ name: "M" });
     incoming.addObjectType({ id: "1", name: "B", kind: "value" });
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const policy = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
 
-    expect(mergeAndValidate(existing, incoming, deltas, policy).diagnostics.map((d) => d.message))
+    expect(
+      mergeAndValidate(existing, incoming, {
+        deltas,
+        matching: "id-first",
+        recognizeRenames: false,
+      }, policy).diagnostics
+        .map((d) => d.message),
+    )
       .toEqual([
         'Merge failed: two elements would take one name: object type "B": '
         + '1 (renamed from "A"), '
@@ -138,7 +162,14 @@ describe("a shared id is the same element", () => {
         + "or rename one of them in the base model first.",
       ]);
     const all = new Set(deltas.map((_, i) => i));
-    expect(mergeAndValidate(existing, incoming, deltas, all).model?.objectTypes.map((o) => o.id))
+    expect(
+      mergeAndValidate(existing, incoming, {
+        deltas,
+        matching: "id-first",
+        recognizeRenames: false,
+      }, all).model?.objectTypes
+        .map((o) => o.id),
+    )
       .toEqual(["1"]);
   });
 

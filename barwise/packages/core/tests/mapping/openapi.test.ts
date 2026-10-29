@@ -588,6 +588,37 @@ describe("OpenAPI renderer", () => {
       expect(itemPath["get"]).toBeDefined();
       expect(itemPath["put"]).toBeDefined();
       expect(itemPath["delete"]).toBeDefined();
+      // One key column, one required path parameter, on each operation.
+      for (const op of ["get", "put", "delete"]) {
+        const params =
+          (itemPath[op] as { parameters: { name: string; in: string; required: boolean; }[]; })
+            .parameters;
+        expect(params.map((p) => [p.name, p.in, p.required])).toEqual([[
+          "customer_id",
+          "path",
+          true,
+        ]]);
+      }
+    });
+
+    it("gives a many-to-many table, as the mapper keys it, both key columns in the item path", () => {
+      const model = new ModelBuilder("Test")
+        .withEntityType("Student", { referenceMode: "student_id" })
+        .withEntityType("Course", { referenceMode: "course_id" })
+        .withBinaryFactType("Student enrolls in Course", {
+          role1: { player: "Student", name: "enrolls in" },
+          role2: { player: "Course", name: "has enrolled" },
+          uniqueness: "spanning",
+        })
+        .build();
+      const relSchema = mapper.map(placeFlags(model));
+      const table = relSchema.tables.find((t) => t.name === "student_enrolls_in_course")!;
+      const key = table.primaryKey.columnNames;
+      expect(key).toHaveLength(2);
+      const spec = renderOpenApi(relSchema);
+      expect(Object.keys(spec.paths)).toContain(
+        `/student-enrolls-in-course/${key.map((c) => `{${c}}`).join("/")}`,
+      );
     });
 
     it("uses kebab-case for path segments", () => {
@@ -732,6 +763,102 @@ describe("OpenAPI renderer", () => {
       const pathKeys = Object.keys(spec.paths);
 
       expect(pathKeys).toContain("/log-entry/{id}");
+    });
+
+    it("names every column of a key over several columns, in key order, in the path and every item operation", () => {
+      // openapi-composite-key-path.spec.md (barwise-pki): the first column
+      // alone addresses many rows.
+      const column = (name: string) => ({
+        name,
+        dataType: "TEXT",
+        dataTypeDefaulted: false,
+        nullable: false,
+      });
+      const relSchema: RelationalSchema = {
+        sourceModelId: "test",
+        tables: [{
+          name: "seat_booking",
+          columns: [column("flight_id"), column("seat_no"), column("leg_no"), column("passenger")],
+          primaryKey: { columnNames: ["flight_id", "leg_no", "seat_no"] },
+          foreignKeys: [],
+          sourceElementId: "ft-seat-booking",
+        }],
+      };
+      const spec = renderOpenApi(relSchema);
+      const itemPath = "/seat-booking/{flight_id}/{leg_no}/{seat_no}";
+      expect(Object.keys(spec.paths)).toEqual(["/seat-booking", itemPath]);
+      const item = spec.paths[itemPath] as Record<
+        string,
+        { parameters: { name: string; in: string; required: boolean; }[]; }
+      >;
+      for (const op of ["get", "put", "delete"]) {
+        expect(item[op]!.parameters.map((p) => [p.name, p.in, p.required])).toEqual([
+          ["flight_id", "path", true],
+          ["leg_no", "path", true],
+          ["seat_no", "path", true],
+        ]);
+      }
+    });
+  });
+
+  describe("path parameters are valid template variables (barwise-9g3)", () => {
+    const column = (name: string) => ({
+      name,
+      dataType: "TEXT",
+      dataTypeDefaulted: false,
+      nullable: false,
+    });
+    /** The item path and its get operation's parameters, for one table. */
+    function item(columns: string[], key: string[]) {
+      const spec = renderOpenApi({
+        sourceModelId: "test",
+        tables: [{
+          name: "finding",
+          columns: columns.map(column),
+          primaryKey: { columnNames: key },
+          foreignKeys: [],
+          sourceElementId: "ot-finding",
+        }],
+      });
+      const path = Object.keys(spec.paths)[1]!;
+      const ops = spec.paths[path] as Record<
+        string,
+        { parameters: { name: string; description?: string; }[]; }
+      >;
+      return { path, parameters: ops["get"]!.parameters };
+    }
+
+    it("renames a column outside the alphabet, and says which column it carries", () => {
+      const { path, parameters } = item(["(ambiguous)", "note"], ["(ambiguous)"]);
+      expect(path).toBe("/finding/{_ambiguous_}");
+      expect(parameters).toEqual([
+        expect.objectContaining({
+          name: "_ambiguous_",
+          description: 'The key column "(ambiguous)".',
+        }),
+      ]);
+    });
+
+    it("keeps a valid name as it is, with no description", () => {
+      const { path, parameters } = item(["order__id", "_id"], ["order__id", "_id"]);
+      expect(path).toBe("/finding/{order__id}/{_id}");
+      expect(parameters.map((p) => p.description)).toEqual([undefined, undefined]);
+    });
+
+    it("never takes a valid key column's name, whatever the key order", () => {
+      // "x(y" maps to "x_y", which the later, valid column holds.
+      const { path } = item(["x(y", "x_y"], ["x(y", "x_y"]);
+      expect(path).toBe("/finding/{x_y_2}/{x_y}");
+    });
+
+    it("never takes another column's name", () => {
+      const { path } = item(["(ambiguous)", "_ambiguous_"], ["(ambiguous)"]);
+      expect(path).toBe("/finding/{_ambiguous__2}");
+    });
+
+    it("gives two columns that map to one name distinct names", () => {
+      const { path } = item(["a(b", "a)b"], ["a(b", "a)b"]);
+      expect(path).toBe("/finding/{a_b}/{a_b_2}");
     });
   });
 

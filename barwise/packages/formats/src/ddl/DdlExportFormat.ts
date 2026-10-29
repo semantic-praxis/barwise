@@ -25,6 +25,7 @@ import { generateDdlLineage } from "@barwise/core/lineage";
 import {
   type ConstraintRouting,
   type DialectCapabilityProfile,
+  hasGeneratedKeys,
   RelationalMapper,
   renderDdl,
   renderPopulationAsSql,
@@ -32,6 +33,7 @@ import {
   routeConstraints,
   type RoutedClause,
   type SpilledConstraint,
+  SURROGATE_POPULATION_NOTE,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
 import { injectBarwiseAnnotations } from "./barwiseAnnotation.js";
@@ -77,6 +79,7 @@ export class DdlExportFormat implements ExportFormatAdapter {
     const mapper = new RelationalMapper();
     const schema = mapper.map(model, {
       preferredIdentifierStrategy: options?.preferredIdentifierStrategy,
+      surrogateKeys: options?.surrogateKeys === true,
     });
 
     // Collect annotations from the model and schema.
@@ -99,15 +102,40 @@ export class DdlExportFormat implements ExportFormatAdapter {
       // Last, so each line sits directly above what it names. The importer
       // reads these instead of guessing names from columns
       // (ddl-round-trip-fixed-point.spec.md, workstream 4).
-      ddlText = injectBarwiseAnnotations(ddlText, model, schema);
+      ddlText = injectBarwiseAnnotations(
+        ddlText,
+        model,
+        schema,
+        routing.clauses.flatMap((c) =>
+          c.columns ? [{ tableName: c.tableName, columns: c.columns }] : []
+        ),
+      );
     }
 
-    // Append population INSERT statements if requested.
+    // Append population INSERT statements if requested. Not with generated
+    // keys: barwise computes no hash, and a row without its key violates
+    // its table (surrogate-key-export.spec.md, open decision 4).
     if (includeExamples) {
       const populationSql = renderPopulationAsSql(model, schema);
-      if (populationSql) {
+      if (populationSql && hasGeneratedKeys(schema)) {
+        ddlText += `\n${SURROGATE_POPULATION_NOTE.replace(/^/gm, "-- ")}\n`;
+      } else if (populationSql) {
         ddlText += populationSql;
       }
+    }
+
+    // A dialect with no UNIQUE cannot state a natural key a generated key
+    // replaced; said here, as a spilled constraint is, rather than dropped
+    // without a word (surrogate-key-export.spec.md).
+    const unstated = profile.unique === "absent"
+      ? schema.tables.filter((t) => t.naturalKey)
+      : [];
+    if (unstated.length > 0) {
+      ddlText +=
+        `\n-- ${dialect} has no UNIQUE, so these natural keys, which generated keys replaced, `
+        + `are not enforced:\n${
+          unstated.map((t) => `--   ${t.name} (${t.naturalKey!.join(", ")})`).join("\n")
+        }\n`;
     }
 
     // Include validation diagnostics as warnings in the result if present.
@@ -121,7 +149,7 @@ export class DdlExportFormat implements ExportFormatAdapter {
       text,
       // What each artifact was built from, for `lineage impact`. No format
       // set it, so every manifest recorded `sources: []` (barwise-ofb).
-      lineage: generateDdlLineage(model, schema),
+      lineage: generateDdlLineage(model, schema, routing.placements),
       annotations: annotations.length > 0 ? annotations : undefined,
       ...withConstraintSpecs(routing.spilled.map((s) => s.spec)),
     };

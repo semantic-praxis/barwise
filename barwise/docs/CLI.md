@@ -132,6 +132,14 @@ Options:
 - `--no-annotate` -- exclude TODO/NOTE annotations
 - `--strict` -- fail on validation errors
 - `--no-examples` -- exclude population example data
+- `--surrogate-keys` -- for `ddl` and `dbt`: give every table keyed
+  on several columns a generated key (`<table>_key`, `VARCHAR(32)`, the
+  hash `dbt_utils.generate_surrogate_key` computes), and make every
+  reference to one a single column beside the natural columns it is
+  hashed from. The natural key stays a UNIQUE (a combination test in
+  dbt), the dbt model SQL computes each generated column, and no
+  population rows are written, since barwise computes no hash. Refused
+  for any other format.
 
 When the format reports constraints it could not express (`ddl`, which
 spills them per dialect; `openapi`, `avro` and `dbt`, which carry only
@@ -180,6 +188,7 @@ Compare two ORM model files and report structural deltas.
 barwise diff old.orm.yaml new.orm.yaml
 barwise diff old.orm.yaml new.orm.yaml --format json
 barwise diff old.orm.yaml new.orm.yaml --no-synonyms
+barwise diff old.orm.yaml new.orm.yaml --rename "fact-type:Customer places Order=Customer submits Order"
 ```
 
 Options:
@@ -193,11 +202,33 @@ Options:
   whose ids are unrelated but may coincide, such as two extractions
   numbered from one counter. `barwise merge` has no such option; see
   the capability matrix in the root `CLAUDE.md`.
+- `--rename <kind>:<old>=<new>` -- pair an element renamed in an edit
+  that also changed it, which the diff cannot recognize; `<kind>` is
+  `object-type` or `fact-type`. Repeatable. A name either model does
+  not hold, or an element already paired with another, is refused. The
+  value splits at the first `=`, so an old name holding `=` is declared
+  through MCP `diff_models` instead.
+
+An object type or fact type that ids and names leave unpaired is paired
+with the one element on the other side that says the same thing -- a fact
+type by its players, role names and constraints; an object type by the
+roles it plays, the subtype facts it is an end of, and a value type's
+value constraint and data type -- and reported as a possible rename, with
+the line "Possibly a rename: paired by what it says, not by its id or name."
+Two different elements of one shape pair the same way, so such a pair is
+rated no lower than the removal it stands in for.
+It matters for two models whose ids are unrelated, such as two imports of
+one schema; a rename within one file keeps its id and pairs by it. A shape
+two elements share pairs nothing, an object type that plays no role and
+ends no subtype fact is never paired this way, and an object type renamed
+together with a fact type it plays in is not recognized; `--rename`
+covers those.
 
 With `--format json`, each delta carries `changes` (what changed, as
 data) beside `changeDescriptions` (the same, as sentences). The shape is
 the MCP `diff_models` tool's; docs/MCP.md shows an example and says how
-constraints are paired.
+constraints are paired. A recognized or declared rename carries
+`pairedBy: "recognized"` or `"declared"`.
 
 ### merge
 
@@ -218,6 +249,11 @@ Neither input file is modified. The merged model goes to stdout unless
 `--output` names a file. If the merge produces structural errors,
 nothing is written anywhere and the command exits 1 -- a broken model
 on disk is worse than no model.
+
+Merge never pairs elements by content. Its diff pairs by id and name
+only, so a new element of the same shape as one in the base (a
+`Supplier` beside a `Vendor`) is added beside it rather than folded
+into it, which `barwise diff` would report as a possible rename.
 
 Options:
 
@@ -243,13 +279,16 @@ one is kept. Each is printed under its file. Run `barwise validate` with
 your 2.x build first if you want to see those cases before they are
 resolved.
 
-This is the one command that modifies its inputs. The file is written
+This is one of the two commands that modify their inputs, with `rename`. The file is written
 from the model, so YAML comments and hand layout in it are not kept. A
 file already at 3.0 is left untouched. A file is not written, and is
 reported, when it cannot be read or does not load, when its 3.0 form would
 not load back (2.0 allowed two constraints to share an id), or when it
 names elements it does not define (a fragment) and carries `is_preferred`
 flags, which cannot be placed without the rest of the model. The rest are still migrated.
+A file is also refused when `<file>.migrating` already exists beside it:
+that is the staged copy an interrupted run left, and `migrate` neither
+writes over it nor removes it. Remove it by hand and run again.
 
 Exit codes: 0 when every file was migrated or already current; 1 under
 `--check` when a file would be rewritten; 2 when any file could not be
@@ -260,6 +299,61 @@ Options:
 - `--check` -- write nothing; exit 1 if any file would be rewritten
 - `--format <text|json>` -- output format (default: text); json prints one
   record per file
+
+### rename
+
+Rename an object type, a fact type or a role, in a model file or across a
+project.
+
+```sh
+barwise rename shop.orm.yaml --object-type Order --to Purchase
+barwise rename shop.orm.yaml --fact-type "Customer places Order" --role-position 1 --to "is placed by"
+barwise rename --project project.orm-project.yaml --domain crm --object-type Customer --to Client
+```
+
+Every reference between elements is an id, so a rename keeps every id and
+changes names. Beyond the element's own name it rewrites its definition,
+when the term is the element's alone and the new term is not already
+defined, and the reference mode of each entity whose key the relational
+mapper types from a renamed value type. Notes, aliases and other free text
+are left as written. Given a project, the rename follows an owned object
+type into its shadows in other domains, every domain's definitions, the
+reference modes of the entity's copies, and both sides of each mapping
+file, and writes exactly the files it changed.
+
+It refuses, and writes nothing, when the element does not exist or a role
+name is shared (name it by `--role-position`), when the new name or its
+local name is already taken, when the element is a shadow (rename its
+owner, through the project), when the rename would change which value type
+keys an entity, when a project did not load cleanly, or when the file, or
+any domain of the project, is not at the current format (run `barwise
+migrate` on it first, which reports what migrating it changes). A model file that
+declares a `domain_context` gets a warning: if it is a project's domain,
+rename through `--project` so its shadows and mapping files follow.
+
+This is one of the two commands that modify their inputs, with `migrate`.
+Every changed file is staged before any is replaced, so a failure while
+staging changes nothing. If replacing them fails part-way (a full disk,
+a permission change), it exits 2 and the json output's `files` and
+`changes` name what was already replaced. Files are written from the
+model, so YAML comments in a rewritten file are lost, as with `migrate`.
+
+Exit codes: 0 when the rename was written; 1 under `--check` when a file
+would be rewritten; 2 when the rename was refused, a file could not be
+read, `--format` is unknown, or the write failed. A mistake commander
+itself rejects (an unknown option, an option missing its value) exits 1,
+as it does for every command; see barwise-o5y.
+
+Options:
+
+- `--object-type <name>` or `--fact-type <name>` -- the element to rename
+- `--role <name>` or `--role-position <n>` -- with `--fact-type`, the role
+  to rename (positions count from 0)
+- `--to <name>` -- the new name (required)
+- `--project <manifest>` and `--domain <context>` -- rename through a
+  project, in place of a model file
+- `--check` -- write nothing; exit 1 if any file would be rewritten
+- `--format <text|json>` -- output format (default: text)
 
 ### review
 
@@ -408,7 +502,9 @@ Options:
 - `--format <ddl|openapi|norma|ossie>` -- source format (required).
   `ossie` reads an Apache Ossie ontology document at version
   `0.2.0.dev0` and refuses any other version; each construct it cannot
-  carry is a warning (`docs/specs/ossie-ontology-format.spec.md`)
+  carry is a warning (`docs/specs/ossie-ontology-format.spec.md`), and so
+  is each field the pinned schema does not define
+  (`docs/specs/ossie-unknown-fields.spec.md`)
 - `--output <file>` -- write .orm.yaml to file instead of stdout
 - `--name <name>` -- model name (defaults to filename)
 - `--infer-references` -- read a column with no declared foreign key

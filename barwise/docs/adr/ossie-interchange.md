@@ -3,7 +3,8 @@
 Scope: architecture
 Date: 2026-10-28
 Tracking: barwise-pf2.4, barwise-pf2, barwise-wcg,
-docs/specs/ossie-ontology-format.spec.md
+docs/specs/ossie-ontology-format.spec.md,
+docs/specs/iri-identity.spec.md
 
 ## Context
 
@@ -32,7 +33,7 @@ alternatives behind decisions 1 to 4. On 2026-10-28 the owner revised
 decision 1 and added decisions 5 and 6, after comparing the two more
 closely: barwise does not try to replace Ossie, takes ideas from it where
 they serve barwise, and leans on it for what Ossie owns. Their reasoning is
-recorded in barwise-wcg until that issue's spec holds it.
+recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
 
 ## Decision
 
@@ -59,9 +60,10 @@ recorded in barwise-wcg until that issue's spec holds it.
 3. **One pinned version, and any other is refused.** The importer reads
    exactly the version string `@barwise/formats` pins (`OSSIE_VERSION`,
    `0.2.0.dev0`) and refuses any other, naming both. The schema that
-   version means is Ossie commit `01a5488d`, whose files are vendored as
-   the test fixtures. Moving the pin is a spec change, with the fixture
-   diff in the same PR.
+   version means is Ossie commit `01a5488d`: its schema files are vendored
+   in `formats/schemas/ossie/`, which the importer reads at run time and
+   the tests read too, and its example is a test fixture. Moving the pin is
+   a spec change, with the diff of those files in the same PR.
 4. **Nothing is lost silently.** The importer names in
    `ImportResult.warnings` every construct it cannot carry; the exporter
    names every construct it cannot write in the loss comment block at the
@@ -71,19 +73,21 @@ recorded in barwise-wcg until that issue's spec holds it.
    until barwise has an expression language of its own (barwise-pf2.2).
 5. **Identity is a readable IRI, after Ossie's naming.** Every barwise
    element is identified by one IRI, replacing the UUIDs barwise mints
-   today, and by nothing else: a declared base that is a standard IRI, then
-   project, any subprojects and domain as the namespace, then a readable
+   today, and by nothing else: a declared base that is a standard IRI and
+   carries the project and any subprojects, then the domain, as the
+   namespace, then a readable
    local name with no category segment, after Ossie's local names
    (`Customer`, `Customer.places`). A model names the other namespaces it
    references in declared imports with aliases, the way XML namespace
    prefixes work; Ossie's `prefixes` map is the same abbreviation, which
    Ossie uses only to write `iri` values. Ossie itself identifies an
    element by its local name and treats `iri` as an optional global
-   identifier that can name an outside definition (`foaf:Agent`); how
+   identifier that can name an outside definition (`foaf:Agent`). How
    barwise's identity IRI relates to such an outside IRI, and which of the
-   two an export writes into Ossie's single `iri` slot, is open in
-   barwise-wcg's spec, along with the local name of a fact type, which in
-   barwise belongs to no concept.
+   two an export writes into Ossie's single `iri` slot, is decision 1 of
+   barwise-wcg's spec (`docs/specs/iri-identity.spec.md`), and the local
+   name of a fact type, which in barwise belongs to no concept, is its
+   decision 2.
 6. **Each side keeps its own vocabulary, and the `ossie` format
    translates.** barwise speaks ORM 2 and Ossie speaks Ossie: neither
    renames its terms to match the other, and nothing outside the `ossie`
@@ -99,20 +103,30 @@ recorded in barwise-wcg until that issue's spec holds it.
   'true'`). Only the string is checked at run time, and `0.2.0.dev0` is a
   development version that upstream can change without renaming, so a
   document written against a later commit that keeps the string passes.
-  The commit pin holds only for the fixtures.
+  One such change is caught at run time: a field the later commit added
+  is not in the pinned schema, so it is named in the warnings (decision 4,
+  below). A changed type or enum on a field the mapper reads is refused by
+  `parseOssie`'s own checks (an upstream `multiplicity` value other than
+  `ManyToOne` or `OneToOne` fails the import). A changed type or enum on any
+  other field, a changed meaning, or a removed field, under the same string,
+  passes; for those the commit pin holds only for the tests.
 - Decision 4 is tested on the pinned example and on unit cases.
   `OssieExportFormat.test.ts` imports `flights.ontology.yaml`, exports it,
   and compares the result construct by construct, excluding only what the
   import warned about; it also validates two exports, the example's and a
   small built model's, against the pinned `ontology.json`. That proves
   nothing is dropped silently only for constructs the example and the
-  unit cases contain. Two gaps are known. The importer does not validate
-  against the pinned schema at run time (`@barwise/formats` carries no
-  JSON-schema validator), so a field the schema does not define is
-  ignored without a warning (barwise-pf2.6d0). And the exporter decides
-  what is a loss by predicting what the importer will read back; three
-  review rounds on PR #762 each found a prediction that was wrong, and
-  re-importing to verify the loss report is barwise-5bv.
+  unit cases contain. A field the pinned schema does not define is named
+  in the import warnings by its path: the importer validates the document
+  against the vendored schema with ajv at run time
+  (`formats/src/ossie/ossieSchema.ts`, tested in
+  `OssieImportFormat.test.ts`, "Ossie import: fields the pinned schema does
+  not define"; `docs/specs/ossie-unknown-fields.spec.md`, barwise-pf2.6d0).
+  The exporter decides what is a loss by predicting what the importer will
+  read back, and three review rounds on PR #762 each found a prediction
+  that was wrong; it now also reads the written document back and adds a
+  loss line for any difference no prediction named (`verifyOssie.ts`,
+  barwise-5bv).
 - The model's name is the one exception decision 4 does not report: a
   caller-supplied name replaces the document's `name` without a warning,
   and the CLI always supplies one (`--name`, defaulting to the file name),
@@ -134,7 +148,9 @@ recorded in barwise-wcg until that issue's spec holds it.
 - Decision 1's list of what barwise leans on Ossie for is review-only:
   nothing stops barwise growing its own metric language or an
   `ai_context` field. Whether barwise adopts `OSSIE_SQL_2026` for
-  governed metrics is barwise-pf2.xil's question. Decision 2's exclusion
+  governed metrics is barwise-pf2.xil's question. The research for it is in
+  `docs/ossie-expressions-research-2026-10-28.md`, beside barwise-pf2.m2w's
+  comparison of subtype and derivation rules with `derived_by`. Decision 2's exclusion
   of mapping documents is likewise not final: whether barwise reads them
   for barwise-pf2.3 is open.
 - Decision 5 is not built. barwise mints UUIDs (`generateId()` in
@@ -147,8 +163,9 @@ recorded in barwise-wcg until that issue's spec holds it.
   diff and merge pairing elements by id first) and
   `docs/specs/importer-role-ids.spec.md` R1 (an importer takes a role's id
   from `generateId()`, never from a string built out of names). With identity built from
-  names, a rename changes an element's IRI, so the spec must also say how
-  diff and merge tell a rename from a removal plus an addition.
+  names, a rename changes an element's IRI. barwise-wcg's spec, decision 8,
+  settles what follows: diff reports a content pair whose names differ as a
+  possible rename, and merge never pairs one, adding it instead.
 - Decision 6 has no gate; that barwise keeps its ORM 2 terms is held by
   review. The translation is tested construct by construct in
   `OssieImportFormat.test.ts` and `OssieExportFormat.test.ts`. It is

@@ -15,6 +15,7 @@
 import { parse } from "yaml";
 import type {
   DbtColumn,
+  DbtForeignKey,
   DbtModel,
   DbtProjectDocument,
   DbtSource,
@@ -102,7 +103,72 @@ function parseModel(raw: Record<string, unknown>): DbtModel {
     ? rawModelTests.flatMap((t) => parseTest(t))
     : [];
 
-  return { name, description, columns, modelTests };
+  const primaryKey = parsePrimaryKey(raw.constraints) ?? columnPrimaryKey(raw.columns);
+  return {
+    name,
+    description,
+    columns,
+    modelTests,
+    foreignKeys: parseForeignKeys(raw.constraints),
+    ...(primaryKey ? { primaryKey } : {}),
+  };
+}
+
+/**
+ * The columns that carry a column-level `primary_key` constraint, dbt's
+ * usual form for a key of one column, or undefined when none does.
+ */
+function columnPrimaryKey(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const names = raw.flatMap((c) => {
+    if (c === null || typeof c !== "object") return [];
+    const col = c as Record<string, unknown>;
+    const constraints = Array.isArray(col.constraints) ? col.constraints : [];
+    // A column with no name cannot be the key; it is no column of the
+    // model to declare.
+    if (typeof col.name !== "string" || col.name === "") return [];
+    return constraints.some((k) =>
+        k !== null && typeof k === "object" && (k as Record<string, unknown>).type === "primary_key"
+      )
+      ? [col.name]
+      : [];
+  });
+  return names.length > 0 ? names : undefined;
+}
+
+/**
+ * The columns of the first model-level `primary_key` constraint naming at
+ * least one, or undefined (dbt-alternate-uniqueness.spec.md).
+ */
+function parsePrimaryKey(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  for (const c of raw) {
+    if (c === null || typeof c !== "object") continue;
+    const r = c as Record<string, unknown>;
+    if (r.type === "primary_key" && Array.isArray(r.columns) && r.columns.length > 0) {
+      return r.columns.map(String);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The model-level `foreign_key` constraints over two or more columns, each
+ * one reference (composite-foreign-key-round-trip.spec.md). A constraint of
+ * another type, over one column (a `relationships` test states those), or
+ * without a `to:` is not one and is left out, as every constraint was
+ * before.
+ */
+function parseForeignKeys(raw: unknown): DbtForeignKey[] {
+  if (!Array.isArray(raw)) return [];
+  const strings = (v: unknown) => Array.isArray(v) ? v.map(String) : [];
+  return raw.flatMap((c): DbtForeignKey[] => {
+    if (c === null || typeof c !== "object") return [];
+    const r = c as Record<string, unknown>;
+    const columns = strings(r.columns);
+    if (r.type !== "foreign_key" || columns.length < 2 || typeof r.to !== "string") return [];
+    return [{ columns, to: extractRefModelName(r.to), toColumns: strings(r.to_columns) }];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -176,12 +242,18 @@ function parseObjectTest(raw: Record<string, unknown>): DbtTest[] {
       ? (value as Record<string, unknown>)
       : {};
     // dbt 1.10 moves a test's arguments under `arguments:`; read either
-    // spelling, the top level winning where both name one key
-    // (dbt-composite-key-tests.spec.md, barwise-lqj).
+    // spelling (dbt-composite-key-tests.spec.md, barwise-lqj). Where both
+    // name one input, `arguments:` wins, as it does in dbt from 1.10.8, so
+    // a half-migrated test imports as dbt runs it. The block itself is not
+    // an input and is dropped, so the two forms read back alike; anything
+    // else named `arguments` (an older test's own input) is kept
+    // (dbt-export-current-test-syntax.spec.md, barwise-fnt).
     const args = given["arguments"];
-    const config = args !== null && typeof args === "object" && !Array.isArray(args)
-      ? { ...(args as Record<string, unknown>), ...given }
-      : given;
+    const block = args !== null && typeof args === "object" && !Array.isArray(args)
+      ? (args as Record<string, unknown>)
+      : undefined;
+    const { arguments: _block, ...rest } = given;
+    const config = block ? { ...rest, ...block } : given;
 
     switch (key) {
       case "not_null":

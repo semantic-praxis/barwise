@@ -1,3 +1,20 @@
+## Project and mapping files state their format version
+
+`.orm-project.yaml` and `.map.yaml` files now start with
+`format_version: "1.0"`, which barwise writes on every such file it saves.
+Files without it still open and are read as 1.0. A file from a newer
+barwise is refused with "the file was written by a newer barwise".
+
+**Older barwise cannot read project or mapping files this release
+writes.** barwise 1.7.0 and earlier, and earlier `edge` builds, refuse
+them with a schema error ("must NOT have additional properties"), not the
+"newer barwise" message, because they read no format version. The same
+builds refuse a model that declares a `namespace`.
+
+Two optional fields arrive with it: `iri_base` on a project and
+`namespace` on a model, which say where element IRIs start. They change no
+element id yet; see `docs/ORM_PROJECT_GUIDE.md`.
+
 ## Model file format 2.0
 
 This release writes `.orm.yaml` files at `orm_version: "2.0"`. Files from
@@ -45,3 +62,157 @@ server and VS Code extension) before anyone saves a file with it.
   full view, even if it leaves out some fact types, so exporting it again
   draws all of them. An empty NORMA diagram is skipped on import, so an
   exported empty view does not come back.
+
+### OpenAPI item paths carry the whole key
+
+A table keyed on several columns, such as the table for a many-to-many
+fact type, now gets an item path with one parameter per key column, in
+key order: `/student-enrolls-in-course/{student_id}/{course_id}`. Before,
+the path named only the first column, which addresses many rows.
+**Clients generated from an earlier OpenAPI export call the old, shorter
+path for these resources and need regenerating.** Resources keyed on one
+column are unchanged.
+
+### Binary constraint sentences state the whole reading
+
+A binary mandatory or uniqueness sentence now keeps the reading's words
+after the second role: "Each Patient has at most one Doctor as primary
+doctor." Before, it kept only the words between the two roles, so "as
+primary doctor" was dropped. A single-role frequency sentence now says
+only what the constraint says: "Each Customer that rates some Product
+rates at least 1 and at most 10 instances of Product." The old "Each
+Customer rates at least 1 and at most 10 Product" also claimed that every
+Customer rates something. These sentences appear in DDL comments and in
+the dbt, OpenAPI, Avro and Ossie constraint reports, so those files change
+text on the next export.
+
+### DDL lineage names the constraints a table states
+
+`barwise lineage impact <constraint id>` now reports the DDL table a
+constraint is written on, as a UNIQUE or CHECK clause or as a comment the
+dialect could not enforce. Before, only a foreign key's constraint was
+listed. An impact report now words a constraint "states constraint X",
+not "enforces". A constraint over subtypes that an export reports also
+carries an example of the instance it forbids: "one Party in both
+LegalEntity and NaturalPerson".
+
+### The dbt export writes the current test syntax
+
+`schema.yml` now lists tests under `data_tests:` and puts each test's
+inputs under `arguments:`, such as a relationships test's `to` and
+`field`. dbt 1.10.8 and later warn on the old form, and dbt requires that
+warning resolved before the move to Fusion (dbt 2.x). A project on dbt
+1.10.5 to 1.10.7 reads the new form without a warning once it sets
+`require_generic_test_arguments_property: true`. One before 1.10.5
+cannot read it. Re-importing a project in either form gives the same
+model.
+
+### A foreign key over several columns round-trips as one reference
+
+- **dbt export.** A foreign key over several columns used to be dropped,
+  because dbt's `relationships` test takes one column. It is now written
+  as a model-level `foreign_key` constraint, which needs dbt 1.9 or later.
+  No contract is written, so dbt records the constraint without enforcing
+  it, and the models build as before. Re-importing the project reads it as
+  one reference.
+- **DDL import.** A foreign key over several columns outside the table's
+  key used to import as one reference per column, so
+  `claim (policy_id, term_number)` gained two references to
+  `policy_period`. It now imports as one. It is mandatory when every
+  column is NOT NULL, and one-to-one when its columns are a UNIQUE of the
+  table. A model imported earlier keeps its extra references until it is
+  imported again.
+- **Some UNIQUEs and keys are now refused with a warning.** A UNIQUE, or a
+  composite PRIMARY KEY, over part of such a foreign key, or over a column
+  two foreign keys share, used to import as a constraint on a reference
+  that did not exist. It is now refused with a warning naming the
+  columns, as a UNIQUE over part of a relationship's role already was.
+- **A key that is one foreign key.** A DDL table or dbt model whose key is
+  exactly one multi-column foreign key imports as an entity with a key of
+  its own and a one-to-one reference. The dbt importer used to find no
+  identifier and skip such a model.
+
+### The dbt export keeps every uniqueness
+
+- **Export.** `schema.yml` now tests every uniqueness the DDL export
+  writes as a UNIQUE clause: a secondary unique column, a one-to-one
+  reference, or a second key of a relationship table. Before, only each
+  table's key was tested and the rest were reported as dropped.
+  - A uniqueness over several columns uses
+    `dbt_utils.unique_combination_of_columns`. A project that never needed
+    dbt_utils may now need to declare it; the export's annotation notes
+    each model that does.
+  - Each model states its key as a `primary_key` constraint (dbt 1.5 or
+    later). No contract is written, so it is metadata and the models build
+    as before.
+  - `dbt test` now runs these tests, so data that breaks a uniqueness the
+    model states fails it.
+- **Import.** The dbt importer reads a declared `primary_key` as the key.
+  It reads `unique` on a reference column as a one-to-one, and a
+  combination test beside the key as the uniqueness the DDL importer reads
+  for the same UNIQUE. Before, those were reported for manual review. A
+  project without `primary_key` keeps the old key guess.
+
+### An annotated DDL round trip no longer adds a key column
+
+A table whose entity objectifies a relationship keyed on one column, such
+as a work order keyed on its batch, used to come back from a DDL export
+with barwise annotations carrying a second identifier. The next export
+then wrote an extra column for it, with a UNIQUE. The import now leaves
+the key to the relationship, so the table exports as it did before.
+
+### A DDL round trip keeps each entity's preferred identifier
+
+An entity that came back from a DDL export and import used to lose its
+preferred identifier when its table was keyed on several columns, or when
+its identifier was not the table's key: 42 entities in the tracked models
+did. The import now makes the uniqueness a multi-column key reads as the
+entity's preferred identifier, for plain and annotated DDL alike, as it
+already did for a key of one column. A composite primary key over plain
+columns is now the entity's identifier; it used to be stored unpreferred,
+so the next export keyed the table on an invented column. Where the identifier is not the key (an objectifier
+identified by a value of its own, a subtype keyed on its supertype link),
+the barwise annotation names its columns in a new `identifiedBy` field,
+and the import reads it.
+
+The dbt import now does the same for a model keyed on several columns
+that it objectifies: the key's uniqueness is the objectifier's preferred
+identifier, where it used to store none (24 entities in the tracked
+models). And an annotated DDL table now follows its barwise line: it is an
+objectifier only when the line says so, so an entity identified by two
+references no longer returns as the objectifier of an invented fact type,
+and it keeps the line's reference mode whatever its key's width.
+
+### Ring sentences, OpenAPI path parameters and Avro field names
+
+- A ring constraint's sentence keeps the reading's text after its second
+  role: "No EntityNode specializes that same EntityNode as supertype." It
+  used to drop "as supertype".
+- An OpenAPI item path names each key parameter with a valid template
+  variable, and an Avro record each field with a valid Avro name. A
+  column named outside those alphabets, such as `(ambiguous)` from an
+  unresolved reference mode, is renamed (`_ambiguous_`), and the
+  parameter's description or the field's doc names the column.
+- The example exports under `examples/transcripts/` are gone. They had
+  drifted from the exporters, and nothing checked them; the CLI's
+  characterization goldens now record and check the same exports.
+
+### The Ossie import names fields the pinned schema does not define
+
+A field in an Apache Ossie ontology document that the pinned
+`0.2.0.dev0` schema does not define, such as a typo or a field a later
+upstream commit added under the same version string, used to be ignored
+with no warning. Each one is now named in the import warnings by its
+path (`concept Airport.relationships[0].colour`), and the import
+otherwise proceeds as before, at medium confidence.
+
+### Generated keys on a warehouse export
+
+`barwise export --format ddl|dbt --surrogate-keys` (and `surrogateKeys`
+on the MCP server's `export_model`) gives every table keyed on several
+columns one generated key, the hash `dbt_utils.generate_surrogate_key`
+computes, and makes every reference to such a table a single column. The
+natural key stays enforced as a UNIQUE, or a combination test in dbt, and
+the dbt models compute each generated column from the natural columns
+kept beside it. The option is off by default; without it, nothing in an
+export changes.

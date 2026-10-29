@@ -174,6 +174,16 @@ describe("barwise migrate", () => {
     expect(existsSync(`${target}.migrating`)).toBe(false);
   });
 
+  it("leaves a staged file from an interrupted run alone, refusing that file with exit 2", async () => {
+    const path = file("shop.orm.yaml", V20);
+    const stale = file("shop.orm.yaml.migrating", "left by a killed run\n");
+    const result = await runCli(["migrate", path]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain("A staged file already exists beside");
+    expect(readFileSync(path, "utf-8")).toBe(V20);
+    expect(readFileSync(stale, "utf-8")).toBe("left by a killed run\n");
+  });
+
   it("prints one record per file with --format json", async () => {
     const path = file("shop.orm.yaml", V20);
     const result = await runCli(["migrate", "--format", "json", path]);

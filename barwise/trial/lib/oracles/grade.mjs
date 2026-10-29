@@ -549,17 +549,21 @@ export function gradeHistoryStep(expect, diff) {
   const has = (kind, elementType, name) =>
     deltas.some((d) => d.kind === kind && d.elementType === elementType && d.name === name);
   // A rename under a kept id is one modification carrying a `name` change
-  // (model invariants WS2): the diff pairs a shared id as one element. The
-  // synonym candidate is the other form, for a rename under a fresh id.
+  // (model invariants WS2): the diff pairs a shared id as one element. Under
+  // a fresh id the diff recognizes it by content and reports the same
+  // modification with `pairedBy: "recognized"` (iri-identity 6a); a
+  // synonym candidate is the form for one it cannot recognize.
   const renamedInPlace = (elementType, from, to) =>
-    deltas.some((d) =>
+    deltas.find((d) =>
       d.kind === "modified" && d.elementType === elementType
       && (d.changes ?? []).some((c) => c.change === "name" && c.from === from && c.to === to)
     );
   if (expect.renamed) {
     const { from, to } = expect.renamed;
-    if (renamedInPlace("object_type", from, to)) {
-      return { status: "pass", detail: `rename ${from} -> ${to} reported as a name change` };
+    const inPlace = renamedInPlace("object_type", from, to);
+    if (inPlace) {
+      const how = inPlace.pairedBy === "recognized" ? "a recognized rename" : "a name change";
+      return { status: "pass", detail: `rename ${from} -> ${to} reported as ${how}` };
     }
     // A synonym candidate names its pair as removedName and addedName
     // (barwise diff --format json). Matched on the serialised candidate as a

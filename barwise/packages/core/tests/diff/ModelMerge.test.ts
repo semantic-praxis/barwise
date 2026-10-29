@@ -14,7 +14,12 @@
  */
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { getStructuralErrors, mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
+import {
+  getStructuralErrors,
+  MERGE_DIFF_OPTIONS,
+  mergeAndValidate,
+  mergeModels,
+} from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
@@ -51,9 +56,9 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set<number>(); // Nothing accepted.
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     expect(merged.objectTypes.map((o) => o.name).sort()).toEqual(
       ["Customer", "Name", "Order"],
@@ -79,14 +84,14 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const addedIdx = diff.deltas.findIndex(
       (d) => d.kind === "added" && d.name === "Product",
     );
     expect(addedIdx).toBeGreaterThanOrEqual(0);
 
     const accepted = new Set([addedIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     expect(merged.objectTypes.map((o) => o.name).sort()).toEqual(
       ["Customer", "Name", "Order", "Product"],
@@ -108,14 +113,14 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const removedIdx = diff.deltas.findIndex(
       (d) => d.kind === "removed" && d.name === "Name",
     );
     expect(removedIdx).toBeGreaterThanOrEqual(0);
 
     const accepted = new Set([removedIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     expect(merged.objectTypes.map((o) => o.name).sort()).toEqual(
       ["Customer", "Order"],
@@ -144,9 +149,9 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const removedIdx = diff.deltas.findIndex((d) => d.kind === "removed" && d.name === "Name");
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set([removedIdx]));
+    const merged = mergeModels(existing, incoming, diff, new Set([removedIdx]));
 
     expect(merged.getDiagramLayout("V")).toEqual({
       name: "V",
@@ -177,9 +182,9 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const removedIdx = diff.deltas.findIndex((d) => d.kind === "removed" && d.name === "Name");
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set([removedIdx]));
+    const merged = mergeModels(existing, incoming, diff, new Set([removedIdx]));
 
     expect(merged.getDiagramLayout("OnlyName")!.elements).toEqual([]);
   });
@@ -198,7 +203,7 @@ describe("mergeModels", () => {
     const merged = mergeModels(
       existing,
       existing,
-      diffModels(existing, existing).deltas,
+      diffModels(existing, existing, MERGE_DIFF_OPTIONS),
       new Set(),
     );
 
@@ -219,9 +224,9 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set<number>(); // Reject everything.
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     expect(merged.objectTypes.map((o) => o.name).sort()).toEqual(
       ["Customer", "Name", "Order"],
@@ -248,14 +253,14 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const modifiedIdx = diff.deltas.findIndex(
       (d) => d.kind === "modified" && d.name === "Customer",
     );
     expect(modifiedIdx).toBeGreaterThanOrEqual(0);
 
     const accepted = new Set([modifiedIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     const mergedCustomer = merged.getObjectTypeByName("Customer")!;
     // UUID should be preserved from existing.
@@ -284,12 +289,12 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const addedIdx = diff.deltas.findIndex(
       (d) => d.kind === "added" && d.name === "Customer has Name",
     );
     const accepted = new Set([addedIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     expect(merged.factTypes).toHaveLength(2);
     const newFt = merged.getFactTypeByName("Customer has Name")!;
@@ -317,14 +322,14 @@ describe("mergeModels", () => {
       .withDefinition("Order", "A request to purchase goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     // Accept the new definition but reject the removal.
     const addedDefIdx = diff.deltas.findIndex(
       (d) => d.kind === "added" && d.elementType === "definition",
     );
     const accepted = new Set([addedDefIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     // Both definitions should be present.
     const terms = merged.definitions.map((d) => d.term).sort();
@@ -340,14 +345,14 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const removedIdx = diff.deltas.findIndex(
       (d) => d.kind === "removed" && d.elementType === "fact_type",
     );
     expect(removedIdx).toBeGreaterThanOrEqual(0);
 
     const accepted = new Set([removedIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     expect(merged.factTypes).toHaveLength(0);
   });
@@ -361,9 +366,9 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A person or organization that purchases goods.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set<number>(); // Reject everything.
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     expect(merged.factTypes).toHaveLength(1);
     expect(merged.factTypes[0]!.name).toBe("Customer places Order");
@@ -384,14 +389,14 @@ describe("mergeModels", () => {
       .withDefinition("Customer", "A buyer of products.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const modIdx = diff.deltas.findIndex(
       (d) => d.kind === "modified" && d.elementType === "definition",
     );
     expect(modIdx).toBeGreaterThanOrEqual(0);
 
     const accepted = new Set([modIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     expect(merged.definitions).toHaveLength(1);
     expect(merged.definitions[0]!.definition).toBe("A buyer of products.");
@@ -415,7 +420,7 @@ describe("mergeModels", () => {
       })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const modIdx = diff.deltas.findIndex(
       (d) => d.kind === "modified" && d.elementType === "fact_type",
     );
@@ -423,7 +428,7 @@ describe("mergeModels", () => {
 
     // Accept the modification.
     const accepted = new Set([modIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     const ft = merged.getFactTypeByName("Customer places Order")!;
     // Should keep the existing id.
@@ -450,9 +455,9 @@ describe("mergeModels", () => {
       })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     // Reject everything.
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set<number>());
+    const merged = mergeModels(existing, incoming, diff, new Set<number>());
 
     const ft = merged.getFactTypeByName("Customer places Order")!;
     expect(ft.roles[0]!.name).toBe("places");
@@ -475,12 +480,12 @@ describe("mergeModels", () => {
       })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const addedFtIdx = diff.deltas.findIndex(
       (d) => d.kind === "added" && d.elementType === "fact_type",
     );
     const accepted = new Set([addedFtIdx]);
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     const ft = merged.getFactTypeByName("Customer has Name")!;
     expect(ft).toBeDefined();
@@ -504,10 +509,10 @@ describe("mergeModels", () => {
       .withDefinition("Person", "A human user.")
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     // Accept everything.
     const allIndices = new Set(diff.deltas.map((_, i) => i));
-    const merged = mergeModels(existing, incoming, diff.deltas, allIndices);
+    const merged = mergeModels(existing, incoming, diff, allIndices);
 
     expect(merged.objectTypes.map((o) => o.name).sort()).toEqual(
       ["Email", "Person"],
@@ -524,8 +529,8 @@ describe("mergeModels", () => {
       .withValueType("Price", { dataType: { name: "decimal", length: 10, scale: 2 } })
       .build();
 
-    const diff = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(existing, incoming, diff, new Set());
     const price = merged.getObjectTypeByName("Price")!;
     expect(price.dataType).toBeDefined();
     expect(price.dataType!.name).toBe("decimal");
@@ -539,9 +544,9 @@ describe("mergeModels", () => {
       .withValueType("Amount", { dataType: { name: "money" } })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const allIndices = new Set(diff.deltas.map((_, i) => i));
-    const merged = mergeModels(existing, incoming, diff.deltas, allIndices);
+    const merged = mergeModels(existing, incoming, diff, allIndices);
     const amount = merged.getObjectTypeByName("Amount")!;
     expect(amount.dataType).toBeDefined();
     expect(amount.dataType!.name).toBe("money");
@@ -563,8 +568,8 @@ describe("mergeModels", () => {
       })
       .build();
 
-    const diff = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(existing, incoming, diff, new Set());
 
     const customer = merged.getObjectTypeByName("Customer")!;
     expect(customer.aliases).toEqual(["Client"]);
@@ -584,7 +589,7 @@ describe("mergeModels", () => {
       })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const modIdx = diff.deltas.findIndex(
       (d) => d.name === "Customer" && d.kind === "modified",
     );
@@ -593,7 +598,7 @@ describe("mergeModels", () => {
     const merged = mergeModels(
       existing,
       incoming,
-      diff.deltas,
+      diff,
       new Set([modIdx]),
     );
 
@@ -618,9 +623,9 @@ describe("mergeModels", () => {
       })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     // Reject everything.
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+    const merged = mergeModels(existing, incoming, diff, new Set());
 
     const customer = merged.getObjectTypeByName("Customer")!;
     expect(customer.aliases).toEqual(["Client"]);
@@ -635,14 +640,14 @@ describe("mergeModels", () => {
       })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const addedIdx = diff.deltas.findIndex(
       (d) => d.kind === "added" && d.name === "Customer",
     );
     const merged = mergeModels(
       existing,
       incoming,
-      diff.deltas,
+      diff,
       new Set([addedIdx]),
     );
 
@@ -664,7 +669,7 @@ describe("mergeModels", () => {
       })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const modIdx = diff.deltas.findIndex(
       (d) => d.name === "Customer" && d.kind === "modified",
     );
@@ -672,7 +677,7 @@ describe("mergeModels", () => {
     const merged = mergeModels(
       existing,
       incoming,
-      diff.deltas,
+      diff,
       new Set([modIdx]),
     );
 
@@ -693,13 +698,13 @@ describe("mergeModels", () => {
       .withValueType("Code", { dataType: { name: "text", length: 10 } })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const modifiedIdx = diff.deltas.findIndex(
       (d) => d.name === "Code" && d.kind === "modified",
     );
     expect(modifiedIdx).toBeGreaterThanOrEqual(0);
 
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set([modifiedIdx]));
+    const merged = mergeModels(existing, incoming, diff, new Set([modifiedIdx]));
     const code = merged.getObjectTypeByName("Code")!;
     expect(code.dataType).toBeDefined();
     expect(code.dataType!.length).toBe(10);
@@ -738,8 +743,8 @@ describe("mergeModels", () => {
       defaultValue: "0",
     });
 
-    const diff = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(existing, incoming, diff, new Set());
 
     const customer = merged.getObjectTypeByName("Customer")!;
     expect(customer.independent).toBe(true);
@@ -763,13 +768,13 @@ describe("mergeModels", () => {
     const existing = make("the old note");
     const incoming = make("the new note");
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const modifiedIdx = diff.deltas.findIndex(
       (d) => d.kind === "modified" && d.name === "Customer",
     );
     expect(modifiedIdx).toBeGreaterThanOrEqual(0);
 
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set([modifiedIdx]));
+    const merged = mergeModels(existing, incoming, diff, new Set([modifiedIdx]));
     expect(merged.getObjectTypeByName("Customer")!.note).toBe("the new note");
   });
 
@@ -818,8 +823,8 @@ describe("mergeModels", () => {
       derivation: { kind: "derived", expression: "Customer places Order if ..." },
     });
 
-    const diff = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(existing, incoming, diff, new Set());
 
     const ft = merged.getFactTypeByName("Customer places Order")!;
     expect(ft.note).toBe("a note on the fact type");
@@ -901,14 +906,14 @@ describe("mergeModels", () => {
       ],
     });
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set(
       diff.deltas
         .map((d, i) => [d, i] as const)
         .filter(([d]) => d.kind === "added")
         .map(([, i]) => i),
     );
-    const merged = mergeModels(existing, incoming, diff.deltas, accepted);
+    const merged = mergeModels(existing, incoming, diff, accepted);
 
     const bornIn = merged.getFactTypeByName("Person was born in Country")!;
     const join = merged.constraintsTouching(bornIn.id).find((c) => c.type === "join_equality");
@@ -940,14 +945,14 @@ describe("mergeAndValidate", () => {
       .withEntityType("Order", { referenceMode: "order_number" })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const addedIdx = diff.deltas.findIndex(
       (d) => d.kind === "added" && d.name === "Order",
     );
     const result = mergeAndValidate(
       existing,
       incoming,
-      diff.deltas,
+      diff,
       new Set([addedIdx]),
     );
 
@@ -974,7 +979,7 @@ describe("mergeAndValidate", () => {
       .withEntityType("Order", { referenceMode: "order_number" })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
 
     // Accept removal of Customer but NOT removal of the fact type.
     const removeOtIdx = diff.deltas.findIndex(
@@ -985,7 +990,7 @@ describe("mergeAndValidate", () => {
     const result = mergeAndValidate(
       existing,
       incoming,
-      diff.deltas,
+      diff,
       new Set([removeOtIdx]),
     );
 
@@ -1018,11 +1023,11 @@ describe("mergeAndValidate", () => {
       .withEntityType("Customer", { referenceMode: "customer_id" })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const result = mergeAndValidate(
       existing,
       incoming,
-      diff.deltas,
+      diff,
       new Set(),
     );
 
@@ -1044,7 +1049,7 @@ describe("mergeAndValidate", () => {
       .withEntityType("Order", { referenceMode: "order_number" })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const removeIdx = diff.deltas.findIndex(
       (d) => d.kind === "removed" && d.name === "Customer",
     );
@@ -1052,7 +1057,7 @@ describe("mergeAndValidate", () => {
     const result = mergeAndValidate(
       existing,
       incoming,
-      diff.deltas,
+      diff,
       new Set([removeIdx]),
     );
 
@@ -1068,8 +1073,8 @@ describe("mergeAndValidate", () => {
       .withEntityType("Customer", { referenceMode: "customer_id" })
       .build();
 
-    const diff = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, diff.deltas, new Set());
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(existing, incoming, diff, new Set());
 
     // mergeModels returns OrmModel, not MergeValidationResult.
     expect(merged.objectTypes).toBeDefined();
@@ -1092,7 +1097,7 @@ describe("mergeAndValidate", () => {
       .withEntityType("Order", { referenceMode: "order_number" })
       .build();
 
-    const diff = diffModels(existing, incoming);
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const removeIdx = diff.deltas.findIndex(
       (d) => d.kind === "removed" && d.name === "Customer",
     );
@@ -1100,7 +1105,7 @@ describe("mergeAndValidate", () => {
     const result = mergeAndValidate(
       existing,
       incoming,
-      diff.deltas,
+      diff,
       new Set([removeIdx]),
     );
 
@@ -1188,13 +1193,17 @@ describe("mergeModels: a KEPT population follows its fact type's roles", () => {
    * barwise-941 describes: instances keyed by ids nothing answers to.
    */
   function mergeKeepingExistingPopulation(existing: OrmModel, incoming: OrmModel) {
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const accepted = new Set(
       deltas
         .map((_, i) => i)
         .filter((i) => deltas[i]!.kind !== "unchanged" && deltas[i]!.elementType !== "population"),
     );
-    return mergeModels(existing, incoming, deltas, accepted);
+    return mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, accepted);
   }
 
   /** The role ids the merged model's only fact type actually declares. */
@@ -1273,8 +1282,12 @@ describe("mergeModels: a KEPT population follows its fact type's roles", () => {
   it("leaves the population alone when the modification is rejected", () => {
     const existing = model("r", {});
     const incoming = model("s", { definition: "A customer places an order." });
-    const { deltas } = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, deltas, new Set());
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, new Set());
 
     expect(instanceKeys(merged)).toEqual(roleIdsOf(merged));
     expect(merged.populations[0]!.instances[0]!.roleValues).toEqual({
@@ -1325,35 +1338,75 @@ describe("mergeModels carries preferred identifiers (orm-format-3 WS4b-ii)", () 
   it("takes an entity's new identifier with its accepted modification, and keeps the old one without it", () => {
     const existing = customers(undefined);
     const incoming = customers("u-cid");
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const i = deltas.findIndex((d) => d.elementType === "object_type" && d.kind === "modified");
     expect(i).toBeGreaterThanOrEqual(0);
 
-    expect(mergeModels(existing, incoming, deltas, new Set([i])).preferredIdentifierRefs)
+    expect(
+      mergeModels(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        new Set([i]),
+      )
+        .preferredIdentifierRefs,
+    )
       .toEqual([["ot-c", "u-cid"]]);
-    expect(mergeModels(existing, incoming, deltas, new Set()).preferredIdentifierRefs).toEqual([]);
+    expect(
+      mergeModels(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        new Set(),
+      )
+        .preferredIdentifierRefs,
+    ).toEqual([]);
   });
 
   it("keeps an unchanged entity's identifier", () => {
     const existing = customers("u-cid");
     const incoming = customers("u-cid");
-    const { deltas } = diffModels(existing, incoming);
-    expect(mergeModels(existing, incoming, deltas, new Set()).preferredIdentifierRefs)
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    expect(
+      mergeModels(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        new Set(),
+      )
+        .preferredIdentifierRefs,
+    )
       .toEqual([["ot-c", "u-cid"]]);
   });
 
   it("drops an added entity's identifier when its constraint's fact type is rejected", () => {
     const existing = customers("u-cid");
     const incoming = customers("u-cid", true);
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const objectTypes = deltas.flatMap((d, i) =>
       d.elementType === "object_type" && d.kind === "added" ? [i] : []
     );
     const all = new Set(deltas.map((_, i) => i));
 
-    expect(mergeModels(existing, incoming, deltas, all).preferredIdentifierRefs)
+    expect(
+      mergeModels(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        all,
+      )
+        .preferredIdentifierRefs,
+    )
       .toEqual([["ot-c", "u-cid"], ["ot-o", "u-onr"]]);
-    expect(mergeModels(existing, incoming, deltas, new Set(objectTypes)).preferredIdentifierRefs)
+    expect(
+      mergeModels(
+        existing,
+        incoming,
+        { deltas, matching: "id-first", recognizeRenames: false },
+        new Set(objectTypes),
+      )
+        .preferredIdentifierRefs,
+    )
       .toEqual([["ot-c", "u-cid"]]);
   });
 });
@@ -1393,26 +1446,44 @@ describe("mergeModels follows a preferred identifier across sides with different
   it("keeps the identifier when the entity takes the incoming side and the fact type the existing", () => {
     const existing = shop("e-");
     const incoming = shop("i-", { definition: "A buyer." });
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const ot = deltas.findIndex((d) => d.elementType === "object_type" && d.kind === "modified");
     expect(ot).toBeGreaterThanOrEqual(0);
     expect(deltas.find((d) => d.elementType === "fact_type")?.kind).toBe("unchanged");
 
-    const merged = mergeModels(existing, incoming, deltas, new Set([ot]));
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, new Set([ot]));
     expect(merged.preferredIdentifierRefs).toEqual([["e-c", "e-u-cid"]]);
   });
 
   it("keeps the identifier when the entity stays and the fact type takes the incoming side", () => {
     const existing = shop("e-");
     const incoming = shop("i-", { reading: "{0} is known by {1}" });
-    const { deltas } = diffModels(existing, incoming);
+    const { deltas } = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const ft = deltas.findIndex((d) => d.elementType === "fact_type" && d.kind === "modified");
     expect(ft).toBeGreaterThanOrEqual(0);
 
-    const merged = mergeModels(existing, incoming, deltas, new Set([ft]));
+    const merged = mergeModels(existing, incoming, {
+      deltas,
+      matching: "id-first",
+      recognizeRenames: false,
+    }, new Set([ft]));
     const [[entity, ref]] = merged.preferredIdentifierRefs as [[string, string]];
     expect(entity).toBe("e-c");
     const c = merged.getConstraint(ref);
     expect(c?.type === "internal_uniqueness" && c.roleIds).toEqual(["i-r-cid"]);
+  });
+});
+
+describe("mergeModels: the model header", () => {
+  it("keeps the base's namespace, as it keeps the domain context (iri-identity WS4)", () => {
+    const existing = new OrmModel({ name: "M", namespace: "https://data.acme.com/acme/m/" });
+    const incoming = new OrmModel({ name: "M", namespace: "https://other.example/m/" });
+    const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(existing, incoming, diff, new Set());
+    expect(merged.namespace).toBe("https://data.acme.com/acme/m/");
   });
 });

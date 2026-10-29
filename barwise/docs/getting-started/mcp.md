@@ -253,6 +253,7 @@ issues, in [the surface parity audit](../surface-parity-audit-2026-10-12.md).
 | `export_model`       | Exports DDL, dbt, OpenAPI, Avro or NORMA                 |
 | `diff_models`        | Compares two models                                      |
 | `merge_models`       | Merges one model into another (writes the base file)     |
+| `rename_element`     | Renames an element, across a project (writes the files)  |
 | `split_model`        | Previews or writes a multi-domain project from one model |
 | `lineage_status`     | Lists stale exported artifacts                           |
 | `impact_analysis`    | Lists the artifacts built from one element               |

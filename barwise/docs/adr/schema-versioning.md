@@ -1,7 +1,7 @@
 # Schema versioning
 
 Scope: architecture
-Date: 2026-10-21
+Date: 2026-10-28
 Tracking: barwise-ubc, barwise-1063, barwise-n9n, barwise-vvg, barwise-6om, barwise-y1b,
 barwise-jj8,
 docs/specs/archive/schema-versioning.spec.md,
@@ -30,12 +30,18 @@ was a section of the metamodel ADR before this one.
    every file it writes, and the JSON Schema pins the same value as a
    `const`, so a reader given a file whose version exceeds its own
    refuses it with a "written by a newer barwise" error rather than a
-   schema failure on an unknown construct.
+   schema failure on an unknown construct. `.orm-project.yaml` and
+   `.map.yaml` follow the same rule with a `format_version` of their own,
+   one current version per file kind; a file of either kind without one
+   predates versioning and is read as its first version.
 2. **An additive change bumps the minor version; a breaking or
    structural change bumps the major with a real migration.** Adding an
    optional construct or field is a minor change: bump
    `CURRENT_ORM_VERSION` and the schema `const`, and register a forward
-   migration (a no-op for a purely additive change). A change an older
+   migration (a no-op for a purely additive change). The loader reads every
+   version from `CURRENT_MAJOR_FIRST_VERSION` up to the current one by
+   applying those steps, so a minor bump keeps every earlier file of its
+   major loadable; a major bump moves `CURRENT_MAJOR_FIRST_VERSION`. A change an older
    reader would misread rather than ignore is structural (diagram
    references moving from names to ids was one).
 3. **The minor bump is shared across its unreleased cycle.** The first
@@ -66,10 +72,17 @@ was a section of the metamodel ADR before this one.
 - Decision 2 has no gate: whether a change is additive or structural is
   a judgment each spec makes and its review checks, as
   `diagram-references-by-id.spec.md` D1 and `orm-format-3.spec.md` did.
-  Its mechanism does not fit today's loader: raw-document steps run only
-  up to `LEGACY_ORM_VERSION` (2.0), and a version between that and the
-  current one is refused, so a 3.0 to 3.1 bump done as written would
-  refuse every 3.0 file until the loader changes (barwise-jj8).
+  Its loader is tested without a real minor: `planRead` in
+  `serialization/schemaVersion.ts` takes the build's versions as a
+  parameter, and `schemaVersion.test.ts` reads a 3.0 document in a
+  synthetic 3.1 build through a 3.0-to-3.1 step, calls a 3.0 file no step
+  reaches a bug in barwise, and still refuses a version between the two
+  majors (barwise-jj8). Against this build's own versions it checks that
+  registered steps reach the current version from its major's first, so a
+  minor bump that forgets its step fails. A step that skips a minor (3.0 to
+  3.2 in a 3.2 build) still passes and leaves every 3.1 file unreadable;
+  nothing checks that, and the serializer's own path through a real minor
+  first runs at that bump.
 - Decision 3 has no gate: a change to `orm-model.schema.json` that
   leaves `CURRENT_ORM_VERSION` equal to the last tagged release's passes
   CI (barwise-vvg, which waits on barwise-6om for what "released"
@@ -96,9 +109,18 @@ was a section of the metamodel ADR before this one.
   (barwise-ok6), and a 2.0 merge fragment's `is_preferred` flags are
   dropped by the lenient load (barwise-n9n.f06). Any surface edit that
   writes an older file has the same comment loss.
-- `.orm-project.yaml` and `.map.yaml` carry no version; the archived
-  spec left them out of scope ("the same pattern can extend to those
-  later") without deciding against it (barwise-y1b).
+- `.orm-project.yaml` and `.map.yaml` follow decisions 1 to 3 with their
+  own `format_version`, each kind on its own version
+  (`CURRENT_PROJECT_FORMAT_VERSION`, `CURRENT_MAPPING_FORMAT_VERSION`, both
+  1.0; barwise-y1b, `docs/specs/iri-identity.spec.md` WS4). Decision 1 is
+  tested for both in core's `formatVersion.test.ts`: each schema `const`
+  equals its constant, every written file is stamped, and a newer file is
+  refused with "newer barwise" before the schema runs. A file without
+  `format_version` predates versioning and is read as 1.0. Decision 4 does
+  not yet apply to them: neither kind has a migration step, and `barwise
+  migrate` takes only `.orm.yaml`, so it gains them with their first step.
+  `planRead` gives all three kinds one answer per refusal reason
+  (`READ_PLAN_ADVICE`).
 - 1.0 includes value ranges (barwise-5t9.1), which shipped before this
   rule; the discipline began with the 1.0 to 1.1 bump.
 - Until they are replaced with links (barwise-5h3; the root `CLAUDE.md` states

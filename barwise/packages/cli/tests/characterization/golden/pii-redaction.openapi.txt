@@ -191,15 +191,16 @@
         }
       }
     },
-    "/finding/{(ambiguous)}": {
+    "/finding/{_ambiguous_}": {
       "get": {
         "summary": "Get a Finding by ID",
         "operationId": "getFinding",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -226,9 +227,10 @@
         "operationId": "updateFinding",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -265,9 +267,10 @@
         "operationId": "deleteFinding",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -469,15 +472,16 @@
         }
       }
     },
-    "/review-decision/{(ambiguous)}": {
+    "/review-decision/{_ambiguous_}": {
       "get": {
         "summary": "Get a ReviewDecision by ID",
         "operationId": "getReviewDecision",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -504,9 +508,10 @@
         "operationId": "updateReviewDecision",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -543,9 +548,10 @@
         "operationId": "deleteReviewDecision",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -886,13 +892,21 @@
         }
       }
     },
-    "/release/{document_id}": {
+    "/release/{document_id}/{downstream_system}": {
       "get": {
         "summary": "Get a Release by ID",
         "operationId": "getRelease",
         "parameters": [
           {
             "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "downstream_system",
             "in": "path",
             "required": true,
             "schema": {
@@ -922,6 +936,14 @@
         "parameters": [
           {
             "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "downstream_system",
             "in": "path",
             "required": true,
             "schema": {
@@ -961,6 +983,14 @@
         "parameters": [
           {
             "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "downstream_system",
             "in": "path",
             "required": true,
             "schema": {
@@ -1025,13 +1055,21 @@
         }
       }
     },
-    "/document-has-scan/{document_id}": {
+    "/document-has-scan/{document_id}/{scan_version}": {
       "get": {
         "summary": "Get a DocumentHasScan by ID",
         "operationId": "getDocumentHasScan",
         "parameters": [
           {
             "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scan_version",
             "in": "path",
             "required": true,
             "schema": {
@@ -1061,6 +1099,14 @@
         "parameters": [
           {
             "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scan_version",
             "in": "path",
             "required": true,
             "schema": {
@@ -1100,6 +1146,14 @@
         "parameters": [
           {
             "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scan_version",
             "in": "path",
             "required": true,
             "schema": {
@@ -1164,7 +1218,7 @@
         }
       }
     },
-    "/scan-produced-finding/{scan_version}": {
+    "/scan-produced-finding/{scan_version}/{_ambiguous_}": {
       "get": {
         "summary": "Get a ScanProducedFinding by ID",
         "operationId": "getScanProducedFinding",
@@ -1173,6 +1227,15 @@
             "name": "scan_version",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -1202,6 +1265,15 @@
             "name": "scan_version",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -1241,6 +1313,15 @@
             "name": "scan_version",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -1303,13 +1384,22 @@
         }
       }
     },
-    "/finding-reviewed-by-reviewer/{(ambiguous)}": {
+    "/finding-reviewed-by-reviewer/{_ambiguous_}/{employee_id}": {
       "get": {
         "summary": "Get a FindingReviewedByReviewer by ID",
         "operationId": "getFindingReviewedByReviewer",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1338,7 +1428,16 @@
         "operationId": "updateFindingReviewedByReviewer",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1377,7 +1476,16 @@
         "operationId": "deleteFindingReviewedByReviewer",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1442,15 +1550,25 @@
         }
       }
     },
-    "/review-decision-is-decision-of-finding/{(ambiguous)}": {
+    "/review-decision-is-decision-of-finding/{_ambiguous_}/{has_decision_about__ambiguous_}": {
       "get": {
         "summary": "Get a ReviewDecisionIsDecisionOfFinding by ID",
         "operationId": "getReviewDecisionIsDecisionOfFinding",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "has_decision_about__ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"has_decision_about_(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -1477,9 +1595,19 @@
         "operationId": "updateReviewDecisionIsDecisionOfFinding",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "has_decision_about__ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"has_decision_about_(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -1516,9 +1644,19 @@
         "operationId": "deleteReviewDecisionIsDecisionOfFinding",
         "parameters": [
           {
-            "name": "(ambiguous)",
+            "name": "_ambiguous_",
             "in": "path",
             "required": true,
+            "description": "The key column \"(ambiguous)\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "has_decision_about__ambiguous_",
+            "in": "path",
+            "required": true,
+            "description": "The key column \"has_decision_about_(ambiguous)\".",
             "schema": {
               "type": "string"
             }
@@ -1581,13 +1719,21 @@
         }
       }
     },
-    "/audit-entry-about-document/{audit_id}": {
+    "/audit-entry-about-document/{audit_id}/{document_id}": {
       "get": {
         "summary": "Get a AuditEntryAboutDocument by ID",
         "operationId": "getAuditEntryAboutDocument",
         "parameters": [
           {
             "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "document_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1617,6 +1763,14 @@
         "parameters": [
           {
             "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "document_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1656,6 +1810,14 @@
         "parameters": [
           {
             "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "document_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1720,13 +1882,21 @@
         }
       }
     },
-    "/audit-entry-performed-by-reviewer/{audit_id}": {
+    "/audit-entry-performed-by-reviewer/{audit_id}/{employee_id}": {
       "get": {
         "summary": "Get a AuditEntryPerformedByReviewer by ID",
         "operationId": "getAuditEntryPerformedByReviewer",
         "parameters": [
           {
             "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1756,6 +1926,14 @@
         "parameters": [
           {
             "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1800,6 +1978,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1820,26 +2006,12 @@
         "properties": {
           "document_id": {
             "type": "string",
-            "format": "uuid",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "format": "uuid"
           },
           "source_system": {
             "type": "string",
             "nullable": true,
             "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
               {
                 "severity": "note",
                 "message": "Value constraint available: ['customer-support', 'lending', 'health-intake', 'survey']. Consider adding an accepted_values test."
@@ -1849,32 +2021,16 @@
           "received_timestamp": {
             "type": "string",
             "format": "date-time",
-            "nullable": true,
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "nullable": true
           },
           "raw_text": {
             "type": "string",
-            "nullable": true,
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "nullable": true
           },
           "document_status": {
             "type": "string",
             "nullable": true,
             "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
               {
                 "severity": "note",
                 "message": "Value constraint available: ['queued', 'scanned', 'reviewed', 'redacted', 'failed', 'on-hold']. Consider adding an accepted_values test."
@@ -1882,17 +2038,10 @@
             ]
           },
           "redacted_text": {
-            "type": "string",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "type": "string"
           }
         },
         "required": [
-          "document_id",
           "document_id",
           "redacted_text"
         ],
@@ -1907,40 +2056,28 @@
         "type": "object",
         "properties": {
           "(ambiguous)": {
-            "type": "integer",
+            "type": "string",
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
           "start_position": {
-            "type": "integer",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "type": "integer"
           },
           "end_position": {
-            "type": "integer",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "type": "integer"
           },
           "piicategory": {
             "type": "string",
             "nullable": true,
             "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
               {
                 "severity": "note",
                 "message": "Value constraint available: ['full-name', 'email-address', 'phone-number', 'date-of-birth', 'social-security-number', 'credit-card-number', 'mailing-address', 'ip-address', 'passport-number', 'drivers-license-number']. Consider adding an accepted_values test."
@@ -1949,13 +2086,7 @@
           },
           "confidence_score": {
             "type": "number",
-            "nullable": true,
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "nullable": true
           }
         },
         "required": [
@@ -1974,37 +2105,20 @@
         "type": "object",
         "properties": {
           "employee_id": {
+            "type": "string"
+          },
+          "has_employee_id_employee_id": {
             "type": "string",
-            "nullable": true,
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "nullable": true
           },
           "reviewer_name": {
             "type": "string",
-            "nullable": true,
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "nullable": true
           },
           "clearance_level": {
             "type": "string",
             "nullable": true,
             "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
               {
                 "severity": "note",
                 "message": "Value constraint available: ['standard', 'elevated', 'restricted']. Consider adding an accepted_values test."
@@ -2030,11 +2144,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }
@@ -2057,7 +2171,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
@@ -2065,10 +2183,6 @@
             "type": "string",
             "nullable": true,
             "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
               {
                 "severity": "note",
                 "message": "Value constraint available: ['scan-initiated', 'scan-completed', 'review-assigned', 'review-completed', 'redaction-applied', 'document-released', 'status-changed']. Consider adding an accepted_values test."
@@ -2094,18 +2208,16 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
           "model_version": {
-            "type": "string",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "type": "string"
           }
         },
         "required": [
@@ -2122,59 +2234,46 @@
       "Release": {
         "type": "object",
         "properties": {
-          "(ambiguous)": {
-            "type": "string",
-            "format": "date-time",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
-          },
-          "release_timestamp": {
-            "type": "string",
-            "format": "date-time",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
-          },
-          "redacted_content_hash": {
-            "type": "string",
-            "nullable": true,
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
-          },
           "document_id": {
             "$ref": "#/components/schemas/Document",
             "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              },
               {
                 "severity": "note",
                 "message": "Value constraint available: ['analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api']. Consider adding an accepted_values test."
               }
             ]
+          },
+          "downstream_system": {
+            "type": "string",
+            "x-barwise-annotations": [
+              {
+                "severity": "note",
+                "message": "Value constraint available: ['analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api']. Consider adding an accepted_values test."
+              }
+            ]
+          },
+          "release_timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "redacted_content_hash": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
-          "(ambiguous)",
-          "release_timestamp",
-          "document_id"
+          "document_id",
+          "downstream_system",
+          "release_timestamp"
         ],
         "x-barwise-annotations": [
           {
             "severity": "note",
             "message": "Definition available from ORM model: \"A record that a redacted document was released to a downstream system, identi...\""
+          },
+          {
+            "severity": "note",
+            "message": "Composite primary key (document_id, downstream_system): unique as a combination."
           }
         ]
       },
@@ -2182,20 +2281,18 @@
         "type": "object",
         "properties": {
           "document_id": {
-            "$ref": "#/components/schemas/Document",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Document"
           },
           "scan_version": {
             "$ref": "#/components/schemas/Scan",
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }
@@ -2219,7 +2316,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
@@ -2228,7 +2329,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }
@@ -2252,18 +2357,16 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
           "employee_id": {
-            "$ref": "#/components/schemas/Reviewer",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Reviewer"
           }
         },
         "required": [
@@ -2285,11 +2388,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
               },
               {
                 "severity": "todo",
-                "message": "Data type defaulted to TEXT. Add a data type to the ORM value type or edit the dbt YAML."
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
@@ -2298,7 +2401,11 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           }
@@ -2322,18 +2429,16 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
           "document_id": {
-            "$ref": "#/components/schemas/Document",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Document"
           }
         },
         "required": [
@@ -2355,18 +2460,16 @@
             "x-barwise-annotations": [
               {
                 "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
+                "message": "No column description. Add a definition to the value type."
+              },
+              {
+                "severity": "todo",
+                "message": "Data type was not declared; exported as TEXT. Add a data type to the value type."
               }
             ]
           },
           "employee_id": {
-            "$ref": "#/components/schemas/Reviewer",
-            "x-barwise-annotations": [
-              {
-                "severity": "todo",
-                "message": "No column description. Add one to the dbt YAML."
-              }
-            ]
+            "$ref": "#/components/schemas/Reviewer"
           }
         },
         "required": [

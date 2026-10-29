@@ -130,10 +130,11 @@ test("the rename expectation is satisfied by the CLI's own name change", () => {
   }
 });
 
-test("a rename under a fresh id is satisfied by the CLI's own synonym candidate", () => {
-  // The other form the grader accepts, against real output too: the same
-  // rename with every reference to the object type moved to a new id, as
-  // a re-extraction would mint one.
+test("a rename under a fresh id is satisfied by the CLI's recognized rename", () => {
+  // Against real output too: the same rename with every reference to the
+  // object type moved to a new id, as a re-extraction would mint one. The
+  // diff recognizes it by content (iri-identity 6a); before that it was a
+  // synonym candidate, a form the grader still accepts (oracles.test.mjs).
   const dir = mkdtempSync(join(tmpdir(), "trial-rename-fresh-"));
   try {
     const step = applyChange(doc, { kind: "rename_object_type", from: "Encounter", to: "Visit" });
@@ -154,7 +155,7 @@ test("a rename under a fresh id is satisfied by the CLI's own synonym candidate"
     assert.equal(d.exit, 0, d.stderr);
     const graded = gradeHistoryStep(step.expect, JSON.parse(d.stdout));
     assert.equal(graded.status, "pass", graded.detail);
-    assert.match(graded.detail, /synonym candidate/);
+    assert.match(graded.detail, /recognized rename/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -1,0 +1,14 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  namespace: not an iri
+  object_types:
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: person_id
+    - id: ot-age
+      name: Age
+      kind: value
+      data_type:
+        name: integer

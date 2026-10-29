@@ -36,7 +36,7 @@ Architecture:
 - [Ossie interchange](adr/ossie-interchange.md) -- 2026-10-28
 - [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23
 - [Production prompt resolution](adr/production-prompt-resolution.md) -- 2026-08-26
-- [Schema versioning](adr/schema-versioning.md) -- 2026-10-21
+- [Schema versioning](adr/schema-versioning.md) -- 2026-10-28
 - [Surface capability parity](adr/surface-capability-parity.md) -- 2026-09-10
 
 Process:

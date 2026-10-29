@@ -156,8 +156,10 @@ to overwrite existing files unless forced, as the CLI does. See
 files and the mapping files:
 
 ```yaml
+format_version: "1.0"
 project:
   name: Auction Semantic Model
+  iri_base: https://data.acme.com/auctions/   # optional
   domains:
     - path: domains/catalog.orm.yaml
       context: catalog
@@ -176,6 +178,22 @@ Each domain has a `context` name that is unique within the project.
 All paths are relative to the manifest's own directory. The manifest
 can also list data `products` and project `settings`; see
 [ARCHITECTURE.md](ARCHITECTURE.md) section 3.1.5.
+
+`format_version` is the manifest format's version, which barwise writes
+on every manifest; a manifest without it is read as 1.0, and one from a
+newer barwise is refused as such. `.map.yaml` files carry their own
+`format_version` the same way.
+
+`iri_base` is optional. It is the absolute IRI, ending in `/`, that every
+domain's namespace starts with: the base and the project's own segments,
+followed by each domain's context, so `catalog` above would be
+`https://data.acme.com/auctions/catalog/`. The project's `name` is a
+display label and is not part of any IRI. A domain file outside such a
+project can declare its own `namespace` in its model header instead; a
+domain that declares a different one inside a project with `iri_base` is
+reported by `barwise validate`, and the project's namespace is the one used. Until
+format 4.0 a namespace changes no element id
+(`docs/specs/iri-identity.spec.md`).
 
 You can also start a project empty, without splitting anything:
 
@@ -204,6 +222,7 @@ A `.map.yaml` file documents the correspondence. The split generates
 one with the `shared_kernel` pattern:
 
 ```yaml
+format_version: "1.0"
 mapping:
   source_context: auctions
   target_context: payments

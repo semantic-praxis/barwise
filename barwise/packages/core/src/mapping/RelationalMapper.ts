@@ -44,6 +44,7 @@ import {
 import type { OrmModel } from "../model/OrmModel.js";
 import type { PreferredIdentifierStrategy } from "../model/OrmProject.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { freeColumnName, toSnake } from "./columnNames.js";
 import type {
   Column,
   ForeignKey,
@@ -51,6 +52,7 @@ import type {
   RelationalSchema,
   Table,
 } from "./RelationalSchema.js";
+import { withSurrogateKeys } from "./surrogateKeys.js";
 
 /**
  * Options for relational mapping.
@@ -65,6 +67,26 @@ export interface RelationalMapperOptions {
    * - undefined -- falls back to TEXT (legacy behavior).
    */
   readonly preferredIdentifierStrategy?: PreferredIdentifierStrategy;
+  /**
+   * Give every table keyed on several columns a generated key, and make
+   * every reference to one a single column: a warehouse export's physical
+   * choice, applied last (`withSurrogateKeys`, surrogate-key-export.spec.md).
+   */
+  readonly surrogateKeys?: boolean;
+}
+
+/**
+ * Whether the table of the entity that objectifies this fact type is keyed
+ * on the fact type's roles: when an entity plays one of them, so the key
+ * is a reference the table absorbs. Otherwise the entity keeps its own
+ * reference-mode column. The DDL importer asks the same question of a
+ * table it reads back (objectified-key-identifier.spec.md, barwise-i3r),
+ * so it is one function both call.
+ */
+export function objectificationGivesKey(factTypeId: string, model: OrmModel): boolean {
+  const factType = model.getFactType(factTypeId);
+  return factType !== undefined
+    && factType.roles.some((role) => model.getObjectType(role.playerId)?.kind === "entity");
 }
 
 export class RelationalMapper {
@@ -237,10 +259,8 @@ export class RelationalMapper {
       (t) => freezeTable(t),
     );
 
-    return {
-      tables: allTables,
-      sourceModelId: model.name,
-    };
+    const schema = { tables: allTables, sourceModelId: model.name };
+    return options?.surrogateKeys ? withSurrogateKeys(schema) : schema;
   }
 
   /**
@@ -249,10 +269,7 @@ export class RelationalMapper {
    * columns, so there would be nothing for the key to be.
    */
   private absorbsAKey(oft: ObjectifiedFactType | undefined, model: OrmModel): boolean {
-    if (!oft) return false;
-    const factType = model.getFactType(oft.factTypeId);
-    if (!factType) return false;
-    return factType.roles.some((role) => model.getObjectType(role.playerId)?.kind === "entity");
+    return oft !== undefined && objectificationGivesKey(oft.factTypeId, model);
   }
 
   /**
@@ -884,13 +901,7 @@ function freezeTable(t: MutableTable): Table {
  * exactly as it did before (barwise-961).
  */
 function pushColumn(columns: Column[], column: Column, alternative?: string): string {
-  const taken = new Set(columns.map((c) => c.name));
-  let name = column.name;
-  if (taken.has(name)) {
-    const stem = alternative ?? name;
-    name = stem;
-    for (let i = 2; taken.has(name); i += 1) name = `${stem}_${i}`;
-  }
+  const name = freeColumnName(columns, column.name, alternative);
   columns.push({ ...column, name });
   return name;
 }
@@ -917,13 +928,6 @@ function associativeKey(
     ?? uniqueness[0];
   if (!chosen) return columns.map((c) => c.name);
   return chosen.roleIds.flatMap((id) => roleColumns.get(id) ?? []);
-}
-
-function toSnake(name: string): string {
-  return name
-    .replace(/([a-z])([A-Z])/g, "$1_$2")
-    .replace(/[\s-]+/g, "_")
-    .toLowerCase();
 }
 
 /**
@@ -1032,19 +1036,48 @@ function referenceModePkType(
   model: OrmModel,
   strategy: PreferredIdentifierStrategy | undefined,
 ): SqlType & { readonly sourceRoleId?: string; } {
+  const key = referenceModeKey(ot, model);
+  if (!key) return keyTypeOf(undefined, strategy);
+  // The entity's role, as a preferred binary records it, so the key
+  // column traces to the value type that typed it -- the annotations
+  // read its definition through this (PR #567 review).
+  const entityRole = key.factType.roles.find((r) => r.playerId === ot.id);
+  return { ...keyTypeOf(key.valueType.dataType, strategy), sourceRoleId: entityRole?.id };
+}
+
+/**
+ * The value type an entity's reference mode names, and the binary that
+ * ties them: the first of `referenceModeCandidates`. The mapper types the
+ * key column from it for an entity with no preferred identifying binary
+ * (an entity that has one is keyed from that binary instead).
+ */
+function referenceModeKey(
+  ot: ObjectType,
+  model: OrmModel,
+): { readonly valueType: ValueType; readonly factType: FactType; } | undefined {
+  return referenceModeCandidates(ot, model)[0];
+}
+
+/**
+ * Every binary in which an entity plays a value type whose `toSnake` name is
+ * the entity's `reference_mode`, in fact type order; the mapper keys from the
+ * first. `renameInModel` asks it which reference modes a value-type rename
+ * must follow, and refuses a rename that changes the first or adds one, so
+ * the rename and the mapper read one rule. Like the mapper's use of it, this
+ * says nothing about an entity keyed from a preferred identifying binary.
+ */
+export function referenceModeCandidates(
+  ot: ObjectType,
+  model: OrmModel,
+): readonly { readonly valueType: ValueType; readonly factType: FactType; }[] {
+  if (ot.kind !== "entity") return [];
+  const found: { valueType: ValueType; factType: FactType; }[] = [];
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
     const vp = findValuePlayer(ft, ot, model);
-    if (vp && toSnake(vp.name) === ot.referenceMode) {
-      // The entity's role, as a preferred binary records it, so the key
-      // column traces to the value type that typed it -- the annotations
-      // read its definition through this (PR #567 review).
-      const entityRole = ft.roles.find((r) => r.playerId === ot.id);
-      return { ...keyTypeOf(vp.dataType, strategy), sourceRoleId: entityRole?.id };
-    }
+    if (vp && toSnake(vp.name) === ot.referenceMode) found.push({ valueType: vp, factType: ft });
   }
-
-  return keyTypeOf(undefined, strategy);
+  return found;
 }
 
 /** A column's SQL type, whether it was declared or a fallback, and which fallback. */

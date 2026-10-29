@@ -1,0 +1,207 @@
+-- Constraint (not expressible in SQL DDL): Each Document that has status some DocumentStatus has status exactly 1 instance of DocumentStatus.
+-- Table: document
+-- Source: Document (6e0d1386-6da7-495c-b47d-b06bf4d08f78)
+-- Definition: An incoming document submitted from a source system that undergoes PII scanning, review, redaction, and release.
+-- NOTE(barwise): Definition available from ORM model: "An incoming document submitted from a source system that undergoes PII scanni..."
+-- barwise:v1 {"kind":"table","table":"document","entity":"Document","referenceMode":"document_id","definition":"An incoming document submitted from a source system that undergoes PII scanning, review, redaction, and release.","supertypes":[]}
+CREATE TABLE document (
+  -- barwise:v1 {"kind":"column","table":"document","column":"document_id","factType":"Document has DocumentId","readings":["{0} has {1}","{1} identifies {0}"],"roles":[{"name":"has","player":"Document"},{"name":"identifies","player":"DocumentId"}],"rowRole":0,"valueDefinition":"System-generated UUID assigned to each document upon arrival."}
+  document_id UUID NOT NULL,
+  -- NOTE(barwise): Value constraint available: ['customer-support', 'lending', 'health-intake', 'survey']. Consider adding an accepted_values test.
+  -- barwise:v1 {"kind":"column","table":"document","column":"source_system","factType":"Document originatesFrom SourceSystem","readings":["{0} originates from {1}","{1} is source system of {0}"],"roles":[{"name":"originates from","player":"Document"},{"name":"is source system of","player":"SourceSystem"}],"rowRole":0,"valueDefinition":"Controlled code indicating which source system provided the document (customer-support, lending, health-intake, survey)."}
+  source_system VARCHAR(50),
+  -- barwise:v1 {"kind":"column","table":"document","column":"received_timestamp","factType":"Document receivedAt ReceivedTimestamp","readings":["{0} was received at {1}","{1} records {0}"],"roles":[{"name":"was received at","player":"Document"},{"name":"records","player":"ReceivedTimestamp"}],"rowRole":0,"valueDefinition":"Timestamp when the document was received."}
+  received_timestamp DATETIME,
+  -- barwise:v1 {"kind":"column","table":"document","column":"raw_text","factType":"Document has RawText","readings":["{0} has {1}","{1} is raw text of {0}"],"roles":[{"name":"has","player":"Document"},{"name":"is raw text of","player":"RawText"}],"rowRole":0,"valueDefinition":"The original document content as raw text, retained for audit purposes."}
+  raw_text VARCHAR(500),
+  -- NOTE(barwise): Value constraint available: ['queued', 'scanned', 'reviewed', 'redacted', 'failed', 'on-hold']. Consider adding an accepted_values test.
+  -- barwise:v1 {"kind":"column","table":"document","column":"document_status","factType":"Document has DocumentStatus","readings":["{0} has status {1}","{1} is status of {0}"],"roles":[{"name":"has status","player":"Document"},{"name":"is status of","player":"DocumentStatus"}],"rowRole":0,"valueDefinition":"Status of the document in its lifecycle: queued, scanned, reviewed, redacted, failed, on-hold."}
+  document_status VARCHAR(20),
+  -- barwise:v1 {"kind":"column","table":"document","column":"redacted_text","factType":"Document has RedactedText","readings":["{0} has redacted text {1}","{1} is redacted text of {0}"],"roles":[{"name":"has redacted text","player":"Document"},{"name":"is redacted text of","player":"RedactedText"}],"rowRole":0,"valueDefinition":"The document text after redaction with category-tagged tokens."}
+  redacted_text VARCHAR(1000) NOT NULL,
+  PRIMARY KEY (document_id),
+  CHECK (source_system IN ('customer-support', 'lending', 'health-intake', 'survey')),
+  CHECK (document_status IN ('queued', 'scanned', 'reviewed', 'redacted', 'failed', 'on-hold'))
+);
+
+-- Table: finding
+-- Source: Finding (fd60ab67-7d91-4e80-9b35-96796b987960)
+-- Definition: A detected PII occurrence within a specific document and scan version, identified by document + scan version + start position.
+-- NOTE(barwise): Definition available from ORM model: "A detected PII occurrence within a specific document and scan version, identi..."
+-- barwise:v1 {"kind":"table","table":"finding","entity":"Finding","referenceMode":"(ambiguous)","definition":"A detected PII occurrence within a specific document and scan version, identified by document + scan version + start position.","supertypes":[]}
+CREATE TABLE finding (
+  "(ambiguous)" TEXT NOT NULL,
+  -- barwise:v1 {"kind":"column","table":"finding","column":"start_position","factType":"Finding has StartPosition","readings":["{0} has start position {1}","{1} is start position of {0}"],"roles":[{"name":"has start position","player":"Finding"},{"name":"is start position of","player":"StartPosition"}],"rowRole":0,"valueDefinition":"Start character index of the PII occurrence in the document text."}
+  start_position INTEGER NOT NULL,
+  -- barwise:v1 {"kind":"column","table":"finding","column":"end_position","factType":"Finding has EndPosition","readings":["{0} has end position {1}","{1} is end position of {0}"],"roles":[{"name":"has end position","player":"Finding"},{"name":"is end position of","player":"EndPosition"}],"rowRole":0,"valueDefinition":"End character index of the PII occurrence in the document text."}
+  end_position INTEGER NOT NULL,
+  -- NOTE(barwise): Value constraint available: ['full-name', 'email-address', 'phone-number', 'date-of-birth', 'social-security-number', 'credit-card-number', 'mailing-address', 'ip-address', 'passport-number', 'drivers-license-number']. Consider adding an accepted_values test.
+  -- barwise:v1 {"kind":"column","table":"finding","column":"piicategory","factType":"Finding has PIICategory","readings":["{0} has category {1}","{1} is category of {0}"],"roles":[{"name":"has category","player":"Finding"},{"name":"is category of","player":"PIICategory"}],"rowRole":0,"valueDefinition":"Categorical type of PII detected in a finding (e.g., full-name, email-address, etc.)."}
+  piicategory VARCHAR(50),
+  -- barwise:v1 {"kind":"column","table":"finding","column":"confidence_score","factType":"Finding has ConfidenceScore","readings":["{0} has confidence score {1}","{1} is confidence score of {0}"],"roles":[{"name":"has confidence score","player":"Finding"},{"name":"is confidence of","player":"ConfidenceScore"}],"rowRole":0,"valueDefinition":"Confidence score (0..1) assigned by the scanner to a finding."}
+  confidence_score DECIMAL(3,2),
+  PRIMARY KEY ("(ambiguous)"),
+  CHECK (piicategory IN ('full-name', 'email-address', 'phone-number', 'date-of-birth', 'social-security-number', 'credit-card-number', 'mailing-address', 'ip-address', 'passport-number', 'drivers_license_number')),
+  CHECK (piicategory IN ('full-name', 'email-address', 'phone-number', 'date-of-birth', 'social-security-number', 'credit-card-number', 'mailing-address', 'ip-address', 'passport-number', 'drivers-license-number'))
+);
+
+-- Table: reviewer
+-- Source: Reviewer (635fcd85-5d99-4e70-a048-e1761dacb7c2)
+-- Definition: An employee who reviews findings in the compliance department.
+-- NOTE(barwise): Definition available from ORM model: "An employee who reviews findings in the compliance department."
+-- barwise:v1 {"kind":"table","table":"reviewer","entity":"Reviewer","referenceMode":"employee_id","definition":"An employee who reviews findings in the compliance department.","supertypes":[]}
+CREATE TABLE reviewer (
+  -- barwise:v1 {"kind":"column","table":"reviewer","column":"employee_id","factType":"Reviewer has EmployeeId","readings":["{0} has {1}","{1} identifies {0}"],"roles":[{"name":"has employee id","player":"Reviewer"},{"name":"identifies","player":"EmployeeId"}],"rowRole":0,"valueDefinition":"Identifier for a reviewer (employee)."}
+  employee_id VARCHAR(20) NOT NULL,
+  has_employee_id_employee_id VARCHAR(20),
+  -- barwise:v1 {"kind":"column","table":"reviewer","column":"reviewer_name","factType":"Reviewer has ReviewerName","readings":["{0} has name {1}","{1} is name of {0}"],"roles":[{"name":"has name","player":"Reviewer"},{"name":"is name of","player":"ReviewerName"}],"rowRole":0,"valueDefinition":"Reviewer's full name."}
+  reviewer_name VARCHAR(100),
+  -- NOTE(barwise): Value constraint available: ['standard', 'elevated', 'restricted']. Consider adding an accepted_values test.
+  -- barwise:v1 {"kind":"column","table":"reviewer","column":"clearance_level","factType":"Reviewer has ClearanceLevel","readings":["{0} has clearance level {1}","{1} is clearance level of {0}"],"roles":[{"name":"has clearance level","player":"Reviewer"},{"name":"is clearance level of","player":"ClearanceLevel"}],"rowRole":0,"valueDefinition":"Reviewer clearance level: standard, elevated, or restricted."}
+  clearance_level VARCHAR(20),
+  PRIMARY KEY (employee_id),
+  CHECK (clearance_level IN ('standard', 'elevated', 'restricted'))
+);
+
+-- Table: review_decision
+-- Source: ReviewDecision (0b8e87ca-853b-488e-a66f-cf492b8fee60)
+-- Definition: A decision made by a reviewer on a single finding, recording the decision type, timestamp and optional note.
+-- NOTE(barwise): Definition available from ORM model: "A decision made by a reviewer on a single finding, recording the decision typ..."
+-- barwise:v1 {"kind":"table","table":"review_decision","entity":"ReviewDecision","referenceMode":"(ambiguous)","definition":"A decision made by a reviewer on a single finding, recording the decision type, timestamp and optional note.","supertypes":[]}
+CREATE TABLE review_decision (
+  "(ambiguous)" TEXT NOT NULL,
+  PRIMARY KEY ("(ambiguous)")
+);
+
+-- Table: audit_entry
+-- Source: AuditEntry (16ee349a-72f4-478c-90f5-80aaac3bb9de)
+-- Definition: A logged action on a document capturing who performed it, when, and details.
+-- NOTE(barwise): Definition available from ORM model: "A logged action on a document capturing who performed it, when, and details."
+-- barwise:v1 {"kind":"table","table":"audit_entry","entity":"AuditEntry","referenceMode":"audit_id","definition":"A logged action on a document capturing who performed it, when, and details.","supertypes":[]}
+CREATE TABLE audit_entry (
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  audit_id TEXT NOT NULL,
+  -- NOTE(barwise): Value constraint available: ['scan-initiated', 'scan-completed', 'review-assigned', 'review-completed', 'redaction-applied', 'document-released', 'status-changed']. Consider adding an accepted_values test.
+  -- barwise:v1 {"kind":"column","table":"audit_entry","column":"action_type","factType":"AuditEntry has ActionType","readings":["{0} has action type {1}","{1} is action type of {0}"],"roles":[{"name":"has action type","player":"AuditEntry"},{"name":"is action type of","player":"ActionType"}],"rowRole":0,"valueDefinition":"Type of action recorded in audit: scan-initiated, scan-completed, review-assigned, review-completed, redaction-applied, document-released, status-changed."}
+  action_type VARCHAR(50),
+  PRIMARY KEY (audit_id),
+  CHECK (action_type IN ('scan-initiated', 'scan-completed', 'review-assigned', 'review-completed', 'redaction-applied', 'document-released', 'status-changed'))
+);
+
+-- Table: scan
+-- Source: Scan (7a290595-e44f-4545-b019-7cd694a8f0d3)
+-- Definition: A scan operation run over a document using a model version that produces findings; scans have an integer scan version.
+-- NOTE(barwise): Definition available from ORM model: "A scan operation run over a document using a model version that produces find..."
+-- barwise:v1 {"kind":"table","table":"scan","entity":"Scan","referenceMode":"scan_version","definition":"A scan operation run over a document using a model version that produces findings; scans have an integer scan version.","supertypes":[]}
+CREATE TABLE scan (
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  scan_version TEXT NOT NULL,
+  -- barwise:v1 {"kind":"column","table":"scan","column":"model_version","factType":"Scan has ModelVersion","readings":["{0} uses model version {1}","{1} is model version of {0}"],"roles":[{"name":"uses model version","player":"Scan"},{"name":"is model version of","player":"ModelVersion"}],"rowRole":0,"valueDefinition":"Model version string for the PII detection model that produced a scan."}
+  model_version VARCHAR(50) NOT NULL,
+  PRIMARY KEY (scan_version)
+);
+
+-- Table: release
+-- Source: Release (510a6c60-7478-4daf-a620-5b3763836371)
+-- Definition: A record that a redacted document was released to a downstream system, identified by document and downstream system.
+-- NOTE(barwise): Definition available from ORM model: "A record that a redacted document was released to a downstream system, identi..."
+-- NOTE(barwise): Composite primary key (document_id, downstream_system): unique as a combination.
+-- barwise:v1 {"kind":"table","table":"release","entity":"Release","referenceMode":"(ambiguous)","definition":"A record that a redacted document was released to a downstream system, identified by document and downstream system.","objectifies":{"factType":"Document releasedTo DownstreamSystem via Release","readings":["{0} is released to {1}","{1} receives {0}"],"roles":[{"name":"is released to","player":"Document","columns":["document_id"]},{"name":"receives","player":"DownstreamSystem","columns":["downstream_system"],"valueDefinition":"Identifier for downstream systems receiving redacted documents (analytics-warehouse, customer-portal, regulatory-filing, partner-api)."}]},"supertypes":[]}
+CREATE TABLE release (
+  -- NOTE(barwise): Value constraint available: ['analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api']. Consider adding an accepted_values test.
+  document_id UUID NOT NULL,
+  -- NOTE(barwise): Value constraint available: ['analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api']. Consider adding an accepted_values test.
+  downstream_system VARCHAR(50) NOT NULL,
+  -- barwise:v1 {"kind":"column","table":"release","column":"release_timestamp","factType":"Release has ReleaseTimestamp","readings":["{0} has timestamp {1}","{1} is timestamp of {0}"],"roles":[{"name":"has timestamp","player":"Release"},{"name":"is timestamp of","player":"ReleaseTimestamp"}],"rowRole":0,"valueDefinition":"Timestamp when the document was released to a downstream system."}
+  release_timestamp DATETIME NOT NULL,
+  -- barwise:v1 {"kind":"column","table":"release","column":"redacted_content_hash","factType":"Release has RedactedContentHash","readings":["{0} has content hash {1}","{1} is content hash of {0}"],"roles":[{"name":"has content hash","player":"Release"},{"name":"is content hash of","player":"RedactedContentHash"}],"rowRole":0,"valueDefinition":"Hash of the redacted content used to verify integrity."}
+  redacted_content_hash VARCHAR(128),
+  PRIMARY KEY (document_id, downstream_system),
+  FOREIGN KEY (document_id) REFERENCES document (document_id),
+  CHECK (downstream_system IN ('analytics-warehouse', 'customer-portal', 'regulatory-filing', 'partner-api'))
+);
+
+-- Table: document_has_scan
+-- Source: Document has Scan (5fa5ce9a-6bb5-43a7-8570-bb9cf271be8a)
+-- NOTE(barwise): Composite primary key (document_id, scan_version): unique as a combination.
+-- barwise:v1 {"kind":"factTable","table":"document_has_scan","factType":"Document has Scan","readings":["{0} has scan {1}","{1} is scan of {0}"],"roles":[{"name":"has scan","player":"Document","columns":["document_id"]},{"name":"is scan of","player":"Scan","columns":["scan_version"]}]}
+CREATE TABLE document_has_scan (
+  document_id UUID NOT NULL,
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  scan_version TEXT NOT NULL,
+  PRIMARY KEY (document_id, scan_version),
+  FOREIGN KEY (document_id) REFERENCES document (document_id),
+  FOREIGN KEY (scan_version) REFERENCES scan (scan_version)
+);
+
+-- Table: scan_produced_finding
+-- Source: Scan produced Finding (95f1e779-55fb-4a67-ac62-70e5b23643ab)
+-- NOTE(barwise): Composite primary key (scan_version, (ambiguous)): unique as a combination.
+-- barwise:v1 {"kind":"factTable","table":"scan_produced_finding","factType":"Scan produced Finding","readings":["{0} produced {1}","{1} is produced by {0}"],"roles":[{"name":"produced","player":"Scan","columns":["scan_version"]},{"name":"is produced by","player":"Finding","columns":["(ambiguous)"]}]}
+CREATE TABLE scan_produced_finding (
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  scan_version TEXT NOT NULL,
+  "(ambiguous)" TEXT NOT NULL,
+  PRIMARY KEY (scan_version, "(ambiguous)"),
+  FOREIGN KEY (scan_version) REFERENCES scan (scan_version),
+  FOREIGN KEY ("(ambiguous)") REFERENCES finding ("(ambiguous)")
+);
+
+-- Constraint (each instance must appear in another table, which no column can require): Each Finding is reviewed by at least one Reviewer.
+-- Table: finding_reviewed_by_reviewer
+-- Source: Finding reviewedBy Reviewer (3c821c8f-c2bd-4570-856b-d34370b7d39c)
+-- NOTE(barwise): Composite primary key ((ambiguous), employee_id): unique as a combination.
+-- barwise:v1 {"kind":"factTable","table":"finding_reviewed_by_reviewer","factType":"Finding reviewedBy Reviewer","readings":["{0} is reviewed by {1}","{1} reviews {0}"],"roles":[{"name":"is reviewed by","player":"Finding","columns":["(ambiguous)"]},{"name":"reviews","player":"Reviewer","columns":["employee_id"]}]}
+CREATE TABLE finding_reviewed_by_reviewer (
+  "(ambiguous)" TEXT NOT NULL,
+  employee_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY ("(ambiguous)", employee_id),
+  FOREIGN KEY ("(ambiguous)") REFERENCES finding ("(ambiguous)"),
+  FOREIGN KEY (employee_id) REFERENCES reviewer (employee_id)
+);
+
+-- Constraint (each instance must appear in another table, which no column can require): Each ReviewDecision is decision of at least one Finding.
+-- Table: review_decision_is_decision_of_finding
+-- Source: ReviewDecision isDecisionOf Finding (1875b69e-d864-4faa-84dd-4e60407b0c1f)
+-- NOTE(barwise): Composite primary key ((ambiguous), has_decision_about_(ambiguous)): unique as a combination.
+-- barwise:v1 {"kind":"factTable","table":"review_decision_is_decision_of_finding","factType":"ReviewDecision isDecisionOf Finding","readings":["{0} is decision of {1}","{1} has decision {0}"],"roles":[{"name":"is decision of","player":"ReviewDecision","columns":["(ambiguous)"]},{"name":"has decision about","player":"Finding","columns":["has_decision_about_(ambiguous)"]}]}
+CREATE TABLE review_decision_is_decision_of_finding (
+  "(ambiguous)" TEXT NOT NULL,
+  "has_decision_about_(ambiguous)" TEXT NOT NULL,
+  PRIMARY KEY ("(ambiguous)", "has_decision_about_(ambiguous)"),
+  FOREIGN KEY ("(ambiguous)") REFERENCES review_decision ("(ambiguous)"),
+  FOREIGN KEY ("has_decision_about_(ambiguous)") REFERENCES finding ("(ambiguous)")
+);
+
+-- Constraint (each instance must appear in another table, which no column can require): Each AuditEntry is about at least one Document.
+-- Table: audit_entry_about_document
+-- Source: AuditEntry about Document (72cca336-4aa4-4c09-a562-3793d481b10e)
+-- NOTE(barwise): Composite primary key (audit_id, document_id): unique as a combination.
+-- barwise:v1 {"kind":"factTable","table":"audit_entry_about_document","factType":"AuditEntry about Document","readings":["{0} is about {1}","{1} has audit entry {0}"],"roles":[{"name":"is about","player":"AuditEntry","columns":["audit_id"]},{"name":"applies to","player":"Document","columns":["document_id"]}]}
+CREATE TABLE audit_entry_about_document (
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  audit_id TEXT NOT NULL,
+  document_id UUID NOT NULL,
+  PRIMARY KEY (audit_id, document_id),
+  FOREIGN KEY (audit_id) REFERENCES audit_entry (audit_id),
+  FOREIGN KEY (document_id) REFERENCES document (document_id)
+);
+
+-- Table: audit_entry_performed_by_reviewer
+-- Source: AuditEntry performedBy Reviewer (1b422114-da9e-43f2-a2a6-08cc964a1d68)
+-- NOTE(barwise): Composite primary key (audit_id, employee_id): unique as a combination.
+-- barwise:v1 {"kind":"factTable","table":"audit_entry_performed_by_reviewer","factType":"AuditEntry performedBy Reviewer","readings":["{0} performed by {1}","{1} performed {0}"],"roles":[{"name":"performed by","player":"AuditEntry","columns":["audit_id"]},{"name":"performed","player":"Reviewer","columns":["employee_id"]}]}
+CREATE TABLE audit_entry_performed_by_reviewer (
+  -- TODO(barwise): No column description. Add a definition to the value type.
+  -- TODO(barwise): Data type was not declared; exported as TEXT. Add a data type to the value type.
+  audit_id TEXT NOT NULL,
+  employee_id VARCHAR(20) NOT NULL,
+  PRIMARY KEY (audit_id, employee_id),
+  FOREIGN KEY (audit_id) REFERENCES audit_entry (audit_id),
+  FOREIGN KEY (employee_id) REFERENCES reviewer (employee_id)
+);

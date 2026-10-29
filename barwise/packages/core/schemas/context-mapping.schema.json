@@ -7,6 +7,11 @@
   "required": ["mapping"],
   "additionalProperties": false,
   "properties": {
+    "format_version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Format version of this mapping file. Optional: a file without it was written before mapping files were versioned and is read as 1.0. Must be \"1.0\" for this schema revision."
+    },
     "mapping": {
       "type": "object",
       "required": ["source_context", "target_context", "pattern"],

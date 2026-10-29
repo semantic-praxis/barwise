@@ -26,7 +26,7 @@ import { subtypeOperands } from "../model/subtypeOperands.js";
 import { renderValuePredicate } from "../sql/valuePredicate.js";
 import { ConstraintVerbalizer } from "../verbalization/index.js";
 import { DIALECT_PROFILES, type DialectCapabilityProfile } from "./dialectCapabilities.js";
-import type { RelationalSchema, Table } from "./RelationalSchema.js";
+import type { RelationalSchema, RoutedUnique, Table } from "./RelationalSchema.js";
 
 /** A constraint clause to inject into a rendered CREATE TABLE. */
 export interface RoutedClause {
@@ -35,6 +35,12 @@ export interface RoutedClause {
   readonly sql: string;
   /** Whether the dialect enforces the clause or only records it. */
   readonly channel: "native" | "informational";
+  /**
+   * A UNIQUE clause's columns, so a format that writes uniqueness in its
+   * own form (dbt) reads them rather than parsing the SQL. Absent on a
+   * CHECK.
+   */
+  readonly columns?: readonly string[];
 }
 
 /** A constraint that degrades to the ConstraintSpec spillway. */
@@ -46,10 +52,23 @@ export interface SpilledConstraint {
   readonly spec: ConstraintSpec;
 }
 
+/** A constraint the routing put on a table, as a clause or a spilled comment. */
+export interface ConstraintPlacement {
+  readonly tableName: string;
+  /** The constraint placed, as the router saw it: not an id to look up again. */
+  readonly inView: ConstraintInView;
+}
+
 /** The routing decision for a whole model. */
 export interface ConstraintRouting {
   readonly clauses: readonly RoutedClause[];
   readonly spilled: readonly SpilledConstraint[];
+  /**
+   * Each constraint the routing wrote on a table, once per table: what
+   * DDL lineage lists as that table's source, since changing the
+   * constraint changes the table's text (barwise-20o).
+   */
+  readonly placements: readonly ConstraintPlacement[];
 }
 
 /**
@@ -80,9 +99,42 @@ export function unreportedConstraintSpecs(
   model: OrmModel,
   schema: RelationalSchema,
 ): ConstraintSpec[] {
+  return specsOnce(routeAll(model, schema, NO_CLAUSES, "this format").spilled);
+}
+
+/**
+ * A target with UNIQUE and no CHECK: a format that writes uniqueness in
+ * its own form but no predicate (dbt's `unique` and combination tests).
+ */
+const UNIQUE_ONLY: DialectCapabilityProfile = { ...NO_CLAUSES, unique: "native" };
+
+/**
+ * What a format that can state uniqueness, and nothing the schema does not
+ * carry otherwise, writes and drops: the UNIQUEs the DDL export writes,
+ * by the router's own decision, and the specs of every other constraint,
+ * as `unreportedConstraintSpecs` reports them (dbt-alternate-uniqueness.spec.md).
+ * Each UNIQUE is listed once per table and column set: two constraints can
+ * write one clause, and dbt refuses two tests of one name.
+ */
+export function routeUniqueOnly(
+  model: OrmModel,
+  schema: RelationalSchema,
+): { uniques: RoutedUnique[]; constraintSpecs: ConstraintSpec[]; } {
+  const { clauses, spilled } = routeAll(model, schema, UNIQUE_ONLY, "this format");
+  const uniques = clauses.flatMap((c) =>
+    c.columns ? [{ tableName: c.tableName, columns: c.columns }] : []
+  );
+  return {
+    uniques: dedupeBy(uniques, (u) => JSON.stringify([u.tableName, [...u.columns].sort()])),
+    constraintSpecs: specsOnce(spilled),
+  };
+}
+
+/** One spec per constraint spilled, in order. */
+function specsOnce(spilled: readonly RoutedSpill[]): ConstraintSpec[] {
   const seen = new Set<Constraint>();
   const specs: ConstraintSpec[] = [];
-  for (const s of routeAll(model, schema, NO_CLAUSES, "this format").spilled) {
+  for (const s of spilled) {
     if (seen.has(s.constraint)) continue;
     seen.add(s.constraint);
     specs.push(s.spec);
@@ -111,8 +163,13 @@ export function routeConstraints(
   profile: DialectCapabilityProfile,
   dialectName: string,
 ): ConstraintRouting {
-  const { clauses, spilled } = routeAll(model, schema, profile, dialectName);
+  const { clauses, spilled, placements } = routeAll(model, schema, profile, dialectName);
   return {
+    // Once per table and constraint: a constraint can spill twice at one
+    // table (a mandatory and its column), and is still one source. Before
+    // the text dedupe, deliberately: two constraints that write the same
+    // clause are both sources, since changing either changes the table.
+    placements: onePerTable(placements),
     clauses: dedupeBy(clauses, (c) => JSON.stringify([c.tableName, c.sql])),
     spilled: dedupeBy(spilled, (s) => JSON.stringify([s.tableName ?? "", s.spec.verbalization]))
       .map(({ tableName, reason, spec }) => ({ tableName, reason, spec })),
@@ -129,12 +186,17 @@ function routeAll(
   schema: RelationalSchema,
   profile: DialectCapabilityProfile,
   dialectName: string,
-): { clauses: RoutedClause[]; spilled: RoutedSpill[]; } {
+): { clauses: RoutedClause[]; spilled: RoutedSpill[]; placements: ConstraintPlacement[]; } {
   const clauses: RoutedClause[] = [];
   const spilled: RoutedSpill[] = [];
+  const placements: ConstraintPlacement[] = [];
+  const place = (inView: ConstraintInView, tableName: string | undefined): void => {
+    if (tableName !== undefined) placements.push({ tableName, inView });
+  };
   const verbalizer = new ConstraintVerbalizer();
 
   const spill = (inView: ConstraintInView, reason: string, tableName?: string): void => {
+    place(inView, tableName);
     spilled.push({
       tableName,
       reason,
@@ -148,6 +210,7 @@ function routeAll(
     clauseSql: string,
     tableName: string,
     inView: ConstraintInView,
+    columns?: readonly string[],
   ): void => {
     const channel = profile[capability];
     if (channel === "absent") {
@@ -158,8 +221,11 @@ function routeAll(
       );
       return;
     }
-    clauses.push({ tableName, sql: clauseSql, channel });
+    place(inView, tableName);
+    clauses.push({ tableName, sql: clauseSql, channel, ...(columns ? { columns } : {}) });
   };
+  const unique = (columns: readonly string[], tableName: string, inView: ConstraintInView) =>
+    route("unique", `UNIQUE (${columns.join(", ")})`, tableName, inView, columns);
 
   // A constraint across fact types is placed by the fact types it spans,
   // never by the one a 2.0 file nests it under (orm-format-3, Open
@@ -208,8 +274,7 @@ function routeAll(
         // and the internal branch skips the same case.
         !isWholePrimaryKey({ table, columns: resolved.flatMap((r) => r.columns) }, schema)
       ) {
-        const columnList = resolved.flatMap((r) => r.columns).join(", ");
-        route("unique", `UNIQUE (${columnList})`, table, inView);
+        unique(resolved.flatMap((r) => r.columns), table, inView);
       }
       return;
     }
@@ -254,13 +319,13 @@ function routeAll(
         // `PRIMARY KEY (medical_record_number)` -- a clause the primary
         // key already enforces.
         if (col && !isPrimaryKey(col, schema)) {
-          route("unique", `UNIQUE (${col.column})`, col.table, inView);
+          unique([col.column], col.table, inView);
         }
         const between = single ? entityBinaryUniqueColumns(single, ft, model, schema) : undefined;
         if (between === "unlocated") {
           spill(inView, "the roles map to no column", tableForFactType(ft, model, schema));
         } else if (typeof between === "object" && !isWholePrimaryKey(between, schema)) {
-          route("unique", `UNIQUE (${between.columns.join(", ")})`, between.table, inView);
+          unique(between.columns, between.table, inView);
         }
         // An n-ary fact type's table is keyed on one of its uniqueness
         // constraints; any other one is a UNIQUE on the same table
@@ -269,7 +334,7 @@ function routeAll(
         if (ft.arity > 2) {
           const spanned = associativeColumns(c.roleIds, schema);
           if (spanned && !isWholePrimaryKey(spanned, schema)) {
-            route("unique", `UNIQUE (${spanned.columns.join(", ")})`, spanned.table, inView);
+            unique(spanned.columns, spanned.table, inView);
           }
         }
         break;
@@ -328,7 +393,31 @@ function routeAll(
     }
   }
 
-  return { clauses, spilled };
+  // A key a generated key replaced is still a uniqueness of its table,
+  // which the schema states rather than the model: a many-to-many table's
+  // spanning uniqueness is realized by its key, and no constraint is
+  // routed as a UNIQUE for it (surrogate-key-export.spec.md). Written once:
+  // an external identifier's own uniqueness is already a clause over the
+  // same columns once they are no longer the key.
+  if (profile.unique !== "absent") {
+    for (const table of schema.tables) {
+      const key = table.naturalKey;
+      if (!key) continue;
+      const same = clauses.some((c) =>
+        c.tableName === table.name && c.columns?.length === key.length
+        && key.every((k) => c.columns!.includes(k))
+      );
+      if (same) continue;
+      clauses.push({
+        tableName: table.name,
+        sql: `UNIQUE (${key.join(", ")})`,
+        channel: profile.unique,
+        columns: key,
+      });
+    }
+  }
+
+  return { clauses, spilled, placements };
 
   function routeValueConstraint(
     c: Extract<Constraint, { type: "value_constraint"; }>,
@@ -344,6 +433,18 @@ function routeAll(
       spill(inView, "the constrained role maps to no single column", col?.table);
     }
   }
+}
+
+/** Each placement once per table and constraint, in order: one pass. */
+function onePerTable(placements: readonly ConstraintPlacement[]): ConstraintPlacement[] {
+  const seen = new Map<string, Set<unknown>>();
+  return placements.filter(({ tableName, inView }) => {
+    const placed = seen.get(tableName) ?? new Set();
+    seen.set(tableName, placed);
+    if (placed.has(inView[0])) return false;
+    placed.add(inView[0]);
+    return true;
+  });
 }
 
 /** Keep the first occurrence of each key, preserving order. */

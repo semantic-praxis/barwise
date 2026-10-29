@@ -15,11 +15,10 @@ import { withDerivedIds } from "./derivedId.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
   applyMigrations,
-  compareOrmVersions,
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
-  type MigrationPlan,
-  planMigration,
+  planRead,
+  unsupportedVersionMessage,
 } from "./schemaVersion.js";
 import { subtypeConstraintsFromFlags } from "./subtypeFlags.js";
 import { deserializeConstraint, serializeConstraint } from "./yaml/constraint.js";
@@ -51,23 +50,6 @@ export class DeserializationError extends Error {
     super(message);
     this.name = "DeserializationError";
   }
-}
-
-/**
- * Build a clear, actionable message for a document whose `orm_version`
- * cannot be brought to the current version.
- */
-function versionErrorMessage(
-  version: string,
-  plan: Extract<MigrationPlan, { ok: false; }>,
-): string {
-  const advice = {
-    newer: "the file was written by a newer barwise; upgrade barwise to read it.",
-    unknown: "no migration path is available; re-export from a compatible version.",
-    cycle: "the migration registry loops back on itself, which is a bug in barwise.",
-  };
-  const head = `Unsupported orm_version "${version}" (this build reads ${CURRENT_ORM_VERSION}):`;
-  return `${head} ${advice[plan.reason]}`;
 }
 
 /** What reading a file changed beyond its format (`OrmYamlSerializer.migrate`). */
@@ -209,7 +191,8 @@ export class OrmYamlSerializer {
 
   /**
    * Bring a freshly parsed document to a version a reader exists for:
-   * 3.0, read as it is, or 2.0, which older documents migrate to first.
+   * the current version, which earlier minors of its major migrate to, or
+   * 2.0, which older documents migrate to first (`planRead`).
    *
    * Documents whose `orm_version` is missing or malformed are passed
    * through untouched so that schema validation reports those cases as it
@@ -226,24 +209,15 @@ export class OrmYamlSerializer {
     const doc = raw as Record<string, unknown>;
     const version = doc.orm_version;
     if (typeof version !== "string") return { doc: raw, version, stated: undefined };
-    if (version === CURRENT_ORM_VERSION) return { doc: raw, version, stated: version };
-    if (compareOrmVersions(version, CURRENT_ORM_VERSION) > 0) {
-      throw new DeserializationError(versionErrorMessage(version, { ok: false, reason: "newer" }));
-    }
-    if (version === LEGACY_ORM_VERSION) return { doc: raw, version, stated: version };
-    // Between 2.0 and 3.0 there is nothing to read: no release wrote it.
-    if (compareOrmVersions(version, LEGACY_ORM_VERSION) > 0) {
-      throw new DeserializationError(
-        versionErrorMessage(version, { ok: false, reason: "unknown" }),
-      );
-    }
-    const plan = planMigration(version, LEGACY_ORM_VERSION);
+    const plan = planRead(version);
     if (!plan.ok) {
-      throw new DeserializationError(versionErrorMessage(version, plan));
+      throw new DeserializationError(
+        unsupportedVersionMessage("orm_version", version, CURRENT_ORM_VERSION, plan.reason),
+      );
     }
     return {
       doc: applyMigrations(doc, plan.steps),
-      version: LEGACY_ORM_VERSION,
+      version: plan.target,
       stated: version,
     };
   }
@@ -263,6 +237,7 @@ export class OrmYamlSerializer {
     const model = new OrmModel({
       name: doc.model.name,
       domainContext: doc.model.domain_context,
+      namespace: doc.model.namespace,
       note: doc.model.note,
     });
 
@@ -378,6 +353,9 @@ export function writeDocument(model: OrmModel): OrmYamlDocument {
 
   if (model.domainContext) {
     doc.model.domain_context = model.domainContext;
+  }
+  if (model.namespace) {
+    doc.model.namespace = model.namespace;
   }
   if (model.note) {
     doc.model.note = model.note;

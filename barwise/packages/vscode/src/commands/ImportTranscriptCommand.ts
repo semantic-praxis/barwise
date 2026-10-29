@@ -4,6 +4,7 @@ import {
   type BreakingLevel,
   deltaLabel,
   diffModels,
+  MERGE_DIFF_OPTIONS,
   mergeAndValidate,
   type ModelDelta,
   type SynonymCandidate,
@@ -214,7 +215,7 @@ export class ImportTranscriptCommand {
       return incomingModel;
     }
 
-    const diff = diffModels(existingModel, incomingModel);
+    const diff = diffModels(existingModel, incomingModel, MERGE_DIFF_OPTIONS);
     if (!diff.hasChanges) {
       vscode.window.showInformationMessage(
         "No changes detected -- existing model is up to date.",
@@ -245,7 +246,7 @@ export class ImportTranscriptCommand {
       const result = mergeAndValidate(
         existingModel,
         incomingModel,
-        diff.deltas,
+        diff,
         accepted,
       );
 

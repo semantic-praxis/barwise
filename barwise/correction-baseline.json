@@ -1,6 +1,12 @@
 {
   "$comment": "Correction records in docs/specs, from scripts/audit-corrections.mjs (npm run audit:corrections -- --check; CI runs it). A spec that records what its draft got wrong carries a verdict here saying what CAUGHT it -- execution, reasoning, or provenance -- or not-a-correction when the detector over-matched. --check fails on a detected record missing here AND on a row no longer detected, so the file always enumerates exactly the corpus. The detector is deliberately over-inclusive; the markers are in the script, which is their only home. Seed and method: docs/spec-correction-taxonomy-2026-09-11.md. Spec: docs/specs/correction-record-ratchet.spec.md.",
   "records": {
+    "annotation-preferred-identifier::9e8dda8979f3": {
+      "spec": "annotation-preferred-identifier.spec.md",
+      "excerpt": "- measured with the scratchpad pi.mjs: all 42 entities keep their preferred identifier through an annotated round trip, and no entity loses one. ten objectifier",
+      "caught_by": "reasoning",
+      "note": "Implementation review: the Scope's writer rule (omit the key) contradicted its own subtype bullet, and the key rule would have preferred a composite foreign key's one-to-one the export does not key on."
+    },
     "artifact-resolution-in-production::1867a6666050": {
       "spec": "artifact-resolution-in-production.spec.md",
       "excerpt": "shipped as specified. llmclient gained provider: string and model: string | undefined; processtranscript resolves against builtinartifacts and falls back to the",
@@ -61,6 +67,12 @@
       "caught_by": "not-a-correction",
       "note": "An Inventory note about what the diff does to the baseline files. The detector matched `caught it` inside prose NAMING the verdict vocabulary, which is the same over-match this spec's first row records."
     },
+    "binary-constraint-sentences::02355d2c915c": {
+      "spec": "binary-constraint-sentences.spec.md",
+      "excerpt": "- measured over the tracked corpus with barwise verbalize, before and after: 20 sentences change. that is the 8 mandatory and uniqueness sentences that regain t",
+      "caught_by": "execution",
+      "note": "The plan sent a reading with text before its subject to the reverse frame; the high implementation review ran such a reading through the verbalizer and got \"the that Order\", so the forward builder lets Each replace that text instead."
+    },
     "ci-local-condition-parity::0bc9b629f788": {
       "spec": "ci-local-condition-parity.spec.md",
       "excerpt": "- ws1. scripts/lib/changed-class.mjs owns classify, and ci.yml's detect step is one line that runs it. it was checked against the last 40 merges to main, runnin",
@@ -78,6 +90,12 @@
       "excerpt": "making the drift testable needed one refactor the workstream did not anticipate: classifychange returned the literal \"caution\" both for a deliberate caution and",
       "caught_by": "execution",
       "note": "Writing the test is what surfaced it: classifyChange returned the literal \"caution\" for both a deliberate caution and an unrecognized string, so no test could distinguish them. Split into classifyKnownChange returning BreakingLevel | undefined."
+    },
+    "composite-foreign-key-round-trip::f6798b7cf08e": {
+      "spec": "composite-foreign-key-round-trip.spec.md",
+      "excerpt": "- models imported from ddl with a multi-column foreign key outside the key change shape: one reference instead of several. that is the fix, and the release note",
+      "caught_by": "not-a-correction",
+      "note": "A Risks bullet describing the intended change of shape, not a correction of the draft."
     },
     "core-branching-load::09caa79b9010": {
       "spec": "core-branching-load.spec.md",
@@ -187,6 +205,12 @@
       "caught_by": "reasoning",
       "note": "A reviewer's objection, in one sentence -- do not build what others have built better -- before anything was re-run. The draft had rejected gitleaks on two grounds that both turn out weak: CLAUDE.md's no-trivial-dependencies rule is about what Node core provides, and the first-party-actions constraint is satisfied by a pinned tarball with a verified digest."
     },
+    "dbt-export-current-test-syntax::a7b541c918f8": {
+      "spec": "dbt-export-current-test-syntax.spec.md",
+      "excerpt": "- renderdbt shall write datatests: on columns and models. - it shall write every test that takes arguments through one helper, generictest(name, args), which re",
+      "caught_by": "not-a-correction",
+      "note": "A Scope requirement (the export writes data_tests: through one helper), not a correction to the spec."
+    },
     "ddl-import-fidelity::0d08b981db76": {
       "spec": "ddl-import-fidelity.spec.md",
       "excerpt": "the existing tests did not catch any of this. ddlimportformat.test.ts asserts that some mandatory constraint exists (tobegreaterthan(0)), never which role it is",
@@ -241,11 +265,11 @@
       "caught_by": "execution",
       "note": "Re-reading the live API after the merge. The first draft asserted GitHub's releases-list sort key was 'measurably neither created_at nor published_at', on the pre-merge reading alone. Running it again after the tag moved showed created_at DID follow the tag (2026-06-14T21:45:35Z -> 2026-09-22T18:40:50Z) while published_at stayed frozen, and the position changed with it -- so the causal chain does run through created_at and the original phrasing overstated the negative. The correction narrows the claim to the chain rather than the full sort rule, because the historical ordering still is not explained by created_at desc alone. Caught by executing the same query twice, not by rethinking it."
     },
-    "effect-adoption::3340fd25eab9": {
+    "effect-adoption::590954cb0e90": {
       "spec": "effect-adoption.spec.md",
       "excerpt": "1. effect types in core's public api -- resolved 2026-10-15 by the owner: exported. alternative and trade-off under alternatives considered. consequence carried",
       "caught_by": "reasoning",
-      "note": "Caught in PR 671 review on 2026-10-16 by Copilot, on decision 2: the claim that a plain newId parameter performs no effect was disputed by reasoning about process-wide generator state and barwise-e8m. No code was run. Item 2 withdraws the claim; item 8 resolves the id source as option (d), so the decoder takes no newId. (Row id changed when item 3 gained its superseded line on 2026-10-16.)"
+      "note": "Caught in PR 671 review on 2026-10-16 by Copilot, on decision 2: the claim that a plain newId parameter performs no effect was disputed by reasoning about process-wide generator state and barwise-e8m. No code was run. Item 2 withdraws the claim; item 8 resolves the id source as option (d), so the decoder takes no newId. (Row id changed when item 3 gained its superseded line on 2026-10-16. and again when item 4 was amended for step-by-step merges on 2026-10-29.)"
     },
     "effect-adoption::8f82ddd00c0b": {
       "spec": "effect-adoption.spec.md",
@@ -264,6 +288,12 @@
       "excerpt": "9. the shipped json schema: generated from effect, or hand-written and drift-tested (revisits item 3; added 2026-10-16) -- resolved 2026-10-16 by the owner: gen",
       "caught_by": "not-a-correction",
       "note": "Reopens item 3 after a probe of Schema.toJsonSchemaDocument on the spike codecs showed generation works; the owner then chose generation on 2026-10-16, reasoning that a test stating its expected answer directly is a better check than a hand-written schema. Item 3 was a judgement revisited, not an error."
+    },
+    "effect-adoption::acf1201087ac": {
+      "spec": "effect-adoption.spec.md",
+      "excerpt": "- changed scope: the two misplacement cases are not s4 cases. their refusal names the constraint and its home, not a field, so no field could be declared that t",
+      "caught_by": "reasoning",
+      "note": "Found while writing the cases: a misplacement refusal names the constraint and its home, not a field, so S4 could not score it; format30.test.ts already pins its wording."
     },
     "effect-comparison::149864007d79": {
       "spec": "effect-comparison.spec.md",
@@ -438,6 +468,18 @@
       "excerpt": "workstream 1 shipped as barwise/scripts/check-instruction-refs.mjs, the check:instruction-refs npm script and a ci.yml step with no if:. the open decisions were",
       "caught_by": "execution",
       "note": "Running the first port of the gate over the real corpus reported 21 ambiguous CLAUDE.md references the prototype had passed; the missing repo-root step was found by that run, not by reading the spec."
+    },
+    "iri-identity::5c5ac7ca4c93": {
+      "spec": "iri-identity.spec.md",
+      "excerpt": "- the verbalization cycle. ormmodel cannot reach the constraint verbalizer today: verbalization modules type-import model/ormmodel.js, directly and through mode",
+      "caught_by": "not-a-correction",
+      "note": "WS6 grounding: a constraint found by reading .dependency-cruiser.cjs and the verbalization imports, stated as a design requirement. No earlier draft claimed OrmModel could call the verbalizer; plan-review rounds revised this paragraph before any build, which is not a correction record."
+    },
+    "iri-identity::d656c9bfd0a8": {
+      "spec": "iri-identity.spec.md",
+      "excerpt": "- 6b, the model and the format. - mint at the add, with the file's stated ids reserved for the load. a reader collects every id the file states before its first",
+      "caught_by": "not-a-correction",
+      "note": "WS6 grounding: the chosen minting mechanism and the alternatives weighed against it. \"Rejected\" names design alternatives, not a wrong claim in an earlier draft."
     },
     "join-ring-constraint::4aa634cf98aa": {
       "spec": "join-ring-constraint.spec.md",
@@ -679,17 +721,23 @@
       "caught_by": "reasoning",
       "note": "Corrections to the WS4b draft. The compiler showed the llm parser never wrote the flags the draft listed it as writing. A dangling subtype fact id would make a model unloadable, so removal prunes the operand; two code review rounds then caught that pruning every kind made a disjunctive mandatory or exclusive-or stronger, that NORMA wrote partitions over every subtype of a supertype, and that reading NORMA partitions back as flags merged two exclusions and dropped modality, which moved the one-to-one NORMA mapping forward into 4b-i."
     },
+    "ossie-export-precise-losses::f3d7c8ecfba7": {
+      "spec": "ossie-export-precise-losses.spec.md",
+      "excerpt": "over the corpus, dropping it changes no output. a narrower row can only add a line, never hide one, so the row explains referencemode alone. - measured through ",
+      "caught_by": "execution",
+      "note": "The planned no-identifier row also explained preferredIdentifier; re-running the corpus export with it dropped changed no output, and reading the writer showed the other identifier line always fires, so the row was narrowed. Implementation review then added the cases the drift test lacked."
+    },
     "ossie-export-verified-by-reimport::0fd9b18a7d2f": {
       "spec": "ossie-export-verified-by-reimport.spec.md",
       "excerpt": "when the ossie exporter has written a document, it shall read the written text back through the ossie importer, compare the result with the source model, and ad",
       "caught_by": "not-a-correction",
       "note": "The spec's opening requirement. It says the writer's predictions were wrong in earlier review rounds, which is the problem statement, not a correction to this spec."
     },
-    "ossie-export-verified-by-reimport::ee418e5d7c13": {
+    "ossie-export-verified-by-reimport::a6a4b03c52cd": {
       "spec": "ossie-export-verified-by-reimport.spec.md",
       "excerpt": "- as planned in the revised plan. the first draft claimed the read-back found an external uniqueness the import adds. the high plan review showed that was an ar",
       "caught_by": "execution",
-      "note": "The high plan review re-ran the prototype with roles restored to source order: the claimed added external uniqueness paired away, leaving a preferred identifier on Model, and readings compared equal, so ignoring them was wrong."
+      "note": "The high plan review re-ran the prototype with roles restored to source order: the claimed added external uniqueness paired away, leaving a preferred identifier on Model, and readings compared equal, so ignoring them was wrong. (Row re-keyed when barwise-huw added a pointer to its decision.)"
     },
     "output-budget::206952685bcc": {
       "spec": "output-budget.spec.md",
@@ -774,6 +822,12 @@
       "excerpt": "- dot names needed no rule. the draft refused . and .. as domain names. splitmodel appends .orm.yaml, so .. becomes the file ...orm.yaml inside domains/; only a",
       "caught_by": "reasoning",
       "note": "Noticed while writing the check, by reading the path template domains/${ctx}.orm.yaml: the suffix turns '..' into a file name, so the dot rule guarded nothing. A test now pins '..' as accepted."
+    },
+    "surrogate-key-export::3f0a5cab6799": {
+      "spec": "surrogate-key-export.spec.md",
+      "excerpt": "- changed scope: a table's key can change without a generated key. a shared-key subtype of a table that got one collapses to its one link column. every referenc",
+      "caught_by": "reasoning",
+      "note": "Implementation review: references to a shared-key subtype whose key collapsed were left multi-column, and a generated key hashed a different column order than references to it; the first was then shown by a test that went red on the earlier code."
     },
     "test-quality::7422006b91c7": {
       "spec": "test-quality.spec.md",

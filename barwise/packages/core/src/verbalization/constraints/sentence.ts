@@ -1,11 +1,12 @@
 /**
  * FORML sentence parts for constraint verbalization: the subject entity
- * a multi-role constraint is about (resolveCommonPlayer) and the predicate
- * phrase between two roles of a binary reading (extractPredicate).
+ * a multi-role constraint is about (resolveCommonPlayer), a reading's parts
+ * as quantified segments (quantifiedReading, forEachReading), and the
+ * clause of a ring sentence (ringReading, ringClause).
  */
+import type { ConstraintModel } from "../../model/constraintModel.js";
 import type { FactType } from "../../model/FactType.js";
-import type { OrmModel } from "../../model/OrmModel.js";
-import { leadOf, type ReadingPart, splitReading, textOf } from "../../model/ReadingOrder.js";
+import { leadOf, type ReadingPart, splitReading } from "../../model/ReadingOrder.js";
 import type { Role } from "../../model/Role.js";
 import { kwSeg, refSeg, textSeg, type VerbalizationSegment } from "../Verbalization.js";
 
@@ -41,7 +42,7 @@ export function localRole(factType: FactType, roleId: string): Role {
 
 export function resolveCommonPlayer(
   roleIds: readonly string[],
-  model: OrmModel,
+  model: ConstraintModel,
 ): { name: string; id: string; } {
   // Model-wide: the roles of a constraint across fact types belong to
   // several fact types, and none of them is the constraint's own
@@ -58,82 +59,94 @@ export function resolveCommonPlayer(
 }
 
 /**
- * A binary reading's predicate between a subject and an object role, and
- * the words hyphen-bound to each role's player (reading-hyphen-binding.spec.md).
- * `subject` and `object` put a player's reference after its lead, so every
- * sentence builder places a lead the same way: immediately before the
- * name, after any quantifier or determiner the builder writes first ("Each
- * Listing has at most one sale Currency").
+ * A binary reading as a ring sentence's clause: the subject's lead, and the
+ * reading's parts after the subject placeholder, rendered by `ringClause`
+ * so text after the object stays ("{0} specializes {1} as supertype"),
+ * which slicing between the placeholders dropped (barwise-7tx). Text
+ * before the subject is dropped, as "No" or "If" takes its place.
  */
-export interface Predicate {
-  readonly text: string;
-  readonly subject: (name: VerbalizationSegment) => VerbalizationSegment[];
-  readonly object: (name: VerbalizationSegment) => VerbalizationSegment[];
-}
-
-function predicate(text: string, subjectLead = "", objectLead = ""): Predicate {
-  return {
-    text,
-    subject: (name) => [...leadSegs(subjectLead), name],
-    object: (name) => [...leadSegs(objectLead), name],
-  };
+export interface RingReading {
+  readonly subjectIndex: number;
+  readonly subjectLead: string;
+  readonly rest: readonly ReadingPart[];
 }
 
 /**
- * The predicate of a binary fact type from the reading that names the
- * subject role before the object role, or undefined when no reading has
- * that order.
+ * The ring reading of a binary fact type: the first reading that names the
+ * subject role before the object role. When none does, the first reading
+ * is taken by placeholder position, its first placeholder the subject.
+ * That reads the fact backwards, which the ring sentence is unchanged by;
+ * each lead stays with the name in its own slot.
  */
-export function orderedPredicate(
+export function ringReading(
   factType: FactType,
   subjectIdx: number,
   objectIdx: number,
-): Predicate | undefined {
-  for (const reading of factType.readings) {
-    const parts = splitReading(reading.template).parts;
+): RingReading {
+  if (factType.arity !== 2) return UNKNOWN_RING_READING;
+  const readings = factType.readings.map((r) => splitReading(r.template).parts);
+  for (const parts of readings) {
     const s = parts.findIndex((p) => p.kind === "role" && p.index === subjectIdx);
     const o = parts.findIndex((p) => p.kind === "role" && p.index === objectIdx);
     if (s >= 0 && o > s) {
-      return predicate(textOf(parts.slice(s + 1, o)).trim(), leadOf(parts[s]), leadOf(parts[o]));
+      return {
+        subjectIndex: subjectIdx,
+        subjectLead: leadOf(parts[s]),
+        rest: parts.slice(s + 1),
+      };
     }
   }
-  return undefined;
+  const first = readings[0];
+  const a = first?.findIndex((p) => p.kind === "role") ?? -1;
+  const opener = first?.[a];
+  if (opener?.kind === "role" && first!.slice(a + 1).some((p) => p.kind === "role")) {
+    return { subjectIndex: opener.index, subjectLead: opener.lead, rest: first!.slice(a + 1) };
+  }
+  return UNKNOWN_RING_READING;
 }
+
+/** The clause of a reading barwise cannot read one from. */
+const UNKNOWN_RING_READING: RingReading = {
+  subjectIndex: 0,
+  subjectLead: "",
+  rest: [{ kind: "text", text: " ... " }, { kind: "role", index: 1, lead: "" }],
+};
 
 /**
- * Extract the predicate of a binary fact type from the reading that names
- * the subject role before the object role. When no reading has that
- * order, the first reading's text between its first two placeholders is
- * used as written, with its binding hyphens removed and no leads: a lead
- * there belongs to whichever noun the reading put after it, which is not
- * the sentence's object. That fallback reads the fact backwards: the ring
- * sentence is unchanged by reversing it, the mandatory and uniqueness
- * sentences ask `orderedPredicate` first, and the frequency sentence
- * still reads backwards (barwise-zx2).
+ * "{subject} [does not] <the reading's rest>", the subject's placeholder
+ * written `subject` wherever it recurs and the other `object` after
+ * `determiner`. A word is spaced from a placeholder; punctuation the
+ * reading put flush against one is not ("{1}'s deputy"). The reading's
+ * closing whitespace and period are dropped, as the sentence ends itself.
  */
-export function extractPredicate(
-  factType: FactType,
-  subjectIdx: number,
-  objectIdx: number,
-): Predicate {
-  const ordered = orderedPredicate(factType, subjectIdx, objectIdx);
-  if (ordered) return ordered;
-
-  const first = factType.readings[0];
-  if (first) {
-    const parts = splitReading(first.template).parts;
-    const placeholders = parts.flatMap((p, i) => p.kind === "role" ? [i] : []);
-    if (placeholders.length >= 2) {
-      const [a, b] = placeholders as [number, number];
-      return predicate(`${textOf(parts.slice(a + 1, b)).trim()} ${leadOf(parts[b])}`.trim());
+export function ringClause(
+  reading: RingReading,
+  subject: VerbalizationSegment,
+  object: VerbalizationSegment,
+  options: { readonly negated?: boolean; readonly determiner?: string; } = {},
+): VerbalizationSegment[] {
+  const segments: VerbalizationSegment[] = [...leadSegs(reading.subjectLead), subject];
+  if (options.negated) segments.push(textSeg(" does not"));
+  const endsInSpace = () => /\s$/.test(segments[segments.length - 1]?.text ?? " ");
+  const last = reading.rest.length - 1;
+  reading.rest.forEach((part, i) => {
+    if (part.kind === "role") {
+      if (!endsInSpace()) segments.push(textSeg(" "));
+      const own = part.index === reading.subjectIndex;
+      if (!own && options.determiner) segments.push(textSeg(options.determiner));
+      segments.push(...leadSegs(part.lead), own ? subject : object);
+      return;
     }
-  }
-
-  return UNKNOWN_PREDICATE;
+    let text = i === last ? part.text.trimEnd().replace(/\.$/, "").trimEnd() : part.text;
+    // One space at most between a name and the text after it, however many
+    // the reading wrote.
+    if (endsInSpace()) text = text.trimStart();
+    else if (/^\s/.test(text)) text = " " + text.trimStart();
+    else if (/^[\p{L}\p{N}]/u.test(text)) text = " " + text;
+    if (text) segments.push(textSeg(text));
+  });
+  return segments;
 }
-
-/** The predicate of a reading barwise cannot read one from. */
-export const UNKNOWN_PREDICATE: Predicate = predicate("...");
 
 /**
  * The first reading of a fact type that opens with role `index`'s
@@ -158,9 +171,46 @@ export function openingReading(
   return undefined;
 }
 
+/**
+ * "Each X <rest>" for role `own`'s player X, from the first reading whose
+ * first placeholder is that role: the forward sentence of a binary
+ * mandatory, uniqueness or frequency (binary-constraint-sentences.spec.md).
+ * Text before the placeholder is dropped, as "Each" takes its place ("the
+ * {0} has {1}" is "Each Order has ..."); everything after it stays, which
+ * slicing between the placeholders did not (barwise-m1c). `rest` renders
+ * the parts after the placeholder, so a frequency can render them twice.
+ * Undefined when no reading names the role first.
+ */
+export function eachReading(
+  model: ConstraintModel,
+  factType: FactType,
+  own: number,
+  rest: (parts: readonly ReadingPart[]) => VerbalizationSegment[],
+): VerbalizationSegment[] | undefined {
+  for (const reading of factType.readings) {
+    const parts = splitReading(reading.template).parts;
+    const first = parts.findIndex((p) => p.kind === "role");
+    const opener = parts[first];
+    if (opener?.kind !== "role" || opener.index !== own) continue;
+    const after = rest(parts.slice(first + 1));
+    // No space before punctuation the reading put flush against the
+    // placeholder ("{0}'s {1}").
+    const head = after[0]?.text ?? "";
+    return [
+      kwSeg("Each "),
+      ...leadSegs(opener.lead),
+      rolePlayer(model, factType, own),
+      ...(/^[\p{L}\p{N}]/u.test(head) ? [textSeg(" ")] : []),
+      ...after,
+      textSeg("."),
+    ];
+  }
+  return undefined;
+}
+
 /** Role `index`'s player as a reference: its object type's name, else the role's. */
 export function rolePlayer(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
   index: number,
 ): VerbalizationSegment {
@@ -186,7 +236,7 @@ export function rolePlayer(
  * writes what goes before and after it.
  */
 export function quantifiedReading(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
   parts: readonly ReadingPart[],
   own: number,
@@ -226,23 +276,41 @@ export function quantifiedReading(
  * Customer, some Order is placed by that Customer." -- the reading as the
  * modeller wrote it, where slicing its predicate would read it backwards
  * ("Each Customer is placed by at least one Order").
+ *
+ * With `counted`, the frequency sentence for such a role: "For each
+ * Customer, if some Order is placed by that Customer, then that holds for
+ * exactly 2 instances of Order." -- conditional, because a frequency
+ * constrains only the X that play the role, and counted with "that holds
+ * for", so the reading's verb need not agree with a plural (barwise-zx2).
  */
 export function forEachReading(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
   own: number,
   others: string,
+  counted?: { readonly other: number; readonly count: string; },
 ): VerbalizationSegment[] {
   // The constructor refuses a fact type with no reading.
   const parts = splitReading(factType.readings[0]!.template).parts;
-  const ownPart = parts.find((p) => p.kind === "role" && p.index === own);
+  const lead = (index: number) => {
+    const part = parts.find((p) => p.kind === "role" && p.index === index);
+    return leadSegs(part?.kind === "role" ? part.lead : "");
+  };
   const player = numberedPlayers(model, factType);
+  const reading = quantifiedReading(model, factType, parts, own, others, player);
   return [
     kwSeg("For each "),
-    ...leadSegs(ownPart?.kind === "role" ? ownPart.lead : ""),
+    ...lead(own),
     player(own),
-    textSeg(", "),
-    ...quantifiedReading(model, factType, parts, own, others, player),
+    ...(counted
+      ? [
+        kwSeg(", if "),
+        ...reading,
+        kwSeg(", then that holds for " + counted.count),
+        ...lead(counted.other),
+        player(counted.other),
+      ]
+      : [textSeg(", "), ...reading]),
     textSeg("."),
   ];
 }
@@ -255,7 +323,7 @@ export function forEachReading(
  * one person reporting to themself.
  */
 function numberedPlayers(
-  model: OrmModel,
+  model: ConstraintModel,
   factType: FactType,
 ): (index: number) => VerbalizationSegment {
   return (index) => {

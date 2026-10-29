@@ -67,7 +67,7 @@ the whole workflow, see
 
 ### Option 1: VS Code Extension (recommended)
 
-Install the **Barwise ORM Modeler** extension. Fifteen of the server's
+Install the **Barwise ORM Modeler** extension. Sixteen of the server's
 tools are registered with VS Code's Language Model Tool API and appear
 automatically in Copilot Chat -- no configuration needed. The gym tools and
 `analyze_repository` are not among them; repository analysis is the
@@ -82,6 +82,7 @@ You can reference any tool directly in Copilot Chat using `#`:
 - `#barwiseDiagram` -- generate an SVG diagram
 - `#barwiseImport` -- extract a model from a transcript
 - `#barwiseMerge` -- merge two models (writes the base file)
+- `#barwiseRename` -- rename an element, across a project (writes the files)
 - `#barwiseExport` -- export to any registered format
 - `#barwiseDescribe` -- summarize entities and rules
 - `#barwiseQuery` -- run a structural query
@@ -389,6 +390,7 @@ Compare two ORM models and return structural deltas.
 | `base`     | string | yes      | File path or inline YAML for the base (original) model          |
 | `incoming` | string | yes      | File path or inline YAML for the incoming (changed) model       |
 | `matching` | string | no       | `id-first` (default) or `content`; as `barwise diff --matching` |
+| `renames`  | array  | no       | `{ kind, from, to }` pairs; as `barwise diff --rename`          |
 
 **Returns** JSON:
 
@@ -429,7 +431,11 @@ by `change` (`definition`, `aliases`, `dataTypeChanged`, `readings`,
 values. `constraintsModified` is the exception: it carries
 `constraints: [{ from, to }]`, one pair per constraint. Object types and
 fact types pair by id where both models hold it, then by name, so a rename
-that keeps the id is one `modified` delta with a `name` change. Within a
+that keeps the id is one `modified` delta with a `name` change. What id
+and name leave unpaired is paired by content, as `barwise diff` describes,
+and such a delta carries `pairedBy: "recognized"`; one named in `renames`
+(`kind` is `objectType` or `factType`) carries `pairedBy: "declared"`.
+`merge_models` never pairs by content. Within a
 paired fact type, a constraint whose id occurs once in each model is paired
 by id, so an edit that keeps the id is one `constraintsModified` entry; the
 rest are paired by content, so a model with fresh ids still matches its
@@ -550,6 +556,48 @@ before saving.
 merged model over that file** and reports the path in `writtenTo`. Pass the
 base as inline YAML to get the result without a write. The CLI's
 `barwise merge` differs: it never modifies its inputs.
+
+---
+
+### rename_element
+
+Rename an object type, a fact type or a role, in a model or across a
+project. Every id is kept. The element's definition, when the term is its
+alone, and the reference mode of each entity keyed by a renamed value type
+follow the rename; free text is left as written. Given a project, the
+rename also follows an owned object type into its shadows in other domains,
+every domain's definitions, and both sides of each mapping file.
+
+| Parameter      | Type    | Required | Description                                                         |
+| -------------- | ------- | -------- | ------------------------------------------------------------------- |
+| `source`       | string  | yes      | File path or inline YAML for a model, or a `.orm-project.yaml` path |
+| `domain`       | string  | no       | For a project source: the domain that holds the element             |
+| `objectType`   | string  | no       | The object type to rename                                           |
+| `factType`     | string  | no       | The fact type to rename, or the one holding the role                |
+| `role`         | string  | no       | With `factType`: the role to rename, by name                        |
+| `rolePosition` | integer | no       | With `factType`: the role to rename, by position (from 0)           |
+| `to`           | string  | yes      | The new name                                                        |
+| `check`        | boolean | no       | Write nothing; report what would change                             |
+
+Name exactly one element: `objectType`, `factType`, or `factType` with
+`role` or `rolePosition`.
+
+**Returns** JSON: for inline YAML, `yaml` (the renamed model), `changes`
+and `warnings`; for a file or project source, `written`, `writtenTo` (or
+`files` under `check`), `changes` and `warnings`; for a refusal, `error`
+and nothing written. If replacing the files fails part-way, the result has
+`error` together with `written: true`, `writtenTo` naming the files
+already replaced, and `changes`: some files are renamed and the rest are
+not. A model that declares a `domain_context` gets a
+warning: rename a project's domain through the project so its shadows and
+mapping files follow. A project that did not load cleanly is refused, and
+so is a model, or any domain of a project, that is not at the current
+format: run `barwise migrate` on it first.
+
+**Like `merge_models`, this is an editing tool: a file source is written
+back.** Every changed file is staged before any is replaced, and files are
+written from the model, so YAML comments in them are lost. The CLI's
+`barwise rename` writes the same way.
 
 ---
 

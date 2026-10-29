@@ -2,7 +2,12 @@
  * export_model tool: exports an ORM model to a specified format.
  */
 
-import { getExporter, listExporters } from "@barwise/core";
+import {
+  getExporter,
+  listExporters,
+  surrogateKeyFormats,
+  surrogateKeysRefusal,
+} from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { formatConstraintReport, registerStandardFormats } from "@barwise/formats";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -68,6 +73,14 @@ export function registerExportModelTool(server: McpServer): void {
               .describe(
                 "Refuse to export if model has validation errors (default: false)",
               ),
+            surrogateKeys: z
+              .boolean()
+              .optional()
+              .describe(
+                "Give every table keyed on several columns a generated key, the hash of "
+                  + "its natural key, and make every reference to one a single column "
+                  + `(${surrogateKeyFormats().join(", ")})`,
+              ),
           })
           .catchall(z.unknown())
           .optional()
@@ -107,6 +120,9 @@ export function executeExportModel(
       }`,
     );
   }
+
+  const refusal = options?.["surrogateKeys"] === true ? surrogateKeysRefusal(format) : undefined;
+  if (refusal) return jsonError(refusal);
 
   // Resolve the model to export. A single call yields one artifact, so a
   // multi-domain project must name the `domain` to export.

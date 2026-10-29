@@ -4,14 +4,14 @@
  * Rewrites each .orm.yaml file in place to the current format, and says
  * what reading it changed beyond the format: the 2.0 `is_preferred` flags
  * the model could not carry as written (orm-format-3 WS4b-iii, Open
- * decision 5). The one CLI command that modifies its inputs; that is its
- * whole job, and the capability matrix records it.
+ * decision 5). One of the two CLI commands that modify their inputs, with
+ * `rename`; that is its whole job, and the capability matrix records it.
  */
 
 import { CURRENT_ORM_VERSION, type MigrationNote } from "@barwise/core";
 import type { Command } from "commander";
-import { chmodSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readFile, serializer } from "../workspace/io.js";
+import { writeFilesAtomically } from "../workspace/stagedWrite.js";
 
 interface MigrateOptions {
   check?: boolean;
@@ -79,7 +79,7 @@ function migrateFile(file: string, check: boolean): FileOutcome {
         }`,
       };
     }
-    if (!check) replace(file, text);
+    if (!check) writeFilesAtomically([{ path: file, text }], ".migrating");
     return {
       file,
       status: check ? "would-migrate" : "migrated",
@@ -88,31 +88,6 @@ function migrateFile(file: string, check: boolean): FileOutcome {
     };
   } catch (err) {
     return { file, status: "error", error: (err as Error).message };
-  }
-}
-
-/**
- * Write beside the file, then rename over it, so an interrupted write
- * leaves the original. Through a symlink to the file it names, so a linked
- * model is migrated where it lives, and with its permission bits. A rename
- * makes a new file: a second hard link keeps the old content, and the new
- * one belongs to whoever ran the command.
- */
-function replace(file: string, text: string): void {
-  const target = realpathSync(file);
-  const temp = `${target}.migrating`;
-  try {
-    writeFileSync(temp, text, "utf-8");
-    // Set after writing: a creation mode is masked by the umask.
-    chmodSync(temp, statSync(target).mode & 0o7777);
-    renameSync(temp, target);
-  } catch (err) {
-    try {
-      rmSync(temp, { force: true });
-    } catch {
-      // The write's error is the one to report.
-    }
-    throw err;
   }
 }
 

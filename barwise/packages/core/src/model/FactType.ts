@@ -188,8 +188,13 @@ export class FactType extends ModelElement {
    * (`OrmModel.addConstraint`). The type says so; the check is for a
    * value whose type was asserted, such as a parsed file, which would
    * otherwise be stored where no reader of the model's constraints looks.
+   *
+   * Returns the constraint as stored, which is a copy carrying its id, as
+   * `OrmModel.addConstraint` does: a caller that needs the id right away
+   * -- a preferred identifier set just after the add -- reads it here
+   * (iri-identity 6a; in 6b the id may be minted rather than generated).
    */
-  addConstraint(constraint: InternalConstraint): void {
+  addConstraint(constraint: InternalConstraint): InternalConstraint {
     const c = constraint as Constraint;
     if (isExternalConstraint(c)) {
       throw new Error(
@@ -204,7 +209,9 @@ export class FactType extends ModelElement {
         }".`,
       );
     }
-    this._constraints.push(withId(c));
+    const stored = withId(c);
+    this._constraints.push(stored);
+    return stored;
   }
 
   /** Get all role ids that reference a given object type (by player id). */

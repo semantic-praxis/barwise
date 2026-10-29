@@ -3,7 +3,7 @@
  */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,5 +102,37 @@ describe("merge_models registration", () => {
     const tool = (await client.listTools()).tools.find((t) => t.name === "merge_models");
     await client.close();
     expect(tool?.description).toMatch(/written back to that file/);
+  });
+});
+
+describe("merge_models never pairs by content (iri-identity 6a)", () => {
+  const supplierShop = (p: string, party: string) =>
+    `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ${p}c, name: ${party}, kind: entity, reference_mode: nr }
+    - { id: ${p}o, name: Order, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: ${p}f
+      name: Party places Order
+      roles:
+        - { id: ${p}r0, player: ${p}c, role_name: places }
+        - { id: ${p}r1, player: ${p}o, role_name: placed by }
+      readings: ["{0} places {1}"]
+`;
+
+  it("adds an element of the same shape as one in the base instead of folding it in", () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-mcp-merge-shape-"));
+    try {
+      const base = join(dir, "a.orm.yaml");
+      writeFileSync(base, supplierShop("a", "Vendor"), "utf-8");
+      const parsed = JSON.parse(executeMerge(base, supplierShop("b", "Supplier")).content[0]!.text);
+      expect(parsed.valid).toBe(true);
+      expect(parsed.yaml).toContain("name: Vendor");
+      expect(parsed.yaml).toContain("name: Supplier");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

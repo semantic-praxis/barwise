@@ -44,8 +44,11 @@ export function buildConstraintSpec(
   let example: string;
   try {
     const ce = generateCounterexampleInView(inView, model);
+    const instance = isOverSubtypes(c) ? subtypeInstance(c, model) : undefined;
     example = ce
       ? `Forbidden: ${ce.text}`
+      : instance
+      ? `Forbidden: ${instance}`
       : "No concrete example available; see the verbalization.";
   } catch {
     example = "No concrete example available; see the verbalization.";
@@ -182,4 +185,46 @@ function roleLabels(
       return player ? `${player.name}.${role.name}` : role.name;
     })
     .join(", ");
+}
+
+/**
+ * The instance a constraint over subtypes forbids, in words: one supertype
+ * instance in two of the subtypes, or in none (barwise-j7j). Not a
+ * `Counterexample`, whose populations must trip population validation:
+ * subtype membership is not populated in a model, so there is nothing to
+ * mint, but the instance needs no population to be stated. Undefined when
+ * a subtype does not resolve to a name, or an exclusion or exclusive-or
+ * names fewer than two.
+ */
+function subtypeInstance(c: SubtypeConstraint, model: OrmModel): string | undefined {
+  const { supertypeId, subtypeIds } = subtypeOperands(c.subtypeFactIds, model);
+  const name = (id: string | undefined) => (id && model.getObjectType(id)?.name) || undefined;
+  const supertype = name(supertypeId);
+  const subtypes = subtypeIds.map(name);
+  // A list with one left out would forbid an allowed instance, and one
+  // naming a subtype twice, or one under another supertype, states an
+  // instance the rule says nothing about. Validation reports both shapes;
+  // an export can still run on them.
+  const sameSupertype = c.subtypeFactIds.every((id) =>
+    model.getSubtypeFact(id)?.supertypeId === supertypeId
+  );
+  if (
+    !supertype || subtypes.length === 0 || subtypes.includes(undefined)
+    || new Set(subtypes).size !== subtypes.length || !sameSupertype
+  ) {
+    return undefined;
+  }
+  const neither = `one ${supertype} in none of: ${subtypes.join(", ")}`;
+  // The "both" form needs two subtypes; over one, only "none of" forbids.
+  const both = subtypes.length >= 2
+    ? `one ${supertype} in both ${subtypes[0]} and ${subtypes[1]}`
+    : undefined;
+  switch (c.type) {
+    case "exclusion":
+      return both;
+    case "disjunctive_mandatory":
+      return neither;
+    case "exclusive_or":
+      return both ? `${both}, or ${neither}` : neither;
+  }
 }

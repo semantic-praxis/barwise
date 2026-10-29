@@ -31,7 +31,9 @@
  */
 
 import { ELEMENT_MATCHINGS } from "@barwise/core/diff";
-import { readFileSync } from "node:fs";
+import { DIFF_RENAME_KINDS } from "@barwise/mcp";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,6 +51,7 @@ const state = vi.hoisted(() => ({
   registered: [] as string[],
   tools: new Map<string, { invoke: (options: { input: unknown; }, token: unknown) => unknown; }>(),
   mcpEnabled: true,
+  documents: [] as { uri: { fsPath: string; }; isDirty: boolean; }[],
 }));
 
 vi.mock("vscode", () => ({
@@ -71,6 +74,9 @@ vi.mock("vscode", () => ({
   },
   workspace: {
     getConfiguration: () => ({ get: (_key: string, _fallback?: unknown) => state.mcpEnabled }),
+    get textDocuments() {
+      return state.documents;
+    },
   },
 }));
 
@@ -109,6 +115,7 @@ describe("VS Code language-model tool registration", () => {
       "barwise_lineage_status",
       "barwise_merge_models",
       "barwise_query_model",
+      "barwise_rename_element",
       "barwise_review_model",
       "barwise_split_model",
       "barwise_validate_model",
@@ -173,6 +180,24 @@ describe("barwise_diff_models passes matching through", () => {
     ) as { inputSchema?: { properties?: { matching?: { enum?: string[]; }; }; }; } | undefined;
     expect(tool?.inputSchema?.properties?.matching?.enum).toEqual([...ELEMENT_MATCHINGS]);
   });
+
+  it("declares the renames shape the MCP tool takes", () => {
+    // The manifest's JSON schema is a second copy of the MCP tool's zod
+    // schema; this keeps the two agreeing (iri-identity 6a).
+    const tool = (manifest.contributes?.languageModelTools ?? []).find(
+      (t) => t.name === "barwise_diff_models",
+    ) as { inputSchema?: { properties?: Record<string, unknown>; }; } | undefined;
+    const renames = tool?.inputSchema?.properties?.renames as {
+      items: {
+        properties: Record<string, { enum?: string[]; minLength?: number; }>;
+        required: string[];
+      };
+    };
+    expect(renames.items.properties.kind!.enum).toEqual([...DIFF_RENAME_KINDS]);
+    expect(renames.items.properties.from!.minLength).toBe(1);
+    expect(renames.items.properties.to!.minLength).toBe(1);
+    expect(renames.items.required.sort()).toEqual(["from", "kind", "to"]);
+  });
 });
 
 describe("barwise_export_model carries the constraint report", () => {
@@ -219,5 +244,78 @@ describe("barwise_export_model carries the constraint report", () => {
     const report = text.indexOf("1 constraint(s) the ddl format could not express:");
     expect(report).toBeGreaterThan(text.indexOf("CREATE TABLE person_is_parent_of_person"));
     expect(text.slice(report)).toContain("- No Person is parent of that same Person.");
+  });
+});
+
+describe("barwise_rename_element", () => {
+  const MODEL = 'orm_version: "3.0"\nmodel:\n  name: Shop\n  object_types:\n'
+    + "    - { id: o, name: Order, kind: entity, reference_mode: order_nr }\n";
+
+  async function rename(path: string, extra: Record<string, unknown> = {}) {
+    registerAll();
+    const result = await state.tools.get("barwise_rename_element")!.invoke(
+      { input: { source: path, objectType: "Order", to: "Purchase", ...extra } },
+      undefined,
+    ) as { content: { value: string; }[]; };
+    return JSON.parse(result.content[0]!.value);
+  }
+
+  it("refuses a model whose editor has unsaved changes, and writes nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-vscode-rename-"));
+    try {
+      const path = join(dir, "shop.orm.yaml");
+      writeFileSync(path, MODEL, "utf-8");
+      state.documents = [{ uri: { fsPath: path }, isDirty: true }];
+      expect((await rename(path)).error).toContain("has unsaved changes");
+      expect(readFileSync(path, "utf-8")).toBe(MODEL);
+
+      state.documents = [{ uri: { fsPath: path }, isDirty: false }];
+      expect((await rename(path)).written).toBe(true);
+      expect(readFileSync(path, "utf-8")).toContain("name: Purchase");
+    } finally {
+      state.documents = [];
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses when the dirty editor names the file through a symlink", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-vscode-rename-"));
+    try {
+      const path = join(dir, "shop.orm.yaml");
+      writeFileSync(path, MODEL, "utf-8");
+      symlinkSync(path, join(dir, "link.orm.yaml"));
+      state.documents = [{ uri: { fsPath: join(dir, "link.orm.yaml") }, isDirty: true }];
+      expect((await rename(path)).error).toContain("has unsaved changes");
+      expect(readFileSync(path, "utf-8")).toBe(MODEL);
+    } finally {
+      state.documents = [];
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a project rename when a domain it would write is dirty, not only the manifest", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-vscode-rename-"));
+    try {
+      mkdirSync(join(dir, "domains"));
+      const domain = join(dir, "domains", "shop.orm.yaml");
+      writeFileSync(domain, MODEL, "utf-8");
+      const manifest = join(dir, "p.orm-project.yaml");
+      writeFileSync(
+        manifest,
+        'format_version: "1.0"\nproject:\n  name: P\n  domains:\n'
+          + '    - { path: "./domains/shop.orm.yaml", context: "shop" }\n',
+        "utf-8",
+      );
+      state.documents = [{ uri: { fsPath: domain }, isDirty: true }];
+      const refused = await rename(manifest, { domain: "shop" });
+      expect(refused.error).toContain(`${domain} has unsaved changes`);
+      expect(readFileSync(domain, "utf-8")).toBe(MODEL);
+
+      // Under check nothing is written, so a dirty buffer is no reason to refuse.
+      expect((await rename(manifest, { domain: "shop", check: true })).files).toEqual([domain]);
+    } finally {
+      state.documents = [];
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

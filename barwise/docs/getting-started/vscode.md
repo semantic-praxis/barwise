@@ -157,6 +157,10 @@ These are chat tools; the palette has no equivalent.
 - `#barwiseMerge` folds one model into another, taking additions and changes
   and refusing removals. It writes the result over the base model's file, so
   commit first. (The CLI's `barwise merge` does not touch its inputs.)
+- `#barwiseRename` renames an object type, a fact type or a role, and given a
+  project, follows it into the other domains and mapping files. It writes the
+  files it changes, as the CLI's `barwise rename` does, and refuses a model
+  with unsaved changes: save first.
 - `#barwiseLineage` reports which exported artifacts are out of date, and
   `#barwiseImpact` lists the artifacts built from one element. Both read the
   lineage manifest that only the CLI's `barwise export` writes; exports made

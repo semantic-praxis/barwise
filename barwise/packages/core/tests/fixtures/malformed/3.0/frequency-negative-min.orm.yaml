@@ -1,0 +1,31 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: person_id
+    - id: ot-age
+      name: Age
+      kind: value
+      data_type:
+        name: integer
+  fact_types:
+    - id: ft-levy-has-age
+      name: Levy has Age
+      roles:
+        - id: r-levy-person
+          player: ot-person
+          role_name: has
+        - id: r-levy-age
+          player: ot-age
+          role_name: is of
+      readings:
+        - "{0} has {1}"
+      constraints:
+        - id: c-levy-frequency
+          type: frequency
+          role: r-levy-person
+          min: -1
+          max: 2

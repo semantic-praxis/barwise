@@ -9,6 +9,7 @@ import type { ObjectType } from "../model/ObjectType.js";
 import type { Population } from "../model/Population.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import type { ChangeDescription } from "./changeDescription.js";
+import type { ElementMatching, PairedBy } from "./identity.js";
 
 export type DeltaKind = "added" | "removed" | "modified" | "unchanged";
 
@@ -48,6 +49,8 @@ interface DeltaCommon {
 export interface ObjectTypeDelta extends DeltaCommon {
   readonly elementType: "object_type";
   readonly name: string;
+  /** How the two sides were paired; present when both are. */
+  readonly pairedBy?: PairedBy;
   /** Present for modified, removed, unchanged. */
   readonly existing?: ObjectType;
   /** Present for added, modified, unchanged. */
@@ -57,6 +60,8 @@ export interface ObjectTypeDelta extends DeltaCommon {
 export interface FactTypeDelta extends DeltaCommon {
   readonly elementType: "fact_type";
   readonly name: string;
+  /** How the two sides were paired; present when both are. */
+  readonly pairedBy?: PairedBy;
   readonly existing?: FactType;
   readonly incoming?: FactType;
 }
@@ -304,6 +309,12 @@ export interface DeltaJson {
   readonly breakingLevel: BreakingLevel;
   readonly changes: readonly ChangeDescription[];
   readonly changeDescriptions: readonly string[];
+  /**
+   * Present only when an object type or fact type was paired by content
+   * or by a declared rename, which is what a reader needs told; a pair by
+   * id or name is the ordinary case and carries nothing.
+   */
+  readonly pairedBy?: RenamePairing;
 }
 
 /**
@@ -325,7 +336,55 @@ export function deltaToJson(delta: ModelDelta): DeltaJson {
     breakingLevel: delta.breakingLevel,
     changes: delta.changes,
     changeDescriptions: delta.changeDescriptions,
+    ...pairedByJson(delta),
   };
+}
+
+function pairedByJson(delta: ModelDelta): { readonly pairedBy?: RenamePairing; } {
+  const pairedBy = renamePairing(delta);
+  return pairedBy ? { pairedBy } : {};
+}
+
+/**
+ * The line a text surface prints under a delta paired as a rename, or
+ * undefined for an ordinary pair. One wording for `barwise diff` and
+ * `barwise history`, which render deltas separately.
+ */
+export function pairingNote(delta: ModelDelta): string | undefined {
+  const pairing = renamePairing(delta);
+  switch (pairing) {
+    case "recognized":
+      // "Possible": two elements of one shape pair the same way (decision 8).
+      return "Possibly a rename: paired by what it says, not by its id or name.";
+    case "declared":
+      return "Paired as a declared rename.";
+    case undefined:
+      return undefined;
+    default: {
+      // A pairing added to `PairedBy` must say what its note is: merge
+      // already refuses it and the JSON shows it, so a silent text line
+      // here would be the one surface that hides it.
+      const unhandled: never = pairing;
+      throw new Error(`pairingNote: no note for pairing "${String(unhandled)}".`);
+    }
+  }
+}
+
+/** A pairing that is not evidence two elements are one: anything but id or name. */
+export type RenamePairing = Exclude<PairedBy, "id" | "name">;
+
+/**
+ * How the delta pairs an object type or fact type when that is by anything
+ * other than its id or name, else undefined. An allowlist of the evidence,
+ * not a list of the rest, so a pairing added to `PairedBy` later is a
+ * rename pairing -- shown to the reader and refused by merge -- until
+ * someone decides otherwise. The one reading every surface and merge's
+ * refusal use, so they cannot disagree about which deltas these are.
+ */
+export function renamePairing(delta: ModelDelta): RenamePairing | undefined {
+  if (delta.elementType !== "object_type" && delta.elementType !== "fact_type") return undefined;
+  const by = delta.pairedBy;
+  return by === undefined || by === "id" || by === "name" ? undefined : by;
 }
 
 /**
@@ -376,6 +435,19 @@ export interface SynonymCandidate {
 export interface ModelDiffResult {
   readonly deltas: readonly ModelDelta[];
   readonly hasChanges: boolean;
+  /**
+   * The matching the diff ran with, so a merge can refuse a diff whose ids
+   * said nothing (`"content"`): its object types and fact types paired by
+   * name alone, which is not evidence two elements are one.
+   */
+  readonly matching: ElementMatching;
+  /**
+   * Whether the diff paired by content (`DiffOptions.recognizeRenames`).
+   * A merge refuses a diff that did, whether or not it found a pair: a
+   * merge path that forgot to turn it off then fails on every input, not
+   * only on one that holds two elements of one shape.
+   */
+  readonly recognizeRenames: boolean;
   /** Potential synonym pairs detected from removed + added elements. */
   readonly synonymCandidates: readonly SynonymCandidate[];
 }

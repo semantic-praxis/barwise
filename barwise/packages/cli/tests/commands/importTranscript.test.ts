@@ -284,6 +284,13 @@ describe("barwise import transcript (merge into existing --output)", () => {
     expect(result.exitCode).toBe(0);
     expect(readFileSync(outFile, "utf8")).toContain("name: Merged");
     expect(result.stderr).not.toContain("Warning:");
+
+    // The merge path diffs as every merge path must (iri-identity 6a):
+    // with recognition on, merge refuses, and this path then falls back to
+    // writing the fresh extraction over the existing model.
+    const { diffModels, MERGE_DIFF_OPTIONS, mergeAndValidate } = await import("@barwise/core/diff");
+    expect(vi.mocked(diffModels).mock.lastCall?.[2]).toBe(MERGE_DIFF_OPTIONS);
+    expect(vi.mocked(mergeAndValidate).mock.lastCall?.[2]).toBe(diffResult);
   });
 
   it("warns when the merged model has validation issues", async () => {

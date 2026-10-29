@@ -29,6 +29,7 @@ src/
     diff.ts             barwise diff <file1> <file2>
     merge.ts            barwise merge <base> <incoming> (non-interactive; stdout by default)
     migrate.ts          barwise migrate <files...> (rewrites .orm.yaml files in place as 3.0)
+    rename.ts           barwise rename (an element, in a file or across a project; rewrites)
     review.ts           barwise review <file> (LLM semantic review; always exits 0)
     gym.ts              barwise gym list|show|check (modeling gym; miss-card
                         emission + session log at $XDG_STATE_HOME/barwise/)
@@ -44,10 +45,13 @@ src/
     llmUsage.ts         barwise llm-usage (report over the call log)
   workspace/
     io.ts               File I/O helpers (loadModel, writeModel)
+    projectLoader.ts    Read a project manifest and the files it names
     format.ts           Output formatting helpers (JSON, text)
     provenance.ts       Version/commit/dirty for recorded eval runs
     promptArtifacts.ts  The artifact candidate set `prompt` resolves over
     callLogSink.ts      JSONL sink for the observability records
+    stagedWrite.ts      The staged multi-file write migrate and rename share (MCP
+                        holds a copy, paired in parity.manifest.json)
 tests/
   cli.test.ts           Scaffolding tests
   commands/             Command-specific tests

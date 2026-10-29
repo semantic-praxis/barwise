@@ -41,7 +41,7 @@ Doctor is assigned to ExamRoom on AppointmentDate
   For each Doctor and AppointmentDate combination, at most one ExamRoom applies.
 Patient has Doctor as primary doctor
 Doctor is primary doctor of Patient
-  Each Patient has at most one Doctor.
-  Each Patient has at least one Doctor.
+  Each Patient has at most one Doctor as primary doctor.
+  Each Patient has at least one Doctor as primary doctor.
 Constraints across fact types
   If Appointment in Appointment has FollowUpNote then Appointment in Appointment has AppointmentStatus.

@@ -10,7 +10,7 @@
  * skipped and named on stderr (barwise-nkn, three trial imports).
  */
 
-import { generateId, type InternalConstraint } from "@barwise/core";
+import { generateId, type InternalConstraint, resolvePreferredIdentifier } from "@barwise/core";
 import { DBT_KEY_TEST } from "@barwise/core/mapping";
 import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
 import {
@@ -20,7 +20,12 @@ import {
   resolveColumnType,
 } from "./columnTypes.js";
 import { findRelationshipTest, hasTest } from "./constraints.js";
-import type { CompositeInfo, DbtMapperContext } from "./context.js";
+import {
+  type CompositeInfo,
+  type DbtMapperContext,
+  referenceName,
+  type RelationshipInfo,
+} from "./context.js";
 import { toPascalCase } from "./naming.js";
 
 /** The columns a model-level combination test names, or undefined for any other test. */
@@ -31,9 +36,30 @@ export function combinationOf(test: DbtModel["modelTests"][number]): string[] | 
 }
 
 /**
+ * Whether two column lists name the same columns, in any order.
+ */
+export function sameColumns(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((c) => b.includes(c));
+}
+
+/**
+ * Whether a combination test's columns are exactly one multi-column
+ * foreign key's: that reference's one-to-one, the far-side uniqueness the
+ * DDL importer reads from a UNIQUE over a foreign key's columns, and not a
+ * key of the model (composite-foreign-key-round-trip.spec.md). Read as a
+ * key, it would be a second candidate beside the model's own, and the
+ * model would lose its identifier.
+ */
+export function isReferenceUniqueness(m: DbtModel, names: readonly string[]): boolean {
+  return m.foreignKeys.some((fk) => sameColumns(fk.columns, names));
+}
+
+/**
  * Every combination a model-level combination test names that this rule
  * reads as a key (composite-key-tables.spec.md, requirement 5): two or
- * more columns, each `not_null`, at least one a `relationships` column.
+ * more columns, each `not_null`, at least one a reference column (a
+ * `relationships` test, or a multi-column foreign key), and not exactly one
+ * foreign key's columns (isReferenceUniqueness).
  * The test proves the combination unique but not present, and a key with
  * a null in it identifies nothing (PR #620 review); a key of values alone
  * is not this rule's. One predicate, so the analysis that suppresses the
@@ -48,7 +74,11 @@ export function candidateKeysOf(m: DbtModel): string[][] {
     if (!names || names.length < 2 || new Set(names).size !== names.length) continue;
     const columns = names.map((n) => m.columns.find((c) => c.name === n));
     if (!columns.every((c) => c !== undefined && hasTest(c, "not_null"))) continue;
-    if (!columns.some((c) => findRelationshipTest(c!) !== undefined)) continue;
+    const inForeignKey = (c: string) => m.foreignKeys.some((fk) => fk.columns.includes(c));
+    if (!columns.some((c) => findRelationshipTest(c!) !== undefined || inForeignKey(c!.name))) {
+      continue;
+    }
+    if (isReferenceUniqueness(m, names)) continue;
     // The same columns in another order are the same key stated twice, not
     // a second candidate (PR #621 review).
     const set = [...names].sort().join("\0");
@@ -67,15 +97,52 @@ export function candidateKeysOf(m: DbtModel): string[][] {
  */
 export function compositeKeyOf(m: DbtModel): string[] | undefined {
   const keys = candidateKeysOf(m);
+  // A declared primary key is the key whatever else qualifies, so every
+  // phase that asks reads the same one; one that is not a candidate is no
+  // composite key (dbt-alternate-uniqueness.spec.md).
+  const declared = declaredKeyOf(m);
+  if (declared) return declared.length > 1 ? keys.find((k) => sameColumns(k, declared)) : undefined;
   return keys.length === 1 ? keys[0] : undefined;
 }
 
 /**
- * Phase 1a: decide each composite-key model's reading. A `relationships`
- * column is a foreign key; dbt states one per column, so each is a role.
- * The roles are the key's columns plus, when exactly one other column
- * remains that is `not_null` and not `unique` by itself, and no other model
- * references this one, that column. The
+ * Whether a combination test holds over every row SQL UNIQUE constrains:
+ * it has no `where` filter, or only the one the export writes over nullable
+ * columns, `<each column> is not null`, which skips the rows SQL UNIQUE
+ * skips (dbt-alternate-uniqueness.spec.md). Any other filter makes it a
+ * uniqueness over some rows only, which is no ORM uniqueness.
+ */
+export function holdsForEveryRow(test: DbtModel["modelTests"][number]): boolean {
+  if (test.type !== "custom") return true;
+  const where = (test.config["config"] as { where?: unknown; } | undefined)?.where;
+  if (where === undefined) return true;
+  const names = combinationOf(test) ?? [];
+  return where === names.map((c) => `${c} is not null`).join(" and ");
+}
+
+/**
+ * The model's `primary_key` constraint's columns, when every one is a
+ * column of the model; a constraint naming another is set aside, and the
+ * key is found from the tests as without one.
+ */
+export function declaredKeyOf(m: DbtModel): readonly string[] | undefined {
+  const declared = m.primaryKey;
+  return declared && declared.every((n) => m.columns.some((c) => c.name === n))
+    ? declared
+    : undefined;
+}
+
+/**
+ * Phase 1a: decide each composite-key model's reading. Each reference in
+ * the key is one role, a multi-column foreign key's columns together,
+ * placed at its first key column, as the DDL importer's
+ * `compositeReading` places them; each other key column is a role. The
+ * shapes that reading declines are declined here too: a reference only
+ * partly in the key, two references sharing a key column, a key that is
+ * one reference. The roles are the key's plus, when exactly one other
+ * unit remains (a column, or all the columns of one multi-column foreign
+ * key) that is `not_null` and not `unique` by itself, and no other model
+ * references this one, that unit. The
  * fact type is objectified when other columns remain, when another model
  * references this one, or when it would be a binary over one reference and
  * one value, which the relational mapper writes into the entity's table.
@@ -94,19 +161,47 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
     if (ctx.pkMap.has(m.name)) continue;
     const key = compositeKeyOf(m);
     if (!key) continue;
-    const relCols = new Set((ctx.relMap.get(m.name) ?? []).map((r) => r.columnName));
-    if (!key.some((c) => relCols.has(c))) continue;
+    const rels = ctx.relMap.get(m.name) ?? [];
+    const relOf = (c: string) => rels.filter((r) => r.columns.includes(c));
+    if (!key.some((c) => relOf(c).length > 0)) {
+      // Its only reference column was in a foreign key analyzeModels set
+      // aside, so nothing in it is a reference read here.
+      ctx.report.gap(
+        "identifier",
+        m.name,
+        `Composite key (${
+          key.join(", ")
+        }): none of its columns is a reference read here, so the model is skipped.`,
+      );
+      continue;
+    }
+    // analyzeModels set aside every reference keyRolesOf would decline, so
+    // what is left always reads; the fallback is the one-column-per-role
+    // reading those models had before.
+    const keyRoles = keyRolesOf(key, rels) ?? key.map((c) => [c]);
     const others = m.columns.filter((c) => !key.includes(c.name));
     const candidates = others.filter((c) => !hasTest(c, "unique"));
-    const lone = candidates.length === 1 ? candidates[0]! : undefined;
-    // A referenced model must be objectified, and a fact type unique over
-    // only some of its roles is not one to objectify (PR #620 review).
-    const extra = !referenced.has(m.name) && lone && hasTest(lone, "not_null")
-      ? lone.name
+    // The units an extra role could be: a column, or the columns of the one
+    // multi-column foreign key it is in (composite-foreign-key-round-trip.spec.md).
+    const unitOf = (c: string): string | undefined => {
+      const multi = relOf(c).filter((r) => r.columns.length > 1);
+      return multi.length === 0 ? c : multi.length === 1 ? multi[0]!.columns.join("\0") : undefined;
+    };
+    const units = new Set(candidates.map((c) => unitOf(c.name)));
+    const lone = units.size === 1 && !units.has(undefined)
+      ? [...units][0]!.split("\0").map((n) => candidates.find((c) => c.name === n))
       : undefined;
-    const roles = (extra ? [...key, extra] : key).map((c) => [c]);
-    const valueBinary = roles.length === 2 && roles.filter((r) => relCols.has(r[0]!)).length === 1;
-    const remaining = others.length - (extra ? 1 : 0);
+    // A referenced model must be objectified, and a fact type unique over
+    // only some of its roles is not one to objectify (PR #620 review). A
+    // foreign key is the extra role only whole, each column a candidate.
+    const extra = !referenced.has(m.name) && lone
+        && lone.every((c) => c !== undefined && hasTest(c, "not_null"))
+      ? lone.map((c) => c!.name)
+      : undefined;
+    const roles = extra ? [...keyRoles, extra] : keyRoles;
+    const valueBinary = roles.length === 2
+      && roles.filter((r) => relOf(r[0]!).length > 0).length === 1;
+    const remaining = others.length - (extra?.length ?? 0);
     pending.set(m.name, {
       m,
       key,
@@ -124,7 +219,7 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
   const unreachable = (name: string) => {
     const { roles } = pending.get(name)!;
     const rels = ctx.relMap.get(name) ?? [];
-    return roles.flat().map((c) => rels.find((r) => r.columnName === c)).find((rel) =>
+    return roles.map((cols) => rels.find((r) => sameColumns(r.columns, cols))).find((rel) =>
       rel !== undefined && !ctx.pkMap.has(rel.targetModelName) && !pending.has(rel.targetModelName)
     );
   };
@@ -136,8 +231,8 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
   const targets = (name: string) => {
     const { roles } = pending.get(name)!;
     const rels = ctx.relMap.get(name) ?? [];
-    return roles.flat().flatMap((c) => {
-      const rel = rels.find((r) => r.columnName === c);
+    return roles.flatMap((cols) => {
+      const rel = rels.find((r) => sameColumns(r.columns, cols));
       return rel && pending.has(rel.targetModelName) ? [rel.targetModelName] : [];
     });
   };
@@ -177,10 +272,10 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
       ctx.report.gap(
         "identifier",
         name,
-        `Composite key (${
-          key.join(", ")
-        }): column "${rel.columnName}" references model "${rel.targetModelName}", which has no identifiable key, so the fact type cannot be built and the model is skipped.`,
-        rel.columnName,
+        `Composite key (${key.join(", ")}): column "${
+          referenceName(rel)
+        }" references model "${rel.targetModelName}", which has no identifiable key, so the fact type cannot be built and the model is skipped.`,
+        rel.columns[0],
       );
     }
   }
@@ -193,9 +288,34 @@ export function analyzeComposites(ctx: DbtMapperContext): void {
       m.name,
       `Composite key (${key.join(", ")}) from ${DBT_KEY_TEST}: imported as ${
         info.objectified ? "an objectified" : "a"
-      } fact type over ${roles.map((r) => r[0]).join(", ")}.`,
+      } fact type over ${roles.map((r) => r.length > 1 ? `(${r.join(", ")})` : r[0]).join(", ")}.`,
     );
   }
+}
+
+/**
+ * A key's roles, in key order: each reference wholly inside it at its
+ * first key column, each other column alone. Undefined for the shapes the
+ * DDL importer's `compositeReading` declines (PR #620 and #621 review): a
+ * reference partly inside the key, two references sharing a key column,
+ * or a key that is one reference.
+ */
+export function keyRolesOf(
+  key: readonly string[],
+  rels: readonly RelationshipInfo[],
+): string[][] | undefined {
+  const inKey = (c: string) => key.includes(c);
+  if (rels.some((r) => r.columns.some(inKey) && !r.columns.every(inKey))) return undefined;
+  const keyRels = rels.filter((r) => r.columns.every(inKey));
+  const covered = keyRels.flatMap((r) => r.columns);
+  if (new Set(covered).size !== covered.length) return undefined;
+  const roles: string[][] = [];
+  for (const c of key) {
+    const rel = keyRels.find((r) => r.columns.includes(c));
+    if (!rel) roles.push([c]);
+    else if (key.find((k) => rel.columns.includes(k)) === c) roles.push([...rel.columns]);
+  }
+  return roles.length < 2 ? undefined : roles;
 }
 
 /** The columns of a model that a composite reading made roles, so the attribute phases skip them. */
@@ -215,9 +335,12 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     // An accepted_values test on a value role is its value constraint, as
     // buildConstraints reads it on any other column (PR #621 review).
     const valueConstraints: InternalConstraint[] = [];
-    for (const [colName] of info.roles) {
+    for (const cols of info.roles) {
+      const colName = cols[0]!;
       const col = m.columns.find((c) => c.name === colName)!;
-      const rel = rels.find((r) => r.columnName === colName);
+      // The reference this role is, by its columns: its first column may
+      // carry a single-column reference of its own as well.
+      const rel = rels.find((r) => sameColumns(r.columns, cols));
       let playerId: string | undefined;
       if (rel) {
         playerId = ctx.entityIdMap.get(rel.targetModelName);
@@ -225,7 +348,9 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
           ctx.report.gap(
             "relationship",
             m.name,
-            `Composite key column "${colName}" references model "${rel.targetModelName}", which has no identifiable key -- the model's fact type is skipped.`,
+            `Composite key column "${
+              cols.join(", ")
+            }" references model "${rel.targetModelName}", which has no identifiable key -- the model's fact type is skipped.`,
             colName,
           );
           break;
@@ -249,7 +374,14 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       roles.push({ id: roleId, name: "is in", playerId });
       // So reportColumnRenames can match the column to the mapper output, as
       // it does for identifier and ordinary columns (PR #621 review).
-      ctx.columnRoleIdMap.set(`${m.name}::${colName}`, roleId);
+      // Every column of a multi-column role records it, as the mapper
+      // writes it on each of the columns it makes for the role.
+      for (const c of cols) {
+        ctx.columnRoleIdMap.set(`${m.name}::${c}`, roleId);
+        // A role of the relationship stands for itself in a uniqueness over
+        // the model's columns, as DDL step 3b reads a taken column.
+        ctx.farRoleIdMap.set(`${m.name}::${c}`, roleId);
+      }
       const accepted = rel
         ? undefined
         : col.tests.find((t): t is Extract<DbtTest, { type: "accepted_values"; }> =>
@@ -282,8 +414,11 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       [c],
       i,
     ) => (info.key.includes(c!) ? [roles[i]!.id] : []));
+    // The key's uniqueness identifies the objectifier, as the DDL import
+    // reads it (import-key-identifier-follow-ups.spec.md, barwise-fuo).
+    const keyId = generateId();
     const constraints: InternalConstraint[] = [
-      { type: "internal_uniqueness", roleIds: keyRoleIds },
+      { id: keyId, type: "internal_uniqueness", roleIds: keyRoleIds },
       ...valueConstraints,
     ];
     const factType = ctx.model.addFactType({
@@ -298,6 +433,13 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     });
     if (info.objectified && entityId) {
       ctx.model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: entityId });
+      // Checked as the DDL import checks it (`preferUniquenessOver`), so a
+      // key the reading ever widens past a reference scheme stores nothing
+      // rather than an identifier validation refuses.
+      ctx.model.setPreferredIdentifier(entityId, keyId);
+      if (!resolvePreferredIdentifier(ctx.model, entityId).ok) {
+        ctx.model.setPreferredIdentifier(entityId, undefined);
+      }
     }
   }
 }

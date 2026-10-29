@@ -17,11 +17,13 @@ import {
 import { generateDdlLineage } from "@barwise/core/lineage";
 import {
   annotateDbtExport,
+  hasGeneratedKeys,
   RelationalMapper,
   type RelationalSchema,
   renderDbt,
+  routeUniqueOnly,
+  SURROGATE_POPULATION_NOTE,
   type Table,
-  unreportedConstraintSpecs,
   withConstraintSpecs,
 } from "@barwise/core/mapping";
 
@@ -58,6 +60,7 @@ export class DbtExportFormat implements ExportFormatAdapter {
     const mapper = new RelationalMapper();
     const schema = mapper.map(model, {
       preferredIdentifierStrategy: options?.preferredIdentifierStrategy,
+      surrogateKeys: options?.surrogateKeys === true,
     });
 
     // Extract dbt-specific options.
@@ -69,10 +72,16 @@ export class DbtExportFormat implements ExportFormatAdapter {
     // models/schema.yml is the file most likely to exist already.
     const modelsDir = resolveModelsDir(options?.modelsDir);
 
+    // The uniquenesses the DDL export writes as UNIQUE clauses, by the
+    // router's own decision, are written as dbt tests; the rest are
+    // reported (dbt-alternate-uniqueness.spec.md).
+    const { uniques, constraintSpecs } = routeUniqueOnly(model, schema);
+
     // Render dbt project.
     const dbtProject = renderDbt(schema, {
       sourceName,
       generateRelationshipTests,
+      uniques,
     });
 
     // Optionally annotate the schema.yml with TODO/NOTE comments.
@@ -80,7 +89,7 @@ export class DbtExportFormat implements ExportFormatAdapter {
     let annotations: ExportResult["annotations"];
 
     if (annotate) {
-      const annotationResult = annotateDbtExport(schemaYaml, model, schema);
+      const annotationResult = annotateDbtExport(schemaYaml, model, schema, uniques);
       schemaYaml = annotationResult.schemaYaml;
       annotations = annotationResult.annotations;
     }
@@ -96,19 +105,23 @@ export class DbtExportFormat implements ExportFormatAdapter {
       });
     }
 
+    // Seed CSV files from populations, if requested. Not with generated
+    // keys, which barwise computes no value for; schema.yml then says so, so
+    // an export written to a directory says it too
+    // (surrogate-key-export.spec.md).
+    const withheld = includeExamples && hasGeneratedKeys(schema);
+    const seedFiles = includeExamples && !withheld ? renderPopulationAsSeeds(model, schema) : [];
+    const seedsWithheld = withheld && model.populations.length > 0;
+    if (seedsWithheld) {
+      schemaYaml = `${SURROGATE_POPULATION_NOTE.replace(/^/gm, "# ")}\n${schemaYaml}`;
+    }
+
     // Add schema.yml.
     files.push({
       name: `${modelsDir}/schema.yml`,
       content: schemaYaml,
     });
-
-    // Add seed CSV files from populations if requested.
-    if (includeExamples) {
-      const seedFiles = renderPopulationAsSeeds(model, schema);
-      for (const seed of seedFiles) {
-        files.push(seed);
-      }
-    }
+    for (const seed of seedFiles) files.push(seed);
 
     // Build combined text view (for tool consumers that use text only).
     const sections: string[] = [];
@@ -137,9 +150,9 @@ export class DbtExportFormat implements ExportFormatAdapter {
       lineage: generateDdlLineage(model, schema),
       files,
       annotations,
-      // The constraints the schema does not carry, by the DDL router's own
-      // rule (schema-export-constraint-specs.spec.md).
-      ...withConstraintSpecs(unreportedConstraintSpecs(model, schema)),
+      // The constraints neither the schema nor a dbt test carries, by the
+      // DDL router's own rule (schema-export-constraint-specs.spec.md).
+      ...withConstraintSpecs(constraintSpecs),
     };
   }
 }

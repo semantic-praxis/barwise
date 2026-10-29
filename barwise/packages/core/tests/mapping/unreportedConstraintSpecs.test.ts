@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import {
   routeConstraints,
+  routeUniqueOnly,
   unreportedConstraintSpecs,
 } from "../../src/mapping/constraintRouting.js";
 import { resolveDialectProfile } from "../../src/mapping/dialectCapabilities.js";
@@ -227,6 +228,32 @@ describe("a constraint over subtypes", () => {
     const schema = new RelationalMapper().map(model);
     expect(unreportedConstraintSpecs(model, schema).map((s) => s.verbalization)).toEqual([
       "Each Party is at most one of: LegalEntity, NaturalPerson.",
+    ]);
+  });
+});
+
+describe("routeUniqueOnly (dbt-alternate-uniqueness.spec.md)", () => {
+  it("names the UNIQUE the DDL export writes, and reports the rest", () => {
+    const model = sixKinds();
+    const schema = new RelationalMapper().map(model);
+    const { uniques, constraintSpecs } = routeUniqueOnly(model, schema);
+    // The secondary uniqueness on Email, by table and columns, not SQL.
+    expect(uniques).toEqual([{ tableName: "person", columns: ["email"] }]);
+    const full = routeConstraints(model, schema, resolveDialectProfile("postgres"), "postgres");
+    expect(full.clauses.find((c) => c.sql === "UNIQUE (email)")?.columns).toEqual(["email"]);
+    // Everything but that uniqueness is still reported.
+    expect(constraintSpecs).toHaveLength(5);
+    expect(constraintSpecs.map((s) => s.pseudocode).join("\n")).not.toMatch(/Person has Email/);
+  });
+
+  it("lists a UNIQUE two constraints write once: dbt refuses two tests of one name", () => {
+    const model = sixKinds();
+    const ft = model.getFactTypeByName("Person has Email")!;
+    // A second uniqueness on the same role writes the same clause.
+    ft.addConstraint({ type: "internal_uniqueness", roleIds: ["Person has Email::role2"] });
+    const schema = new RelationalMapper().map(model);
+    expect(routeUniqueOnly(model, schema).uniques).toEqual([
+      { tableName: "person", columns: ["email"] },
     ]);
   });
 });

@@ -6,7 +6,9 @@
  *
  *   - Models with a unique+not_null column become entity types
  *   - Non-FK columns become value types with binary fact types
- *   - Columns with relationship tests become entity-to-entity fact types
+ *   - Columns with relationship tests become entity-to-entity fact types,
+ *     and so does each model-level foreign_key constraint over several
+ *     columns, one fact type however many columns it has
  *   - not_null tests become mandatory constraints
  *   - unique tests become internal uniqueness constraints
  *   - accepted_values tests become value constraints
@@ -32,6 +34,7 @@ import { reportColumnRenames } from "./dbtMapping/exportedColumns.js";
 import { createFactTypes } from "./dbtMapping/factTypes.js";
 import { createIdentifierTypes } from "./dbtMapping/identifierTypes.js";
 import { indexSourceDataTypes } from "./dbtMapping/sourceTypes.js";
+import { createUniqueness } from "./dbtMapping/uniqueness.js";
 import { createValueTypes } from "./dbtMapping/valueTypes.js";
 import type { DbtProjectDocument } from "./DbtSchemaTypes.js";
 
@@ -73,6 +76,7 @@ export function mapDbtToOrm(doc: DbtProjectDocument): DbtMapResult {
   createIdentifierTypes(ctx);
   createValueTypes(ctx);
   createFactTypes(ctx);
+  createUniqueness(ctx);
   reportColumnRenames(ctx);
   return { model: ctx.model, report: ctx.report.build() };
 }

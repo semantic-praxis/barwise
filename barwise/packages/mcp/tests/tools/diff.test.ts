@@ -170,3 +170,45 @@ describe("diff_models handler", () => {
     expect(matching.safeParse("fuzzy").success).toBe(false);
   });
 });
+
+describe("diff_models renames (iri-identity 6a)", () => {
+  const shop = (p: string, customer: string, places: string, role: string) =>
+    `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ${p}c, name: ${customer}, kind: entity, reference_mode: nr }
+    - { id: ${p}o, name: Order, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: ${p}f
+      name: ${places}
+      roles:
+        - { id: ${p}r0, player: ${p}c, role_name: ${role} }
+        - { id: ${p}r1, player: ${p}o, role_name: placed by }
+      readings: ["{0} ${role} {1}"]
+`;
+  const run = (...args: Parameters<typeof executeDiff>) =>
+    JSON.parse(executeDiff(...args).content[0]!.text);
+
+  it("marks a recognized rename", () => {
+    const result = run(
+      shop("a", "Customer", "Customer places Order", "places"),
+      shop("b", "Client", "Customer places Order", "places"),
+    );
+    expect(result.deltas).toContainEqual(
+      expect.objectContaining({ name: "Customer", pairedBy: "recognized" }),
+    );
+  });
+
+  it("pairs a declared rename", () => {
+    const result = run(
+      shop("a", "Customer", "Customer places Order", "places"),
+      shop("b", "Customer", "Customer submits Order", "submits"),
+      undefined,
+      [{ kind: "factType", from: "Customer places Order", to: "Customer submits Order" }],
+    );
+    expect(result.deltas).toContainEqual(
+      expect.objectContaining({ elementType: "fact_type", pairedBy: "declared" }),
+    );
+  });
+});

@@ -608,13 +608,21 @@
         }
       }
     },
-    "/person-is-parent-of-person/{person_id}": {
+    "/person-is-parent-of-person/{person_id}/{is_child_of_person_id}": {
       "get": {
         "summary": "Get a PersonIsParentOfPerson by ID",
         "operationId": "getPersonIsParentOfPerson",
         "parameters": [
           {
             "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "is_child_of_person_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -644,6 +652,14 @@
         "parameters": [
           {
             "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "is_child_of_person_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -683,6 +699,14 @@
         "parameters": [
           {
             "name": "person_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "is_child_of_person_id",
             "in": "path",
             "required": true,
             "schema": {

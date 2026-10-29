@@ -44,7 +44,7 @@ export {
 export { executeAnalyzeRepository } from "./tools/analyze.js";
 export { executeDescribeDomain } from "./tools/describeDomain.js";
 export { executeDiagram } from "./tools/diagram.js";
-export { executeDiff } from "./tools/diff.js";
+export { DIFF_RENAME_KINDS, type DiffRenameInput, executeDiff } from "./tools/diff.js";
 export { executeExportModel } from "./tools/exportModel.js";
 export { executeGymCheck, executeGymList } from "./tools/gym.js";
 export { executeImpactAnalysis } from "./tools/impactAnalysis.js";
@@ -53,6 +53,7 @@ export { executeImportModel } from "./tools/importModel.js";
 export { executeLineageStatus } from "./tools/lineageStatus.js";
 export { executeMerge } from "./tools/merge.js";
 export { executeQueryModel } from "./tools/queryModel.js";
+export { executeRename, type RenameElementInput } from "./tools/rename.js";
 export { executeReview, formatReview } from "./tools/review.js";
 export { executeSchema } from "./tools/schema.js";
 export { executeSplit } from "./tools/split.js";

@@ -162,6 +162,24 @@ describe("FactType", () => {
     expect(ft.internalConstraints).toEqual([]);
   });
 
+  it("returns the constraint as stored, id included, so a caller can name it at once", () => {
+    // A preferred identifier set right after the add needs the id
+    // (iri-identity 6a); the caller's own object never gets one.
+    const ft = new FactType({
+      name: "Test",
+      roles: [
+        { name: "r1", playerId: player1Id, id: "role-1" },
+        { name: "r2", playerId: player2Id, id: "role-2" },
+      ],
+      readings: ["{0} test {1}"],
+    });
+    const given = { type: "internal_uniqueness" as const, roleIds: ["role-1"] };
+    const stored = ft.addConstraint(given);
+    expect(stored.id).toEqual(expect.any(String));
+    expect(given).not.toHaveProperty("id");
+    expect(ft.internalConstraints).toContain(stored);
+  });
+
   it("allows adding constraints after construction", () => {
     const ft = new FactType({
       name: "Test",

@@ -17,6 +17,7 @@ export interface OrmYamlDocument {
   model: {
     name: string;
     domain_context?: string;
+    namespace?: string;
     note?: string;
     object_types?: OrmYamlObjectType[];
     fact_types?: OrmYamlFactType[];
