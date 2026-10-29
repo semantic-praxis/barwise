@@ -15,7 +15,7 @@ import type { Population } from "../model/Population.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { classifyBreakingLevel } from "./breakingLevel.js";
 import { describeChange } from "./changeDescription.js";
-import type { DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
+import type { BreakingLevel, DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
 import {
   constraintPairing,
   diffDefinition,
@@ -31,7 +31,7 @@ import {
 } from "./elementDiff.js";
 import { detectSynonymCandidates } from "./synonyms.js";
 
-import type { DeclaredRename, ElementMatching } from "./identity.js";
+import type { DeclaredRename, ElementMatching, PairedBy } from "./identity.js";
 export {
   type DeclaredRename,
   ELEMENT_MATCHINGS,
@@ -85,9 +85,30 @@ export type {
   ObjectifiedFactTypeDelta,
   ObjectTypeDelta,
   PopulationDelta,
+  RenamePairing,
   SubtypeFactDelta,
   SynonymCandidate,
 } from "./deltas.js";
+
+/**
+ * The breaking level of a paired object type or fact type. A pair the
+ * content pass recognized, or the caller declared, is rated no lower than
+ * the removal it stands in for: it may be two different elements of one
+ * shape (decision 8), and a reader who acts on a lower rating has been told
+ * less than the unpaired diff would have told them.
+ */
+function pairedLevel(
+  pairedBy: PairedBy,
+  kind: DeltaKind,
+  changes: Parameters<typeof classifyBreakingLevel>[1],
+  type: "object_type" | "fact_type",
+): BreakingLevel {
+  const own = classifyBreakingLevel(kind, changes, type);
+  if (pairedBy === "id" || pairedBy === "name") return own;
+  const removal = classifyBreakingLevel("removed", [], type);
+  const rank: Record<BreakingLevel, number> = { safe: 0, caution: 1, breaking: 2 };
+  return rank[removal] > rank[own] ? removal : own;
+}
 
 /**
  * Diff two ORM models, pairing elements by id and then by name.
@@ -151,7 +172,7 @@ export function diffModels(
         pairedBy: pair.pairedBy!,
         changes,
         changeDescriptions: changes.map(describeChange),
-        breakingLevel: classifyBreakingLevel(kind, changes, "object_type"),
+        breakingLevel: pairedLevel(pair.pairedBy!, kind, changes, "object_type"),
       });
     }
   }
@@ -195,7 +216,7 @@ export function diffModels(
         pairedBy: pair.pairedBy!,
         changes,
         changeDescriptions: changes.map(describeChange),
-        breakingLevel: classifyBreakingLevel(kind, changes, "fact_type"),
+        breakingLevel: pairedLevel(pair.pairedBy!, kind, changes, "fact_type"),
       });
     }
   }

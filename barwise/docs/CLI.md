@@ -205,14 +205,18 @@ Options:
 - `--rename <kind>:<old>=<new>` -- pair an element renamed in an edit
   that also changed it, which the diff cannot recognize; `<kind>` is
   `object-type` or `fact-type`. Repeatable. A name either model does
-  not hold, or an element already paired with another, is refused.
+  not hold, or an element already paired with another, is refused. The
+  value splits at the first `=`, so an old name holding `=` is declared
+  through MCP `diff_models` instead.
 
 An object type or fact type that ids and names leave unpaired is paired
 with the one element on the other side that says the same thing -- a fact
 type by its players, role names and constraints; an object type by the
 roles it plays, the subtype facts it is an end of, and a value type's
-value constraint and data type -- and reported as a rename, with the line
-"Recognized as a rename: paired by what it says, not by its id or name."
+value constraint and data type -- and reported as a possible rename, with
+the line "Possibly a rename: paired by what it says, not by its id or name."
+Two different elements of one shape pair the same way, so such a pair is
+rated no lower than the removal it stands in for.
 It matters for two models whose ids are unrelated, such as two imports of
 one schema; a rename within one file keeps its id and pairs by it. A shape
 two elements share pairs nothing, an object type that plays no role and

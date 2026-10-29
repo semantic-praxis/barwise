@@ -97,7 +97,7 @@ describe("a rename the diff recognizes", () => {
     const delta = named(diff, "object_type")[0]!;
     expect(deltaToJson(delta).pairedBy).toBe("recognized");
     expect(pairingNote(delta)).toBe(
-      "Recognized as a rename: paired by what it says, not by its id or name.",
+      "Possibly a rename: paired by what it says, not by its id or name.",
     );
   });
 
@@ -112,6 +112,21 @@ describe("a rename the diff recognizes", () => {
     const byId = diffModels(shop("a"), shop("a", { customer: "Client" })).deltas
       .find((d) => d.elementType === "object_type" && d.kind === "modified");
     expect(byId).toEqual(expect.objectContaining({ pairedBy: "id" }));
+  });
+
+  it("is rated no lower than the removal it stands in for", () => {
+    // It may be two elements of one shape, so a reader told "safe" would
+    // know less than the unpaired diff told them: a removal is breaking.
+    const recognized = named(
+      diffModels(shop("a"), shop("b", { customer: "Client" })),
+      "object_type",
+    );
+    expect(recognized[0]!.breakingLevel).toBe("breaking");
+    const unpaired = named(
+      diffModels(shop("a"), shop("b", { customer: "Client" }), { recognizeRenames: false }),
+      "object_type",
+    );
+    expect(unpaired.find((d) => d.kind === "removed")!.breakingLevel).toBe("breaking");
   });
 
   it("is not done when recognizeRenames is off", () => {

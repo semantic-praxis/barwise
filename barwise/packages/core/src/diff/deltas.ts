@@ -314,7 +314,7 @@ export interface DeltaJson {
    * or by a declared rename, which is what a reader needs told; a pair by
    * id or name is the ordinary case and carries nothing.
    */
-  readonly pairedBy?: "recognized" | "declared";
+  readonly pairedBy?: RenamePairing;
 }
 
 /**
@@ -336,8 +336,13 @@ export function deltaToJson(delta: ModelDelta): DeltaJson {
     breakingLevel: delta.breakingLevel,
     changes: delta.changes,
     changeDescriptions: delta.changeDescriptions,
-    ...(renamePairing(delta) ? { pairedBy: renamePairing(delta) } : {}),
+    ...pairedByJson(delta),
   };
+}
+
+function pairedByJson(delta: ModelDelta): { readonly pairedBy?: RenamePairing; } {
+  const pairedBy = renamePairing(delta);
+  return pairedBy ? { pairedBy } : {};
 }
 
 /**
@@ -348,7 +353,8 @@ export function deltaToJson(delta: ModelDelta): DeltaJson {
 export function pairingNote(delta: ModelDelta): string | undefined {
   switch (renamePairing(delta)) {
     case "recognized":
-      return "Recognized as a rename: paired by what it says, not by its id or name.";
+      // "Possible": two elements of one shape pair the same way (decision 8).
+      return "Possibly a rename: paired by what it says, not by its id or name.";
     case "declared":
       return "Paired as a declared rename.";
     case undefined:
@@ -356,17 +362,21 @@ export function pairingNote(delta: ModelDelta): string | undefined {
   }
 }
 
+/** A pairing that is not evidence two elements are one: anything but id or name. */
+export type RenamePairing = Exclude<PairedBy, "id" | "name">;
+
 /**
- * "recognized" or "declared" when the delta pairs an object type or fact
- * type by something other than its id or name, else undefined. The one
- * reading every surface and merge's refusal use, so they cannot disagree
- * about which deltas are rename pairings.
+ * How the delta pairs an object type or fact type when that is by anything
+ * other than its id or name, else undefined. An allowlist of the evidence,
+ * not a list of the rest, so a pairing added to `PairedBy` later is a
+ * rename pairing -- shown to the reader and refused by merge -- until
+ * someone decides otherwise. The one reading every surface and merge's
+ * refusal use, so they cannot disagree about which deltas these are.
  */
-export function renamePairing(delta: ModelDelta): "recognized" | "declared" | undefined {
+export function renamePairing(delta: ModelDelta): RenamePairing | undefined {
   if (delta.elementType !== "object_type" && delta.elementType !== "fact_type") return undefined;
-  return delta.pairedBy === "recognized" || delta.pairedBy === "declared"
-    ? delta.pairedBy
-    : undefined;
+  const by = delta.pairedBy;
+  return by === undefined || by === "id" || by === "name" ? undefined : by;
 }
 
 /**

@@ -32,6 +32,7 @@ export {
   type PairedBy,
   pairingNote,
   type PopulationDelta,
+  type RenamePairing,
   renamePairing,
   type SubtypeFactDelta,
   type SynonymCandidate,

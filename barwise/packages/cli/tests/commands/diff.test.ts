@@ -216,7 +216,7 @@ model:
     const text = await runCli(["diff", a, b]);
     expect(text.exitCode).toBe(0);
     expect(text.stdout).toContain(
-      "Recognized as a rename: paired by what it says, not by its id or name.",
+      "Possibly a rename: paired by what it says, not by its id or name.",
     );
     const json = JSON.parse((await runCli(["diff", a, b, "--format", "json"])).stdout);
     expect(json.deltas).toContainEqual(
