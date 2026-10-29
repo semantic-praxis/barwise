@@ -8,7 +8,9 @@ project rules); decision 17 taken; WS5 implemented 2026-10-29 (5a: `renameInMode
 `renameInProject`; 5b: `barwise rename`, MCP `rename_element`, the VS Code
 tool); rename recognition moved to WS6; WS6 grounded 2026-10-29 (6a to 6f,
 decision 15 amended, decisions 18 to 20); 6a in progress (diff recognizes renames,
-merge refuses content and rename pairings, implemented 2026-10-29); WS7 to come
+merge refuses content and rename pairings, implemented 2026-10-29; the verbalization
+interface, `model/mint.ts` and `FactType.addConstraint`'s return, implemented
+2026-10-29); WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-29
@@ -1013,6 +1015,24 @@ build differs from the bullet above:
   decides otherwise.
 - The constraint keys moved to a leaf module, `diff/constraintKey.ts`,
   because `elementDiff.ts` imports `identity.ts`.
+- The verbalization cycle runs through five modules, found by making
+  `OrmModel` import the constraint verbalizer and reading dependency-cruiser's
+  report: `ConstraintVerbalizer.ts`, `constraints/phase1.ts`, `phase2.ts`,
+  `sentence.ts` and `model/subtypeOperands.ts`. `ExportAnnotationCollector`
+  is reached only from the whole-model `Verbalizer` and is not on it. The
+  interface is `ConstraintModel` (`model/constraintModel.ts`, with
+  `ConstraintInView` moved there and re-exported); `OrmModel` declares it
+  implements it. The same probe, run after the change, reports no cycle.
+- The subtype-fact and objectification sentences moved from `Verbalizer`
+  into `verbalization/elementSentences.ts`, over `ConstraintModel`, so
+  `mint.ts` can read them; the `Verbalizer` methods delegate.
+- `mintedKey` walks the constraint's serialized form by field: references
+  (roles, subtype facts, a join path's root and steps) become what the
+  sentence names, stated fields are kept, the id is dropped, and a field
+  the walk does not know throws, so a constraint kind added later must say
+  which of its fields are references. The guard and the key share that
+  walk. The guard also requires every player of a role's fact type, which
+  the sentence names, to resolve.
 
 **6b to 6f, the 4.0 series: no release between them**, as
 `orm-format-3`'s 4a/4b, because a build that writes 4.0 must already

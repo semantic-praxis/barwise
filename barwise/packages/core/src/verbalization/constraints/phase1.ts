@@ -2,9 +2,9 @@
  * Phase 1 constraint verbalizations: uniqueness, mandatory, value, and
  * external uniqueness.
  */
+import type { ConstraintModel } from "../../model/constraintModel.js";
 import type { FactType } from "../../model/FactType.js";
 import type { ValueRange } from "../../model/ObjectType.js";
-import type { OrmModel } from "../../model/OrmModel.js";
 import type { Role } from "../../model/Role.js";
 import {
   buildVerbalization,
@@ -28,7 +28,7 @@ import {
 export function verbalizeInternalUniqueness(
   roleIds: readonly string[],
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   // `factType.hasRole` is not redundant with the arity test. The binary
   // path resolves its role with `findIndex` and then asserts the result
@@ -63,7 +63,7 @@ export function verbalizeInternalUniqueness(
 export function verbalizeBinaryUniqueness(
   constrainedRoleId: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   return binarySentence(constrainedRoleId, factType, model, "at most one ", "at most one ");
 }
@@ -80,7 +80,7 @@ export function verbalizeBinaryUniqueness(
 function binarySentence(
   roleId: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
   forward: string,
   reverse: string,
 ): Verbalization {
@@ -105,7 +105,7 @@ function binarySentence(
 export function verbalizeMultiRoleUniqueness(
   roleIds: readonly string[],
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const constrainedIndices = roleIds
     .map((rid) => factType.roles.findIndex((r) => r.id === rid))
@@ -150,7 +150,7 @@ export function verbalizeMultiRoleUniqueness(
 export function verbalizeGenericUniqueness(
   roleIds: readonly string[],
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const roleNames = roleIds.map((rid) => {
     const role = localRole(factType, rid);
@@ -186,7 +186,7 @@ export function verbalizeGenericUniqueness(
 export function verbalizeMandatory(
   roleId: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   // See `verbalizeInternalUniqueness` for why `hasRole` guards the
   // binary path (barwise-979).
@@ -204,7 +204,11 @@ export function verbalizeMandatory(
  * else "For each Agreement, some Party ... signs that Agreement." from the
  * first reading. Every other placeholder names its own player.
  */
-function verbalizeNaryMandatory(role: Role, factType: FactType, model: OrmModel): Verbalization {
+function verbalizeNaryMandatory(
+  role: Role,
+  factType: FactType,
+  model: ConstraintModel,
+): Verbalization {
   const own = factType.roles.indexOf(role);
   const subject = rolePlayer(model, factType, own);
 
@@ -230,7 +234,7 @@ function verbalizeNaryMandatory(role: Role, factType: FactType, model: OrmModel)
 export function verbalizeBinaryMandatory(
   roleId: string,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   return binarySentence(roleId, factType, model, "at least one ", "some ");
 }
@@ -263,7 +267,7 @@ export function verbalizeValueConstraint(
   values: readonly string[],
   ranges: readonly ValueRange[] | undefined,
   factType: FactType,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   let targetName: string;
   let targetId: string;
@@ -300,7 +304,7 @@ export function verbalizeValueConstraint(
 export function verbalizeExternalUniqueness(
   roleIds: readonly string[],
   sourceId: string,
-  model: OrmModel,
+  model: ConstraintModel,
 ): Verbalization {
   const segments: VerbalizationSegment[] = [
     textSeg("The combination of "),

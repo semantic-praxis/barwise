@@ -5,8 +5,8 @@ import {
   isExternalConstraint,
   roleIdsOf,
 } from "../model/Constraint.js";
+import type { ConstraintInView, ConstraintModel } from "../model/constraintModel.js";
 import type { FactType } from "../model/FactType.js";
-import type { ConstraintInView, OrmModel } from "../model/OrmModel.js";
 import {
   verbalizeExternalUniqueness,
   verbalizeInternalUniqueness,
@@ -152,7 +152,7 @@ export class ConstraintVerbalizer {
    * so no row can mix two models. A fact type `model` does not have
    * yields nothing.
    */
-  verbalizeAll(factTypeId: string, model: OrmModel): Verbalization[] {
+  verbalizeAll(factTypeId: string, model: ConstraintModel): Verbalization[] {
     const ft = model.getFactType(factTypeId);
     if (!ft) return [];
     return model.constraintsTouching(ft.id).map((c) => this.verbalize(c, ft, model));
@@ -167,7 +167,7 @@ export class ConstraintVerbalizer {
   verbalize(
     constraint: Constraint,
     factType: FactType,
-    model: OrmModel,
+    model: ConstraintModel,
   ): Verbalization {
     if (isExternalConstraint(constraint)) return this.verbalizeExternal(constraint, model);
     return asConstraintRow(
@@ -185,7 +185,7 @@ export class ConstraintVerbalizer {
    * decision 9). Query and describe both report constraints through this,
    * so they cannot disagree about any of the four.
    */
-  reportInView(inView: ConstraintInView, model: OrmModel): ConstraintReport {
+  reportInView(inView: ConstraintInView, model: ConstraintModel): ConstraintReport {
     const [constraint, factType] = inView;
     const row = factType === undefined
       ? this.verbalizeExternal(constraint, model)
@@ -206,7 +206,7 @@ export class ConstraintVerbalizer {
    * roles are resolved model-wide and the sentence names each role's fact
    * type wherever they differ.
    */
-  verbalizeExternal(constraint: ExternalConstraint, model: OrmModel): Verbalization {
+  verbalizeExternal(constraint: ExternalConstraint, model: ConstraintModel): Verbalization {
     const spanned = model.factTypesNaming([constraint, undefined]).map((ft) => ft.id);
     const id = constraint.id ?? spanned[0] ?? "";
     const v = this.verbalizeExternalByType(constraint, id, model);
@@ -221,7 +221,7 @@ export class ConstraintVerbalizer {
   private verbalizeInternal(
     constraint: InternalConstraint,
     factType: FactType,
-    model: OrmModel,
+    model: ConstraintModel,
   ): Verbalization {
     // One guard for every internal kind, before dispatch, rather than a
     // fallback at each of the places a role lookup can miss. Below this
@@ -240,7 +240,7 @@ export class ConstraintVerbalizer {
   private verbalizeInternalByType(
     constraint: InternalConstraint,
     factType: FactType,
-    model: OrmModel,
+    model: ConstraintModel,
   ): Verbalization {
     switch (constraint.type) {
       case "internal_uniqueness":
@@ -293,7 +293,7 @@ export class ConstraintVerbalizer {
   private verbalizeExternalByType(
     constraint: ExternalConstraint,
     id: string,
-    model: OrmModel,
+    model: ConstraintModel,
   ): Verbalization {
     switch (constraint.type) {
       case "external_uniqueness":
