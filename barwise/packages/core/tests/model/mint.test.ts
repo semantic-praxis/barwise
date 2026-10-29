@@ -57,6 +57,12 @@ function people(p: string): OrmModel {
   binary("n", "Person has Name", "P", "N", "has", "is of", "{0} has {1}");
   binary("a", "Person has Age", "P", "A", "has", "is of", "{0} has {1}");
   binary("k", "Person knows Person", "P", "P", "knows", "is known by", "{0} knows {1}");
+  m.addFactType({
+    id: `${p}u`,
+    name: "Person smokes",
+    roles: [{ id: `${p}u0`, name: "smokes", playerId: `${p}P` }],
+    readings: ["{0} smokes"],
+  });
   m.addSubtypeFact({ id: `${p}s1`, subtypeId: `${p}D`, supertypeId: `${p}P` });
   m.addSubtypeFact({ id: `${p}s2`, subtypeId: `${p}R`, supertypeId: `${p}P` });
   return m;
@@ -89,7 +95,7 @@ function everyKind(p: string): Constraint[] {
     { type: "ring", id: r("ring"), roleId1: r("k0"), roleId2: r("k1"), ringType: "irreflexive" },
     { type: "frequency", id: r("freq"), roleIds: [r("d0")], min: 1, max: 2 },
     { type: "value_comparison", id: r("vcmp"), roleId1: r("k0"), roleId2: r("k1"), operator: "<" },
-    { type: "cardinality", id: r("card"), roleId: r("d0"), min: 0, max: 3 },
+    { type: "cardinality", id: r("card"), roleId: r("u0"), min: 0, max: 3 },
     { type: "join_subset", id: r("js"), subset: hop, superset: hop },
     { type: "join_equality", id: r("je"), operands: [hop, hop] },
     { type: "join_exclusion", id: r("jx"), operands: [hop, hop] },
@@ -209,6 +215,36 @@ describe("a minted constraint name", () => {
           projection: [-1, 1],
         },
         ringType: "irreflexive",
+      }, undefined],
+      // Shapes no validation rule reports, or that the agreement test's
+      // fixtures reach another way (mintAgreesWithValidation.test.ts).
+      ["a ring naming one role twice", {
+        type: "ring",
+        id: "x",
+        roleId1: "ak0",
+        roleId2: "ak0",
+        ringType: "asymmetric",
+      }, "ak"],
+      ["a join ring projecting three columns", {
+        type: "join_ring",
+        id: "x",
+        operand: {
+          path: { root: "aP", steps: [{ entry: "ak0", exit: "ak1" }] },
+          projection: [0, 1, 1],
+        },
+        ringType: "irreflexive",
+      }, undefined],
+      ["a join subset over operands of different column types", {
+        type: "join_subset",
+        id: "x",
+        subset: {
+          path: { root: "aP", steps: [{ entry: "ad0", exit: "ad1" }] },
+          projection: [0, 1],
+        },
+        superset: {
+          path: { root: "aP", steps: [{ entry: "an0", exit: "an1" }] },
+          projection: [0, 1],
+        },
       }, undefined],
       ["a join projecting nothing", {
         type: "join_ring",

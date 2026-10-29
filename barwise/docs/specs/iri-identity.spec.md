@@ -1038,12 +1038,20 @@ build differs from the bullet above:
 - Resolving is not enough for the guard: a disjunctive mandatory over roles
   of two players resolves, and its sentence names the first role's player
   as the one every instance plays. What each sentence assumes of its
-  constraint's shape -- one shared player, one shared supertype, a join path
-  that chains and projects nodes it reaches, something to constrain -- is
-  stated once, in `verbalization/constraints/assumptions.ts`, beside the
-  sentences, and the guard refuses a constraint whose shape breaks it. That
-  module is not validation: it answers only whether this one sentence is of
-  its constraint.
+  constraint's shape -- one shared player, two distinct ring roles, a unary
+  fact type under a cardinality, a join path that chains, operands that
+  project the same column types, something to constrain -- is stated once,
+  in `verbalization/constraints/assumptions.ts`, beside the sentences, and
+  the guard refuses a constraint whose shape breaks it. The first version
+  listed six shapes and review found eight more, so the list is not trusted
+  to be complete by inspection: it restates part of what validation's
+  constraint rules check, and `mintAgreesWithValidation.test.ts` classifies
+  every `constraint/*` rule as one the guard refuses (with a model that
+  rule reports and the guard refuses) or one whose report the sentence
+  still states, and fails on an unclassified rule. What it cannot see is a
+  phrasing guess no rule reports: a ring naming one role twice was one
+  (barwise-ik3), and such a shape is caught only by reading the phrasing
+  paths.
 - The key holds what the sentence prints: a role is its position, its name
   and its fact type's name, readings and players; an internal constraint
   also carries its host fact type, which its sentence names even where no
