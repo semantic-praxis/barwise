@@ -131,6 +131,40 @@ describe("renameInModel", () => {
     );
   });
 
+  it("changes and reports no reference mode when the snake-case form is unchanged", () => {
+    const { model, changes } = renameInModel(
+      shop(),
+      { kind: "objectType", name: "CustomerId" },
+      "Customer_Id",
+    );
+    expect(model.getObjectType("ot-customer")).toMatchObject({ referenceMode: "customer_id" });
+    expect(changes.some((c) => c.includes("reference mode"))).toBe(false);
+  });
+
+  it("refuses a value type renamed into a second match for an entity's key", () => {
+    // Customer plays Email in a binary and is keyed by CustomerId.
+    expect(() => renameInModel(shop(), { kind: "objectType", name: "Email" }, "Customer_Id"))
+      .toThrow(
+        /second value type matching the reference mode "customer_id" of entity "Customer"/,
+      );
+  });
+
+  it("refuses a rename that gives an entity a key it did not have", () => {
+    const m = shop();
+    const nr = m.addObjectType({ name: "Nr", kind: "value" });
+    m.addFactType({
+      name: "Order has Nr",
+      roles: [
+        { name: "has", playerId: "ot-order" },
+        { name: "of", playerId: nr.id },
+      ],
+      readings: ["{0} has {1}"],
+    });
+    expect(() => renameInModel(m, { kind: "objectType", name: "Nr" }, "OrderNr")).toThrow(
+      /change the key of entity "Order" from no value type to value type "OrderNr"/,
+    );
+  });
+
   it("leaves an entity's reference mode alone when the entity itself is renamed", () => {
     const { model } = renameInModel(shop(), { kind: "objectType", name: "Customer" }, "Client");
     expect(model.getObjectType("ot-customer")).toMatchObject({ referenceMode: "customer_id" });

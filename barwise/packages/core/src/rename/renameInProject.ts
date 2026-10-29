@@ -10,6 +10,7 @@
  * cascade follows names, and `files` says which files it changed.
  */
 
+import { toSnake } from "../mapping/columnNames.js";
 import type { ContextMappingConfig } from "../model/ContextMapping.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
@@ -20,6 +21,7 @@ import {
   applyToDocument,
   planRename,
   readBack,
+  refuseKeyShift,
   renameDefinition,
   RenameError,
   type RenamePlan,
@@ -40,6 +42,9 @@ export interface ProjectRenameResult {
 /**
  * Rename one element of the domain `context`, and follow it into the
  * shadows, reference modes, definitions and mapping files that name it.
+ * The input project and its models are not changed; a domain the rename
+ * did not touch shares its model with the input, so a caller that edits
+ * the result's untouched models edits the input's too.
  *
  * @throws {RenameError} when a domain is not loaded, the context is not a
  * domain, or the rename is refused in any domain it reaches.
@@ -113,7 +118,19 @@ export function renameInProject(
   });
 
   const renamedModels = new Map<string, OrmModel>();
-  for (const [ctx, doc] of docs) renamedModels.set(ctx, readBack(doc));
+  for (const [ctx, doc] of docs) {
+    const where = `In domain "${ctx}": `;
+    let model: OrmModel;
+    try {
+      model = readBack(doc);
+    } catch (err) {
+      if (err instanceof RenameError) throw new RenameError(where + err.message);
+      throw err;
+    }
+    const ctxPlan = renamed.find((r) => r.context === ctx)?.plan ?? plan;
+    refuseKeyShift(models.get(ctx)!, model, ctxPlan, where);
+    renamedModels.set(ctx, model);
+  }
 
   const next = new OrmProject({
     name: project.name,
@@ -179,15 +196,31 @@ function renameDefinitionsAnywhere(
 ): void {
   for (const [ctx, model] of models) {
     if (!model.definitions.some((d) => d.term === plan.from)) continue;
-    renameDefinition(docOf(ctx), plan.from, plan.to, changes, termFree, ` in domain "${ctx}"`);
+    const where = ` in domain "${ctx}"`;
+    // Decided on the model first, so a domain whose definition is left is
+    // not opened, read back or listed in `files`.
+    if (!termFree(plan.from)) {
+      changes.push(
+        `Left the definition of "${plan.from}"${where}: another element of the project is also named "${plan.from}".`,
+      );
+    } else if (model.definitions.some((d) => d.term === plan.to)) {
+      changes.push(
+        `Left the definition of "${plan.from}"${where}: a definition of "${plan.to}" already exists.`,
+      );
+    } else {
+      renameDefinition(docOf(ctx), plan.from, plan.to, changes, termFree, where);
+    }
   }
 }
 
 /**
- * An entity whose reference mode a value-type rename changed may have
- * shadows in other domains, which split gives the same reference mode and
- * which the mapper keys from it; a shadow left behind would give two
- * domains different key names for one entity.
+ * An entity whose reference mode a value-type rename changed is one entity
+ * across the project: its owner and every shadow of it, which split gives
+ * the same reference mode and from which the mapper names the key and
+ * foreign-key columns. Each copy that still holds the old mode takes the
+ * new one, whether the change began at the owner or at a shadow, so two
+ * domains never name one entity's key differently. A copy holding some
+ * other mode is left: the mapper never tied it to the renamed value type.
  */
 function followReferenceModes(
   models: ReadonlyMap<string, OrmModel>,
@@ -196,24 +229,25 @@ function followReferenceModes(
   plan: RenamePlan,
   changes: string[],
 ): void {
-  for (const [ownerCtx, ids] of entitiesWithNewMode) {
+  const fromMode = toSnake(plan.from);
+  const toMode = toSnake(plan.to);
+  for (const [ctx, ids] of entitiesWithNewMode) {
     for (const id of ids) {
-      const entity = docOf(ownerCtx).model.object_types?.find((ot) => ot.id === id);
-      if (!entity || entity.source_context !== undefined) continue;
-      for (const [ctx, model] of models) {
-        if (ctx === ownerCtx) continue;
-        const shadow = model.objectTypes.find((ot) =>
-          ot.sourceContext === ownerCtx && ot.name === entity.name
+      const entity = models.get(ctx)!.getObjectType(id);
+      if (!entity) continue;
+      const ownerCtx = entity.sourceContext ?? ctx;
+      for (const [other, model] of models) {
+        const copy = model.objectTypes.find((ot) =>
+          ot.name === entity.name
+          && (other === ownerCtx ? ot.sourceContext === undefined : ot.sourceContext === ownerCtx)
         );
-        if (!shadow || shadow.kind !== "entity" || shadow.referenceMode === entity.reference_mode) {
-          continue;
-        }
-        const shadowDoc = docOf(ctx).model.object_types?.find((ot) => ot.id === shadow.id);
-        if (!shadowDoc) continue;
-        shadowDoc.reference_mode = entity.reference_mode;
+        if (copy?.kind !== "entity" || copy.referenceMode !== fromMode) continue;
+        const copyDoc = docOf(other).model.object_types?.find((ot) => ot.id === copy.id);
+        if (!copyDoc || copyDoc.reference_mode !== fromMode) continue; // already rewritten
+        copyDoc.reference_mode = toMode;
         changes.push(
-          `Changed the reference mode of "${entity.name}" to "${entity.reference_mode}" in domain "${ctx}", `
-            + `following its owner after "${plan.from}" was renamed.`,
+          `Changed the reference mode of "${entity.name}" from "${fromMode}" to "${toMode}" in domain "${other}", `
+            + `following "${plan.from}" renamed to "${plan.to}".`,
         );
       }
     }

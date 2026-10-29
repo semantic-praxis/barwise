@@ -1036,19 +1036,33 @@ function referenceModePkType(
   model: OrmModel,
   strategy: PreferredIdentifierStrategy | undefined,
 ): SqlType & { readonly sourceRoleId?: string; } {
+  const key = referenceModeKey(ot, model);
+  if (!key) return keyTypeOf(undefined, strategy);
+  // The entity's role, as a preferred binary records it, so the key
+  // column traces to the value type that typed it -- the annotations
+  // read its definition through this (PR #567 review).
+  const entityRole = key.factType.roles.find((r) => r.playerId === ot.id);
+  return { ...keyTypeOf(key.valueType.dataType, strategy), sourceRoleId: entityRole?.id };
+}
+
+/**
+ * The value type an entity's reference mode names, and the binary that
+ * ties them: the first binary in which the entity plays a value type whose
+ * `toSnake` name is the entity's `reference_mode`. The mapper types the
+ * key column from it, and `renameInModel` asks it which reference modes a
+ * value-type rename must follow, so the two cannot disagree.
+ */
+export function referenceModeKey(
+  ot: ObjectType,
+  model: OrmModel,
+): { readonly valueType: ValueType; readonly factType: FactType; } | undefined {
+  if (ot.kind !== "entity") return undefined;
   for (const ft of model.factTypes) {
     if (ft.arity !== 2) continue;
     const vp = findValuePlayer(ft, ot, model);
-    if (vp && toSnake(vp.name) === ot.referenceMode) {
-      // The entity's role, as a preferred binary records it, so the key
-      // column traces to the value type that typed it -- the annotations
-      // read its definition through this (PR #567 review).
-      const entityRole = ft.roles.find((r) => r.playerId === ot.id);
-      return { ...keyTypeOf(vp.dataType, strategy), sourceRoleId: entityRole?.id };
-    }
+    if (vp && toSnake(vp.name) === ot.referenceMode) return { valueType: vp, factType: ft };
   }
-
-  return keyTypeOf(undefined, strategy);
+  return undefined;
 }
 
 /** A column's SQL type, whether it was declared or a fallback, and which fallback. */

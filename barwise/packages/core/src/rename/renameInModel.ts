@@ -13,6 +13,7 @@
 
 import { stringify } from "yaml";
 import { toSnake } from "../mapping/columnNames.js";
+import { referenceModeKey } from "../mapping/RelationalMapper.js";
 import type { FactType } from "../model/FactType.js";
 import { localName } from "../model/name.js";
 import type { ObjectType } from "../model/ObjectType.js";
@@ -62,7 +63,9 @@ export function renameInModel(model: OrmModel, target: RenameTarget, to: string)
   applyToDocument(doc, model, plan, changes, {
     definitionTermFree: (old) => !holdsName(model, old, plan.elementId),
   });
-  return { model: readBack(doc), ids: new Map(), changes };
+  const renamed = readBack(doc);
+  refuseKeyShift(model, renamed, plan);
+  return { model: renamed, ids: new Map(), changes };
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +219,15 @@ export function holdsName(model: OrmModel, name: string, exceptId: string): bool
 // Internals
 // ---------------------------------------------------------------------------
 
+/** Whether an entity and a value type are the two players of a binary. */
+function playsInBinary(model: OrmModel, entityId: string, valueTypeId: string): boolean {
+  return model.factTypes.some((ft) =>
+    ft.arity === 2
+    && ft.roles.some((r) => r.playerId === entityId)
+    && ft.roles.some((r) => r.playerId === valueTypeId)
+  );
+}
+
 function planRoleRename(
   model: OrmModel,
   target: Extract<RenameTarget, { kind: "role"; }>,
@@ -320,12 +332,11 @@ function takenError(
 }
 
 /**
- * The reference modes that name a renamed value type. The relational
- * mapper types an entity's key from the value type it plays in a binary
- * fact type whose `toSnake` name equals the entity's `reference_mode`
- * (`referenceModePkType`); a rename that left the string would silently
- * untype the key column. An entity with that string that does not play the
- * value type is left alone, because the mapper never tied the two.
+ * The reference modes that name a renamed value type: each entity whose
+ * key the mapper types from it (`referenceModeKey`, the mapper's own rule)
+ * gets the new name's `toSnake` form, because a rename that left the
+ * string would silently untype the key column. An entity that merely holds
+ * the same string is left alone, because the mapper never tied the two.
  */
 function renameReferenceModes(
   doc: OrmYamlDocument,
@@ -338,19 +349,66 @@ function renameReferenceModes(
   if (valueType?.kind !== "value") return [];
   const from = toSnake(plan.from);
   const to = toSnake(plan.to);
-  const players = new Set<string>();
-  for (const ft of model.factTypes) {
-    if (ft.arity !== 2) continue;
-    const [a, b] = ft.roles;
-    if (a!.playerId === valueType.id) players.add(b!.playerId);
-    if (b!.playerId === valueType.id) players.add(a!.playerId);
-  }
+  if (from === to) return [];
+  const keyed = new Set(
+    model.objectTypes.filter((ot) => referenceModeKey(ot, model)?.valueType.id === valueType.id)
+      .map((ot) => ot.id),
+  );
   const changed: string[] = [];
   for (const ot of doc.model.object_types ?? []) {
-    if (ot.kind !== "entity" || ot.reference_mode !== from || !players.has(ot.id)) continue;
+    if (!keyed.has(ot.id) || ot.reference_mode !== from) continue;
     ot.reference_mode = to;
     changed.push(ot.id);
     changes.push(`Changed the reference mode of "${ot.name}" from "${from}" to "${to}"${where}.`);
   }
   return changed;
+}
+
+/**
+ * Refuse a rename that changes which value type keys an entity. The
+ * reference-mode rewrite keeps a renamed key value type's entities keyed
+ * by it; this catches the rest, such as a value type renamed into the
+ * `toSnake` form an entity's reference mode already names, which would
+ * give the mapper a second candidate and make the key column's type depend
+ * on fact type order.
+ */
+export function refuseKeyShift(
+  before: OrmModel,
+  after: OrmModel,
+  plan: RenamePlan,
+  where = "",
+): void {
+  const renamedValue =
+    plan.kind === "objectType" && before.getObjectType(plan.elementId)?.kind === "value"
+      ? plan.elementId
+      : undefined;
+  for (const ot of before.objectTypes) {
+    if (
+      renamedValue !== undefined && ot.kind === "entity" && ot.referenceMode === toSnake(plan.to)
+    ) {
+      // The first binary wins in the mapper, so a renamed value type that
+      // now also matches an entity keyed by another one changes nothing
+      // today and becomes the key if the fact types are reordered.
+      const key = referenceModeKey(ot, after)?.valueType;
+      if (key && key.id !== renamedValue && playsInBinary(after, ot.id, renamedValue)) {
+        throw new RenameError(
+          `${where}"${plan.to}" would be a second value type matching the reference mode "${ot.referenceMode}" `
+            + `of entity "${ot.name}", which is keyed by value type "${key.name}".`,
+        );
+      }
+    }
+    const was = referenceModeKey(ot, before)?.valueType;
+    const now = referenceModeKey(after.getObjectType(ot.id) ?? ot, after)?.valueType;
+    if (was?.id === now?.id) continue;
+    const describe = (
+      v: { name: string; } | undefined,
+    ) => (v ? `value type "${v.name}"` : "no value type");
+    throw new RenameError(
+      `${where}The rename would change the key of entity "${ot.name}" from ${describe(was)} to `
+        + `${describe(now)}, because its reference mode "${
+          ot.kind === "entity" ? ot.referenceMode : ""
+        }" `
+        + `would name a different value type.`,
+    );
+  }
 }

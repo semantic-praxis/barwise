@@ -27,7 +27,7 @@ src/
   diff/           Model diffing and three-way merge
   rename/         Renaming an element: renameInModel, and renameInProject with
                   its cascade into shadows, reference modes, definitions and
-                  mapping files (exported from the root, beside split)
+                  mapping files
   index.ts        Root public API: foundational only (model, serialization,
                   validation, format registry, import/export types)
 
@@ -37,8 +37,8 @@ tests/            Mirrors src/ structure; see testing section below
 
 The capability modules are exposed as package subpath exports, not from
 the root barrel: `@barwise/core/mapping`, `/diff`, `/verbalization`,
-`/counterexample`, `/sql`, `/annotation`, `/lineage`, `/describe`, and
-`/query`. Each has a `src/<name>/index.ts` barrel listed in
+`/counterexample`, `/sql`, `/annotation`, `/lineage`, `/describe`,
+`/query`, and `/rename`. Each has a `src/<name>/index.ts` barrel listed in
 `package.json` `exports`. Import a capability from its subpath; import
 the metamodel, serializers, validation, and the format registry from the
 root. (Spec: `docs/specs/archive/core-subpath-exports.spec.md`.)

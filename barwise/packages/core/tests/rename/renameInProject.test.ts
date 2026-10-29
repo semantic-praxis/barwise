@@ -9,6 +9,7 @@ import { OrmProject } from "../../src/model/OrmProject.js";
 import { splitModel } from "../../src/project/splitModel.js";
 import { RenameError } from "../../src/rename/renameInModel.js";
 import { renameInProject } from "../../src/rename/renameInProject.js";
+import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { assembleProject, type ProjectFiles } from "../../src/serialization/projectAssembly.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
@@ -145,18 +146,121 @@ describe("renameInProject", () => {
     const project = new OrmProject({ name: "P" });
     const sales = new OrmModel({ name: "sales" });
     sales.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_nr" });
-    sales.addDefinition({ term: "Order", definition: "A shipment request." });
+    // The definition sits apart, as split puts definitions in one domain,
+    // and describes shipping's Order, not sales'.
+    const glossary = new OrmModel({ name: "glossary" });
+    glossary.addDefinition({ term: "Order", definition: "A shipment request." });
     const shipping = new OrmModel({ name: "shipping" });
     shipping.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_nr" });
+    project.addDomain({ path: "glossary.orm.yaml", context: "glossary" }).setModel(glossary);
     project.addDomain({ path: "sales.orm.yaml", context: "sales" }).setModel(sales);
     project.addDomain({ path: "shipping.orm.yaml", context: "shipping" }).setModel(shipping);
 
-    const { project: renamed, changes } = renameInProject(project, "sales", {
+    const { project: renamed, changes, files } = renameInProject(project, "sales", {
       kind: "objectType",
       name: "Order",
     }, "SalesOrder");
-    expect(renamed.getDomain("sales")!.model!.definitions.map((d) => d.term)).toEqual(["Order"]);
+    expect(renamed.getDomain("glossary")!.model!.definitions.map((d) => d.term)).toEqual(["Order"]);
     expect(changes.some((c) => c.startsWith('Left the definition of "Order"'))).toBe(true);
+    expect(files).toEqual(["sales.orm.yaml"]);
+  });
+
+  it("renames a fact type and a role, naming only the files that changed", () => {
+    const ft = renameInProject(splitShop(), "crm", {
+      kind: "factType",
+      name: "Customer has CustomerId",
+    }, "Customer is keyed by CustomerId");
+    expect(ft.project.getDomain("crm")!.model!.getFactTypeByName("Customer is keyed by CustomerId"))
+      .toBeDefined();
+    expect(ft.files).toEqual(["domains/crm.orm.yaml"]);
+
+    const role = renameInProject(splitShop(), "billing", {
+      kind: "role",
+      factType: "Invoice is billed to Customer",
+      role: 0,
+    }, "sent to");
+    expect(
+      role.project.getDomain("billing")!.model!.getFactTypeByName("Invoice is billed to Customer")!
+        .roles[0]!.name,
+    )
+      .toBe("sent to");
+    expect(role.files).toEqual(["domains/billing.orm.yaml"]);
+  });
+
+  it("renames a fact type's definition wherever split put it", () => {
+    const project = splitShop();
+    project.getDomain("catalog")!.model!.addDefinition({
+      term: "Customer has CustomerId",
+      definition: "The key.",
+    });
+    const { project: renamed, files } = renameInProject(project, "crm", {
+      kind: "factType",
+      name: "Customer has CustomerId",
+    }, "Customer is keyed by CustomerId");
+    expect(renamed.getDomain("catalog")!.model!.definitions.map((d) => d.term)).toContain(
+      "Customer is keyed by CustomerId",
+    );
+    expect([...files].sort()).toEqual(["domains/catalog.orm.yaml", "domains/crm.orm.yaml"]);
+  });
+
+  it("follows a reference mode changed at a shadow back to its owner", () => {
+    const project = new OrmProject({ name: "P" });
+    const a = new OrmModel({ name: "a" });
+    a.addObjectType({ id: "c", name: "Customer", kind: "entity", referenceMode: "customer_id" });
+    a.addObjectType({ id: "v", name: "CustomerId", kind: "value" });
+    const b = new OrmModel({ name: "b" });
+    b.addObjectType({
+      id: "c",
+      name: "Customer",
+      kind: "entity",
+      referenceMode: "customer_id",
+      sourceContext: "a",
+    });
+    b.addObjectType({ id: "v", name: "CustomerId", kind: "value", sourceContext: "a" });
+    b.addFactType({
+      name: "Customer has CustomerId",
+      roles: [{ name: "has", playerId: "c" }, { name: "of", playerId: "v" }],
+      readings: ["{0} has {1}"],
+    });
+    project.addDomain({ path: "a.orm.yaml", context: "a" }).setModel(a);
+    project.addDomain({ path: "b.orm.yaml", context: "b" }).setModel(b);
+
+    const { project: renamed, changes } = renameInProject(project, "a", {
+      kind: "objectType",
+      name: "CustomerId",
+    }, "ClientKey");
+    expect(renamed.getDomain("b")!.model!.getObjectType("c")).toMatchObject({
+      referenceMode: "client_key",
+    });
+    expect(renamed.getDomain("a")!.model!.getObjectType("c")).toMatchObject({
+      referenceMode: "client_key",
+    });
+    expect(changes.filter((c) => c.includes("reference mode"))).toHaveLength(2);
+  });
+
+  it("leaves a shadow whose reference mode is not the old one", () => {
+    const project = splitShop();
+    const billing = project.getDomain("billing")!.model!;
+    const shadow = billing.getObjectTypeByName("Customer")!;
+    // Rebuild billing with the shadow's mode set by hand.
+    const yaml = new OrmYamlSerializer().serialize(billing).replace(
+      `name: Customer\n      kind: entity\n      reference_mode: customer_id`,
+      `name: Customer\n      kind: entity\n      reference_mode: cust_no`,
+    );
+    project.getDomain("billing")!.setModel(
+      new OrmYamlSerializer().deserialize(yaml, { lenient: true }),
+    );
+    expect(project.getDomain("billing")!.model!.getObjectType(shadow.id)).toMatchObject({
+      referenceMode: "cust_no",
+    });
+
+    const { project: renamed } = renameInProject(project, "crm", {
+      kind: "objectType",
+      name: "CustomerId",
+    }, "ClientKey");
+    expect(renamed.getDomain("billing")!.model!.getObjectType(shadow.id)).toMatchObject({
+      referenceMode: "cust_no",
+    });
   });
 
   it("refuses a project with a domain that is not loaded", () => {
