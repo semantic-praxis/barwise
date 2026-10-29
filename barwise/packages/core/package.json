@@ -39,6 +39,10 @@
       "types": "./dist/query/index.d.ts",
       "default": "./dist/query/index.js"
     },
+    "./rename": {
+      "types": "./dist/rename/index.d.ts",
+      "default": "./dist/rename/index.js"
+    },
     "./sql": {
       "types": "./dist/sql/index.d.ts",
       "default": "./dist/sql/index.js"
