@@ -148,3 +148,86 @@ describe("the harness, as Effect resolves the value (second review of R1)", () =
     expect(paths(L, [{ type: "a" }, { type: 3 }])).toEqual(["1.type"]);
   });
 });
+
+describe("the harness, against the third review of R1", () => {
+  it("reports a rule's several issues once each, and runs no rule again for them", () => {
+    let runs = 0;
+    const fit = crossField(
+      { id: "fit", reads: ["roles", "readings"] },
+      (v: { readonly roles: readonly string[]; readonly readings: readonly string[]; }) => {
+        runs++;
+        return v.readings.slice(v.roles.length).map((_, i) => ({
+          path: ["readings", v.roles.length + i],
+          issue: "has no role to read.",
+        }));
+      },
+      "must not have more readings than roles.",
+    );
+    const zero = crossField(
+      { id: "zero", reads: ["c"] },
+      (v: { readonly c: number; }) => v.c !== 0,
+      "must have a nonzero c.",
+    );
+    const F = Schema.Struct({
+      roles: Schema.Array(Schema.String),
+      readings: Schema.Array(Schema.String),
+      c: Schema.Number,
+    }).check(fit, zero);
+    // Effect runs both rules here; before the fix the walk ran them again
+    // for the Composite holding fit's issues, and recursed without end.
+    expect(paths(F, { roles: ["a"], readings: ["x", "y", "z"], c: 0 })).toEqual([
+      "",
+      "readings.1",
+      "readings.2",
+    ]);
+    expect(runs).toBe(1);
+    // Beside a field error the harness runs them, once.
+    runs = 0;
+    expect(paths(F, { roles: ["a"], readings: ["x", "y"], c: 0, extra: 1 })).toEqual([
+      "",
+      "extra",
+      "readings.1",
+    ]);
+    expect(runs).toBe(1);
+  });
+
+  it("does not run a rule Effect already ran and passed", () => {
+    let runs = 0;
+    const counted = crossField(
+      { id: "counted", reads: ["a", "b"] },
+      (v: { readonly a: number; readonly b: number; }) => {
+        runs++;
+        return v.a <= v.b;
+      },
+      "must have a no larger than b.",
+    );
+    const notThree = Schema.makeFilter((v: { readonly a: number; }) => v.a !== 3, {
+      message: "must not have a of 3.",
+    });
+    const N = Schema.Struct({ a: Schema.Number, b: Schema.Number }).check(notThree, counted);
+    expect(paths(N, { a: 3, b: 4 })).toEqual([""]);
+    expect(runs).toBe(1);
+  });
+
+  it("does not run a list rule over an item of the wrong kind", () => {
+    const distinct = crossField(
+      { id: "distinct-types", reads: ["*.type"] },
+      (items: readonly { readonly type: string; }[]) =>
+        new Set(items.map((i) => i.type)).size === items.length,
+      "must not repeat a type.",
+    );
+    const L = Schema.Array(Schema.Struct({ type: Schema.String })).check(distinct);
+    expect(paths(L, [{ type: "a" }, null])).toEqual(["1"]);
+  });
+
+  it("keeps a problem to one line", () => {
+    const U = Schema.Union([
+      Schema.Struct({ a: Schema.Number }),
+      Schema.Struct({ b: Schema.Number }),
+    ]);
+    const result = Effect.runSync(Effect.result(decoderFor(U)({ a: 1, b: 2, extra: 1 })));
+    const messages = Result.isFailure(result) ? result.failure.problems.map((p) => p.message) : [];
+    expect(messages.length).toBeGreaterThan(0);
+    for (const m of messages) expect(m).not.toContain("\n");
+  });
+});

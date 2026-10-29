@@ -28,7 +28,7 @@ import {
   VALUE_ONLY_FIELDS,
   type ValueRange,
 } from "../model/ObjectType.js";
-import { type DecodeOptions, type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
+import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { crossField } from "./harness.js";
 import { type ElementLabel, elementOf } from "./problems.js";
 
@@ -292,11 +292,8 @@ export function toRecord(file: ObjectTypeFileValue): DecodedObjectType {
 const decodeFile = decoderFor(ObjectTypeFile);
 
 /** Decode one object type as a 3.0 file states it. */
-export function decodeObjectType(
-  doc: unknown,
-  options: DecodeOptions = {},
-): Effect.Effect<DecodedObjectType, DecodeProblems> {
-  return decodeFile(doc, options).pipe(Effect.map(toRecord));
+export function decodeObjectType(doc: unknown): Effect.Effect<DecodedObjectType, DecodeProblems> {
+  return decodeFile(doc).pipe(Effect.map(toRecord));
 }
 
 /** The synchronous boundary: the decoded object type, or every problem thrown at once. */

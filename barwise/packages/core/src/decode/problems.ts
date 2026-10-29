@@ -19,6 +19,12 @@ import { extraChecks } from "./harness.js";
 export interface DecodeProblem {
   /** How a person finds the element: its name, else its id, else "". */
   readonly element: string;
+  /**
+   * Where the element sits in the decoded value: `[]` for the value
+   * itself, `["object_types", 3]` in a document. What finds an element
+   * that has no name or id (third review of R1).
+   */
+  readonly at: readonly PropertyKey[];
   /** The path below the element, in the file's spelling. */
   readonly path: readonly PropertyKey[];
   /** A sentence naming the element and the field. */
@@ -86,7 +92,9 @@ function predicateOf(issue: SchemaIssue.Issue, fallback: string | undefined): st
   if (issue._tag === "MissingKey") {
     return issue.annotations?.messageMissingKey ?? ownMessage(issue) ?? "is missing.";
   }
-  return ownMessage(issue) ?? fallback ?? `is invalid: ${defaultFormat(issue)}.`;
+  // Effect's text can run to several lines; a problem is one.
+  return ownMessage(issue) ?? fallback
+    ?? `is invalid: ${defaultFormat(issue).replace(/\s*\n\s*/g, " ")}.`;
 }
 
 interface Context {
@@ -108,6 +116,7 @@ export function problemsOf(
     const below = path.slice(context.base);
     out.push({
       element: context.label.identity,
+      at: path.slice(0, context.base),
       path: below,
       message: below.length === 0
         ? `${context.label.label} ${predicate}`
@@ -124,6 +133,21 @@ export function problemsOf(
     const element = elementAt(ast);
     return element ? { label: element.describe(value), base: path.length } : context;
   };
+
+  // An element that is not a mapping: named by its noun, and, below the
+  // root, by where it sits, since it has no name to be found by.
+  const notAMapping = (element: ElementAnnotation, path: readonly PropertyKey[]) =>
+    push(
+      {
+        label: {
+          label: path.length === 0 ? element.noun : `${element.noun} at ${fieldPath(path)}`,
+          identity: "",
+        },
+        base: path.length,
+      },
+      path,
+      "must be a mapping of fields.",
+    );
 
   const walk = (
     node: SchemaIssue.Issue,
@@ -163,13 +187,7 @@ export function problemsOf(
         // wrong tag -- or, for a value that is not a mapping at all, that.
         if (element) {
           if (isMapping(value)) push(here, path, element.badTag);
-          else {
-            push(
-              { label: { label: element.noun, identity: "" }, base: path.length },
-              path,
-              "must be a mapping of fields.",
-            );
-          }
+          else notAMapping(element, path);
           return;
         }
         push(context, path, predicateOf(node, fallback));
@@ -180,15 +198,24 @@ export function problemsOf(
         // each in its own words or, lacking any, the rule's.
         const message = ownMessage(node) ?? fallback;
         const inner = node.issue;
-        if (inner._tag === "Pointer" || inner._tag === "Composite") {
+        if (inner._tag === "Pointer") {
           walk(inner, value, path, context, message);
+        } else if (inner._tag === "Composite") {
+          // A rule's several issues, wrapped in a Composite at its own node:
+          // not a failure of that node, so its rules are not run again
+          // (third review of R1, where that recursed without end).
+          for (const child of inner.issues) walk(child, value, path, context, message);
         } else {
           push(context, path, ownMessage(inner) ?? message ?? predicateOf(inner, undefined));
         }
         return;
       }
-      default:
-        push(context, path, predicateOf(node, fallback));
+      default: {
+        // A struct element given something that is not a mapping.
+        const element = node._tag === "InvalidType" ? elementAt(node.ast) : undefined;
+        if (element && !isMapping(value)) notAMapping(element, path);
+        else push(context, path, predicateOf(node, fallback));
+      }
     }
   };
 

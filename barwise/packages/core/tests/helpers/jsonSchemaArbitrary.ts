@@ -15,9 +15,10 @@
  *
  * It reads the subset of JSON Schema the model schema uses; a keyword it
  * does not know is refused, so a schema change cannot silently narrow it.
- * Every keyword it knows it honours: the second review of R1 found it
- * reading `oneOf` beside `properties` as nothing, so every constraint it
- * drew was `{}`.
+ * Every keyword it knows it honours, `additionalProperties` by the test
+ * asking today's reader about the stray key: the second review of R1 found
+ * it reading `oneOf` beside `properties` as nothing, so every constraint
+ * it drew was `{}`.
  */
 import fc from "fast-check";
 
@@ -105,12 +106,15 @@ export function fromJsonSchema(root: Node, node: Node): fc.Arbitrary<unknown> {
     }
     case "object":
     case undefined:
-      return branches
-        // A tagged union written as one object with a `oneOf` of variants,
-        // or an `anyOf` naming which fields must be present: one branch is
-        // chosen and its properties and requirements join the node's.
-        ? fc.constantFrom(...branches).chain((branch) => objectArbitrary(root, node, branch))
-        : objectArbitrary(root, node, undefined);
+      // A tagged union written as one object with a `oneOf` of variants,
+      // or an `anyOf` naming which fields must be present: one branch is
+      // chosen and its properties and requirements join the node's. An
+      // `if` chooses `then` or `else` the same way.
+      return fc.constantFrom(...(branches ?? [undefined])).chain((branch) =>
+        fc.constantFrom(...(node.if ? ["then", "else"] as const : [undefined])).chain((side) =>
+          objectArbitrary(root, node, branch, side)
+        )
+      );
     default:
       throw new Error(`jsonSchemaArbitrary does not read type ${String(node.type)}`);
   }
@@ -124,37 +128,72 @@ export function fromJsonSchema(root: Node, node: Node): fc.Arbitrary<unknown> {
 const percent = fc.noBias(fc.integer({ min: 0, max: 99 }));
 
 /**
- * An object: each required property usually present, each optional one
- * sometimes, the properties an `if/then/else` branch adds or forbids
- * among them, and now and then a key the schema does not name. `branch` is
- * the `oneOf` or `anyOf` member chosen for it, if it has one.
+ * The one condition an `if` may state: a property holding a constant.
+ * Anything else is refused, as an unknown keyword is.
  */
-function objectArbitrary(root: Node, node: Node, branch: Node | undefined): fc.Arbitrary<unknown> {
-  for (const key of Object.keys(branch ?? {})) {
-    if (!KNOWN.has(key)) throw new Error(`jsonSchemaArbitrary does not read "${key}"`);
+function conditionOf(node: Node): [string, unknown] {
+  const properties = (node.if as Node).properties as Record<string, Node> | undefined;
+  const entries = Object.entries(properties ?? {});
+  const [key, schema] = entries[0] ?? [];
+  if (entries.length !== 1 || Object.keys(node.if as Node).length !== 1 || !schema?.const) {
+    throw new Error("jsonSchemaArbitrary reads an `if` only as one property's const");
   }
-  const properties = {
+  return [key!, schema.const];
+}
+
+/**
+ * An object: each required property usually present, each optional one
+ * sometimes, and now and then a key the schema does not name. `branch` is
+ * the `oneOf` or `anyOf` member chosen for it, and `side` the side of
+ * its `if`: the condition's property is made to hold or not to, and that
+ * side's requirements join, and its forbidden properties are left out
+ * (third review of R1, which found both sides merged whatever the
+ * condition said).
+ */
+function objectArbitrary(
+  root: Node,
+  node: Node,
+  branch: Node | undefined,
+  side: "then" | "else" | undefined,
+): fc.Arbitrary<unknown> {
+  const conditional = side === undefined ? undefined : node[side] as Node | undefined;
+  for (const part of [branch, conditional]) {
+    for (const key of Object.keys(part ?? {})) {
+      if (!KNOWN.has(key)) throw new Error(`jsonSchemaArbitrary does not read "${key}"`);
+    }
+  }
+  const properties: Record<string, unknown> = {
     ...(node.properties as Record<string, unknown> | undefined),
     ...(branch?.properties as Record<string, unknown> | undefined),
+    ...(conditional?.properties as Record<string, unknown> | undefined),
   };
-  for (const conditional of [node.then, node.else] as (Node | undefined)[]) {
-    for (
-      const [k, v] of Object.entries((conditional?.properties ?? {}) as Record<string, unknown>)
-    ) {
-      if (v !== false && !(k in properties)) properties[k] = v;
-    }
+  if (side !== undefined) {
+    const [key, value] = conditionOf(node);
+    properties[key] = side === "then"
+      ? { const: value }
+      : {
+        ...(properties[key] as Node),
+        enum: ((properties[key] as Node).enum as unknown[])
+          .filter((v) => v !== value),
+      };
   }
   const required = new Set([
     ...((node.required ?? []) as string[]),
     ...((branch?.required ?? []) as string[]),
+    ...((conditional?.required ?? []) as string[]),
   ]);
-  const entries = Object.entries(properties).filter(([, v]) => v !== false) as [string, Node][];
-  const fields = entries.map(([key, schema]) =>
-    fc.tuple(
-      fc.constant(key),
-      fromJsonSchema(root, schema),
-      percent.map((r) => (required.has(key) ? r < 99 : r < 30)),
-    )
+  // A property this side forbids is drawn from the node's own schema for
+  // it, rarely: the stray that shows a forbidden field refused.
+  const base = (node.properties ?? {}) as Record<string, Node>;
+  const entries = Object.entries(properties).flatMap(([key, v]): [string, Node, number][] =>
+    v !== false
+      ? [[key, v as Node, required.has(key) ? 99 : 30]]
+      : base[key]
+      ? [[key, base[key], 3]]
+      : []
+  );
+  const fields = entries.map(([key, schema, odds]) =>
+    fc.tuple(fc.constant(key), fromJsonSchema(root, schema), percent.map((r) => r < odds))
   );
   return fc.tuple(fc.tuple(...fields), percent).map(([values, r]) => {
     const out: Record<string, unknown> = {};

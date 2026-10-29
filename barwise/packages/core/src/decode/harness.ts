@@ -67,8 +67,11 @@ export function markOf(check: unknown): CrossFieldMark | undefined {
   return mark && typeof mark.id === "string" ? mark : undefined;
 }
 
-/** Issue tags that mean a field is missing or of the wrong kind. */
-const STRUCTURAL = new Set(["MissingKey", "InvalidType", "InvalidValue", "AnyOf"]);
+/**
+ * Issue tags that mean a field is missing or of the wrong kind. A failed
+ * union (`AnyOf`) is one too, handled in its own case below.
+ */
+const STRUCTURAL = new Set(["MissingKey", "InvalidType", "InvalidValue"]);
 
 /**
  * The paths below a failed node where a field is missing or of the wrong
@@ -94,11 +97,15 @@ function structuralPaths(
   }
 }
 
-/** Whether a read path (`min`, `*.type`) names a concrete path. */
-function names(read: string, path: readonly PropertyKey[]): boolean {
+/**
+ * Whether a broken path covers a read path (`min`, `*.type`): it names
+ * the field the rule reads, or one of its parents. A rule reading
+ * `*.type` must not run over an item that is `null` (third review of R1).
+ */
+function covers(path: readonly PropertyKey[], read: string): boolean {
   const segments = read.split(".");
-  return segments.length === path.length
-    && segments.every((s, i) => s === "*" || s === String(path[i]));
+  return path.length <= segments.length
+    && path.every((p, i) => segments[i] === "*" || segments[i] === String(p));
 }
 
 /**
@@ -109,15 +116,16 @@ function names(read: string, path: readonly PropertyKey[]): boolean {
 export function extraChecks(failed: SchemaIssue.Composite, raw: unknown): SchemaIssue.Issue[] {
   const ast = failed.ast;
   if (ast._tag !== "Objects" && ast._tag !== "Arrays") return [];
-  const ran = new Set(
-    failed.issues.flatMap((child) => (child._tag === "Filter" ? [child.filter] : [])),
-  );
+  // A node's checks are a check's own issue only once all its fields
+  // decoded, and then Effect runs every one of them, the passing ones
+  // included: a failed check here means none is left to run.
+  if (failed.issues.some((child) => child._tag === "Filter")) return [];
   const broken = structuralPaths(failed);
   const extra: SchemaIssue.Issue[] = [];
   for (const check of ast.checks ?? []) {
     const mark = markOf(check);
-    if (!mark || check._tag !== "Filter" || ran.has(check)) continue;
-    if (mark.reads.some((read) => broken.some((path) => names(read, path)))) continue;
+    if (!mark || check._tag !== "Filter") continue;
+    if (mark.reads.some((read) => broken.some((path) => covers(path, read)))) continue;
     // Not caught: every field the rule reads has the right shape, so a rule
     // that throws here has a bug, and a silent skip would hide it.
     const issue = check.run(raw, ast, {});

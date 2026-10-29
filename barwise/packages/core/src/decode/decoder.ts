@@ -26,27 +26,30 @@ export class DecodeError extends Error {
   }
 }
 
-/** A file's unknown field is refused, as its JSON Schema refuses it. */
-const OPTIONS: SchemaAST.ParseOptions = { errors: "all", onExcessProperty: "error" };
-
-export interface DecodeOptions {
-  /** Off only in the harness's own test, to show which cases need it. */
-  readonly harness?: boolean;
-}
+/**
+ * Every problem collected, and a file's unknown field refused, as its JSON
+ * Schema refuses it. Exported for the harness's own test, which decodes
+ * with the harness off to show which cases need it; the shell has no such
+ * switch (third review of R1).
+ */
+export const DECODE_OPTIONS: SchemaAST.ParseOptions = {
+  errors: "all",
+  onExcessProperty: "error",
+};
 
 /** A decoder for one Schema: the decoded value, or every problem with it. */
 export function decoderFor<S extends Schema.Top>(schema: S) {
-  const decode = Schema.decodeUnknownEffect(schema, OPTIONS);
-  return (raw: unknown, options: DecodeOptions = {}): Effect.Effect<S["Type"], DecodeProblems> =>
+  const decode = Schema.decodeUnknownEffect(schema, DECODE_OPTIONS);
+  return (raw: unknown): Effect.Effect<S["Type"], DecodeProblems> =>
     decode(raw).pipe(
       Effect.mapError((error) => {
-        const problems = problemsOf(error.issue, raw, options);
+        const problems = problemsOf(error.issue, raw);
         // A failed decode always carries at least one leaf; the fallback only
         // keeps the type honest if Effect ever hands back an empty composite.
         return new DecodeProblems(
           problems.length > 0
             ? (problems as [DecodeProblem, ...DecodeProblem[]])
-            : [{ element: "", path: [], message: "The value is malformed." }],
+            : [{ element: "", at: [], path: [], message: "The value is malformed." }],
         );
       }),
     ) as Effect.Effect<S["Type"], DecodeProblems>;

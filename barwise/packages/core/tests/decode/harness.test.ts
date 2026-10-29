@@ -17,11 +17,13 @@
 import * as Arbitrary from "effect/Arbitrary";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import type * as SchemaAST from "effect/SchemaAST";
 import { describe, expect, it } from "vitest";
+import { DECODE_OPTIONS } from "../../src/decode/decoder.js";
 import { markOf } from "../../src/decode/harness.js";
-import { decodeObjectType, ObjectTypeFile } from "../../src/decode/objectType.js";
-import { fieldPath } from "../../src/decode/problems.js";
+import { ObjectTypeFile } from "../../src/decode/objectType.js";
+import { fieldPath, problemsOf } from "../../src/decode/problems.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
 type Doc = Record<string, unknown>;
@@ -99,10 +101,13 @@ const inputs: Doc[] = [
   ) as unknown as Doc[]),
 ];
 
+const decode = Schema.decodeUnknownEffect(ObjectTypeFile, DECODE_OPTIONS);
+
+/** Every path a decode reports, through the shell's own walk, harness on or off. */
 function reported(doc: Doc, harness = true): string[] {
-  const result = Effect.runSync(Effect.result(decodeObjectType(doc, { harness })));
+  const result = Effect.runSync(Effect.result(decode(doc)));
   if (Result.isSuccess(result)) return [];
-  return result.failure.problems.map((p) => fieldPath(p.path)).sort();
+  return problemsOf(result.failure.issue, doc, { harness }).map((p) => fieldPath(p.path)).sort();
 }
 
 /** Every node of a Schema, through every child the harness walks. */

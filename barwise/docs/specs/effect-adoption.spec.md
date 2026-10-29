@@ -878,12 +878,26 @@ barrel does not export.
     `anyOf` presence, `minimum`, `minLength` and `minItems`. It now
     honours each, and a test holds it to drawing constraints of more than
     five kinds, at least 30% of them valid, for R2; the object type
-    property now accepts 715 of its 3,000 values (floor 600).
+    property now accepts 715 of its 3,000 values (floor 600, raised after the third review).
 - Detail findings from the same review: the reads check follows only
   top-level keys, which is exact for R1's three rules and is required
   before R2's first list-level rule (barwise-nh5); the member-choice
   caching and recursion guard, and a record member matching any object,
   went with the member choice itself.
+- The third implementation review found no flaw in the design and five
+  defects in the walk, each fixed with a test that fails when it is
+  planted back: a rule returning several issues was walked as a failure of
+  its own node, re-running every rule there (without end, for a rule
+  pointing below a field it reads); a broken parent of a dotted read did
+  not stop the rule, which then threw on `null.type`; a rule Effect had
+  already run and passed was run again; Effect's several-line text broke a
+  problem's one line; and a struct element that is not a mapping was not
+  worded as one. A problem now carries `at`, where its element sits, and
+  an element with no name is named by that position. The decoder shell
+  lost its test-only `harness` switch, and the generator now honours
+  `if/then/else` (the side's requirements and forbidden fields), so the
+  object type property accepts 1,896 of its 3,000 values (floor 1,600).
+  Running a rule under the decode's parse options is barwise-yn2.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,

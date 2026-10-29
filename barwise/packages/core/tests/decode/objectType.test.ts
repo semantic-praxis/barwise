@@ -74,7 +74,7 @@ describe("the object type decoder, against today's reader", () => {
       { numRuns: 3000, seed: 11 },
     );
     // Not vacuous: a fair share of the drawn values are valid.
-    expect(accepted).toBeGreaterThan(600);
+    expect(accepted).toBeGreaterThan(1600);
   });
 
   const objectTypes = modelCorpus().flatMap(({ file, doc }) =>
