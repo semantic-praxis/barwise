@@ -2,7 +2,7 @@
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
-restarted on format 3.0 2026-10-29 (1r), R0 done, R1 onward not started; WS1b
+restarted on format 3.0 2026-10-29 (1r), R0 and R1 done, R2 onward not started; WS1b
 follows the restart's WS1 reading; WS2 onward not started
 Created: 2026-10-15
 Last-updated: 2026-10-29
@@ -787,6 +787,46 @@ The 2.0 reading is unchanged by the scorer's extension: `malformed` on the
 - S6 rose from 25,382 instantiations at WS0 to 38,363 on `main` today,
   with no Effect: format 3.0's placement types. The spike is read against
   today's number.
+
+**R1, done 2026-10-29: Effect, the harness and object types**, in
+`core/src/decode/`, which nothing on the load path imports and core's
+barrel does not export.
+
+- Changed scope: the Schemas are written in the file's own keys and make
+  no transformation, and a plain `toRecord` maps a decoded value to
+  `main`'s `ObjectType` record. #672 decoded through renamed keys
+  (`encodeKeys`), which needed every reported path re-spelled into the
+  file's keys (`spelledAs`) and gave the harness a decoded shape that
+  differed from the raw one. Here a decoded value is the raw value, so a
+  rule runs on raw input exactly, and a problem's path is the file's.
+  #672's record-producing codec for configs (`createObjectType`'s input)
+  is not ported: it replaces the constructor, which is WS2 to WS4's.
+- Part A's two probes, on Effect 4.0.5: a failed decode reports a check
+  it ran as a `Filter` issue carrying that filter, so a rule Effect
+  reported is recognised by identity; and a filter's `run` takes the raw
+  value. The harness is therefore the design part A described, with no
+  fallback: a rule marked by `crossField` runs wherever none of the
+  fields it reads failed, and a failure Effect reported at the same path
+  for the same rule is not reported twice.
+- Held to `main` by tests, not by being on the load path: all 1,547
+  object types in the 85 corpus models decode to the record
+  `createObjectType(deserializeObjectType(...))` builds, with the same
+  preferred identifier; 500 derived values each pass the hand-written 3.0
+  schema and the constructor, to the same record; and the 12 3.0
+  malformed object type cases are refused at their field, named with the
+  element.
+- The planted-defect test plants six structural defects and three
+  cross-field ones into every corpus and derived object type, requiring
+  exactly the declared paths. Three pairs put each rule beside a field
+  error in its own struct; each pair's rule goes unreported without the
+  harness, and every rule the Schema marks has a pair.
+- Planted against, each failing its test: the harness off, a rule that
+  reads a failing field, no dedupe, a record that drops `note`, aliases
+  allowed empty, a Schema missing `note`, a Schema adding a field, and a
+  required `preferred_identifier`. The version-agreement test refuses a
+  range, another version, and a core that does not pin exactly.
+- S5 is unchanged by construction and was checked: `validate` loads 313
+  modules on `main` and on R1's head alike.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,
