@@ -784,6 +784,15 @@ YAML it falls back to the server's working directory. Only the CLI's
 `barwise export` records artifacts in the manifest; `export_model` does
 not, so artifacts exported through this server are not reported.
 
+Given a path, only that model's exports are read; `unattributedArtifacts`
+lists exports that name no model and that this model does not own, and
+`orphanedArtifacts` exports naming a model file that no longer exists
+(see `barwise lineage` in CLI.md). Given inline YAML
+there is no file to read for: the tool reads every export when they all
+name one model, or all name none (a manifest from before exports named
+their model, read as it always was), and otherwise returns an `error`
+naming the models and asking for a path.
+
 ---
 
 ### impact_analysis
@@ -799,7 +808,10 @@ artifacts depend on it.
 **Returns** JSON impact report listing the exported artifacts recorded
 in the lineage manifest that depend on the element. As with
 `lineage_status`, the manifest is located next to the model file when
-`source` is a path.
+`source` is a path, and only that model's exports are read (with any
+that name no model). Given inline YAML, every export holding the id is
+read, and each affected artifact carries the `sourceModel` its export
+names.
 
 ---
 
