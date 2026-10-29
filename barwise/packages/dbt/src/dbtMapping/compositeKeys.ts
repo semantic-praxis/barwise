@@ -10,7 +10,7 @@
  * skipped and named on stderr (barwise-nkn, three trial imports).
  */
 
-import { generateId, type InternalConstraint } from "@barwise/core";
+import { generateId, type InternalConstraint, resolvePreferredIdentifier } from "@barwise/core";
 import { DBT_KEY_TEST } from "@barwise/core/mapping";
 import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
 import {
@@ -433,7 +433,13 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     });
     if (info.objectified && entityId) {
       ctx.model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: entityId });
+      // Checked as the DDL import checks it (`preferUniquenessOver`), so a
+      // key the reading ever widens past a reference scheme stores nothing
+      // rather than an identifier validation refuses.
       ctx.model.setPreferredIdentifier(entityId, keyId);
+      if (!resolvePreferredIdentifier(ctx.model, entityId).ok) {
+        ctx.model.setPreferredIdentifier(entityId, undefined);
+      }
     }
   }
 }

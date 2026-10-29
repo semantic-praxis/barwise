@@ -299,8 +299,14 @@ export class DdlImportFormat implements ImportFormat {
       // with `supertypes` is the export's statement and is trusted: an
       // entity identified by two references is keyed on its foreign keys
       // and objectifies nothing (barwise-xgu). An older line, from before
-      // that field, keeps the guess.
-      const objectifies = annotated?.supertypes !== undefined
+      // that field, keeps the guess, and so does a key with a supertype
+      // link's column in it: step 3 reads no key through a link, so the
+      // guess is what keeps such a table keyed.
+      const trusted = annotated?.supertypes !== undefined
+        && !annotated.supertypes.some((link) =>
+          link.columns.some((c) => table.primaryKey.includes(c))
+        );
+      const objectifies = trusted
         ? annotated.objectifies !== undefined
         : reading !== undefined
           || foreignKeysOfKey(table) !== undefined

@@ -34,6 +34,31 @@ describe("an annotated table line", () => {
     expect(model.objectifiedFactTypes).toEqual([]);
     const resolved = resolvePreferredIdentifier(model, seat.id);
     expect(resolved.ok && resolved.at.constraint.type).toBe("external_uniqueness");
+    // Over the two references' far roles: the person and the course.
+    const players = resolved.ok
+      ? resolved.at.constraint.roleIds.map((id) => {
+        const role = model.factTypes.flatMap((f) => f.roles).find((r) => r.id === id);
+        return model.getObjectType(role?.playerId ?? "")?.name;
+      })
+      : [];
+    expect(players.sort()).toEqual(["Course", "Person"]);
+  });
+
+  it("keeps the guess for a key with a supertype link's column in it", () => {
+    // Step 3 reads no key through a supertype link, so trusting the line
+    // here would leave the table keyed on nothing.
+    const link = {
+      entity: "Person",
+      columns: ["person_id"],
+      providesIdentification: false,
+      isExclusive: false,
+      isExhaustive: false,
+    };
+    const { model, seat } = seatOf(
+      keyedOnTwoReferences({ referenceMode: "seat_id", supertypes: [link] }),
+    );
+    expect(model.objectifiedFactTypes.map((o) => o.objectTypeId)).toEqual([seat.id]);
+    expect(resolvePreferredIdentifier(model, seat.id).ok).toBe(true);
   });
 
   it("from before supertypes keeps reading a table keyed on references as an objectifier", () => {
