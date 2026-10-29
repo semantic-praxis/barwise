@@ -1,5 +1,6 @@
 import type { Constraint } from "../../src/model/Constraint.js";
 import { storePreferredFlags } from "../../src/model/identification.js";
+import { localName } from "../../src/model/name.js";
 import type {
   DataTypeDef,
   ObjectTypeKind,
@@ -7,6 +8,22 @@ import type {
 } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig } from "../../src/model/Population.js";
+
+/**
+ * The id the builder gives a binary fact type's role, by its position (1 or
+ * 2, as `role1` and `role2` name them). A test that names a role by id
+ * calls this, so the format is decided here once. It avoids `:`, which
+ * format 4.0 reserves for an alias, and puts `.` between the fact type and
+ * the role, as 4.0 does (iri-identity, decision 3 and WS6 6a).
+ */
+export function roleId(factTypeName: string, position: 1 | 2): string {
+  return `${localName(factTypeName)}.role${position}`;
+}
+
+/** The id of the uniqueness a fact type's `isPreferred` flags. */
+export function preferredId(factTypeName: string): string {
+  return `${localName(factTypeName)}_preferred`;
+}
 
 /**
  * Shorthand options for adding an object type via the builder.
@@ -187,7 +204,7 @@ export class ModelBuilder {
    * Add a population with sample instances for a fact type.
    *
    * Instance values use the builder's deterministic role IDs:
-   * "FactTypeName::role1" and "FactTypeName::role2".
+   * `roleId(name, 1)` and `roleId(name, 2)`.
    */
   withPopulation(
     factTypeName: string,
@@ -233,7 +250,7 @@ export class ModelBuilder {
     // The flagged uniqueness of each fact type, by the id it is given.
     const flagged = new Set<string>();
     const flag = (factTypeName: string) => {
-      const id = `${factTypeName}::preferred`;
+      const id = preferredId(factTypeName);
       flagged.add(id);
       return id;
     };
@@ -286,8 +303,8 @@ export class ModelBuilder {
 
       // We need to generate role ids ahead of time so constraints can reference them.
       // We use deterministic ids based on fact type name + position.
-      const role1Id = `${name}::role1`;
-      const role2Id = `${name}::role2`;
+      const role1Id = roleId(name, 1);
+      const role2Id = roleId(name, 2);
 
       if (options.uniqueness) {
         const preferred = options.isPreferred ?? false;

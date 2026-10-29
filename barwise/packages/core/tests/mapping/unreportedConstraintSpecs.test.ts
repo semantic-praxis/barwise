@@ -12,7 +12,7 @@ import {
 import { resolveDialectProfile } from "../../src/mapping/dialectCapabilities.js";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 /**
  * One constraint of each kind the router routes or spills, with distinct
@@ -64,25 +64,25 @@ function sixKinds(): OrmModel {
     .build();
   model.getFactTypeByName("Person has Score")!.addConstraint({
     type: "value_constraint",
-    roleId: "Person has Score::role2",
+    roleId: roleId("Person has Score", 2),
     values: ["1", "2", "3"],
   });
   model.getFactTypeByName("Person starts on StartDay")!.addConstraint({
     type: "value_comparison",
-    roleId1: "Person starts on StartDay::role2",
-    roleId2: "Person ends on EndDay::role2",
+    roleId1: roleId("Person starts on StartDay", 2),
+    roleId2: roleId("Person ends on EndDay", 2),
     operator: "<=",
   });
   model.getFactTypeByName("Person mentors Person")!.addConstraint({
     type: "ring",
-    roleId1: "Person mentors Person::role1",
-    roleId2: "Person mentors Person::role2",
+    roleId1: roleId("Person mentors Person", 1),
+    roleId2: roleId("Person mentors Person", 2),
     ringType: "irreflexive",
   });
   model.addConstraint({
     type: "subset",
-    subsetRoleIds: ["Person has Grade::role1"],
-    supersetRoleIds: ["Person has Score::role1"],
+    subsetRoleIds: [roleId("Person has Grade", 1)],
+    supersetRoleIds: [roleId("Person has Score", 1)],
   });
   return model;
 }
@@ -136,7 +136,7 @@ describe("unreportedConstraintSpecs", () => {
     for (const name of ["best", "worst"]) {
       model.getFactTypeByName(`Person has ${name} Score`)!.addConstraint({
         type: "value_constraint",
-        roleId: `Person has ${name} Score::role2`,
+        roleId: roleId(`Person has ${name} Score`, 2),
         values: ["1", "2"],
       });
     }
@@ -250,7 +250,7 @@ describe("routeUniqueOnly (dbt-alternate-uniqueness.spec.md)", () => {
     const model = sixKinds();
     const ft = model.getFactTypeByName("Person has Email")!;
     // A second uniqueness on the same role writes the same clause.
-    ft.addConstraint({ type: "internal_uniqueness", roleIds: ["Person has Email::role2"] });
+    ft.addConstraint({ type: "internal_uniqueness", roleIds: [roleId("Person has Email", 2)] });
     const schema = new RelationalMapper().map(model);
     expect(routeUniqueOnly(model, schema).uniques).toEqual([
       { tableName: "person", columns: ["email"] },

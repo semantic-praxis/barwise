@@ -28,7 +28,7 @@ import { OrmModel } from "../../src/model/OrmModel.js";
 import { referenceDiagnostics } from "../../src/validation/referenceDiagnostics.js";
 import { RULE_ID } from "../../src/validation/ruleId.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 function base(): OrmModel {
   return new ModelBuilder("Ref")
@@ -116,8 +116,9 @@ const BEFORE: Record<string, { ruleId: string; severity: string; message: string
   joinStep: {
     ruleId: "constraint/join-bad-step",
     severity: "error",
-    message:
-      'Join constraint over fact type "Customer has Name" has a step whose entry "Customer has Name::role1" / exit "role-missing" are not both roles of one fact type.',
+    message: `Join constraint over fact type "Customer has Name" has a step whose entry "${
+      roleId("Customer has Name", 1)
+    }" / exit "role-missing" are not both roles of one fact type.`,
   },
   rolePlayer: {
     ruleId: "structural/dangling-role-reference",

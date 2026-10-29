@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { DbtExportFormat } from "../src/DbtExportFormat.js";
-import { ModelBuilder } from "./helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "./helpers/ModelBuilder.js";
 
 const dbtFormat = new DbtExportFormat();
 
@@ -30,12 +30,12 @@ function buildEnrollmentModelWithIncompleteInstance() {
     .withPopulation("Student enrolls Course", [
       {
         roleValues: {
-          "Student enrolls Course::role1": "S001",
-          "Student enrolls Course::role2": "Design, 101",
+          [roleId("Student enrolls Course", 1)]: "S001",
+          [roleId("Student enrolls Course", 2)]: "Design, 101",
         },
       },
       // Missing the Course role value -- an incomplete instance.
-      { roleValues: { "Student enrolls Course::role1": "S002" } },
+      { roleValues: { [roleId("Student enrolls Course", 1)]: "S002" } },
     ])
     .build();
 }
@@ -309,8 +309,8 @@ describe("constraints the export does not carry", () => {
     if (withRing) {
       model.getFactTypeByName("Person mentors Person")!.addConstraint({
         type: "ring",
-        roleId1: "Person mentors Person::role1",
-        roleId2: "Person mentors Person::role2",
+        roleId1: roleId("Person mentors Person", 1),
+        roleId2: roleId("Person mentors Person", 2),
         ringType: "irreflexive",
       });
     }

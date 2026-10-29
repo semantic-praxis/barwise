@@ -7,7 +7,7 @@
 import { resolveDialectProfile, routeConstraints } from "@barwise/core/mapping";
 import { describe, expect, it } from "vitest";
 import { DdlExportFormat } from "../src/ddl/DdlExportFormat.js";
-import { ModelBuilder } from "./helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "./helpers/ModelBuilder.js";
 
 const ddlFormat = new DdlExportFormat();
 
@@ -45,8 +45,8 @@ function ringModel() {
     .build();
   model.getFactTypeByName("Employee manages Employee")!.addConstraint({
     type: "ring",
-    roleId1: "Employee manages Employee::role1",
-    roleId2: "Employee manages Employee::role2",
+    roleId1: roleId("Employee manages Employee", 1),
+    roleId2: roleId("Employee manages Employee", 2),
     ringType: "acyclic",
   });
   return model;
@@ -210,7 +210,7 @@ describe("constraint routing (unit)", () => {
     // The same rule again, as a role-level constraint.
     model.getFactTypeByName("Customer has Status")!.addConstraint({
       type: "value_constraint",
-      roleId: "Customer has Status::role2",
+      roleId: roleId("Customer has Status", 2),
       values: ["a", "b"],
     });
 

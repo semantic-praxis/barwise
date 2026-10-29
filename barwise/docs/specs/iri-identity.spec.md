@@ -10,7 +10,7 @@ tool); rename recognition moved to WS6; WS6 grounded 2026-10-29 (6a to 6f,
 decision 15 amended, decisions 18 to 20); 6a in progress (diff recognizes renames,
 merge refuses content and rename pairings, implemented 2026-10-29; the verbalization
 interface, `model/mint.ts` and `FactType.addConstraint`'s return, implemented
-2026-10-29); WS7 to come
+2026-10-29; the test builders off `::` ids, implemented 2026-10-29); WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-29

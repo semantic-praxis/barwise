@@ -9,7 +9,7 @@ import { OrmModel } from "../../src/model/OrmModel.js";
 import { populationValidationRules } from "../../src/validation/rules/populationValidation.js";
 import { counterexampleRoundTripFailure } from "../helpers/counterexampleRules.js";
 import { graphFor } from "../helpers/graphFor.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 /**
  * The core correctness guarantee: a generated counterexample is the
@@ -88,7 +88,7 @@ describe("counterexample generation", () => {
     const ft = model.getFactTypeByName("Order has Rating")!;
     ft.addConstraint({
       type: "value_constraint",
-      roleId: "Order has Rating::role2",
+      roleId: roleId("Order has Rating", 2),
       values: ["A", "B", "C"],
     });
     const vc = ft.internalConstraints.find((c) => c.type === "value_constraint")!;
@@ -112,7 +112,7 @@ describe("counterexample generation", () => {
     const ft = model.getFactTypeByName("Customer places Order")!;
     ft.addConstraint({
       type: "frequency",
-      roleIds: ["Customer places Order::role1"],
+      roleIds: [roleId("Customer places Order", 1)],
       min: 1,
       max: 3,
     });
@@ -128,7 +128,7 @@ describe("counterexample generation", () => {
     const ft = model.getFactTypeByName("Customer places Order")!;
     ft.addConstraint({
       type: "frequency",
-      roleIds: ["Customer places Order::role1"],
+      roleIds: [roleId("Customer places Order", 1)],
       min: 2,
       max: "unbounded",
     });
@@ -144,7 +144,7 @@ describe("counterexample generation", () => {
     const ft = model.getFactTypeByName("Customer places Order")!;
     ft.addConstraint({
       type: "frequency",
-      roleIds: ["Customer places Order::role1"],
+      roleIds: [roleId("Customer places Order", 1)],
       min: 1,
       max: "unbounded",
     });
@@ -175,8 +175,8 @@ describe("counterexample generation", () => {
       const ft = model.getFactTypeByName("Person reports to Person")!;
       ft.addConstraint({
         type: "ring",
-        roleId1: "Person reports to Person::role1",
-        roleId2: "Person reports to Person::role2",
+        roleId1: roleId("Person reports to Person", 1),
+        roleId2: roleId("Person reports to Person", 2),
         ringType,
       });
       const rc = ft.internalConstraints.find((c) => c.type === "ring")!;
@@ -203,14 +203,17 @@ describe("counterexample generation", () => {
           .build();
         const ft = model.getFactTypeByName("Person reports to Person")!;
         for (
-          const roleId of ["Person reports to Person::role1", "Person reports to Person::role2"]
+          const id of [
+            roleId("Person reports to Person", 1),
+            roleId("Person reports to Person", 2),
+          ]
         ) {
-          ft.addConstraint({ type: "value_constraint", roleId, values: [...values] });
+          ft.addConstraint({ type: "value_constraint", roleId: id, values: [...values] });
         }
         ft.addConstraint({
           type: "ring",
-          roleId1: "Person reports to Person::role1",
-          roleId2: "Person reports to Person::role2",
+          roleId1: roleId("Person reports to Person", 1),
+          roleId2: roleId("Person reports to Person", 2),
           ringType,
         });
         const rc = ft.internalConstraints.find((c) => c.type === "ring")!;
@@ -255,8 +258,8 @@ describe("counterexample generation", () => {
       const ft = model.getFactTypeByName("Person reports to Person")!;
       ft.addConstraint({
         type: "ring",
-        roleId1: "Person reports to Person::role1",
-        roleId2: "Person reports to Person::role2",
+        roleId1: roleId("Person reports to Person", 1),
+        roleId2: roleId("Person reports to Person", 2),
         ringType,
       });
       const rc = ft.internalConstraints.find((c) => c.type === "ring")!;
@@ -269,8 +272,8 @@ describe("counterexample generation", () => {
       // each other's reverse, not one row repeating a value in both roles.
       if (ringType === "asymmetric") {
         const rows = forbidden.instances.map((i) => [
-          i.roleValues["Person reports to Person::role1"],
-          i.roleValues["Person reports to Person::role2"],
+          i.roleValues[roleId("Person reports to Person", 1)],
+          i.roleValues[roleId("Person reports to Person", 2)],
         ]);
         expect(rows[0]![0]).not.toBe(rows[0]![1]);
         expect(rows[1]![0]).toBe(rows[0]![1]);
@@ -344,7 +347,7 @@ describe("cross-fact-type counterexamples", () => {
   it("returns nothing for a mandatory role with no anchor fact type", () => {
     const model = placesModel();
     const ft = model.getFactTypeByName("Customer places Order")!;
-    ft.addConstraint({ type: "mandatory", roleId: "Customer places Order::role1" });
+    ft.addConstraint({ type: "mandatory", roleId: roleId("Customer places Order", 1) });
     const mc = ft.internalConstraints.find((c) => c.type === "mandatory")!;
 
     expect(generateCounterexampleForConstraint(mc, ft, model)).toBeUndefined();
@@ -371,7 +374,7 @@ describe("cross-fact-type counterexamples", () => {
     const home = model.getFactTypeByName("Person has HomePhone")!;
     model.addConstraint({
       type: "disjunctive_mandatory",
-      roleIds: ["Person has HomePhone::role1", "Person has MobilePhone::role1"],
+      roleIds: [roleId("Person has HomePhone", 1), roleId("Person has MobilePhone", 1)],
     });
     const dc = model.constraintsTouching(home.id).find((c) => c.type === "disjunctive_mandatory")!;
 
@@ -401,7 +404,7 @@ describe("cross-fact-type counterexamples", () => {
     const drives = model.getFactTypeByName("Person drives Car")!;
     model.addConstraint({
       type: "exclusion",
-      roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
+      roleIds: [roleId("Person drives Car", 1), roleId("Person rides Bus", 1)],
     });
     const ec = model.constraintsTouching(drives.id).find((c) => c.type === "exclusion")!;
 
@@ -415,7 +418,7 @@ describe("cross-fact-type counterexamples", () => {
     const drives = model.getFactTypeByName("Person drives Car")!;
     model.addConstraint({
       type: "exclusive_or",
-      roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
+      roleIds: [roleId("Person drives Car", 1), roleId("Person rides Bus", 1)],
     });
     const xor = model.constraintsTouching(drives.id).find((c) => c.type === "exclusive_or")!;
 
@@ -440,10 +443,10 @@ describe("cross-fact-type counterexamples", () => {
     const teaches = model.getFactTypeByName("Person teaches Course")!;
     model.addConstraint({
       type: "subset",
-      subsetRoleIds: ["Person teaches Course::role1", "Person teaches Course::role2"],
+      subsetRoleIds: [roleId("Person teaches Course", 1), roleId("Person teaches Course", 2)],
       supersetRoleIds: [
-        "Person enrolled in Course::role1",
-        "Person enrolled in Course::role2",
+        roleId("Person enrolled in Course", 1),
+        roleId("Person enrolled in Course", 2),
       ],
     });
     const sc = model.constraintsTouching(teaches.id).find((c) => c.type === "subset")!;
@@ -474,7 +477,7 @@ describe("cross-fact-type counterexamples", () => {
     const inBuilding = model.getFactTypeByName("Room is in Building")!;
     model.addConstraint({
       type: "external_uniqueness",
-      roleIds: ["Room is in Building::role2", "Room has RoomNumber::role2"],
+      roleIds: [roleId("Room is in Building", 2), roleId("Room has RoomNumber", 2)],
     });
     const euc = model.constraintsTouching(inBuilding.id).find((c) =>
       c.type === "external_uniqueness"
@@ -493,7 +496,7 @@ describe("cross-fact-type counterexamples", () => {
     // Both constrained roles share a fact type -> no single common object.
     model.addConstraint({
       type: "external_uniqueness",
-      roleIds: ["Room is in Building::role1", "Room is in Building::role2"],
+      roleIds: [roleId("Room is in Building", 1), roleId("Room is in Building", 2)],
     });
     const euc = model.constraintsTouching(inBuilding.id).find((c) =>
       c.type === "external_uniqueness"
@@ -518,8 +521,8 @@ describe("cross-fact-type counterexamples", () => {
     const manages = model.getFactTypeByName("Person manages Dept")!;
     model.addConstraint({
       type: "equality",
-      roleIds1: ["Person manages Dept::role1", "Person manages Dept::role2"],
-      roleIds2: ["Person works in Dept::role1", "Person works in Dept::role2"],
+      roleIds1: [roleId("Person manages Dept", 1), roleId("Person manages Dept", 2)],
+      roleIds2: [roleId("Person works in Dept", 1), roleId("Person works in Dept", 2)],
     });
     const eq = model.constraintsTouching(manages.id).find((c) => c.type === "equality")!;
 

@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { isInternalUniqueness, isMandatoryRole } from "../../src/model/Constraint.js";
 import { isEntityType, isValueType } from "../../src/model/ObjectType.js";
 import { expandReading } from "../../src/model/ReadingOrder.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, preferredId, roleId } from "../helpers/ModelBuilder.js";
 
 describe("ModelBuilder", () => {
   it("builds the order management example from the architecture doc", () => {
@@ -158,5 +158,29 @@ describe("ModelBuilder", () => {
     expect(
       model.getObjectTypeByName("Customer")?.referenceMode,
     ).toBe("customer_id");
+  });
+
+  it("gives roles and the preferred uniqueness ids with no colon, through roleId and preferredId", () => {
+    // Format 4.0 reserves `:` for an alias (iri-identity 6a). A test that
+    // hard-codes a role id reads it from `roleId`, so this is the one place
+    // the builder's format is pinned.
+    const model = new ModelBuilder("Ids")
+      .withEntityType("Customer", { referenceMode: "customer_id" })
+      .withEntityType("Order", { referenceMode: "order_number" })
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+        isPreferred: true,
+      })
+      .build();
+    const ft = model.getFactTypeByName("Customer places Order")!;
+    expect(ft.roles.map((r) => r.id)).toEqual([
+      roleId("Customer places Order", 1),
+      roleId("Customer places Order", 2),
+    ]);
+    expect(ft.internalConstraints.map((c) => c.id)).toContain(preferredId("Customer places Order"));
+    const ids = [...ft.roles.map((r) => r.id), ...ft.internalConstraints.map((c) => c.id)];
+    expect(ids.filter((id) => id?.includes(":"))).toEqual([]);
   });
 });

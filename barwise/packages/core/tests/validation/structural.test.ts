@@ -22,7 +22,7 @@ import {
   structuralWellFormedness,
 } from "../../src/validation/rules/structural.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 describe("structuralRules", () => {
   it("produces no diagnostics for a valid model", () => {
@@ -564,7 +564,10 @@ describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
         uniqueness: "role1",
       })
       .withPopulation("City has Count", [{
-        roleValues: { "City has Count::role1": "Oslo", "City has Count::role2": "700000" },
+        roleValues: {
+          [roleId("City has Count", 1)]: "Oslo",
+          [roleId("City has Count", 2)]: "700000",
+        },
       }])
       .build();
     expect(ids(model, "structural/local-name-collision").map((d) => d.message)).toEqual([

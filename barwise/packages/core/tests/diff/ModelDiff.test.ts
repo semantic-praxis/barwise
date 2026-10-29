@@ -1654,7 +1654,7 @@ describe("a constraint over roles of other fact types", () => {
   // The same model with every role id replaced, as an import mints them.
   const withNewRoleIds = (m: OrmModel) => {
     const yaml = new OrmYamlSerializer();
-    return yaml.deserialize(yaml.serialize(m).replace(/::role(\d)/g, "::minted-$1"));
+    return yaml.deserialize(yaml.serialize(m).replace(/\.role(\d)\b/g, ".minted-$1"));
   };
   // A constraint across fact types has its own delta since WS3c; read an
   // added or removed one as the change kind a fact type used to report.
