@@ -311,13 +311,10 @@ a permission change), it exits 2 and the json output's `files` and
 model, so YAML comments in a rewritten file are lost, as with `migrate`.
 
 Exit codes: 0 when the rename was written; 1 under `--check` when a file
-would be rewritten; 2 when the rename was refused or the write failed. A
-mistake commander itself rejects (an unknown option, an option missing
-its value) exits 1, as it does for every command; see barwise-o5y.
-
-Exit codes: 0 when renamed; 1 under `--check` when files would be
-rewritten; 2 when the rename was refused, a file could not be read, or
-`--format` is unknown.
+would be rewritten; 2 when the rename was refused, a file could not be
+read, `--format` is unknown, or the write failed. A mistake commander
+itself rejects (an unknown option, an option missing its value) exits 1,
+as it does for every command; see barwise-o5y.
 
 Options:
 
