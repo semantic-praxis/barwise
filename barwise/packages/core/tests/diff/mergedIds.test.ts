@@ -32,7 +32,7 @@ function factType(m: OrmModel, id: string, player: string): void {
 function mergeKeeping(existing: OrmModel, incoming: OrmModel): OrmModel {
   const { deltas } = diffModels(existing, incoming);
   const policy = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
-  const result = mergeAndValidate(existing, incoming, deltas, policy);
+  const result = mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, policy);
   expect(result.model).not.toBeNull();
   return result.model!;
 }

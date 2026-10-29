@@ -188,6 +188,7 @@ Compare two ORM model files and report structural deltas.
 barwise diff old.orm.yaml new.orm.yaml
 barwise diff old.orm.yaml new.orm.yaml --format json
 barwise diff old.orm.yaml new.orm.yaml --no-synonyms
+barwise diff old.orm.yaml new.orm.yaml --rename "fact-type:Customer places Order=Customer submits Order"
 ```
 
 Options:
@@ -201,11 +202,29 @@ Options:
   whose ids are unrelated but may coincide, such as two extractions
   numbered from one counter. `barwise merge` has no such option; see
   the capability matrix in the root `CLAUDE.md`.
+- `--rename <kind>:<old>=<new>` -- pair an element renamed in an edit
+  that also changed it, which the diff cannot recognize; `<kind>` is
+  `object-type` or `fact-type`. Repeatable. A name either model does
+  not hold, or an element already paired with another, is refused.
+
+An object type or fact type that ids and names leave unpaired is paired
+with the one element on the other side that says the same thing -- a fact
+type by its players, role names and constraints; an object type by the
+roles it plays, the subtype facts it is an end of, and a value type's
+value constraint and data type -- and reported as a rename, with the line
+"Recognized as a rename: paired by what it says, not by its id or name."
+It matters for two models whose ids are unrelated, such as two imports of
+one schema; a rename within one file keeps its id and pairs by it. A shape
+two elements share pairs nothing, an object type that plays no role and
+ends no subtype fact is never paired this way, and an object type renamed
+together with a fact type it plays in is not recognized; `--rename`
+covers those.
 
 With `--format json`, each delta carries `changes` (what changed, as
 data) beside `changeDescriptions` (the same, as sentences). The shape is
 the MCP `diff_models` tool's; docs/MCP.md shows an example and says how
-constraints are paired.
+constraints are paired. A recognized or declared rename carries
+`pairedBy: "recognized"` or `"declared"`.
 
 ### merge
 
@@ -226,6 +245,11 @@ Neither input file is modified. The merged model goes to stdout unless
 `--output` names a file. If the merge produces structural errors,
 nothing is written anywhere and the command exits 1 -- a broken model
 on disk is worse than no model.
+
+Merge never pairs elements by content. Its diff pairs by id and name
+only, so a new element of the same shape as one in the base (a
+`Supplier` beside a `Vendor`) is added beside it rather than folded
+into it, which `barwise diff` would report as a possible rename.
 
 Options:
 

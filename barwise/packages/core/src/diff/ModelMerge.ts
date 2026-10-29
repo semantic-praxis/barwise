@@ -40,11 +40,12 @@ import type { Diagnostic } from "../validation/Diagnostic.js";
 import { referenceDiagnostics } from "../validation/referenceDiagnostics.js";
 import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
-import type { DeltaKind } from "./deltas.js";
+import { type DeltaKind, elementName, type ModelDiffResult, renamePairing } from "./deltas.js";
 import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
 import type {
   ConstraintDelta,
   DefinitionDelta,
+  DiffOptions,
   FactTypeDelta,
   ModelDelta,
   ObjectifiedFactTypeDelta,
@@ -54,20 +55,41 @@ import type {
 } from "./ModelDiff.js";
 
 /**
+ * What a merge reads of a diff: its deltas, and the matching it ran with.
+ * The whole result rather than the bare deltas, so a merge can see how the
+ * diff paired its elements and refuse a pairing that is not evidence two
+ * elements are one (iri-identity 6a).
+ */
+export type MergeInput = Pick<ModelDiffResult, "deltas" | "matching">;
+
+/**
+ * The options every diff that feeds a merge passes: ids and names only,
+ * no pairing by content. One constant, so the merge paths (`barwise
+ * merge`, transcript import on the CLI and in the editor, MCP
+ * `merge_models`) cannot come to diff differently, and so a reader sees
+ * why: `mergeModels` refuses a recognized pair.
+ */
+export const MERGE_DIFF_OPTIONS = { recognizeRenames: false } as const satisfies DiffOptions;
+
+/**
  * Build a merged OrmModel from the existing model plus a set of accepted
  * delta indices.
  *
  * @param existing  The current model on disk.
  * @param incoming  The freshly extracted model (source of new content).
- * @param deltas    The full diff result.
- * @param accepted  Set of indices into `deltas` that the user accepted.
+ * @param diff      The diff of `existing` against `incoming`.
+ * @param accepted  Set of indices into `diff.deltas` that the user accepted.
+ * @throws when the diff matched by content or holds a rename pairing
+ *   ({@link refuseUnmergeablePairing}), or two kept elements share a name.
  */
 export function mergeModels(
   existing: OrmModel,
   incoming: OrmModel,
-  deltas: readonly ModelDelta[],
+  diff: MergeInput,
   accepted: ReadonlySet<number>,
 ): OrmModel {
+  refuseUnmergeablePairing(diff);
+  const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
   const merged = new OrmModel({
     name: existing.name,
@@ -818,6 +840,37 @@ function mergedId(
 }
 
 /**
+ * Refuse a diff a merge cannot trust, before anything is built.
+ *
+ * Two cases, one reason: each pairs elements on evidence that two
+ * different elements can share. A `matching: "content"` diff pairs object
+ * types and fact types by name alone, ids saying nothing (sample
+ * comparison). A rename the diff recognized by content, or that its caller
+ * declared, pairs two elements of one shape -- a transcript's new
+ * `Supplier` beside the base's `Vendor` -- and accepting it would fold
+ * them into one (decision 8). The whole diff is refused, not only the
+ * accepted deltas, because a pairing also decides what every reference to
+ * the element means. Before, a comment was the only guard.
+ */
+function refuseUnmergeablePairing(diff: MergeInput): void {
+  if (diff.matching === "content") {
+    throw new Error(
+      'Cannot merge a diff built with matching: "content": its ids say nothing, so its '
+        + 'pairs are not evidence. Diff with matching: "id-first" to merge.',
+    );
+  }
+  const paired = diff.deltas.filter((d) => renamePairing(d) !== undefined);
+  if (paired.length > 0) {
+    const names = paired.map((d) => `"${elementName(d)}"`);
+    throw new Error(
+      `Cannot merge a diff that pairs elements as renames (${names.join(", ")}): two `
+        + "different elements can share a shape. Diff with recognizeRenames: false and "
+        + "no declared renames to merge.",
+    );
+  }
+}
+
+/**
  * Refuse a merge that would give two object types, or two fact types, one
  * name, before anything is built.
  *
@@ -829,8 +882,9 @@ function mergedId(
  * `mergeAndValidate` reports it as `merge-error`. Before, `addObjectType`
  * threw a bare "already exists" halfway through the build, naming one.
  *
- * Content-mode deltas are never merged (their callers compare LLM
- * samples), so nothing here guards an id the content pass left unpaired.
+ * A content-matching diff never reaches this point:
+ * `refuseUnmergeablePairing` refuses it first, so nothing here guards an
+ * id that diff's name pass left unpaired.
  */
 function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
   const kept = deltas.flatMap((d, i) => {
@@ -1126,13 +1180,13 @@ export function getStructuralErrors(model: OrmModel): readonly Diagnostic[] {
 export function mergeAndValidate(
   existing: OrmModel,
   incoming: OrmModel,
-  deltas: readonly ModelDelta[],
+  diff: MergeInput,
   accepted: ReadonlySet<number>,
 ): MergeValidationResult {
   let model: OrmModel;
 
   try {
-    model = mergeModels(existing, incoming, deltas, accepted);
+    model = mergeModels(existing, incoming, diff, accepted);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {

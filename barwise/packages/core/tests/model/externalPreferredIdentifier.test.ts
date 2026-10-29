@@ -299,7 +299,12 @@ describe("the other readers of an external identifier", () => {
       d.kind === "modified" && d.elementType === "object_type" && d.incoming?.name === "Room"
     );
     expect(room).toBeGreaterThanOrEqual(0);
-    const merged = mergeModels(existing, incoming, deltas, new Set([room]));
+    const merged = mergeModels(
+      existing,
+      incoming,
+      { deltas, matching: "id-first" },
+      new Set([room]),
+    );
     expect(merged.preferredIdentifierOf("e-ot-room")).toBe("e-c-room-id");
     expect(preferredIdentifiers(merged).byEntity.get("e-ot-room")?.kind).toBe("external");
   });

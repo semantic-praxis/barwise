@@ -280,7 +280,12 @@ describe("diff and merge", () => {
       operand: { ...grandparent, path: { ...grandparent.path, root: "person-2" } },
     });
     const { deltas } = diffModels(existing, incoming);
-    const merged = mergeModels(existing, incoming, deltas, new Set(deltas.keys()));
+    const merged = mergeModels(
+      existing,
+      incoming,
+      { deltas, matching: "id-first" },
+      new Set(deltas.keys()),
+    );
     const jr = merged.getConstraint("jr") as JoinRingConstraint | undefined;
     expect([jr?.ringType, jr?.operand.path.root]).toEqual(["acyclic", "person"]);
   });

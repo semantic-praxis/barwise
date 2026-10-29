@@ -143,7 +143,7 @@ describe("a constraint over subtypes", () => {
     const merged = mergeModels(
       existing,
       incoming,
-      deltas,
+      { deltas, matching: "id-first" },
       new Set(deltas.map((_, i) => i)),
     );
     expect(merged.constraints).toHaveLength(1);
@@ -166,7 +166,7 @@ describe("a constraint over subtypes", () => {
     const accepted = new Set(
       deltas.flatMap((d, i) => (d.elementType === "subtype_fact" ? [i] : [])),
     );
-    const merged = mergeModels(existing, incoming, deltas, accepted);
+    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
     expect(merged.constraints).toMatchObject([
       { type: "exclusion", subtypeFactIds: [sf["Male"], sf["Female"]] },
     ]);
@@ -198,7 +198,7 @@ describe("a constraint over subtypes", () => {
     const accepted = new Set(
       deltas.flatMap((d, i) => (d.elementType === "subtype_fact" ? [] : [i])),
     );
-    const merged = mergeModels(existing, incoming, deltas, accepted);
+    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
     expect(merged.constraints).toEqual([]);
   });
 });

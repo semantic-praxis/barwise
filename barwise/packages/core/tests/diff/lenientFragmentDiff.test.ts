@@ -124,7 +124,7 @@ describe("a subtype fact in a lenient fragment", () => {
     const accepted = new Set(
       deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
     );
-    const merged = mergeModels(existing, incoming, deltas, accepted);
+    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
     expect(merged.subtypeFacts).toHaveLength(1);
     expect(merged.getObjectType(merged.subtypeFacts[0]!.subtypeId)?.name).toBe("Manager");
   });
@@ -225,7 +225,12 @@ describe("a subtype fact in a lenient fragment", () => {
       const accepted = new Set(
         deltas.map((d, i) => (d.kind === "added" ? i : -1)).filter((i) => i >= 0),
       );
-      const result = mergeAndValidate(existing, incoming, deltas, accepted);
+      const result = mergeAndValidate(
+        existing,
+        incoming,
+        { deltas, matching: "id-first" },
+        accepted,
+      );
 
       expect(result.model?.subtypeFacts).toHaveLength(1);
       expect(result.isValid).toBe(false);
@@ -374,7 +379,12 @@ describe("a lenient fragment element the merge used to drop", () => {
     );
 
     const { deltas } = diffModels(existing, incoming);
-    const result = mergeAndValidate(existing, incoming, deltas, acceptAdded(deltas));
+    const result = mergeAndValidate(
+      existing,
+      incoming,
+      { deltas, matching: "id-first" },
+      acceptAdded(deltas),
+    );
 
     expect(result.model?.populations).toHaveLength(1);
     expect(result.isValid).toBe(false);
@@ -395,7 +405,12 @@ describe("a lenient fragment element the merge used to drop", () => {
       incoming.addObjectifiedFactType({ id: "oft-typo", objectTypeId, factTypeId }, lenient);
 
       const { deltas } = diffModels(existing, incoming);
-      const result = mergeAndValidate(existing, incoming, deltas, acceptAdded(deltas));
+      const result = mergeAndValidate(
+        existing,
+        incoming,
+        { deltas, matching: "id-first" },
+        acceptAdded(deltas),
+      );
 
       expect(result.model?.objectifiedFactTypes).toHaveLength(1);
       expect(result.isValid).toBe(false);
@@ -432,7 +447,7 @@ describe("a lenient fragment element the merge used to drop", () => {
         .map((d, i) => (d.kind === "removed" && d.elementType !== "population" ? i : -1))
         .filter((i) => i >= 0),
     );
-    const result = mergeAndValidate(existing, incoming, deltas, accepted);
+    const result = mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, accepted);
 
     expect(result.model?.factTypes).toHaveLength(0);
     expect(result.model?.populations).toHaveLength(0);
@@ -460,7 +475,9 @@ describe("a renamed fact type in a lenient fragment", () => {
     const existing = existingIsFragment ? works(fragment()) : works(objectTypes());
     const incoming = existingIsFragment ? assigned(objectTypes()) : assigned(fragment());
 
-    const { synonymCandidates } = diffModels(existing, incoming);
+    // With rename recognition off, the fragment's players must still
+    // resolve by name for the synonym detector to see the pair.
+    const { synonymCandidates } = diffModels(existing, incoming, { recognizeRenames: false });
     expect(synonymCandidates).toContainEqual(
       expect.objectContaining({
         elementType: "fact_type",
@@ -468,6 +485,17 @@ describe("a renamed fact type in a lenient fragment", () => {
         addedName: "EmployeeIsAssignedTo",
       }),
     );
+
+    // With it on (the default), the same resolution lets the content pass
+    // pair the two as one renamed fact type (iri-identity 6a).
+    const ft = diffModels(existing, incoming).deltas.filter((d) => d.elementType === "fact_type");
+    expect(ft).toEqual([
+      expect.objectContaining({
+        kind: "modified",
+        name: "EmployeeWorksInDepartment",
+        pairedBy: "recognized",
+      }),
+    ]);
   });
 });
 

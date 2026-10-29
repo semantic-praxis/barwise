@@ -390,6 +390,7 @@ Compare two ORM models and return structural deltas.
 | `base`     | string | yes      | File path or inline YAML for the base (original) model          |
 | `incoming` | string | yes      | File path or inline YAML for the incoming (changed) model       |
 | `matching` | string | no       | `id-first` (default) or `content`; as `barwise diff --matching` |
+| `renames`  | array  | no       | `{ kind, from, to }` pairs; as `barwise diff --rename`          |
 
 **Returns** JSON:
 
@@ -430,7 +431,11 @@ by `change` (`definition`, `aliases`, `dataTypeChanged`, `readings`,
 values. `constraintsModified` is the exception: it carries
 `constraints: [{ from, to }]`, one pair per constraint. Object types and
 fact types pair by id where both models hold it, then by name, so a rename
-that keeps the id is one `modified` delta with a `name` change. Within a
+that keeps the id is one `modified` delta with a `name` change. What id
+and name leave unpaired is paired by content, as `barwise diff` describes,
+and such a delta carries `pairedBy: "recognized"`; one named in `renames`
+(`kind` is `objectType` or `factType`) carries `pairedBy: "declared"`.
+`merge_models` never pairs by content. Within a
 paired fact type, a constraint whose id occurs once in each model is paired
 by id, so an edit that keeps the id is one `constraintsModified` entry; the
 rest are paired by content, so a model with fresh ids still matches its

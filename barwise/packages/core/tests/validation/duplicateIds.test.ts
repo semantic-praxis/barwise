@@ -224,7 +224,7 @@ ${body}`;
     const additions = new Set(
       diff.deltas.flatMap((d, i) => (d.kind === "added" ? [i] : [])),
     );
-    const result = mergeAndValidate(existing, incoming, diff.deltas, additions);
+    const result = mergeAndValidate(existing, incoming, diff, additions);
     expect(result.isValid).toBe(false);
     expect(result.diagnostics.map((d) => d.ruleId)).toContain(RULE);
   });
@@ -240,7 +240,7 @@ describe("a merge whose base already holds a duplicate constraint id", () => {
     incoming.addObjectType({ id: "y", name: "B", kind: "entity", referenceMode: "b_id" });
     const diff = diffModels(existing, incoming);
     const all = new Set(diff.deltas.map((_, i) => i));
-    const result = mergeAndValidate(existing, incoming, diff.deltas, all);
+    const result = mergeAndValidate(existing, incoming, diff, all);
     expect(result.isValid).toBe(false);
     expect(result.diagnostics.map((d) => d.ruleId)).toContain(
       "structural/duplicate-constraint-id",

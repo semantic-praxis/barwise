@@ -7,7 +7,8 @@ project and mapping files, `iri_base`, `namespace`, `namespaceOf` and two
 project rules); decision 17 taken; WS5 implemented 2026-10-29 (5a: `renameInModel`,
 `renameInProject`; 5b: `barwise rename`, MCP `rename_element`, the VS Code
 tool); rename recognition moved to WS6; WS6 grounded 2026-10-29 (6a to 6f,
-decision 15 amended, decisions 18 to 20), not started; WS7 to come
+decision 15 amended, decisions 18 to 20); 6a in progress (diff recognizes renames,
+merge refuses content and rename pairings, implemented 2026-10-29); WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-29

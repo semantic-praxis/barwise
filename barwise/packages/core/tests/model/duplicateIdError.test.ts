@@ -193,7 +193,7 @@ describe("merge gives an objectification a fresh id when its own is held", () =>
     const { deltas } = diffModels(existing, incoming);
     const policy = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
 
-    const result = mergeAndValidate(existing, incoming, deltas, policy);
+    const result = mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, policy);
     expect(result.diagnostics).toEqual([]);
     const ofts = result.model!.objectifiedFactTypes;
     expect(ofts.map((o) => o.factTypeId).sort()).toEqual(["f1", "f2"]);

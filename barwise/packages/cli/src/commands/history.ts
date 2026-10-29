@@ -9,7 +9,7 @@
  */
 
 import { type OrmModel, OrmYamlSerializer } from "@barwise/core";
-import { deltaLabel, diffModels } from "@barwise/core/diff";
+import { deltaLabel, diffModels, pairingNote } from "@barwise/core/diff";
 import type { Command } from "commander";
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
@@ -172,6 +172,8 @@ function renderDeltas(older: OrmModel, newer: OrmModel): string {
   let out = "";
   for (const delta of deltas) {
     out += `  ${delta.kind.toUpperCase().padEnd(8)} ${deltaLabel(delta)}\n`;
+    const note = pairingNote(delta);
+    if (note) out += `    ${note}\n`;
     for (const change of delta.changeDescriptions) {
       out += `    ${change}\n`;
     }

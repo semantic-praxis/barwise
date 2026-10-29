@@ -77,7 +77,12 @@ describe("a shared id is the same element", () => {
     for (
       const [accepted, side] of [[new Set([at]), incoming], [new Set<number>(), existing]] as const
     ) {
-      const result = mergeAndValidate(existing, incoming, deltas, accepted);
+      const result = mergeAndValidate(
+        existing,
+        incoming,
+        { deltas, matching: "id-first" },
+        accepted,
+      );
       expect(result.diagnostics).toEqual([]);
       const merged = result.model!;
       expect(counts(merged)).toEqual(counts(existing));
@@ -102,7 +107,12 @@ describe("a shared id is the same element", () => {
     const { deltas } = diffModels(existing, incoming);
     const renameA = deltas.findIndex((d) => d.existing?.id === "a");
 
-    const result = mergeAndValidate(existing, incoming, deltas, new Set([renameA]));
+    const result = mergeAndValidate(
+      existing,
+      incoming,
+      { deltas, matching: "id-first" },
+      new Set([renameA]),
+    );
     expect(result.model).toBeNull();
     expect(result.diagnostics.map((d) => d.message)).toEqual([
       'Merge failed: two elements would take one name: object type "Client": '
@@ -112,7 +122,10 @@ describe("a shared id is the same element", () => {
     ]);
     // Deciding both together is fine either way.
     const all = new Set(deltas.map((_, i) => i));
-    expect(mergeAndValidate(existing, incoming, deltas, all).model?.getObjectType("a")?.name)
+    expect(
+      mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, all).model
+        ?.getObjectType("a")?.name,
+    )
       .toBe("Client");
   });
 
@@ -129,7 +142,10 @@ describe("a shared id is the same element", () => {
     const { deltas } = diffModels(existing, incoming);
     const policy = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
 
-    expect(mergeAndValidate(existing, incoming, deltas, policy).diagnostics.map((d) => d.message))
+    expect(
+      mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, policy).diagnostics
+        .map((d) => d.message),
+    )
       .toEqual([
         'Merge failed: two elements would take one name: object type "B": '
         + '1 (renamed from "A"), '
@@ -138,7 +154,10 @@ describe("a shared id is the same element", () => {
         + "or rename one of them in the base model first.",
       ]);
     const all = new Set(deltas.map((_, i) => i));
-    expect(mergeAndValidate(existing, incoming, deltas, all).model?.objectTypes.map((o) => o.id))
+    expect(
+      mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, all).model?.objectTypes
+        .map((o) => o.id),
+    )
       .toEqual(["1"]);
   });
 

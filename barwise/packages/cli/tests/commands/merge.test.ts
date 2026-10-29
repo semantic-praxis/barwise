@@ -6,7 +6,7 @@
  * merge command's real risk is what it does to files, not what it
  * prints.
  */
-import { copyFileSync, existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -100,5 +100,39 @@ describe("barwise merge", () => {
     copyFileSync(base, copy);
     const result = await runCli(["merge", copy, incoming]);
     expect(result.exitCode).toBe(0);
+  });
+});
+
+describe("barwise merge never pairs by content (iri-identity 6a)", () => {
+  const supplierShop = (p: string, party: string) =>
+    `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ${p}c, name: ${party}, kind: entity, reference_mode: nr }
+    - { id: ${p}o, name: Order, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: ${p}f
+      name: Party places Order
+      roles:
+        - { id: ${p}r0, player: ${p}c, role_name: places }
+        - { id: ${p}r1, player: ${p}o, role_name: placed by }
+      readings: ["{0} places {1}"]
+`;
+
+  it("adds an element of the same shape as one in the base instead of folding it in", async () => {
+    // Vendor and Supplier say the same thing, so `barwise diff` reports a
+    // possible rename; merge diffs by id and name only and adds Supplier.
+    const dir = mkdtempSync(join(tmpdir(), "barwise-merge-shape-"));
+    const a = join(dir, "a.orm.yaml");
+    const b = join(dir, "b.orm.yaml");
+    writeFileSync(a, supplierShop("a", "Vendor"), "utf-8");
+    writeFileSync(b, supplierShop("b", "Supplier"), "utf-8");
+    const result = await runCli(["merge", a, b, "--format", "json"]);
+    expect(result.exitCode).toBe(0);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.valid).toBe(true);
+    expect(parsed.yaml).toContain("name: Vendor");
+    expect(parsed.yaml).toContain("name: Supplier");
   });
 });

@@ -55,7 +55,7 @@ describe("two subtype facts over one pair", () => {
   it("a merge keeps both, and validation still reports the repeat", () => {
     const model = withRepeatedPair();
     const { deltas } = diffModels(model, model);
-    const result = mergeAndValidate(model, model, deltas, new Set());
+    const result = mergeAndValidate(model, model, { deltas, matching: "id-first" }, new Set());
     expect(result.model?.subtypeFacts.map((sf) => sf.id)).toEqual(["sf1", "sf2"]);
     expect(result.diagnostics.map((d) => d.ruleId)).toEqual([RULE_ID.duplicateSubtypeFact]);
   });
@@ -73,7 +73,12 @@ describe("what the merge still drops, and the ids it keeps", () => {
       });
     }
     const { deltas } = diffModels(existing, incoming);
-    const result = mergeAndValidate(existing, incoming, deltas, new Set(deltas.keys()));
+    const result = mergeAndValidate(
+      existing,
+      incoming,
+      { deltas, matching: "id-first" },
+      new Set(deltas.keys()),
+    );
     expect(result.model?.subtypeFacts).toEqual([]);
   });
 
@@ -92,7 +97,12 @@ describe("what the merge still drops, and the ids it keeps", () => {
     const { deltas } = diffModels(existing, incoming);
     expect(deltas.filter((d) => d.elementType === "subtype_fact").map((d) => d.kind))
       .toEqual(["unchanged", "modified"]);
-    const result = mergeAndValidate(existing, incoming, deltas, new Set(deltas.keys()));
+    const result = mergeAndValidate(
+      existing,
+      incoming,
+      { deltas, matching: "id-first" },
+      new Set(deltas.keys()),
+    );
     expect(result.model?.subtypeFacts.map((sf) => sf.id)).toEqual(["sf1", "sf2"]);
   });
 
@@ -100,7 +110,8 @@ describe("what the merge still drops, and the ids it keeps", () => {
     const model = withRepeatedPair();
     model.addConstraint({ type: "exclusion", id: "x", subtypeFactIds: ["sf1", "sf2"] });
     const { deltas } = diffModels(model, model);
-    const merged = mergeAndValidate(model, model, deltas, new Set()).model!;
+    const merged = mergeAndValidate(model, model, { deltas, matching: "id-first" }, new Set())
+      .model!;
     expect(merged.getConstraint("x")).toMatchObject({ subtypeFactIds: ["sf1", "sf2"] });
   });
 });
@@ -128,7 +139,7 @@ describe("a repeat the incoming side no longer holds", () => {
     // The surfaces' default: accept additions and modifications, reject removals.
     const accepted = new Set(deltas.flatMap((d, i) => (d.kind === "removed" ? [] : [i])));
 
-    const result = mergeAndValidate(existing, incoming, deltas, accepted);
+    const result = mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, accepted);
     expect(result.model?.subtypeFacts.map((sf) => sf.id)).toEqual(["sf1", "sf2"]);
     expect(result.model?.getConstraint("x")).toMatchObject({ subtypeFactIds: ["sf1", "sf2"] });
     expect(result.diagnostics.map((d) => d.ruleId)).toEqual([RULE_ID.duplicateSubtypeFact]);
@@ -157,7 +168,7 @@ describe("a repeat an accepted removal leaves out", () => {
       deltas.flatMap((d, i) => (d.elementType === "subtype_fact" ? [i] : [])),
     );
 
-    const result = mergeAndValidate(existing, incoming, deltas, accepted);
+    const result = mergeAndValidate(existing, incoming, { deltas, matching: "id-first" }, accepted);
     expect(result.model?.subtypeFacts.map((sf) => sf.id)).toEqual(["sf2", "sf3"]);
     expect(result.model?.getConstraint("x")).toMatchObject({ subtypeFactIds: ["sf2", "sf3"] });
   });

@@ -60,7 +60,7 @@ function merge(a: OrmModel, b: OrmModel, take: boolean): OrmModel {
   const accepted = new Set(
     deltas.flatMap((d, i) => (d.elementType !== "constraint" || take ? [i] : [])),
   );
-  return mergeModels(a, b, deltas, accepted);
+  return mergeModels(a, b, { deltas, matching: "id-first" }, accepted);
 }
 
 describe("the constraint delta", () => {
@@ -192,7 +192,9 @@ describe("merging the constraint delta", () => {
     const accepted = new Set(
       deltas.flatMap((d, i) => (d.elementType === "fact_type" && d.kind === "added" ? [] : [i])),
     );
-    expect(mergeModels(rooms([key()]), incoming, deltas, accepted).constraints).toEqual([key()]);
+    expect(
+      mergeModels(rooms([key()]), incoming, { deltas, matching: "id-first" }, accepted).constraints,
+    ).toEqual([key()]);
   });
 
   it("names the merged model's roles when an incoming one was matched by name", () => {
@@ -212,7 +214,8 @@ describe("merging the constraint delta", () => {
     const accepted = new Set(
       deltas.flatMap((d, i) => (d.elementType === "fact_type" && d.kind === "added" ? [] : [i])),
     );
-    expect(mergeModels(rooms([]), incoming, deltas, accepted).constraints).toEqual([]);
+    expect(mergeModels(rooms([]), incoming, { deltas, matching: "id-first" }, accepted).constraints)
+      .toEqual([]);
   });
 
   it("carries one whose role no model holds, so validation reports it", () => {

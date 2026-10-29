@@ -50,7 +50,7 @@ describe("law: merging nothing changes nothing", () => {
     fc.assert(
       fc.property(arbOrmModel(), (model) => {
         const { deltas } = diffModels(model, model);
-        const merged = mergeModels(model, model, deltas, new Set());
+        const merged = mergeModels(model, model, { deltas, matching: "id-first" }, new Set());
         expect(hashModel(merged)).toBe(hashModel(model));
       }),
       { seed: SEED, numRuns: RUNS },
@@ -68,7 +68,7 @@ describe("law: merging nothing changes nothing", () => {
     fc.assert(
       fc.property(arbOrmModel(), (model) => {
         const { deltas } = diffModels(model, model);
-        const merged = mergeModels(model, model, deltas, new Set());
+        const merged = mergeModels(model, model, { deltas, matching: "id-first" }, new Set());
 
         expect(merged.objectTypes.length).toBe(model.objectTypes.length);
         expect(merged.factTypes.length).toBe(model.factTypes.length);
@@ -308,8 +308,8 @@ describe("law: merging twice gives the same model", () => {
       fc.property(arbOrmModel(), arbOrmModel(), fc.infiniteStream(fc.boolean()), (a, b, coin) => {
         const { deltas } = diffModels(a, b);
         const accepted = new Set(deltas.flatMap((_, i) => (coin.next().value ? [i] : [])));
-        const once = mergeAndValidate(a, b, deltas, accepted);
-        const twice = mergeAndValidate(a, b, deltas, accepted);
+        const once = mergeAndValidate(a, b, { deltas, matching: "id-first" }, accepted);
+        const twice = mergeAndValidate(a, b, { deltas, matching: "id-first" }, accepted);
         expect(twice.model && yaml.serialize(twice.model)).toBe(
           once.model && yaml.serialize(once.model),
         );
@@ -326,7 +326,7 @@ function mergeAll(existing: OrmModel, incoming: OrmModel): OrmModel {
   const accepted = new Set(
     deltas.map((_, index) => index).filter((index) => deltas[index]!.kind !== "unchanged"),
   );
-  return mergeModels(existing, incoming, deltas, accepted);
+  return mergeModels(existing, incoming, { deltas, matching: "id-first" }, accepted);
 }
 
 function names(elements: readonly { name: string; }[]): string[] {

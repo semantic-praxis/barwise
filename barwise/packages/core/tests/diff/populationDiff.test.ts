@@ -246,7 +246,12 @@ describe("a population merges from its delta rather than being carried", () => {
     const incoming = bothKinds("E9", "E8");
     const { deltas } = diffModels(existing, incoming);
 
-    const merged = mergeModels(existing, incoming, deltas, all(deltas.length));
+    const merged = mergeModels(
+      existing,
+      incoming,
+      { deltas, matching: "id-first" },
+      all(deltas.length),
+    );
     const significant = merged.populations.find((p) => !p.sample)!;
     expect(significant.instances[0]!.roleValues["r-worker"]).toBe("E9");
   });
@@ -256,7 +261,7 @@ describe("a population merges from its delta rather than being carried", () => {
     const incoming = bothKinds("E9", "E8");
     const { deltas } = diffModels(existing, incoming);
 
-    const merged = mergeModels(existing, incoming, deltas, new Set());
+    const merged = mergeModels(existing, incoming, { deltas, matching: "id-first" }, new Set());
     const significant = merged.populations.find((p) => !p.sample)!;
     expect(significant.instances[0]!.roleValues["r-worker"]).toBe("E1");
   });
@@ -265,7 +270,12 @@ describe("a population merges from its delta rather than being carried", () => {
     const model = bothKinds("E1", "E2");
     const { deltas } = diffModels(model, bothKinds("E1", "E2"));
 
-    const merged = mergeModels(model, bothKinds("E1", "E2"), deltas, new Set());
+    const merged = mergeModels(
+      model,
+      bothKinds("E1", "E2"),
+      { deltas, matching: "id-first" },
+      new Set(),
+    );
     expect(merged.populations).toHaveLength(2);
     expect(merged.populations.filter((p) => p.sample)).toHaveLength(1);
   });

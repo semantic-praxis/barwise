@@ -8,6 +8,7 @@ export {
 export {
   type BreakingLevel,
   type ConstraintDelta,
+  type DeclaredRename,
   type DefinitionDelta,
   type DeltaJson,
   type DeltaKind,
@@ -28,13 +29,18 @@ export {
   type NamedElementType,
   type ObjectifiedFactTypeDelta,
   type ObjectTypeDelta,
+  type PairedBy,
+  pairingNote,
   type PopulationDelta,
+  renamePairing,
   type SubtypeFactDelta,
   type SynonymCandidate,
 } from "./ModelDiff.js";
 export {
   getStructuralErrors,
+  MERGE_DIFF_OPTIONS,
   mergeAndValidate,
+  type MergeInput,
   mergeModels,
   type MergeValidationResult,
 } from "./ModelMerge.js";

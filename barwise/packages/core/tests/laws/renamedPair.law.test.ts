@@ -151,7 +151,12 @@ describe("law: a shared id is the same element", () => {
           const accepted = new Set(
             deltas.flatMap((_, i) => (coin.next().value ? [i] : [])),
           );
-          const result = mergeAndValidate(existing, incoming, deltas, accepted);
+          const result = mergeAndValidate(
+            existing,
+            incoming,
+            { deltas, matching: "id-first" },
+            accepted,
+          );
 
           // The name each object type and fact type ends with.
           const takes = new Map<string, string>();

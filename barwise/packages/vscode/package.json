@@ -397,6 +397,19 @@
                 "content"
               ],
               "description": "How elements pair. 'id-first' (default): a shared id is the same element. 'content': ids say nothing; for two models whose ids are unrelated but may coincide."
+            },
+            "renames": {
+              "type": "array",
+              "description": "Renames to pair that the diff cannot recognize because the element also changed. A renamed element the diff recognizes by what it says is reported with pairedBy 'recognized'; a declared one with pairedBy 'declared'.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": { "type": "string", "enum": ["objectType", "factType"] },
+                  "from": { "type": "string", "description": "Its name in the base model" },
+                  "to": { "type": "string", "description": "Its name in the incoming model" }
+                },
+                "required": ["kind", "from", "to"]
+              }
             }
           },
           "required": [
