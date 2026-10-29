@@ -1,6 +1,6 @@
 # The dbt import prefers an objectified composite key, and the DDL import trusts its table line
 
-Status: Draft
+Status: Implemented
 
 Created: 2026-10-29
 Last-updated: 2026-10-29
@@ -124,6 +124,31 @@ tracked models.
   - an annotated composite key table whose line names a reference mode
     other than `<table>_id`, which keeps it.
 - The release note names the dbt change.
+
+## Implementation notes
+
+- Changed scope: a line with `supertypes` is not trusted when one of
+  its supertype links has a column in the key. Step 3 reads no key
+  through a link, so reading such a table as a plain entity left it with
+  no identifier, where the guess keeps it keyed as an objectifier. The
+  implementation review found it; a test goes red without the guard.
+- The dbt import keeps the objectifier's identifier only when
+  `resolvePreferredIdentifier` accepts it, as the DDL import's
+  `preferUniquenessOver` does. Every key the composite reading builds
+  resolves today.
+- The parity tests describe preferred identifiers through one helper,
+  `cli/tests/workspace/preferred.ts`. The composite test also fails when
+  both importers lose an objectifier's identifier. Twelve parity cases go
+  red on the old dbt code.
+- One existing fixture in `preferredIdentifierRoundTrip.test.ts` relied
+  on the guess: its line had `supertypes` and no `objectifies` for a
+  table it described as an objectified ternary. It now states
+  `objectifies`.
+- Declined from the implementation review: a version field to replace
+  `supertypes` as the signal (the writer documents that the field is on
+  every line, so absence means an older writer), and sharing the
+  description helper with formats' round-trip test (two packages' tests,
+  with different inputs: resolved and stored references).
 
 ## Risks and testing
 
