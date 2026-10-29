@@ -32,6 +32,7 @@ import {
   executeLineageStatus,
   executeMerge,
   executeQueryModel,
+  executeRename,
   executeSchema,
   executeSplit,
   executeValidate,
@@ -41,6 +42,7 @@ import {
   type SourceInput,
   sourcePath,
 } from "@barwise/mcp";
+import { realpathSync } from "node:fs";
 import * as vscode from "vscode";
 import { getAnthropicApiKey } from "../llm/anthropicKey.js";
 import { CopilotLlmClient } from "../llm/CopilotLlmClient.js";
@@ -91,6 +93,17 @@ interface ImportTranscriptInput {
 interface MergeInput {
   base?: string;
   incoming: string;
+}
+
+interface RenameInput {
+  source?: string;
+  domain?: string;
+  objectType?: string;
+  factType?: string;
+  role?: string;
+  rolePosition?: number;
+  to: string;
+  check?: boolean;
 }
 
 interface SplitModelInput {
@@ -266,6 +279,46 @@ function runExportModel(input: ExportModelInput): vscode.LanguageModelToolResult
 }
 
 /**
+ * Rename, refusing when any file it would write has unsaved changes in an
+ * editor: the rename is written to disk, and saving the dirty buffer
+ * afterwards would undo it in that file alone -- for a project, leaving the
+ * other files renamed and this one not. So the files are found by a
+ * check-only run first (for a project they are domain and mapping files,
+ * never the manifest named as the source), and compared by real path.
+ */
+function runRename(input: RenameInput): vscode.LanguageModelToolResult {
+  const source = resolveSourceParam(input.source);
+  if (input.check !== true) {
+    const planned = JSON.parse(
+      executeRename({ ...input, source, check: true }).content[0]!.text,
+    ) as { files?: string[]; };
+    const dirty = new Set(
+      vscode.workspace.textDocuments.filter((d) => d.isDirty).map((d) => realPath(d.uri.fsPath)),
+    );
+    const unsaved = (planned.files ?? []).filter((file) => dirty.has(realPath(file)));
+    if (unsaved.length > 0) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(JSON.stringify({
+          error: `${unsaved.join(", ")} ${unsaved.length === 1 ? "has" : "have"} unsaved changes. `
+            + "Save first, then rename: the rename writes these files, and saving the editor's "
+            + "version afterwards would undo it there.",
+        })),
+      ]);
+    }
+  }
+  return toToolResult(executeRename({ ...input, source }));
+}
+
+/** A path with symlinks resolved, or as given when it does not exist. */
+function realPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
+/**
  * split_model: a relative outDir is taken against the workspace folder
  * holding the source (else the first folder), never the extension host's
  * working directory -- resolveWriteDir says why.
@@ -387,6 +440,12 @@ export function registerLanguageModelTools(context: vscode.ExtensionContext): vo
     "barwise_merge_models",
     (i) => toToolResult(executeMerge(resolveSourceParam(i.base), i.incoming)),
     "Merging Barwise models...",
+  );
+  register<RenameInput>(
+    context,
+    "barwise_rename_element",
+    runRename,
+    (i) => (i.check ? "Previewing Barwise rename..." : "Renaming in Barwise model..."),
   );
   register<SplitModelInput>(
     context,

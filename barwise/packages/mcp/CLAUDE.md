@@ -25,6 +25,8 @@ src/
   workspace/
     resolve.ts          Source resolution (file path / inline YAML / project)
     projectLoader.ts    Filesystem walk for a .orm-project.yaml manifest
+    stagedWrite.ts      Staged multi-file write (a copy of the CLI's, paired in
+                        parity.manifest.json)
   llm/
     SamplingLlmClient.ts  LlmClient over MCP sampling -- the host's model, no key
     resolveClient.ts      Prefer sampling, fall back to a key, report which
@@ -42,6 +44,7 @@ src/
     gym.ts              gym_list / gym_check tools (modeling gym)
     import.ts           import_transcript tool
     merge.ts            merge_models tool
+    rename.ts           rename_element tool (writes a file or project source back)
     split.ts            split_model tool (preview, or write a multi-domain project)
     review.ts           review_model tool (exports formatReview, shared with vscode)
     queryModel.ts       query_model tool

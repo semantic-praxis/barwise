@@ -251,13 +251,16 @@ one is kept. Each is printed under its file. Run `barwise validate` with
 your 2.x build first if you want to see those cases before they are
 resolved.
 
-This is the one command that modifies its inputs. The file is written
+This is one of the two commands that modify their inputs, with `rename`. The file is written
 from the model, so YAML comments and hand layout in it are not kept. A
 file already at 3.0 is left untouched. A file is not written, and is
 reported, when it cannot be read or does not load, when its 3.0 form would
 not load back (2.0 allowed two constraints to share an id), or when it
 names elements it does not define (a fragment) and carries `is_preferred`
 flags, which cannot be placed without the rest of the model. The rest are still migrated.
+A file is also refused when `<file>.migrating` already exists beside it:
+that is the staged copy an interrupted run left, and `migrate` neither
+writes over it nor removes it. Remove it by hand and run again.
 
 Exit codes: 0 when every file was migrated or already current; 1 under
 `--check` when a file would be rewritten; 2 when any file could not be
@@ -268,6 +271,61 @@ Options:
 - `--check` -- write nothing; exit 1 if any file would be rewritten
 - `--format <text|json>` -- output format (default: text); json prints one
   record per file
+
+### rename
+
+Rename an object type, a fact type or a role, in a model file or across a
+project.
+
+```sh
+barwise rename shop.orm.yaml --object-type Order --to Purchase
+barwise rename shop.orm.yaml --fact-type "Customer places Order" --role-position 1 --to "is placed by"
+barwise rename --project project.orm-project.yaml --domain crm --object-type Customer --to Client
+```
+
+Every reference between elements is an id, so a rename keeps every id and
+changes names. Beyond the element's own name it rewrites its definition,
+when the term is the element's alone and the new term is not already
+defined, and the reference mode of each entity whose key the relational
+mapper types from a renamed value type. Notes, aliases and other free text
+are left as written. Given a project, the rename follows an owned object
+type into its shadows in other domains, every domain's definitions, the
+reference modes of the entity's copies, and both sides of each mapping
+file, and writes exactly the files it changed.
+
+It refuses, and writes nothing, when the element does not exist or a role
+name is shared (name it by `--role-position`), when the new name or its
+local name is already taken, when the element is a shadow (rename its
+owner, through the project), when the rename would change which value type
+keys an entity, when a project did not load cleanly, or when the file, or
+any domain of the project, is not at the current format (run `barwise
+migrate` on it first, which reports what migrating it changes). A model file that
+declares a `domain_context` gets a warning: if it is a project's domain,
+rename through `--project` so its shadows and mapping files follow.
+
+This is one of the two commands that modify their inputs, with `migrate`.
+Every changed file is staged before any is replaced, so a failure while
+staging changes nothing. If replacing them fails part-way (a full disk,
+a permission change), it exits 2 and the json output's `files` and
+`changes` name what was already replaced. Files are written from the
+model, so YAML comments in a rewritten file are lost, as with `migrate`.
+
+Exit codes: 0 when the rename was written; 1 under `--check` when a file
+would be rewritten; 2 when the rename was refused, a file could not be
+read, `--format` is unknown, or the write failed. A mistake commander
+itself rejects (an unknown option, an option missing its value) exits 1,
+as it does for every command; see barwise-o5y.
+
+Options:
+
+- `--object-type <name>` or `--fact-type <name>` -- the element to rename
+- `--role <name>` or `--role-position <n>` -- with `--fact-type`, the role
+  to rename (positions count from 0)
+- `--to <name>` -- the new name (required)
+- `--project <manifest>` and `--domain <context>` -- rename through a
+  project, in place of a model file
+- `--check` -- write nothing; exit 1 if any file would be rewritten
+- `--format <text|json>` -- output format (default: text)
 
 ### review
 

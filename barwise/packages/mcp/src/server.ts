@@ -53,6 +53,7 @@ export { executeImportModel } from "./tools/importModel.js";
 export { executeLineageStatus } from "./tools/lineageStatus.js";
 export { executeMerge } from "./tools/merge.js";
 export { executeQueryModel } from "./tools/queryModel.js";
+export { executeRename, type RenameElementInput } from "./tools/rename.js";
 export { executeReview, formatReview } from "./tools/review.js";
 export { executeSchema } from "./tools/schema.js";
 export { executeSplit } from "./tools/split.js";
