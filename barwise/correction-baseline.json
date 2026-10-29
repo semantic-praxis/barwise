@@ -361,6 +361,12 @@
       "caught_by": "reasoning",
       "note": "'Additive' was corrected by reasoning from how the other penalties are surfaced, not from a run."
     },
+    "executable-adrs::3aaa193bfa3a": {
+      "spec": "executable-adrs.spec.md",
+      "excerpt": "grounded 2026-10-28 by extracting the npm scripts each adr names and resolving them against package.json and cisteps(). the third column counts lines in each ad",
+      "caught_by": "reasoning",
+      "note": "The Inventory's first drafts predicted each ADR's declared state and marked most rows enforced. The eighth /code-review pass on the plan read each ADR's Consequences and found decisions with no gate in about ten of them; a keyword count over the ADRs (16 of 20 with gap phrases) confirmed the pattern. The column was replaced with that count, labelled a shadow, and the audit workstream became a per-decision audit."
+    },
     "export-artifact-validation::72d83b5439a8": {
       "spec": "export-artifact-validation.spec.md",
       "excerpt": "the second workstream did not survive grounding. the draft had ddlexportformat.test.ts parse its rendered output through parsesqlwithsqlglot. probed against the",
