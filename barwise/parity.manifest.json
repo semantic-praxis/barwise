@@ -163,7 +163,7 @@
     },
     {
       "name": "package-model-builder",
-      "why": "formats, dbt and learn tests build models through one shorthand; a fixture in one package must mean the same model in the others, and the role and preferred ids it mints (roleId, preferredId) are the format 6b of iri-identity changes in one place. Core keeps its own builder, which reads core source rather than the package build and carries fields only core tests use.",
+      "why": "formats, dbt and learn tests build models through one shorthand; a fixture in one package must mean the same model in the others. The role and preferred ids it mints (roleId, preferredId) are the format 6b of iri-identity changes, here and in core's builder, which is kept apart because it reads core source rather than the package build and carries fields only core tests use.",
       "members": [
         "packages/formats/tests/helpers/ModelBuilder.ts",
         "packages/dbt/tests/helpers/ModelBuilder.ts",

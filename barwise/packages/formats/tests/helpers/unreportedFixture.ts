@@ -5,8 +5,7 @@
  * drop (schema-export-constraint-specs.spec.md).
  */
 import type { OrmModel } from "@barwise/core";
-import { ModelBuilder } from "./ModelBuilder.js";
-import { roleId } from "./ModelBuilder.js";
+import { ModelBuilder, roleId } from "./ModelBuilder.js";
 
 export const MENTOR_RING_PSEUDOCODE = "for all x: not Person mentors Person(x, x)";
 

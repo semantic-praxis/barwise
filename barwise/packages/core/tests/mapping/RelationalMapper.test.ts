@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import { renderDdl } from "../../src/mapping/renderers/ddl.js";
+import { localName } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 import { placeFlags } from "../helpers/placeFlags.js";
@@ -1586,8 +1587,8 @@ describe("well-formedness the mapper law generalises", () => {
       model.addFactType({
         name: name!,
         roles: [
-          { id: `${name}::r1`, name: verb!, playerId: student.id },
-          { id: `${name}::r2`, name: "is of", playerId: grade.id },
+          { id: `${localName(name!)}.r1`, name: verb!, playerId: student.id },
+          { id: `${localName(name!)}.r2`, name: "is of", playerId: grade.id },
         ],
         readings: [`{0} ${verb} {1}`, `{1} is of {0}`],
       });
