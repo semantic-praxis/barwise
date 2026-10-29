@@ -5,6 +5,7 @@ Status: Draft
 Created: 2026-10-29
 Last-updated: 2026-10-29
 Tracking: barwise-fuo, barwise-xgu, barwise-9zm
+Plan-reviewed: 01e4836d (code-review, pr-review)
 Touches: barwise/packages/dbt/src/dbtMapping/compositeKeys.ts,
 barwise/packages/dbt/tests/,
 barwise/packages/formats/src/ddl/DdlImportFormat.ts,
