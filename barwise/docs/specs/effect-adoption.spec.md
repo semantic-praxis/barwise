@@ -827,6 +827,29 @@ barrel does not export.
   range, another version, and a core that does not pin exactly.
 - S5 is unchanged by construction and was checked: `validate` loads 313
   modules on `main` and on R1's head alike.
+- The first implementation review found four design flaws, each fixed
+  with a test that fails when it is planted back:
+  - a union's member was chosen by any single-literal field, so a tag
+    written with `Literals`, a suspended or nested member, or an optional
+    literal two members share left the rule unreported; a member is now the
+    one whose required literal fields all hold;
+  - the walk did not enter a record's entries, a tuple's elements, or the
+    one struct of an untagged union (`NullOr`, a union with a string);
+  - agreement with `main` was tested one way only, so a decoder refusing an
+    empty `definition` passed: a generator over the hand-written schema
+    (`tests/helpers/jsonSchemaArbitrary.ts`) now draws 3,000 values, 592
+    of them valid, and the decoder must accept exactly what `main` accepts.
+    Its first run found the decoder refusing integers above 2^53, which
+    `main` accepts (`Schema.Int` is a safe-integer check), now fixed;
+  - nothing checked that a rule's `reads` covers what its predicate reads,
+    or that the walked Schemas make no transformation, and a rule that
+    threw was skipped without a word: a proxy now records each rule's
+    reads, an AST check refuses a transformation, and a throw surfaces.
+- Detail findings from the same review, each now a test: a record is
+  frozen; every problem a fixture reports is at its declared field; a
+  value that is not a mapping is one problem worded as that; the lockfile
+  installs one `effect`, at core's version. The harness builds its issues
+  with Effect's own `Filter` constructor.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,

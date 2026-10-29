@@ -8,10 +8,12 @@
  */
 import * as Arbitrary from "effect/Arbitrary";
 import * as Effect from "effect/Effect";
+import fc from "fast-check";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
+import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import {
   ObjectTypeError,
   ObjectTypeFile,
@@ -23,12 +25,61 @@ import {
   deserializeObjectType,
   type OrmYamlObjectType,
 } from "../../src/serialization/yaml/objectType.js";
+import { fromJsonSchema } from "../helpers/jsonSchemaArbitrary.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
 /** What today's reader makes of one object type of a validated document. */
 const todays = (doc: OrmYamlObjectType) => createObjectType(deserializeObjectType(doc));
 
+/** Whether today's reader accepts one object type, and the record it builds. */
+function todaysReading(value: unknown): { ok: true; record: unknown; } | { ok: false; } {
+  const doc = { orm_version: "3.0", model: { name: "M", object_types: [value] } };
+  if (!validator.validateModel(doc).valid) return { ok: false };
+  try {
+    return { ok: true, record: todays(value as OrmYamlObjectType) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function decodersReading(value: unknown): { ok: true; record: unknown; } | { ok: false; } {
+  try {
+    return { ok: true, record: runObjectTypeDecode(value).record };
+  } catch (e) {
+    if (e instanceof ObjectTypeError) return { ok: false };
+    throw e;
+  }
+}
+
+const validator = new SchemaValidator();
+
 describe("the object type decoder, against today's reader", () => {
+  it("accepts exactly what today's reader accepts, drawn from the hand-written schema", () => {
+    // Both directions, from an answer key the Schema under test did not
+    // write: a decoder that refused an empty definition, or an integer
+    // above 2^53, would pass every test that draws from the Schema itself.
+    const objectType = (schema as { definitions: Record<string, object>; }).definitions
+      .object_type!;
+    let accepted = 0;
+    fc.assert(
+      fc.property(
+        fromJsonSchema(schema as Record<string, unknown>, objectType as Record<string, unknown>),
+        (value) => {
+          const today = todaysReading(value);
+          const decoded = decodersReading(value);
+          expect([JSON.stringify(value), decoded.ok]).toEqual([JSON.stringify(value), today.ok]);
+          if (today.ok && decoded.ok) {
+            accepted++;
+            expect(decoded.record).toEqual(today.record);
+          }
+        },
+      ),
+      { numRuns: 3000, seed: 11 },
+    );
+    // Not vacuous: a fair share of the drawn values are valid.
+    expect(accepted).toBeGreaterThan(400);
+  });
+
   const objectTypes = modelCorpus().flatMap(({ file, doc }) =>
     (doc.model.object_types ?? []).map((ot) => ({ file, ot }))
   );
@@ -37,7 +88,12 @@ describe("the object type decoder, against today's reader", () => {
     expect(objectTypes.length).toBeGreaterThan(500);
     for (const { file, ot } of objectTypes) {
       const decoded = runObjectTypeDecode(ot);
+      // toEqual, not toStrictEqual, on purpose: today's record carries a
+      // data type's absent sizes as keys holding undefined ({ name,
+      // length: undefined }), which the decoder leaves out. No reader
+      // distinguishes them (the writer tests each with !== undefined).
       expect([file, ot.id, decoded.record]).toEqual([file, ot.id, todays(ot)]);
+      expect([file, ot.id, Object.isFrozen(decoded.record)]).toEqual([file, ot.id, true]);
       expect([file, ot.id, decoded.preferredIdentifier]).toEqual([
         file,
         ot.id,
@@ -83,7 +139,9 @@ describe("the 3.0 malformed object type cases", () => {
       const problems = (error as ObjectTypeError).problems;
       // The case's one problem is the field it declares, named in the message
       // with the element; nothing else is wrong with the fixture.
-      expect(problems.map((p) => String(p.path[0] ?? ""))).toContain(c.field);
+      // Every problem is at the declared field: a fixture holds one problem,
+      // so a second, spurious report fails here.
+      expect(problems.map((p) => String(p.path[0] ?? ""))).toEqual(problems.map(() => c.field));
       const atField = problems.find((p) => String(p.path[0] ?? "") === c.field)!;
       expect(atField.message).toContain(c.field);
       expect(atField.message).toContain(String(ot.name ?? ot.id).trim() || String(ot.id));
@@ -92,5 +150,19 @@ describe("the 3.0 malformed object type cases", () => {
 
   it("covers every object type case", () => {
     expect(objectTypeCases.length).toBe(12);
+  });
+});
+
+describe("an object type that is not a mapping", () => {
+  it.each([[null], ["x"], [[1]], [3]])("%j is refused as not a mapping, once", (value) => {
+    let error: unknown;
+    try {
+      runObjectTypeDecode(value);
+    } catch (e) {
+      error = e;
+    }
+    const problems = (error as ObjectTypeError).problems;
+    expect(problems).toHaveLength(1);
+    expect(problems[0]!.message).toBe("Object type must be a mapping of fields.");
   });
 });

@@ -47,8 +47,15 @@ const Name = Schema.String.check(
   Schema.makeFilter((name: string) => name.trim() !== "", { message: "must not be blank." }),
 );
 
-const NonNegativeInt = Schema.Int.check(
-  Schema.isGreaterThanOrEqualTo(0, { message: "must be a non-negative integer." }),
+/**
+ * Any non-negative integer, as JSON Schema's `integer` reads one. Not
+ * `Schema.Int`, which is `Number.isSafeInteger` and so refused 2^53 + 2,
+ * which today's schema and constructor accept (review of R1).
+ */
+const NonNegativeInt = Schema.Number.check(
+  Schema.makeFilter((n: number) => Number.isInteger(n) && n >= 0, {
+    message: "must be a non-negative integer.",
+  }),
 );
 
 // -- Nested definitions -----------------------------------------------------
@@ -288,6 +295,15 @@ export function decodeObjectType(
   return decodeFile(doc).pipe(
     Effect.map(toRecord),
     Effect.mapError((error) => {
+      // Not a mapping: one problem, worded as that, not as a bad `kind`,
+      // which is how the union's mismatch would otherwise read.
+      if (!isMapping(doc)) {
+        return new ObjectTypeProblems([{
+          element: "",
+          path: [],
+          message: "Object type must be a mapping of fields.",
+        }]);
+      }
       const located = locate(error.issue);
       const all = harness
         ? [...located, ...crossFieldProblems(ObjectTypeFile.ast, doc, located)]
@@ -296,6 +312,8 @@ export function decodeObjectType(
     }),
   );
 }
+
+const isMapping = (v: unknown): boolean => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** The synchronous boundary: the decoded object type, or every problem thrown at once. */
 export function runObjectTypeDecode(doc: unknown): DecodedObjectType {

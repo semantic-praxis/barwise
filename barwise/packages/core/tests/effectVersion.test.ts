@@ -53,6 +53,19 @@ it("every package declaring effect pins core's exact version", () => {
   expect(disagreements(manifests)).toEqual([]);
 });
 
+it("installs one effect, at core's version, so no transitive copy brings a second", () => {
+  // Manifests can agree while a dependency pulls another effect into a
+  // nested node_modules; only the lockfile shows that.
+  const lock = JSON.parse(readFileSync(resolve(BARWISE, "package-lock.json"), "utf8")) as {
+    packages: Record<string, { version?: string; }>;
+  };
+  const installed = Object.entries(lock.packages)
+    .filter(([path]) => /(^|\/)node_modules\/effect$/.test(path))
+    .map(([path, entry]) => `${path}@${entry.version}`);
+  const pinned = manifests.find((m) => m.name === "@barwise/core")?.dependencies?.effect;
+  expect(installed).toEqual([`node_modules/effect@${pinned}`]);
+});
+
 it("refuses a range, another version, and a core that does not pin", () => {
   const core: Manifest = { name: "@barwise/core", dependencies: { effect: "4.0.5" } };
   expect(disagreements([core, { name: "a", devDependencies: { effect: "^4.0.5" } }])).toEqual([

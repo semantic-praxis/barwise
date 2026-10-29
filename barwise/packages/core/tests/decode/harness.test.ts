@@ -105,24 +105,58 @@ function reported(doc: Doc, harness = true): string[] {
   return result.failure.problems.map((p) => fieldPath(p.path)).sort();
 }
 
-/** Every rule the Schema marks, found by walking it. */
-function markedRules(ast: SchemaAST.AST, seen = new Set<SchemaAST.AST>()): Set<string> {
-  const ids = new Set<string>();
-  if (seen.has(ast)) return ids;
+/** Every node of a Schema, through every child the harness walks. */
+function nodesOf(ast: SchemaAST.AST, seen = new Set<SchemaAST.AST>()): SchemaAST.AST[] {
+  if (seen.has(ast)) return [];
   seen.add(ast);
-  for (const check of ast.checks ?? []) {
-    const mark = markOf(check);
-    if (mark) ids.add(mark.id);
-  }
   const children: SchemaAST.AST[] = ast._tag === "Objects"
-    ? ast.propertySignatures.map((ps) => ps.type)
+    ? [...ast.propertySignatures.map((ps) => ps.type), ...ast.indexSignatures.map((i) => i.type)]
     : ast._tag === "Arrays"
     ? [...ast.elements, ...ast.rest]
     : ast._tag === "Union"
     ? [...ast.types]
+    : ast._tag === "Suspend"
+    ? [ast.thunk()]
     : [];
-  for (const child of children) for (const id of markedRules(child, seen)) ids.add(id);
-  return ids;
+  return [ast, ...children.flatMap((child) => nodesOf(child, seen))];
+}
+
+const markedChecks = (ast: SchemaAST.AST) =>
+  nodesOf(ast).flatMap((node) =>
+    (node.checks ?? []).flatMap((check) => {
+      const mark = markOf(check);
+      return mark && check._tag === "Filter" ? [{ node, check, mark }] : [];
+    })
+  );
+
+/**
+ * The keys a check reads of the value it runs on, recorded through a proxy
+ * over each of a few values: absent, a number, a string, so a predicate
+ * that branches on what it reads is followed down each branch.
+ */
+function keysRead(
+  check: { run: (v: unknown, ast: SchemaAST.AST, o: object) => unknown; },
+  node: SchemaAST.AST,
+) {
+  const read = new Set<string>();
+  for (const fill of [undefined, 1, "x"]) {
+    const proxy = new Proxy({}, {
+      get: (_, key) => {
+        if (typeof key === "string") read.add(key);
+        return fill;
+      },
+      has: (_, key) => {
+        if (typeof key === "string") read.add(key);
+        return fill !== undefined;
+      },
+    });
+    try {
+      check.run(proxy, node, {});
+    } catch {
+      // A predicate that cannot read a filler value still recorded what it read.
+    }
+  }
+  return [...read].sort();
 }
 
 describe("the cross-field harness", () => {
@@ -154,6 +188,22 @@ describe("the cross-field harness", () => {
 
   it("has a pair for every rule the Schema marks", () => {
     const pairs = new Set(PLANTS.flatMap((p) => (p.rule ? [p.rule] : [])));
-    expect([...markedRules(ObjectTypeFile.ast)].sort()).toEqual([...pairs].sort());
+    const marked = new Set(markedChecks(ObjectTypeFile.ast).map((c) => c.mark.id));
+    expect([...marked].sort()).toEqual([...pairs].sort());
+  });
+
+  it("runs each rule only on fields it declares it reads", () => {
+    // A rule that read an undeclared field would run on it after that
+    // field failed, and misread it.
+    for (const { node, check, mark } of markedChecks(ObjectTypeFile.ast)) {
+      expect([mark.id, keysRead(check, node)]).toEqual([mark.id, [...mark.reads].sort()]);
+    }
+  });
+
+  it("walks a Schema that makes no transformation, so a decoded value is the raw one", () => {
+    // A key rename or a decoding default anywhere would have the harness run
+    // a rule on a shape Effect never checked.
+    const transforming = nodesOf(ObjectTypeFile.ast).filter((n) => n.encoding !== undefined);
+    expect(transforming.map((n) => n._tag)).toEqual([]);
   });
 });

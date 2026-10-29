@@ -27,8 +27,10 @@
  * decoded is the raw value, and running a rule on the raw value is running
  * it on what Effect would have checked.
  */
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
+import * as SchemaIssue from "effect/SchemaIssue";
 import { type Located } from "./problems.js";
 
 /** The mark a cross-field rule carries on its filter. */
@@ -52,9 +54,6 @@ export function markOf(check: unknown): CrossFieldMark | undefined {
     ?.crossField;
   return mark && typeof mark.id === "string" ? mark : undefined;
 }
-
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
 
 const startsWith = (path: readonly PropertyKey[], prefix: readonly PropertyKey[]) =>
   prefix.every((segment, i) => path[i] === segment);
@@ -85,7 +84,8 @@ function walk(
 ): void {
   switch (ast._tag) {
     case "Objects": {
-      if (!isRecord(raw)) return;
+      if (!Predicate.isObject(raw) || Array.isArray(raw)) return;
+      const value = raw as Record<PropertyKey, unknown>;
       for (const check of ast.checks ?? []) {
         const mark = markOf(check);
         if (!mark || check._tag !== "Filter") continue;
@@ -94,35 +94,36 @@ function walk(
         if (located.some((l) => mark.reads.some((f) => startsWith(l.path, [...path, f])))) {
           continue;
         }
-        let issue;
-        try {
-          issue = check.run(raw, ast, {});
-        } catch {
-          // A rule that cannot read the value is not a failure of it.
-          continue;
-        }
+        // Not caught: every field the rule reads decoded, so a rule that
+        // throws here has a bug, and a silent skip would hide it.
+        const issue = check.run(raw, ast, {});
         if (issue === undefined) continue;
         const reported = located.some((l) =>
           samePath(l.path, path) && l.issue._tag === "Filter"
           && markOf(l.issue.filter)?.id === mark.id
         );
-        if (!reported) {
-          found.push({ path, issue: { _tag: "Filter", filter: check, issue } as Located["issue"] });
-        }
+        if (!reported) found.push({ path, issue: new SchemaIssue.Filter(check, issue, raw) });
       }
+      const named = new Set<PropertyKey>();
       for (const ps of ast.propertySignatures) {
-        const key = ps.name;
-        if (typeof key === "string" && key in raw) {
-          walk(ps.type, raw[key], [...path, key], located, found);
+        named.add(ps.name);
+        if (ps.name in value) walk(ps.type, value[ps.name], [...path, ps.name], located, found);
+      }
+      // A record's entries: every key no property names, under the
+      // signature's value type.
+      for (const sig of ast.indexSignatures) {
+        for (const key of Object.keys(value)) {
+          if (!named.has(key)) walk(sig.type, value[key], [...path, key], located, found);
         }
       }
       return;
     }
     case "Arrays": {
       if (!Array.isArray(raw)) return;
-      const item = ast.rest[0];
-      if (item === undefined) return;
-      raw.forEach((element, i) => walk(item, element, [...path, i], located, found));
+      raw.forEach((element, i) => {
+        const item = i < ast.elements.length ? ast.elements[i] : ast.rest[0];
+        if (item !== undefined) walk(item, element, [...path, i], located, found);
+      });
       return;
     }
     case "Union": {
@@ -138,19 +139,43 @@ function walk(
   }
 }
 
+/** A union's members with nested unions and suspensions opened. */
+function membersOf(ast: SchemaAST.AST): SchemaAST.AST[] {
+  if (ast._tag === "Suspend") return membersOf(ast.thunk());
+  if (ast._tag === "Union") return ast.types.flatMap(membersOf);
+  return [ast];
+}
+
+/** The literal values a type admits, or undefined when it is not literal. */
+function literalsOf(ast: SchemaAST.AST): readonly unknown[] | undefined {
+  if (SchemaAST.isLiteral(ast)) return [ast.literal];
+  if (ast._tag === "Union") {
+    const each = ast.types.map(literalsOf);
+    return each.every((l) => l !== undefined) ? each.flat() : undefined;
+  }
+  return undefined;
+}
+
 /**
- * The member of a union the raw value's literal tag selects: the one struct
- * whose literal property the value matches. None when no member or several
- * do, which is a union mismatch Effect has already reported.
+ * The one member of a union the raw value belongs to. A member is a
+ * candidate when it is the right shape for the value -- a struct for an
+ * object, an array for an array -- and every required field of it that
+ * admits only literals (`kind`, `type`, whether `Literal` or `Literals`)
+ * holds one of them; an optional literal field is no tag. None when no
+ * member or several fit, which is a union mismatch Effect has already
+ * reported.
  */
 function memberFor(ast: SchemaAST.Union, raw: unknown): SchemaAST.AST | undefined {
-  if (!isRecord(raw)) return undefined;
-  const matching = ast.types.filter((member) =>
-    member._tag === "Objects"
-    && member.propertySignatures.some((ps) =>
-      SchemaAST.isLiteral(ps.type) && typeof ps.name === "string"
-      && raw[ps.name] === ps.type.literal
-    )
-  );
-  return matching.length === 1 ? matching[0] : undefined;
+  const candidates = membersOf(ast).filter((member) => {
+    if (member._tag === "Arrays") return Array.isArray(raw);
+    if (member._tag !== "Objects") return false;
+    if (!Predicate.isObject(raw) || Array.isArray(raw)) return false;
+    const value = raw as Record<PropertyKey, unknown>;
+    return member.propertySignatures.every((ps) => {
+      if (ps.type.context?.isOptional === true) return true;
+      const literals = literalsOf(ps.type);
+      return literals === undefined || literals.includes(value[ps.name]);
+    });
+  });
+  return candidates.length === 1 ? candidates[0] : undefined;
 }
