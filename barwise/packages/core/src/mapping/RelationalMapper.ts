@@ -44,7 +44,7 @@ import {
 import type { OrmModel } from "../model/OrmModel.js";
 import type { PreferredIdentifierStrategy } from "../model/OrmProject.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
-import { freeColumnName } from "./columnNames.js";
+import { freeColumnName, toSnake } from "./columnNames.js";
 import type {
   Column,
   ForeignKey,
@@ -928,13 +928,6 @@ function associativeKey(
     ?? uniqueness[0];
   if (!chosen) return columns.map((c) => c.name);
   return chosen.roleIds.flatMap((id) => roleColumns.get(id) ?? []);
-}
-
-function toSnake(name: string): string {
-  return name
-    .replace(/([a-z])([A-Z])/g, "$1_$2")
-    .replace(/[\s-]+/g, "_")
-    .toLowerCase();
 }
 
 /**

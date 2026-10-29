@@ -25,6 +25,9 @@ src/
                   and constraint routing: what the schema realized, and what a
                   dialect adds as UNIQUE/CHECK or spills as a ConstraintSpec
   diff/           Model diffing and three-way merge
+  rename/         Renaming an element: renameInModel, and renameInProject with
+                  its cascade into shadows, reference modes, definitions and
+                  mapping files (exported from the root, beside split)
   index.ts        Root public API: foundational only (model, serialization,
                   validation, format registry, import/export types)
 

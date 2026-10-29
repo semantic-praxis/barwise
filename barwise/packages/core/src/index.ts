@@ -192,6 +192,14 @@ export {
   splitModel,
   type SplitResult,
 } from "./project/index.js";
+export {
+  type ProjectRenameResult,
+  RenameError,
+  renameInModel,
+  renameInProject,
+  type RenameResult,
+  type RenameTarget,
+} from "./rename/index.js";
 export { canonicalJson, derivedId } from "./serialization/derivedId.js";
 export {
   CURRENT_MAPPING_FORMAT_VERSION,

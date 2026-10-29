@@ -4,7 +4,8 @@ Status: In progress -- WS1 and WS2 implemented 2026-10-28 (the loader reads a
 minor of the current major, barwise-jj8; `localName()` and the name checks);
 WS3 folded into WS6; WS4 implemented 2026-10-28 with barwise-y1b (versioned
 project and mapping files, `iri_base`, `namespace`, `namespaceOf` and two
-project rules); WS5 grounded (5a core, 5b surfaces; rename recognition moved to WS6) and decision 17 taken; WS5 to WS7 to come
+project rules); decision 17 taken; WS5a implemented 2026-10-29 (`renameInModel`,
+`renameInProject`); rename recognition moved to WS6; WS5b to WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-29
