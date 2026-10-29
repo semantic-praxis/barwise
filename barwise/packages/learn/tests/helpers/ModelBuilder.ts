@@ -9,6 +9,24 @@ import {
 } from "@barwise/core";
 
 /**
+ * The id the builder gives a binary fact type's role, by its position (1 or
+ * 2, as `role1` and `role2` name them). A test that names a role by id
+ * calls this, so the format is decided here. It avoids `:`, which format
+ * 4.0 reserves for an alias, and keeps the fact type's name as written, so
+ * two fact types whose names differ give different ids. The `#` is one
+ * `localName` always encodes, so a builder id never reads as a 4.0 id
+ * (iri-identity, WS6 6a).
+ */
+export function roleId(factTypeName: string, position: 1 | 2): string {
+  return `${factTypeName}#role${position}`;
+}
+
+/** The id of the uniqueness a fact type's `isPreferred` flags. */
+export function preferredId(factTypeName: string): string {
+  return `${factTypeName}#preferred`;
+}
+
+/**
  * Shorthand options for adding an object type via the builder.
  */
 interface ObjectTypeOptions {
@@ -185,7 +203,7 @@ export class ModelBuilder {
    * Add a population with sample instances for a fact type.
    *
    * Instance values use the builder's deterministic role IDs:
-   * "FactTypeName::role1" and "FactTypeName::role2".
+   * `roleId(name, 1)` and `roleId(name, 2)`.
    */
   withPopulation(
     factTypeName: string,
@@ -216,7 +234,7 @@ export class ModelBuilder {
     // The flagged uniqueness of each fact type, by the id it is given.
     const flagged = new Set<string>();
     const flag = (factTypeName: string) => {
-      const id = `${factTypeName}::preferred`;
+      const id = preferredId(factTypeName);
       flagged.add(id);
       return id;
     };
@@ -268,8 +286,8 @@ export class ModelBuilder {
 
       // We need to generate role ids ahead of time so constraints can reference them.
       // We use deterministic ids based on fact type name + position.
-      const role1Id = `${name}::role1`;
-      const role2Id = `${name}::role2`;
+      const role1Id = roleId(name, 1);
+      const role2Id = roleId(name, 2);
 
       if (options.uniqueness) {
         const preferred = options.isPreferred ?? false;

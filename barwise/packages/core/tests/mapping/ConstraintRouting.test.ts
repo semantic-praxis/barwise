@@ -13,7 +13,7 @@ import { DIALECT_PROFILES, resolveDialectProfile } from "../../src/mapping/diale
 import { RelationalMapper } from "../../src/mapping/RelationalMapper.js";
 import { type Constraint, isInternalConstraint } from "../../src/model/Constraint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 const postgres = resolveDialectProfile("postgres");
 
@@ -71,8 +71,8 @@ function spilledPseudocode(model: OrmModel, factName: string, constraint: Constr
 }
 
 const manages = "Person manages Person";
-const mRole1 = `${manages}::role1`;
-const mRole2 = `${manages}::role2`;
+const mRole1 = roleId(manages, 1);
+const mRole2 = roleId(manages, 2);
 
 describe("constraint pseudocode generation", () => {
   it.each(
@@ -125,7 +125,7 @@ describe("constraint pseudocode generation", () => {
 
   it("renders exclusion, exclusive-or, and disjunctive-mandatory role lists", () => {
     const model = baseModel();
-    const leads1 = "Person leads Project::role1";
+    const leads1 = roleId("Person leads Project", 1);
 
     expect(spilledPseudocode(model, manages, {
       type: "exclusion",
@@ -144,7 +144,7 @@ describe("constraint pseudocode generation", () => {
   });
 
   it("renders subset and equality population comparisons", () => {
-    const leads1 = "Person leads Project::role1";
+    const leads1 = roleId("Person leads Project", 1);
 
     expect(spilledPseudocode(baseModel(), manages, {
       type: "subset",
@@ -193,8 +193,8 @@ describe("spill classification", () => {
     const model = baseModel();
     const routing = routeWith(model, "Person leads Project", {
       type: "value_comparison",
-      roleId1: "Person leads Project::role1",
-      roleId2: "Person leads Project::role2",
+      roleId1: roleId("Person leads Project", 1),
+      roleId2: roleId("Person leads Project", 2),
       operator: "<",
     });
 
@@ -222,8 +222,8 @@ describe("spill classification", () => {
 
     const routing = routeWith(model, "Period has StartDay", {
       type: "value_comparison",
-      roleId1: "Period has StartDay::role2",
-      roleId2: "Period has EndDay::role2",
+      roleId1: roleId("Period has StartDay", 2),
+      roleId2: roleId("Period has EndDay", 2),
       operator: "<=",
     });
 
@@ -278,7 +278,7 @@ describe("spill classification", () => {
     const model = baseModel();
     const routing = routeWith(model, "Person has Score", {
       type: "external_uniqueness",
-      roleIds: ["Person has Score::role1", "Person leads Project::role2"],
+      roleIds: [roleId("Person has Score", 1), roleId("Person leads Project", 2)],
     });
 
     expect(routing.spilled).toHaveLength(1);
@@ -292,7 +292,7 @@ describe("spill classification", () => {
     const model = baseModel();
     const routing = routeWith(model, "Person leads Project", {
       type: "value_constraint",
-      roleId: "Person leads Project::role1",
+      roleId: roleId("Person leads Project", 1),
       values: ["x"],
     });
 

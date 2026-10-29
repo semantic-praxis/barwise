@@ -5,7 +5,7 @@
  * drop (schema-export-constraint-specs.spec.md).
  */
 import type { OrmModel } from "@barwise/core";
-import { ModelBuilder } from "./ModelBuilder.js";
+import { ModelBuilder, roleId } from "./ModelBuilder.js";
 
 export const MENTOR_RING_PSEUDOCODE = "for all x: not Person mentors Person(x, x)";
 
@@ -28,8 +28,8 @@ export function mentorsModel(withRing: boolean): OrmModel {
   if (withRing) {
     model.getFactTypeByName("Person mentors Person")!.addConstraint({
       type: "ring",
-      roleId1: "Person mentors Person::role1",
-      roleId2: "Person mentors Person::role2",
+      roleId1: roleId("Person mentors Person", 1),
+      roleId2: roleId("Person mentors Person", 2),
       ringType: "irreflexive",
     });
   }

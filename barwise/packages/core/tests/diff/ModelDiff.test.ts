@@ -1652,9 +1652,15 @@ describe("a constraint over roles of other fact types", () => {
     return m;
   };
   // The same model with every role id replaced, as an import mints them.
+  // The ids are read from the model, not matched by a pattern, so a change
+  // to the builder's id format cannot leave this rewriting nothing.
   const withNewRoleIds = (m: OrmModel) => {
     const yaml = new OrmYamlSerializer();
-    return yaml.deserialize(yaml.serialize(m).replace(/::role(\d)/g, "::minted-$1"));
+    let text = yaml.serialize(m);
+    for (const [i, id] of m.factTypes.flatMap((ft) => ft.roles.map((r) => r.id)).entries()) {
+      text = text.split(id).join(`minted-role-${i}`);
+    }
+    return yaml.deserialize(text);
   };
   // A constraint across fact types has its own delta since WS3c; read an
   // added or removed one as the change kind a fact type used to report.

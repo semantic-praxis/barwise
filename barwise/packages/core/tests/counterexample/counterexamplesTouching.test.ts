@@ -10,7 +10,7 @@ import {
   counterexamplesTouching,
   generateCounterexamples,
 } from "../../src/counterexample/CounterexampleGenerator.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 function drivesRidesWalks() {
   const model = new ModelBuilder()
@@ -35,7 +35,7 @@ function drivesRidesWalks() {
   model.addConstraint({
     id: "c-excl",
     type: "exclusion",
-    roleIds: ["Person drives Car::role1", "Person rides Bus::role1"],
+    roleIds: [roleId("Person drives Car", 1), roleId("Person rides Bus", 1)],
   });
   return model;
 }

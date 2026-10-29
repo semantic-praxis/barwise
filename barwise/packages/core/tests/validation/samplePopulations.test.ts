@@ -19,7 +19,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
-import { ModelBuilder } from "../helpers/ModelBuilder.js";
+import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 const MANDATORY_VIOLATION = "population/mandatory-violation";
 
@@ -51,16 +51,16 @@ function incidents(sample: boolean) {
   add("Incident has Severity", [
     {
       roleValues: {
-        "Incident has Severity::role1": "INC-001",
-        "Incident has Severity::role2": "P1",
+        [roleId("Incident has Severity", 1)]: "INC-001",
+        [roleId("Incident has Severity", 2)]: "P1",
       },
     },
   ]);
   add("Incident seen in Alert", [
     {
       roleValues: {
-        "Incident seen in Alert::role1": "INC-003",
-        "Incident seen in Alert::role2": "A-9",
+        [roleId("Incident seen in Alert", 1)]: "INC-003",
+        [roleId("Incident seen in Alert", 2)]: "A-9",
       },
     },
   ]);
@@ -110,8 +110,8 @@ describe("a sample population", () => {
       .withPopulation("Incident seen in Alert", [
         {
           roleValues: {
-            "Incident seen in Alert::role1": "INC-007",
-            "Incident seen in Alert::role2": "A-1",
+            [roleId("Incident seen in Alert", 1)]: "INC-007",
+            [roleId("Incident seen in Alert", 2)]: "A-1",
           },
         },
       ])
@@ -119,8 +119,8 @@ describe("a sample population", () => {
       .withSamplePopulation("Incident has Severity", [
         {
           roleValues: {
-            "Incident has Severity::role1": "INC-007",
-            "Incident has Severity::role2": "P2",
+            [roleId("Incident has Severity", 1)]: "INC-007",
+            [roleId("Incident has Severity", 2)]: "P2",
           },
         },
       ])
@@ -149,14 +149,14 @@ describe("a sample population", () => {
       .withSamplePopulation("Incident has Severity", [
         {
           roleValues: {
-            "Incident has Severity::role1": "INC-001",
-            "Incident has Severity::role2": "P1",
+            [roleId("Incident has Severity", 1)]: "INC-001",
+            [roleId("Incident has Severity", 2)]: "P1",
           },
         },
         {
           roleValues: {
-            "Incident has Severity::role1": "INC-001",
-            "Incident has Severity::role2": "P3",
+            [roleId("Incident has Severity", 1)]: "INC-001",
+            [roleId("Incident has Severity", 2)]: "P3",
           },
         },
       ])
