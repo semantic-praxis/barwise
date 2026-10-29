@@ -180,7 +180,10 @@ In scope:
   to the wrong element rather than to nothing. A 4.0 project load
   therefore compares each shadow's `name` with its resolved owner's
   `name` and reports a mismatch naming the owner, and `barwise migrate`
-  given the project fixes both sides.
+  given the project fixes both sides. The check also fires when the
+  owner's `name` was edited without a rename (decision 13(a)), where the
+  alias binds correctly; that is accepted, because the shadow's copy of
+  the name is then stale too.
 - When a 4.0 build checks lineage against an export written under 3.x ids,
   which the manifest's version marks, it shall report the export as stale
   with the reason "ids changed to 4.0" rather than as an ordinary change,
@@ -912,17 +915,26 @@ PR and may be released.
   always passes it), so in a shared directory it names whichever domain
   exported last, and copying it into the old exports would hand domain A's
   artifacts to domain B. An old export is attributed by its `sources`
-  instead: 6a ships on 3.x, where element UUIDs never collide across
-  models, so an export whose `elementId`s a model holds is that model's,
-  and the first write after 6a records it. An export that cannot be placed
-  that way (no sources, or ids no loaded model holds) stays unattributed,
-  and every model's status lists it as unattributed, to be re-exported.
-  The top-level field is kept, so an older build reads the manifest as it
-  does today. Without a model path -- MCP `impact_analysis` and
-  `lineage_status` given inline YAML (`impactAnalysis.ts:41-42`,
-  `lineageStatus.ts:35-40`) -- a report reads the exports whose sources
-  the given model holds, and when more than one model's exports hold an
-  id, it names each model rather than merging them. The two identical `lineageIo.readManifest`
+  instead, to the one model that holds every source id and owns at least
+  one of them. Holding is not enough, because split gives each shadow its
+  owner's UUID (`splitModel.ts:347-348`), so a domain's shadow holds the
+  owner's ids; a shadow (`source_context` set) does not own. The first
+  write after 6a records the attribution. An export that no model, or
+  more than one, qualifies for (no sources, ids no loaded model owns)
+  stays unattributed, and every model's status lists it as unattributed,
+  to be re-exported. A user who upgrades straight to 4.0 with no 6a write
+  between gets the same rule through the 3.x reader's in-memory UUID map,
+  or, for a domain loaded as 4.0, an unattributed export. The top-level
+  field is kept, so an older build reads the manifest as it does today.
+  Without a model path -- MCP `impact_analysis` and `lineage_status` given
+  inline YAML (`impactAnalysis.ts:41-42`, `lineageStatus.ts:35-40`) --
+  there is no model to attribute by under 4.0, where local names collide.
+  Impact, which never loads the model (`impactAnalysis.ts:36-48`), reads
+  every export that holds the id and names each export's model.
+  `lineage_status` with inline YAML reads the manifest as today when its
+  exports name one model, and otherwise refuses, naming the models and
+  asking for a path, rather than comparing one model's hash with
+  another's exports. The two identical `lineageIo.readManifest`
   copies (cli and mcp) are registered in `parity.manifest.json` in the
   same PR.
 - **Diff recognizes renames (decision 8).** The WS5 plan review moved this
@@ -1028,9 +1040,10 @@ version-1 manifest would go silently empty for impact analysis.
     objectifying type's id; any other objectified fact type's id is
     `localName(name)`. The id is fixed when it is given: renaming a
     player or editing the reading changes neither the id nor any warning.
-    `renameInModel` gives a renamed fact type `localName(new name)`, or,
-    when that is again its objectifying type's id, the decision-20 id from
-    its first reading at that moment. The
+    `renameInModel` gives a renamed fact type `localName(new name)`; a
+    new name whose local name is its objectifying type's id is refused
+    there, as WS5 refuses any held local name, so the decision-20 id is
+    given only at import and in migration. The
     two importers that objectify know it from their source before they add
     the fact type, so each states that id; the replay does the same in
     migration. Decision 17's bullet is read that way: decision 4 applies
@@ -1087,15 +1100,19 @@ version-1 manifest would go silently empty for impact analysis.
     message says suffixed); an objectified fact type whose name's local
     name is its objectifying type's id is exempt, because no id from its
     name can be stated beside that type's, and its decision-20 id, once
-    given, is kept like any other until a rename. In 4.0
+    given, is kept like any other until a rename. Renaming the objectifying
+    type ends the exemption, and the rule then reports the fact type's
+    decision-20 id; that is expected, because a rename of the fact type can
+    now give it `localName(name)`, which is the repair. In 4.0
     `structural/local-name-collision` (`structural.ts:255-280`), which
     compares `localName(name)` today, compares ids, so the 22 corpus
     pairs and every NORMA import stop warning once their ids differ, and
     its 3.x message, which says the migration "will rename the fact
     type", says it gives the fact type its own id; role ids embed their
     fact type's id, not `localName(name)`, and
-    `structural/duplicate-role-name` (`structural.ts:289`) builds them
-    that way; `stale-minted-name`, a graph rule run only
+    `structural/duplicate-role-name` and the `population` variant of
+    `local-name-collision` build them that way from one `ftLocal`
+    (`structural.ts:303,310-313`); `stale-minted-name`, a graph rule run only
     when the graph builds (decision 14, section 3); a reference whose
     alias the model does not import (error), and a declared alias whose
     context no loaded project supplies (warning), so a standalone domain
@@ -1230,9 +1247,10 @@ version-1 manifest would go silently empty for impact analysis.
   serialized model, so a model's own `namespace` and `imports` are in the
   hash; `iri_base` and contexts are in the project file, which is not.
   That settles WS4's "which namespace inputs lineage tracks": the model's
-  own, and the project's none, because the one export whose output holds
-  IRIs runs through the project form, which records no lineage (6b's
-  `iriOf`). Renames rewrite the manifests
+  own, which the hash covers, so an export of a domain file that declares
+  its own `namespace` (`export.ts:96-108`) is tracked through it; and the
+  project's none, because a project export, whose IRIs come from
+  `iri_base` and the context, records no lineage (6b's `iriOf`). Renames rewrite the manifests
   they can see through a pure core helper, `renameInManifest(manifest,
   ids, sourceModel)`, never restamping the hash, because the artifacts
   really are stale: for a model file, `<dir>/.barwise/lineage.yaml`; for
@@ -1480,9 +1498,9 @@ accepted. The options stay, so a later reader sees what was weighed.
   `iri_base`, a context, or a model's `namespace` moves every IRI `iriOf`
   gives, though no stored id changes, because ids are local names (6b).
   The project's display name is kept out of the namespace for this reason
-  (WS4). Diff reports a model's own namespace and imports (6b); an export
-  that holds IRIs is a project export, which lineage does not track (6b,
-  6e); a context renamed by
+  (WS4). Diff reports a model's own namespace and imports (6b); a project
+  export's IRIs are untracked by lineage, and an export under a model's own
+  namespace is covered by the model's hash (6e); a context renamed by
   hand is reported as unresolved aliases until a context rename exists.
 - Run the full monorepo build and tests after each workstream; WS6 changes
   core's public API.
