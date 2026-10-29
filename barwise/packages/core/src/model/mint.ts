@@ -19,6 +19,7 @@
  * element gets no name, and validation reports what is wrong with it.
  */
 import { serializeConstraint } from "../serialization/yaml/constraint.js";
+import { sentenceHolds } from "../verbalization/constraints/assumptions.js";
 import { ConstraintVerbalizer } from "../verbalization/ConstraintVerbalizer.js";
 import {
   verbalizeObjectifiedFactType,
@@ -36,61 +37,92 @@ export type Mintable =
   | { readonly kind: "subtypeFact"; readonly subtypeFact: SubtypeFact; }
   | { readonly kind: "objectification"; readonly objectification: ObjectifiedFactType; };
 
+/** A minted name and the key it was minted from. */
+export interface Minted {
+  readonly name: string;
+  readonly key: string;
+}
+
 const verbalizer = new ConstraintVerbalizer();
+
+/**
+ * The element's name and key, or undefined when its sentence would not be
+ * of this element. One call checks the element once; `mintedName` and
+ * `mintedKey` are this, halved.
+ */
+export function mint(element: Mintable, model: ConstraintModel): Minted | undefined {
+  if (!isMintable(element, model)) return undefined;
+  const text = sentence(element, model).trim().replace(/\.$/, "");
+  return { name: localName(text), key: JSON.stringify(key(element, model)) };
+}
 
 /**
  * The element's name: its sentence without the closing period, through
  * `localName()`. Undefined when the sentence would not be of this element.
  */
 export function mintedName(element: Mintable, model: ConstraintModel): string | undefined {
-  if (!isMintable(element, model)) return undefined;
-  const text = sentence(element, model).trim().replace(/\.$/, "");
-  return localName(text);
+  return mint(element, model)?.name;
 }
 
 /**
  * What the name was minted from, without ids: the element's serialized
  * form with its id dropped and every reference replaced by what the
- * sentence names -- an object type by its name, a role by its position in
- * its fact type and that fact type's readings and players, a subtype fact
- * by its two types' names. Not the sentence, so a change to the
- * verbalizer's wording does not make every name stale (decision 14).
- * Undefined when the element is not mintable.
+ * sentence names -- an object type by its name, a role by its name, its
+ * position, and its fact type, a subtype fact by its two types' names.
+ * Not the sentence, so a change to the verbalizer's wording does not make
+ * every name stale (decision 14). Undefined when the element is not
+ * mintable.
+ *
+ * The key is built from the serializer's field names rather than the
+ * model's because the serialized form is what `minted_from` sits beside in
+ * the file, and a reader comparing the two reads one vocabulary.
  */
 export function mintedKey(element: Mintable, model: ConstraintModel): string | undefined {
-  if (!isMintable(element, model)) return undefined;
+  return mint(element, model)?.key;
+}
+
+function key(element: Mintable, model: ConstraintModel): unknown {
   switch (element.kind) {
-    case "constraint":
-      return JSON.stringify(constraintKey(element.inView, model));
+    case "constraint": {
+      const [constraint, host] = element.inView;
+      const stated = constraintKey(constraint, model);
+      // An internal constraint's sentence names its fact type even where
+      // no role does (a value constraint on the whole fact type), so the
+      // host is part of what the name was minted from.
+      return host === undefined ? stated : { ...stated, fact_type: factTypeKey(host, model) };
+    }
     case "subtypeFact": {
       const sf = element.subtypeFact;
-      return JSON.stringify({
+      return {
         subtype: model.getObjectType(sf.subtypeId)!.name,
         supertype: model.getObjectType(sf.supertypeId)!.name,
-        defining_rule: sf.definingRule ?? null,
-      });
+        // The sentence prints the expression; the rule's kind and storage
+        // do not change what it says.
+        defining_rule: sf.definingRule?.expression ?? null,
+      };
     }
     case "objectification": {
       const o = element.objectification;
-      return JSON.stringify({
+      return {
         fact_type: factTypeKey(model.getFactType(o.factTypeId)!, model),
         object_type: model.getObjectType(o.objectTypeId)!.name,
-      });
+      };
     }
   }
 }
 
 /**
  * Whether the element's sentence is of the element: every reference
- * resolves, each role to exactly one fact type, and an internal
- * constraint's roles to its own. A local check, not `graphOf`, which reads
- * the whole model and would make each add linear in its size.
+ * resolves, each role to exactly one fact type, an internal constraint's
+ * roles to its own, and what the sentence assumes of the shape holds
+ * (`sentenceHolds`). It reads only what the element names, through the
+ * model's lookups, not `graphOf`, which builds the whole model's graph.
  */
 export function isMintable(element: Mintable, model: ConstraintModel): boolean {
   switch (element.kind) {
     case "constraint": {
       const [constraint, host] = element.inView;
-      return references(constraint).every((ref) => {
+      const resolves = references(constraint).every((ref) => {
         if (ref.kind === "objectType") return model.getObjectType(ref.id) !== undefined;
         if (ref.kind === "subtypeFact") {
           const sf = model.getSubtypeFact(ref.id);
@@ -103,6 +135,7 @@ export function isMintable(element: Mintable, model: ConstraintModel): boolean {
         // dangles would read as its role name.
         return holders[0]!.roles.every((r) => model.getObjectType(r.playerId) !== undefined);
       });
+      return resolves && sentenceHolds(constraint, model);
     }
     case "subtypeFact": {
       const sf = element.subtypeFact;
@@ -133,9 +166,10 @@ function sentence(element: Mintable, model: ConstraintModel): string {
   }
 }
 
-/** A role's fact type as its sentence names it: its readings and players. */
+/** A fact type as sentences name it: its name, readings, and players. */
 function factTypeKey(ft: FactType, model: ConstraintModel): unknown {
   return {
+    name: ft.name,
     readings: ft.readings.map((r) => r.template),
     players: ft.roles.map((r) => model.getObjectType(r.playerId)?.name ?? null),
   };
@@ -229,8 +263,11 @@ function references(constraint: Parameters<typeof serializeConstraint>[0]): Refe
   return refs;
 }
 
-function constraintKey(inView: ConstraintInView, model: ConstraintModel): unknown {
-  return walk(inView[0], (ref) => {
+function constraintKey(
+  constraint: ConstraintInView[0],
+  model: ConstraintModel,
+): Record<string, unknown> {
+  return walk(constraint, (ref) => {
     switch (ref.kind) {
       case "objectType":
         return model.getObjectType(ref.id)!.name;
@@ -240,7 +277,8 @@ function constraintKey(inView: ConstraintInView, model: ConstraintModel): unknow
       }
       case "role": {
         const ft = model.factTypesHolding([ref.id])[0]!;
-        return [ft.roles.findIndex((r) => r.id === ref.id), factTypeKey(ft, model)];
+        const at = ft.roles.findIndex((r) => r.id === ref.id);
+        return [at, ft.roles[at]!.name, factTypeKey(ft, model)];
       }
     }
   });

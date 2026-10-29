@@ -14,11 +14,14 @@ import {
   isExternalConstraint,
 } from "../../src/model/Constraint.js";
 import type { ConstraintInView } from "../../src/model/constraintModel.js";
-import { isMintable, type Mintable, mintedKey, mintedName } from "../../src/model/mint.js";
+import { isMintable, mint, type Mintable, mintedKey, mintedName } from "../../src/model/mint.js";
 import { localName } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ConstraintVerbalizer } from "../../src/verbalization/ConstraintVerbalizer.js";
 import { arbOrmModel } from "../arbitraries/model.js";
+
+// These fixtures build `OrmModel` directly rather than through
+// `ModelBuilder`: ids are what the tests vary, so they are written out.
 
 /**
  * One model, every id prefixed by `p`, so two copies differ in every id and
@@ -176,15 +179,134 @@ describe("a minted constraint name", () => {
           projection: [0, 1],
         }, { path: { root: "nope", steps: [{ entry: "ad0", exit: "ad1" }] }, projection: [0, 1] }],
       }, undefined],
+      // What the sentence assumes of the shape (`sentenceHolds`): each of
+      // these resolves, and its sentence would still misstate it.
+      ["a disjunctive mandatory over roles of two players", {
+        type: "disjunctive_mandatory",
+        id: "x",
+        roleIds: ["ad1", "an0"],
+      }, undefined],
+      ["an exclusive-or over roles of two players", {
+        type: "exclusive_or",
+        id: "x",
+        roleIds: ["an0", "ad1"],
+      }, undefined],
+      ["an exclusion over subtype facts of two supertypes", {
+        type: "exclusion",
+        id: "x",
+        subtypeFactIds: ["as1", "as3"],
+      }, undefined],
+      ["an exclusion over no subtype facts", {
+        type: "exclusion",
+        id: "x",
+        subtypeFactIds: [],
+      }, undefined],
+      ["a join projecting a negative index", {
+        type: "join_ring",
+        id: "x",
+        operand: {
+          path: { root: "aP", steps: [{ entry: "ak0", exit: "ak1" }] },
+          projection: [-1, 1],
+        },
+        ringType: "irreflexive",
+      }, undefined],
+      ["a join projecting nothing", {
+        type: "join_ring",
+        id: "x",
+        operand: {
+          path: { root: "aP", steps: [{ entry: "ak0", exit: "ak1" }] },
+          projection: [],
+        },
+        ringType: "irreflexive",
+      }, undefined],
+      ["a uniqueness over no roles", { type: "internal_uniqueness", id: "x", roleIds: [] }, "ad"],
+      ["an external uniqueness over no roles", {
+        type: "external_uniqueness",
+        id: "x",
+        roleIds: [],
+      }, undefined],
+      ["a join projecting a node the path does not reach", {
+        type: "join_ring",
+        id: "x",
+        operand: {
+          path: { root: "aP", steps: [{ entry: "ak0", exit: "ak1" }] },
+          projection: [0, 2],
+        },
+        ringType: "irreflexive",
+      }, undefined],
+      ["a join step that crosses fact types", {
+        type: "join_ring",
+        id: "x",
+        operand: {
+          path: { root: "aP", steps: [{ entry: "ad0", exit: "an1" }] },
+          projection: [0, 1],
+        },
+        ringType: "irreflexive",
+      }, undefined],
+      ["a join rooted at a type its first step is not entered by", {
+        type: "join_ring",
+        id: "x",
+        operand: {
+          path: { root: "aC", steps: [{ entry: "ad0", exit: "ad1" }] },
+          projection: [0, 1],
+        },
+        ringType: "irreflexive",
+      }, undefined],
+      ["a join step that enters and exits by one role", {
+        type: "join_ring",
+        id: "x",
+        operand: {
+          path: { root: "aP", steps: [{ entry: "ad0", exit: "ad0" }] },
+          projection: [0, 1],
+        },
+        ringType: "irreflexive",
+      }, undefined],
     ] as const,
   )("is not minted for %s", (_what, raw, hostId) => {
     const m = people("a");
+    m.addObjectType({ id: "aV", name: "Van", kind: "entity", referenceMode: "vin" });
+    m.addSubtypeFact({ id: "as3", subtypeId: "aV", supertypeId: "aC" });
     const c = raw as unknown as Constraint;
     const host = hostId === undefined ? undefined : m.getFactType(hostId);
     const element: Mintable = { kind: "constraint", inView: [c, host] as ConstraintInView };
     expect(isMintable(element, m)).toBe(false);
     expect(mintedName(element, m)).toBeUndefined();
     expect(mintedKey(element, m)).toBeUndefined();
+    expect(mint(element, m)).toBeUndefined();
+  });
+
+  it("changes its key when a fact type or role it names is renamed", () => {
+    // The sentence prints both, so a key without them would call a name
+    // current that no longer reads true.
+    const keyOf = (rename: (m: OrmModel) => void) => {
+      const m = people("a");
+      rename(m);
+      const c = { type: "mandatory", id: "x", roleId: "ad0" } as Constraint;
+      return mintedKey(asConstraint(m, c), m);
+    };
+    const base = keyOf(() => {});
+    expect(keyOf((m) => (m.getFactType("ad")!.name = "Person operates Car"))).not.toBe(base);
+    expect(keyOf((m) => (m.getFactType("ad")!.roles[0]!.name = "operates"))).not.toBe(base);
+  });
+
+  it("keys an internal constraint by its fact type even where no role names it", () => {
+    const m = people("a");
+    const vc = { type: "value_constraint", id: "x", values: ["1"] } as Constraint;
+    const on = (id: string) =>
+      mintedKey({ kind: "constraint", inView: [vc, m.getFactType(id)] as ConstraintInView }, m);
+    expect(on("an")).toBeDefined();
+    expect(on("an")).not.toBe(on("aa"));
+  });
+
+  it("gives mint the same name and key as the two halves", () => {
+    const m = people("a");
+    for (const c of everyKind("a")) {
+      const element = asConstraint(m, c);
+      expect(mint(element, m), c.type).toEqual({
+        name: mintedName(element, m),
+        key: mintedKey(element, m),
+      });
+    }
   });
 
   it("is not minted when a player of the role's fact type dangles", () => {
@@ -237,6 +359,23 @@ describe("a minted subtype fact or objectification name", () => {
     );
   });
 
+  it("keys a defining rule by its expression alone", () => {
+    const keyOf = (rule: object) => {
+      const m = people("a");
+      m.addObjectType({ id: "aV", name: "Veteran", kind: "entity", referenceMode: "nr" });
+      m.addSubtypeFact({
+        id: "x",
+        subtypeId: "aV",
+        supertypeId: "aP",
+        definingRule: rule as never,
+      });
+      return mintedKey({ kind: "subtypeFact", subtypeFact: m.getSubtypeFact("x")! }, m);
+    };
+    const said = { kind: "derived", expression: "each Person who served" };
+    expect(keyOf({ ...said, storage: "stored" })).toBe(keyOf(said));
+    expect(keyOf({ ...said, expression: "each Person who retired" })).not.toBe(keyOf(said));
+  });
+
   it("is not minted for a subtype fact whose end dangles", () => {
     const m = people("a");
     const element: Mintable = {
@@ -248,18 +387,26 @@ describe("a minted subtype fact or objectification name", () => {
 });
 
 describe("minting over generated models", () => {
-  it("is defined or refused for every constraint, never throws, and is the same twice", () => {
+  it("is defined or refused for every constraint, never throws, and keys hold no id", () => {
+    // The generator's ids (`ot0`, `ft2`, `ft2r1`, `sf0`, `c3`, `pref1`)
+    // are never also names (`T0`, `F2`, `plays1`), so one appearing as a
+    // whole string in a key is an id the walk let through.
+    const generatedId = /"(?:ot|ft|sf|c|pref)\d+(?:r\d+)?"/;
+    let minted = 0;
     fc.assert(
       fc.property(arbOrmModel(), (model) => {
         for (const inView of model.everyConstraint()) {
           const element: Mintable = { kind: "constraint", inView };
-          const name = mintedName(element, model);
-          expect(name).toBe(mintedName(element, model));
-          expect(mintedKey(element, model)).toBe(mintedKey(element, model));
-          expect(name === undefined).toBe(!isMintable(element, model));
+          const result = mint(element, model);
+          expect(result === undefined).toBe(!isMintable(element, model));
+          if (result === undefined) continue;
+          minted++;
+          expect(result.key).not.toMatch(generatedId);
         }
       }),
       { seed: 20261029, numRuns: 100 },
     );
+    // A run that minted nothing would pass every assertion above.
+    expect(minted).toBeGreaterThan(0);
   });
 });

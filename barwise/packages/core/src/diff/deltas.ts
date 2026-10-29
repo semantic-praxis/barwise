@@ -365,7 +365,7 @@ export function pairingNote(delta: ModelDelta): string | undefined {
       // already refuses it and the JSON shows it, so a silent text line
       // here would be the one surface that hides it.
       const unhandled: never = pairing;
-      return unhandled;
+      throw new Error(`pairingNote: no note for pairing "${String(unhandled)}".`);
     }
   }
 }

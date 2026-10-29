@@ -1032,7 +1032,31 @@ build differs from the bullet above:
   the walk does not know throws, so a constraint kind added later must say
   which of its fields are references. The guard and the key share that
   walk. The guard also requires every player of a role's fact type, which
-  the sentence names, to resolve.
+  the sentence names, to resolve. The key keeps the serializer's field
+  names, not the model's, because `minted_from` sits beside that form in
+  the file and a reader comparing the two reads one vocabulary.
+- Resolving is not enough for the guard: a disjunctive mandatory over roles
+  of two players resolves, and its sentence names the first role's player
+  as the one every instance plays. What each sentence assumes of its
+  constraint's shape -- one shared player, one shared supertype, a join path
+  that chains and projects nodes it reaches, something to constrain -- is
+  stated once, in `verbalization/constraints/assumptions.ts`, beside the
+  sentences, and the guard refuses a constraint whose shape breaks it. That
+  module is not validation: it answers only whether this one sentence is of
+  its constraint.
+- The key holds what the sentence prints: a role is its position, its name
+  and its fact type's name, readings and players; an internal constraint
+  also carries its host fact type, which its sentence names even where no
+  role does (a value constraint on the whole fact type); a subtype fact's
+  defining rule is its expression alone. `mint()` returns the name and key
+  from one check; `mintedName` and `mintedKey` read it.
+- Two consequences for 6b. A key can still hold something no sentence
+  prints (every reading of a role's fact type, where a sentence uses one),
+  so a name is stale only when the key differs and the name minted now
+  differs too; otherwise the key is refreshed in place. And two constraints
+  can mint one name from different keys (an external uniqueness over
+  `[a, b]` and over `[b, a]` reads the same), which is the suffix rule's
+  case, not the guard's.
 
 **6b to 6f, the 4.0 series: no release between them**, as
 `orm-format-3`'s 4a/4b, because a build that writes 4.0 must already
