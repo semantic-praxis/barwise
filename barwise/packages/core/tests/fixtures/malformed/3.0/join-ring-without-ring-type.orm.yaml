@@ -1,0 +1,32 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-person
+      name: Person
+      kind: entity
+      reference_mode: person_id
+  fact_types:
+    - id: ft-loop-mentors
+      name: Person mentors Person
+      roles:
+        - id: r-loop-mentor
+          player: ot-person
+          role_name: mentors
+        - id: r-loop-mentee
+          player: ot-person
+          role_name: is mentored by
+      readings:
+        - "{0} mentors {1}"
+  constraints:
+    - id: c-loop-join-ring
+      type: join_ring
+      operand:
+        path:
+          root: ot-person
+          steps:
+            - entry: r-loop-mentor
+              exit: r-loop-mentee
+        projection:
+          - 0
+          - 1

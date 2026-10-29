@@ -1,0 +1,11 @@
+orm_version: "3.0"
+model:
+  name: Malformed
+  object_types:
+    - id: ot-warehouse
+      name: Warehouse
+      kind: entity
+      reference_mode: warehouse_code
+      value_constraint:
+        values:
+          - W1

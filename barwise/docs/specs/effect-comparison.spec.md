@@ -1220,7 +1220,7 @@ this one. The list is the trial scorer's protected set, path for path.
 > whose path contains "golden"), `barwise/packages/promptlab/tests/referenceDrift.test.ts`,
 > any `*.reference.orm.yaml`, `barwise/scripts/measure-comparison.mjs`,
 > `barwise/scripts/tests/measure-comparison.test.mjs`, and these modules
-> under `barwise/scripts/lib/`: `changed-class.mjs`, `malformed-score.mjs`,
+> under `barwise/scripts/lib/`: `changed-class.mjs`, `corpus-listing.mjs`, `malformed-score.mjs`,
 > `median.mjs`, `module-count-hook.mjs`, `schema-cases.mjs`, `tracked.mjs`. Read
 > the root `CLAUDE.md` and `barwise/packages/core/CLAUDE.md` first.
 > Commit your work on the branch when you are done; do not push. Report

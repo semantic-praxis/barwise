@@ -66,7 +66,6 @@ export type ConstraintRecord =
   | (Base & {
     readonly type: "internal_uniqueness";
     readonly roleIds: readonly string[];
-    readonly isPreferred?: boolean;
   })
   | (Base & { readonly type: "mandatory"; readonly roleId: string; })
   | (Base & { readonly type: "external_uniqueness"; readonly roleIds: readonly string[]; })
@@ -130,6 +129,20 @@ export type ConstraintRecord =
 export type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false)
   : false;
 
+/** Every key of every member of a union, optional keys included. */
+type AllKeys<T> = T extends unknown ? keyof T : never;
+
+/**
+ * Mutually assignable and stating the same keys. Assignability alone treats
+ * an optional key as matching whether it is there or not, so a record that
+ * kept 2.0's `isPreferred?` matched a union that had dropped it, and a port
+ * that kept or dropped an optional field would pass (effect-adoption.spec.md,
+ * 1r, R0).
+ */
+type SameMember<A, B> = MutuallyAssignable<A, B> extends true
+  ? MutuallyAssignable<AllKeys<A>, AllKeys<B>>
+  : false;
+
 /**
  * For each kind of the frozen record, whether `Candidate`'s member of that
  * kind and the record's are mutually assignable, and whether `Candidate`
@@ -139,7 +152,7 @@ export type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true
  */
 export type KindsMatch<Candidate extends { readonly type: string; }> =
   & {
-    [K in ConstraintRecord["type"]]: MutuallyAssignable<
+    [K in ConstraintRecord["type"]]: SameMember<
       Extract<Candidate, { readonly type: K; }>,
       Extract<ConstraintRecord, { readonly type: K; }>
     >;

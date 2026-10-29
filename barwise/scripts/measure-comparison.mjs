@@ -5,9 +5,16 @@
  *   startup   [--runs N] [--no-build]   G4: `barwise validate` on the reference
  *                                       model, npm build and release bundle
  *   bundles   [--no-build]              R2: vscode and CLI bundle sizes
- *   malformed [--json]                  D2 (and effect-adoption S4): how the
+ *   malformed [--json] [--format 3.0]   D2 (and effect-adoption S4): how the
  *                                       loader reports malformed object
- *                                       types, fact types and constraints
+ *                                       types, fact types and constraints;
+ *                                       --format 3.0 scores the 3.0 cases
+ *                                       (effect-adoption 1r)
+ *   corpus    [--write D | --read D]    effect-adoption S1 (1r): each tracked
+ *                                       model's 3.0 bytes, hashed, strict and
+ *                                       lenient, for comparing two heads;
+ *                                       --write keeps the 3.0 text in D,
+ *                                       --read lists D's files instead
  *   typecheck [--runs N]                effect-adoption S6: core's cold
  *                                       type-check time and instantiations
  *   diff      <base> [<head>]           D1, R1, R3: what a change touched
@@ -35,11 +42,21 @@
  * (barwise-r7j).
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { cpus, tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { committedPaths, uncommittedPaths } from "./lib/changed-class.mjs";
+import { corpusListing } from "./lib/corpus-listing.mjs";
 import {
   ambiguityReport,
   caseProblem,
@@ -322,8 +339,18 @@ function bundles(args) {
 
 // -- malformed -------------------------------------------------------------
 
+/**
+ * The fixture sets, by the format they are written in. The 2.0 set is the
+ * comparison's and WS0's; the 3.0 set restates it at 3.0 and adds the
+ * rules 3.0 brought (effect-adoption.spec.md, 1r, R0).
+ */
+const MALFORMED_SETS = { "2.0": MALFORMED_DIR, "3.0": join(MALFORMED_DIR, "3.0") };
+
 async function malformed(args) {
-  const manifestPath = join(MALFORMED_DIR, "cases.json");
+  const format = flag(args, "--format") ?? "2.0";
+  const dir = MALFORMED_SETS[format];
+  if (!dir) refuse(`--format ${format}: one of ${Object.keys(MALFORMED_SETS).join(", ")}.`);
+  const manifestPath = join(dir, "cases.json");
   if (!existsSync(manifestPath)) refuse(`${manifestPath} is missing.`);
   let loader;
   try {
@@ -332,20 +359,31 @@ async function malformed(args) {
   } catch (error) {
     refuse(`@barwise/core could not be loaded (build it first): ${error.message.split("\n")[0]}`);
   }
-  const { cases } = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const read = (file) => readFileSync(join(MALFORMED_DIR, file), "utf8");
-  const results = cases.map((c) => ({
-    file: c.file,
-    ...scoreDocument(read(c.file), [caseProblem(c, read(c.file)).problem], loader),
-  }));
-  const all = combine(cases, read);
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const { cases } = manifest;
+  // The fixtures say what they are written in; the flag only picks the set.
+  const version = manifest.orm_version ?? "2.0";
+  if (version !== format) refuse(`${manifestPath} states orm_version ${version}, not ${format}.`);
+  const read = (file) => readFileSync(join(dir, file), "utf8");
+  let results;
+  let all;
+  try {
+    results = cases.map((c) => ({
+      file: c.file,
+      ...scoreDocument(read(c.file), [caseProblem(c, read(c.file)).problem], loader),
+    }));
+    all = combine(cases, read, version);
+  } catch (error) {
+    // A manifest the scorer cannot read is no reading, not a finding.
+    refuse(`the ${format} cases cannot be scored: ${error.message}`);
+  }
   const combined = scoreDocument(all.yaml, all.problems, loader);
   const ambiguity = ambiguityReport([...results, combined]);
   if (ambiguity) refuse(ambiguity);
 
   if (args.includes("--json")) {
     process.stdout.write(
-      `${JSON.stringify({ environment: environment(), results, combined }, null, 2)}\n`,
+      `${JSON.stringify({ environment: environment(), format, results, combined }, null, 2)}\n`,
     );
     return 0;
   }
@@ -360,6 +398,51 @@ async function malformed(args) {
   };
   for (const r of results) process.stdout.write(`${r.file.padEnd(40)} ${one(r)}\n`);
   process.stdout.write(`${"combined (every case in one file)".padEnd(40)} ${one(combined)}\n`);
+  return 0;
+}
+
+// -- corpus ----------------------------------------------------------------
+
+/** Every file under `dir`, as paths relative to it, sorted. */
+function filesUnder(dir, prefix = "") {
+  return readdirSync(join(dir, prefix), { withFileTypes: true })
+    .flatMap((e) =>
+      e.isDirectory() ? filesUnder(dir, join(prefix, e.name)) : [join(prefix, e.name)]
+    )
+    .sort();
+}
+
+async function corpus(args) {
+  const writeDir = flag(args, "--write");
+  const readDir = flag(args, "--read");
+  if (writeDir && readDir) refuse("--write and --read are two runs, on two heads; give one.");
+  let loader;
+  try {
+    const core = await import("@barwise/core");
+    loader = new core.OrmYamlSerializer();
+  } catch (error) {
+    refuse(`@barwise/core could not be loaded (build it first): ${error.message.split("\n")[0]}`);
+  }
+  // Tracked files, asked of git: a checkout holds untracked trial outputs
+  // CI never sees, and a listing of them would differ between worktrees.
+  let texts;
+  try {
+    const files = readDir
+      ? filesUnder(resolve(readDir)).map((f) => [f, join(resolve(readDir), f)])
+      : git(["ls-files", "--", "*.orm.yaml"]).trim().split("\n").filter(Boolean)
+        .map((f) => [f, join(REPO_ROOT, f)]);
+    texts = new Map(files.map(([f, abs]) => [f, readFileSync(abs, "utf8")]));
+  } catch (error) {
+    refuse(`the corpus could not be read: ${error.message.split("\n")[0]}`);
+  }
+  const written = writeDir ? new Map() : undefined;
+  const lines = corpusListing(texts, loader, written);
+  for (const [f, text] of written ?? []) {
+    const out = join(resolve(writeDir), f);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, text);
+  }
+  process.stdout.write(`${lines.join("\n")}\n`);
   return 0;
 }
 
@@ -1021,7 +1104,17 @@ function usage(args) {
 }
 
 const [command, ...rest] = process.argv.slice(2);
-const commands = { startup, typecheck, bundles, malformed, diff, trial, heldout, usage };
+const commands = {
+  startup,
+  typecheck,
+  bundles,
+  malformed,
+  corpus,
+  diff,
+  trial,
+  heldout,
+  usage,
+};
 if (!commands[command]) {
   refuse(`unknown subcommand ${command ?? "(none)"}; one of ${Object.keys(commands).join(", ")}.`);
 }
