@@ -580,9 +580,14 @@ Name exactly one element: `objectType`, `factType`, or `factType` with
 **Returns** JSON: for inline YAML, `yaml` (the renamed model), `changes`
 and `warnings`; for a file or project source, `written`, `writtenTo` (or
 `files` under `check`), `changes` and `warnings`; for a refusal, `error`
-and nothing written. A model that declares a `domain_context` gets a
+and nothing written. If replacing the files fails part-way, the result has
+`error` together with `written: true`, `writtenTo` naming the files
+already replaced, and `changes`: some files are renamed and the rest are
+not. A model that declares a `domain_context` gets a
 warning: rename a project's domain through the project so its shadows and
-mapping files follow. A project that did not load cleanly is refused.
+mapping files follow. A project that did not load cleanly is refused, and
+so is a model, or any domain of a project, that is not at the current
+format: run `barwise migrate` on it first.
 
 **Like `merge_models`, this is an editing tool: a file source is written
 back.** Every changed file is staged before any is replaced, and files are

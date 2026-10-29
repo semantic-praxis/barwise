@@ -31,7 +31,7 @@
  */
 
 import { ELEMENT_MATCHINGS } from "@barwise/core/diff";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -232,10 +232,10 @@ describe("barwise_rename_element", () => {
   const MODEL = 'orm_version: "3.0"\nmodel:\n  name: Shop\n  object_types:\n'
     + "    - { id: o, name: Order, kind: entity, reference_mode: order_nr }\n";
 
-  async function rename(path: string) {
+  async function rename(path: string, extra: Record<string, unknown> = {}) {
     registerAll();
     const result = await state.tools.get("barwise_rename_element")!.invoke(
-      { input: { source: path, objectType: "Order", to: "Purchase" } },
+      { input: { source: path, objectType: "Order", to: "Purchase", ...extra } },
       undefined,
     ) as { content: { value: string; }[]; };
     return JSON.parse(result.content[0]!.value);
@@ -253,6 +253,47 @@ describe("barwise_rename_element", () => {
       state.documents = [{ uri: { fsPath: path }, isDirty: false }];
       expect((await rename(path)).written).toBe(true);
       expect(readFileSync(path, "utf-8")).toContain("name: Purchase");
+    } finally {
+      state.documents = [];
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses when the dirty editor names the file through a symlink", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-vscode-rename-"));
+    try {
+      const path = join(dir, "shop.orm.yaml");
+      writeFileSync(path, MODEL, "utf-8");
+      symlinkSync(path, join(dir, "link.orm.yaml"));
+      state.documents = [{ uri: { fsPath: join(dir, "link.orm.yaml") }, isDirty: true }];
+      expect((await rename(path)).error).toContain("has unsaved changes");
+      expect(readFileSync(path, "utf-8")).toBe(MODEL);
+    } finally {
+      state.documents = [];
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a project rename when a domain it would write is dirty, not only the manifest", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "barwise-vscode-rename-"));
+    try {
+      mkdirSync(join(dir, "domains"));
+      const domain = join(dir, "domains", "shop.orm.yaml");
+      writeFileSync(domain, MODEL, "utf-8");
+      const manifest = join(dir, "p.orm-project.yaml");
+      writeFileSync(
+        manifest,
+        'format_version: "1.0"\nproject:\n  name: P\n  domains:\n'
+          + '    - { path: "./domains/shop.orm.yaml", context: "shop" }\n',
+        "utf-8",
+      );
+      state.documents = [{ uri: { fsPath: domain }, isDirty: true }];
+      const refused = await rename(manifest, { domain: "shop" });
+      expect(refused.error).toContain(`${domain} has unsaved changes`);
+      expect(readFileSync(domain, "utf-8")).toBe(MODEL);
+
+      // Under check nothing is written, so a dirty buffer is no reason to refuse.
+      expect((await rename(manifest, { domain: "shop", check: true })).files).toEqual([domain]);
     } finally {
       state.documents = [];
       rmSync(dir, { recursive: true, force: true });

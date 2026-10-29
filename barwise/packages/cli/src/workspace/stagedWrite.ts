@@ -33,8 +33,9 @@ export class PartialWriteError extends Error {
  * (permissions, a full disk), and then a `PartialWriteError` names every
  * file already replaced. Writes go through a symlink to the file it names.
  * A rename makes a new file: a second hard link keeps the old content, and
- * the new file belongs to whoever ran the command. Returns the real paths
- * replaced.
+ * the new file belongs to whoever ran the command. Returns the paths
+ * replaced, as the caller gave them (`replaced` on the error names them
+ * the same way), so a report names the files the user asked about.
  *
  * @throws when two writes name one file, or a staged file already exists
  * (left by an interrupted run): neither is written over.
@@ -49,14 +50,14 @@ export function writeFilesAtomically(
     throw new Error(`Two writes name one file: ${twice}. Nothing was written.`);
   }
 
-  const staged: { target: string; temp: string; }[] = [];
+  const staged: { given: string; target: string; temp: string; }[] = [];
   try {
     files.forEach((file, i) => {
       const target = targets[i]!;
       const temp = `${target}${suffix}`;
       // Exclusively: a file already there is not ours to write over or remove.
       writeFileSync(temp, file.text, { encoding: "utf-8", flag: "wx" });
-      staged.push({ target, temp });
+      staged.push({ given: file.path, target, temp });
       // Set after writing: a creation mode is masked by the umask.
       chmodSync(temp, statSync(target).mode & 0o7777);
     });
@@ -73,17 +74,17 @@ export function writeFilesAtomically(
   }
 
   const replaced: string[] = [];
-  for (const { target, temp } of staged) {
+  for (const { given, target, temp } of staged) {
     try {
       renameSync(temp, target);
-      replaced.push(target);
+      replaced.push(given);
     } catch (err) {
       removeQuietly(staged.slice(replaced.length).map((s) => s.temp));
       const done = replaced.length === 0
         ? "no file was changed"
         : `already replaced: ${replaced.join(", ")}`;
       throw new PartialWriteError(
-        `Could not replace ${target}: ${(err as Error).message} (${done}).`,
+        `Could not replace ${given}: ${(err as Error).message} (${done}).`,
         replaced,
         { cause: err },
       );

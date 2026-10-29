@@ -258,6 +258,9 @@ reported, when it cannot be read or does not load, when its 3.0 form would
 not load back (2.0 allowed two constraints to share an id), or when it
 names elements it does not define (a fragment) and carries `is_preferred`
 flags, which cannot be placed without the rest of the model. The rest are still migrated.
+A file is also refused when `<file>.migrating` already exists beside it:
+that is the staged copy an interrupted run left, and `migrate` neither
+writes over it nor removes it. Remove it by hand and run again.
 
 Exit codes: 0 when every file was migrated or already current; 1 under
 `--check` when a file would be rewritten; 2 when any file could not be
@@ -294,14 +297,23 @@ It refuses, and writes nothing, when the element does not exist or a role
 name is shared (name it by `--role-position`), when the new name or its
 local name is already taken, when the element is a shadow (rename its
 owner, through the project), when the rename would change which value type
-keys an entity, or when a project did not load cleanly. A model file that
+keys an entity, when a project did not load cleanly, or when the file, or
+any domain of the project, is not at the current format (run `barwise
+migrate` on it first, which reports what migrating it changes). A model file that
 declares a `domain_context` gets a warning: if it is a project's domain,
 rename through `--project` so its shadows and mapping files follow.
 
 This is one of the two commands that modify their inputs, with `migrate`.
 Every changed file is staged before any is replaced, so a failure while
-staging changes nothing. Files are written from the model, so YAML comments
-in a rewritten file are lost, as with `migrate`.
+staging changes nothing. If replacing them fails part-way (a full disk,
+a permission change), it exits 2 and the json output's `files` and
+`changes` name what was already replaced. Files are written from the
+model, so YAML comments in a rewritten file are lost, as with `migrate`.
+
+Exit codes: 0 when the rename was written; 1 under `--check` when a file
+would be rewritten; 2 when the rename was refused or the write failed. A
+mistake commander itself rejects (an unknown option, an option missing
+its value) exits 1, as it does for every command; see barwise-o5y.
 
 Exit codes: 0 when renamed; 1 under `--check` when files would be
 rewritten; 2 when the rename was refused, a file could not be read, or

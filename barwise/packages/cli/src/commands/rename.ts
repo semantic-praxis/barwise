@@ -101,6 +101,9 @@ function run(file: string | undefined, opts: RenameOptions): Outcome {
     }
     if (opts.project !== undefined) return renameProject(opts.project, opts.domain!, target, opts);
     if (file === undefined) return failure("Name a model file, or --project and --domain.");
+    if (file.endsWith(".orm-project.yaml")) {
+      return failure(`${file} is a project. Rename through it with --project and --domain.`);
+    }
     return renameFile(file, target, opts);
   } catch (err) {
     // A refusal, a usage mistake, a file that would not load, or a write
@@ -189,9 +192,10 @@ function write(
     writeFilesAtomically(writes);
   } catch (err) {
     // A write that stopped part-way names what it replaced, so `files` says
-    // which files are in their new state rather than claiming none are.
-    const replaced = err instanceof PartialWriteError ? err.replaced : [];
-    return { ...failure((err as Error).message), files: replaced };
+    // which files are in their new state rather than claiming none are, and
+    // `changes` says what those files now carry.
+    if (!(err instanceof PartialWriteError)) return failure((err as Error).message);
+    return { ...failure(err.message), files: err.replaced, changes };
   }
   return { status: "renamed", files, changes, warnings };
 }

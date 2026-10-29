@@ -162,12 +162,14 @@ function writeBack(
     writeFilesAtomically(writes);
   } catch (err) {
     // A write that stopped part-way names what it replaced, so the result
-    // says which files are in their new state rather than claiming none are.
-    const replaced = err instanceof PartialWriteError ? err.replaced : [];
+    // says which files are in their new state rather than claiming none are,
+    // and `changes` says what those files now carry.
+    if (!(err instanceof PartialWriteError)) return json({ error: (err as Error).message });
     return json({
-      error: (err as Error).message,
-      written: replaced.length > 0,
-      writtenTo: replaced,
+      error: err.message,
+      written: err.replaced.length > 0,
+      writtenTo: err.replaced,
+      changes,
     });
   }
   return json({ written: true, writtenTo: files, changes, warnings });

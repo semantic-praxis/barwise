@@ -724,12 +724,20 @@ changed.
   dangling reference loads and renames as it would on its own; a project
   whose load still reported a problem (a domain or mapping file that could
   not be read or parsed) is refused, naming it, because the pure cascade cannot see a file
-  that never loaded.
+  that never loaded. A file, or any domain of a project, that is not at the
+  current format is refused rather than migrated silently, naming
+  `barwise migrate`, which reports what migrating it changes. That check
+  and the list of files a project rename writes are shared by the surfaces
+  from `@barwise/core/rename` (`modelForRename`, `projectRenameWrites`);
+  each surface parses its own target arguments.
 - **The write.** Every changed file is staged (written beside its target)
   before any target is replaced, and only then are the staged files renamed
   over their targets, so a failure while staging changes nothing. A failure
   during the renames themselves (permissions, a full disk) can still leave
-  the files before it replaced, which the command reports by name.
+  the files before it replaced, which the command reports by name, with
+  the changes those files carry. Two writes naming one file are refused, and
+  staged files are created exclusively, so one left by an interrupted run is
+  neither written over nor removed (`migrate` included).
   `migrate`'s `replace()` writes and renames in one call, so it is split
   into stage and commit, in a module both commands use.
 - **MCP** `rename_element`, with the same lenient loads (file and
@@ -740,7 +748,10 @@ changed.
   staged write is a second copy there, registered with the CLI's in
   `parity.manifest.json` in the same PR. It returns the YAML for an inline
   source.
-- **VS Code**: the language-model tool over the MCP function. An editor
+- **VS Code**: the language-model tool over the MCP function, refusing
+  when any file the rename would write has unsaved changes in an editor
+  (found by a check-only run, compared by real path), since saving that
+  buffer afterwards would undo the rename in that file alone. An editor
   rename (F2) through the language server is not in scope; it advertises no
   rename provider today.
 - **Comments are lost** in every file a rename rewrites, because the file is

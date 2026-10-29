@@ -42,6 +42,7 @@ import {
   type SourceInput,
   sourcePath,
 } from "@barwise/mcp";
+import { realpathSync } from "node:fs";
 import * as vscode from "vscode";
 import { getAnthropicApiKey } from "../llm/anthropicKey.js";
 import { CopilotLlmClient } from "../llm/CopilotLlmClient.js";
@@ -278,32 +279,50 @@ function runExportModel(input: ExportModelInput): vscode.LanguageModelToolResult
 }
 
 /**
- * split_model: a relative outDir is taken against the workspace folder
- * holding the source (else the first folder), never the extension host's
- * working directory -- resolveWriteDir says why.
- */
-/**
- * Rename, refusing a model whose editor has unsaved changes: the rename is
- * written to disk, so it would save the unsaved edits with it, and the
- * dirty buffer would then disagree with the file until the user chose one.
+ * Rename, refusing when any file it would write has unsaved changes in an
+ * editor: the rename is written to disk, and saving the dirty buffer
+ * afterwards would undo it in that file alone -- for a project, leaving the
+ * other files renamed and this one not. So the files are found by a
+ * check-only run first (for a project they are domain and mapping files,
+ * never the manifest named as the source), and compared by real path.
  */
 function runRename(input: RenameInput): vscode.LanguageModelToolResult {
   const source = resolveSourceParam(input.source);
-  const path = sourcePath(source);
-  const open = path === undefined
-    ? undefined
-    : vscode.workspace.textDocuments.find((d) => d.uri.fsPath === path);
-  if (open?.isDirty && input.check !== true) {
-    return new vscode.LanguageModelToolResult([
-      new vscode.LanguageModelTextPart(JSON.stringify({
-        error: `${path} has unsaved changes. Save it first, then rename: the rename writes the `
-          + "file, and the editor reloads a saved file when it changes on disk.",
-      })),
-    ]);
+  if (input.check !== true) {
+    const planned = JSON.parse(
+      executeRename({ ...input, source, check: true }).content[0]!.text,
+    ) as { files?: string[]; };
+    const dirty = new Set(
+      vscode.workspace.textDocuments.filter((d) => d.isDirty).map((d) => realPath(d.uri.fsPath)),
+    );
+    const unsaved = (planned.files ?? []).filter((file) => dirty.has(realPath(file)));
+    if (unsaved.length > 0) {
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(JSON.stringify({
+          error: `${unsaved.join(", ")} ${unsaved.length === 1 ? "has" : "have"} unsaved changes. `
+            + "Save first, then rename: the rename writes these files, and saving the editor's "
+            + "version afterwards would undo it there.",
+        })),
+      ]);
+    }
   }
   return toToolResult(executeRename({ ...input, source }));
 }
 
+/** A path with symlinks resolved, or as given when it does not exist. */
+function realPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
+/**
+ * split_model: a relative outDir is taken against the workspace folder
+ * holding the source (else the first folder), never the extension host's
+ * working directory -- resolveWriteDir says why.
+ */
 function runSplitModel(input: SplitModelInput): vscode.LanguageModelToolResult {
   const source = resolveSourceParam(input.source);
   let outDir: string | undefined;

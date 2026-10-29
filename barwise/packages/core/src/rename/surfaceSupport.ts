@@ -1,8 +1,11 @@
 /**
- * What every rename surface does around the pure operation, written once
- * here so the CLI, MCP and the editor cannot drift: which files a project
- * rename writes and with what text, and the refusal of a file that is not
- * at the current format. Pure; the surfaces own the reads and the writes.
+ * Two things every rename surface does around the pure operation, written
+ * once here so the CLI, MCP and the editor do not each restate them: which
+ * files a project rename writes and with what text, and the refusal of a
+ * file that is not at the current format. Each surface still parses its own
+ * target arguments, because they arrive differently (strings from a command
+ * line, typed values from a tool call). Pure; the surfaces own the reads
+ * and the writes.
  */
 
 import type { OrmModel } from "../model/OrmModel.js";

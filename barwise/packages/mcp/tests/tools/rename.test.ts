@@ -149,6 +149,22 @@ describe("rename_element", () => {
         .toBe("A project source needs domain.");
     });
 
+    it("refuses when any domain is not the current format, not only the one renamed", () => {
+      const billing = join(project, "domains/billing.orm.yaml");
+      writeFileSync(billing, readFileSync(join(PROJECT_FIXTURE, "domains/billing.orm.yaml")));
+      const crmBefore = readFileSync(join(project, "domains/crm.orm.yaml"), "utf-8");
+      const result = body(
+        executeRename({
+          source: join(project, "project.orm-project.yaml"),
+          domain: "crm",
+          objectType: "Customer",
+          to: "Client",
+        }),
+      );
+      expect(result.error).toContain("billing.orm.yaml is format 1.0");
+      expect(readFileSync(join(project, "domains/crm.orm.yaml"), "utf-8")).toBe(crmBefore);
+    });
+
     it("refuses a project whose load reported a problem", () => {
       const manifest = join(project, "broken.orm-project.yaml");
       const result = body(

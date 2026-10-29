@@ -11,8 +11,8 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
-  realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -196,6 +196,13 @@ describe("barwise rename", () => {
     expect(readFileSync(path, "utf-8")).toBe(MODEL);
   });
 
+  it("points a project manifest given as the file at --project", async () => {
+    const path = file("p.orm-project.yaml", 'format_version: "1.0"\n');
+    const result = await runCli(["rename", path, "--object-type", "Order", "--to", "X"]);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toContain("is a project. Rename through it with --project and --domain.");
+  });
+
   it("refuses a model file and --project together", async () => {
     const path = file("shop.orm.yaml", MODEL);
     const result = await runCli([
@@ -248,6 +255,26 @@ describe("barwise rename", () => {
       expect(result.stdout).toContain("Wrote 2 file(s)");
     });
 
+    it("refuses when any domain is not the current format, not only the one renamed", async () => {
+      const billing = join(project, "domains/billing.orm.yaml");
+      writeFileSync(billing, readFileSync(join(PROJECT_FIXTURE, "domains/billing.orm.yaml")));
+      const crmBefore = readFileSync(join(project, "domains/crm.orm.yaml"), "utf-8");
+      const result = await runCli([
+        "rename",
+        "--project",
+        join(project, "project.orm-project.yaml"),
+        "--domain",
+        "crm",
+        "--object-type",
+        "Customer",
+        "--to",
+        "Client",
+      ]);
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toContain("billing.orm.yaml is format 1.0");
+      expect(readFileSync(join(project, "domains/crm.orm.yaml"), "utf-8")).toBe(crmBefore);
+    });
+
     it("refuses a project whose load reported a problem, writing nothing", async () => {
       const manifest = join(project, "missing-domain.orm-project.yaml");
       const result = await runCli([
@@ -270,7 +297,7 @@ describe("barwise rename", () => {
   });
 
   describe("the staged write", () => {
-    it("changes nothing when staging a later file fails", () => {
+    it("changes nothing when a later file cannot be resolved", () => {
       const first = file("a.orm.yaml", "before\n");
       const missing = join(dir, "no-such-dir", "b.orm.yaml");
       expect(() =>
@@ -319,6 +346,9 @@ describe("barwise rename", () => {
 
     it("names the files it replaced when a rename fails part-way", () => {
       const a = file("a.orm.yaml", "a0\n");
+      // Named through a symlink, so the given path and the real one differ.
+      const link = join(dir, "link.orm.yaml");
+      symlinkSync(a, link);
       // A non-empty directory stages (its temp is a file beside it) but
       // cannot be renamed over, so the second replacement fails.
       const blocked = join(dir, "blocked");
@@ -326,12 +356,13 @@ describe("barwise rename", () => {
       writeFileSync(join(blocked, "keep"), "x", "utf-8");
       let caught: unknown;
       try {
-        writeFilesAtomically([{ path: a, text: "a1\n" }, { path: blocked, text: "b1\n" }]);
+        writeFilesAtomically([{ path: link, text: "a1\n" }, { path: blocked, text: "b1\n" }]);
       } catch (err) {
         caught = err;
       }
       expect(caught).toBeInstanceOf(PartialWriteError);
-      expect((caught as PartialWriteError).replaced).toEqual([realpathSync(a)]);
+      // As given, not resolved, so a report names the file the user named.
+      expect((caught as PartialWriteError).replaced).toEqual([link]);
       expect(readFileSync(a, "utf-8")).toBe("a1\n");
     });
   });
