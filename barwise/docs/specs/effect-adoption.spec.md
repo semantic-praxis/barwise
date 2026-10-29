@@ -544,7 +544,7 @@ to derive. Those are the spike's first readings.
 
 ### 1r. The restart on format 3.0 (added 2026-10-29)
 
-In one sentence: the spike is rebuilt from current `main` on format 3.0,
+In one sentence: the spike is rebuilt on `main`, merged step by step, on format 3.0,
 porting what #672 showed still applies, and the 3.0 load path is decoded
 by Effect alone once every key in it has a decoder, so the two-validator
 merge layer #672 built and WS1b part B would have removed is never
@@ -696,7 +696,7 @@ not because a gate failed.
   defect; S3's tightening; the `corpus` subcommand; and S1, S4, S5 and S6
   baselines taken on `main`. An instrument change, which the Non-goals
   allow as amended below.
-- **R1, on the spike branch: Effect, the harness and object types.**
+- **R1: Effect, the harness and object types.**
   `effect` pinned at 4.0.5 (Open decision 14); the object type Schema with
   `preferred_identifier` and Open decision 5's config leaf link; the
   decoder in Open decision 8's shape; part A's harness and its
@@ -722,7 +722,7 @@ not because a gate failed.
 - **The WS1 reading on 3.0.** S1 to S6 and M1 to M4 are read on the R4
   head, `main` back to back, and recorded here. A failed gate ends the
   spike as Open decision 4 says. A pass continues with WS1b parts B3, C,
-  D and E as written, on the spike branch.
+  D and E as written, each merged to `main` in turn.
 
 **R0, done 2026-10-29: the readings on `main`** (at `fbade557` with R0's
 instruments added, which change no file under `core/src`; Node v26.7.0, an
@@ -788,12 +788,30 @@ The 2.0 reading is unchanged by the scorer's extension: `malformed` on the
   with no Effect: format 3.0's placement types. The spike is read against
   today's number.
 
-**Branch.** The spike is built on its own branch (confirmed by the owner
-2026-10-29),
-`experiment/effect-adoption-3.0`, from `main` after this section and R0
-merge, and opened as a PR that never merges, as #672 was. #672 stays open
-as the 2.0 evidence until the restart's WS1 reading is recorded, and is
-then closed with a pointer here.
+**Each step merges to `main` (owner's direction, 2026-10-29).** There
+is no long-lived spike branch: R1 to R4, and WS1b's parts after them,
+each land on `main` as their own PR, through the usual reviews and CI.
+That reverses #672's "nothing merges", and the order above is what keeps
+`main` safe while it does:
+
+- **R1 to R3 are additive.** They add `effect` to core's dependencies,
+  the Schemas, the decoders and their tests, and nothing on the load path
+  calls them: `OrmYamlSerializer` reads every file as it does today. A
+  user sees no change, and S1 holds by construction. `core/CLAUDE.md`'s
+  dependency rule and WS2's version-agreement test land with R1, the PR
+  that adds the dependency.
+- **R4 is the one switch.** It puts the decoders on the 3.0 load path
+  and deletes what they replace, in one PR, with S1 to S6 read on its
+  head against `main` before it merges.
+- **A failed reading is a removal PR.** If the WS1 reading on R4's head
+  fails a gate, R4 does not merge, and one PR removes R1 to R3's Schemas,
+  decoders and dependency from `main` (Open decision 4). Until R4 the
+  code is unused, so removing it touches nothing else, and that is the
+  reason "a mixed metamodel" ("Should the adoption start with a
+  spike?") does not apply: no reader depends on it.
+
+#672 stays open as the 2.0 evidence until the restart's WS1 reading is
+recorded, and is then closed with a pointer here.
 
 **Estimate.** R0 is one session. R1 to R4 are four to five: the port is
 mostly Schemas, and the merge layer that took most of #672's 14 review
@@ -802,12 +820,12 @@ B3, C, D and E, about 4 to 7 sessions of the 8 to 12 estimated.
 
 ### 1b. The spike, continued: one harness, Effect alone on load, derived generators (added 2026-10-16)
 
-In one sentence: on the spike branch, replace the four hand-made
+In one sentence: on the spike, replace the four hand-made
 compensations for Effect's cross-field blind spot with one harness,
 then make the Effect decoders the only validator on load (barwise-4r3),
 and draw the test generators from the same Schemas wherever they can
-express the data. The owner asked for all three on 2026-10-16. Nothing
-here merges; each part extends what WS1 measures toward the end state
+express the data. The owner asked for all three on 2026-10-16. Each
+part merges to `main` in turn (1r, amended 2026-10-29); each extends what WS1 measures toward the end state
 WS2 to WS4 would land, so the adoption decision is made on the whole
 cost, not the first slice of it.
 
@@ -1137,7 +1155,7 @@ makes the first three read from that definition:
   second source would report the same problem twice in different
   words. Open decision 12.
 
-E changes `@barwise/mcp` and `barwise-vscode` on the spike branch,
+E changes `@barwise/mcp` and `barwise-vscode`,
 neither of which depends on `effect` itself. Reading discriminator values,
 per-kind fields, literals and `description` annotations needs Effect's AST
 API, so E1's export is plain data computed in core from the Schemas -- the
@@ -1209,9 +1227,11 @@ entry only records that it follows.
    itself. Revisit when the drift tests show the two agreeing for every kind.
    Superseded 2026-10-16 by item 9: the files are generated.
 4. **What a failed spike leaves behind.** Recommend: the WS0
-   instruments stay on `main`, the branch is kept as evidence, and
-   barwise-973 resumes from the plain arm (`8398a193`), the comparison's
-   fallback.
+   and R0 instruments stay on `main`; one PR removes the Schemas,
+   decoders and `effect` dependency R1 to R3 merged (unused until R4,
+   so nothing else changes); and barwise-973 resumes from the plain arm
+   (`8398a193`), the comparison's fallback. (Amended 2026-10-29: the
+   steps merge to `main`, so there is no branch to keep.)
 
 5. **The lenient config leaf, so that derivation works -- resolved
    2026-10-15: option (a), verified.** The model codec reads a data type
@@ -1370,8 +1390,9 @@ entry only records that it follows.
 
 ## Non-goals
 
-- No change to `main` beyond WS0's and R0's instruments before the spike
-  passes (R0 added 2026-10-29).
+- No change to `main`'s load path before the WS1 reading on 3.0 passes:
+  R1 to R3 merge, and nothing reads files through them until R4 (amended
+  2026-10-29; it read "no change to `main` beyond the instruments").
 - No Effect in `llm`, `cli`, `mcp` or `vscode` beyond declaring the
   dependency where a package imports a core decoder.
 - No new capability: this restyles how core holds and decodes a model,
