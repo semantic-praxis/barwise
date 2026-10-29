@@ -163,11 +163,39 @@
     },
     {
       "name": "package-model-builder",
-      "why": "formats, dbt and learn tests build models through one shorthand; a fixture in one package must mean the same model in the others. The role and preferred ids it mints (roleId, preferredId) are the format 6b of iri-identity changes, here and in core's builder, which is kept apart because it reads core source rather than the package build and carries fields only core tests use.",
+      "why": "formats, dbt and learn tests build models through one shorthand; a fixture in one package must mean the same model in the others. Core keeps its own builder, which reads core source rather than the package build and carries fields only core tests use; its roleId and preferredId are tied to these by the model-builder-roleId and model-builder-preferredId sets.",
       "members": [
         "packages/formats/tests/helpers/ModelBuilder.ts",
         "packages/dbt/tests/helpers/ModelBuilder.ts",
         "packages/learn/tests/helpers/ModelBuilder.ts"
+      ]
+    },
+    {
+      "name": "model-builder-roleId",
+      "why": "the id format the test builders mint must be the same in core's builder and the package builders (iri-identity 6a); the package-model-builder set ties the three package copies, this ties core to them",
+      "members": [
+        {
+          "file": "packages/core/tests/helpers/ModelBuilder.ts",
+          "symbol": "roleId"
+        },
+        {
+          "file": "packages/formats/tests/helpers/ModelBuilder.ts",
+          "symbol": "roleId"
+        }
+      ]
+    },
+    {
+      "name": "model-builder-preferredId",
+      "why": "the id format the test builders mint must be the same in core's builder and the package builders (iri-identity 6a); the package-model-builder set ties the three package copies, this ties core to them",
+      "members": [
+        {
+          "file": "packages/core/tests/helpers/ModelBuilder.ts",
+          "symbol": "preferredId"
+        },
+        {
+          "file": "packages/formats/tests/helpers/ModelBuilder.ts",
+          "symbol": "preferredId"
+        }
       ]
     }
   ]

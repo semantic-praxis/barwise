@@ -2,7 +2,6 @@ import {
   type Constraint,
   type DataTypeDef,
   type FactInstanceConfig,
-  localName,
   type ObjectTypeKind,
   OrmModel,
   storePreferredFlags,
@@ -12,17 +11,19 @@ import {
 /**
  * The id the builder gives a binary fact type's role, by its position (1 or
  * 2, as `role1` and `role2` name them). A test that names a role by id
- * calls this, so the format is decided here once. It avoids `:`, which
- * format 4.0 reserves for an alias, and puts `.` between the fact type and
- * the role, as 4.0 does (iri-identity, decision 3 and WS6 6a).
+ * calls this, so the format is decided here. It avoids `:`, which format
+ * 4.0 reserves for an alias, and keeps the fact type's name as written, so
+ * two fact types whose names differ give different ids. The `#` is one
+ * `localName` always encodes, so a builder id never reads as a 4.0 id
+ * (iri-identity, WS6 6a).
  */
 export function roleId(factTypeName: string, position: 1 | 2): string {
-  return `${localName(factTypeName)}.role${position}`;
+  return `${factTypeName}#role${position}`;
 }
 
 /** The id of the uniqueness a fact type's `isPreferred` flags. */
 export function preferredId(factTypeName: string): string {
-  return `${localName(factTypeName)}_preferred`;
+  return `${factTypeName}#preferred`;
 }
 
 /**

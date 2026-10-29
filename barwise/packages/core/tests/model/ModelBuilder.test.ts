@@ -182,5 +182,8 @@ describe("ModelBuilder", () => {
     expect(ft.internalConstraints.map((c) => c.id)).toContain(preferredId("Customer places Order"));
     const ids = [...ft.roles.map((r) => r.id), ...ft.internalConstraints.map((c) => c.id)];
     expect(ids.filter((id) => id?.includes(":"))).toEqual([]);
+    // Names that `localName` would make one ("Order Line", "Order_Line")
+    // keep apart, so two fact types never share a role id.
+    expect(roleId("Order Line", 1)).not.toBe(roleId("Order_Line", 1));
   });
 });
