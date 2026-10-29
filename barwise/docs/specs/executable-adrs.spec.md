@@ -215,14 +215,22 @@ In scope, `check:adr-tests` (new; runs in CI after the test steps):
   finding, else 2 if any refusal, else 0.
 - When an expected report is missing, the check shall exit 2. The
   expected set is derived, not listed: one vitest report per package
-  whose `package.json` defines `test:coverage`; one per file in
-  `scripts/tests/expected-counts.json`, the manifest
+  whose `package.json` defines `test:coverage`; one per key of `counts`
+  in `scripts/tests/expected-counts.json` (15 files today), the manifest
   `run-script-tests.mjs` already keeps; and one for `test:trial`. A suite
   that silently produced no report cannot read as a pass.
 - Reports are written by the runners:
   - vitest: `barwiseVitestConfig()` in `barwise/vitest.shared.ts` adds
     the built-in `json` reporter beside `default`, writing
-    `test-results/vitest.json` in the package. `turbo.json` adds
+    `test-results/vitest.json` in the package. Verified on vitest 5.0.1
+    (2026-10-29): each entry of `testResults[].assertionResults[]` has
+    `title` (the test's own name), `ancestorTitles` and `status`, which
+    is `passed`, `skipped` or `todo`; a test inside a `describe.skipIf`
+    reports `skipped`; suites are not listed, so a tag on a `describe`
+    appears only in a child's `ancestorTitles`. `check:adr-tests` reads
+    `title` and `status` and nothing else, and refuses a report whose
+    shape lacks them, so a vitest upgrade that renames them stops the
+    check rather than passing it. `turbo.json` adds
     `test-results/**` to `test:coverage`'s `outputs`, so a turbo cache
     hit restores the report rather than leaving none. A restored report
     is only as fresh as turbo's hash, and CI keeps `barwise/.turbo`
@@ -231,14 +239,27 @@ In scope, `check:adr-tests` (new; runs in CI after the test steps):
     `package.json` or `barwise/vitest.shared.ts` would replay an old
     report, and an old coverage result with it, which is a latent bug
     today. WS2 sets the inputs to `$TURBO_DEFAULT$` (every tracked file in
-    the package) plus `$TURBO_ROOT$/barwise/vitest.shared.ts`, after
-    confirming turbo 2.11 supports both.
+    the package) plus `$TURBO_ROOT$/vitest.shared.ts`. Verified with a
+    dry run on turbo 2.11.3 (2026-10-29): today's hash has neither
+    vitest config; `$TURBO_DEFAULT$` adds `vitest.config.ts`, and the
+    root file needs `$TURBO_ROOT$/vitest.shared.ts`, because turbo's root
+    is `barwise/`, where `turbo.json` lives (the form with `barwise/`
+    in it matched nothing). WS2 pins this with a test that dry-runs
+    `test:coverage` and asserts `vitest.shared.ts` is among its inputs,
+    since a wrong path fails silently.
   - `node --test`: a small reporter, `scripts/lib/test-tag-reporter.mjs`,
     writes one JSON line per finished test (`name`, `file`, and whether
     it passed, skipped or was todo). `run-script-tests.mjs` passes it as
     a second `--test-reporter` with its own destination beside the
     existing `tap` one (its comment records why reporters must be paired
     with destinations), and the `test:trial` script does the same.
+    Verified on Node 26.7.0 (2026-10-29): `test:pass` events carry
+    `details.type` (`test` or `suite`), `skip: true` for a skipped test
+    and `todo: true` for a todo; a `describe` emits `test:pass` with type
+    `suite`, so the type filter is required; a test inside a skipped
+    `describe` emits no event; tap to `stdout` plus the reporter to a
+    file exits 0. A destination of `/dev/null` crashes the runner (fsync
+    `EINVAL`), so no reporter is ever discarded that way.
   - Report directories are gitignored.
 - The step is `- run: npm run check:adr-tests`, after `test:coverage` in
   `ci.yml`, with the same `docs_only` guard as the test steps it reads.
@@ -403,6 +424,12 @@ with its decisions, then `; gap: <issue-id> (<decisions>)` for each
   but it is the inference "explicit over implicit" refuses: it cannot
   tell a gate the ADR relies on from one it mentions in passing
   (`ci:local`, named in seven ADRs, enforces none of them).
+- **vitest's native test tags instead of tags in titles.** vitest 5
+  reports a `tags` field for every test, so vitest tests could declare a
+  decision without touching their names. It lost because `node --test`
+  has no such field (its events carry `name`, `details.type`, `skip` and
+  `todo`), so the script and trial suites would need a second mechanism.
+  A tag in the title reads the same in both reports.
 - **Map ADRs to enforcers only from the enforcer side.** Tags do this for
   tests, and the header still lists `tests (<id>)` because an ADR with no
   enforcer needs somewhere to say so, and "which decisions are
@@ -431,7 +458,7 @@ together (exit 1, both listed), asserting exit codes directly; and `ciStepOccurr
 `scripts/tests/ci-conditions.test.mjs`. WS1 updates
 `scripts/tests/expected-counts.json` (`npm run test:scripts -- --write`).
 
-### 2. Test reports and `check:adr-tests` (provisional: report formats not yet grounded)
+### 2. Test reports and `check:adr-tests`
 
 Add the vitest `json` reporter in `vitest.shared.ts`, `test-results/**`
 to `turbo.json`'s `test:coverage` outputs, `scripts/lib/test-tag-reporter.mjs`
@@ -443,10 +470,9 @@ generated root forwarder, and its `ci.yml` step. Its new test files and
 cases change the script-test manifest, so WS2 also runs
 `npm run test:scripts -- --write` to update
 `scripts/tests/expected-counts.json`, which is also the list
-`check:adr-tests` derives its expected reports from. Before building, ground
-the vitest 5.0.1 json report's shape (the field holding a test's own
-title and its status values) and the Node 26 test-runner event fields
-the reporter reads; this spec has not run either. Tests feed
+`check:adr-tests` derives its expected reports from. The report formats
+were grounded by running both runners (Scope, "Reports are written by
+the runners"). Tests feed
 `check-adr-tests.mjs` fixture reports, including a missing package
 report (refuse), a skipped tagged test (does not count), a tag in a
 `describe` title only (does not count, in both report formats), a stale
