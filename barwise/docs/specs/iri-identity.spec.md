@@ -9,7 +9,7 @@ project rules); WS5 grounded (5a core, 5b surfaces; rename recognition moved to 
 Created: 2026-10-28
 Last-updated: 2026-10-29
 Tracking: barwise-wcg, barwise-y1b
-Plan-reviewed: 5e108470 (code-review, pr-review; re-pointed after WS4 was grounded with barwise-y1b)
+Plan-reviewed: e9714f47 (code-review x5, pr-review; re-pointed after WS5 was grounded and decision 17 taken)
 Touches: barwise/packages/core/src/model/,
 barwise/packages/core/src/serialization/,
 barwise/packages/core/schemas/,
