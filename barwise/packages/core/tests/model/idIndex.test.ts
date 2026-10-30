@@ -9,7 +9,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";
 import { FactType } from "../../src/model/FactType.js";
-import { IdIndex, type IdKind } from "../../src/model/idIndex.js";
+import { IdIndex, IdKeyedStore, type IdKind } from "../../src/model/idIndex.js";
 import { DuplicateIdError, OrmModel } from "../../src/model/OrmModel.js";
 import { arbOrmModel } from "../arbitraries/model.js";
 
@@ -52,6 +52,16 @@ describe("IdIndex", () => {
     index.release("x", "object type");
     expect(index.holds("x")).toBe(false);
     expect(index.kindsHolding("x")).toEqual([]);
+  });
+
+  it("refuses a second element under a held id in one store, and leaves the index as it was", () => {
+    const index = new IdIndex();
+    const store = new IdKeyedStore<{ id: string; }>("population", index);
+    store.set({ id: "p" });
+    expect(() => store.set({ id: "p" })).toThrow(/a population already holds "p"/);
+    expect(index.snapshot()).toEqual(new Map([["p", new Map([["population", 1]])]]));
+    expect(store.delete("p")).toBe(true);
+    expect(index.holds("p")).toBe(false);
   });
 
   it("refuses to release an id nothing of that kind holds", () => {

@@ -95,8 +95,15 @@ export class IdKeyedStore<E extends { readonly id: string; }> {
     return this.byId.values();
   }
 
-  /** Store an element under its id; the caller has refused a held one. */
+  /**
+   * Store an element under its id. The model refuses a held id first, with a
+   * message naming both elements; this refuses it too, so a caller that
+   * forgot cannot overwrite an element and leave the index counting both.
+   */
   set(element: E): void {
+    if (this.byId.has(element.id)) {
+      throw new Error(`IdKeyedStore: a ${this.kind} already holds ${JSON.stringify(element.id)}.`);
+    }
     this.byId.set(element.id, element);
     this.index.hold(element.id, this.kind);
   }
