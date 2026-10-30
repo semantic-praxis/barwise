@@ -5,7 +5,7 @@ import { ModelElement } from "./ModelElement.js";
  * Configuration for creating a new ObjectifiedFactType.
  */
 export interface ObjectifiedFactTypeConfig {
-  /** Optional stable identifier. Generated if omitted. */
+  /** Optional stable identifier. In a model, its minted name if omitted; standalone, generated. */
   readonly id?: string;
   /** The id of the fact type being objectified. */
   readonly factTypeId: string;

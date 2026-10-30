@@ -2,39 +2,39 @@ orm_version: "3.0"
 model:
   name: employee-hierarchy
   object_types:
-    - id: 00000000-0000-7001-ad34-3b424950575e
+    - id: Person
       name: Person
       kind: entity
       reference_mode: person_id
       definition: Any individual tracked by the HR system.
-    - id: 00000000-0000-7002-8c53-5a61686f767d
+    - id: Employee
       name: Employee
       kind: entity
       reference_mode: employee_id
       definition: A person who works for the company.
-    - id: 00000000-0000-7003-ab72-7980878e959c
+    - id: Manager
       name: Manager
       kind: entity
       reference_mode: manager_id
       definition: An employee who manages other employees.
-    - id: 00000000-0000-7004-8a91-989fa6adb4bb
+    - id: Department
       name: Department
       kind: entity
       reference_mode: department_code
       definition: An organizational unit within the company.
-    - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
+    - id: DepartmentName
       name: DepartmentName
       kind: value
       definition: The name of a department.
   fact_types:
-    - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
+    - id: Employee_works_in_Department
       name: Employee works in Department
       roles:
-        - id: 00000000-0000-7007-a7ee-f5fc030a1118
-          player: 00000000-0000-7002-8c53-5a61686f767d
+        - id: Employee_works_in_Department.works_in
+          player: Employee
           role_name: works in
-        - id: 00000000-0000-7008-860d-141b22293037
-          player: 00000000-0000-7004-8a91-989fa6adb4bb
+        - id: Employee_works_in_Department.has
+          player: Department
           role_name: has
       readings:
         - "{0} works in {1}"
@@ -42,19 +42,19 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7007-a7ee-f5fc030a1118
-          id: 00000000-0000-700f-9fe6-edf4fb020910
+            - Employee_works_in_Department.works_in
+          id: 00000000-0000-7001-ad34-3b424950575e
         - type: mandatory
-          role: 00000000-0000-7007-a7ee-f5fc030a1118
-          id: 00000000-0000-7010-be05-0c131a21282f
-    - id: 00000000-0000-7009-a52c-333a41484f56
+          role: Employee_works_in_Department.works_in
+          id: Each_Employee_works_in_at_least_one_Department
+    - id: Manager_manages_Department
       name: Manager manages Department
       roles:
-        - id: 00000000-0000-700a-844b-525960676e75
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Manager_manages_Department.manages
+          player: Manager
           role_name: manages
-        - id: 00000000-0000-700b-a36a-71787f868d94
-          player: 00000000-0000-7004-8a91-989fa6adb4bb
+        - id: Manager_manages_Department.is_managed_by
+          player: Department
           role_name: is managed by
       readings:
         - "{0} manages {1}"
@@ -62,16 +62,16 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-700b-a36a-71787f868d94
-          id: 00000000-0000-7011-9d24-2b323940474e
-    - id: 00000000-0000-700c-8289-90979ea5acb3
+            - Manager_manages_Department.is_managed_by
+          id: 00000000-0000-7002-8c53-5a61686f767d
+    - id: Department_has_DepartmentName
       name: Department has DepartmentName
       roles:
-        - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
-          player: 00000000-0000-7004-8a91-989fa6adb4bb
+        - id: Department_has_DepartmentName.has
+          player: Department
           role_name: has
-        - id: 00000000-0000-700e-80c7-ced5dce3eaf1
-          player: 00000000-0000-7005-a9b0-b7bec5ccd3da
+        - id: Department_has_DepartmentName.is_of
+          player: DepartmentName
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -79,13 +79,13 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-700d-a1a8-afb6bdc4cbd2
-          id: 00000000-0000-7012-bc43-4a51585f666d
+            - Department_has_DepartmentName.has
+          id: 00000000-0000-7003-ab72-7980878e959c
   subtype_facts:
-    - id: 00000000-0000-7013-9b62-6970777e858c
-      subtype: 00000000-0000-7002-8c53-5a61686f767d
-      supertype: 00000000-0000-7001-ad34-3b424950575e
+    - id: Employee_is_a_subtype_of_Person
+      subtype: Employee
+      supertype: Person
       provides_identification: false
-    - id: 00000000-0000-7014-ba81-888f969da4ab
-      subtype: 00000000-0000-7003-ab72-7980878e959c
-      supertype: 00000000-0000-7002-8c53-5a61686f767d
+    - id: Manager_is_a_subtype_of_Employee
+      subtype: Manager
+      supertype: Employee

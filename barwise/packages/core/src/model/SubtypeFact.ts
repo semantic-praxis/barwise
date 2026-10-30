@@ -6,7 +6,7 @@ import { ModelElement } from "./ModelElement.js";
  * Configuration for creating a new SubtypeFact.
  */
 export interface SubtypeFactConfig {
-  /** Optional stable identifier. Generated if omitted. */
+  /** Optional stable identifier. In a model, its minted name if omitted; standalone, generated. */
   readonly id?: string;
   /** The id of the subtype (child) entity type. */
   readonly subtypeId: string;

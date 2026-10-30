@@ -1604,12 +1604,13 @@ describe("diffModels", () => {
 
     const result = diffModels(make("pc-country"), make("pc-country-2"));
     // A join constraint spans fact types, so it is the model's and has a
-    // delta of its own (WS3c). Built in code twice, its ids differ, so the
-    // changed path reads as one removed and one added rather than modified.
+    // delta of its own (WS3c). Built in code twice, it is named from its
+    // sentence both times, which reads the same, so the two pair by id and
+    // the changed path is one modification (iri-identity 6b).
     const kinds = result.deltas.flatMap((d) =>
       d.elementType === "constraint" && d.constraintType === "join_equality" ? [d.kind] : []
     );
-    expect(kinds.sort()).toEqual(["added", "removed"]);
+    expect(kinds).toEqual(["modified"]);
   });
 });
 
@@ -1622,6 +1623,7 @@ describe("a constraint over roles of other fact types", () => {
     buildingRole = 1,
     other = "Room is in Building",
     dangling?: string,
+    constraintId?: string,
   ) => {
     const m = new ModelBuilder("Rooms")
       .withEntityType("Room", { referenceMode: "room_id" })
@@ -1647,6 +1649,7 @@ describe("a constraint over roles of other fact types", () => {
     const building = m.getFactTypeByName(other)!;
     m.addConstraint({
       type: "external_uniqueness",
+      ...(constraintId !== undefined ? { id: constraintId } : {}),
       roleIds: [host.roles[1]!.id, dangling ?? building.roles[buildingRole]!.id],
     });
     return m;
@@ -1711,10 +1714,11 @@ describe("a constraint over roles of other fact types", () => {
       const other = m.getFactTypeByName("Room has RoomName")!.roles[1]!.id;
       return yaml.deserialize(text.split(other).join(id));
     };
-    const a = ambiguous(model("number"));
-    expect(constraintChanges(a, ambiguous(withNewRoleIds(model("number")))).length).toBeGreaterThan(
-      0,
-    );
+    // Unrelated constraint ids, as two 3.x imports of one schema give, so
+    // the pairing falls to the key.
+    const a = ambiguous(model("number", 1, undefined, undefined, "eu-a"));
+    const b = ambiguous(withNewRoleIds(model("number", 1, undefined, undefined, "eu-b")));
+    expect(constraintChanges(a, b).length).toBeGreaterThan(0);
   });
 
   it("keys a host role id another fact type also holds by its raw id", () => {
@@ -1725,9 +1729,9 @@ describe("a constraint over roles of other fact types", () => {
       const other = m.getFactTypeByName("Room has RoomName")!.roles[1]!.id;
       return yaml.deserialize(yaml.serialize(m).split(other).join(id));
     };
-    const a = ambiguousHost(model("number"));
-    expect(constraintChanges(a, ambiguousHost(withNewRoleIds(model("number")))).length)
-      .toBeGreaterThan(0);
+    const a = ambiguousHost(model("number", 1, undefined, undefined, "eu-a"));
+    const b = ambiguousHost(withNewRoleIds(model("number", 1, undefined, undefined, "eu-b")));
+    expect(constraintChanges(a, b).length).toBeGreaterThan(0);
   });
 
   it("resolves a role a lenient fragment does not define against the other model, both ways", () => {

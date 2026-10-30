@@ -143,7 +143,13 @@ describe("buildFactTypeFocusSummary", () => {
       kind: "entity",
       referenceMode: "customer_id",
     });
-    const order = model.addObjectType({ name: "Order", kind: "entity", referenceMode: "order_id" });
+    // Stated, so the test can tell a printed id from the printed name.
+    const order = model.addObjectType({
+      id: "ot-order",
+      name: "Order",
+      kind: "entity",
+      referenceMode: "order_id",
+    });
     const ft = model.addFactType({
       name: "Customer places Order",
       roles: [

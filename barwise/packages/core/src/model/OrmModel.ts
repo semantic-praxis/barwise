@@ -10,10 +10,12 @@ import {
 } from "./Constraint.js";
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
-import { FactType, type FactTypeConfig } from "./FactType.js";
-import { withId } from "./id.js";
+import { checkInternalConstraint, FactType, type FactTypeConfig } from "./FactType.js";
+import { generateId } from "./id.js";
 import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.js";
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
+import { mint, type Mintable } from "./mint.js";
+import { localName } from "./name.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
@@ -119,8 +121,21 @@ export class OrmModel implements ConstraintModel {
    * not exposed, so only a fact type this model added reaches the index.
    */
   private readonly _admission: ConstraintAdmission = {
-    admitConstraint: <C extends InternalConstraint>(constraint: C): C => {
-      const stored = withId(constraint);
+    admitConstraint: <C extends InternalConstraint>(constraint: C, hostId: string): C => {
+      // Only a fact type this model stores holds this admission; a host the
+      // store does not map would be named as a constraint across fact types.
+      const host = this._factTypes.get(hostId);
+      if (host === undefined) {
+        throw new Error(
+          `Model "${this._name}" holds no fact type "${hostId}" to admit a constraint to.`,
+        );
+      }
+      const stored = constraint.id === undefined
+        ? {
+          ...constraint,
+          id: this.nameFor({ kind: "constraint", inView: [constraint, host] as ConstraintInView }),
+        }
+        : constraint;
       this._ids.hold(stored.id, "constraint");
       return stored;
     },
@@ -213,6 +228,33 @@ export class OrmModel implements ConstraintModel {
     }
   }
 
+  /**
+   * `base` when nothing in the model holds it, else the first of
+   * `base_2`, `base_3`, ... that nothing holds: the suffix rule, across
+   * every kind, because in format 4.0 a local name is unique in its model
+   * (iri-identity WS6, 6b). The add order is the caller's, so the names a
+   * load gives are a function of its input.
+   */
+  private mintedId(base: string, taken: ReadonlySet<string> = new Set()): string {
+    const free = (id: string) => !this._ids.holds(id) && !taken.has(id);
+    if (free(base)) return base;
+    for (let n = 2;; n++) {
+      if (free(`${base}_${n}`)) return `${base}_${n}`;
+    }
+  }
+
+  /**
+   * The id an element its sentence names takes: the minted name, under the
+   * suffix rule (`mint.ts`). An element whose sentence would not be of it
+   * -- a reference that dangles, a shape the sentence misreads -- is left
+   * unnamed in format 4.0 (decisions 17 and 19); until 4.0 lets an id be
+   * absent (6b-2b), it gets a generated id, because format 3.0 requires one.
+   */
+  private nameFor(element: Mintable): string {
+    const minted = mint(element, this);
+    return minted ? this.mintedId(minted.name) : generateId();
+  }
+
   /** An object type by name where the model holds it, else by its id. */
   private objectTypeLabel(id: string): string {
     return quoted(this._objectTypes.get(id)?.name ?? id);
@@ -241,7 +283,9 @@ export class OrmModel implements ConstraintModel {
         `Object type "${config.name}" already exists in model "${this._name}".`,
       );
     }
-    const ot = createObjectType(config);
+    const ot = createObjectType(
+      config.id === undefined ? { ...config, id: this.mintedId(localName(config.name)) } : config,
+    );
     this._objectTypes.set(ot);
     return ot;
   }
@@ -359,14 +403,19 @@ export class OrmModel implements ConstraintModel {
   }
 
   /**
-   * Add a constraint across fact types to the model, giving it an id from
-   * the installed generator when it has none, as `FactType.addConstraint`
-   * does for its own (barwise-nkq). Its roles are not checked: a lenient
+   * Add a constraint across fact types to the model, naming it by its
+   * minted sentence when it has no id, as the model does for a fact type's
+   * own (iri-identity, decision 17). Its roles are not checked: a lenient
    * load or a fragment can name a role the model does not hold, and
    * validation reports it.
    */
   addConstraint(constraint: ExternalConstraint): ExternalConstraint {
-    const stored = withId(constraint);
+    const stored = constraint.id === undefined
+      ? {
+        ...constraint,
+        id: this.nameFor({ kind: "constraint", inView: [constraint, undefined] }),
+      }
+      : constraint;
     this._constraints.push(stored);
     this._ids.hold(stored.id, "constraint");
     return stored;
@@ -603,11 +652,73 @@ export class OrmModel implements ConstraintModel {
       }
     }
 
-    const ft = new FactType(config);
+    // Refused before anything is stored, as the constructor refused them.
+    const constraints = (config.constraints ?? []).map((c) =>
+      checkInternalConstraint(c, config.name)
+    );
+    // Every id the config states wins over a name minted in the same add
+    // (decision 17): the fact type's and its roles' minted ids skip them,
+    // and the stated constraint ids are held while the unnamed constraints
+    // are named, then released for the admission's own hold.
+    const statedConstraints = constraints.flatMap((c) => (c.id === undefined ? [] : [c.id]));
+    const stated = new Set([
+      ...config.roles.flatMap((r) => (r.id === undefined ? [] : [r.id])),
+      ...statedConstraints,
+    ]);
+    const id = config.id ?? this.mintedId(localName(config.name), stated);
+    const ft = new FactType({
+      ...config,
+      id,
+      roles: this.namedRoles(config, id, new Set([...stated, id])),
+      constraints: [],
+    });
     this._factTypes.set(ft);
-    for (const [id, kind] of idsWithin(ft)) this._ids.hold(id, kind);
+    for (const [held, kind] of idsWithin(ft)) this._ids.hold(held, kind);
     ft.joinModel(this._admission);
+    for (const held of statedConstraints) this._ids.hold(held, "constraint");
+    // After the fact type is in, so each is named from its sentence, which
+    // reads the fact type's players and readings.
+    // Anything that throws here -- a constraint whose type was asserted and
+    // is missing a field the sentence reads -- takes the fact type back out,
+    // so a refused add leaves the model as it was, as it did when the
+    // constructor refused it.
+    try {
+      for (const c of constraints) ft.addConstraint(c);
+    } catch (err) {
+      this.removeFactType(ft.id);
+      throw err;
+    } finally {
+      for (const held of statedConstraints) this._ids.release(held, "constraint");
+    }
     return ft;
+  }
+
+  /**
+   * The roles with their ids: each its own, or `<fact type>.<role>`
+   * (iri-identity, the role id rule). Two roles given without ids under one
+   * name are refused, because neither id could say which role it is
+   * (decision 5, for new authoring); a file that repeats a name states its
+   * role ids.
+   */
+  private namedRoles(
+    config: FactTypeConfig,
+    factTypeId: string,
+    stated: ReadonlySet<string>,
+  ): FactTypeConfig["roles"] {
+    const unnamed = config.roles.filter((r) => r.id === undefined);
+    for (const [local, roles] of groupRepeats(unnamed, (r) => localName(r.name))) {
+      throw new Error(
+        `Fact type "${config.name}" has ${roles.length} roles named "${roles[0]!.name}" `
+          + `(${local}): give each role a name of its own, or state the role ids.`,
+      );
+    }
+    const taken = new Set(stated);
+    return config.roles.map((r) => {
+      if (r.id !== undefined) return r;
+      const id = this.mintedId(`${factTypeId}.${localName(r.name)}`, taken);
+      taken.add(id);
+      return { ...r, id };
+    });
   }
 
   /**
@@ -692,7 +803,22 @@ export class OrmModel implements ConstraintModel {
     const refusal = this.subtypeFactRefusal(config, options);
     if (refusal !== undefined) throw new Error(refusal);
 
-    const sf = new SubtypeFact(config);
+    const sf = new SubtypeFact(
+      config.id === undefined
+        ? {
+          ...config,
+          id: this.nameFor({
+            kind: "subtypeFact",
+            subtypeFact: {
+              id: "",
+              subtypeId: config.subtypeId,
+              supertypeId: config.supertypeId,
+              definingRule: config.definingRule,
+            },
+          }),
+        }
+        : config,
+    );
     this._subtypeFacts.set(sf);
     return sf;
   }
@@ -824,7 +950,21 @@ export class OrmModel implements ConstraintModel {
     const refusal = this.objectificationRefusal(config, options);
     if (refusal !== undefined) throw new Error(refusal);
 
-    const oft = new ObjectifiedFactType(config);
+    const oft = new ObjectifiedFactType(
+      config.id === undefined
+        ? {
+          ...config,
+          id: this.nameFor({
+            kind: "objectification",
+            objectification: {
+              id: "",
+              factTypeId: config.factTypeId,
+              objectTypeId: config.objectTypeId,
+            },
+          }),
+        }
+        : config,
+    );
     this._objectifiedFactTypes.set(oft);
     return oft;
   }
@@ -953,7 +1093,12 @@ export class OrmModel implements ConstraintModel {
         `Fact type id "${config.factTypeId}" does not exist in the model.`,
       );
     }
-    const pop = new Population(config);
+    // Its fact type's id and `.population`, under the suffix rule (decision 7).
+    const pop = new Population(
+      config.id === undefined
+        ? { ...config, id: this.mintedId(`${config.factTypeId}.population`) }
+        : config,
+    );
     this._populations.set(pop);
     return pop;
   }

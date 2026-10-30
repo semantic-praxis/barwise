@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 const CLI_ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), "../dist/index.js");
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const V7_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const dir = mkdtempSync(join(tmpdir(), "cli-entry-ids-"));
@@ -32,8 +33,12 @@ describe("CLI entry point", () => {
       [CLI_ENTRY, "import", "model", sql, "--format", "ddl"],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     );
+    // Elements the model names take local names (iri-identity 6b); the ids
+    // the importer still states come from the generator, and those must be
+    // v7. A v4 id among them means the install line is gone.
     const ids = [...yaml.matchAll(/^\s*(?:- )?id: (\S+)$/gm)].map((m) => m[1]!);
-    expect(ids.length).toBeGreaterThan(0);
-    for (const id of ids) expect(id).toMatch(V7_SHAPE);
+    const generated = ids.filter((id) => UUID_SHAPE.test(id));
+    expect(generated.length).toBeGreaterThan(0);
+    for (const id of generated) expect(id).toMatch(V7_SHAPE);
   });
 });

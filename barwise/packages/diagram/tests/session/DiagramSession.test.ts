@@ -10,18 +10,23 @@ import { ModelBuilder } from "../../../core/tests/helpers/ModelBuilder.js";
 import { DiagramSession } from "../../src/session/DiagramSession.js";
 
 /** A relates to B relates to C (3 entities, 2 binary fact types). */
-function chainModel(): OrmModel {
+/**
+ * A -> B -> C. `p` prefixes every name, so `chainModel("New")` is the same
+ * shape with every element renamed: since a model names its elements'
+ * ids (iri-identity 6b), that is the model none of whose ids resolves.
+ */
+function chainModel(p = ""): OrmModel {
   return new ModelBuilder("Chain")
-    .withEntityType("A", { referenceMode: "id" })
-    .withEntityType("B", { referenceMode: "id" })
-    .withEntityType("C", { referenceMode: "id" })
-    .withBinaryFactType("A relates to B", {
-      role1: { player: "A", name: "relates to" },
-      role2: { player: "B", name: "is related to by" },
+    .withEntityType(`${p}A`, { referenceMode: "id" })
+    .withEntityType(`${p}B`, { referenceMode: "id" })
+    .withEntityType(`${p}C`, { referenceMode: "id" })
+    .withBinaryFactType(`${p}A relates to ${p}B`, {
+      role1: { player: `${p}A`, name: "relates to" },
+      role2: { player: `${p}B`, name: "is related to by" },
     })
-    .withBinaryFactType("B relates to C", {
-      role1: { player: "B", name: "relates to" },
-      role2: { player: "C", name: "is related to by" },
+    .withBinaryFactType(`${p}B relates to ${p}C`, {
+      role1: { player: `${p}B`, name: "relates to" },
+      role2: { player: `${p}C`, name: "is related to by" },
     })
     .build();
 }
@@ -85,13 +90,14 @@ function chainWithDisconnectedPair(): OrmModel {
 }
 
 /** Party <- Person <- Employee, a two-level subtype chain. */
-function subtypeChainModel(): OrmModel {
+/** Party <- Person <- Employee; `p` prefixes every name, as in `chainModel`. */
+function subtypeChainModel(p = ""): OrmModel {
   return new ModelBuilder("SubChain")
-    .withEntityType("Party", { referenceMode: "party_id" })
-    .withEntityType("Person", { referenceMode: "party_id" })
-    .withEntityType("Employee", { referenceMode: "party_id" })
-    .withSubtypeFact("Person", "Party")
-    .withSubtypeFact("Employee", "Person")
+    .withEntityType(`${p}Party`, { referenceMode: "party_id" })
+    .withEntityType(`${p}Person`, { referenceMode: "party_id" })
+    .withEntityType(`${p}Employee`, { referenceMode: "party_id" })
+    .withSubtypeFact(`${p}Person`, `${p}Party`)
+    .withSubtypeFact(`${p}Employee`, `${p}Person`)
     .build();
 }
 
@@ -593,9 +599,9 @@ describe("DiagramSession", () => {
     session.apply({ type: "loadView", viewName: "AB" });
     await session.present();
 
-    // Swap to a freshly built model with the same names but different ids,
+    // Swap to a model with every element renamed, so different ids,
     // without re-running present() -- lastLayout still carries the old ids.
-    session.setModel(chainModel());
+    session.setModel(chainModel("New"));
     const view = session.buildViewLayout("Stale");
     expect(view.elements).toEqual([]);
   });
@@ -818,9 +824,9 @@ describe("DiagramSession", () => {
     await session.present();
     session.apply({ type: "focusEntity", nodeId: otId(model, "Person"), hopCount: 1 });
 
-    // Reload with a freshly built model: the same shape but new ids, so the
+    // Reload with every element renamed: the same shape but new ids, so the
     // previously focused entity id no longer resolves and must be cleared.
-    session.setModel(subtypeChainModel());
+    session.setModel(subtypeChainModel("New"));
     const p = await session.present();
 
     expect(p.focus).toBeNull();
@@ -881,9 +887,9 @@ describe("DiagramSession", () => {
     const kept = await session.present();
     expect(kept.ghostNodeIds.length).toBeGreaterThan(0);
 
-    // A freshly built model has entirely new ids: the ghost no longer
-    // resolves and cleanStaleFilterIds must drop it.
-    session.setModel(chainModel());
+    // A model with every element renamed has entirely new ids: the ghost
+    // no longer resolves and cleanStaleFilterIds must drop it.
+    session.setModel(chainModel("New"));
     const cleared = await session.present();
     expect(cleared.ghostNodeIds).toEqual([]);
   });
@@ -938,9 +944,9 @@ describe("DiagramSession", () => {
     await session.present();
 
     // The fact type id from the old model no longer resolves against the
-    // new one, so its saved position/orientation must be dropped rather
+    // renamed one, so its saved position/orientation must be dropped rather
     // than saved under a stale key.
-    session.setModel(chainModel());
+    session.setModel(chainModel("New"));
     const layout = session.buildLayout("Stale");
 
     expect(layout.positions[abFtId]).toBeUndefined();

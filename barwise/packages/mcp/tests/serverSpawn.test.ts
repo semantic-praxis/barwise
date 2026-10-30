@@ -95,9 +95,14 @@ describe("MCP server stdio spawn", () => {
       },
     });
     const text = (result.content as Array<{ type: string; text: string; }>)[0]!.text;
+    // Elements the model names take local names (iri-identity 6b); the ids
+    // the importer still states come from the generator, and must be v7.
     const ids = [...text.matchAll(/^\s*(?:- )?id: (\S+)$/gm)].map((m) => m[1]!);
-    expect(ids.length).toBeGreaterThan(0);
-    for (const id of ids) {
+    const generated = ids.filter((id) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)
+    );
+    expect(generated.length).toBeGreaterThan(0);
+    for (const id of generated) {
       expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     }
   });

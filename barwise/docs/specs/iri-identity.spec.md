@@ -12,7 +12,8 @@ recognizes renames and merge refuses content and rename pairings; the
 verbalization interface, `model/mint.ts` and `FactType.addConstraint`'s
 return; the test builders off `::` ids; lineage exports name their model);
 6b-1 implemented 2026-10-30 (the cross-kind id index and constraint
-admission); 6b-2 to 6f and WS7 to come
+admission); 6b-2a implemented 2026-10-30 (minting in the model); 6b-2b to
+6f and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-30
@@ -1447,12 +1448,30 @@ sites.
   (`model/constraintAdmission.ts`): a fact type in a model hands each
   later constraint to the model, which enters its id today and mints it
   in 6b-2.
-- _6b-2, the format._ Minting at the add (local names, `<ft>.<role>`, the
-  suffix rule, the stated ids reserved for a load, decision 20), the
-  cross-kind refusal, absent ids on subtype facts and objectifications
-  (decision 19), the 4.0 JSON Schema and Effect decoders with the 3.0
-  pair frozen, the 4.0 writer, and the 3.x and 2.0 replay with its
-  in-memory id map for diff; and the test, fixture and golden churn.
+- _6b-2, in two parts_ (owner, 2026-10-30).
+  - _6b-2a, minting in the model; files stay 3.0._ An element added
+    without an id is named at the add: an object type and a fact type by
+    `localName(name)`, a role `<fact type>.<role>` (two roles given one
+    name and no ids are refused, decision 5b), a constraint, subtype fact
+    and objectification by `mint()`, a population
+    `<fact type>.population` and its instances `<population>.N`, past
+    the highest number used and never reused (decision 7); each under the
+    suffix rule against every id the index holds, of any kind. A fact
+    type's config constraints are refused before anything is stored, then
+    added after the fact type is in, so each is named from its sentence.
+    Two stopgaps last until 6b-2b, because format 3.0 requires every id:
+    an element its sentence cannot name gets a generated id (decision 19's
+    absent id needs the 4.0 schema), and nothing reserves a load's stated
+    ids, since a 3.0 file states every id and nothing in its load is
+    minted. Cross-kind refusal waits for the replay too. Tests that relied
+    on two builds giving unrelated ids now state them; the ten promptlab
+    references are regenerated.
+  - _6b-2b, the format._ The stated ids reserved for a load, decision 20,
+    the cross-kind refusal, absent ids on subtype facts and
+    objectifications (decision 19), the 4.0 JSON Schema and Effect
+    decoders with the 3.0 pair frozen, the 4.0 writer, and the 3.x and
+    2.0 replay with its in-memory id map for diff; and the fixture and
+    golden churn.
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
   `imports`.

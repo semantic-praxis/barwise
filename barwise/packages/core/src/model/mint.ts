@@ -4,10 +4,10 @@
  * and the content key each was minted from (iri-identity, section 3 and
  * WS6 6a). Pure: one model and one element give one name and one key.
  *
- * Nothing calls this yet. In 6b `OrmModel` gives an element without an id
- * its minted name when the element joins the model (decision 17), stores
- * the key beside it as `minted_from`, and reports the name stale when the
- * element's key no longer matches (decision 14). It takes the model as
+ * `OrmModel` gives an element added without an id its minted name
+ * (decision 17; iri-identity 6b-2a). Storing the key beside it as
+ * `minted_from`, and reporting the name stale when the element's key no
+ * longer matches (decision 14), come with format 4.0. It takes the model as
  * `ConstraintModel`, which is what lets `OrmModel` call it without an
  * import cycle.
  *
@@ -22,20 +22,20 @@ import { serializeConstraint } from "../serialization/yaml/constraint.js";
 import { sentenceHolds } from "../verbalization/constraints/assumptions.js";
 import { ConstraintVerbalizer } from "../verbalization/ConstraintVerbalizer.js";
 import {
+  type ObjectificationShape,
+  type SubtypeFactShape,
   verbalizeObjectifiedFactType,
   verbalizeSubtypeFact,
 } from "../verbalization/elementSentences.js";
 import type { ConstraintInView, ConstraintModel } from "./constraintModel.js";
 import type { FactType } from "./FactType.js";
 import { localName } from "./name.js";
-import type { ObjectifiedFactType } from "./ObjectifiedFactType.js";
-import type { SubtypeFact } from "./SubtypeFact.js";
 
 /** An element that takes a minted name. */
 export type Mintable =
   | { readonly kind: "constraint"; readonly inView: ConstraintInView; }
-  | { readonly kind: "subtypeFact"; readonly subtypeFact: SubtypeFact; }
-  | { readonly kind: "objectification"; readonly objectification: ObjectifiedFactType; };
+  | { readonly kind: "subtypeFact"; readonly subtypeFact: SubtypeFactShape; }
+  | { readonly kind: "objectification"; readonly objectification: ObjectificationShape; };
 
 /** A minted name and the key it was minted from. */
 export interface Minted {
