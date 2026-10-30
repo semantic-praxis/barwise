@@ -34,15 +34,49 @@
     // cover it, since build reads every package file; naming it here keeps
     // a schema-only change from replaying a cached pass if build's inputs
     // are ever narrowed.
+    //
+    // The rest of each list is what a cached pass also depends on
+    // (docs/specs/executable-adrs.spec.md, WS2; barwise-ym8.7jz items 6, 8,
+    // 10). The package's vitest.config.ts and package.json, and the shared
+    // vitest.shared.ts -- $TURBO_ROOT$ is barwise/, where this file is --
+    // decide which tests run and how; leaving them out replayed an old pass,
+    // and an old coverage result, after a config change. examples/,
+    // test-plan/ and docs/getting-started/ are the files outside a package
+    // that package tests read. Not every package-only file is listed
+    // ($TURBO_DEFAULT$ would make a README edit rerun the suite), and the
+    // list cannot be complete: core's model corpus reads every tracked
+    // .orm.yaml in the repository. A cache hit is as fresh as these inputs.
+    // test-results/ holds the json report check:adr-tests reads, so a cache
+    // hit restores it rather than leaving none.
     "test": {
       "dependsOn": ["build"],
-      "outputs": [],
-      "inputs": ["src/**", "tests/**", "schemas/**"]
+      "outputs": ["test-results/**"],
+      "inputs": [
+        "src/**",
+        "tests/**",
+        "schemas/**",
+        "vitest.config.ts",
+        "package.json",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/examples/**",
+        "$TURBO_ROOT$/test-plan/**",
+        "$TURBO_ROOT$/docs/getting-started/**"
+      ]
     },
     "test:coverage": {
       "dependsOn": ["build"],
-      "outputs": ["coverage/**"],
-      "inputs": ["src/**", "tests/**", "schemas/**"]
+      "outputs": ["coverage/**", "test-results/**"],
+      "inputs": [
+        "src/**",
+        "tests/**",
+        "schemas/**",
+        "vitest.config.ts",
+        "package.json",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/examples/**",
+        "$TURBO_ROOT$/test-plan/**",
+        "$TURBO_ROOT$/docs/getting-started/**"
+      ]
     },
     "test:watch": {
       "cache": false,

@@ -14,7 +14,9 @@
  * config wraps the returned object in that package's own `defineConfig`,
  * which is where it gets type-checked.
  */
-import { join } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * The four coverage percentages a package's suite must not fall below.
@@ -100,6 +102,31 @@ function reportsDirectory(pkg: string): { reportsDirectory?: string; } {
 }
 
 /**
+ * vitest's own default reporters, plus `json` writing every test's title and
+ * status to `test-results/vitest.json` in the package, for `check:adr-tests`
+ * (docs/specs/executable-adrs.spec.md, WS2; the path's one owner is
+ * scripts/lib/test-reports.mjs).
+ *
+ * Setting `reporters` replaces vitest's computed default -- `minimal` for an
+ * agent, `default` otherwise, plus `github-actions` in CI for the PR
+ * annotations -- so the default is read, not restated: `configDefaults` from
+ * the package's own `vitest/config`, resolved from the package as its config
+ * would be, which keeps this file's no-import-of-vitest rule (above) intact
+ * (barwise-ym8.7jz, item 4).
+ */
+function testReport(pkg: string): { reporters: unknown[]; outputFile: { json: string; }; } {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const fromPackage = createRequire(join(here, "packages", pkg, "package.json"));
+  const { configDefaults } = fromPackage("vitest/config") as {
+    configDefaults: { reporters: unknown[]; };
+  };
+  return {
+    reporters: [...configDefaults.reporters, "json"],
+    outputFile: { json: "test-results/vitest.json" },
+  };
+}
+
+/**
  * The vitest configuration for one package.
  *
  * `pkg` names the directory under a run-scoped coverage root; it is a
@@ -118,6 +145,7 @@ export function barwiseVitestConfig(pkg: string, shape: PackageTestShape) {
   return {
     test: {
       include: [...(shape.testInclude ?? ["tests/**/*.test.ts"])],
+      ...testReport(pkg),
       // Twelve packages ran under a 5s default and several of them could
       // not: real ELK layout, a full validate of the auction model, and
       // loading the packaged seed suite all take seconds under coverage

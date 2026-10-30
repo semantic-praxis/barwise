@@ -33,6 +33,7 @@
     "check:book-citations": "node scripts/check-book-citations.mjs",
     "check:instruction-refs": "node scripts/check-instruction-refs.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
+    "check:adr-tests": "node scripts/check-adr-tests.mjs",
     "test:scripts": "node scripts/run-script-tests.mjs",
     "test:optimizer": "uv run --frozen --extra dev pytest -q",
     "audit:duplication": "node scripts/audit-duplication.mjs",
@@ -70,7 +71,7 @@
     "trial:offline": "node trial/lib/run.mjs offline",
     "trial:keyed": "node trial/lib/run.mjs keyed",
     "trial:gate": "node trial/lib/gate.mjs",
-    "test:trial": "node --test trial/tests/*.test.mjs"
+    "test:trial": "mkdir -p test-results && node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/lib/test-tag-reporter.mjs --test-reporter-destination=test-results/trial.jsonl trial/tests/*.test.mjs"
   },
   "devDependencies": {
     "@dprint/json": "0.24.0",
