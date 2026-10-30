@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
 import { ExternalConstraintFile, InternalConstraintFile } from "../../src/decode/constraint.js";
 import { decoderFor } from "../../src/decode/decoder.js";
+import { DocumentFile } from "../../src/decode/document.js";
 import { FactTypeFile } from "../../src/decode/factType.js";
 import { ObjectTypeFile } from "../../src/decode/objectType.js";
 import { elementOf } from "../../src/decode/problems.js";
@@ -64,7 +65,9 @@ it("puts every element annotation where the walk meets it, on a node and never o
   // the walk then labels the element's problems by whatever encloses it
   // ("The document") -- R3's fact type did, until this test.
   const roots = [ObjectTypeFile, InternalConstraintFile, ExternalConstraintFile, FactTypeFile];
-  const onChecks = roots.flatMap((root) =>
+  // The document holds every element, R4's own among them; it is no
+  // element itself, so it is scanned but not asked for a label.
+  const onChecks = [...roots, DocumentFile].flatMap((root) =>
     nodesOf(root.ast).flatMap((node) =>
       (node.checks ?? []).filter((c) =>
         (c.annotations as { element?: unknown; } | undefined)?.element

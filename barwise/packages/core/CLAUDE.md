@@ -14,9 +14,13 @@ Allowed runtime dependencies: `yaml`, `ajv`, and `effect`, pinned to an
 exact version (`tests/effectVersion.test.ts` fails a range, and any other
 workspace package that declares it at a different version). No others
 without discussion. `effect` arrived with the decoders in `src/decode/`
-(`docs/specs/effect-adoption.spec.md`, 1r, R1): until R4 nothing on the
-load path imports them, and core's barrel does not export them, so a
-surface that starts does not load Effect.
+(`docs/specs/effect-adoption.spec.md`, 1r, R1), and since R4 the 3.0
+loader reads every file through them alone. The barrel exports the
+serializer, which imports them, so loading core loads Effect, whether or
+not a file is read (R4's S5 reading has the cost). `ajv` stays for the
+2.0 reader, which validates against the frozen
+`schemas/orm-model-2.0.schema.json` (Open decision 13). Core's barrel does
+not export the decoders.
 
 ## Package Layout
 
@@ -30,8 +34,8 @@ src/
                   and constraint routing: what the schema realized, and what a
                   dialect adds as UNIQUE/CHECK or spills as a ConstraintSpec
   decode/         Effect Schemas and decoders for the 3.0 file format, with
-                  the cross-field harness; off the load path until
-                  effect-adoption R4
+                  the cross-field harness; the 3.0 loader reads files
+                  through them alone (effect-adoption R4)
   diff/           Model diffing and three-way merge
   rename/         Renaming an element: renameInModel, and renameInProject with
                   its cascade into shadows, reference modes, definitions and
@@ -201,9 +205,13 @@ it, so knip sees an unused file where there is a live edge.
   (`docs/specs/counterexample-stray-rules.spec.md`).
 - Serialization round-trips must be lossless. Any new model field must
   have a corresponding serialization path and a round-trip test.
-- JSON Schemas in `schemas/` are first-class artifacts used for file
-  validation on load, editor autocomplete, and LLM output constraint.
-  Keep them in sync with the serializers.
+- JSON Schemas in `schemas/` are first-class artifacts, read by editors
+  and by LLM clients through the MCP server. A 3.0 file is validated on
+  load by the decoders in `src/decode/`, not by `orm-model.schema.json`, so
+  the two are copies that must agree: each decoder has a drift test against
+  the schema (`tests/decode/*SchemaDrift.test.ts`), until WS1b part C
+  generates the file from the Schemas. Keep both in sync with the
+  serializers. The frozen 2.0 schema still validates a 2.0 file on load.
 
 ## Testing
 

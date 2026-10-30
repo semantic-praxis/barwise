@@ -251,11 +251,6 @@
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
       "detail": "ConceptualDataTypeName restated as record in packages/formats/src/ossie/writeOssie.ts"
     },
-    "literal:9133a7a7fd33": {
-      "status": "tracked:barwise-ehl",
-      "note": "the misplaced-constraint sentence, stated by the R2 decoder and by refuseMisplacedConstraints until R4 deletes the latter (effect-adoption 1r)",
-      "detail": "packages/core/src/decode/constraint.ts, packages/core/src/serialization/OrmYamlSerializer.ts"
-    },
     "literal:b8915ff0d86b": {
       "status": "accepted-benign",
       "note": "two decisions sharing one sentence: a fact type's roles (FactTypeFile) and a constraint's role list (roleList); neither minimum follows from the other, and each drift test holds its own to the schema",

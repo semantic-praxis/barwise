@@ -1,12 +1,5 @@
+import { isEntityType, isValueType, type ObjectType } from "../../model/ObjectType.js";
 import {
-  type ConceptualDataTypeName,
-  isEntityType,
-  isValueType,
-  type ObjectType,
-  type ObjectTypeConfig,
-} from "../../model/ObjectType.js";
-import {
-  deserializeValueConstraintBody,
   type OrmYamlValueConstraintBody,
   serializeValueConstraintBody,
 } from "./valueConstraint.js";
@@ -90,30 +83,4 @@ export function serializeObjectType(
   }
 
   return result;
-}
-
-export function deserializeObjectType(otDoc: OrmYamlObjectType): ObjectTypeConfig {
-  return {
-    id: otDoc.id,
-    name: otDoc.name,
-    kind: otDoc.kind,
-    referenceMode: otDoc.reference_mode,
-    definition: otDoc.definition,
-    sourceContext: otDoc.source_context,
-    valueConstraint: otDoc.value_constraint
-      ? deserializeValueConstraintBody(otDoc.value_constraint)
-      : undefined,
-    dataType: otDoc.data_type
-      ? {
-        name: otDoc.data_type.name as ConceptualDataTypeName,
-        length: otDoc.data_type.length,
-        scale: otDoc.data_type.scale,
-      }
-      : undefined,
-    aliases: otDoc.aliases,
-    independent: otDoc.independent,
-    defaultValue: otDoc.default_value,
-    note: otDoc.note,
-    cardinality: otDoc.cardinality,
-  };
 }

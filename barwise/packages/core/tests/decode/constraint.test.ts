@@ -26,11 +26,9 @@ import {
 import { DecodeError, decoderFor } from "../../src/decode/decoder.js";
 import { elementOf } from "../../src/decode/problems.js";
 import { CONSTRAINT_TYPES, placementOf } from "../../src/model/Constraint.js";
+import { deserializeConstraint } from "../../src/serialization/reader20.js";
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
-import {
-  deserializeConstraint,
-  type OrmYamlConstraint,
-} from "../../src/serialization/yaml/constraint.js";
+import type { OrmYamlConstraint } from "../../src/serialization/yaml/constraint.js";
 import { type ConstraintKind, derivedConstraints } from "../helpers/derivedConstraints.js";
 import { fromJsonSchema } from "../helpers/jsonSchemaArbitrary.js";
 import { corpusConstraints } from "../helpers/modelCorpus.js";

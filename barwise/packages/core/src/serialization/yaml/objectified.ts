@@ -1,7 +1,4 @@
-import type {
-  ObjectifiedFactType,
-  ObjectifiedFactTypeConfig,
-} from "../../model/ObjectifiedFactType.js";
+import type { ObjectifiedFactType } from "../../model/ObjectifiedFactType.js";
 
 export interface OrmYamlObjectifiedFactType {
   id: string;
@@ -16,15 +13,5 @@ export function serializeObjectifiedFactType(
     id: oft.id,
     fact_type: oft.factTypeId,
     object_type: oft.objectTypeId,
-  };
-}
-
-export function deserializeObjectifiedFactType(
-  oftDoc: OrmYamlObjectifiedFactType,
-): ObjectifiedFactTypeConfig {
-  return {
-    id: oftDoc.id,
-    factTypeId: oftDoc.fact_type,
-    objectTypeId: oftDoc.object_type,
   };
 }

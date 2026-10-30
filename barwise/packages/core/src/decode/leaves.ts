@@ -39,6 +39,14 @@ export const notBlank = (what: string) =>
   );
 export const Name = notBlank("");
 
+/** Any integer, as JSON Schema's `integer` reads one: a diagram position. */
+export const Integer = Schema.Number.annotate({ message: "must be an integer." }).check(
+  Schema.makeFilter((n: number) => Number.isInteger(n), {
+    message: "must be an integer.",
+    arbitraryConstraint: { number: "integer" },
+  }),
+);
+
 /**
  * An integer no smaller than `min`, as JSON Schema's `integer` with a
  * `minimum` reads one. Not `Schema.Int`, which is `Number.isSafeInteger`

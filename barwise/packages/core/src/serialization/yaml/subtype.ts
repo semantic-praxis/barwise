@@ -1,9 +1,5 @@
-import type { SubtypeFact, SubtypeFactConfig } from "../../model/SubtypeFact.js";
-import {
-  deserializeDerivation,
-  type OrmYamlDerivation,
-  serializeDerivation,
-} from "./derivation.js";
+import type { SubtypeFact } from "../../model/SubtypeFact.js";
+import { type OrmYamlDerivation, serializeDerivation } from "./derivation.js";
 
 export interface OrmYamlSubtypeFact {
   id: string;
@@ -30,16 +26,4 @@ export function serializeSubtypeFact(sf: SubtypeFact): OrmYamlSubtypeFact {
     result.defining_rule = serializeDerivation(sf.definingRule);
   }
   return result;
-}
-
-export function deserializeSubtypeFact(sfDoc: OrmYamlSubtypeFact): SubtypeFactConfig {
-  return {
-    id: sfDoc.id,
-    subtypeId: sfDoc.subtype,
-    supertypeId: sfDoc.supertype,
-    providesIdentification: sfDoc.provides_identification ?? true,
-    definingRule: sfDoc.defining_rule
-      ? deserializeDerivation(sfDoc.defining_rule)
-      : undefined,
-  };
 }

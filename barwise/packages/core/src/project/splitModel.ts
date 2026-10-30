@@ -11,6 +11,7 @@
  */
 
 import { stringify } from "yaml";
+import { type ConstraintFileValue, constraintRecord } from "../decode/constraint.js";
 import { roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
 import { IRI_BASE_PATTERN } from "../model/iri.js";
@@ -19,7 +20,6 @@ import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";
 import { OrmYamlSerializer, writeDocument } from "../serialization/OrmYamlSerializer.js";
 import { ProjectSerializer } from "../serialization/ProjectSerializer.js";
-import { deserializeConstraint, type OrmYamlConstraint } from "../serialization/yaml/constraint.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -384,7 +384,7 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
     const homedSubtypeIds = new Set(homedSubtypes.map((sf) => sf.id));
     const keptConstraints = modelConstraints.filter((constraint) => {
       const subtypeFactIds = subtypeFactIdsOf(
-        deserializeConstraint(constraint as unknown as OrmYamlConstraint),
+        constraintRecord(constraint as unknown as ConstraintFileValue),
       );
       const here = subtypeFactIds.every((id) => homedSubtypeIds.has(id))
         && constraintIsLocal(constraint, ctx, roleToFt, ftHome);
@@ -683,7 +683,7 @@ function pickWinner(votes: ReadonlyMap<string, number>): string | undefined {
  * "no roles."
  */
 function constraintRoleIds(constraint: RawConstraint): string[] {
-  return roleIdsOf(deserializeConstraint(constraint as unknown as OrmYamlConstraint));
+  return roleIdsOf(constraintRecord(constraint as unknown as ConstraintFileValue));
 }
 
 /**

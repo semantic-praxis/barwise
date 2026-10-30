@@ -42,6 +42,15 @@ const KNOWN = new Set([
   "else",
   "$ref",
   "description",
+  // Annotations and the root's metadata, read as nothing: they constrain no
+  // value (R4, which draws whole documents).
+  "default",
+  "title",
+  "$schema",
+  "$id",
+  "definitions",
+  // A string's pattern, honoured (R4: the model's namespace).
+  "pattern",
 ]);
 
 /** Usually `usual`, one time in `odds + 1` the stray. */
@@ -51,6 +60,13 @@ function mostly<T>(usual: fc.Arbitrary<T>, stray: fc.Arbitrary<T>, odds = 40): f
 
 function stringArbitrary(node: Node): fc.Arbitrary<string> {
   const minLength = typeof node.minLength === "number" ? node.minLength : 0;
+  if (typeof node.pattern === "string") {
+    return mostly(
+      fc.stringMatching(new RegExp(node.pattern)),
+      fc.constantFrom("", "no-scheme/", "urn:x", "http://a b/"),
+      10,
+    );
+  }
   return mostly(
     fc.string({ minLength: Math.max(minLength, 1), maxLength: 12 }),
     fc.constantFrom("", " ", "  \t"),

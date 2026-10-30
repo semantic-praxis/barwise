@@ -2,8 +2,9 @@
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
-restarted on format 3.0 2026-10-29 (1r), R0 to R3 done, R4 not started; WS1b
-follows the restart's WS1 reading; WS2 onward not started
+restarted on format 3.0 2026-10-29 (1r), R0 to R3 done, R4 built and its
+WS1 reading taken 2026-10-30 and passed (S4 as Open decision 15 resolved
+it); WS1b parts B3, C, D and E not started; WS2 onward not started
 Created: 2026-10-15
 Last-updated: 2026-10-30
 Tracking: barwise-jo5 (this spec); barwise-4r3 (Effect alone on load,
@@ -1069,6 +1070,164 @@ construction, as for R1 and R2.
   maximum's message without "unbounded", ids with no wrong-type message,
   an empty id labelled as none, and the element annotation after the check.
 
+**R4, built 2026-10-30: the rest of the document, and ajv off the 3.0
+path**, in `core/src/decode/document.ts`, with `decode/derivation.ts` split
+out of R3's fact type module so subtype facts share it.
+
+- The header, `subtype_facts`, `objectified_fact_types`, `populations`
+  and their instances, `definitions` and `diagrams`, in the file's own
+  keys, and the document root. `documentConfigs` maps a decoded document
+  to the configs the `deserialize*` functions built. The namespace is
+  checked against the schema's own pattern (`NAMESPACE_FILE_PATTERN`);
+  the model's constructor checks the IRI again after decoding, as it does
+  on `main`, so nothing here reads or writes IRI identity.
+- The 3.0 loader runs the decoders alone. A `DecodeError` becomes a
+  `DeserializationError` whose message lists every problem, one per line,
+  with a JSON Pointer per problem in `validationResult`. The model is
+  built from the decoded configs (`fromDecoded`), and the cross-element
+  checks run after decoding as before: repeated constraint ids, the
+  stores' held ids, references between elements, and the lenient option.
+  `refuseMisplacedConstraints` is deleted. The `deserialize*` functions,
+  `readTail` and the 2.0 reader moved unchanged into
+  `serialization/reader20.ts`; the `serialize*` functions stay in
+  `yaml/*.ts` for the writer; `DeserializationError` has its own module,
+  which both readers import.
+- The record states the modality, alethic when the file states none
+  (R2), and `main`'s model stores none for a default. The loader drops an
+  alethic modality before the model (`modelConstraint`), so the loaded
+  model is `main`'s and no existing test changed.
+- Agreement with `main`, both ways, on whole documents: 1,000 drawn from
+  the hand-written schema, and the decoder accepts exactly what `main`'s
+  schema, the model's name rule and each element's constructor accept, to
+  the same configs; all 85 corpus documents decode to `main`'s configs.
+  All 38 refused 3.0 malformed cases are refused by the loader at their
+  declared field and nowhere else; a file holding three of them reports
+  all three in one pass. A drift test holds the document Schema to the
+  shipped JSON Schema, field by field, with required fields, numeric
+  limits, enumerations and the namespace pattern.
+- Found by the WS1 reading and fixed before it was recorded: a
+  constraint's problems named the constraint by id but not the fact type
+  it sits in, which `main` names, so S4's naming read 26/37 combined. An
+  element annotation can now say it `locates` the elements inside it, and
+  fact types and populations do: a problem reads `The mandatory constraint
+  "c1" in fact type "F": modality ...`. A rule whose sentence names the
+  enclosing element itself, the misplacement sentence, is not prefixed
+  again.
+- Planted against, each failing its test: the modality kept, the lenient
+  option ignored, repeated ids allowed, the preferred identifier unset,
+  instances dropped, a population's description dropped, a definition
+  term's minimum dropped, the namespace pattern widened, an element
+  annotation placed on a check, the place never added, a fact type or a
+  population that does not locate, and the misplacement sentence prefixed
+  twice.
+- Changed scope: `core/src/project/splitModel.ts` built a constraint's
+  record through `deserializeConstraint`; it now calls `constraintRecord`,
+  so the split path does not depend on the 2.0 reader. The test generator
+  over the hand-written schema (`tests/helpers/jsonSchemaArbitrary.ts`)
+  now reads the root's keywords and honours `pattern`.
+- The pre-merge review's `/code-review` found no design flaw and these
+  details, each fixed with a test that fails when it is planted back
+  where it changes behaviour: the refusal had become several lines, which
+  `barwise migrate` prints after a file name, and is one line again,
+  problems joined by "; " as ajv's were; a problem at the document itself
+  had the path "" where ajv gave "/"; a definition with no term read
+  "Definition of with no term"; an id of spaces labelled its element as
+  having none; `SchemaValidator` still compiled the 3.0 schema up front,
+  which only tests now use; the integer leaf was a second copy beside
+  `intAtLeast`; and three doc comments still said 3.0 is validated
+  against the JSON Schema. Declined, with the reason: building the
+  document decoder on first use, since building it costs nothing
+  measurable and the time is Effect's import, which a synchronous
+  `deserialize` cannot defer; and adding the modality default in one place
+  only, since S3's frozen record requires it stated and `main`'s model
+  stores none (`splitModel` reads only role ids from the record). S1, S4
+  and S5 were re-read after these fixes and are unchanged: S5 376 ms npm
+  and 339 ms bundle, `main` 285 and 335 back to back.
+- Its second pass, on the fixed head, found no design flaw and these, each
+  fixed with a test that fails when it is planted back: a blank definition
+  term or text, or a blank diagram name, passed the decoder and the
+  model's constructor then threw a plain `Error`, alone and unlabelled
+  (`main` does the same; the leaves are now `notBlank`, as the model's
+  name is, and the agreement test builds those constructors); joining
+  sentences with "; " read ".; ", so they now follow one another; the
+  orientations message restated the list, which is now a total record over
+  the model's type; and two doc comments. Tracked: the same-id rules of a
+  subtype fact and an objectification, the same class of constructor check,
+  which need harness rules (barwise-um9); and the test generator's
+  namespace-shaped strays for any pattern (barwise-vy9). Declined, with
+  the reason: the namespace pattern's copy, which is drift-tested and whose
+  original is IRI code this restart stays out of; the label helpers, which
+  key on different fields; `Integer` beside `intAtLeast`, two refusals
+  with different messages; and the place-or-sentence rule in the walk,
+  which a test pins and which touches only a rule's own issues.
+- Its third pass found nothing blocking. Fixed, with a test that fails
+  when planted back: a line break in a name the file states split the
+  one-line refusal, and is now written `\n` there; and `core/CLAUDE.md`
+  said reading a 3.0 file loads Effect, where loading core does. Declined,
+  with the reason: the eager decoder (as above); the 3.0 refusal's prefix,
+  which names the format where the 2.0 reader's names the schema, the 2.0
+  path unchanged by design; `splitModel`'s cast, the same raw input
+  `main` passed to `deserializeConstraint`; the header type, whose new
+  fields the drift test would catch through the schema; and
+  `SchemaValidator.validateModel`, still public API. barwise-ehl closes
+  in the tracker follow-up after merge, as the steward skill does it.
+- barwise-ehl's duplicated misplacement sentence is gone with
+  `refuseMisplacedConstraints`, and its baseline row with it.
+
+**The WS1 reading on 3.0, taken 2026-10-30** on R4's head at `b6bdc263`,
+`main` at `876fb4c6` read back to back on the same machine (Node v26.7.0,
+an Intel Xeon 2.30 GHz x4):
+
+| Gate | `main`                                                                     | R4                                                                                                                                    |
+| ---- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| S1   | `corpus`: 158 models; strict 85 loaded, 73 refused; lenient 93 and 65      | the same 316-line listing, file for file; `--write` on `main` then `--read` on R4 gives the same bytes for all 85, strict and lenient |
+| S2   | layout tests green                                                         | layout tests green                                                                                                                    |
+| S3   | type tests green                                                           | type tests green: the decoder's record is the frozen `ConstraintRecord`, kind by kind                                                 |
+| S4   | singly 32/39 reported; combined 26/37 reported, 20 named, constraints 1/11 | singly 38/39 reported, each named; combined 36/37 reported, 36 named, constraints named 10/11; 0 silent losses on either head         |
+| S5   | `validate` 279 and 282 ms npm, 330 and 329 ms bundle; 313 modules, 1.70 MB | 397 and 406 ms npm, 374 and 373 ms bundle, under the 1 s limit; 441 modules and 4.34 MB loaded                                        |
+| S6   | 2,890 ms median (2,830-2,900), 74,836 instantiations                       | 3,040 ms median (3,010-3,160), 80,530 instantiations (reported, no limit)                                                             |
+
+The one S4 case R4 does not report is `frequency-max-below-min`. It loads
+on both heads, and `barwise validate` refuses it on both with "Frequency
+constraint in fact type "Tariff has Age" has max (2) less than min (3)".
+R2 kept it loading so that S1 holds: `main` loads that file, and refusing
+it at decode would make the two heads' listings differ. S1 and S4's bar
+("every case reported") cannot both be met for this case. The owner
+resolved Open decision 15 as (a) on 2026-10-30: S4 is read over the cases
+`main`'s loader refuses, where R4 reads 38/38 singly and 36/36 combined.
+**Every gate holds, and the reading passes.**
+
+- S5 was read twice on each head, in the order `main`, R4, `main`, R4;
+  the two readings agree within 10 ms. Loading core now loads Effect, so
+  `barwise --version` rose with `validate` (268 to 382 ms npm); the
+  bundle's rise is smaller (330 to 374 ms).
+- S6's `main` figure is today's, R1 to R3 included, since they are on
+  `main`; R4 adds 150 ms and 5,694 instantiations.
+
+**M1 to M4 on R4's head**, seed 1, 1,000 values per element Schema and
+100 per constraint kind:
+
+| Schema                                                                        | M1  | M2   | M3   | M4   |
+| ----------------------------------------------------------------------------- | --- | ---- | ---- | ---- |
+| object type                                                                   | yes | 100% | 100% | 100% |
+| the constraint union, and each of the 17 kinds alone                          | yes | 100% | 100% | 100% |
+| fact type                                                                     | no  | --   | --   | --   |
+| subtype fact, objectification, fact instance, population, definition, diagram | yes | 100% | 100% | 100% |
+| the document                                                                  | yes | 100% | 100% | 100% |
+
+- Fact types read no, as at R3: 0 values in 10,001 tries, since the
+  reading rule discards every derived fact type. The document derives
+  only by leaving fact types out: of its 1,000 values, 51 have
+  `fact_types` and every one is empty. A document generator needs
+  WS1b part D's fact type generator first.
+- M3's first reading was 93% for every Schema, and the cause was the
+  instrument: fast-check draws some objects with no prototype, and
+  `isDeepStrictEqual` compares prototypes. Compared with both sides
+  cloned (keys and values only, `-0` kept), every value comes back.
+- M4 wraps each element in the smallest valid document, as WS1 describes:
+  an internal constraint in a fact type, an external one in
+  `model.constraints`, an instance in a population.
+
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,
 each land on `main` as their own PR, through the usual reviews and CI.
@@ -1647,6 +1806,27 @@ entry only records that it follows.
     two weeks old at the restart, and the version WS2 named. #672 used
     4.0.4. 4.0.6 and 4.0.7 are under two weeks old. M1 is re-read on the
     pinned version, since derivation is marked unstable.
+15. **A case S1 requires to load (added 2026-10-30) -- resolved
+    2026-10-30 by the owner: option (a).** The 3.0
+    case `frequency-max-below-min` is a file `main` loads, leaving the
+    max below min to validation, which refuses it. S1 requires the spike
+    to load what `main` loads; S4's bar requires every case reported by the
+    loader. R4 loads it, so S1 holds and S4 reads 38/39 singly and 36/37
+    combined, with no silent loss. The case was written in WS0, before
+    this conflict was visible, and R0's notes already list it as the one
+    loading case.
+    - **(a)** S4 is read over the cases `main`'s loader refuses: a case
+      `main` loads and validation refuses is validation's, as R2 decided
+      for this one, and S4 holds at 38/38 and 36/36. Recommended: the
+      gate stands for "no bad model passes unnoticed", and validation
+      notices this one on both heads with the same message; the format
+      leaves the relation between two fields to validation elsewhere too.
+    - **(b)** S4 holds as written, so the decoder must refuse the case,
+      and S1 then differs from `main` on one fixture file. That is a
+      change in what loads, which S1 exists to prevent, and it reverses
+      R2's scope change for every constraint whose max may be below its min.
+    - **(c)** The gate fails as written, and the restart ends as Open
+      decision 4 says.
 
 ## Risks and testing
 

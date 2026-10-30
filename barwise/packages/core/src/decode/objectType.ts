@@ -10,10 +10,10 @@
  * is the raw value, which is what lets the cross-field harness run a rule on
  * raw input (`harness.ts`), and a path in a problem is a path in the file.
  *
- * Nothing on the load path calls this until R4: `OrmYamlSerializer` reads
- * files as it always has. Until then two tests hold it to that reader: every
- * object type in the corpus decodes to the record `createObjectType` builds
- * from `deserializeObjectType`, and every 3.0 malformed object type case is
+ * The 3.0 loader reads object types through this (`decode/document.ts`,
+ * R4). Tests hold it to the reader it replaced: every object type in the
+ * corpus decodes to the record `createObjectType` builds from
+ * `deserializeObjectType`, and every 3.0 malformed object type case is
  * refused at its field.
  *
  * The decoder mints no id (Open decision 8): a 3.0 file states every id, and

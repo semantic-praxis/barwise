@@ -26,16 +26,11 @@
  * it says nothing: the roles list's minimum is the problem, and every
  * reading would only repeat it.
  *
- * Nothing on the load path calls this until R4.
+ * The 3.0 loader reads fact types through this (`decode/document.ts`, R4).
  */
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import type {
-  DerivationKind,
-  DerivationRule,
-  DerivationStorage,
-  FactTypeConfig,
-} from "../model/FactType.js";
+import type { FactTypeConfig } from "../model/FactType.js";
 import { validateReadingTemplate } from "../model/ReadingOrder.js";
 import {
   constraintRecord,
@@ -43,20 +38,12 @@ import {
   InternalConstraintsFile,
 } from "./constraint.js";
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
+import { DerivationFile, derivationRule } from "./derivation.js";
 import { crossField } from "./harness.js";
-import { Flag, Name, nonEmpty, notBlank, Text } from "./leaves.js";
+import { Name, nonEmpty, notBlank, Text } from "./leaves.js";
 import { type ElementLabel, elementOf, labelByNameOrId } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
-
-/** Total records, so a kind or storage added to the model fails to compile here. */
-const DERIVATION_KIND_MEMBERS: Record<DerivationKind, true> = { derived: true, semiderived: true };
-const DERIVATION_KINDS = Object.keys(DERIVATION_KIND_MEMBERS) as DerivationKind[];
-const STORAGE_MEMBERS: Record<DerivationStorage, true> = {
-  derive_on_request: true,
-  derived_and_stored: true,
-};
-const STORAGES = Object.keys(STORAGE_MEMBERS) as DerivationStorage[];
 
 /** A reading the constructor accepts: something left after trimming. */
 const Reading = notBlank(" (a reading)");
@@ -64,17 +51,6 @@ const Reading = notBlank(" (a reading)");
 // -- The fact type ----------------------------------------------------------
 
 const RoleFile = Schema.Struct({ id: nonEmpty(""), player: nonEmpty(""), role_name: Name });
-
-const DerivationFile = Schema.Struct({
-  kind: Schema.Literals(DERIVATION_KINDS).annotate({
-    message: `must be ${DERIVATION_KINDS.join(" or ")}.`,
-  }),
-  storage: Schema.optionalKey(
-    Schema.Literals(STORAGES).annotate({ message: `must be ${STORAGES.join(" or ")}.` }),
-  ),
-  expression: Text,
-  is_formal: Schema.optionalKey(Flag),
-});
 
 /**
  * Each reading names every role at least once, and no role the fact type lacks: one
@@ -124,7 +100,9 @@ export const FactTypeFile = Schema.Struct({
 })
   // Annotated before the rule is attached: annotating a checked Schema
   // annotates its last check, and the walk then never meets the element.
-  .annotate(elementOf({ noun: "Fact type", badTag: "", describe: describeFactType }))
+  .annotate(
+    elementOf({ noun: "Fact type", badTag: "", describe: describeFactType, locates: true }),
+  )
   .check(readingsFitRoles);
 
 /** A decoded file fact type: exactly what the file states. */
@@ -136,17 +114,6 @@ export type FactTypeFileValue = (typeof FactTypeFile)["Type"];
 export interface DecodedFactType extends FactTypeConfig {
   readonly id: string;
   readonly constraints: readonly DecodedInternalConstraint[];
-}
-
-function derivationRule(d: NonNullable<FactTypeFileValue["derivation"]>): DerivationRule {
-  // A storage the file states is kept, the default included, and a false
-  // `is_formal` dropped, as `deserializeDerivation` reads them.
-  return {
-    kind: d.kind,
-    expression: d.expression,
-    ...(d.storage !== undefined ? { storage: d.storage } : {}),
-    ...(d.is_formal ? { isFormal: true } : {}),
-  };
 }
 
 /** The config a decoded fact type stands for, as `deserializeFactType` builds it. */

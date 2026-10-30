@@ -57,6 +57,13 @@ export interface ElementAnnotation {
    * reported: a constraint's `type`. Without it, at the element itself.
    */
   readonly tagField?: string;
+  /**
+   * Whether an element inside this one is found through it, so its
+   * problems name this one as well: a constraint under a fact type reads
+   * `... constraint "c1" in fact type "F": ...`. The model does not set
+   * it; its elements are found by their own names.
+   */
+  readonly locates?: boolean;
 }
 
 /**
@@ -87,11 +94,15 @@ const isMapping = (v: unknown): boolean => typeof v === "object" && v !== null &
 
 const defaultFormat = SchemaIssue.makeFormatterDefault();
 
-/** The message an issue carries itself, if it has one. */
-function ownMessage(issue: SchemaIssue.Issue, enclosing?: ElementLabel): string | undefined {
-  const within = issue._tag === "Filter"
+const messageWithinOf = (issue: SchemaIssue.Issue): MessageWithin | undefined =>
+  issue._tag === "Filter"
     ? (issue.filter.annotations as { messageWithin?: MessageWithin; } | undefined)?.messageWithin
     : undefined;
+const hasMessageWithin = (issue: SchemaIssue.Issue) => messageWithinOf(issue) !== undefined;
+
+/** The message an issue carries itself, if it has one. */
+function ownMessage(issue: SchemaIssue.Issue, enclosing?: ElementLabel): string | undefined {
+  const within = messageWithinOf(issue);
   if (within) return within(enclosing && inSentence(enclosing.label));
   const message = issue._tag === "InvalidType"
     ? issue.ast.annotations?.message
@@ -131,6 +142,10 @@ interface Context {
   readonly base: number;
   /** The element this one sits in, if it is decoded inside one. */
   readonly enclosing?: ElementLabel;
+  /** Whether this element's annotation `locates` the elements inside it. */
+  readonly locates?: boolean;
+  /** The enclosing element as the label names it, where that one `locates`. */
+  readonly place?: string;
 }
 
 const ROOTLESS: ElementLabel = { label: "The document", identity: "" };
@@ -144,13 +159,16 @@ export function problemsOf(
   const out: DecodeProblem[] = [];
   const push = (context: Context, path: readonly PropertyKey[], predicate: string) => {
     const below = path.slice(context.base);
+    const label = context.place
+      ? `${context.label.label} in ${context.place}`
+      : context.label.label;
     out.push({
       element: context.label.identity,
       at: path.slice(0, context.base),
       path: below,
       message: below.length === 0
-        ? `${context.label.label} ${predicate}`
-        : `${context.label.label}: ${fieldPath(below)} ${predicate}`,
+        ? `${label} ${predicate}`
+        : `${label}: ${fieldPath(below)} ${predicate}`,
     });
   };
 
@@ -167,6 +185,8 @@ export function problemsOf(
         base: path.length,
         // The bare root is no element, so an element directly in it has none around it.
         ...(context.label !== ROOTLESS ? { enclosing: context.label } : {}),
+        ...(element.locates ? { locates: true } : {}),
+        ...(context.locates ? { place: inSentence(context.label.label) } : {}),
       }
       : context;
   };
@@ -234,16 +254,20 @@ export function problemsOf(
         // A rule's own failure: its issues are reported where they point,
         // each in its own words or, lacking any, the rule's.
         const message = ownMessage(node, context.enclosing) ?? fallback;
+        // A sentence that names the enclosing element itself is not
+        // prefixed with it again.
+        const { place: _, ...unplaced } = context;
+        const here = hasMessageWithin(node) ? unplaced : context;
         const inner = node.issue;
         if (inner._tag === "Pointer") {
-          walk(inner, value, path, context, message);
+          walk(inner, value, path, here, message);
         } else if (inner._tag === "Composite") {
           // A rule's several issues, wrapped in a Composite at its own node:
           // not a failure of that node, so its rules are not run again
           // (third review of R1, where that recursed without end).
-          for (const child of inner.issues) walk(child, value, path, context, message);
+          for (const child of inner.issues) walk(child, value, path, here, message);
         } else {
-          push(context, path, ownMessage(inner) ?? message ?? predicateOf(inner, undefined));
+          push(here, path, ownMessage(inner) ?? message ?? predicateOf(inner, undefined));
         }
         return;
       }

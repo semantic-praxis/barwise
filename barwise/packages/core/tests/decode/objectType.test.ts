@@ -17,11 +17,9 @@ import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import { DecodeError } from "../../src/decode/decoder.js";
 import { ObjectTypeFile, runObjectTypeDecode } from "../../src/decode/objectType.js";
 import { createObjectType } from "../../src/model/ObjectType.js";
+import { deserializeObjectType } from "../../src/serialization/reader20.js";
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
-import {
-  deserializeObjectType,
-  type OrmYamlObjectType,
-} from "../../src/serialization/yaml/objectType.js";
+import type { OrmYamlObjectType } from "../../src/serialization/yaml/objectType.js";
 import { fromJsonSchema } from "../helpers/jsonSchemaArbitrary.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 

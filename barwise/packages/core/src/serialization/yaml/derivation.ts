@@ -18,13 +18,3 @@ export function serializeDerivation(d: DerivationRule): OrmYamlDerivation {
   }
   return out;
 }
-
-/** Parse a derivation rule, dropping the default storage and false flags. */
-export function deserializeDerivation(d: OrmYamlDerivation): DerivationRule {
-  const rule: DerivationRule = { kind: d.kind, expression: d.expression };
-  return {
-    ...rule,
-    ...(d.storage ? { storage: d.storage } : {}),
-    ...(d.is_formal ? { isFormal: true } : {}),
-  };
-}

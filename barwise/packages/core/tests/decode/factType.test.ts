@@ -1,29 +1,23 @@
 /**
- * The fact type decoder agrees with today's reader before it is on the load
- * path (docs/specs/effect-adoption.spec.md, 1r, R3): it accepts exactly the
- * fact types today's schema and `FactType` constructor accept, to the config
- * `deserializeFactType` builds; every corpus fact type decodes so; every 3.0
- * malformed fact type case, and every constraint case inside one, is refused
- * at its field; and the misplacement sentence is the one
- * `refuseMisplacedConstraints` writes today.
+ * The fact type decoder agrees with the reader it replaced
+ * (docs/specs/effect-adoption.spec.md, 1r, R3): it accepts exactly the fact
+ * types the 3.0 schema and `FactType` constructor accept, to the config
+ * `deserializeFactType` builds; every corpus fact type decodes so; and every
+ * 3.0 malformed fact type case, and every constraint case inside one, is
+ * refused at its field.
  */
 import fc from "fast-check";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parse, stringify } from "yaml";
+import { parse } from "yaml";
 import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import { DecodeError } from "../../src/decode/decoder.js";
 import { runFactTypeDecode } from "../../src/decode/factType.js";
-import { CONSTRAINT_TYPES, placementOf } from "../../src/model/Constraint.js";
 import { FactType } from "../../src/model/FactType.js";
-import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
+import { deserializeFactType } from "../../src/serialization/reader20.js";
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
-import {
-  deserializeFactType,
-  type OrmYamlFactType,
-} from "../../src/serialization/yaml/factType.js";
-import { derivedConstraints } from "../helpers/derivedConstraints.js";
+import type { OrmYamlFactType } from "../../src/serialization/yaml/factType.js";
 import { fromJsonSchema } from "../helpers/jsonSchemaArbitrary.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
@@ -164,80 +158,6 @@ describe("the 3.0 malformed fact type cases", () => {
   it("covers every fact type case, its constraints' included", () => {
     expect(factTypeCases.length).toBe(17);
   });
-});
-
-describe("the misplacement sentence", () => {
-  /** What today's loader says of a fact type listing `c`. */
-  function todaysRefusal(c: Record<string, unknown>): string {
-    const doc = {
-      orm_version: "3.0",
-      model: {
-        name: "M",
-        object_types: [{ id: "ot", name: "O", kind: "entity", reference_mode: "o_id" }],
-        fact_types: [{
-          id: "ft",
-          name: "O has O",
-          roles: [{ id: "r1", player: "ot", role_name: "a" }, {
-            id: "r2",
-            player: "ot",
-            role_name: "b",
-          }],
-          readings: ["{0} has {1}"],
-          constraints: [c],
-        }],
-      },
-    };
-    try {
-      new OrmYamlSerializer().deserialize(stringify(doc));
-    } catch (e) {
-      return (e as Error).message;
-    }
-    throw new Error("today's loader accepted a misplaced constraint");
-  }
-
-  function decodersRefusal(c: Record<string, unknown>): string[] {
-    try {
-      runFactTypeDecode({
-        id: "ft",
-        name: "O has O",
-        roles: [{ id: "r1", player: "ot", role_name: "a" }, {
-          id: "r2",
-          player: "ot",
-          role_name: "b",
-        }],
-        readings: ["{0} has {1}"],
-        constraints: [c],
-      });
-    } catch (e) {
-      return (e as DecodeError).problems.map((p) => p.message);
-    }
-    return [];
-  }
-
-  // The copy barwise-ehl tracks until R4 deletes today's: the two must agree,
-  // for every kind that lives in the model, with a string id, an empty one
-  // or none, under a fact type whose name is as the model stores it
-  // (trimmed). Two differences are deliberate, each on input refused either
-  // way: a numeric or boolean id labels the constraint, where today's
-  // sentence leaves it out, and a blank or absent fact type name, where
-  // only today's sentence says "undefined".
-  const external = CONSTRAINT_TYPES.filter((t) => placementOf(t) === "external");
-  const forms: [string, (c: Record<string, unknown>) => Record<string, unknown>][] = [
-    ["with its id", (c) => c],
-    ["with an empty id", (c) => ({ ...c, id: "" })],
-    ["with no id", ({ id: _id, ...c }) => c],
-  ];
-
-  it.each(external.flatMap((t) => forms.map(([form, f]) => [t, form, f] as const)))(
-    "is today's for %s under a fact type, %s",
-    (type, _, form) => {
-      const c = form({ ...(derivedConstraints(type)[0] as unknown as Record<string, unknown>) });
-      const today = todaysRefusal(c);
-      // The decoder also reports an empty or absent id, which today's schema
-      // reports after the refusal; the sentence is one of its problems.
-      expect(decodersRefusal(c)).toContain(today);
-    },
-  );
 });
 
 describe("a fact type's refusals in its own words (barwise-f9t)", () => {
