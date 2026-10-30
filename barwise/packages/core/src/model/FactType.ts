@@ -172,8 +172,8 @@ export class FactType extends ModelElement {
   /**
    * The model that holds this fact type, as the narrow interface it admits
    * constraints through; none until a model adds it. Called by
-   * `OrmModel.addFactType`, after the fact type's own constraints are in,
-   * with an admission only the model holds, so no other caller can reach
+   * `OrmModel.addFactType` once the fact type is stored, before its own
+   * constraints are added, so each is admitted and named; with an admission only the model holds, so no other caller can reach
    * the model's id index through a fact type.
    */
   joinModel(admission: ConstraintAdmission): void {
@@ -202,9 +202,10 @@ export class FactType extends ModelElement {
   }
 
   /**
-   * Add a constraint to this fact type, giving it an id from the installed
-   * generator when it has none, as the constructor does. A constraint built
-   * in code is new, so a fresh id is right (barwise-nkq); without one, every
+   * Add a constraint to this fact type, giving it an id when it has none:
+   * in a model, its minted name (iri-identity, decision 17); standalone, one
+   * from the installed generator, as the constructor does (barwise-nkq).
+   * Without one, every
    * output that names a constraint by id would have nothing to name it by
    * until the model was saved and reloaded.
    *

@@ -114,8 +114,14 @@ export class Population {
     let id = config.id;
     if (id === undefined) id = `${prefix}${this._next++}`;
     else if (id.startsWith(prefix)) {
-      const n = Number(id.slice(prefix.length));
-      if (Number.isInteger(n) && n >= this._next) this._next = n + 1;
+      // Plain decimal only: `Number` also reads "1e21", "0x10" and " 3",
+      // and a count past 2^53 stops moving, so every later instance would
+      // take one id.
+      const suffix = id.slice(prefix.length);
+      const n = Number(suffix);
+      if (/^[1-9]\d*$/.test(suffix) && Number.isSafeInteger(n + 1) && n >= this._next) {
+        this._next = n + 1;
+      }
     }
     return { id, roleValues: { ...config.roleValues } };
   }

@@ -47,6 +47,15 @@ export function parseFactTypes(
         playerId: ot.id,
       });
     }
+    // A role named after its player repeats in a ring fact type ("Person
+    // manages Person"), and the model refuses two roles under one name
+    // (iri-identity, decision 5). Numbered here, as the suffix rule would.
+    const seen = new Map<string, number>();
+    for (const r of resolvedRoles) {
+      const n = (seen.get(r.name) ?? 0) + 1;
+      seen.set(r.name, n);
+      if (n > 1) r.name = `${r.name}_${n}`;
+    }
 
     if (resolutionFailed) continue;
 

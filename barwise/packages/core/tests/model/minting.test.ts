@@ -100,6 +100,40 @@ describe("a model naming what it is given", () => {
     );
   });
 
+  it("moves the instance count only past a plain decimal number", () => {
+    const m = people();
+    const pop = m.addPopulation({
+      factTypeId: "Person_drives_Car",
+      instances: [
+        { id: "Person_drives_Car.population.1e21", roleValues: {} },
+        { id: "Person_drives_Car.population.0x10", roleValues: {} },
+        { id: "Person_drives_Car.population.9007199254740993", roleValues: {} },
+      ],
+    });
+    // None of those moved it, so two unnamed instances get two ids.
+    expect([pop.addInstance({ roleValues: {} }).id, pop.addInstance({ roleValues: {} }).id])
+      .toEqual(["Person_drives_Car.population.1", "Person_drives_Car.population.2"]);
+  });
+
+  it("takes a fact type back out when one of its constraints throws", () => {
+    const m = people();
+    expect(() =>
+      m.addFactType({
+        name: "Person rides Car",
+        roles: [
+          { name: "rides", playerId: "Person" },
+          { name: "is ridden by", playerId: "Car" },
+        ],
+        readings: ["{0} rides {1}"],
+        // Asserted, as a parsed file is, and missing the roles its sentence reads.
+        constraints: [{ type: "internal_uniqueness" } as never],
+      })
+    ).toThrow();
+    expect(m.getFactTypeByName("Person rides Car")).toBeUndefined();
+    expect(m.idKindsHolding("Person_rides_Car")).toEqual([]);
+    expect(m.idKindsHolding("Person_rides_Car.rides")).toEqual([]);
+  });
+
   it("gives the next free _N when the name is held, by any kind", () => {
     const m = new OrmModel({ name: "M" });
     // A fact type's stated id equal to the object type's would-be name.

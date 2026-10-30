@@ -122,13 +122,18 @@ export class OrmModel implements ConstraintModel {
    */
   private readonly _admission: ConstraintAdmission = {
     admitConstraint: <C extends InternalConstraint>(constraint: C, hostId: string): C => {
+      // Only a fact type this model stores holds this admission; a host the
+      // store does not map would be named as a constraint across fact types.
+      const host = this._factTypes.get(hostId);
+      if (host === undefined) {
+        throw new Error(
+          `Model "${this._name}" holds no fact type "${hostId}" to admit a constraint to.`,
+        );
+      }
       const stored = constraint.id === undefined
         ? {
           ...constraint,
-          id: this.nameFor({
-            kind: "constraint",
-            inView: [constraint, this._factTypes.get(hostId)!] as ConstraintInView,
-          }),
+          id: this.nameFor({ kind: "constraint", inView: [constraint, host] as ConstraintInView }),
         }
         : constraint;
       this._ids.hold(stored.id, "constraint");
@@ -398,9 +403,9 @@ export class OrmModel implements ConstraintModel {
   }
 
   /**
-   * Add a constraint across fact types to the model, giving it an id from
-   * the installed generator when it has none, as `FactType.addConstraint`
-   * does for its own (barwise-nkq). Its roles are not checked: a lenient
+   * Add a constraint across fact types to the model, naming it by its
+   * minted sentence when it has no id, as the model does for a fact type's
+   * own (iri-identity, decision 17). Its roles are not checked: a lenient
    * load or a fragment can name a role the model does not hold, and
    * validation reports it.
    */
@@ -658,7 +663,16 @@ export class OrmModel implements ConstraintModel {
     ft.joinModel(this._admission);
     // After the fact type is in, so each is named from its sentence, which
     // reads the fact type's players and readings.
-    for (const c of constraints) ft.addConstraint(c);
+    // Anything that throws here -- a constraint whose type was asserted and
+    // is missing a field the sentence reads -- takes the fact type back out,
+    // so a refused add leaves the model as it was, as it did when the
+    // constructor refused it.
+    try {
+      for (const c of constraints) ft.addConstraint(c);
+    } catch (err) {
+      this.removeFactType(ft.id);
+      throw err;
+    }
     return ft;
   }
 

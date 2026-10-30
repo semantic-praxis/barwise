@@ -4,10 +4,10 @@
  * and the content key each was minted from (iri-identity, section 3 and
  * WS6 6a). Pure: one model and one element give one name and one key.
  *
- * Nothing calls this yet. In 6b `OrmModel` gives an element without an id
- * its minted name when the element joins the model (decision 17), stores
- * the key beside it as `minted_from`, and reports the name stale when the
- * element's key no longer matches (decision 14). It takes the model as
+ * `OrmModel` gives an element added without an id its minted name
+ * (decision 17; iri-identity 6b-2a). Storing the key beside it as
+ * `minted_from`, and reporting the name stale when the element's key no
+ * longer matches (decision 14), come with format 4.0. It takes the model as
  * `ConstraintModel`, which is what lets `OrmModel` call it without an
  * import cycle.
  *
