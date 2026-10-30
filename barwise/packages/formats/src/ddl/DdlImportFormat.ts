@@ -1215,7 +1215,10 @@ export class DdlImportFormat implements ImportFormat {
         { type: "mandatory", roleId: row },
       ],
     );
-    model.setPreferredIdentifier(entity.id, added.stored[0]!.id);
+    model.setPreferredIdentifier(
+      entity.id,
+      added.factType.uniquenessOver([added.otherRoleId])!.id,
+    );
     return { factType: added.factType, farRoleId: added.otherRoleId };
   }
 
@@ -1554,11 +1557,15 @@ export class DdlImportFormat implements ImportFormat {
       roles,
       readings: [...relationship.readings],
       ...(relationship.definition ? { definition: relationship.definition } : {}),
-    }, { suffixRepeatedRoleNames: true });
+    }, {
+      suffixRepeatedRoleNames: true,
+      constraintsOver: (ids) =>
+        uniqueness.map((idx) => ({
+          type: "internal_uniqueness" as const,
+          roleIds: idx.map((i) => ids[i]!),
+        })),
+    });
     const roleIds = factType.roles.map((r) => r.id);
-    for (const idx of uniqueness) {
-      factType.addConstraint({ type: "internal_uniqueness", roleIds: idx.map((i) => roleIds[i]!) });
-    }
     if (objectifier) {
       model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: objectifier.id });
     }
@@ -2141,22 +2148,27 @@ function hasFactType(name: string, rowPlayerId: string, otherPlayerId: string): 
 }
 
 /**
- * Add a binary fact type, then the constraints over its two roles. The
- * model names the roles (`<fact type>.<role>`, iri-identity decision 17),
- * so the constraints are stated over the row's role and the other one and
- * added once the fact type has its ids. Returns the constraints as stored,
- * so a caller reads a preferred identifier's id from them.
+ * Add a binary fact type with its constraints, stated over the row's role
+ * and the other one. The model names the roles (`<fact type>.<role>`,
+ * iri-identity decision 17) and adds the constraints inside the same add,
+ * so a refused one leaves the model as it was. An annotation may name both
+ * roles alike, and an import takes the suffix rule for that (decision 5 as
+ * amended).
  */
 function addBinary(
   model: OrmModel,
   { rowRole, roles, ...config }: BinaryConfig,
   constraintsOver: (rowRoleId: string, otherRoleId: string) => InternalConstraint[],
-): { factType: FactType; otherRoleId: string; stored: InternalConstraint[]; } {
-  const factType = model.addFactType({ ...config, roles: [...roles] });
-  const rowRoleId = factType.roles[rowRole]!.id;
-  const otherRoleId = factType.roles[1 - rowRole]!.id;
-  const stored = constraintsOver(rowRoleId, otherRoleId).map((c) => factType.addConstraint(c));
-  return { factType, otherRoleId, stored };
+): { factType: FactType; rowRoleId: string; otherRoleId: string; } {
+  const factType = model.addFactType({ ...config, roles: [...roles] }, {
+    suffixRepeatedRoleNames: true,
+    constraintsOver: (ids) => constraintsOver(ids[rowRole]!, ids[1 - rowRole]!),
+  });
+  return {
+    factType,
+    rowRoleId: factType.roles[rowRole]!.id,
+    otherRoleId: factType.roles[1 - rowRole]!.id,
+  };
 }
 
 /**

@@ -519,7 +519,9 @@ function addRelationship(
   const players = rolePlayers(c, r);
   const keys = roleKeys(c, r);
   // No role ids: the model names each `<fact type>.<role key>` (iri-identity
-  // decision 17), and Ossie's role keys already differ within a relationship.
+  // decision 17). Ossie refuses two keys that are equal, but two that differ
+  // only in spacing or Unicode form give one local name, so they take the
+  // suffix rule, as an import may (decision 5 as amended).
   const roles: RoleConfig[] = players.map((player, i) => ({
     name: keys[i]!,
     playerId: playerId(model, player),
@@ -539,7 +541,7 @@ function addRelationship(
   const requires = r.requires ?? [];
   for (const expr of requires) warnings.push(kept(name, expr));
   const note = notes(requires, []);
-  const factType = model.addFactType({
+  model.addFactType({
     id: generateId(),
     name,
     roles,
@@ -551,11 +553,11 @@ function addRelationship(
         derivation: { kind: "derived" as const, expression: joinDerivation(r.derived_by) },
       }
       : {}),
+  }, {
+    suffixRepeatedRoleNames: true,
+    // Over the role ids the model gives them.
+    constraintsOver: (ids) => multiplicityConstraints(name, ids, r.multiplicity, warnings),
   });
-  // Over the stored roles, which carry the ids the model gave them.
-  for (const c of multiplicityConstraints(name, factType.roles, r.multiplicity, warnings)) {
-    factType.addConstraint(c);
-  }
 }
 
 /**
@@ -608,7 +610,7 @@ function reading(
  */
 function multiplicityConstraints(
   name: string,
-  roles: readonly RoleConfig[],
+  ids: readonly string[],
   multiplicity: OssieRelationship["multiplicity"],
   warnings: string[],
 ): InternalConstraint[] {
@@ -617,7 +619,6 @@ function multiplicityConstraints(
     id: generateId(),
     roleIds: ids,
   });
-  const ids = roles.map((r) => r.id!);
   if (multiplicity === "OneToOne") {
     if (ids.length === 2) return [uc([ids[0]!]), uc([ids[1]!])];
     warnings.push(

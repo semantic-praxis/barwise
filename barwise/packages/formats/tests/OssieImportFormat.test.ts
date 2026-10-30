@@ -94,6 +94,27 @@ ontology:
 });
 
 describe("Ossie import: relationships", () => {
+  it("imports role names that differ only in spacing, their ids under the suffix rule", () => {
+    // Ossie tells these keys apart; their local names are one, so the
+    // model's suffix rule numbers the second (iri-identity decision 5).
+    const { model } = load(`
+ontology:
+  - { concept: Day, type: ValueType, extends: [ String ] }
+  - concept: Order
+    type: EntityType
+    relationships:
+      - name: span
+        roles: [ { concept: Day, name: "start day" }, { concept: Day, name: "start_day" } ]
+        verbalizes: [ "{Order} runs from {Day:start day} to {Day:start_day}" ]
+`);
+    const ft = model.factTypes.find((f) => f.roles.length === 3)!;
+    expect(ft.roles.map((r) => r.id.slice(ft.id.length))).toEqual([
+      ".Order",
+      ".start_day",
+      ".start_day_2",
+    ]);
+  });
+
   const doc = `
 ontology:
   - { concept: NrDays, type: ValueType, extends: [ Integer ] }

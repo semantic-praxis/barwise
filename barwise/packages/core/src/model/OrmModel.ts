@@ -93,6 +93,13 @@ export class DuplicateIdError extends Error {
   }
 }
 
+/** How `OrmModel.addFactType` adds a fact type; see its parameters. */
+export interface AddFactTypeOptions {
+  readonly skipPlayerValidation?: boolean;
+  readonly suffixRepeatedRoleNames?: boolean;
+  readonly constraintsOver?: (roleIds: readonly string[]) => readonly InternalConstraint[];
+}
+
 /**
  * The root aggregate for an ORM model. Holds all object types, fact types,
  * and definitions, and provides query and mutation methods.
@@ -651,6 +658,10 @@ export class OrmModel implements ConstraintModel {
    *   name and no ids take the suffix rule (`<ft>.is_in`, `<ft>.is_in_2`)
    *   instead of being refused: a migration or an import translating a
    *   source that names its roles alike (iri-identity, decision 5).
+   * @param options.constraintsOver - Constraints over the roles' ids, given
+   *   them once the model has named the roles: for a caller whose roles have
+   *   no ids yet (an importer). Added after the config's constraints, and
+   *   inside the same rollback, so a refused one leaves the model as it was.
    * @throws If any role references a nonexistent object type (unless skipPlayerValidation).
    * @throws If two roles without ids share a name (unless suffixRepeatedRoleNames).
    * @throws DuplicateIdError if a fact type with the same id already exists.
@@ -658,7 +669,7 @@ export class OrmModel implements ConstraintModel {
    */
   addFactType(
     config: FactTypeConfig,
-    options?: { skipPlayerValidation?: boolean; suffixRepeatedRoleNames?: boolean; },
+    options?: AddFactTypeOptions,
   ): FactType {
     this.refuseHeldId(this._factTypes, config, "fact type", (e) => `fact type ${quoted(e.name)}`);
     const existing = this.getFactTypeByName(config.name);
@@ -718,6 +729,8 @@ export class OrmModel implements ConstraintModel {
     // constructor refused it.
     try {
       for (const c of constraints) ft.addConstraint(c);
+      const over = options?.constraintsOver?.(ft.roles.map((r) => r.id)) ?? [];
+      for (const c of over) ft.addConstraint(c);
     } catch (err) {
       this.removeFactType(ft.id);
       throw err;
@@ -741,11 +754,9 @@ export class OrmModel implements ConstraintModel {
     suffixRepeats: boolean,
   ): FactTypeConfig["roles"] {
     const unnamed = config.roles.filter((r) => r.id === undefined);
-    for (
-      const [local, roles] of suffixRepeats
-        ? []
-        : groupRepeats(unnamed, (r) => localName(r.name))
-    ) {
+    const [repeat] = suffixRepeats ? [] : groupRepeats(unnamed, (r) => localName(r.name));
+    if (repeat !== undefined) {
+      const [local, roles] = repeat;
       throw new Error(
         `Fact type "${config.name}" has ${roles.length} roles named "${roles[0]!.name}" `
           + `(${local}): give each role a name of its own, or state the role ids.`,

@@ -58,8 +58,8 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
     identifierOwner.set(identifier.id, identifierOwner.get(identifier.id) ?? m.name);
 
     const factName = `${entityName} has ${identifier.name}`;
-    // The model names the roles and constraints (iri-identity decision 17),
-    // so the constraints are added once the fact type has its role ids.
+    // The model names the roles and constraints (iri-identity decision 17);
+    // the constraints are stated over the role ids it gives.
     const ft = ctx.model.addFactType({
       name: factName,
       roles: [
@@ -67,16 +67,19 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
         { name: "is of", playerId: identifier.id },
       ],
       readings: ["{0} has {1}", "{1} is of {0}"],
+    }, {
+      constraintsOver: ([entityRole, valueRole]) => [
+        { type: "internal_uniqueness", roleIds: [valueRole!] },
+        { type: "internal_uniqueness", roleIds: [entityRole!] },
+        { type: "mandatory", roleId: entityRole! },
+      ],
     });
     const [entityRoleId, valueRoleId] = ft.roles.map((r) => r.id) as [string, string];
     ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, entityRoleId);
     ctx.farRoleIdMap.set(`${m.name}::${col.name}`, valueRoleId);
     // The value role's uniqueness is the entity's preferred identifier,
     // named on the entity by the id it was stored under (orm-format-3 WS4b).
-    const identifying = ft.addConstraint({ type: "internal_uniqueness", roleIds: [valueRoleId] });
-    ft.addConstraint({ type: "internal_uniqueness", roleIds: [entityRoleId] });
-    ft.addConstraint({ type: "mandatory", roleId: entityRoleId });
-    ctx.model.setPreferredIdentifier(entityId, identifying.id!);
+    ctx.model.setPreferredIdentifier(entityId, ft.uniquenessOver([valueRoleId])!.id);
   }
 }
 

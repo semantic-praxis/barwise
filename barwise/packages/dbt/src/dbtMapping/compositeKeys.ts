@@ -400,6 +400,7 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       items.length === 2
         ? items.join(" and ")
         : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+    const keyRoles = info.roles.flatMap(([c], i) => (info.key.includes(c!) ? [i] : []));
     // Every role is "is in", so the ids take the suffix rule
     // (`<ft>.is_in`, `<ft>.is_in_2`), as an import may (iri-identity,
     // decision 5 as amended).
@@ -411,7 +412,19 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       // it carries an explicit description; objectified, the entity does
       // (PR #621 review). An inferred one is not invented for it.
       ...(!info.objectified && m.description ? { definition: m.description } : {}),
-    }, { suffixRepeatedRoleNames: true });
+    }, {
+      suffixRepeatedRoleNames: true,
+      constraintsOver: (ids) => [
+        // The key's uniqueness identifies the objectifier, as the DDL import
+        // reads it (import-key-identifier-follow-ups.spec.md, barwise-fuo).
+        { type: "internal_uniqueness", roleIds: keyRoles.map((i) => ids[i]!) },
+        ...valueConstraints.map(({ role, values }) => ({
+          type: "value_constraint" as const,
+          roleId: ids[role]!,
+          values,
+        })),
+      ],
+    });
     const roleIds = factType.roles.map((r) => r.id);
     for (const [i, cols] of roleColumns.entries()) {
       // So reportColumnRenames can match the column to the mapper output, as
@@ -425,21 +438,16 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
         ctx.farRoleIdMap.set(`${m.name}::${c}`, roleIds[i]!);
       }
     }
-    // The key's uniqueness identifies the objectifier, as the DDL import
-    // reads it (import-key-identifier-follow-ups.spec.md, barwise-fuo).
-    const key = factType.addConstraint({
-      type: "internal_uniqueness",
-      roleIds: info.roles.flatMap(([c], i) => (info.key.includes(c!) ? [roleIds[i]!] : [])),
-    });
-    for (const { role, values } of valueConstraints) {
-      factType.addConstraint({ type: "value_constraint", roleId: roleIds[role]!, values });
-    }
+
     if (info.objectified && entityId) {
       ctx.model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: entityId });
       // Checked as the DDL import checks it (`preferUniquenessOver`), so a
       // key the reading ever widens past a reference scheme stores nothing
       // rather than an identifier validation refuses.
-      ctx.model.setPreferredIdentifier(entityId, key.id!);
+      ctx.model.setPreferredIdentifier(
+        entityId,
+        factType.uniquenessOver(keyRoles.map((i) => roleIds[i]!))!.id,
+      );
       if (!resolvePreferredIdentifier(ctx.model, entityId).ok) {
         ctx.model.setPreferredIdentifier(entityId, undefined);
       }
