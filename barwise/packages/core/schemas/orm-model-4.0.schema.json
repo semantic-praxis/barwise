@@ -1,0 +1,1594 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://orm-modeler.dev/schemas/v1/orm-model-4.0.schema.json",
+  "title": "ORM Domain Model",
+  "description": "Schema for .orm.yaml domain model files used by Barwise.",
+  "type": "object",
+  "required": [
+    "orm_version",
+    "model"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "orm_version": {
+      "type": "string",
+      "const": "4.0",
+      "description": "Schema version. Must be \"4.0\" for this schema revision."
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable name for this domain model."
+        },
+        "domain_context": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The bounded context this model represents (e.g. \"ecommerce\")."
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:\\S*[/#]$",
+          "description": "The absolute IRI this model's element IRIs start with, ending in / or #. For a model outside a project that declares iri_base; in such a project the project's namespace wins."
+        },
+        "imports": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/definitions/local_name"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "The contexts this model refers to, each by the alias its references use: alias to a context name or an absolute IRI."
+        },
+        "note": {
+          "type": "string",
+          "description": "Free-text model-level note, distinct from formal definitions."
+        },
+        "object_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/object_type"
+          },
+          "description": "The object types (entity and value types) in this model."
+        },
+        "fact_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/fact_type"
+          },
+          "description": "The fact types (relationships) in this model."
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/external_constraint"
+          },
+          "description": "Constraints that live in the model rather than in one fact type: across fact types, or over subtypes."
+        },
+        "subtype_facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/subtype_fact"
+          },
+          "description": "Subtype relationships between entity types."
+        },
+        "objectified_fact_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/objectified_fact_type"
+          },
+          "description": "Fact types that are simultaneously entity types (objectification/nesting)."
+        },
+        "populations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/population"
+          },
+          "description": "Sample fact instance populations used for constraint validation."
+        },
+        "definitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/definition"
+          },
+          "description": "Ubiquitous language entries not directly attached to a model element."
+        },
+        "diagrams": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/diagram_layout"
+          },
+          "description": "Persisted diagram layouts with element positions and fact type orientations."
+        }
+      }
+    }
+  },
+  "definitions": {
+    "object_type": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/reference"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable name."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "entity",
+            "value"
+          ],
+          "description": "Whether this is an entity type or a value type."
+        },
+        "reference_mode": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The reference mode for entity types (e.g. \"customer_id\"). Required for entity types."
+        },
+        "definition": {
+          "type": "string",
+          "description": "Natural-language definition for the ubiquitous language."
+        },
+        "source_context": {
+          "type": "string",
+          "description": "The bounded context this object type originates from."
+        },
+        "value_constraint": {
+          "$ref": "#/definitions/value_constraint_def",
+          "description": "Value constraint for value types."
+        },
+        "data_type": {
+          "$ref": "#/definitions/data_type_def",
+          "description": "Conceptual data type for value types (e.g. text, integer, decimal)."
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Alternative names for this object type (synonyms from different stakeholders or contexts)."
+        },
+        "independent": {
+          "type": "boolean",
+          "description": "Whether the object type is independent: its instances may exist without participating in any non-identifying fact."
+        },
+        "default_value": {
+          "type": "string",
+          "description": "Default value for a value type, threaded into relational mapping as a SQL column DEFAULT."
+        },
+        "note": {
+          "type": "string",
+          "description": "Free-text note, informal commentary distinct from the formal definition."
+        },
+        "cardinality": {
+          "$ref": "#/definitions/cardinality_range_def",
+          "description": "Bound on this object type's population (number of instances)."
+        },
+        "preferred_identifier": {
+          "$ref": "#/definitions/local_name"
+        }
+      },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "entity"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reference_mode"
+        ],
+        "properties": {
+          "data_type": false,
+          "value_constraint": false,
+          "default_value": false
+        }
+      },
+      "else": {
+        "properties": {
+          "preferred_identifier": false
+        }
+      }
+    },
+    "role_path_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "steps"
+      ],
+      "description": "A declared role path: a root object type (the join variable) and ordered single-fact-type hops.",
+      "properties": {
+        "root": {
+          "$ref": "#/definitions/reference"
+        },
+        "steps": {
+          "type": "array",
+          "description": "The ordered hops; empty means the path is just the root.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "entry",
+              "exit"
+            ],
+            "properties": {
+              "entry": {
+                "$ref": "#/definitions/role_id"
+              },
+              "exit": {
+                "$ref": "#/definitions/role_id"
+              }
+            }
+          }
+        }
+      }
+    },
+    "join_operand_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "projection"
+      ],
+      "description": "A join-constraint operand: a role path plus the projection selecting which path nodes form the compared tuple.",
+      "properties": {
+        "path": {
+          "$ref": "#/definitions/role_path_def",
+          "description": "The role path this operand projects from."
+        },
+        "projection": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Path-node indices (0 = root, k = after step k) forming the compared tuple, in order."
+        }
+      }
+    },
+    "ring_type_def": {
+      "type": "string",
+      "enum": [
+        "irreflexive",
+        "asymmetric",
+        "antisymmetric",
+        "intransitive",
+        "acyclic",
+        "symmetric",
+        "transitive",
+        "purely_reflexive"
+      ],
+      "description": "The ring property being constrained."
+    },
+    "cardinality_range_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min",
+        "max"
+      ],
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum number of instances (inclusive)."
+        },
+        "max": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "string",
+              "const": "unbounded"
+            }
+          ],
+          "description": "Maximum number of instances, or \"unbounded\"."
+        }
+      }
+    },
+    "value_range_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "string",
+          "description": "Lower bound; omit for open-below."
+        },
+        "max": {
+          "type": "string",
+          "description": "Upper bound; omit for open-above."
+        },
+        "min_inclusive": {
+          "type": "boolean",
+          "description": "Lower bound inclusive (default true)."
+        },
+        "max_inclusive": {
+          "type": "boolean",
+          "description": "Upper bound inclusive (default true)."
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "min"
+          ]
+        },
+        {
+          "required": [
+            "max"
+          ]
+        }
+      ]
+    },
+    "value_constraint_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Enumerated allowed values."
+        },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/value_range_def"
+          },
+          "minItems": 1,
+          "description": "Allowed value ranges (inclusive/exclusive, possibly open-ended)."
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "values"
+          ]
+        },
+        {
+          "required": [
+            "ranges"
+          ]
+        }
+      ]
+    },
+    "data_type_def": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": [
+            "text",
+            "integer",
+            "decimal",
+            "money",
+            "float",
+            "boolean",
+            "date",
+            "time",
+            "datetime",
+            "timestamp",
+            "auto_counter",
+            "binary",
+            "uuid",
+            "other"
+          ],
+          "description": "Portable conceptual data type name."
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Length parameter (e.g. VARCHAR length)."
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Scale parameter (e.g. decimal scale)."
+        }
+      }
+    },
+    "role": {
+      "type": "object",
+      "required": [
+        "id",
+        "player",
+        "role_name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/role_id"
+        },
+        "player": {
+          "$ref": "#/definitions/reference"
+        },
+        "role_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The role name used in verbalization."
+        }
+      }
+    },
+    "fact_type": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "roles",
+        "readings"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/local_name"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable name (typically the forward reading)."
+        },
+        "definition": {
+          "type": "string",
+          "description": "Natural-language definition."
+        },
+        "note": {
+          "type": "string",
+          "description": "Free-text note, informal commentary distinct from the formal definition."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/role"
+          },
+          "minItems": 1,
+          "description": "Ordered roles in this fact type."
+        },
+        "readings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "description": "Reading templates with positional placeholders."
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/internal_constraint"
+          },
+          "description": "The fact type's own constraints: the internal kinds only."
+        },
+        "derivation": {
+          "$ref": "#/definitions/derivation_rule_def",
+          "description": "Derivation rule when this fact type is derived; absent for an asserted fact type."
+        }
+      }
+    },
+    "derivation_rule_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "expression"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "derived",
+            "semiderived"
+          ],
+          "description": "Definitional axis: fully derived (*) or semiderived (+)."
+        },
+        "storage": {
+          "type": "string",
+          "enum": [
+            "derive_on_request",
+            "derived_and_stored"
+          ],
+          "description": "Storage axis: on-request (*, default) or stored (**)."
+        },
+        "expression": {
+          "type": "string",
+          "description": "The rule text (natural language or hand-written FORML). Stored verbatim, never executed."
+        },
+        "is_formal": {
+          "type": "boolean",
+          "description": "Reserved: true once the expression is a parsed formal rule. Absent or false in v1."
+        }
+      }
+    },
+    "subtype_fact": {
+      "type": "object",
+      "required": [
+        "subtype",
+        "supertype"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/local_name"
+        },
+        "subtype": {
+          "$ref": "#/definitions/reference"
+        },
+        "supertype": {
+          "$ref": "#/definitions/reference"
+        },
+        "provides_identification": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the subtype uses the supertype's reference scheme for identification."
+        },
+        "defining_rule": {
+          "$ref": "#/definitions/derivation_rule_def",
+          "description": "Defining rule when this subtype's membership is determined by a derivation rule; absent for an asserted subtype."
+        },
+        "minted_from": {
+          "$ref": "#/definitions/minted_from"
+        }
+      },
+      "dependencies": {
+        "minted_from": [
+          "id"
+        ]
+      }
+    },
+    "objectified_fact_type": {
+      "type": "object",
+      "required": [
+        "fact_type",
+        "object_type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/local_name"
+        },
+        "fact_type": {
+          "$ref": "#/definitions/local_name"
+        },
+        "object_type": {
+          "$ref": "#/definitions/reference"
+        },
+        "minted_from": {
+          "$ref": "#/definitions/minted_from"
+        }
+      },
+      "dependencies": {
+        "minted_from": [
+          "id"
+        ]
+      }
+    },
+    "population": {
+      "type": "object",
+      "required": [
+        "id",
+        "fact_type",
+        "instances"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/population_id"
+        },
+        "fact_type": {
+          "$ref": "#/definitions/local_name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this population."
+        },
+        "sample": {
+          "type": "boolean",
+          "description": "True when these instances are an illustrative sample rather than the complete extension of the fact type. A sample is positive evidence only: it can satisfy a constraint but never creates the obligation that one be satisfied, so its instances are excluded from the object universe used by mandatory and cardinality checks. Absent means a significant (complete) population, checked as a closed world."
+        },
+        "instances": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/fact_instance"
+          },
+          "description": "The sample fact instances in this population."
+        }
+      }
+    },
+    "fact_instance": {
+      "type": "object",
+      "required": [
+        "id",
+        "role_values"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/instance_id"
+        },
+        "role_values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Mapping of role id to concrete value.",
+          "propertyNames": {
+            "$ref": "#/definitions/role_id"
+          }
+        }
+      }
+    },
+    "definition": {
+      "type": "object",
+      "required": [
+        "term",
+        "definition"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "term": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The term being defined."
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The natural-language definition."
+        },
+        "context": {
+          "type": "string",
+          "description": "The bounded context in which this term applies."
+        }
+      }
+    },
+    "diagram_layout": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display name for this diagram view."
+        },
+        "elements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/reference"
+          },
+          "description": "Ids of the object types included in this view. An empty list is an empty view. When absent, all elements are shown."
+        },
+        "positions": {
+          "type": "object",
+          "description": "Element positions keyed by object type or fact type id. Values are {x, y} in integer pixels, screen coordinates (0,0 top-left, x right, y down).",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "x": {
+                "type": "integer",
+                "description": "Horizontal position in pixels."
+              },
+              "y": {
+                "type": "integer",
+                "description": "Vertical position in pixels."
+              }
+            }
+          }
+        },
+        "orientations": {
+          "type": "object",
+          "description": "Fact type orientation overrides keyed by fact type id. Only includes explicitly set orientations.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "horizontal",
+              "vertical"
+            ]
+          }
+        }
+      }
+    },
+    "internal_constraint": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "description": "A constraint that lives in its fact type: every role it names is one of that fact type's roles.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "internal_uniqueness"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 1,
+              "description": "Role ids within the same fact type."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "roles"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "mandatory"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "$ref": "#/definitions/role_id"
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "role"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "value_constraint"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "$ref": "#/definitions/role_id"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "description": "Allowed enumerated values."
+            },
+            "ranges": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/value_range_def"
+              },
+              "minItems": 1,
+              "description": "Allowed value ranges (inclusive/exclusive, possibly open-ended)."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "values"
+              ]
+            },
+            {
+              "required": [
+                "ranges"
+              ]
+            }
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ring"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role_1": {
+              "$ref": "#/definitions/role_id"
+            },
+            "role_2": {
+              "$ref": "#/definitions/role_id"
+            },
+            "ring_type": {
+              "$ref": "#/definitions/ring_type_def"
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "role_1",
+            "role_2",
+            "ring_type"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "frequency"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "$ref": "#/definitions/role_id"
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 1,
+              "description": "The role sequence being frequency-constrained (a combination)."
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Minimum occurrences."
+            },
+            "max": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "string",
+                  "const": "unbounded"
+                }
+              ],
+              "description": "Maximum occurrences, or \"unbounded\"."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "min",
+            "max"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "role"
+              ]
+            },
+            {
+              "required": [
+                "roles"
+              ]
+            }
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "value_comparison"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role_1": {
+              "$ref": "#/definitions/role_id"
+            },
+            "role_2": {
+              "$ref": "#/definitions/role_id"
+            },
+            "operator": {
+              "type": "string",
+              "enum": [
+                "<",
+                "<=",
+                "=",
+                "<>",
+                ">=",
+                ">"
+              ],
+              "description": "value(role_1) <operator> value(role_2) must hold for every instance."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "role_1",
+            "role_2",
+            "operator"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "cardinality"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "role": {
+              "$ref": "#/definitions/role_id"
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum number of object instances playing the role."
+            },
+            "max": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "const": "unbounded"
+                }
+              ],
+              "description": "Maximum number of instances, or \"unbounded\"."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "role",
+            "min",
+            "max"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "external_constraint": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "description": "A constraint that lives in the model: its roles may span fact types, or it constrains subtypes.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "external_uniqueness"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 1,
+              "description": "Role ids spanning multiple fact types."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "roles"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "disjunctive_mandatory"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 2,
+              "description": "Two or more role ids (may span fact types)."
+            },
+            "subtype_facts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/local_name"
+              },
+              "minItems": 0,
+              "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "roles"
+              ]
+            },
+            {
+              "required": [
+                "subtype_facts"
+              ]
+            }
+          ],
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "exclusion"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 2,
+              "description": "Two or more role ids (may span fact types)."
+            },
+            "subtype_facts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/local_name"
+              },
+              "minItems": 0,
+              "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "roles"
+              ]
+            },
+            {
+              "required": [
+                "subtype_facts"
+              ]
+            }
+          ],
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "exclusive_or"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 2,
+              "description": "Two or more role ids (may span fact types)."
+            },
+            "subtype_facts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/local_name"
+              },
+              "minItems": 0,
+              "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "roles"
+              ]
+            },
+            {
+              "required": [
+                "subtype_facts"
+              ]
+            }
+          ],
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "subset"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "subset_roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 1,
+              "description": "Role ids forming the subset side."
+            },
+            "superset_roles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 1,
+              "description": "Role ids forming the superset side."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "subset_roles",
+            "superset_roles"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "equality"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "roles_1": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 1,
+              "description": "First role sequence."
+            },
+            "roles_2": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/role_id"
+              },
+              "minItems": 1,
+              "description": "Second role sequence."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "roles_1",
+            "roles_2"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "join_subset"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "subset": {
+              "$ref": "#/definitions/join_operand_def",
+              "description": "The operand whose projected tuples must be contained in the superset's."
+            },
+            "superset": {
+              "$ref": "#/definitions/join_operand_def",
+              "description": "The operand whose projected tuples contain the subset's."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "subset",
+            "superset"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "join_equality"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "operands": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/join_operand_def"
+              },
+              "minItems": 2,
+              "description": "Two or more operands whose projected tuple sets must be equal."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "operands"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "join_exclusion"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "operands": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/join_operand_def"
+              },
+              "minItems": 2,
+              "description": "Two or more operands whose projected tuple sets must be pairwise disjoint."
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "operands"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "join_ring"
+            },
+            "id": {
+              "$ref": "#/definitions/local_name"
+            },
+            "modality": {
+              "type": "string",
+              "enum": [
+                "alethic",
+                "deontic"
+              ],
+              "description": "Alethic (necessity, the default) or deontic (obligation)."
+            },
+            "operand": {
+              "$ref": "#/definitions/join_operand_def"
+            },
+            "ring_type": {
+              "$ref": "#/definitions/ring_type_def"
+            },
+            "minted_from": {
+              "$ref": "#/definitions/minted_from"
+            }
+          },
+          "required": [
+            "type",
+            "operand",
+            "ring_type"
+          ],
+          "additionalProperties": false,
+          "dependencies": {
+            "minted_from": [
+              "id"
+            ]
+          }
+        }
+      ]
+    },
+    "local_name": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
+      "description": "A local name: an element's id, as localName() gives it from the element's name, or as a person stated it."
+    },
+    "reference": {
+      "type": "string",
+      "pattern": "^(?:(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+:)?(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
+      "description": "An object type's id: a local name, or a shadow's alias:local."
+    },
+    "role_id": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+\\.(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
+      "description": "A role's id: <fact type>.<role>."
+    },
+    "population_id": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+\\.(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
+      "description": "A population's id: <fact type>.population."
+    },
+    "instance_id": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+\\.(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+\\.(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
+      "description": "A fact instance's id: <population>.N."
+    },
+    "minted_from": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The content key the id was minted from; present only beside the id it was minted for."
+    }
+  }
+}

@@ -22,6 +22,7 @@ import {
   structuralWellFormedness,
 } from "../../src/validation/rules/structural.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
+import { injectFactType } from "../helpers/injectFactType.js";
 import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
 
 describe("structuralRules", () => {
@@ -65,24 +66,20 @@ describe("structuralRules", () => {
     });
 
     it("detects a role referencing a nonexistent object type", () => {
-      // FactType does not validate playerIds -- it just stores them.
-      // We create a fact type with a bogus playerId and inject it
-      // into the model to trigger the structural rule.
-      const ot = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
-      const ft = new FactType({
-        name: "Customer places Order",
-        roles: [
-          { name: "places", playerId: ot.id },
-          { name: "is placed by", playerId: "nonexistent-ot-id" },
-        ],
-        readings: ["{0} places {1}"],
-      });
-
       const model = new OrmModel({ name: "Test" });
-      model.addObjectType({ id: ot.id, name: "Customer", kind: "entity", referenceMode: "cid" });
-      // Bypass addFactType validation by injecting directly.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft);
+      const ot = model.addObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
+      // The player check is skipped, as a lenient load skips it.
+      model.addFactType(
+        {
+          name: "Customer places Order",
+          roles: [
+            { name: "places", playerId: ot.id },
+            { name: "is placed by", playerId: "nonexistent-ot-id" },
+          ],
+          readings: ["{0} places {1}"],
+        },
+        { skipPlayerValidation: true },
+      );
 
       // The check moved into `graphOf`; the diagnostic id did not move
       // with it, because that id is what a consumer reads.
@@ -143,10 +140,9 @@ describe("structuralRules", () => {
       const model = new OrmModel({ name: "Test" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (model as any)._objectTypes.set(ot);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft1);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft2);
+      // addFactType refuses a second name, so these go in past it.
+      injectFactType(model, ft1);
+      injectFactType(model, ft2);
 
       const diagnostics = structuralWellFormedness(model);
       const dupes = diagnostics.filter(

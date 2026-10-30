@@ -40,7 +40,8 @@ import {
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { DerivationFile, derivationRule } from "./derivation.js";
 import { crossField } from "./harness.js";
-import { Name, nonEmpty, notBlank, Text } from "./leaves.js";
+import { type FormatIds, IDS_30 } from "./ids.js";
+import { Name, notBlank, Text } from "./leaves.js";
 import { type ElementLabel, elementOf, labelByNameOrId } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
@@ -50,7 +51,8 @@ const Reading = notBlank(" (a reading)");
 
 // -- The fact type ----------------------------------------------------------
 
-const RoleFile = Schema.Struct({ id: nonEmpty(""), player: nonEmpty(""), role_name: Name });
+const roleFileOf = (ids: FormatIds<Schema.Struct.Fields>) =>
+  Schema.Struct({ id: ids.role, player: ids.objectTypeRef, role_name: Name });
 
 /**
  * Each reading names every role at least once, and no role the fact type lacks: one
@@ -83,27 +85,39 @@ const readingsFitRoles = crossField(
 /** What a message calls a fact type: by its name, else its id. */
 const describeFactType = (raw: unknown): ElementLabel => labelByNameOrId("Fact type", raw);
 
+/**
+ * A fact type as a format states it, its own constraints included, for
+ * that format's id leaves and constraint list.
+ */
+export const factTypeFileOf = (
+  ids: FormatIds<Schema.Struct.Fields>,
+  // Typed as the 3.0 list: a reader of another format passes its own list
+  // and narrows its constraints itself (`document40.ts`).
+  constraints: typeof InternalConstraintsFile,
+) =>
+  Schema.Struct({
+    id: ids.factType,
+    name: Name,
+    definition: Schema.optionalKey(Text),
+    note: Schema.optionalKey(Text),
+    roles: Schema.Array(roleFileOf(ids)).check(
+      Schema.isMinLength(1, { message: "must list at least one role." }),
+    ),
+    readings: Schema.Array(Reading).check(
+      Schema.isMinLength(1, { message: "must list at least one reading." }),
+    ),
+    constraints: Schema.optionalKey(constraints),
+    derivation: Schema.optionalKey(DerivationFile),
+  })
+    // Annotated before the rule is attached: annotating a checked Schema
+    // annotates its last check, and the walk then never meets the element.
+    .annotate(
+      elementOf({ noun: "Fact type", badTag: "", describe: describeFactType, locates: true }),
+    )
+    .check(readingsFitRoles);
+
 /** A fact type as a 3.0 file states it, its own constraints included. */
-export const FactTypeFile = Schema.Struct({
-  id: nonEmpty(""),
-  name: Name,
-  definition: Schema.optionalKey(Text),
-  note: Schema.optionalKey(Text),
-  roles: Schema.Array(RoleFile).check(
-    Schema.isMinLength(1, { message: "must list at least one role." }),
-  ),
-  readings: Schema.Array(Reading).check(
-    Schema.isMinLength(1, { message: "must list at least one reading." }),
-  ),
-  constraints: Schema.optionalKey(InternalConstraintsFile),
-  derivation: Schema.optionalKey(DerivationFile),
-})
-  // Annotated before the rule is attached: annotating a checked Schema
-  // annotates its last check, and the walk then never meets the element.
-  .annotate(
-    elementOf({ noun: "Fact type", badTag: "", describe: describeFactType, locates: true }),
-  )
-  .check(readingsFitRoles);
+export const FactTypeFile = factTypeFileOf(IDS_30, InternalConstraintsFile);
 
 /** A decoded file fact type: exactly what the file states. */
 export type FactTypeFileValue = (typeof FactTypeFile)["Type"];
