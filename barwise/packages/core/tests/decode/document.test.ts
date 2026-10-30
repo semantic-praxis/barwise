@@ -203,6 +203,60 @@ describe("the 3.0 malformed cases, through the loader", () => {
     expect(errors[0]!.message).toContain(c.field);
   });
 
+  it.each(
+    cases.filter((c) => c.constraint !== undefined && !VALIDATIONS.includes(c.file))
+      .map((c) => [c.file] as const),
+  )("%s names the fact type its constraint sits in", (file) => {
+    const text = readFileSync(resolve(MALFORMED, file), "utf8");
+    const factType = parse(text).model.fact_types[0].name as string;
+    expect(() => serializer.deserialize(text)).toThrow(`in fact type "${factType}": `);
+  });
+
+  it("an instance's problem names its population", () => {
+    const doc = {
+      orm_version: "3.0",
+      model: {
+        name: "M",
+        populations: [{
+          id: "pop",
+          fact_type: "f",
+          instances: [{ id: "i", role_values: { r: 1 } }],
+        }],
+      },
+    };
+    expect(() => runDocumentDecode(doc)).toThrow(
+      'Fact instance "i" in population "pop": role_values.r',
+    );
+  });
+
+  it("a sentence that names the fact type itself names it once", () => {
+    const doc = {
+      orm_version: "3.0",
+      model: {
+        name: "M",
+        object_types: [{ id: "p", name: "Person", kind: "value", data_type: { name: "text" } }],
+        fact_types: [{
+          id: "f",
+          name: "Person exists",
+          roles: [{ id: "r", player: "p", role_name: "exists" }],
+          readings: ["{0} exists"],
+          constraints: [{ id: "c", type: "subset", subset_roles: ["r"], superset_roles: ["r"] }],
+        }],
+      },
+    };
+    let error: unknown;
+    try {
+      runDocumentDecode(doc);
+    } catch (e) {
+      error = e;
+    }
+    const messages = (error as DecodeError).problems.map((p) => p.message);
+    expect(messages).toEqual([
+      expect.stringContaining('is listed under fact type "Person exists", but'),
+    ]);
+    expect(messages[0]!.split("Person exists").length).toBe(2);
+  });
+
   it.each(VALIDATIONS)("%s loads, as before R4: its problem is validation's", (file) => {
     expect(() => serializer.deserialize(readFileSync(resolve(MALFORMED, file), "utf8"))).not
       .toThrow();

@@ -100,7 +100,9 @@ export const FactTypeFile = Schema.Struct({
 })
   // Annotated before the rule is attached: annotating a checked Schema
   // annotates its last check, and the walk then never meets the element.
-  .annotate(elementOf({ noun: "Fact type", badTag: "", describe: describeFactType }))
+  .annotate(
+    elementOf({ noun: "Fact type", badTag: "", describe: describeFactType, locates: true }),
+  )
   .check(readingsFitRoles);
 
 /** A decoded file fact type: exactly what the file states. */

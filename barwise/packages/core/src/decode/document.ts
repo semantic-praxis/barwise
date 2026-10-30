@@ -85,7 +85,14 @@ const PopulationFile = Schema.Struct({
   description: Schema.optionalKey(Text),
   sample: Schema.optionalKey(Flag),
   instances: Schema.Array(FactInstanceFile),
-}).annotate(element("Population", "id"));
+}).annotate(
+  elementOf({
+    noun: "Population",
+    badTag: "",
+    describe: labelBy("Population", "id"),
+    locates: true,
+  }),
+);
 
 const DefinitionFile = Schema.Struct({
   term: nonEmpty(""),
