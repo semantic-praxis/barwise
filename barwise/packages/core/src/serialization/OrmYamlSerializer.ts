@@ -1,7 +1,12 @@
 import { parse, stringify } from "yaml";
-import { modelConstraint } from "../decode/constraint.js";
+import {
+  type DecodedExternalConstraint,
+  type DecodedInternalConstraint,
+  modelConstraint,
+} from "../decode/constraint.js";
 import { DecodeError } from "../decode/decoder.js";
 import { type DecodedDocument, runDocumentDecode } from "../decode/document.js";
+import { type DecodedDocument40, runDocument40Decode } from "../decode/document40.js";
 import type { DecodeProblem } from "../decode/problems.js";
 import { describeConstraintRepeat, describeConstraintRepeats } from "../model/Constraint.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -199,16 +204,22 @@ export class OrmYamlSerializer {
  * as a `validationResult`, its paths JSON Pointers into the file, "/" for
  * the document itself, as ajv's were (effect-adoption 1r, R4).
  */
-function decodeOrRefuse(doc: unknown): DecodedDocument {
+function decodeOrRefuse(doc: unknown): DecodedDocument;
+function decodeOrRefuse<D>(doc: unknown, decode: (doc: unknown) => D, version: string): D;
+function decodeOrRefuse(
+  doc: unknown,
+  decode: (doc: unknown) => unknown = runDocumentDecode,
+  version = "3.0",
+): unknown {
   try {
-    return runDocumentDecode(doc);
+    return decode(doc);
   } catch (err) {
     if (!(err instanceof DecodeError)) throw err;
     const pointer = (p: DecodeProblem) =>
       [...p.at, ...p.path].map((s) => `/${String(s).replace(/~/g, "~0").replace(/\//g, "~1")}`)
         .join("") || "/";
     throw new DeserializationError(
-      `The model file does not conform to format 3.0: ${
+      `The model file does not conform to format ${version}: ${
         err.problems.map((p) => p.message.replace(/\r?\n/g, "\\n")).join(" ")
       }`,
       {
@@ -225,9 +236,23 @@ function decodeOrRefuse(doc: unknown): DecodedDocument {
  * repeated across the file, and, unless `lenient`, the references the
  * model's constructors check.
  */
-function fromDecoded(doc: DecodedDocument, options?: { lenient?: boolean; }): OrmModel {
-  const model = new OrmModel(doc.header);
+function fromDecoded(
+  doc: DecodedDocument | DecodedDocument40,
+  options?: { lenient?: boolean; },
+  reserved: Iterable<string> = [],
+): OrmModel {
+  // `imports` is decoded and not yet kept: the model carries it with 6b-3's
+  // header change (iri-identity WS6), and nothing writes a 4.0 file yet.
+  const { imports: _notKept, ...header } = doc.header as DecodedDocument40["header"];
+  const model = new OrmModel(header);
+  return model.withReserved(reserved, () => addDecoded(model, doc, options));
+}
 
+function addDecoded(
+  model: OrmModel,
+  doc: DecodedDocument | DecodedDocument40,
+  options?: { lenient?: boolean; },
+): OrmModel {
   for (const ot of doc.objectTypes) model.addObjectType(ot.record);
 
   // Every constraint id is stated (the format requires it) and is
@@ -242,11 +267,12 @@ function fromDecoded(doc: DecodedDocument, options?: { lenient?: boolean; }): Or
   // asks the same `groupRepeats` of the built model. Holders whose fact
   // types also share an id never reach it: the store refuses the second
   // fact type (`DuplicateIdError`, model-invariants WS3).
+  // A 4.0 file may leave a constraint's id to the model; only stated ids repeat.
   const stated = [
     ...doc.factTypes.flatMap((ft) => ft.constraints.map((c) => [c, ft.name] as const)),
     ...doc.constraints.map((c) => [c, undefined] as const),
-  ];
-  const repeats = [...groupRepeats(stated, ([c]) => c.id)];
+  ].filter(([c]) => c.id !== undefined);
+  const repeats = [...groupRepeats(stated, ([c]) => c.id!)];
   if (repeats.length > 0) {
     const named = describeConstraintRepeats(
       repeats.map(([id, holders]) => describeConstraintRepeat(id, holders)),
@@ -259,14 +285,19 @@ function fromDecoded(doc: DecodedDocument, options?: { lenient?: boolean; }): Or
 
   for (const ft of doc.factTypes) {
     model.addFactType(
-      { ...ft, constraints: ft.constraints.map(modelConstraint) },
+      {
+        ...ft,
+        constraints: ft.constraints.map((c) => modelConstraint(c as DecodedInternalConstraint)),
+      },
       { skipPlayerValidation: options?.lenient },
     );
   }
   for (const sf of doc.subtypeFacts) {
     model.addSubtypeFact(sf, { skipPlayerValidation: options?.lenient });
   }
-  for (const c of doc.constraints) model.addConstraint(modelConstraint(c));
+  for (const c of doc.constraints) {
+    model.addConstraint(modelConstraint(c as DecodedExternalConstraint));
+  }
 
   // After every constraint, so a reference resolves whatever order the
   // file lists them in. A reference to a constraint that does not exist,
@@ -287,6 +318,52 @@ function fromDecoded(doc: DecodedDocument, options?: { lenient?: boolean; }): Or
   for (const d of doc.definitions) model.addDefinition(d);
   for (const dl of doc.diagrams) model.addDiagramLayout(dl);
   return model;
+}
+
+/**
+ * Read a format 4.0 document into the model (iri-identity WS6, 6b-2b-1):
+ * decoded by the 4.0 decoders, every problem at once; then every id the
+ * file states collected before the first add. An id stated by two
+ * elements is refused, whatever their kinds, because in 4.0 an id names
+ * one element; the rest are reserved for the load, so a name the model
+ * mints for an element the file gives no id skips them, and the element
+ * stating each takes it wherever it sits in the file.
+ *
+ * Not yet reached from `deserialize`: `planRead` refuses 4.0 until 6b-2b-2
+ * writes it, so a 4.0 file is never saved as 3.0.
+ */
+export function readDocument40(doc: unknown, options?: { lenient?: boolean; }): OrmModel {
+  const decoded = decodeOrRefuse(doc, runDocument40Decode, "4.0");
+  const stated = statedIds40(decoded);
+  const repeats = [...groupRepeats(stated, ([id]) => id)];
+  if (repeats.length > 0) {
+    const named = repeats.map(([id, holders]) =>
+      `"${id}" (${holders.map(([, kind]) => kind).join(", ")})`
+    ).join("; ");
+    throw new DeserializationError(
+      `Ids are stated by more than one element: ${named}. An id names one element.`,
+    );
+  }
+  return refusingHeldIds(() => fromDecoded(decoded, options, stated.map(([id]) => id)));
+}
+
+/** Every id a 4.0 document states, with the kind of element stating it. */
+function statedIds40(doc: DecodedDocument40): (readonly [string, string])[] {
+  const ids: (readonly [string, string])[] = [];
+  const add = (id: string | undefined, kind: string) => {
+    if (id !== undefined) ids.push([id, kind]);
+  };
+  for (const ot of doc.objectTypes) add(ot.record.id, "an object type");
+  for (const ft of doc.factTypes) {
+    add(ft.id, "a fact type");
+    for (const r of ft.roles) add(r.id, "a role");
+    for (const c of ft.constraints) add(c.id, "a constraint");
+  }
+  for (const c of doc.constraints) add(c.id, "a constraint");
+  for (const sf of doc.subtypeFacts) add(sf.id, "a subtype fact");
+  for (const o of doc.objectifiedFactTypes) add(o.id, "an objectification");
+  for (const p of doc.populations) add(p.config.id, "a population");
+  return ids;
 }
 
 /**

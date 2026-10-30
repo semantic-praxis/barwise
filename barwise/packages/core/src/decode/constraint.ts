@@ -40,6 +40,7 @@ import {
 } from "../model/Constraint.js";
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { crossField, crossFieldGuard, type CrossFieldMark, type MessageWithin } from "./harness.js";
+import { type FormatIds, IDS_30 } from "./ids.js";
 import {
   intAtLeast,
   nonEmpty,
@@ -89,17 +90,13 @@ const atLeastItems = (min: number, message: string) =>
     arbitraryConstraint: { minLength: min },
   });
 
-const RoleId = nonEmpty("");
-const roleList = (min: number) =>
-  Schema.Array(nonEmpty(" (a role id)")).check(
+const roleListOf = (ids: AnyIds) => (min: number) =>
+  Schema.Array(ids.roleInList).check(
     atLeastItems(
       min,
       min === 1 ? "must list at least one role." : `must list at least ${min} roles.`,
     ),
   );
-const RoleIds = roleList(1);
-/** Subtype facts of one supertype; too few is validation's to report. */
-const SubtypeFactIds = Schema.Array(nonEmpty(" (a subtype fact id)"));
 
 /** A maximum: an integer no smaller than `min`, or "unbounded", named whichever part fails. */
 const bound = (min: number) => {
@@ -141,84 +138,95 @@ const Operands = Schema.Array(JoinOperandFile).pipe(
 
 // -- The kinds --------------------------------------------------------------
 
-const base = {
-  id: nonEmpty("").pipe(
-    Schema.annotateKey({
-      messageMissingKey: "is missing: a 3.0 file states every constraint's id.",
-    }),
-  ),
-  modality: Schema.optionalKey(Modality),
-};
-
-const kind = <T extends string, F extends Schema.Struct.Fields>(type: T, fields: F) =>
-  Schema.Struct({ ...base, type: Schema.Literal(type), ...fields });
-
-/** Roles or a supertype's subtype facts, exactly one of the two. */
-const rolesOrSubtypeFacts = <T extends string>(type: T) =>
-  kind(type, {
-    roles: Schema.optionalKey(roleList(2)),
-    subtype_facts: Schema.optionalKey(SubtypeFactIds),
-  }).check(
-    crossField(
-      { id: "roles-or-subtype-facts", reads: ["roles", "subtype_facts"] },
-      (c: { readonly roles?: unknown; readonly subtype_facts?: unknown; }) =>
-        c.roles === undefined && c.subtype_facts === undefined
-          ? false
-          : c.roles !== undefined && c.subtype_facts !== undefined
-          ? {
-            path: ["subtype_facts"],
-            issue: "must not be given beside roles: a constraint is over roles or over "
-              + "subtype facts, not both.",
-          }
-          : true,
-      "must have roles or subtype_facts.",
-    ),
-  );
-
 /**
- * Each kind's Schema, keyed by kind, so the two lists are built from one
- * table, and derivation (M1) and the drift test can read each kind alone.
+ * Every constraint kind's Schema for a format's id leaves, keyed by kind,
+ * so the two lists are built from one table, and derivation (M1) and the
+ * drift test can read each kind alone. Built once for 3.0 and once for 4.0
+ * (`ids.ts`).
  */
-export const CONSTRAINT_KIND_FILES = {
-  internal_uniqueness: kind("internal_uniqueness", { roles: RoleIds }),
-  mandatory: kind("mandatory", { role: RoleId }),
-  value_constraint: kind("value_constraint", {
-    role: Schema.optionalKey(RoleId),
-    values: Schema.optionalKey(ValuesFile),
-    ranges: Schema.optionalKey(RangesFile),
-  }).check(valuesOrRanges),
-  ring: kind("ring", { role_1: RoleId, role_2: RoleId, ring_type: RingTypeFile }),
-  frequency: kind("frequency", {
-    role: Schema.optionalKey(RoleId),
-    roles: Schema.optionalKey(RoleIds),
-    min: intAtLeast(1),
-    max: bound(1),
-  }).check(
-    crossField(
-      { id: "frequency-role-or-roles", reads: ["role", "roles"] },
-      (c: { readonly role?: unknown; readonly roles?: unknown; }) =>
-        c.role !== undefined || c.roles !== undefined,
-      "must have a role or roles.",
-    ),
-  ),
-  value_comparison: kind("value_comparison", {
-    role_1: RoleId,
-    role_2: RoleId,
-    operator: OperatorFile,
-  }),
-  cardinality: kind("cardinality", { role: RoleId, min: intAtLeast(0), max: bound(0) }),
-  external_uniqueness: kind("external_uniqueness", { roles: RoleIds }),
-  disjunctive_mandatory: rolesOrSubtypeFacts("disjunctive_mandatory"),
-  exclusion: rolesOrSubtypeFacts("exclusion"),
-  exclusive_or: rolesOrSubtypeFacts("exclusive_or"),
-  subset: kind("subset", { subset_roles: RoleIds, superset_roles: RoleIds }),
-  equality: kind("equality", { roles_1: RoleIds, roles_2: RoleIds }),
-  join_subset: kind("join_subset", { subset: JoinOperandFile, superset: JoinOperandFile }),
-  join_equality: kind("join_equality", { operands: Operands }),
-  join_exclusion: kind("join_exclusion", { operands: Operands }),
-  join_ring: kind("join_ring", { operand: JoinOperandFile, ring_type: RingTypeFile }),
-} satisfies Record<Constraint["type"], Schema.Top>;
+export function constraintKindFiles<I extends AnyIds>(ids: I) {
+  const RoleId = ids.role;
+  const roleList = roleListOf(ids);
+  const RoleIds = roleList(1);
+  /** Subtype facts of one supertype; too few is validation's to report. */
+  const SubtypeFactIds = Schema.Array(ids.subtypeFactInList);
+  const base = {
+    ...(ids.constraintMinted as I["constraintMinted"]),
+    modality: Schema.optionalKey(Modality),
+  };
+  const ruled = <S extends Schema.Top>(struct: S): S =>
+    ids.mintedRule === undefined ? struct : (struct.check(ids.mintedRule as never) as unknown as S);
 
+  const kind = <T extends string, F extends Schema.Struct.Fields>(type: T, fields: F) =>
+    ruled(Schema.Struct({ ...base, type: Schema.Literal(type), ...fields }));
+
+  /** Roles or a supertype's subtype facts, exactly one of the two. */
+  const rolesOrSubtypeFacts = <T extends string>(type: T) =>
+    kind(type, {
+      roles: Schema.optionalKey(roleList(2)),
+      subtype_facts: Schema.optionalKey(SubtypeFactIds),
+    }).check(
+      crossField(
+        { id: "roles-or-subtype-facts", reads: ["roles", "subtype_facts"] },
+        (c: { readonly roles?: unknown; readonly subtype_facts?: unknown; }) =>
+          c.roles === undefined && c.subtype_facts === undefined
+            ? false
+            : c.roles !== undefined && c.subtype_facts !== undefined
+            ? {
+              path: ["subtype_facts"],
+              issue: "must not be given beside roles: a constraint is over roles or over "
+                + "subtype facts, not both.",
+            }
+            : true,
+        "must have roles or subtype_facts.",
+      ),
+    );
+
+  return {
+    internal_uniqueness: kind("internal_uniqueness", { roles: RoleIds }),
+    mandatory: kind("mandatory", { role: RoleId }),
+    value_constraint: kind("value_constraint", {
+      role: Schema.optionalKey(RoleId),
+      values: Schema.optionalKey(ValuesFile),
+      ranges: Schema.optionalKey(RangesFile),
+    }).check(valuesOrRanges),
+    ring: kind("ring", { role_1: RoleId, role_2: RoleId, ring_type: RingTypeFile }),
+    frequency: kind("frequency", {
+      role: Schema.optionalKey(RoleId),
+      roles: Schema.optionalKey(RoleIds),
+      min: intAtLeast(1),
+      max: bound(1),
+    }).check(
+      crossField(
+        { id: "frequency-role-or-roles", reads: ["role", "roles"] },
+        (c: { readonly role?: unknown; readonly roles?: unknown; }) =>
+          c.role !== undefined || c.roles !== undefined,
+        "must have a role or roles.",
+      ),
+    ),
+    value_comparison: kind("value_comparison", {
+      role_1: RoleId,
+      role_2: RoleId,
+      operator: OperatorFile,
+    }),
+    cardinality: kind("cardinality", { role: RoleId, min: intAtLeast(0), max: bound(0) }),
+    external_uniqueness: kind("external_uniqueness", { roles: RoleIds }),
+    disjunctive_mandatory: rolesOrSubtypeFacts("disjunctive_mandatory"),
+    exclusion: rolesOrSubtypeFacts("exclusion"),
+    exclusive_or: rolesOrSubtypeFacts("exclusive_or"),
+    subset: kind("subset", { subset_roles: RoleIds, superset_roles: RoleIds }),
+    equality: kind("equality", { roles_1: RoleIds, roles_2: RoleIds }),
+    join_subset: kind("join_subset", { subset: JoinOperandFile, superset: JoinOperandFile }),
+    join_equality: kind("join_equality", { operands: Operands }),
+    join_exclusion: kind("join_exclusion", { operands: Operands }),
+    join_ring: kind("join_ring", { operand: JoinOperandFile, ring_type: RingTypeFile }),
+  } satisfies Record<Constraint["type"], Schema.Top>;
+}
+
+/** Format 3.0's kinds. */
+export const CONSTRAINT_KIND_FILES = constraintKindFiles(IDS_30);
+
+type AnyIds = FormatIds<Schema.Struct.Fields>;
 type Kinds = typeof CONSTRAINT_KIND_FILES;
 type Kind = keyof Kinds;
 
@@ -302,14 +310,31 @@ type ListMember<W extends "internal" | "external"> = {
 function listedIn<W extends "internal" | "external">(where: W) {
   // The map decides with `placementOf`, and `ListMember` with the type
   // `PLACEMENT` derives, so the run-time and type-level lists cannot part.
-  const members = (Object.keys(CONSTRAINT_KIND_FILES) as Kind[]).map((k) =>
-    placementOf(k) === where
-      ? CONSTRAINT_KIND_FILES[k]
-      : CONSTRAINT_KIND_FILES[k].pipe(misplacedIn(where))
-  ) as ListMember<W>[];
-  return Schema.Union(members).annotate(
+  return listOf(membersIn(where, CONSTRAINT_KIND_FILES) as ListMember<W>[]);
+}
+
+/** A table's kinds for one list: its own as they are, the other list's refused. */
+function membersIn<T extends Record<Kind, Schema.Top>>(where: "internal" | "external", table: T) {
+  return (Object.keys(table) as Kind[]).map((k) =>
+    placementOf(k) === where ? table[k] : table[k].pipe(misplacedIn(where))
+  );
+}
+
+const listOf = <M extends readonly Schema.Top[]>(members: M) =>
+  Schema.Union(members).annotate(
     elementOf({ noun: "Constraint", badTag, tagField: "type", describe: describeConstraint }),
   );
+
+/**
+ * Both lists for another format's kind table (`constraintKindFiles`),
+ * typed loosely: the 3.0 lists below carry the per-kind types gate S3
+ * reads, and a reader of another format narrows its own values.
+ */
+export function constraintListsOf(table: Record<Kind, Schema.Top>) {
+  return {
+    internal: Schema.Array(listOf(membersIn("internal", table))),
+    external: Schema.Array(listOf(membersIn("external", table))),
+  };
 }
 
 /** A constraint under a fact type, as a 3.0 file lists it. */

@@ -37,17 +37,18 @@ import { type ElementLabel, elementOf } from "./problems.js";
 // -- Leaves -----------------------------------------------------------------
 
 /** How a message names an element by one of its fields, else by its noun. */
-const labelBy = (noun: string, key: string, labelled?: string) => (raw: unknown): ElementLabel => {
-  const value = raw !== null && typeof raw === "object"
-    ? (raw as Record<string, unknown>)[key]
-    : undefined;
-  return typeof value === "string" && value !== ""
-    ? { label: `${labelled ?? noun} "${value}"`, identity: value }
-    : { label: `${noun} with no ${key}`, identity: "" };
-};
+export const labelBy =
+  (noun: string, key: string, labelled?: string) => (raw: unknown): ElementLabel => {
+    const value = raw !== null && typeof raw === "object"
+      ? (raw as Record<string, unknown>)[key]
+      : undefined;
+    return typeof value === "string" && value !== ""
+      ? { label: `${labelled ?? noun} "${value}"`, identity: value }
+      : { label: `${noun} with no ${key}`, identity: "" };
+  };
 
 /** Annotate a struct as an element named by one field. */
-const element = (noun: string, key: string, labelled?: string) =>
+export const element = (noun: string, key: string, labelled?: string) =>
   elementOf({ noun, badTag: "", describe: labelBy(noun, key, labelled) });
 
 // -- The remaining elements -------------------------------------------------
@@ -86,7 +87,7 @@ const PopulationFile = Schema.Struct({
   }),
 );
 
-const DefinitionFile = Schema.Struct({
+export const DefinitionFile = Schema.Struct({
   // Not blank, as `addDefinition` refuses a blank term or text: refused
   // here, the problem is reported with the file's others.
   term: notBlank(""),
@@ -99,6 +100,11 @@ type Orientation = DiagramLayout["orientations"][string];
 const ORIENTATION_MEMBERS: Record<Orientation, true> = { horizontal: true, vertical: true };
 const ORIENTATIONS = Object.keys(ORIENTATION_MEMBERS) as Orientation[];
 
+/** A view's orientation for one element. */
+export const OrientationFile = Schema.Literals(ORIENTATIONS).annotate({
+  message: `must be ${ORIENTATIONS.map((o) => `"${o}"`).join(" or ")}.`,
+});
+
 const DiagramFile = Schema.Struct({
   // Not blank, as `addDiagramLayout` refuses a blank name.
   name: notBlank(""),
@@ -107,12 +113,7 @@ const DiagramFile = Schema.Struct({
     Schema.Record(Schema.String, Schema.Struct({ x: Integer, y: Integer })),
   ),
   orientations: Schema.optionalKey(
-    Schema.Record(
-      Schema.String,
-      Schema.Literals(ORIENTATIONS).annotate({
-        message: `must be ${ORIENTATIONS.map((o) => `"${o}"`).join(" or ")}.`,
-      }),
-    ),
+    Schema.Record(Schema.String, OrientationFile),
   ),
 }).annotate(element("Diagram", "name"));
 
@@ -126,11 +127,23 @@ const DiagramFile = Schema.Struct({
  * patterns together).
  */
 export const NAMESPACE_FILE_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]*:\S*[/#]$/;
-const Namespace = Text.check(
+export const Namespace = Text.check(
   Schema.makeFilter((iri: string) => NAMESPACE_FILE_PATTERN.test(iri), {
     message: "must be an absolute IRI ending in / or #.",
   }),
 );
+
+/** The model as an element: named by its name, else "The model". */
+export const modelElement = elementOf({
+  noun: "Model",
+  badTag: "",
+  describe: (raw) => {
+    const name = (raw as { name?: unknown; } | null)?.name;
+    return typeof name === "string" && name.trim() !== ""
+      ? { label: `Model "${name.trim()}"`, identity: name.trim() }
+      : { label: "The model", identity: "" };
+  },
+});
 
 const ModelFile = Schema.Struct({
   name: Name,
@@ -145,18 +158,7 @@ const ModelFile = Schema.Struct({
   populations: Schema.optionalKey(Schema.Array(PopulationFile)),
   definitions: Schema.optionalKey(Schema.Array(DefinitionFile)),
   diagrams: Schema.optionalKey(Schema.Array(DiagramFile)),
-}).annotate(
-  elementOf({
-    noun: "Model",
-    badTag: "",
-    describe: (raw) => {
-      const name = (raw as { name?: unknown; } | null)?.name;
-      return typeof name === "string" && name.trim() !== ""
-        ? { label: `Model "${name.trim()}"`, identity: name.trim() }
-        : { label: "The model", identity: "" };
-    },
-  }),
-);
+}).annotate(modelElement);
 
 /** A 3.0 document: its version, and its model. */
 export const DocumentFile = Schema.Struct({

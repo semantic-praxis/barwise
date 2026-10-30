@@ -1471,17 +1471,28 @@ sites.
     write, so main never holds a build that reads 4.0 and saves it as 3.0
     (which would drop `imports`, `minted_from` and absent ids).
     - _6b-2b-1, the 4.0 reader, unwired._ The stated ids reserved for a
-      load (`OrmModel.withReserved`); the 4.0 JSON Schema, shipped as
-      `orm-model-4.0.schema.json` beside the current one, and the 4.0
-      Effect decoders, built from the 3.0 decoders' fields with the 4.0
-      differences laid over them rather than a copy, held to that file by
-      a drift test; and `readDocument40`, whose pre-pass collects every
-      stated id, refuses one stated twice across kinds, and reserves the
-      rest. `planRead` still refuses 4.0 and the writer still writes
-      3.0, so nothing outside tests reaches it. `minted_from` is
-      decoded and not yet stored, and an element its sentence cannot name
-      still takes 6b-2a's generated id. barwise-wcg.f1s's test injections
-      go through a helper that keeps the index whole.
+      load (`OrmModel.withReserved`), and a population numbering past
+      every number its config states. Format 4.0's id patterns, stated
+      once in `model/name.ts`: a local name; an object type's id or a
+      reference, a local name or `alias:local`; a role's and a
+      population's, `<local name>.<local name>`; an instance's, three
+      (owner, 2026-10-30: strict, the shapes the rules give). The 4.0
+      JSON Schema, shipped as `orm-model-4.0.schema.json` beside the
+      current one. The 4.0 Effect decoders (`decode/document40.ts`): the
+      object type, fact type and constraint Schemas become builders over a
+      format's id leaves (`decode/ids.ts`), applied once to 3.0's leaves,
+      which leave every 3.0 Schema as it was, and once to 4.0's; the
+      smaller elements are stated in `document40.ts`, because 3.0 is
+      frozen and the two need not agree from here on. A drift test holds
+      the decoders to the file by fields, by the patterns' sources, and by
+      a corpus both must accept or refuse alike. `readDocument40` collects
+      every stated id, refuses one stated twice across kinds, and reads
+      through `fromDecoded` with the rest reserved. `planRead` still
+      refuses 4.0 and the writer still writes 3.0, so nothing outside
+      tests reaches it. `imports` and `minted_from` are decoded and not
+      yet kept, and an element its sentence cannot name still takes
+      6b-2a's generated id. barwise-wcg.f1s's test injections go through
+      `addFactType` or a helper that keeps the index whole.
     - _6b-4a, the importers off role ids_ (owner, 2026-10-30), moved
       ahead of 6b-2b-2 because a 4.0 role id is strictly
       `<local name>.<local name>`: the importers that state UUID role

@@ -255,6 +255,11 @@
       "status": "accepted-benign",
       "note": "two decisions sharing one sentence: a fact type's roles (FactTypeFile) and a constraint's role list (roleList); neither minimum follows from the other, and each drift test holds its own to the schema",
       "detail": "packages/core/src/decode/constraint.ts, packages/core/src/decode/factType.ts"
+    },
+    "literal:685446d8a81a": {
+      "status": "accepted-benign",
+      "note": "each format version decoder refuses any other orm_version in the same words: 3.0 is frozen and 4.0 states its own (iri-identity 6b-2b-1); the two must differ, not agree",
+      "detail": "\").annotate({ message: 'must be \" in packages/core/src/decode/document.ts, packages/core/src/decode/document40.ts"
     }
   }
 }
