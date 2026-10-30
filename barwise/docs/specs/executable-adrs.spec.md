@@ -10,6 +10,7 @@ from the plan review)
 Touches: barwise/scripts/check-architecture.mjs,
 barwise/scripts/lib/architecture-section.mjs,
 +barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/lib/ci-gates.mjs,
++barwise/scripts/lib/ci-occurrences.mjs, barwise/scripts/lib/spec-reader.mjs,
 +barwise/scripts/check-adr-tests.mjs, +barwise/scripts/lib/test-tag-reporter.mjs,
 barwise/scripts/run-script-tests.mjs, barwise/vitest.shared.ts,
 barwise/scripts/lib/changed-class.mjs,
