@@ -140,7 +140,13 @@ export function keysRead(check: MarkedCheck["check"], node: SchemaAST.AST): stri
         if (isList && /^\d+$/.test(key)) {
           const item = join(path, "*");
           read.add(item);
-          return fill === "absent" ? undefined : shaped(item, ast.rest[0] ?? ast.elements[0]);
+          // Each item varies as a struct's fields do: in the shaped run it
+          // has its Schema's shape, otherwise its fields are all the run's
+          // filler, so a list rule that branches on an item's field is
+          // followed down each branch (review of R3).
+          const itemAst = ast.rest[0] ?? ast.elements[0];
+          if (fill === "shaped") return shaped(item, itemAst);
+          return proxyAt(item, itemAst?._tag === "Objects" ? itemAst : undefined, fill);
         }
         if (key in t) return Reflect.get(t, key, receiver);
         // A mapping filler standing where the field is a list.

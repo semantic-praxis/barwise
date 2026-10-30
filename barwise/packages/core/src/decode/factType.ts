@@ -11,12 +11,14 @@
  * internal list: the class still builds the element, and making it a record
  * is WS4's.
  *
- * **The reading rule.** Each reading names every role once, and no role the
- * fact type lacks. It reads two fields, so it is a rule the harness runs,
- * reported at each reading at fault whatever else is wrong with the fact
- * type -- #672 ran it on the raw input after every decode instead. A blank
- * reading is refused by the reading's own leaf, as the constructor refuses
- * it, and the rule leaves it to that.
+ * **The reading rule.** Each reading names every role at least once, and no
+ * role the fact type lacks, as `validateReadingTemplate` has it. It reads
+ * two fields, so it is a rule the harness runs, reported at each reading at
+ * fault beside the fact type's other problems -- #672 ran it on the raw
+ * input after every decode instead. It is skipped, as every rule is, where
+ * a field it reads is of the wrong kind: `roles` or `readings` not a list,
+ * or a reading not a string. A blank reading is refused by the reading's
+ * own leaf, as the constructor refuses it, and the rule leaves it to that.
  *
  * Nothing on the load path calls this until R4.
  */
@@ -36,8 +38,8 @@ import {
 } from "./constraint.js";
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { crossField } from "./harness.js";
-import { Name, nonEmpty } from "./leaves.js";
-import { type ElementLabel, elementOf } from "./problems.js";
+import { Flag, Name, nonEmpty, notBlank, Text } from "./leaves.js";
+import { type ElementLabel, elementOf, labelByNameOrId } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
 
@@ -51,12 +53,7 @@ const STORAGE_MEMBERS: Record<DerivationStorage, true> = {
 const STORAGES = Object.keys(STORAGE_MEMBERS) as DerivationStorage[];
 
 /** A reading the constructor accepts: something left after trimming. */
-const Reading = Schema.String.annotate({ message: "must be a string (a reading)." }).check(
-  Schema.makeFilter((template: string) => template.trim() !== "", {
-    message: "must not be blank (a reading).",
-    arbitraryConstraint: { minLength: 1 },
-  }),
-);
+const Reading = notBlank(" (a reading)");
 
 // -- The fact type ----------------------------------------------------------
 
@@ -69,12 +66,12 @@ const DerivationFile = Schema.Struct({
   storage: Schema.optionalKey(
     Schema.Literals(STORAGES).annotate({ message: `must be ${STORAGES.join(" or ")}.` }),
   ),
-  expression: Schema.String,
-  is_formal: Schema.optionalKey(Schema.Boolean),
+  expression: Text,
+  is_formal: Schema.optionalKey(Flag),
 });
 
 /**
- * Each reading names every role, and no role the fact type lacks: one
+ * Each reading names every role at least once, and no role the fact type lacks: one
  * problem per reading at fault, in the constructor's words. A reading that
  * is not a string, or is blank, is its leaf's to report and is passed over,
  * so the others are still judged.
@@ -97,26 +94,15 @@ const readingsFitRoles = crossField(
   "must have readings that name each of its roles.",
 );
 
-/**
- * What a message calls a fact type: by its name, or by its id when the name
- * is missing or blank -- which is when the name is the problem.
- */
-function describeFactType(raw: unknown): ElementLabel {
-  const doc = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const name = typeof doc.name === "string" ? doc.name.trim() : "";
-  if (name !== "") return { label: `Fact type "${name}"`, identity: name };
-  if (typeof doc.id === "string" && doc.id !== "") {
-    return { label: `Fact type with id "${doc.id}"`, identity: doc.id };
-  }
-  return { label: "Fact type with no name or id", identity: "" };
-}
+/** What a message calls a fact type: by its name, else its id. */
+const describeFactType = (raw: unknown): ElementLabel => labelByNameOrId("Fact type", raw);
 
 /** A fact type as a 3.0 file states it, its own constraints included. */
 export const FactTypeFile = Schema.Struct({
   id: nonEmpty(""),
   name: Name,
-  definition: Schema.optionalKey(Schema.String),
-  note: Schema.optionalKey(Schema.String),
+  definition: Schema.optionalKey(Text),
+  note: Schema.optionalKey(Text),
   roles: Schema.Array(RoleFile).check(
     Schema.isMinLength(1, { message: "must list at least one role." }),
   ),

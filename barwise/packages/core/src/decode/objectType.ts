@@ -35,10 +35,11 @@ import {
   nonEmpty,
   rangeRecord,
   RangesFile,
+  Text,
   ValuesFile,
   valuesOrRanges,
 } from "./leaves.js";
-import { type ElementLabel, elementOf } from "./problems.js";
+import { type ElementLabel, elementOf, labelByNameOrId } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
 
@@ -80,18 +81,11 @@ const CardinalityFile = Schema.Struct({
  * name is missing or blank -- which is when the name is the problem.
  */
 function describeObjectType(raw: unknown): ElementLabel {
-  const doc = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const kind = doc.kind === "entity"
-    ? "Entity type"
-    : doc.kind === "value"
-    ? "Value type"
-    : "Object type";
-  const name = typeof doc.name === "string" ? doc.name.trim() : "";
-  if (name !== "") return { label: `${kind} "${name}"`, identity: name };
-  if (typeof doc.id === "string" && doc.id !== "") {
-    return { label: `${kind} with id "${doc.id}"`, identity: doc.id };
-  }
-  return { label: `${kind} with no name or id`, identity: "" };
+  const kind = (raw as { kind?: unknown; } | null)?.kind;
+  return labelByNameOrId(
+    kind === "entity" ? "Entity type" : kind === "value" ? "Value type" : "Object type",
+    raw,
+  );
 }
 
 // -- The two variants -------------------------------------------------------
@@ -99,11 +93,11 @@ function describeObjectType(raw: unknown): ElementLabel {
 const baseFields = {
   id: nonEmpty(""),
   name: Name,
-  definition: Schema.optionalKey(Schema.String),
-  source_context: Schema.optionalKey(Schema.String),
+  definition: Schema.optionalKey(Text),
+  source_context: Schema.optionalKey(Text),
   aliases: Schema.optionalKey(Schema.Array(nonEmpty(" (an alias)"))),
   independent: Schema.optionalKey(Schema.Boolean),
-  note: Schema.optionalKey(Schema.String),
+  note: Schema.optionalKey(Text),
   cardinality: Schema.optionalKey(CardinalityFile),
 };
 
@@ -151,7 +145,7 @@ const ValueTypeFile = Schema.Struct({
   ),
   data_type: Schema.optionalKey(DataTypeFile),
   value_constraint: Schema.optionalKey(ValueConstraintFile),
-  default_value: Schema.optionalKey(Schema.String),
+  default_value: Schema.optionalKey(Text),
 });
 
 /**

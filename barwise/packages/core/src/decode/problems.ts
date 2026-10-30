@@ -59,6 +59,22 @@ export interface ElementAnnotation {
   readonly tagField?: string;
 }
 
+/**
+ * What a message calls an element named by its `name`: by the name as the
+ * model stores it, trimmed; by its id when the name is missing or blank --
+ * which is when the name is the problem; and, lacking both, by its noun.
+ * Object types and fact types alike.
+ */
+export function labelByNameOrId(noun: string, raw: unknown): ElementLabel {
+  const doc = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const name = typeof doc.name === "string" ? doc.name.trim() : "";
+  if (name !== "") return { label: `${noun} "${name}"`, identity: name };
+  if (typeof doc.id === "string" && doc.id !== "") {
+    return { label: `${noun} with id "${doc.id}"`, identity: doc.id };
+  }
+  return { label: `${noun} with no name or id`, identity: "" };
+}
+
 /** Mark a Schema as an element, for `problemsOf`. */
 export function elementOf(annotation: ElementAnnotation) {
   return { element: annotation } as const;

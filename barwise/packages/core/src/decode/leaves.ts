@@ -19,16 +19,24 @@ export const nonEmpty = (what: string) =>
   );
 
 /**
- * A name `requireName` accepts: something left after trimming. An object
- * type's, a fact type's and a role's.
+ * Text `requireName` accepts: something left after trimming. A name -- an
+ * object type's, a fact type's, a role's -- and a reading.
  */
-export const Name = Schema.String.annotate({ message: "must be a string." }).check(
-  Schema.makeFilter((name: string) => name.trim() !== "", {
-    message: "must not be blank.",
-    // Not blank implies a length of at least one: the schema's minLength.
-    arbitraryConstraint: { minLength: 1 },
-  }),
-);
+export const notBlank = (what: string) =>
+  Schema.String.annotate({ message: `must be a string${what}.` }).check(
+    Schema.makeFilter((text: string) => text.trim() !== "", {
+      message: `must not be blank${what}.`,
+      // Not blank implies a length of at least one: the schema's minLength.
+      arbitraryConstraint: { minLength: 1 },
+    }),
+  );
+export const Name = notBlank("");
+
+/** Free text: any string, and only a string. */
+export const Text = Schema.String.annotate({ message: "must be a string." });
+
+/** A flag: true or false, and nothing else. */
+export const Flag = Schema.Boolean.annotate({ message: "must be true or false." });
 
 /**
  * An integer no smaller than `min`, as JSON Schema's `integer` with a

@@ -991,9 +991,13 @@ still off the load path.
   requires.
 - The misplacement sentence now names the enclosing fact type through
   `messageWithin`, and a test compares it with today's: for every kind that
-  lives in the model, with its id, an empty id and none, the decoder's
-  problems hold `refuseMisplacedConstraints`'s sentence exactly. The copy
-  barwise-ehl tracks is therefore checked until R4 deletes the old one.
+  lives in the model, with a string id, an empty one, a numeric or boolean
+  one and none, the decoder's problems hold `refuseMisplacedConstraints`'s
+  sentence exactly, under a fact type whose name is as the model stores it.
+  The copy barwise-ehl tracks is therefore checked until R4 deletes the old
+  one. The two differ only for a name with surrounding space, which the
+  decoder trims as the model does, and for a blank or absent name, which
+  both refuse and where only today's sentence says "undefined".
 - Agreement with `main`, both ways: 2,000 fact types drawn from the
   hand-written schema, half given readings that name each role, and the
   decoder accepts exactly what today's schema and the `FactType` constructor
@@ -1007,7 +1011,7 @@ still off the load path.
   `crossField` takes extra annotations and has a guard form that every
   marked rule goes through, a maximum's refusal names "unbounded", an id or
   role id that is not a string is refused as such, and the constraint's
-  label matches `refuseMisplacedConstraints` for an empty or absent id.
+  label matches `refuseMisplacedConstraints` for every id.
 - Found while building it: annotating a checked Schema annotates its last
   check, not the node, so the walk labelled the fact type's problems "The
   document". The annotation goes before the check, and a test refuses an
@@ -1015,6 +1019,18 @@ still off the load path.
 - The reads check fills each field with a value of the Schema's own shape
   as well as with nothing and the wrong kinds, so a rule that calls a
   list's methods (`readings.flatMap`) meets a list.
+- The author-side review found no design flaw and these details, each now
+  a test or fixed: a numeric id was labelled where today's sentence leaves
+  it out, so the label now leaves out any id that is not a string (which
+  reverses R2's review on that point, for the copy's sake); the module's
+  doc claimed the reading rule ran whatever else was wrong, where it is
+  skipped, as every rule is, when a reading is not a string; the reads
+  check had stopped varying a list's items, and a list rule branching on
+  an item's field is now shown to be followed; free text and flags have
+  their own wrong-type wording; the object type and fact type share one
+  name-or-id labeller, and a name and a reading one non-blank leaf.
+  Declined: one guard for both list minimums, since the operands' narrows
+  to a tuple and a role list's must not, or S3 fails.
 
 **R3's readings.** M1 for fact types reads no: `Arbitrary.schema` over the
 fact type Schema generates nothing (0 values, 201 discards at sizes 3 and

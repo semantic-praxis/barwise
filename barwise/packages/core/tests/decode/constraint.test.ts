@@ -338,10 +338,10 @@ describe("each refusal in its own words (barwise-f9t)", () => {
         'The exclusion constraint "x": roles.0 must be a string (a role id).',
       ],
       [
-        "an id of the wrong type, by which the constraint is still named",
+        "an id of the wrong type, left out of the label as today's loader leaves it",
         "external",
         { id: 7, type: "subset", subset_roles: ["a"], superset_roles: ["b"] },
-        "The subset constraint with id 7: id must be a string.",
+        "The subset constraint: id must be a string.",
       ],
       [
         "an empty id, quoted",

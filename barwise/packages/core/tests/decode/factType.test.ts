@@ -216,12 +216,17 @@ describe("the misplacement sentence", () => {
   }
 
   // The copy barwise-ehl tracks until R4 deletes today's: the two must agree,
-  // for every kind that lives in the model, whatever id it states.
+  // for every kind that lives in the model, whatever id it states, under a
+  // fact type whose name is as the model stores it (trimmed). A blank or
+  // absent fact type name is refused by both, and only today's sentence
+  // then says "undefined".
   const external = CONSTRAINT_TYPES.filter((t) => placementOf(t) === "external");
   const forms: [string, (c: Record<string, unknown>) => Record<string, unknown>][] = [
     ["with its id", (c) => c],
     ["with an empty id", (c) => ({ ...c, id: "" })],
     ["with no id", ({ id: _id, ...c }) => c],
+    ["with a numeric id", (c) => ({ ...c, id: 7 })],
+    ["with a boolean id", (c) => ({ ...c, id: true })],
   ];
 
   it.each(external.flatMap((t) => forms.map(([form, f]) => [t, form, f] as const)))(
@@ -234,4 +239,43 @@ describe("the misplacement sentence", () => {
       expect(decodersRefusal(c)).toContain(today);
     },
   );
+});
+
+describe("a fact type's refusals in its own words (barwise-f9t)", () => {
+  const FT = {
+    id: "ft",
+    name: "O has O",
+    roles: [{ id: "r1", player: "ot", role_name: "a" }],
+    readings: ["{0} exists"],
+  };
+  const messages = (doc: unknown) => {
+    try {
+      runFactTypeDecode(doc);
+      return [];
+    } catch (e) {
+      return (e as DecodeError).problems.map((p) => p.message);
+    }
+  };
+
+  it.each(
+    [
+      [
+        "free text that is not a string",
+        { ...FT, derivation: { kind: "derived", expression: 5 } },
+        'Fact type "O has O": derivation.expression must be a string.',
+      ],
+      [
+        "a flag that is not one",
+        { ...FT, derivation: { kind: "derived", expression: "x", is_formal: "yes" } },
+        'Fact type "O has O": derivation.is_formal must be true or false.',
+      ],
+      [
+        "a note that is not a string",
+        { ...FT, note: 3 },
+        'Fact type "O has O": note must be a string.',
+      ],
+    ] as const,
+  )("%s", (_, doc, message) => {
+    expect(messages(doc)).toEqual([message]);
+  });
 });

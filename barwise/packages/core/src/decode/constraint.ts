@@ -244,13 +244,12 @@ function describeConstraint(raw: unknown): ElementLabel {
   const noun = typeof doc.type === "string" && placementOf(doc.type) !== undefined
     ? `The ${doc.type} constraint`
     : "The constraint";
-  // An empty id is quoted and an absent one left out, as
-  // `refuseMisplacedConstraints` words them; an id of the wrong type is
-  // still how a reader finds the constraint. One with no id is found by the
-  // problem's `at`.
-  if (typeof doc.id === "string") return { label: `${noun} "${doc.id}"`, identity: doc.id };
-  return typeof doc.id === "number" || typeof doc.id === "boolean"
-    ? { label: `${noun} with id ${String(doc.id)}`, identity: String(doc.id) }
+  // Any string id is quoted, an empty one included, and any other left out,
+  // as `refuseMisplacedConstraints` words them: the two sentences must
+  // agree until R4 deletes that copy (barwise-ehl). A constraint with no
+  // usable id is found by the problem's `at`.
+  return typeof doc.id === "string"
+    ? { label: `${noun} "${doc.id}"`, identity: doc.id }
     : { label: noun, identity: "" };
 }
 
