@@ -1143,6 +1143,23 @@ out of R3's fact type module so subtype facts share it.
   stores none (`splitModel` reads only role ids from the record). S1, S4
   and S5 were re-read after these fixes and are unchanged: S5 376 ms npm
   and 339 ms bundle, `main` 285 and 335 back to back.
+- Its second pass, on the fixed head, found no design flaw and these, each
+  fixed with a test that fails when it is planted back: a blank definition
+  term or text, or a blank diagram name, passed the decoder and the
+  model's constructor then threw a plain `Error`, alone and unlabelled
+  (`main` does the same; the leaves are now `notBlank`, as the model's
+  name is, and the agreement test builds those constructors); joining
+  sentences with "; " read ".; ", so they now follow one another; the
+  orientations message restated the list, which is now a total record over
+  the model's type; and two doc comments. Tracked: the same-id rules of a
+  subtype fact and an objectification, the same class of constructor check,
+  which need harness rules (barwise-um9); and the test generator's
+  namespace-shaped strays for any pattern (barwise-vy9). Declined, with
+  the reason: the namespace pattern's copy, which is drift-tested and whose
+  original is IRI code this restart stays out of; the label helpers, which
+  key on different fields; `Integer` beside `intAtLeast`, two refusals
+  with different messages; and the place-or-sentence rule in the walk,
+  which a test pins and which touches only a rule's own issues.
 - barwise-ehl's duplicated misplacement sentence is gone with
   `refuseMisplacedConstraints`, and its baseline row with it.
 

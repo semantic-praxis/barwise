@@ -97,6 +97,14 @@ function todaysReading(doc: unknown): Reading {
       const { config, constraints } = deserializeFactType(ft);
       new FactType({ ...config, constraints: constraints as never });
     }
+    // Each on a model of its own: a name two of them share is a check
+    // between elements, made after decoding on both paths.
+    for (const def of d.model.definitions ?? []) {
+      new OrmModel({ name: "M" }).addDefinition(deserializeDefinition(def));
+    }
+    for (const dl of d.model.diagrams ?? []) {
+      new OrmModel({ name: "M" }).addDiagramLayout(deserializeDiagramLayout(dl));
+    }
   } catch {
     return { ok: false };
   }
@@ -262,6 +270,31 @@ describe("the 3.0 malformed cases, through the loader", () => {
       expect.stringMatching(/^Definition of "T": definition /),
       expect.stringMatching(/^Fact instance " {2}" in population "p": role_values\.r /),
     ]));
+  });
+
+  it("refuses a blank term, text or diagram name with the file's other problems", () => {
+    const doc = {
+      orm_version: "3.0",
+      model: {
+        name: "M",
+        object_types: [{ id: "o", name: " ", kind: "value", data_type: { name: "text" } }],
+        definitions: [{ term: " ", definition: " " }],
+        diagrams: [{ name: " " }],
+      },
+    };
+    let error: unknown;
+    try {
+      runDocumentDecode(doc);
+    } catch (e) {
+      error = e;
+    }
+    expect((error as DecodeError).problems.map((p) => [...p.at, ...p.path].join(".")).sort())
+      .toEqual([
+        "model.definitions.0.definition",
+        "model.definitions.0.term",
+        "model.diagrams.0.name",
+        "model.object_types.0.name",
+      ]);
   });
 
   it("an instance's problem names its population", () => {

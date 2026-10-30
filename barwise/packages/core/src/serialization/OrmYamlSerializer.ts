@@ -82,9 +82,9 @@ export class OrmYamlSerializer {
    * below 3.0 validated against the frozen 2.0 schema. If either fails, a
    * DeserializationError is thrown with every problem found.
    *
-   * The model is then constructed from the validated document. Construction
-   * errors (e.g. referential integrity violations) are thrown as
-   * DeserializationError.
+   * The model is then constructed from the decoded document. A held id or a
+   * repeated constraint id is thrown as DeserializationError; a check only an
+   * element's constructor makes is thrown as that constructor throws it.
    */
   /**
    * @param yaml - The YAML string to deserialize.
@@ -156,8 +156,8 @@ export class OrmYamlSerializer {
    * 2.0, which older documents migrate to first (`planRead`).
    *
    * Documents whose `orm_version` is missing or malformed are passed
-   * through untouched so that schema validation reports those cases as it
-   * always has. A present-but-unsupported version throws a
+   * through untouched so that the reader reports them: the decoders for
+   * 3.0, which name the missing or malformed version as a problem. A present-but-unsupported version throws a
    * {@link DeserializationError} describing whether the file is too new or
    * simply unreachable.
    */
@@ -192,8 +192,8 @@ export class OrmYamlSerializer {
 
 /**
  * Decode a 3.0 document, or refuse it with every problem it has, each
- * naming its element and field. The message is one line, problems joined
- * by "; " as ajv's were, because surfaces print it after a file name
+ * naming its element and field. The message is one line, its problems
+ * sentences one after another, because surfaces print it after a file name
  * (`barwise migrate` gives one line per file). The problems are also kept
  * as a `validationResult`, its paths JSON Pointers into the file, "/" for
  * the document itself, as ajv's were (effect-adoption 1r, R4).
@@ -208,7 +208,7 @@ function decodeOrRefuse(doc: unknown): DecodedDocument {
         .join("") || "/";
     throw new DeserializationError(
       `The model file does not conform to format 3.0: ${
-        err.problems.map((p) => p.message).join("; ")
+        err.problems.map((p) => p.message).join(" ")
       }`,
       {
         valid: false,

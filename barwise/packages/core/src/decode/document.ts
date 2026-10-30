@@ -30,7 +30,7 @@ import {
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { DerivationFile, derivationRule } from "./derivation.js";
 import { type DecodedFactType, factTypeConfig, FactTypeFile } from "./factType.js";
-import { Flag, Integer, Name, nonEmpty, Text } from "./leaves.js";
+import { Flag, Integer, Name, nonEmpty, notBlank, Text } from "./leaves.js";
 import { type DecodedObjectType, ObjectTypeFile, toRecord } from "./objectType.js";
 import { type ElementLabel, elementOf } from "./problems.js";
 
@@ -87,15 +87,21 @@ const PopulationFile = Schema.Struct({
 );
 
 const DefinitionFile = Schema.Struct({
-  term: nonEmpty(""),
-  definition: nonEmpty(""),
+  // Not blank, as `addDefinition` refuses a blank term or text: refused
+  // here, the problem is reported with the file's others.
+  term: notBlank(""),
+  definition: notBlank(""),
   context: Schema.optionalKey(Text),
 }).annotate(element("Definition", "term", "Definition of"));
 
-const ORIENTATIONS = ["horizontal", "vertical"] as const;
+type Orientation = DiagramLayout["orientations"][string];
+/** A total record, so an orientation added to the model fails to compile here. */
+const ORIENTATION_MEMBERS: Record<Orientation, true> = { horizontal: true, vertical: true };
+const ORIENTATIONS = Object.keys(ORIENTATION_MEMBERS) as Orientation[];
 
 const DiagramFile = Schema.Struct({
-  name: nonEmpty(""),
+  // Not blank, as `addDiagramLayout` refuses a blank name.
+  name: notBlank(""),
   elements: Schema.optionalKey(Schema.Array(nonEmpty(" (an element)"))),
   positions: Schema.optionalKey(
     Schema.Record(Schema.String, Schema.Struct({ x: Integer, y: Integer })),
@@ -103,7 +109,9 @@ const DiagramFile = Schema.Struct({
   orientations: Schema.optionalKey(
     Schema.Record(
       Schema.String,
-      Schema.Literals(ORIENTATIONS).annotate({ message: 'must be "horizontal" or "vertical".' }),
+      Schema.Literals(ORIENTATIONS).annotate({
+        message: `must be ${ORIENTATIONS.map((o) => `"${o}"`).join(" or ")}.`,
+      }),
     ),
   ),
 }).annotate(element("Diagram", "name"));
