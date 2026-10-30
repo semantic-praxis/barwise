@@ -7275,3 +7275,267 @@ test("check:architecture cannot answer with no ADR to check", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- check:architecture, executable ADRs WS1: Enforced-by: declarations ---
+
+/**
+ * An ADR declaring all four entry kinds over four decisions, one of whose
+ * bold titles wraps, beside the inputs those entries read: a ci.yml whose
+ * steps are the gates, the root scripts, and a tracker with an open and a
+ * closed issue. Each case below breaks one thing and expects one finding,
+ * or one refusal, from the real check.
+ */
+const ENFORCED_ADR = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n"
+  + "Enforced-by: npm run check:x (one), npm run audit:y -- --check (two),\n"
+  + "tests (three), none (barwise-gap: four)\n\n"
+  + "## Context\n\nWhy.\n\n## Decision\n\n"
+  + "1. **One.** {#one} The first rule.\n"
+  + "2. **Two, whose title\n   wraps.** {#two} The second.\n"
+  + "3. **Three.** {#three} The third.\n"
+  + "4. **Four.** {#four} The fourth.\n\n"
+  + "## Consequences\n\nWhat follows.\n";
+const ENFORCED_CI = "name: CI\non: push\njobs:\n  ci:\n    runs-on: ubuntu-latest\n"
+  + "    defaults:\n      run:\n        working-directory: barwise\n    steps:\n"
+  + "      - uses: actions/checkout@v7\n"
+  + "      - run: npm run check:x\n"
+  + "      - run: npm run audit:y -- --check\n"
+  + "        if: steps.changes.outputs.docs_only != 'true'\n";
+const ENFORCED_ROOT_PKG = JSON.stringify({
+  scripts: {
+    "check:x": "node scripts/x.mjs",
+    "audit:y": "node scripts/y.mjs",
+    lint: "turbo run lint",
+    "check:adr-tests": "node scripts/check-adr-tests.mjs",
+  },
+});
+const ENFORCED_TRACKER = '{"id":"barwise-gap","status":"open","title":"g"}\n'
+  + '{"id":"barwise-shut","status":"closed","title":"s"}\n';
+
+function enforcementRepo() {
+  const fixture = architectureRepo();
+  const { dir } = fixture;
+  stageAdr(dir, "a-concern", ENFORCED_ADR);
+  stage(dir, ".github/workflows/ci.yml", ENFORCED_CI);
+  stage(dir, "barwise/package.json", ENFORCED_ROOT_PKG);
+  stage(dir, ".beads/issues.jsonl", ENFORCED_TRACKER);
+  execFileSync("git", ["commit", "-qm", "enforced"], { cwd: dir });
+  return fixture;
+}
+const ENFORCED_PATH = "barwise/docs/adr/a-concern.md";
+const CI_PATH = ".github/workflows/ci.yml";
+
+test("check:architecture accepts every entry kind when each decision is accounted for", () => {
+  const { dir } = enforcementRepo();
+  try {
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    assert.match(ok.stdout, /1 declare Enforced-by:/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture names each broken Enforced-by: declaration, exit 1", () => {
+  const { dir } = enforcementRepo();
+  try {
+    for (
+      const [rel, edit, why] of [
+        // Decision ids.
+        [
+          ENFORCED_PATH,
+          (s) => s.replace(" {#three}", ""),
+          /decision 3 \(line \d+\) has no \{#id\}/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("{#four}", "{#one}"),
+          /decisions 1 and 4 share the id one/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("tests (three)", "tests (thre)"),
+          /lists thre, which no decision/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("\ntests (three), ", "\n"),
+          /decision 3 \{#three\} has no Enforced-by: entry/,
+        ],
+        // The header's own form.
+        [ENFORCED_PATH, (s) => s.replace("(one),", "(one)"), /is not an entry/],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("(barwise-gap: four)", "(barwise-gap: four"),
+          /unclosed "\("/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("four)\n\n", "four)\nOwner: someone\n\n"),
+          /Enforced-by: is not the last header field \(Owner follows it\)/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace(/Enforced-by:[^]*?four\)\n/, "Enforced-by:\n"),
+          /Enforced-by: declares nothing/,
+        ],
+        // Gate entries.
+        [ENFORCED_PATH, (s) => s.replace("check:x (one)", "lint (one)"), /lint is not a gate name/],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("check:x (one)", "check:adr-tests (one)"),
+          /check:adr-tests checks other gates and cannot vouch/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("check:x (one)", "check:nope (one)"),
+          /has no script check:nope/,
+        ],
+        [
+          CI_PATH,
+          (s) => s.replace("run: npm run check:x", "run: npm run --silent check:x"),
+          /no ci\.yml step's run: is exactly "npm run check:x"/,
+        ],
+        // The arguments are part of the match: without them the audit never fails CI.
+        [
+          CI_PATH,
+          (s) => s.replace("audit:y -- --check", "audit:y"),
+          /no ci\.yml step's run: is exactly "npm run audit:y -- --check"/,
+        ],
+        [
+          CI_PATH,
+          (s) => s.replace("!= 'true'", "== 'true'"),
+          /a guard that does not run it on every code change/,
+        ],
+        [
+          CI_PATH,
+          (s) => s.replace("docs_only != 'true'", "optimizer == 'true'"),
+          /a guard that does not run it on every code change/,
+        ],
+        [
+          CI_PATH,
+          (s) =>
+            s.replace("npm run check:x\n", "npm run check:x\n        continue-on-error: true\n"),
+          /"npm run check:x" is continue-on-error/,
+        ],
+        [
+          CI_PATH,
+          (s) => s.replace("    runs-on:", "    continue-on-error: true\n    runs-on:"),
+          /is continue-on-error, so it cannot fail CI/,
+        ],
+        [
+          CI_PATH,
+          (s) =>
+            s.replace(
+              "npm run check:x\n",
+              "npm run check:x\n        working-directory: barwise/packages/core\n",
+            ),
+          /"npm run check:x" does not run in barwise\//,
+        ],
+        // Gap issues.
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("barwise-gap:", "barwise-shut:"),
+          /barwise-shut is closed/,
+        ],
+        [
+          ENFORCED_PATH,
+          (s) => s.replace("barwise-gap:", "barwise-nil:"),
+          /barwise-nil is not in \.beads/,
+        ],
+      ]
+    ) {
+      const r = archPlanted(dir, rel, edit);
+      assert.equal(r.status, 1, `${why}\n${r.stdout}${r.stderr}`);
+      assert.match(r.stderr, why);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture refuses, exit 2, only where it cannot tell, and lists it beside findings", () => {
+  const { dir } = enforcementRepo();
+  try {
+    const unknownGuard = (s) =>
+      s.replace("steps.changes.outputs.docs_only != 'true'", "github.ref == 'refs/heads/main'");
+    const refused = archPlanted(dir, CI_PATH, unknownGuard);
+    assert.equal(refused.status, 2, refused.stdout + refused.stderr);
+    // A gate switched off with `if: false` must not keep counting as an
+    // enforcer; the check cannot evaluate the form, so it refuses.
+    const off = archPlanted(
+      dir,
+      CI_PATH,
+      (s) => s.replace("steps.changes.outputs.docs_only != 'true'", "false"),
+    );
+    assert.equal(off.status, 2, off.stdout + off.stderr);
+    assert.match(off.stderr, /audit:y -- --check.*if: false/);
+    assert.match(
+      refused.stderr,
+      /cannot answer for 1 declaration.*\n.*audit:y -- --check.*if: github\.ref/,
+    );
+    const expression = archPlanted(
+      dir,
+      CI_PATH,
+      (s) =>
+        s.replace(
+          "npm run check:x\n",
+          "npm run check:x\n        continue-on-error: ${{ matrix.x }}\n",
+        ),
+    );
+    assert.equal(expression.status, 2, expression.stdout + expression.stderr);
+    assert.match(expression.stderr, /"npm run check:x \(one\)".*continue-on-error/);
+    // One occurrence never runs on a code change and one cannot be read:
+    // the unreadable one might qualify, so the answer is a refusal, not a
+    // finding (barwise-ym8.7jz review of e247c807).
+    const mixed = archPlanted(
+      dir,
+      CI_PATH,
+      (s) =>
+        s.replace("!= 'true'", "== 'true'")
+        + "      - run: npm run audit:y -- --check\n        if: github.ref == 'refs/heads/main'\n",
+    );
+    assert.equal(mixed.status, 2, mixed.stdout + mixed.stderr);
+    // An expression continue-on-error on a step whose guard never runs it
+    // on a code change cannot qualify either way: a finding, not a refusal.
+    const never = archPlanted(
+      dir,
+      CI_PATH,
+      (s) =>
+        s.replace("!= 'true'", "== 'true'").replace(
+          "audit:y -- --check\n",
+          "audit:y -- --check\n        continue-on-error: ${{ matrix.x }}\n",
+        ),
+    );
+    assert.equal(never.status, 1, never.stdout + never.stderr);
+    assert.match(never.stderr, /a guard that does not run it on every code change/);
+    // A finding with a refusal beside it is exit 1, and both are listed.
+    writeFileSync(join(dir, CI_PATH), unknownGuard(ENFORCED_CI));
+    const both = archPlanted(dir, ENFORCED_PATH, (s) => s.replace("check:x (one)", "lint (one)"));
+    assert.equal(both.status, 1, both.stdout + both.stderr);
+    assert.match(both.stderr, /lint is not a gate name/);
+    assert.match(both.stderr, /cannot answer for 1 declaration/);
+    writeFileSync(join(dir, CI_PATH), ENFORCED_CI);
+    // An input the entries need and cannot read.
+    rmSync(join(dir, ".beads", "issues.jsonl"));
+    const noTracker = runArch(dir);
+    assert.equal(noTracker.status, 2, noTracker.stdout + noTracker.stderr);
+    assert.match(noTracker.stderr, /\.beads\/issues\.jsonl: ENOENT/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check:architecture does not read ci.yml, scripts or the tracker for an ADR without Enforced-by:", () => {
+  const { dir } = architectureRepo();
+  try {
+    // No ci.yml, root package.json or tracker in this fixture: an ADR with
+    // no header needs none of them, and none is a refusal.
+    stageAdr(dir, "a-concern", ADR_OK);
+    execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
+    const ok = runArch(dir);
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    assert.match(ok.stdout, /0 declare Enforced-by:/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

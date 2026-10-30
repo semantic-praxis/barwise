@@ -1,15 +1,16 @@
 # Executable ADRs: each ADR declares what enforces it, and CI checks the declaration
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-10-30 (the declaration pass in check:architecture, adr-enforcement.mjs, ciStepOccurrences(); an absent header still allowed). WS2 to WS4 not yet built.
 
 Created: 2026-10-28
-Last-updated: 2026-10-29
+Last-updated: 2026-10-30
 Plan-reviewed: e247c807 (code-review, pr-review; the review's ten items are barwise-ym8.7jz, which supersedes this text where they conflict)
 Tracking: barwise-ym8, barwise-ym8.7jz (required implementation items
 from the plan review)
 Touches: barwise/scripts/check-architecture.mjs,
 barwise/scripts/lib/architecture-section.mjs,
 +barwise/scripts/lib/adr-enforcement.mjs, barwise/scripts/lib/ci-gates.mjs,
++barwise/scripts/lib/ci-occurrences.mjs, barwise/scripts/lib/spec-reader.mjs,
 +barwise/scripts/check-adr-tests.mjs, +barwise/scripts/lib/test-tag-reporter.mjs,
 barwise/scripts/run-script-tests.mjs, barwise/vitest.shared.ts,
 barwise/scripts/lib/changed-class.mjs,

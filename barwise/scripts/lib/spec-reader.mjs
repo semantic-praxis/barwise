@@ -125,12 +125,20 @@ function headerBounds(text) {
  * specs into the wrong survey class. A value ends at the next header
  * field or the first blank line, and is read from the header block only.
  */
+/**
+ * The start of a header field line, as `header()` ends a value at it:
+ * a capitalised name, a colon, then a space or tab. Exported so a reader
+ * that lists a header's fields agrees with `header()` about where one
+ * field ends (adr-enforcement.mjs).
+ */
+export const FIELD_LINE = "[A-Z][A-Za-z-]*:[ \\t]";
+
 export function header(text, field) {
   const m = new RegExp(
     // `$` is NOT the terminator: under the `m` flag it matches at every
     // line end, so the lookahead fires immediately and the value is
     // truncated to its first line. `(?![\\s\\S])` is end of input.
-    `^${field}:[ \\t]*([\\s\\S]*?)(?=\\n[A-Z][A-Za-z-]*:[ \\t]|\\n[ \\t]*\\n|(?![\\s\\S]))`,
+    `^${field}:[ \\t]*([\\s\\S]*?)(?=\\n${FIELD_LINE}|\\n[ \\t]*\\n|(?![\\s\\S]))`,
     "m",
   ).exec(headerBlock(text));
   return m ? m[1].trim() : undefined;

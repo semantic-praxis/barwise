@@ -28,6 +28,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { classify } from "../lib/changed-class.mjs";
 import { ciSteps, shouldRun, WORKFLOW } from "../lib/ci-gates.mjs";
+import { ciStepOccurrences } from "../lib/ci-occurrences.mjs";
 import { ciLocalLibs } from "./ci-local-files.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -119,6 +120,175 @@ test("ciSteps reads an if: written before its run: and one written after", () =>
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("ciStepOccurrences keeps each job's keys on its own steps, not the job before", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-steps-"));
+  try {
+    const wf = join(dir, "ci.yml");
+    writeFileSync(
+      wf,
+      [
+        "name: CI",
+        "jobs:",
+        "  first:",
+        "    defaults:",
+        "      run:",
+        "        working-directory: barwise",
+        "    steps:",
+        "      - run: npm run a",
+        "      - run: npm run b",
+        "        working-directory: barwise/packages/core",
+        "      - run: |",
+        "          if: not-a-key",
+        "          npm run c",
+        "      - uses: actions/cache@v6",
+        "        with:",
+        "          continue-on-error: true",
+        "  second:",
+        "    if: github.event_name == 'pull_request'",
+        "    continue-on-error: true",
+        "    steps:",
+        "      - run: npm run a",
+        "        if: steps.changes.outputs.docs_only != 'true'",
+        "      - run: npm run d",
+        "        continue-on-error: ${{ matrix.experimental }}",
+        "",
+      ].join("\n"),
+    );
+    const at = (job, run) => ciStepOccurrences(wf).filter((s) => s.job === job && s.run === run);
+    const all = ciStepOccurrences(wf);
+    assert.equal(all.length, 6, JSON.stringify(all));
+    // The first job's last step does not pick up the second job's keys.
+    assert.deepEqual(all.find((s) => s.job === "first" && s.run === null), {
+      job: "first",
+      run: null,
+      condition: "",
+      continueOnError: false,
+      workingDirectory: "barwise",
+    });
+    assert.equal(at("first", "npm run b")[0].workingDirectory, "barwise/packages/core");
+    // A block is its text, newlines and all, so it matches no one-line
+    // `npm run` gate, and nothing inside it is taken for a key.
+    const block = all.find((s) => s.job === "first" && s.run?.includes("\n"));
+    assert.equal(block.run, "if: not-a-key\nnpm run c");
+    assert.equal(block.condition, "");
+    // Job-level if: joins the step's; job-level continue-on-error wins.
+    assert.deepEqual(at("second", "npm run a")[0], {
+      job: "second",
+      run: "npm run a",
+      condition: "github.event_name == 'pull_request' && steps.changes.outputs.docs_only != 'true'",
+      continueOnError: true,
+      workingDirectory: null,
+    });
+    // The job says continue-on-error: true, which wins over the step's expression.
+    assert.equal(at("second", "npm run d")[0].continueOnError, true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ciStepOccurrences reads an expression continue-on-error as null", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-steps-"));
+  try {
+    const wf = join(dir, "ci.yml");
+    writeFileSync(
+      wf,
+      "jobs:\n  ci:\n    steps:\n      - run: npm run x\n        continue-on-error: ${{ matrix.x }}\n"
+        + "      - run: npm run y\n        continue-on-error: false\n",
+    );
+    assert.deepEqual(
+      ciStepOccurrences(wf).map((s) => [s.run, s.continueOnError]),
+      [["npm run x", null], ["npm run y", false]],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ciStepOccurrences reads job keys written after steps:, and a compact step list", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-steps-"));
+  try {
+    const wf = join(dir, "ci.yml");
+    // Both are valid YAML, and a line scanner got each wrong: the job's
+    // keys after its steps never reached them, and the compact list lost
+    // every step's keys (review of the WS1 branch).
+    writeFileSync(
+      wf,
+      [
+        "jobs:",
+        "  late:",
+        "    steps:",
+        "      - run: npm run check:x",
+        "    continue-on-error: true",
+        "    if: github.event_name == 'push'",
+        "  compact:",
+        "    steps:",
+        "    - run: npm run check:z",
+        "      if: steps.changes.outputs.docs_only != 'true'",
+        "",
+      ].join("\n"),
+    );
+    assert.deepEqual(ciStepOccurrences(wf), [
+      {
+        job: "late",
+        run: "npm run check:x",
+        condition: "github.event_name == 'push'",
+        continueOnError: true,
+        workingDirectory: null,
+      },
+      {
+        job: "compact",
+        run: "npm run check:z",
+        condition: "steps.changes.outputs.docs_only != 'true'",
+        continueOnError: false,
+        workingDirectory: null,
+      },
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ciStepOccurrences reads workflow-level defaults and one spelling of a directory", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-steps-"));
+  try {
+    const wf = join(dir, "ci.yml");
+    writeFileSync(
+      wf,
+      [
+        "defaults:",
+        "  run:",
+        "    working-directory: ./barwise/",
+        "jobs:",
+        "  ci:",
+        "    steps:",
+        "      - run: npm run check:x",
+        "      - run: npm run check:y",
+        "        working-directory: barwise/packages/core",
+        "",
+      ].join("\n"),
+    );
+    assert.deepEqual(ciStepOccurrences(wf).map((s) => s.workingDirectory), [
+      "barwise",
+      "barwise/packages/core",
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ciStepOccurrences and ciSteps read the real ci.yml the same way", () => {
+  // Two readers of one file (ci-gates.mjs stays on builtins for ci:local's
+  // copied fixtures), so they are held to one answer: the first occurrence
+  // of each npm step, with its condition, in order.
+  const derived = [];
+  for (const s of ciStepOccurrences(WORKFLOW)) {
+    const npm = /^npm (.+)$/.exec(s.run ?? "");
+    if (!npm || npm[1] === "ci" || derived.some((d) => d.args === npm[1])) continue;
+    derived.push({ args: npm[1], condition: s.condition });
+  }
+  assert.deepEqual(derived, ciSteps(WORKFLOW));
 });
 
 test("every condition on a gate in the real ci.yml is one shouldRun understands", () => {
