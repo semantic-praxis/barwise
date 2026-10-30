@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { parseEnforcedBy } from "./adr-enforcement.mjs";
 import { header } from "./spec-reader.mjs";
 
 export const BEGIN =
@@ -72,6 +73,30 @@ export function loadIntended(root) {
 }
 
 /**
+ * What an ADR's `Enforced-by:` header declares, as the index shows it, or
+ * "" for an ADR without one (docs/specs/executable-adrs.spec.md, WS4). Read
+ * from the ADR's own text through parseEnforcedBy(), the reader the check
+ * uses, so the index never reads ci.yml or the tracker and cannot show an
+ * entry differently from how the check reads it. An entry that does not
+ * parse is left out here; check:architecture reports it.
+ *
+ *   declared: purity (no-io, no-clock), tests (pure-ids); gap: barwise-k3x (same-output)
+ */
+export function enforcementLine(text) {
+  const { present, entries } = parseEnforcedBy(text);
+  if (!present) return "";
+  const ids = (e) => `(${e.ids.join(", ")})`;
+  const declared = entries.filter((e) => e.kind !== "none").map((e) =>
+    e.kind === "tests" ? `tests ${ids(e)}` : `${e.script} ${ids(e)}`
+  );
+  const parts = [
+    ...(declared.length > 0 ? [`declared: ${declared.join(", ")}`] : []),
+    ...entries.filter((e) => e.kind === "none").map((e) => `gap: ${e.issue} ${ids(e)}`),
+  ];
+  return parts.join("; ");
+}
+
+/**
  * The section, markers included. `adrs` is [{ f, text }] with `f` the path
  * relative to the repo root, in path order (both callers read git ls-files,
  * which sorts); `intended` is the INTENDED
@@ -83,6 +108,7 @@ export function renderSection(adrs, intended) {
     link: f.replace(/^barwise\/docs\//, ""),
     scope: header(text, "Scope"),
     date: header(text, "Date"),
+    enforcement: enforcementLine(text),
   }));
   const out = [
     BEGIN,
@@ -96,11 +122,28 @@ export function renderSection(adrs, intended) {
     "",
     "### Decisions",
   ];
+  // Said once, and only when some ADR declares: what "declared" means and
+  // the two limits under it (the spec, "What does executable buy").
+  if (entries.some((e) => e.enforcement !== "")) {
+    out.push(
+      "",
+      "After an ADR's date: `declared:` names the gates and tagged tests its",
+      "`Enforced-by:` header lists, which `check:architecture` and",
+      "`check:adr-tests` hold to existing and running in CI, not to catching a",
+      "violation; `gap:` names the open issue for a decision nothing enforces",
+      "yet. A declared gate blocks a merge only if `main` requires the `ci`",
+      "check (barwise-raw), and most gates skip a docs-only change.",
+    );
+  }
   for (const scope of ["architecture", "process"]) {
     const rows = entries.filter((e) => e.scope === scope);
     if (rows.length === 0) continue;
     out.push("", `${scope[0].toUpperCase()}${scope.slice(1)}:`, "");
-    for (const e of rows) out.push(`- [${e.title}](${e.link}) -- ${e.date}`);
+    for (const e of rows) {
+      out.push(
+        `- [${e.title}](${e.link}) -- ${e.date}${e.enforcement ? ` -- ${e.enforcement}` : ""}`,
+      );
+    }
   }
   out.push(
     "",
