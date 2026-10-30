@@ -117,6 +117,18 @@ describe("reading a format 4.0 document", () => {
     );
   });
 
+  it("names an id-less subtype fact by what it relates when it has a problem", () => {
+    const bad = doc({ subtypeFacts: [{ subtype: "Person", supertype: "a.b" }] });
+    expect(() => readDocument40(bad)).toThrow(/Subtype fact of "Person" under "a\.b"/);
+  });
+
+  it("refuses a blank diagram name with the file's other problems", () => {
+    const bad = doc();
+    (bad.model as Record<string, unknown>).diagrams = [{ name: "   " }];
+    expect(() => readDocument40(bad)).toThrow(DeserializationError);
+    expect(() => readDocument40(bad)).toThrow(/does not conform to format 4\.0.*blank/);
+  });
+
   it("numbers a population's unnamed instances past every number it states", () => {
     const model = readDocument40(doc({
       populations: [{

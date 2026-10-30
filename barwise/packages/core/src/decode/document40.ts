@@ -7,9 +7,11 @@
  * gives; a constraint's, subtype fact's or objectification's left to the
  * model when absent, with `minted_from` only beside one; and the model's
  * `imports`. Object types, fact types and constraints are built by the
- * same builders as 3.0's, from 4.0's leaves; the smaller elements are
- * stated here, because 3.0's are frozen and the two need not agree from
- * here on. The configs are the ones `documentConfigs` gives a 3.0 file.
+ * same builders as 3.0's, from 4.0's leaves; subtype facts,
+ * objectifications, populations, instances, diagrams and the model are
+ * stated here, from 4.0's leaves. Definitions, the namespace, a diagram's
+ * orientation and the model's label are 3.0's own pieces, reused: a change
+ * to one of them changes both formats.
  *
  * Nothing outside tests reads a 4.0 file yet: `planRead` still refuses
  * the version and the writer still writes 3.0, until 6b-2b-2 switches both
@@ -34,14 +36,36 @@ import {
   modelElement,
   Namespace,
   OrientationFile,
+  smallElementConfigs,
 } from "./document.js";
 import { type DecodedFactType, factTypeFileOf } from "./factType.js";
 import { IDS_40 } from "./ids.js";
-import { Flag, Integer, Name, nonEmpty, Text } from "./leaves.js";
+import { Flag, Integer, Name, nonEmpty, notBlank, Text } from "./leaves.js";
 import { objectTypeFileOf } from "./objectType.js";
-import { elementOf } from "./problems.js";
+import { type ElementLabel, elementOf } from "./problems.js";
 
 const ids = IDS_40;
+
+/**
+ * An element 4.0 may leave unnamed, labelled by its id when it states one,
+ * else by what it relates, so a problem with an id-less one still says
+ * which it is.
+ */
+const byIdOr = (noun: string, relates: (raw: unknown) => string | undefined) =>
+  elementOf({
+    noun,
+    badTag: "",
+    describe: (raw: unknown): ElementLabel => {
+      const id = raw !== null && typeof raw === "object"
+        ? (raw as Record<string, unknown>).id
+        : undefined;
+      if (typeof id === "string" && id !== "") return { label: `${noun} "${id}"`, identity: id };
+      const what = raw !== null && typeof raw === "object" ? relates(raw) : undefined;
+      return what !== undefined
+        ? { label: `${noun} ${what}`, identity: what }
+        : { label: `${noun} with no id`, identity: "" };
+    },
+  });
 const ruled = <S extends Schema.Top>(struct: S): S => struct.check(ids.mintedRule as never) as S;
 
 const lists = constraintListsOf(constraintKindFiles(ids));
@@ -53,7 +77,12 @@ const SubtypeFactFile = ruled(
     supertype: ids.objectTypeRef,
     provides_identification: Schema.optionalKey(Flag),
     defining_rule: Schema.optionalKey(DerivationFile),
-  }).annotate(element("Subtype fact", "id")),
+  }).annotate(byIdOr("Subtype fact", (raw) => {
+    const { subtype, supertype } = raw as { subtype?: unknown; supertype?: unknown; };
+    return typeof subtype === "string" && typeof supertype === "string"
+      ? `of "${subtype}" under "${supertype}"`
+      : undefined;
+  })),
 );
 
 const ObjectifiedFactTypeFile = ruled(
@@ -61,7 +90,10 @@ const ObjectifiedFactTypeFile = ruled(
     ...ids.minted,
     fact_type: ids.factType,
     object_type: ids.objectTypeRef,
-  }).annotate(element("Objectified fact type", "id")),
+  }).annotate(byIdOr("Objectified fact type", (raw) => {
+    const { fact_type } = raw as { fact_type?: unknown; };
+    return typeof fact_type === "string" ? `of "${fact_type}"` : undefined;
+  })),
 );
 
 const FactInstanceFile = Schema.Struct({
@@ -85,7 +117,8 @@ const PopulationFile = Schema.Struct({
 );
 
 const DiagramFile = Schema.Struct({
-  name: nonEmpty(""),
+  // Not blank, as `addDiagramLayout` refuses a blank name.
+  name: notBlank(""),
   elements: Schema.optionalKey(Schema.Array(ids.elementInList)),
   positions: Schema.optionalKey(
     Schema.Record(Schema.String, Schema.Struct({ x: Integer, y: Integer })),
@@ -145,22 +178,36 @@ export interface DecodedDocument40 {
 }
 
 /**
- * The configs: 3.0's mapping, which reads only fields the two formats
- * share (`minted_from` and `imports` are not among them), with the
- * header's `imports` added. An id the file leaves out maps to an id of
- * `undefined`, which the model names as it names an absent one.
+ * The configs. Object types, fact types and constraints go through 3.0's
+ * mappings, which their shared builders make the same shape in both
+ * formats but for a constraint's id, which 4.0 may leave out: that one
+ * cast is the boundary, and `DecodedDocument40` types the id as optional.
+ * Everything else maps through `smallElementConfigs`, typed for both.
  */
 function document40Configs(file: (typeof Document40File)["Type"]): DecodedDocument40 {
-  // The one boundary where a 4.0 value is read as 3.0's type: every field
-  // `documentConfigs` reads has the same shape in both, except an id 4.0
-  // may leave out, which `DecodedDocument40` types as optional.
-  const configs = documentConfigs(
-    file as unknown as DocumentFileValue,
-  ) as unknown as DecodedDocument40;
-  const imports = file.model.imports;
-  return imports === undefined
-    ? configs
-    : { ...configs, header: { ...configs.header, imports: { ...imports } } };
+  const m = file.model;
+  const shared = documentConfigs({
+    orm_version: "3.0",
+    model: {
+      name: m.name,
+      ...(m.object_types !== undefined ? { object_types: m.object_types } : {}),
+      ...(m.fact_types !== undefined ? { fact_types: m.fact_types } : {}),
+      ...(m.constraints !== undefined ? { constraints: m.constraints } : {}),
+    },
+  } as unknown as DocumentFileValue);
+  return {
+    header: {
+      name: m.name,
+      ...(m.domain_context !== undefined ? { domainContext: m.domain_context } : {}),
+      ...(m.namespace !== undefined ? { namespace: m.namespace } : {}),
+      ...(m.note !== undefined ? { note: m.note } : {}),
+      ...(m.imports !== undefined ? { imports: { ...m.imports } } : {}),
+    },
+    objectTypes: shared.objectTypes,
+    factTypes: shared.factTypes as DecodedDocument40["factTypes"],
+    constraints: shared.constraints as DecodedDocument40["constraints"],
+    ...smallElementConfigs(m),
+  };
 }
 
 const decodeFile = decoderFor(Document40File);

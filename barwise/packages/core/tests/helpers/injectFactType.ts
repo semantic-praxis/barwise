@@ -8,7 +8,7 @@
  */
 import type { FactType } from "../../src/model/FactType.js";
 import type { IdIndex } from "../../src/model/idIndex.js";
-import type { OrmModel } from "../../src/model/OrmModel.js";
+import { idsWithin, type OrmModel } from "../../src/model/OrmModel.js";
 
 interface ModelInternals {
   readonly _factTypes: { set(ft: FactType): void; };
@@ -19,7 +19,6 @@ interface ModelInternals {
 export function injectFactType(model: OrmModel, ft: FactType): void {
   const m = model as unknown as ModelInternals;
   m._factTypes.set(ft);
-  for (const r of ft.roles) m._ids.hold(r.id, "role");
-  for (const c of ft.internalConstraints) m._ids.hold(c.id, "constraint");
+  for (const [id, kind] of idsWithin(ft)) m._ids.hold(id, kind);
   ft.joinModel(m._admission);
 }

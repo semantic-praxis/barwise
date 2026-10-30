@@ -30,12 +30,15 @@ const KEPT_ASCII = /[A-Za-z0-9\-_~!$&'()*+,;=@]/;
  * One character of a local name, as a regular-expression source: a kept
  * ASCII character, a percent-encoded byte as `localName` writes it
  * (upper-case hex), or an RFC 3987 `ucschar` less the bidirectional
- * formatting characters (`isUcschar` below). Format 4.0's JSON Schema
+ * formatting characters (`isUcschar` below) and the spaces `localName`
+ * splits words on. Format 4.0's JSON Schema
  * states the same patterns, and `localNamePattern.test.ts` holds the two
  * together and checks that every `localName` output matches.
  */
 const LOCAL_NAME_CHAR = "(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}"
-  + "|[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF"
+  // `(?!\s)`: `localName` splits words on `\s`, which takes Unicode spaces
+  // inside ucschar (U+00A0, U+2000 to U+200A, U+3000), so none is kept.
+  + "|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF"
   + "\\uF900-\\uFDCF\\uFDF0-\\uFFEF"
   + Array.from({ length: 14 }, (_, i) => {
     const plane = (i + 1).toString(16).toUpperCase();

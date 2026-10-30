@@ -1505,7 +1505,11 @@ sites.
       and objectifications (decision 19) and `minted_from` stored; the
       model-level cross-kind refusal; the 4.0 writer; the 3.x and 2.0
       replay with its in-memory id map for diff, and `planRead`'s two
-      legacy slots; and the fixture and golden churn.
+      legacy slots; and the fixture and golden churn. Required test, from
+      6b-2b-1's review: a lenient 4.0 load of an element whose sentence
+      cannot be minted (a dangling reference) gives the same model on every
+      read, because decision 19 leaves it unnamed; 6b-2b-1 still gives it
+      6b-2a's generated id, which is why that reader stays unwired.
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
   `imports`.

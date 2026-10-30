@@ -138,6 +138,7 @@ const CASES: [string, (d: Record<string, any>) => void, boolean][] = [
   ["a space in an object type id", (d) => (d.model.object_types[0].id = "Per son"), false],
   ["an alias on a fact type id", (d) => (d.model.fact_types[0].id = "crm:Smokes"), false],
   ["two aliases", (d) => (d.model.subtype_facts[0].subtype = "a:b:c"), false],
+  ["a no-break space in an id", (d) => (d.model.object_types[0].id = "Per\u00A0son"), false],
   ["a lower-case escape", (d) => (d.model.object_types[0].id = "v1%2e2"), false],
   ["a population id of one part", (d) => (d.model.populations[0].id = "pop"), false],
   ["an instance id of two parts", (d) => {

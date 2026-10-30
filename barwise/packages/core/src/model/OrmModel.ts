@@ -50,7 +50,7 @@ const quoted = (text: string): string => JSON.stringify(text);
  * the store's to hold). One list for the add and the removal, so the
  * index takes and gives back the same ids.
  */
-function idsWithin(ft: FactType): [string | undefined, IdKind][] {
+export function idsWithin(ft: FactType): [string | undefined, IdKind][] {
   return [
     ...ft.roles.map((r): [string, IdKind] => [r.id, "role"]),
     ...ft.internalConstraints.map((c): [string | undefined, IdKind] => [c.id, "constraint"]),

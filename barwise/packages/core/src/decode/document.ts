@@ -30,6 +30,7 @@ import {
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { DerivationFile, derivationRule } from "./derivation.js";
 import { type DecodedFactType, factTypeConfig, FactTypeFile } from "./factType.js";
+import { IDS_30 } from "./ids.js";
 import { Flag, Integer, Name, nonEmpty, notBlank, Text } from "./leaves.js";
 import { type DecodedObjectType, ObjectTypeFile, toRecord } from "./objectType.js";
 import { type ElementLabel, elementOf } from "./problems.js";
@@ -54,27 +55,27 @@ export const element = (noun: string, key: string, labelled?: string) =>
 // -- The remaining elements -------------------------------------------------
 
 const SubtypeFactFile = Schema.Struct({
-  id: nonEmpty(""),
-  subtype: nonEmpty(""),
-  supertype: nonEmpty(""),
+  ...IDS_30.minted,
+  subtype: IDS_30.objectTypeRef,
+  supertype: IDS_30.objectTypeRef,
   provides_identification: Schema.optionalKey(Flag),
   defining_rule: Schema.optionalKey(DerivationFile),
 }).annotate(element("Subtype fact", "id"));
 
 const ObjectifiedFactTypeFile = Schema.Struct({
-  id: nonEmpty(""),
-  fact_type: nonEmpty(""),
-  object_type: nonEmpty(""),
+  ...IDS_30.minted,
+  fact_type: IDS_30.factType,
+  object_type: IDS_30.objectTypeRef,
 }).annotate(element("Objectified fact type", "id"));
 
 const FactInstanceFile = Schema.Struct({
-  id: nonEmpty(""),
-  role_values: Schema.Record(Schema.String, Text),
+  id: IDS_30.instance,
+  role_values: Schema.Record(IDS_30.roleKey, Text),
 }).annotate(element("Fact instance", "id"));
 
 const PopulationFile = Schema.Struct({
-  id: nonEmpty(""),
-  fact_type: nonEmpty(""),
+  id: IDS_30.population,
+  fact_type: IDS_30.factType,
   description: Schema.optionalKey(Text),
   sample: Schema.optionalKey(Flag),
   instances: Schema.Array(FactInstanceFile),
@@ -108,7 +109,7 @@ export const OrientationFile = Schema.Literals(ORIENTATIONS).annotate({
 const DiagramFile = Schema.Struct({
   // Not blank, as `addDiagramLayout` refuses a blank name.
   name: notBlank(""),
-  elements: Schema.optionalKey(Schema.Array(nonEmpty(" (an element)"))),
+  elements: Schema.optionalKey(Schema.Array(IDS_30.elementInList)),
   positions: Schema.optionalKey(
     Schema.Record(Schema.String, Schema.Struct({ x: Integer, y: Integer })),
   ),
@@ -208,15 +209,49 @@ export function documentConfigs(file: DocumentFileValue): DecodedDocument {
     objectTypes: (m.object_types ?? []).map(toRecord),
     factTypes: (m.fact_types ?? []).map(factTypeConfig),
     constraints: (m.constraints ?? []).map(constraintRecord),
+    ...smallElementConfigs(m),
+  };
+}
+
+/** What the two formats state alike past their ids: an id may be absent only in 4.0. */
+interface SmallElementsFile {
+  readonly subtype_facts?: readonly {
+    readonly id?: string;
+    readonly subtype: string;
+    readonly supertype: string;
+    readonly provides_identification?: boolean;
+    readonly defining_rule?: (typeof DerivationFile)["Type"];
+  }[];
+  readonly objectified_fact_types?: readonly {
+    readonly id?: string;
+    readonly fact_type: string;
+    readonly object_type: string;
+  }[];
+  readonly populations?: DocumentFileValue["model"]["populations"];
+  readonly definitions?: DocumentFileValue["model"]["definitions"];
+  readonly diagrams?: DocumentFileValue["model"]["diagrams"];
+}
+
+/**
+ * The configs of the elements past the object types, fact types and
+ * constraints, for either format: an id the file leaves out is left out,
+ * and the model names the element.
+ */
+export function smallElementConfigs(m: SmallElementsFile): Pick<
+  DecodedDocument,
+  "subtypeFacts" | "objectifiedFactTypes" | "populations" | "definitions" | "diagrams"
+> {
+  const statedId = (id: string | undefined) => (id !== undefined ? { id } : {});
+  return {
     subtypeFacts: (m.subtype_facts ?? []).map((sf) => ({
-      id: sf.id,
+      ...statedId(sf.id),
       subtypeId: sf.subtype,
       supertypeId: sf.supertype,
       providesIdentification: sf.provides_identification ?? true,
       ...(sf.defining_rule !== undefined ? { definingRule: derivationRule(sf.defining_rule) } : {}),
     })),
     objectifiedFactTypes: (m.objectified_fact_types ?? []).map((o) => ({
-      id: o.id,
+      ...statedId(o.id),
       factTypeId: o.fact_type,
       objectTypeId: o.object_type,
     })),
