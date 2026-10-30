@@ -15,11 +15,16 @@
  * role the fact type lacks, as `validateReadingTemplate` has it. It reads
  * two fields, so it is a rule the harness runs, reported at each reading at
  * fault beside the fact type's other problems -- #672 ran it on the raw
- * input after every decode instead. It is skipped where `roles` or
- * `readings` is not a list, and passes over a reading that is not a
- * string or is blank, which its own leaf refuses, so the other readings are
- * still judged (review of R3). With no roles it says nothing: the roles
- * list's minimum is the problem, and every reading would only repeat it.
+ * input after every decode instead. Like every rule, it is skipped where a
+ * field it reads is of the wrong kind: `roles` or `readings` not a list,
+ * or a reading not a string. Today's loader reports no more than that: its
+ * schema refuses the reading and the constructor, which checks the
+ * placeholders, never runs. A reading that is not a string comes from an
+ * unquoted `{0}` in YAML, which a formatter or the writer prevents, so the
+ * harness carries no special case for it (owner's call, 2026-10-30). A
+ * blank reading is its leaf's, and the rule passes over it. With no roles
+ * it says nothing: the roles list's minimum is the problem, and every
+ * reading would only repeat it.
  *
  * Nothing on the load path calls this until R4.
  */
@@ -73,16 +78,18 @@ const DerivationFile = Schema.Struct({
 
 /**
  * Each reading names every role at least once, and no role the fact type lacks: one
- * problem per reading at fault, in the constructor's words. A reading that
- * is not a string, or is blank, is its leaf's to report and is passed over,
- * so the others are still judged.
+ * problem per reading at fault, in the constructor's words. A blank reading
+ * is its leaf's to report and is passed over, so the others are still
+ * judged.
  */
 const readingsFitRoles = crossField(
-  { id: "readings-fit-roles", reads: ["readings", "roles"], guards: ["readings.*"] },
+  { id: "readings-fit-roles", reads: ["readings.*", "roles"] },
   (ft: { readonly roles: readonly unknown[]; readonly readings: readonly unknown[]; }) => {
     // No roles is the roles list's problem; every reading would only repeat it.
     if (ft.roles.length === 0) return true;
     const issues = ft.readings.flatMap((template, i) => {
+      // Every reading is a string here (the harness skips the rule otherwise);
+      // the test only narrows the type.
       if (typeof template !== "string" || template.trim() === "") return [];
       const errors = validateReadingTemplate(template, ft.roles.length);
       return errors.length === 0 ? [] : [{

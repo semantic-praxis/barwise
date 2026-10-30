@@ -984,15 +984,17 @@ still off the load path.
   value to the `FactTypeConfig` `deserializeFactType` builds, its
   constraints R2's records: the `FactType` class still builds the element.
 - The reading rule is a harness check on the Schema, reported at each
-  reading at fault whatever else is wrong with the fact type; a blank
-  reading is its own leaf's, as the constructor refuses it. A reading that
-  is not a string is passed over and the others still judged: the rule
-  declares `readings.*` as a guard (`CrossFieldMark.guards`), a read it
-  checks the kind of itself, which the reads check holds like any other
-  but which does not suspend the rule. With no roles the rule says
-  nothing, leaving it to the roles list's minimum, so
-  `fact-type-without-roles` no longer carries the consequence R0's notes
-  declared.
+  reading at fault beside the fact type's other problems; a blank reading
+  is its own leaf's, as the constructor refuses it. Like every rule it is
+  skipped where a field it reads is of the wrong kind, so a reading that is
+  not a string suspends it for the other readings. That is no less than
+  today's loader reports: its schema refuses the reading, and the
+  constructor that checks placeholders never runs. Owner's call
+  (2026-10-30): such a reading comes from an unquoted `{0}` in YAML, a
+  lint and format problem the tools already handle, so the harness carries
+  no mechanism for it. With no roles the rule says nothing, leaving it to
+  the roles list's minimum, so `fact-type-without-roles` no longer carries
+  the consequence R0's notes declared.
 - The misplacement sentence now names the enclosing fact type through
   `messageWithin`, and a test compares it with today's: for every kind that
   lives in the model, with a string id, an empty one, a numeric or boolean
@@ -1040,8 +1042,11 @@ still off the load path.
   Declined: one guard for both list minimums, since the operands' narrows
   to a tuple and a role list's must not, or S3 fails.
 - The pre-merge review's `/code-review` (its second pass) found the
-  reading rule suspended by one non-string reading a second time, now
-  fixed by `guards`; the reading rule repeating an empty roles list for
+  reading rule suspended by one non-string reading a second time; a
+  `guards` field that let a rule pass over such an item was tried, and
+  its third pass found it unenforced at run time and invisible to the reads
+  check, so it was removed on the owner's call above. The same pass found
+  the reading rule repeating an empty roles list for
   every reading; that dropping a numeric id from the label, done for the
   sentence's sake, cost every other problem of that constraint its name,
   so it was reverted and the sentence's difference stated instead; and the

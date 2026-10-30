@@ -11,13 +11,7 @@ import type * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import { ExternalConstraintFile, InternalConstraintFile } from "../../src/decode/constraint.js";
 import { CONSTRAINT_TYPES, placementOf } from "../../src/model/Constraint.js";
-import {
-  declaredReads,
-  keysRead,
-  markedChecks,
-  nodesOf,
-  reportedPaths,
-} from "../helpers/decodeHarness.js";
+import { keysRead, markedChecks, nodesOf, reportedPaths } from "../helpers/decodeHarness.js";
 import { derivedConstraints } from "../helpers/derivedConstraints.js";
 import { corpusConstraints } from "../helpers/modelCorpus.js";
 
@@ -233,7 +227,7 @@ describe("the cross-field harness, over constraints", () => {
 
   it("runs each rule only on fields it declares it reads", () => {
     for (const { node, check, mark } of marked) {
-      expect([mark.id, keysRead(check, node)]).toEqual([mark.id, declaredReads(mark)]);
+      expect([mark.id, keysRead(check, node)]).toEqual([mark.id, [...mark.reads].sort()]);
     }
   });
 

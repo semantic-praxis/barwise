@@ -68,16 +68,6 @@ export const markedChecks = (ast: SchemaAST.AST): MarkedCheck[] =>
     })
   );
 
-/**
- * What a mark says its rule reads, in `keysRead`'s terms: its `reads` and
- * `guards` together, the deepest paths only (`readings` with
- * `readings.*` is `readings.*`).
- */
-export function declaredReads(mark: CrossFieldMark): string[] {
-  const all = [...mark.reads, ...(mark.guards ?? [])];
-  return [...new Set(all)].filter((p) => !all.some((q) => q !== p && q.startsWith(`${p}.`))).sort();
-}
-
 type Fill = "absent" | "number" | "string" | "shaped";
 const FILLS: readonly Fill[] = ["absent", "number", "string", "shaped"];
 

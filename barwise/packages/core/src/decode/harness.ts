@@ -40,14 +40,6 @@ export interface CrossFieldMark {
    * or of the wrong kind.
    */
   readonly reads: readonly string[];
-  /**
-   * Fields the rule also reads but checks the kind of itself, so one of
-   * the wrong kind does not suspend it: a list it judges item by item,
-   * passing over an item that is not what it judges (`readings.*`, whose
-   * non-string reading is its leaf's to report). Held to what the rule
-   * reads by the same test as `reads` (review of R3).
-   */
-  readonly guards?: readonly string[];
 }
 
 /**

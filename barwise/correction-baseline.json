@@ -265,12 +265,6 @@
       "caught_by": "execution",
       "note": "Re-reading the live API after the merge. The first draft asserted GitHub's releases-list sort key was 'measurably neither created_at nor published_at', on the pre-merge reading alone. Running it again after the tag moved showed created_at DID follow the tag (2026-06-14T21:45:35Z -> 2026-09-22T18:40:50Z) while published_at stayed frozen, and the position changed with it -- so the causal chain does run through created_at and the original phrasing overstated the negative. The correction narrows the claim to the chain rather than the full sort rule, because the historical ordering still is not explained by created_at desc alone. Caught by executing the same query twice, not by rethinking it."
     },
-    "effect-adoption::383d45a454f9": {
-      "spec": "effect-adoption.spec.md",
-      "excerpt": "- the fact type, its roles and its derivation in the file's own keys, with the fact type's constraints held by r2's internal list, so a fact type and its constr",
-      "caught_by": "execution",
-      "note": "R3's author-side /code-review (2026-10-30) ran a probe: readings [5, '{0} has {7}'] reported only the non-string reading, so factType.ts's doc claim that the reading rule ran 'whatever else is wrong' was false; the rule is skipped, as every harness rule is, where a reading is not a string. The doc now says so. The same pass found the numeric-id label differing from refuseMisplacedConstraints by probe; the parity test gained those ids. The pre-merge review's /code-review then found, by probe again, the rule still suspended by a non-string reading and repeating an empty roles list; both fixed (guards, and no reading report without roles). (Row id changed when those notes were added, 2026-10-30.)"
-    },
     "effect-adoption::590954cb0e90": {
       "spec": "effect-adoption.spec.md",
       "excerpt": "1. effect types in core's public api -- resolved 2026-10-15 by the owner: exported. alternative and trade-off under alternatives considered. consequence carried",
@@ -300,6 +294,12 @@
       "excerpt": "- changed scope: the two misplacement cases are not s4 cases. their refusal names the constraint and its home, not a field, so no field could be declared that t",
       "caught_by": "reasoning",
       "note": "Found while writing the cases: a misplacement refusal names the constraint and its home, not a field, so S4 could not score it; format30.test.ts already pins its wording."
+    },
+    "effect-adoption::dc18e9aad529": {
+      "spec": "effect-adoption.spec.md",
+      "excerpt": "- the fact type, its roles and its derivation in the file's own keys, with the fact type's constraints held by r2's internal list, so a fact type and its constr",
+      "caught_by": "execution",
+      "note": "R3's author-side /code-review (2026-10-30) ran a probe: readings [5, '{0} has {7}'] reported only the non-string reading, so factType.ts's doc claim that the reading rule ran 'whatever else is wrong' was false; the rule is skipped, as every harness rule is, where a reading is not a string. The doc now says so. The same pass found the numeric-id label differing from refuseMisplacedConstraints by probe; the parity test gained those ids. The pre-merge review's /code-review then found, by probe again, the rule still suspended by a non-string reading and repeating an empty roles list; the empty-roles repeat is fixed; a guards mechanism for the non-string reading was tried, found unenforced by the third pass, and removed on the owner's call that an unquoted reading is a lint and format problem. (Row id changed twice on 2026-10-30, as those notes were added and then revised.)"
     },
     "effect-comparison::149864007d79": {
       "spec": "effect-comparison.spec.md",
