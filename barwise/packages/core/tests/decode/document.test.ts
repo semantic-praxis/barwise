@@ -121,7 +121,12 @@ function decodersReading(doc: unknown): Reading {
 }
 
 describe("the document decoder, against the reader it replaced", () => {
-  it("accepts exactly the documents it accepted, drawn whole from the hand-written schema", () => {
+  // 3 s alone and 4.5 s under coverage, but CI ran it past the shared 30 s
+  // with every package in parallel on four cores (PR #873); the runs are
+  // the evidence, so the budget is what moves.
+  it("accepts exactly the documents it accepted, drawn whole from the hand-written schema", {
+    timeout: 120_000,
+  }, () => {
     let accepted = 0;
     fc.assert(
       fc.property(fromJsonSchema(schema as never, schema as never), (doc) => {
