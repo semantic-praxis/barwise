@@ -2,7 +2,7 @@
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
-restarted on format 3.0 2026-10-29 (1r), R0 to R2 done, R3 onward not started; WS1b
+restarted on format 3.0 2026-10-29 (1r), R0 to R3 done, R4 not started; WS1b
 follows the restart's WS1 reading; WS2 onward not started
 Created: 2026-10-15
 Last-updated: 2026-10-30
@@ -974,6 +974,100 @@ R2's head alike.
   list or on the fact type could produce only through a sentence-override
   hook, the same plumbing as `messageWithin` in another place; and the
   per-member guard is what narrows each list's decoded type.
+
+**R3, done 2026-10-30: fact types and roles**, in `core/src/decode/factType.ts`,
+still off the load path.
+
+- The fact type, its roles and its derivation in the file's own keys, with
+  the fact type's `constraints` held by R2's internal list, so a fact type
+  and its constraints decode in one pass. `factTypeConfig` maps a decoded
+  value to the `FactTypeConfig` `deserializeFactType` builds, its
+  constraints R2's records: the `FactType` class still builds the element.
+- The reading rule is a harness check on the Schema, reported at each
+  reading at fault beside the fact type's other problems; a blank reading
+  is its own leaf's, as the constructor refuses it. Like every rule it is
+  skipped where a field it reads is of the wrong kind, so a reading that is
+  not a string suspends it for the other readings. That is no less than
+  today's loader reports: its schema refuses the reading, and the
+  constructor that checks placeholders never runs. Owner's call
+  (2026-10-30): such a reading comes from an unquoted `{0}` in YAML, a
+  lint and format problem the tools already handle, so the harness carries
+  no mechanism for it. With no roles the rule says nothing, leaving it to
+  the roles list's minimum, so `fact-type-without-roles` no longer carries
+  the consequence R0's notes declared.
+- The misplacement sentence now names the enclosing fact type through
+  `messageWithin`, and a test compares it with today's: for every kind that
+  lives in the model, with a string id, an empty one, a numeric or boolean
+  one and none, the decoder's problems hold `refuseMisplacedConstraints`'s
+  sentence exactly, under a fact type whose name is as the model stores it.
+  The copy barwise-ehl tracks is therefore checked until R4 deletes the old
+  one. Two differences are deliberate, each on input refused either way:
+  a numeric or boolean id labels the constraint, where today's sentence
+  leaves it out, since the label serves every problem the constraint has;
+  and a blank or absent fact type name, where only today's sentence says
+  "undefined". A name with surrounding space is trimmed, as the model
+  stores it.
+- Agreement with `main`, both ways: 2,000 fact types drawn from the
+  hand-written schema, half given readings that name each role, and the
+  decoder accepts exactly what today's schema and the `FactType` constructor
+  accept (660 of them valid), to the same config; all 1,515 corpus fact
+  types decode to today's config. The 17 3.0 fact type cases, the 11
+  constraint cases among them, are refused at their declared path, with
+  `fact-type-without-roles`'s declared consequence (R0's notes) and
+  `frequency-max-below-min` loading as on `main`.
+- Changed scope: barwise-f9t, R2's review details, landed here, since R3
+  reuses those modules: the kind table is total over `Constraint["type"]`,
+  `crossField` takes extra annotations and has a guard form that every
+  marked rule goes through, a maximum's refusal names "unbounded", an id or
+  role id that is not a string is refused as such, and the constraint's
+  label matches `refuseMisplacedConstraints` for a string, empty or absent
+  id.
+- Found while building it: annotating a checked Schema annotates its last
+  check, not the node, so the walk labelled the fact type's problems "The
+  document". The annotation goes before the check, and a test refuses an
+  element annotation on any check in any of the decoders' Schemas.
+- The reads check fills each field with a value of the Schema's own shape
+  as well as with nothing and the wrong kinds, so a rule that calls a
+  list's methods (`readings.flatMap`) meets a list.
+- The author-side review found no design flaw and these details, each now
+  a test or fixed: a numeric id was labelled where today's sentence leaves
+  it out, so the label now leaves out any id that is not a string (which
+  reverses R2's review on that point, for the copy's sake); the module's
+  doc claimed the reading rule ran whatever else was wrong, where it is
+  skipped, as every rule is, when a reading is not a string; the reads
+  check had stopped varying a list's items, and a list rule branching on
+  an item's field is now shown to be followed; free text and flags have
+  their own wrong-type wording; the object type and fact type share one
+  name-or-id labeller, and a name and a reading one non-blank leaf.
+  Declined: one guard for both list minimums, since the operands' narrows
+  to a tuple and a role list's must not, or S3 fails.
+- The pre-merge review's `/code-review` (its second pass) found the
+  reading rule suspended by one non-string reading a second time; a
+  `guards` field that let a rule pass over such an item was tried, and
+  its third pass found it unenforced at run time and invisible to the reads
+  check, so it was removed on the owner's call above. The same pass found
+  the reading rule repeating an empty roles list for
+  every reading; that dropping a numeric id from the label, done for the
+  sentence's sake, cost every other problem of that constraint its name,
+  so it was reverted and the sentence's difference stated instead; and the
+  free-text and flag leaves adopted everywhere (object type, ranges,
+  values). Each fix has a test that fails with it planted back.
+
+**R3's readings.** M1 for fact types reads no: `Arbitrary.schema` over the
+fact type Schema generates nothing (0 values, 201 discards at sizes 3 and
+10), because a derived reading almost never names each role, so the
+reading rule discards every value. The construct is the reading rule, a
+filter over two fields that derivation can only apply by rejection; a
+fact type generator needs readings built from its roles, which is WS1b
+part D's question, not a gate. S1, S5 and S6 are unchanged by
+construction, as for R1 and R2.
+
+- Planted against, each failing its test: the reading rule declaring too
+  little, the rule off (twice: agreement and harness), a blank reading
+  accepted, blank names accepted, the default storage dropped, a note
+  dropped, the constraints unchecked, the fact type labelled by id only, a
+  maximum's message without "unbounded", ids with no wrong-type message,
+  an empty id labelled as none, and the element annotation after the check.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,

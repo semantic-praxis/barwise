@@ -76,4 +76,20 @@ describe("keysRead", () => {
     expect(readsOf(S)[0]).not.toEqual(mark.reads);
     expect(readsOf(S)).toEqual([["operand.path.root", "ring_type"]]);
   });
+
+  it("follows a list rule down each branch of an item's field (review of R3)", () => {
+    // Declared too little: it reads *.a as well when an item's type is a number.
+    const L = Schema.Array(
+      Schema.Struct({ type: Schema.String, a: Schema.String, b: Schema.String }),
+    )
+      .check(
+        crossField(
+          { id: "branching", reads: ["*.type", "*.b"] },
+          (items: readonly { readonly type: unknown; readonly a: string; readonly b: string; }[]) =>
+            items.every((i) => (typeof i.type === "number" ? i.a : i.b) !== ""),
+          "m",
+        ),
+      );
+    expect(readsOf(L)).toEqual([["*.a", "*.b", "*.type"]]);
+  });
 });

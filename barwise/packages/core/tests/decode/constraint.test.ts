@@ -306,3 +306,69 @@ describe("a constraint that is not a mapping", () => {
     ]]);
   });
 });
+
+describe("each refusal in its own words (barwise-f9t)", () => {
+  const messages = (where: Where, value: unknown) => {
+    try {
+      run(where, [value]);
+      return [];
+    } catch (e) {
+      return (e as DecodeError).problems.map((p) => p.message);
+    }
+  };
+
+  it.each(
+    [
+      [
+        "a maximum below its minimum names the alternative",
+        "internal",
+        { id: "f", type: "frequency", role: "r", min: 1, max: 0 },
+        'The frequency constraint "f": max must be an integer of at least 1 or "unbounded".',
+      ],
+      [
+        "a negative maximum names it too",
+        "internal",
+        { id: "k", type: "cardinality", role: "r", min: 0, max: -1 },
+        'The cardinality constraint "k": max must be a non-negative integer or "unbounded".',
+      ],
+      [
+        "a role id that is not a string",
+        "external",
+        { id: "x", type: "exclusion", roles: [5, "b"] },
+        'The exclusion constraint "x": roles.0 must be a string (a role id).',
+      ],
+      [
+        "an id of the wrong type, by which the constraint is still named",
+        "external",
+        { id: 7, type: "subset", subset_roles: ["a"], superset_roles: ["b"] },
+        "The subset constraint with id 7: id must be a string.",
+      ],
+      [
+        "an empty id, quoted",
+        "internal",
+        { id: "", type: "mandatory", role: "r" },
+        'The mandatory constraint "": id must not be empty.',
+      ],
+      [
+        "an absent id, by the kind alone",
+        "internal",
+        { type: "mandatory", role: "r" },
+        "The mandatory constraint: id is missing: a 3.0 file states every constraint's id.",
+      ],
+      [
+        "a range's bound that is not a string",
+        "internal",
+        { id: "v", type: "value_constraint", ranges: [{ min: 1 }] },
+        'The value_constraint constraint "v": ranges.0.min must be a string.',
+      ],
+      [
+        "a range's flag that is not one",
+        "internal",
+        { id: "v", type: "value_constraint", ranges: [{ min: "1", min_inclusive: "no" }] },
+        'The value_constraint constraint "v": ranges.0.min_inclusive must be true or false.',
+      ],
+    ] as const,
+  )("%s", (_, where, value, message) => {
+    expect(messages(where, value)).toEqual([message]);
+  });
+});
