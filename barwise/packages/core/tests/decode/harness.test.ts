@@ -16,14 +16,9 @@
  */
 import * as Arbitrary from "effect/Arbitrary";
 import * as Effect from "effect/Effect";
-import * as Result from "effect/Result";
-import * as Schema from "effect/Schema";
-import type * as SchemaAST from "effect/SchemaAST";
 import { describe, expect, it } from "vitest";
-import { DECODE_OPTIONS } from "../../src/decode/decoder.js";
-import { markOf } from "../../src/decode/harness.js";
 import { ObjectTypeFile } from "../../src/decode/objectType.js";
-import { fieldPath, problemsOf } from "../../src/decode/problems.js";
+import { keysRead, markedChecks, nodesOf, reportedPaths } from "../helpers/decodeHarness.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
 type Doc = Record<string, unknown>;
@@ -101,68 +96,8 @@ const inputs: Doc[] = [
   ) as unknown as Doc[]),
 ];
 
-const decode = Schema.decodeUnknownEffect(ObjectTypeFile, DECODE_OPTIONS);
-
 /** Every path a decode reports, through the shell's own walk, harness on or off. */
-function reported(doc: Doc, harness = true): string[] {
-  const result = Effect.runSync(Effect.result(decode(doc)));
-  if (Result.isSuccess(result)) return [];
-  return problemsOf(result.failure.issue, doc, { harness }).map((p) => fieldPath(p.path)).sort();
-}
-
-/** Every node of a Schema, through every child the harness walks. */
-function nodesOf(ast: SchemaAST.AST, seen = new Set<SchemaAST.AST>()): SchemaAST.AST[] {
-  if (seen.has(ast)) return [];
-  seen.add(ast);
-  const children: SchemaAST.AST[] = ast._tag === "Objects"
-    ? [...ast.propertySignatures.map((ps) => ps.type), ...ast.indexSignatures.map((i) => i.type)]
-    : ast._tag === "Arrays"
-    ? [...ast.elements, ...ast.rest]
-    : ast._tag === "Union"
-    ? [...ast.types]
-    : ast._tag === "Suspend"
-    ? [ast.thunk()]
-    : [];
-  return [ast, ...children.flatMap((child) => nodesOf(child, seen))];
-}
-
-const markedChecks = (ast: SchemaAST.AST) =>
-  nodesOf(ast).flatMap((node) =>
-    (node.checks ?? []).flatMap((check) => {
-      const mark = markOf(check);
-      return mark && check._tag === "Filter" ? [{ node, check, mark }] : [];
-    })
-  );
-
-/**
- * The keys a check reads of the value it runs on, recorded through a proxy
- * over each of a few values: absent, a number, a string, so a predicate
- * that branches on what it reads is followed down each branch.
- */
-function keysRead(
-  check: { run: (v: unknown, ast: SchemaAST.AST, o: object) => unknown; },
-  node: SchemaAST.AST,
-) {
-  const read = new Set<string>();
-  for (const fill of [undefined, 1, "x"]) {
-    const proxy = new Proxy({}, {
-      get: (_, key) => {
-        if (typeof key === "string") read.add(key);
-        return fill;
-      },
-      has: (_, key) => {
-        if (typeof key === "string") read.add(key);
-        return fill !== undefined;
-      },
-    });
-    try {
-      check.run(proxy, node, {});
-    } catch {
-      // A predicate that cannot read a filler value still recorded what it read.
-    }
-  }
-  return [...read].sort();
-}
+const reported = (doc: Doc, harness = true) => reportedPaths(ObjectTypeFile, doc, harness);
 
 describe("the cross-field harness", () => {
   it("starts from inputs that all decode", () => {

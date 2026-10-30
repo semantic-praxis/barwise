@@ -9,6 +9,7 @@ import type * as SchemaAST from "effect/SchemaAST";
 import { describe, expect, it } from "vitest";
 import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import { ObjectTypeFile } from "../../src/decode/objectType.js";
+import { fields } from "../helpers/schemaFields.js";
 
 type JsonObject = {
   properties?: Record<string, unknown>;
@@ -23,22 +24,6 @@ const deref = (node: unknown): JsonObject => {
   const ref = (node as JsonObject).$ref;
   return ref ? defs[ref.replace("#/definitions/", "")]! : (node as JsonObject);
 };
-
-/** A struct's fields as the Schema states them. */
-function fields(ast: SchemaAST.AST) {
-  if (ast._tag !== "Objects") throw new Error(`not a struct: ${ast._tag}`);
-  const all = ast.propertySignatures.map((ps) => ({
-    name: String(ps.name),
-    type: ps.type,
-    optional: ps.type.context?.isOptional === true,
-  }));
-  return {
-    allowed: all.filter((f) => f.type._tag !== "Never").map((f) => f.name).sort(),
-    refused: all.filter((f) => f.type._tag === "Never").map((f) => f.name).sort(),
-    required: all.filter((f) => !f.optional).map((f) => f.name).sort(),
-    byName: new Map(all.map((f) => [f.name, f.type])),
-  };
-}
 
 const variant = (kind: string) =>
   (ObjectTypeFile.ast.types as readonly SchemaAST.AST[]).find((m) =>

@@ -26,77 +26,35 @@ import {
   type ConceptualDataTypeName,
   type ObjectType,
   VALUE_ONLY_FIELDS,
-  type ValueRange,
 } from "../model/ObjectType.js";
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { crossField } from "./harness.js";
+import {
+  intAtLeast,
+  nonEmpty,
+  rangeRecord,
+  RangesFile,
+  ValuesFile,
+  valuesOrRanges,
+} from "./leaves.js";
 import { type ElementLabel, elementOf } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
-
-// Every `message` below is the predicate of a sentence whose subject and
-// field path the decoder supplies:
-// `Entity type "Customer": reference_mode must not be empty.`
-
-const nonEmpty = (what: string) =>
-  Schema.String.check(Schema.isMinLength(1, { message: `must not be empty${what}.` }));
 
 /** A name `requireName` accepts: something left after trimming. */
 const Name = Schema.String.check(
   Schema.makeFilter((name: string) => name.trim() !== "", { message: "must not be blank." }),
 );
 
-/**
- * Any non-negative integer, as JSON Schema's `integer` reads one. Not
- * `Schema.Int`, which is `Number.isSafeInteger` and so refused 2^53 + 2,
- * which today's schema and constructor accept (review of R1).
- */
-const NonNegativeInt = Schema.Number.check(
-  Schema.makeFilter((n: number) => Number.isInteger(n) && n >= 0, {
-    message: "must be a non-negative integer.",
-  }),
-);
+const NonNegativeInt = intAtLeast(0);
 
 // -- Nested definitions -----------------------------------------------------
 
-/**
- * One allowed range of values. A range with neither bound states nothing,
- * so it needs a `min` or a `max`; each inclusive flag defaults to true.
- */
-const ValueRangeFile = Schema.Struct({
-  min: Schema.optionalKey(Schema.String),
-  max: Schema.optionalKey(Schema.String),
-  min_inclusive: Schema.optionalKey(Schema.Boolean),
-  max_inclusive: Schema.optionalKey(Schema.Boolean),
-}).check(
-  crossField(
-    { id: "value-range-bound", reads: ["min", "max"] },
-    (r: { readonly min?: string; readonly max?: string; }) =>
-      r.min !== undefined || r.max !== undefined,
-    "must have a min or a max.",
-  ),
-);
-
 /** Enumerated values, ranges, or both, and never neither. */
 const ValueConstraintFile = Schema.Struct({
-  values: Schema.optionalKey(
-    Schema.Array(Schema.String).check(
-      Schema.isMinLength(1, { message: "must list at least one value when present." }),
-    ),
-  ),
-  ranges: Schema.optionalKey(
-    Schema.Array(ValueRangeFile).check(
-      Schema.isMinLength(1, { message: "must list at least one range when present." }),
-    ),
-  ),
-}).check(
-  crossField(
-    { id: "value-constraint-content", reads: ["values", "ranges"] },
-    (vc: { readonly values?: readonly unknown[]; readonly ranges?: readonly unknown[]; }) =>
-      vc.values !== undefined || vc.ranges !== undefined,
-    "must have at least one value or range.",
-  ),
-);
+  values: Schema.optionalKey(ValuesFile),
+  ranges: Schema.optionalKey(RangesFile),
+}).check(valuesOrRanges);
 
 const DataTypeFile = Schema.Struct({
   name: Schema.Literals(CONCEPTUAL_DATA_TYPE_NAMES).annotate({
@@ -222,16 +180,6 @@ export interface DecodedObjectType {
   readonly record: ObjectType;
   /** An entity's `preferred_identifier`: the model stores it, not the record. */
   readonly preferredIdentifier?: string;
-}
-
-function rangeRecord(r: (typeof ValueRangeFile)["Type"]): ValueRange {
-  return {
-    ...(r.min !== undefined ? { min: r.min } : {}),
-    ...(r.max !== undefined ? { max: r.max } : {}),
-    // A flag the file states true is the default, which the record leaves out.
-    ...(r.min_inclusive === false ? { minInclusive: false } : {}),
-    ...(r.max_inclusive === false ? { maxInclusive: false } : {}),
-  };
 }
 
 /**

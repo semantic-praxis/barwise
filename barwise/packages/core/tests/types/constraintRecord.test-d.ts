@@ -1,15 +1,17 @@
 /**
- * The S3 harness bites (docs/specs/effect-adoption.spec.md).
+ * Gate S3 (docs/specs/effect-adoption.spec.md), and the harness that makes
+ * it bite.
  *
- * On `main` there is no derived type yet, so these check two things. The
- * frozen `ConstraintRecord` agrees with `src/` today, once barwise-973's two
- * narrowings are applied to today's union -- the drift check its comment
+ * S3 itself: the record the constraint decoder builds, whose type is derived
+ * from its Schemas (`DecodedConstraint`, R2), matches the frozen
+ * `ConstraintRecord` kind by kind. Beside it, two checks on the instrument.
+ * The frozen `ConstraintRecord` agrees with `src/` today, once barwise-973's
+ * two narrowings are applied to today's union -- the drift check its comment
  * names. And `KindsMatch` rejects a candidate widened in each way, missing a
- * kind, or carrying one extra. The spike adds one line:
- * `expectTypeOf<KindsMatch<Constraint>>().toEqualTypeOf<AllKindsMatch>()`,
- * where `Constraint` is by then the Schema-derived type.
+ * kind, or carrying one extra.
  */
 import { describe, expectTypeOf, it } from "vitest";
+import type { DecodedConstraint } from "../../src/decode/constraint.js";
 import type { Constraint, ConstraintModality, JoinOperand } from "../../src/model/Constraint.js";
 import type { AllKindsMatch, ConstraintRecord, KindsMatch } from "./constraintRecord.js";
 
@@ -32,6 +34,12 @@ type Of<C, K extends ConstraintRecord["type"]> = Extract<C, { readonly type: K; 
 type Replace<K extends ConstraintRecord["type"], Member> =
   | Exclude<ConstraintRecord, { readonly type: K; }>
   | Member;
+
+describe("S3: the decoder's record", () => {
+  it("is ConstraintRecord, kind by kind", () => {
+    expectTypeOf<KindsMatch<DecodedConstraint>>().toEqualTypeOf<AllKindsMatch>();
+  });
+});
 
 describe("ConstraintRecord", () => {
   it("agrees with src/ today, once barwise-973's narrowings are applied", () => {
