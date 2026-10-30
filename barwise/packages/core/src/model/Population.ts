@@ -21,7 +21,7 @@ export interface FactInstance {
  * Configuration for creating a new FactInstance.
  */
 export interface FactInstanceConfig {
-  /** Optional stable identifier. Generated if omitted. */
+  /** Optional stable identifier. If omitted, `<population>.N`, the next number. */
   readonly id?: string;
   /** Role ID to value mapping. */
   readonly roleValues: Record<string, string>;
@@ -31,7 +31,7 @@ export interface FactInstanceConfig {
  * Configuration for creating a new Population.
  */
 export interface PopulationConfig {
-  /** Optional stable identifier. Generated if omitted. */
+  /** Optional stable identifier. In a model, `<fact type>.population` if omitted; standalone, generated. */
   readonly id?: string;
   /** The id of the fact type this population samples. */
   readonly factTypeId: string;
@@ -112,8 +112,12 @@ export class Population {
   private createInstance(config: FactInstanceConfig): FactInstance {
     const prefix = `${this.id}.`;
     let id = config.id;
-    if (id === undefined) id = `${prefix}${this._next++}`;
-    else if (id.startsWith(prefix)) {
+    if (id === undefined) {
+      if (!Number.isSafeInteger(this._next + 1)) {
+        throw new Error(`Population "${this.id}" has no instance number left to give.`);
+      }
+      id = `${prefix}${this._next++}`;
+    } else if (id.startsWith(prefix)) {
       // Plain decimal only: `Number` also reads "1e21", "0x10" and " 3",
       // and a count past 2^53 stops moving, so every later instance would
       // take one id.

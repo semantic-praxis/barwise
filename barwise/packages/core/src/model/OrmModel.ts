@@ -656,11 +656,26 @@ export class OrmModel implements ConstraintModel {
     const constraints = (config.constraints ?? []).map((c) =>
       checkInternalConstraint(c, config.name)
     );
-    const id = config.id ?? this.mintedId(localName(config.name));
-    const ft = new FactType({ ...config, id, roles: this.namedRoles(config, id), constraints: [] });
+    // Every id the config states wins over a name minted in the same add
+    // (decision 17): the fact type's and its roles' minted ids skip them,
+    // and the stated constraint ids are held while the unnamed constraints
+    // are named, then released for the admission's own hold.
+    const statedConstraints = constraints.flatMap((c) => (c.id === undefined ? [] : [c.id]));
+    const stated = new Set([
+      ...config.roles.flatMap((r) => (r.id === undefined ? [] : [r.id])),
+      ...statedConstraints,
+    ]);
+    const id = config.id ?? this.mintedId(localName(config.name), stated);
+    const ft = new FactType({
+      ...config,
+      id,
+      roles: this.namedRoles(config, id, new Set([...stated, id])),
+      constraints: [],
+    });
     this._factTypes.set(ft);
     for (const [held, kind] of idsWithin(ft)) this._ids.hold(held, kind);
     ft.joinModel(this._admission);
+    for (const held of statedConstraints) this._ids.hold(held, "constraint");
     // After the fact type is in, so each is named from its sentence, which
     // reads the fact type's players and readings.
     // Anything that throws here -- a constraint whose type was asserted and
@@ -672,6 +687,8 @@ export class OrmModel implements ConstraintModel {
     } catch (err) {
       this.removeFactType(ft.id);
       throw err;
+    } finally {
+      for (const held of statedConstraints) this._ids.release(held, "constraint");
     }
     return ft;
   }
@@ -683,7 +700,11 @@ export class OrmModel implements ConstraintModel {
    * (decision 5, for new authoring); a file that repeats a name states its
    * role ids.
    */
-  private namedRoles(config: FactTypeConfig, factTypeId: string): FactTypeConfig["roles"] {
+  private namedRoles(
+    config: FactTypeConfig,
+    factTypeId: string,
+    stated: ReadonlySet<string>,
+  ): FactTypeConfig["roles"] {
     const unnamed = config.roles.filter((r) => r.id === undefined);
     for (const [local, roles] of groupRepeats(unnamed, (r) => localName(r.name))) {
       throw new Error(
@@ -691,7 +712,7 @@ export class OrmModel implements ConstraintModel {
           + `(${local}): give each role a name of its own, or state the role ids.`,
       );
     }
-    const taken = new Set(config.roles.flatMap((r) => (r.id === undefined ? [] : [r.id])));
+    const taken = new Set(stated);
     return config.roles.map((r) => {
       if (r.id !== undefined) return r;
       const id = this.mintedId(`${factTypeId}.${localName(r.name)}`, taken);

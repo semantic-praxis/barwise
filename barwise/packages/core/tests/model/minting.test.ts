@@ -115,6 +115,66 @@ describe("a model naming what it is given", () => {
       .toEqual(["Person_drives_Car.population.1", "Person_drives_Car.population.2"]);
   });
 
+  it("moves the instance count past the highest stated number, in any order", () => {
+    const m = people();
+    const pop = m.addPopulation({
+      factTypeId: "Person_drives_Car",
+      instances: [
+        { id: "Person_drives_Car.population.7", roleValues: {} },
+        { id: "Person_drives_Car.population.3", roleValues: {} },
+      ],
+    });
+    expect(pop.addInstance({ roleValues: {} }).id).toBe("Person_drives_Car.population.8");
+  });
+
+  it("refuses an instance number past the safe range rather than give one twice", () => {
+    const m = people();
+    const top = Number.MAX_SAFE_INTEGER - 2;
+    const pop = m.addPopulation({
+      factTypeId: "Person_drives_Car",
+      instances: [{ id: `Person_drives_Car.population.${top}`, roleValues: {} }],
+    });
+    expect(pop.addInstance({ roleValues: {} }).id).toBe(
+      `Person_drives_Car.population.${top + 1}`,
+    );
+    expect(() => pop.addInstance({ roleValues: {} })).toThrow(/no instance number left/);
+  });
+
+  it("lets every id one add states win over a name it mints (decision 17)", () => {
+    const m = people();
+    // A role stated with the id the fact type would be given.
+    const ft = m.addFactType({
+      name: "Person walks",
+      roles: [{ id: "Person_walks", name: "walks", playerId: "Person" }],
+      readings: ["{0} walks"],
+      constraints: [
+        { type: "mandatory", roleId: "Person_walks" },
+        // Stated with the name the first would be minted.
+        { id: "Each_Person_walks", type: "mandatory", roleId: "Person_walks" },
+      ],
+    });
+    expect(ft.id).toBe("Person_walks_2");
+    expect(ft.internalConstraints.map((c) => c.id)).toEqual([
+      "Each_Person_walks_2",
+      "Each_Person_walks",
+    ]);
+    // A stated role id taken by the name another role would mint.
+    const ft2 = m.addFactType({
+      name: "Person greets Car",
+      roles: [
+        { name: "a", playerId: "Person" },
+        { id: "Person_greets_Car.a", name: "b", playerId: "Car" },
+      ],
+      readings: ["{0} greets {1}"],
+    });
+    expect(ft2.roles.map((r) => r.id)).toEqual(["Person_greets_Car.a_2", "Person_greets_Car.a"]);
+    // The stated ids were held only while naming: once the fact type goes,
+    // nothing holds them.
+    expect(m.idKindsHolding("Each_Person_walks")).toEqual(["constraint"]);
+    m.removeFactType(ft.id);
+    expect(m.idKindsHolding("Each_Person_walks")).toEqual([]);
+  });
+
   it("takes a fact type back out when one of its constraints throws", () => {
     const m = people();
     expect(() =>
@@ -171,6 +231,17 @@ describe("a model naming what it is given", () => {
         readings: ["{0} knows {1}"],
       })
     ).toThrow(/has 2 roles named "knows".*give each role a name of its own, or state the role ids/);
+    // By local name: two spellings of one name would mint one id.
+    expect(() =>
+      m.addFactType({
+        name: "Person reports to Person",
+        roles: [
+          { name: "reports to", playerId: "Person" },
+          { name: "reports_to", playerId: "Person" },
+        ],
+        readings: ["{0} reports to {1}"],
+      })
+    ).toThrow(/has 2 roles named "reports to"/);
     // Stated ids keep a file that repeats a name readable.
     const ft = m.addFactType({
       name: "Person knows Person",

@@ -29,4 +29,26 @@ describe("parseFactTypes", () => {
       "person_2",
     ]);
   });
+
+  it("numbers role names by local name, as the model compares them", () => {
+    const model = new OrmModel({ name: "Staff" });
+    model.addObjectType({ name: "Person", kind: "entity", referenceMode: "id" });
+    const warnings: string[] = [];
+    parseFactTypes(
+      [{
+        name: "Person reports to Person",
+        roles: [
+          { player: "Person", role_name: "reports to" },
+          { player: "Person", role_name: "reports_to" },
+        ],
+        readings: ["{0} reports to {1}"],
+        source_references: [],
+      }],
+      model,
+      warnings,
+    );
+    expect(warnings).toEqual([]);
+    expect(model.getFactTypeByName("Person reports to Person")?.roles.map((r) => r.name))
+      .toEqual(["reports to", "reports_to_2"]);
+  });
 });

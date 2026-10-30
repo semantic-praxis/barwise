@@ -2,7 +2,7 @@
  * Pass 2 of the draft-model parse: create fact types.
  */
 
-import type { OrmModel } from "@barwise/core";
+import { localName, type OrmModel } from "@barwise/core";
 import type { ElementProvenance, ExtractedFactType } from "../ExtractionTypes.js";
 import { buildDefaultReading } from "./helpers.js";
 
@@ -52,8 +52,9 @@ export function parseFactTypes(
     // (iri-identity, decision 5). Numbered here, as the suffix rule would.
     const seen = new Map<string, number>();
     for (const r of resolvedRoles) {
-      const n = (seen.get(r.name) ?? 0) + 1;
-      seen.set(r.name, n);
+      const key = localName(r.name);
+      const n = (seen.get(key) ?? 0) + 1;
+      seen.set(key, n);
       if (n > 1) r.name = `${r.name}_${n}`;
     }
 
