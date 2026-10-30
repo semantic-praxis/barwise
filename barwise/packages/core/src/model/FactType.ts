@@ -6,7 +6,7 @@ import {
   isInternalConstraint,
 } from "./Constraint.js";
 import type { ConstraintAdmission } from "./constraintAdmission.js";
-import { generateId } from "./id.js";
+import { withId } from "./id.js";
 import { ModelElement } from "./ModelElement.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
 import { Role, type RoleConfig } from "./Role.js";
@@ -171,14 +171,24 @@ export class FactType extends ModelElement {
 
   /**
    * The model that holds this fact type, as the narrow interface it admits
-   * constraints through; none until a model adds it. Called once, by
-   * `OrmModel.addFactType`, after the fact type's own constraints are in.
+   * constraints through; none until a model adds it. Called by
+   * `OrmModel.addFactType`, after the fact type's own constraints are in,
+   * with an admission only the model holds, so no other caller can reach
+   * the model's id index through a fact type.
    */
   joinModel(admission: ConstraintAdmission): void {
     if (this._admission !== undefined) {
       throw new Error(`Fact type "${this.name}" is already in a model.`);
     }
     this._admission = admission;
+  }
+
+  /**
+   * The model removed this fact type, so a constraint added to it from
+   * now on is the fact type's alone and enters no model's index.
+   */
+  leaveModel(admission: ConstraintAdmission): void {
+    if (this._admission === admission) this._admission = undefined;
   }
 
   /** Find a role by its id. Returns undefined if not found. */
@@ -234,15 +244,6 @@ export class FactType extends ModelElement {
   rolesForPlayer(playerId: string): readonly Role[] {
     return this._roles.filter((r) => r.playerId === playerId);
   }
-}
-
-/**
- * A constraint with an id: its own, or a fresh one from the installed
- * generator. The one rule both ways into a fact type follow, so the
- * constructor and `addConstraint` cannot drift apart again (barwise-nkq).
- */
-function withId<C extends Constraint>(c: C): C {
-  return c.id ? c : { ...c, id: generateId() };
 }
 
 /**

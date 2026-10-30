@@ -36,6 +36,20 @@ export function setIdGenerator(generator: IdGenerator | undefined): void {
   installedGenerator = generator;
 }
 
+/**
+ * The value with an id: its own, or a fresh one from the installed
+ * generator. The one rule every way a constraint enters a model follows --
+ * `FactType`'s constructor and `addConstraint`, `OrmModel.addConstraint`,
+ * and a constraint a fact type in a model hands the model -- so the ways
+ * in cannot give ids by different rules (barwise-nkq), and 6b-2's minting
+ * replaces it in one place.
+ */
+export function withId<T extends { readonly id?: string; }>(
+  value: T,
+): T & { readonly id: string; } {
+  return value.id ? (value as T & { readonly id: string; }) : { ...value, id: generateId() };
+}
+
 /** Mint a fresh element id via the installed generator, or v4 by default. */
 export function generateId(): string {
   return installedGenerator ? installedGenerator() : randomUUID();

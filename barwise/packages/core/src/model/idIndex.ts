@@ -67,3 +67,44 @@ export class IdIndex {
     return new Map([...this.held].map(([id, kinds]) => [id, new Map(kinds)]));
   }
 }
+
+/**
+ * A model's store for one id-keyed kind, which keeps the id index as it
+ * changes: `set` holds the element's id and `delete` releases it, so a
+ * store and the index cannot fall out of step by a method that writes one
+ * and forgets the other (review of 6b-1).
+ */
+export class IdKeyedStore<E extends { readonly id: string; }> {
+  private readonly byId = new Map<string, E>();
+
+  constructor(private readonly kind: IdKeyedKind, private readonly index: IdIndex) {}
+
+  get(id: string): E | undefined {
+    return this.byId.get(id);
+  }
+
+  has(id: string): boolean {
+    return this.byId.has(id);
+  }
+
+  get size(): number {
+    return this.byId.size;
+  }
+
+  values(): IterableIterator<E> {
+    return this.byId.values();
+  }
+
+  /** Store an element under its id; the caller has refused a held one. */
+  set(element: E): void {
+    this.byId.set(element.id, element);
+    this.index.hold(element.id, this.kind);
+  }
+
+  /** Drop the element under `id`, if any; whether one was there. */
+  delete(id: string): boolean {
+    if (!this.byId.delete(id)) return false;
+    this.index.release(id, this.kind);
+    return true;
+  }
+}

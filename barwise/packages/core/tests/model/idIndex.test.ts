@@ -63,24 +63,35 @@ describe("IdIndex", () => {
 });
 
 describe("the model's id index", () => {
-  it("holds what the stores hold through adds and removes", () => {
+  it("holds what the stores hold through adds, admissions and removes", () => {
     fc.assert(
       fc.property(arbOrmModel(), fc.array(fc.nat(), { maxLength: 12 }), (model, picks) => {
         expect(indexOf(model)).toEqual(expected(model));
+        // Fact types removed along the way, which may be given constraints
+        // after they leave: those must reach no index.
+        const removed: FactType[] = [];
         for (const pick of picks) {
-          // A removal the model refuses (an object type still played, a
-          // fact type still objectified) changes nothing, so it is skipped.
-          const removals: (() => void)[] = [
+          // A step the model refuses (an object type still played, a fact
+          // type still objectified) changes nothing, so it is skipped.
+          const admit = (ft: FactType) => () => {
+            ft.addConstraint({ type: "mandatory", roleId: ft.roles[0]!.id });
+          };
+          const steps: (() => void)[] = [
+            ...model.factTypes.map(admit),
+            ...removed.map(admit),
             ...model.constraints.map((c) => () => model.removeConstraint(c)),
             ...model.subtypeFacts.map((sf) => () => model.removeSubtypeFact(sf.id)),
             ...model.objectifiedFactTypes.map((o) => () => model.removeObjectifiedFactType(o.id)),
             ...model.populations.map((p) => () => model.removePopulation(p.id)),
-            ...model.factTypes.map((ft) => () => model.removeFactType(ft.id)),
+            ...model.factTypes.map((ft) => () => {
+              model.removeFactType(ft.id);
+              removed.push(ft);
+            }),
             ...model.objectTypes.map((ot) => () => model.removeObjectType(ot.id)),
           ];
-          if (removals.length === 0) break;
+          if (steps.length === 0) break;
           try {
-            removals[pick % removals.length]!();
+            steps[pick % steps.length]!();
           } catch {
             continue;
           }
@@ -115,9 +126,24 @@ describe("the model's id index", () => {
       roles: [{ name: "smokes", playerId: "P" }],
       readings: ["{0} smokes"],
     });
+    const admission = { admitConstraint: <C>(c: C) => c };
+    ft.joinModel(admission);
+    expect(() => ft.joinModel(admission)).toThrow(/already in a model/);
+  });
+
+  it("forgets a fact type the model removed: a constraint given it later is held nowhere", () => {
     const m = new OrmModel({ name: "M" });
-    ft.joinModel(m);
-    expect(() => ft.joinModel(m)).toThrow(/already in a model/);
+    m.addObjectType({ id: "P", name: "Person", kind: "entity", referenceMode: "nr" });
+    const ft = m.addFactType({
+      id: "f",
+      name: "Person smokes",
+      roles: [{ id: "f0", name: "smokes", playerId: "P" }],
+      readings: ["{0} smokes"],
+    });
+    m.removeFactType("f");
+    ft.addConstraint({ type: "mandatory", id: "late", roleId: "f0" });
+    expect(m.idKindsHolding("late")).toEqual([]);
+    expect(indexOf(m)).toEqual(expected(m));
   });
 
   it("still refuses an id only within a kind, as format 3.0 does", () => {

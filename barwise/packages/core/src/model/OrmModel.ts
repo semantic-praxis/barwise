@@ -11,8 +11,8 @@ import {
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { FactType, type FactTypeConfig } from "./FactType.js";
-import { generateId } from "./id.js";
-import { IdIndex, type IdKeyedKind, type IdKind } from "./idIndex.js";
+import { withId } from "./id.js";
+import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.js";
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
@@ -42,6 +42,18 @@ export interface OrmModelConfig {
 }
 
 const quoted = (text: string): string => JSON.stringify(text);
+
+/**
+ * The ids within a fact type: its roles' and its constraints' (its own is
+ * the store's to hold). One list for the add and the removal, so the
+ * index takes and gives back the same ids.
+ */
+function idsWithin(ft: FactType): [string | undefined, IdKind][] {
+  return [
+    ...ft.roles.map((r): [string, IdKind] => [r.id, "role"]),
+    ...ft.internalConstraints.map((c): [string | undefined, IdKind] => [c.id, "constraint"]),
+  ];
+}
 
 /**
  * Whether a fact type holds any of these roles: the one touch test behind
@@ -86,19 +98,33 @@ export class DuplicateIdError extends Error {
  * The OrmModel enforces referential integrity: roles in fact types must
  * reference object types that exist in the model.
  */
-export class OrmModel implements ConstraintModel, ConstraintAdmission {
+export class OrmModel implements ConstraintModel {
   private _name: string;
   private _domainContext: string | undefined;
   private _note: string | undefined;
   private _namespace: string | undefined;
 
-  private readonly _objectTypes: Map<string, ObjectType> = new Map();
-  private readonly _factTypes: Map<string, FactType> = new Map();
-  private readonly _subtypeFacts: Map<string, SubtypeFact> = new Map();
-  private readonly _objectifiedFactTypes: Map<string, ObjectifiedFactType> = new Map();
-  private readonly _populations: Map<string, Population> = new Map();
-  /** Every id the stores hold, across kinds (`idIndex.ts`). */
+  /** Every id the stores hold, across kinds (`idIndex.ts`); each store keeps it. */
   private readonly _ids = new IdIndex();
+  private readonly _objectTypes = new IdKeyedStore<ObjectType>("object type", this._ids);
+  private readonly _factTypes = new IdKeyedStore<FactType>("fact type", this._ids);
+  private readonly _subtypeFacts = new IdKeyedStore<SubtypeFact>("subtype fact", this._ids);
+  private readonly _objectifiedFactTypes = new IdKeyedStore<ObjectifiedFactType>(
+    "objectification",
+    this._ids,
+  );
+  private readonly _populations = new IdKeyedStore<Population>("population", this._ids);
+  /**
+   * How a fact type in this model hands it a later constraint. Held here,
+   * not exposed, so only a fact type this model added reaches the index.
+   */
+  private readonly _admission: ConstraintAdmission = {
+    admitConstraint: <C extends InternalConstraint>(constraint: C): C => {
+      const stored = withId(constraint);
+      this._ids.hold(stored.id, "constraint");
+      return stored;
+    },
+  };
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
   private readonly _constraints: ExternalConstraint[] = [];
@@ -174,7 +200,7 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
    * names the two the same way.
    */
   private refuseHeldId<E, C extends { readonly id?: string; }>(
-    store: ReadonlyMap<string, E>,
+    store: { get(id: string): E | undefined; },
     config: C,
     kind: IdKeyedKind,
     describe: (element: E | C) => string,
@@ -216,8 +242,7 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
       );
     }
     const ot = createObjectType(config);
-    this._objectTypes.set(ot.id, ot);
-    this._ids.hold(ot.id, "object type");
+    this._objectTypes.set(ot);
     return ot;
   }
 
@@ -262,7 +287,6 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
     }
 
     this._objectTypes.delete(id);
-    this._ids.release(id, "object type");
     this._preferredIdentifiers.delete(id);
     this.pruneDiagramReferences(id);
   }
@@ -342,7 +366,7 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
    * validation reports it.
    */
   addConstraint(constraint: ExternalConstraint): ExternalConstraint {
-    const stored = constraint.id ? constraint : { ...constraint, id: generateId() };
+    const stored = withId(constraint);
     this._constraints.push(stored);
     this._ids.hold(stored.id, "constraint");
     return stored;
@@ -354,24 +378,14 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
    */
   removeConstraint(constraint: ExternalConstraint): void {
     const i = this._constraints.indexOf(constraint);
-    if (i >= 0) {
-      this._constraints.splice(i, 1);
-      this._ids.release(constraint.id, "constraint");
-    }
+    if (i >= 0) this.dropConstraintAt(i);
     if (constraint.id !== undefined) this.dropPreferredIdentifiersTo(new Set([constraint.id]));
   }
 
-  /**
-   * Take in a constraint a fact type in this model was given after it
-   * joined the model (`ConstraintAdmission`): the constraint as stored,
-   * with an id from the installed generator when it has none, as
-   * `addConstraint` gives one, and its id in the model's id index. In
-   * format 4.0 the id is minted here instead (iri-identity 6b).
-   */
-  admitConstraint<C extends InternalConstraint>(constraint: C): C {
-    const stored = constraint.id ? constraint : { ...constraint, id: generateId() };
-    this._ids.hold(stored.id, "constraint");
-    return stored;
+  /** Drop the constraint across fact types at `i`, and its id from the index. */
+  private dropConstraintAt(i: number): void {
+    const [dropped] = this._constraints.splice(i, 1);
+    this._ids.release(dropped!.id, "constraint");
   }
 
   /**
@@ -590,11 +604,9 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
     }
 
     const ft = new FactType(config);
-    this._factTypes.set(ft.id, ft);
-    this._ids.hold(ft.id, "fact type");
-    for (const r of ft.roles) this._ids.hold(r.id, "role");
-    for (const c of ft.internalConstraints) this._ids.hold(c.id, "constraint");
-    ft.joinModel(this);
+    this._factTypes.set(ft);
+    for (const [id, kind] of idsWithin(ft)) this._ids.hold(id, kind);
+    ft.joinModel(this._admission);
     return ft;
   }
 
@@ -618,9 +630,8 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
     }
 
     this._factTypes.delete(id);
-    this._ids.release(id, "fact type");
-    for (const r of ft.roles) this._ids.release(r.id, "role");
-    for (const c of ft.internalConstraints) this._ids.release(c.id, "constraint");
+    for (const [held, kind] of idsWithin(ft)) this._ids.release(held, kind);
+    ft.leaveModel(this._admission);
     // An entity identified by one of its constraints is no longer: the
     // reference goes with the constraint, so a saved model does not name a
     // constraint that does not exist.
@@ -682,8 +693,7 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
     if (refusal !== undefined) throw new Error(refusal);
 
     const sf = new SubtypeFact(config);
-    this._subtypeFacts.set(sf.id, sf);
-    this._ids.hold(sf.id, "subtype fact");
+    this._subtypeFacts.set(sf);
     return sf;
   }
 
@@ -739,13 +749,10 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
       throw new Error(`Subtype fact with id "${id}" not found.`);
     }
     this._subtypeFacts.delete(id);
-    this._ids.release(id, "subtype fact");
     for (let i = this._constraints.length - 1; i >= 0; i--) {
       const kept = withoutSubtypeFacts(this._constraints[i]!, (sf) => sf === id);
-      if (kept === undefined) {
-        this._ids.release(this._constraints[i]!.id, "constraint");
-        this._constraints.splice(i, 1);
-      } else this._constraints[i] = kept;
+      if (kept === undefined) this.dropConstraintAt(i);
+      else this._constraints[i] = kept;
     }
   }
 
@@ -818,8 +825,7 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
     if (refusal !== undefined) throw new Error(refusal);
 
     const oft = new ObjectifiedFactType(config);
-    this._objectifiedFactTypes.set(oft.id, oft);
-    this._ids.hold(oft.id, "objectification");
+    this._objectifiedFactTypes.set(oft);
     return oft;
   }
 
@@ -876,7 +882,6 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
       throw new Error(`Objectified fact type with id "${id}" not found.`);
     }
     this._objectifiedFactTypes.delete(id);
-    this._ids.release(id, "objectification");
   }
 
   /**
@@ -949,8 +954,7 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
       );
     }
     const pop = new Population(config);
-    this._populations.set(pop.id, pop);
-    this._ids.hold(pop.id, "population");
+    this._populations.set(pop);
     return pop;
   }
 
@@ -960,7 +964,6 @@ export class OrmModel implements ConstraintModel, ConstraintAdmission {
       throw new Error(`Population with id "${id}" not found.`);
     }
     this._populations.delete(id);
-    this._ids.release(id, "population");
   }
 
   // ---- Definitions ----
