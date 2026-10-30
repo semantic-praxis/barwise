@@ -98,6 +98,11 @@ export class Population {
     this.sample = config.sample ?? false;
 
     if (config.instances) {
+      // Every stated number first, so an unnamed instance listed before a
+      // stated one does not take its number.
+      for (const inst of config.instances) {
+        if (inst.id !== undefined) this.countPast(inst.id);
+      }
       for (const inst of config.instances) {
         this._instances.push(this.createInstance(inst));
       }
@@ -117,17 +122,24 @@ export class Population {
         throw new Error(`Population "${this.id}" has no instance number left to give.`);
       }
       id = `${prefix}${this._next++}`;
-    } else if (id.startsWith(prefix)) {
-      // Plain decimal only: `Number` also reads "1e21", "0x10" and " 3",
-      // and a count past 2^53 stops moving, so every later instance would
-      // take one id.
-      const suffix = id.slice(prefix.length);
-      const n = Number(suffix);
-      if (/^[1-9]\d*$/.test(suffix) && Number.isSafeInteger(n + 1) && n >= this._next) {
-        this._next = n + 1;
-      }
+    } else {
+      this.countPast(id);
     }
     return { id, roleValues: { ...config.roleValues } };
+  }
+
+  /** Move the count past a stated id of the form `<population>.<n>`. */
+  private countPast(id: string): void {
+    const prefix = `${this.id}.`;
+    if (!id.startsWith(prefix)) return;
+    // Plain decimal only: `Number` also reads "1e21", "0x10" and " 3",
+    // and a count past 2^53 stops moving, so every later instance would
+    // take one id.
+    const suffix = id.slice(prefix.length);
+    const n = Number(suffix);
+    if (/^[1-9]\d*$/.test(suffix) && Number.isSafeInteger(n + 1) && n >= this._next) {
+      this._next = n + 1;
+    }
   }
 
   /** All fact instances in this population. */
