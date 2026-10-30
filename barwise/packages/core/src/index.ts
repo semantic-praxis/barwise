@@ -148,6 +148,7 @@ export {
   type ConstraintInView,
   DuplicateIdError,
   type IdKeyedKind,
+  type IdKind,
   OrmModel,
   type OrmModelConfig,
 } from "./model/OrmModel.js";

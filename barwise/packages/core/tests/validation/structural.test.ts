@@ -82,7 +82,7 @@ describe("structuralRules", () => {
       model.addObjectType({ id: ot.id, name: "Customer", kind: "entity", referenceMode: "cid" });
       // Bypass addFactType validation by injecting directly.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft.id, ft);
+      (model as any)._factTypes.set(ft);
 
       // The check moved into `graphOf`; the diagnostic id did not move
       // with it, because that id is what a consumer reads.
@@ -115,9 +115,9 @@ describe("structuralRules", () => {
 
       const model = new OrmModel({ name: "Test" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._objectTypes.set(ot1.id, ot1);
+      (model as any)._objectTypes.set(ot1);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._objectTypes.set(ot2.id, ot2);
+      (model as any)._objectTypes.set(ot2);
 
       const diagnostics = structuralWellFormedness(model);
       const dupes = diagnostics.filter(
@@ -142,11 +142,11 @@ describe("structuralRules", () => {
 
       const model = new OrmModel({ name: "Test" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._objectTypes.set(ot.id, ot);
+      (model as any)._objectTypes.set(ot);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft1.id, ft1);
+      (model as any)._factTypes.set(ft1);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any)._factTypes.set(ft2.id, ft2);
+      (model as any)._factTypes.set(ft2);
 
       const diagnostics = structuralWellFormedness(model);
       const dupes = diagnostics.filter(
@@ -486,9 +486,9 @@ describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
     const a = createObjectType({ name: "Customer", kind: "entity", referenceMode: "nr" });
     const b = createObjectType({ name: "Customer", kind: "entity", referenceMode: "nr" });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (model as any)._objectTypes.set(a.id, a);
+    (model as any)._objectTypes.set(a);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (model as any)._objectTypes.set(b.id, b);
+    (model as any)._objectTypes.set(b);
     expect(ids(model, "structural/local-name-collision")).toEqual([]);
     expect(ids(model, "structural/duplicate-object-type-name")).toHaveLength(1);
   });
