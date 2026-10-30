@@ -15,10 +15,11 @@
  * role the fact type lacks, as `validateReadingTemplate` has it. It reads
  * two fields, so it is a rule the harness runs, reported at each reading at
  * fault beside the fact type's other problems -- #672 ran it on the raw
- * input after every decode instead. It is skipped, as every rule is, where
- * a field it reads is of the wrong kind: `roles` or `readings` not a list,
- * or a reading not a string. A blank reading is refused by the reading's
- * own leaf, as the constructor refuses it, and the rule leaves it to that.
+ * input after every decode instead. It is skipped where `roles` or
+ * `readings` is not a list, and passes over a reading that is not a
+ * string or is blank, which its own leaf refuses, so the other readings are
+ * still judged (review of R3). With no roles it says nothing: the roles
+ * list's minimum is the problem, and every reading would only repeat it.
  *
  * Nothing on the load path calls this until R4.
  */
@@ -77,8 +78,10 @@ const DerivationFile = Schema.Struct({
  * so the others are still judged.
  */
 const readingsFitRoles = crossField(
-  { id: "readings-fit-roles", reads: ["readings.*", "roles"] },
+  { id: "readings-fit-roles", reads: ["readings", "roles"], guards: ["readings.*"] },
   (ft: { readonly roles: readonly unknown[]; readonly readings: readonly unknown[]; }) => {
+    // No roles is the roles list's problem; every reading would only repeat it.
+    if (ft.roles.length === 0) return true;
     const issues = ft.readings.flatMap((template, i) => {
       if (typeof template !== "string" || template.trim() === "") return [];
       const errors = validateReadingTemplate(template, ft.roles.length);

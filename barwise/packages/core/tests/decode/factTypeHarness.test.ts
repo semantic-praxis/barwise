@@ -13,7 +13,13 @@
 import { describe, expect, it } from "vitest";
 import { InternalConstraintFile } from "../../src/decode/constraint.js";
 import { FactTypeFile } from "../../src/decode/factType.js";
-import { keysRead, markedChecks, nodesOf, reportedPaths } from "../helpers/decodeHarness.js";
+import {
+  declaredReads,
+  keysRead,
+  markedChecks,
+  nodesOf,
+  reportedPaths,
+} from "../helpers/decodeHarness.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
 type Doc = Record<string, unknown>;
@@ -53,6 +59,17 @@ const PLANTS: readonly Plant[] = [
     name: "a reading naming a role the fact type lacks",
     plant: (d) => ({ ...d, readings: [strayReading(d)] }),
     paths: ["readings.0"],
+  },
+  {
+    name: "a reading that is not a string, beside a stray placeholder",
+    plant: (d) => ({ ...d, readings: [5, strayReading(d)] }),
+    // The rule passes over the bad reading and still judges the other.
+    paths: ["readings.0", "readings.1"],
+  },
+  {
+    name: "no roles, which the readings do not repeat",
+    plant: (d) => ({ ...d, roles: [] }),
+    paths: ["roles"],
   },
   // Pairs: the rule broken beside a field error, and beside a role's.
   {
@@ -111,7 +128,7 @@ describe("the cross-field harness, over fact types", () => {
 
   it("runs each rule only on fields it declares it reads", () => {
     for (const { node, check, mark } of marked) {
-      expect([mark.id, keysRead(check, node)]).toEqual([mark.id, [...mark.reads].sort()]);
+      expect([mark.id, keysRead(check, node)]).toEqual([mark.id, declaredReads(mark)]);
     }
   });
 

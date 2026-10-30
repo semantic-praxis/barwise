@@ -244,12 +244,15 @@ function describeConstraint(raw: unknown): ElementLabel {
   const noun = typeof doc.type === "string" && placementOf(doc.type) !== undefined
     ? `The ${doc.type} constraint`
     : "The constraint";
-  // Any string id is quoted, an empty one included, and any other left out,
-  // as `refuseMisplacedConstraints` words them: the two sentences must
-  // agree until R4 deletes that copy (barwise-ehl). A constraint with no
-  // usable id is found by the problem's `at`.
-  return typeof doc.id === "string"
-    ? { label: `${noun} "${doc.id}"`, identity: doc.id }
+  // A string id is quoted, an empty one included, and an absent one left
+  // out, as `refuseMisplacedConstraints` words them; `factType.test.ts`
+  // holds the two sentences together until R4 deletes that copy
+  // (barwise-ehl). A number or a flag is still how a reader finds the
+  // constraint, so it labels this one's every problem, where today's
+  // sentence leaves it out: such an id is refused either way (review of R3).
+  if (typeof doc.id === "string") return { label: `${noun} "${doc.id}"`, identity: doc.id };
+  return typeof doc.id === "number" || typeof doc.id === "boolean"
+    ? { label: `${noun} with id ${String(doc.id)}`, identity: String(doc.id) }
     : { label: noun, identity: "" };
 }
 

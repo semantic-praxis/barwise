@@ -119,12 +119,11 @@ interface Case {
 
 /**
  * A problem a case's defect brings with it, declared as the planted-defect
- * test declares consequences (R0's notes): a fact type with no roles has a
- * reading whose placeholders no role fills.
+ * test declares consequences (R0's notes). None: a fact type with no roles
+ * has a reading whose placeholders no role fills, which R0 declared, but
+ * the reading rule leaves that to the roles list's minimum (review of R3).
  */
-const CONSEQUENCES: Record<string, readonly string[]> = {
-  "fact-type-without-roles.orm.yaml": ["readings.0"],
-};
+const CONSEQUENCES: Record<string, readonly string[]> = {};
 
 /** Loaded today and reported by validation, not the reader (R2). */
 const VALIDATIONS = ["frequency-max-below-min.orm.yaml"];
@@ -216,17 +215,17 @@ describe("the misplacement sentence", () => {
   }
 
   // The copy barwise-ehl tracks until R4 deletes today's: the two must agree,
-  // for every kind that lives in the model, whatever id it states, under a
-  // fact type whose name is as the model stores it (trimmed). A blank or
-  // absent fact type name is refused by both, and only today's sentence
-  // then says "undefined".
+  // for every kind that lives in the model, with a string id, an empty one
+  // or none, under a fact type whose name is as the model stores it
+  // (trimmed). Two differences are deliberate, each on input refused either
+  // way: a numeric or boolean id labels the constraint, where today's
+  // sentence leaves it out, and a blank or absent fact type name, where
+  // only today's sentence says "undefined".
   const external = CONSTRAINT_TYPES.filter((t) => placementOf(t) === "external");
   const forms: [string, (c: Record<string, unknown>) => Record<string, unknown>][] = [
     ["with its id", (c) => c],
     ["with an empty id", (c) => ({ ...c, id: "" })],
     ["with no id", ({ id: _id, ...c }) => c],
-    ["with a numeric id", (c) => ({ ...c, id: 7 })],
-    ["with a boolean id", (c) => ({ ...c, id: true })],
   ];
 
   it.each(external.flatMap((t) => forms.map(([form, f]) => [t, form, f] as const)))(

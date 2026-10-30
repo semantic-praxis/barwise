@@ -338,10 +338,10 @@ describe("each refusal in its own words (barwise-f9t)", () => {
         'The exclusion constraint "x": roles.0 must be a string (a role id).',
       ],
       [
-        "an id of the wrong type, left out of the label as today's loader leaves it",
+        "an id of the wrong type, by which the constraint is still named",
         "external",
         { id: 7, type: "subset", subset_roles: ["a"], superset_roles: ["b"] },
-        "The subset constraint: id must be a string.",
+        "The subset constraint with id 7: id must be a string.",
       ],
       [
         "an empty id, quoted",
@@ -354,6 +354,18 @@ describe("each refusal in its own words (barwise-f9t)", () => {
         "internal",
         { type: "mandatory", role: "r" },
         "The mandatory constraint: id is missing: a 3.0 file states every constraint's id.",
+      ],
+      [
+        "a range's bound that is not a string",
+        "internal",
+        { id: "v", type: "value_constraint", ranges: [{ min: 1 }] },
+        'The value_constraint constraint "v": ranges.0.min must be a string.',
+      ],
+      [
+        "a range's flag that is not one",
+        "internal",
+        { id: "v", type: "value_constraint", ranges: [{ min: "1", min_inclusive: "no" }] },
+        'The value_constraint constraint "v": ranges.0.min_inclusive must be true or false.',
       ],
     ] as const,
   )("%s", (_, where, value, message) => {

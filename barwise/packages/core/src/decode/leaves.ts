@@ -12,18 +12,25 @@ import * as Schema from "effect/Schema";
 import type { ValueRange } from "../model/ObjectType.js";
 import { crossField } from "./harness.js";
 
+/** Any string, and only a string: `what` names the field's role, " (a role id)". */
+const aString = (what: string) => Schema.String.annotate({ message: `must be a string${what}.` });
+
+/** Free text: any string, and only a string. */
+export const Text = aString("");
+
+/** A flag: true or false, and nothing else. */
+export const Flag = Schema.Boolean.annotate({ message: "must be true or false." });
+
 /** A string with something in it; one of another type is refused as not a string. */
 export const nonEmpty = (what: string) =>
-  Schema.String.annotate({ message: `must be a string${what}.` }).check(
-    Schema.isMinLength(1, { message: `must not be empty${what}.` }),
-  );
+  aString(what).check(Schema.isMinLength(1, { message: `must not be empty${what}.` }));
 
 /**
  * Text `requireName` accepts: something left after trimming. A name -- an
  * object type's, a fact type's, a role's -- and a reading.
  */
 export const notBlank = (what: string) =>
-  Schema.String.annotate({ message: `must be a string${what}.` }).check(
+  aString(what).check(
     Schema.makeFilter((text: string) => text.trim() !== "", {
       message: `must not be blank${what}.`,
       // Not blank implies a length of at least one: the schema's minLength.
@@ -31,12 +38,6 @@ export const notBlank = (what: string) =>
     }),
   );
 export const Name = notBlank("");
-
-/** Free text: any string, and only a string. */
-export const Text = Schema.String.annotate({ message: "must be a string." });
-
-/** A flag: true or false, and nothing else. */
-export const Flag = Schema.Boolean.annotate({ message: "must be true or false." });
 
 /**
  * An integer no smaller than `min`, as JSON Schema's `integer` with a
@@ -64,10 +65,10 @@ export const intAtLeast = (
  * so it needs a `min` or a `max`; each inclusive flag defaults to true.
  */
 export const ValueRangeFile = Schema.Struct({
-  min: Schema.optionalKey(Schema.String),
-  max: Schema.optionalKey(Schema.String),
-  min_inclusive: Schema.optionalKey(Schema.Boolean),
-  max_inclusive: Schema.optionalKey(Schema.Boolean),
+  min: Schema.optionalKey(Text),
+  max: Schema.optionalKey(Text),
+  min_inclusive: Schema.optionalKey(Flag),
+  max_inclusive: Schema.optionalKey(Flag),
 }).check(
   crossField(
     { id: "value-range-bound", reads: ["min", "max"] },
@@ -81,7 +82,7 @@ export const ValueRangeFile = Schema.Struct({
  * A value constraint's two lists, the object type's and a role's alike:
  * each may be left out, and is never empty when present.
  */
-export const ValuesFile = Schema.Array(Schema.String).check(
+export const ValuesFile = Schema.Array(Text).check(
   Schema.isMinLength(1, { message: "must list at least one value when present." }),
 );
 export const RangesFile = Schema.Array(ValueRangeFile).check(

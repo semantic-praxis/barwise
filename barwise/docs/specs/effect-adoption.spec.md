@@ -985,19 +985,26 @@ still off the load path.
   constraints R2's records: the `FactType` class still builds the element.
 - The reading rule is a harness check on the Schema, reported at each
   reading at fault whatever else is wrong with the fact type; a blank
-  reading is its own leaf's, as the constructor refuses it. The rule reads
-  `readings.*` and `roles`, so a reading that is not a string suspends it
-  for the fact type's other readings, which the harness's skip rule
-  requires.
+  reading is its own leaf's, as the constructor refuses it. A reading that
+  is not a string is passed over and the others still judged: the rule
+  declares `readings.*` as a guard (`CrossFieldMark.guards`), a read it
+  checks the kind of itself, which the reads check holds like any other
+  but which does not suspend the rule. With no roles the rule says
+  nothing, leaving it to the roles list's minimum, so
+  `fact-type-without-roles` no longer carries the consequence R0's notes
+  declared.
 - The misplacement sentence now names the enclosing fact type through
   `messageWithin`, and a test compares it with today's: for every kind that
   lives in the model, with a string id, an empty one, a numeric or boolean
   one and none, the decoder's problems hold `refuseMisplacedConstraints`'s
   sentence exactly, under a fact type whose name is as the model stores it.
   The copy barwise-ehl tracks is therefore checked until R4 deletes the old
-  one. The two differ only for a name with surrounding space, which the
-  decoder trims as the model does, and for a blank or absent name, which
-  both refuse and where only today's sentence says "undefined".
+  one. Two differences are deliberate, each on input refused either way:
+  a numeric or boolean id labels the constraint, where today's sentence
+  leaves it out, since the label serves every problem the constraint has;
+  and a blank or absent fact type name, where only today's sentence says
+  "undefined". A name with surrounding space is trimmed, as the model
+  stores it.
 - Agreement with `main`, both ways: 2,000 fact types drawn from the
   hand-written schema, half given readings that name each role, and the
   decoder accepts exactly what today's schema and the `FactType` constructor
@@ -1011,7 +1018,8 @@ still off the load path.
   `crossField` takes extra annotations and has a guard form that every
   marked rule goes through, a maximum's refusal names "unbounded", an id or
   role id that is not a string is refused as such, and the constraint's
-  label matches `refuseMisplacedConstraints` for every id.
+  label matches `refuseMisplacedConstraints` for a string, empty or absent
+  id.
 - Found while building it: annotating a checked Schema annotates its last
   check, not the node, so the walk labelled the fact type's problems "The
   document". The annotation goes before the check, and a test refuses an
@@ -1031,6 +1039,14 @@ still off the load path.
   name-or-id labeller, and a name and a reading one non-blank leaf.
   Declined: one guard for both list minimums, since the operands' narrows
   to a tuple and a role list's must not, or S3 fails.
+- The pre-merge review's `/code-review` (its second pass) found the
+  reading rule suspended by one non-string reading a second time, now
+  fixed by `guards`; the reading rule repeating an empty roles list for
+  every reading; that dropping a numeric id from the label, done for the
+  sentence's sake, cost every other problem of that constraint its name,
+  so it was reverted and the sentence's difference stated instead; and the
+  free-text and flag leaves adopted everywhere (object type, ranges,
+  values). Each fix has a test that fails with it planted back.
 
 **R3's readings.** M1 for fact types reads no: `Arbitrary.schema` over the
 fact type Schema generates nothing (0 values, 201 discards at sizes 3 and

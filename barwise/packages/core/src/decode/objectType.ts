@@ -30,6 +30,7 @@ import {
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { crossField } from "./harness.js";
 import {
+  Flag,
   intAtLeast,
   Name,
   nonEmpty,
@@ -96,7 +97,7 @@ const baseFields = {
   definition: Schema.optionalKey(Text),
   source_context: Schema.optionalKey(Text),
   aliases: Schema.optionalKey(Schema.Array(nonEmpty(" (an alias)"))),
-  independent: Schema.optionalKey(Schema.Boolean),
+  independent: Schema.optionalKey(Flag),
   note: Schema.optionalKey(Text),
   cardinality: Schema.optionalKey(CardinalityFile),
 };

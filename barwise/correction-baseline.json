@@ -265,11 +265,11 @@
       "caught_by": "execution",
       "note": "Re-reading the live API after the merge. The first draft asserted GitHub's releases-list sort key was 'measurably neither created_at nor published_at', on the pre-merge reading alone. Running it again after the tag moved showed created_at DID follow the tag (2026-06-14T21:45:35Z -> 2026-09-22T18:40:50Z) while published_at stayed frozen, and the position changed with it -- so the causal chain does run through created_at and the original phrasing overstated the negative. The correction narrows the claim to the chain rather than the full sort rule, because the historical ordering still is not explained by created_at desc alone. Caught by executing the same query twice, not by rethinking it."
     },
-    "effect-adoption::0cc5f41ba6e5": {
+    "effect-adoption::383d45a454f9": {
       "spec": "effect-adoption.spec.md",
       "excerpt": "- the fact type, its roles and its derivation in the file's own keys, with the fact type's constraints held by r2's internal list, so a fact type and its constr",
       "caught_by": "execution",
-      "note": "R3's author-side /code-review (2026-10-30) ran a probe: readings [5, '{0} has {7}'] reported only the non-string reading, so factType.ts's doc claim that the reading rule ran 'whatever else is wrong' was false; the rule is skipped, as every harness rule is, where a reading is not a string. The doc now says so. The same pass found the numeric-id label differing from refuseMisplacedConstraints by probe; the parity test gained those ids."
+      "note": "R3's author-side /code-review (2026-10-30) ran a probe: readings [5, '{0} has {7}'] reported only the non-string reading, so factType.ts's doc claim that the reading rule ran 'whatever else is wrong' was false; the rule is skipped, as every harness rule is, where a reading is not a string. The doc now says so. The same pass found the numeric-id label differing from refuseMisplacedConstraints by probe; the parity test gained those ids. The pre-merge review's /code-review then found, by probe again, the rule still suspended by a non-string reading and repeating an empty roles list; both fixed (guards, and no reading report without roles). (Row id changed when those notes were added, 2026-10-30.)"
     },
     "effect-adoption::590954cb0e90": {
       "spec": "effect-adoption.spec.md",

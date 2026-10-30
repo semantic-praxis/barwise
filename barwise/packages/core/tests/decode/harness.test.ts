@@ -18,7 +18,13 @@ import * as Arbitrary from "effect/Arbitrary";
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 import { ObjectTypeFile } from "../../src/decode/objectType.js";
-import { keysRead, markedChecks, nodesOf, reportedPaths } from "../helpers/decodeHarness.js";
+import {
+  declaredReads,
+  keysRead,
+  markedChecks,
+  nodesOf,
+  reportedPaths,
+} from "../helpers/decodeHarness.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
 type Doc = Record<string, unknown>;
@@ -136,7 +142,7 @@ describe("the cross-field harness", () => {
     // A rule that read an undeclared field would run on it after that
     // field failed, and misread it.
     for (const { node, check, mark } of markedChecks(ObjectTypeFile.ast)) {
-      expect([mark.id, keysRead(check, node)]).toEqual([mark.id, [...mark.reads].sort()]);
+      expect([mark.id, keysRead(check, node)]).toEqual([mark.id, declaredReads(mark)]);
     }
   });
 
