@@ -7,8 +7,10 @@
  * by whichever core constructor first trips over it with a message about
  * barwise internals.
  *
- * Every id comes from `generateId()`, as every importer's does but NORMA's
- * (`docs/specs/importer-role-ids.spec.md`, R1): elements are found again
+ * Role ids are the model's `<fact type>.<role key>` (iri-identity 6b-4a);
+ * every other id comes from `generateId()` until 6b-4b retires it, as
+ * every importer's does but NORMA's (`docs/specs/importer-role-ids.spec.md`,
+ * R1). Elements are found again
  * by name -- Ossie concept names are unique, and a relationship imports as
  * `Concept.rel` -- never by an id built from one. A re-import diffs by
  * content, which diff falls back to when ids differ.

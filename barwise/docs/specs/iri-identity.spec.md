@@ -1497,9 +1497,10 @@ sites.
     - _6b-4a, the importers off role ids_ (owner, 2026-10-30), moved
       ahead of 6b-2b-2 because a 4.0 role id is strictly
       `<local name>.<local name>`: the importers that state UUID role
-      ids add the fact type without them and read them back, as 6b-4
-      describes, so the writer never emits a role id the 4.0 schema
-      refuses. The dbt composite-key and DDL relationship importers name
+      ids add the fact type without them and state its constraints over
+      the role ids the model gives, through `addFactType`'s
+      `constraintsOver`, inside the same add and its rollback, so the
+      writer never emits a role id the 4.0 schema refuses. The dbt composite-key and DDL relationship importers name
       every role "is in", so they pass `suffixRepeatedRoleNames` (decision
       5 as amended); a preferred identifier reads the id its constraint was
       stored under. The CLI and MCP entry-point tests observe the UUIDv7
