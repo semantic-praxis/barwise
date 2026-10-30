@@ -3,8 +3,8 @@
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
 restarted on format 3.0 2026-10-29 (1r), R0 to R3 done, R4 built and its
-WS1 reading taken 2026-10-30, every gate holding but S4, which waits on Open
-decision 15; WS1b follows that decision; WS2 onward not started
+WS1 reading taken 2026-10-30 and passed (S4 as Open decision 15 resolved
+it); WS1b parts B3, C, D and E not started; WS2 onward not started
 Created: 2026-10-15
 Last-updated: 2026-10-30
 Tracking: barwise-jo5 (this spec); barwise-4r3 (Effect alone on load,
@@ -1146,8 +1146,10 @@ on both heads, and `barwise validate` refuses it on both with "Frequency
 constraint in fact type "Tariff has Age" has max (2) less than min (3)".
 R2 kept it loading so that S1 holds: `main` loads that file, and refusing
 it at decode would make the two heads' listings differ. S1 and S4's bar
-("every case reported") cannot both be met for this case, so whether S4
-holds is the owner's call (Open decision 15).
+("every case reported") cannot both be met for this case. The owner
+resolved Open decision 15 as (a) on 2026-10-30: S4 is read over the cases
+`main`'s loader refuses, where R4 reads 38/38 singly and 36/36 combined.
+**Every gate holds, and the reading passes.**
 
 - S5 was read twice on each head, in the order `main`, R4, `main`, R4;
   the two readings agree within 10 ms. Loading core now loads Effect, so
@@ -1758,7 +1760,8 @@ entry only records that it follows.
     two weeks old at the restart, and the version WS2 named. #672 used
     4.0.4. 4.0.6 and 4.0.7 are under two weeks old. M1 is re-read on the
     pinned version, since derivation is marked unstable.
-15. **A case S1 requires to load (added 2026-10-30) -- open.** The 3.0
+15. **A case S1 requires to load (added 2026-10-30) -- resolved
+    2026-10-30 by the owner: option (a).** The 3.0
     case `frequency-max-below-min` is a file `main` loads, leaving the
     max below min to validation, which refuses it. S1 requires the spike
     to load what `main` loads; S4's bar requires every case reported by the
