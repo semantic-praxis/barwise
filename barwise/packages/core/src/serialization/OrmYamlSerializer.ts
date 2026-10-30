@@ -194,7 +194,8 @@ export class OrmYamlSerializer {
  * Decode a 3.0 document, or refuse it with every problem it has, each
  * naming its element and field. The message is one line, its problems
  * sentences one after another, because surfaces print it after a file name
- * (`barwise migrate` gives one line per file). The problems are also kept
+ * (`barwise migrate` gives one line per file); a line break inside a name
+ * the file states is written as `\n` there, and kept in `validationResult`. The problems are also kept
  * as a `validationResult`, its paths JSON Pointers into the file, "/" for
  * the document itself, as ajv's were (effect-adoption 1r, R4).
  */
@@ -208,7 +209,7 @@ function decodeOrRefuse(doc: unknown): DecodedDocument {
         .join("") || "/";
     throw new DeserializationError(
       `The model file does not conform to format 3.0: ${
-        err.problems.map((p) => p.message).join(" ")
+        err.problems.map((p) => p.message.replace(/\r?\n/g, "\\n")).join(" ")
       }`,
       {
         valid: false,

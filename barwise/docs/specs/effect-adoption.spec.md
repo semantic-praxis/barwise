@@ -1160,6 +1160,17 @@ out of R3's fact type module so subtype facts share it.
   key on different fields; `Integer` beside `intAtLeast`, two refusals
   with different messages; and the place-or-sentence rule in the walk,
   which a test pins and which touches only a rule's own issues.
+- Its third pass found nothing blocking. Fixed, with a test that fails
+  when planted back: a line break in a name the file states split the
+  one-line refusal, and is now written `\n` there; and `core/CLAUDE.md`
+  said reading a 3.0 file loads Effect, where loading core does. Declined,
+  with the reason: the eager decoder (as above); the 3.0 refusal's prefix,
+  which names the format where the 2.0 reader's names the schema, the 2.0
+  path unchanged by design; `splitModel`'s cast, the same raw input
+  `main` passed to `deserializeConstraint`; the header type, whose new
+  fields the drift test would catch through the schema; and
+  `SchemaValidator.validateModel`, still public API. barwise-ehl closes
+  in the tracker follow-up after merge, as the steward skill does it.
 - barwise-ehl's duplicated misplacement sentence is gone with
   `refuseMisplacedConstraints`, and its baseline row with it.
 

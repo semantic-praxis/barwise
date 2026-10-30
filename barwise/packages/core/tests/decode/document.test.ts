@@ -244,6 +244,14 @@ describe("the 3.0 malformed cases, through the loader", () => {
     const refused = error as DeserializationError;
     expect(refused.validationResult!.errors).toHaveLength(2);
     expect(refused.message).not.toContain("\n");
+    try {
+      serializer.deserialize(
+        'orm_version: "3.0"\nmodel:\n  name: M\n  definitions:\n    - term: "a\\nb"\n      definition: " "\n',
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect((error as DeserializationError).message).toContain('Definition of "a\\nb": definition');
   });
 
   it("labels a definition by its term, and an element by any id it states", () => {

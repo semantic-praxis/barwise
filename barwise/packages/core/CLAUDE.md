@@ -15,8 +15,10 @@ exact version (`tests/effectVersion.test.ts` fails a range, and any other
 workspace package that declares it at a different version). No others
 without discussion. `effect` arrived with the decoders in `src/decode/`
 (`docs/specs/effect-adoption.spec.md`, 1r, R1), and since R4 the 3.0
-loader reads every file through them alone, so reading a 3.0 file loads
-Effect. `ajv` stays for the 2.0 reader, which validates against the frozen
+loader reads every file through them alone. The barrel exports the
+serializer, which imports them, so loading core loads Effect, whether or
+not a file is read (R4's S5 reading has the cost). `ajv` stays for the
+2.0 reader, which validates against the frozen
 `schemas/orm-model-2.0.schema.json` (Open decision 13). Core's barrel does
 not export the decoders.
 
