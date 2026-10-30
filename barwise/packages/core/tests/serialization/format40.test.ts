@@ -18,6 +18,8 @@ function doc(extra: {
   subtypeFacts?: Record<string, unknown>[];
   objectTypes?: Record<string, unknown>[];
   populations?: Record<string, unknown>[];
+  modelConstraints?: Record<string, unknown>[];
+  objectified?: Record<string, unknown>[];
 } = {}): Record<string, unknown> {
   return {
     orm_version: "4.0",
@@ -36,6 +38,8 @@ function doc(extra: {
       }],
       ...(extra.subtypeFacts ? { subtype_facts: extra.subtypeFacts } : {}),
       ...(extra.populations ? { populations: extra.populations } : {}),
+      ...(extra.modelConstraints ? { constraints: extra.modelConstraints } : {}),
+      ...(extra.objectified ? { objectified_fact_types: extra.objectified } : {}),
     },
   };
 }
@@ -101,12 +105,71 @@ describe("reading a format 4.0 document", () => {
       readDocument40(doc({
         objectTypes: [{ id: "Person_smokes", name: "Smokes", kind: "entity", reference_mode: "x" }],
       }))
-    ).toThrow(/"Person_smokes" \(an object type, a fact type\).*An id names one element/);
+    ).toThrow(/"Person_smokes" \(an object type and a fact type\).*An id names one element/);
     expect(() =>
       readDocument40(doc({
         constraints: [{ id: "Person", type: "mandatory", role: "Person_smokes.smokes" }],
       }))
     ).toThrow(DeserializationError);
+  });
+
+  // Each kind the reader collects stated ids from, as the second holder of
+  // an id another kind states, so dropping any kind from the collection
+  // fails here. Role and population ids hold a dot, so they meet each other.
+  const UNNAMED_MANDATORY = { type: "mandatory", role: "Person_smokes.smokes" };
+  const STATED_TWICE: [string, Parameters<typeof doc>[0], RegExp][] = [
+    ["a role and a population", {
+      populations: [{ id: "Person_smokes.smokes", fact_type: "Person_smokes", instances: [] }],
+    }, /"Person_smokes\.smokes" \(a role and a population\)/],
+    ["an object type and a fact type's constraint", {
+      constraints: [{ id: "Person", type: "mandatory", role: "Person_smokes.smokes" }],
+    }, /"Person" \(an object type and a constraint\)/],
+    ["an object type and a model constraint", {
+      modelConstraints: [{
+        id: "Person",
+        type: "external_uniqueness",
+        roles: ["Person_smokes.smokes"],
+      }],
+    }, /"Person" \(an object type and a constraint\)/],
+    ["an object type and a subtype fact", {
+      subtypeFacts: [{ id: "Person", subtype: "Person", supertype: "Person" }],
+    }, /"Person" \(an object type and a subtype fact\)/],
+    ["an object type and an objectification", {
+      objectified: [{ id: "Person", fact_type: "Person_smokes", object_type: "Person" }],
+    }, /"Person" \(an object type and an objectification\)/],
+    ["two fact types' worth: one kind twice", {
+      objectTypes: [{ id: "Person", name: "Human", kind: "entity", reference_mode: "x" }],
+    }, /"Person" \(2 object types\)/],
+  ];
+  it.each(STATED_TWICE)("refuses an id stated by %s", (_, extra, message) => {
+    expect(() => readDocument40(doc(extra))).toThrow(message);
+  });
+
+  // Kinds added after a fact type's constraints: each keeps the name it
+  // states, and the fact type's unnamed constraint takes the next.
+  const ADDED_LATER: [string, Parameters<typeof doc>[0]][] = [
+    ["a model constraint", {
+      modelConstraints: [{
+        id: "Each_Person_smokes",
+        type: "external_uniqueness",
+        roles: ["Person_smokes.smokes"],
+      }],
+    }],
+    ["an objectification", {
+      objectTypes: [{ id: "Smoking", name: "Smoking", kind: "entity", reference_mode: "nr" }],
+      objectified: [{
+        id: "Each_Person_smokes",
+        fact_type: "Person_smokes",
+        object_type: "Smoking",
+      }],
+    }],
+  ];
+  it.each(ADDED_LATER)("keeps a name %s states over one a constraint would mint", (_, extra) => {
+    const model = readDocument40(doc({ ...extra, constraints: [UNNAMED_MANDATORY] }));
+    expect(model.getFactType("Person_smokes")!.internalConstraints[0]!.id).toBe(
+      "Each_Person_smokes_2",
+    );
+    expect(model.idKindsHolding("Each_Person_smokes")).toHaveLength(1);
   });
 
   it("refuses a malformed id in the decoder's words, naming format 4.0", () => {

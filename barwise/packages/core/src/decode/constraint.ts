@@ -41,14 +41,7 @@ import {
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { crossField, crossFieldGuard, type CrossFieldMark, type MessageWithin } from "./harness.js";
 import { type FormatIds, IDS_30 } from "./ids.js";
-import {
-  intAtLeast,
-  nonEmpty,
-  rangeRecord,
-  RangesFile,
-  ValuesFile,
-  valuesOrRanges,
-} from "./leaves.js";
+import { intAtLeast, rangeRecord, RangesFile, ValuesFile, valuesOrRanges } from "./leaves.js";
 import { type ElementLabel, elementOf } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
@@ -108,33 +101,34 @@ const bound = (min: number) => {
   });
 };
 
-const RolePathFile = Schema.Struct({
-  root: nonEmpty(""),
-  steps: Schema.Array(Schema.Struct({ entry: nonEmpty(""), exit: nonEmpty("") })),
-});
-
-const JoinOperandFile = Schema.Struct({
-  path: RolePathFile,
-  projection: Schema.Array(intAtLeast(0)),
-});
-type JoinOperandFileValue = (typeof JoinOperandFile)["Type"];
+/** A join operand: a role path from a root object type, and its projection. */
+const joinOperandFileOf = (ids: AnyIds) =>
+  Schema.Struct({
+    path: Schema.Struct({
+      root: ids.objectTypeRef,
+      steps: Schema.Array(Schema.Struct({ entry: ids.role, exit: ids.role })),
+    }),
+    projection: Schema.Array(intAtLeast(0)),
+  });
+type JoinOperandFileValue = ReturnType<typeof joinOperandFileOf>["Type"];
 
 /**
  * Two or more operands, typed as such: the record's narrowing, stated by the
  * check that enforces it, so the derived type carries it. Marked as the
  * role lists' minimum is, for the same reason.
  */
-const Operands = Schema.Array(JoinOperandFile).pipe(
-  crossFieldGuard(
-    LIST_LENGTH,
-    (
-      ops,
-    ): ops is readonly [JoinOperandFileValue, JoinOperandFileValue, ...JoinOperandFileValue[]] =>
-      ops.length >= 2,
-    "must list at least two operands.",
-    { arbitraryConstraint: { minLength: 2 } },
-  ),
-);
+const operandsOf = (operand: ReturnType<typeof joinOperandFileOf>) =>
+  Schema.Array(operand).pipe(
+    crossFieldGuard(
+      LIST_LENGTH,
+      (
+        ops,
+      ): ops is readonly [JoinOperandFileValue, JoinOperandFileValue, ...JoinOperandFileValue[]] =>
+        ops.length >= 2,
+      "must list at least two operands.",
+      { arbitraryConstraint: { minLength: 2 } },
+    ),
+  );
 
 // -- The kinds --------------------------------------------------------------
 
@@ -156,6 +150,10 @@ export function constraintKindFiles<I extends AnyIds>(ids: I) {
   };
   const ruled = <S extends Schema.Top>(struct: S): S =>
     ids.mintedRule === undefined ? struct : (struct.check(ids.mintedRule as never) as unknown as S);
+
+  const JoinOperandFile = joinOperandFileOf(ids);
+  // One operand Schema for every kind that holds one.
+  const Operands = operandsOf(JoinOperandFile);
 
   const kind = <T extends string, F extends Schema.Struct.Fields>(type: T, fields: F) =>
     ruled(Schema.Struct({ ...base, type: Schema.Literal(type), ...fields }));

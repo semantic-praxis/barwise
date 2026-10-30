@@ -219,9 +219,7 @@
       "description": "A declared role path: a root object type (the join variable) and ordered single-fact-type hops.",
       "properties": {
         "root": {
-          "type": "string",
-          "minLength": 1,
-          "description": "The root object type id -- the correlation / join variable's type."
+          "$ref": "#/definitions/reference"
         },
         "steps": {
           "type": "array",
@@ -235,14 +233,10 @@
             ],
             "properties": {
               "entry": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Entry role id (played by the current path node)."
+                "$ref": "#/definitions/role_id"
               },
               "exit": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Exit role id (another role of the entry role's fact type)."
+                "$ref": "#/definitions/role_id"
               }
             }
           }

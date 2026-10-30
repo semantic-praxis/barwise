@@ -123,6 +123,13 @@ function base(): Record<string, any> {
   };
 }
 
+/** A join ring over one hop, its step's roles and root as given. */
+const joinRing = (role: string, root = "Person") => ({
+  type: "join_ring",
+  operand: { path: { root, steps: [{ entry: role, exit: role }] }, projection: [0, 1] },
+  ring_type: "irreflexive",
+});
+
 const CASES: [string, (d: Record<string, any>) => void, boolean][] = [
   ["the base document", () => {}, true],
   ["a stated constraint id", (d) => (d.model.fact_types[0].constraints[0].id = "Each_P"), true],
@@ -151,6 +158,17 @@ const CASES: [string, (d: Record<string, any>) => void, boolean][] = [
   ["a diagram element with a dot", (d) => (d.model.diagrams[0].elements = ["a.b"]), false],
   ["a constraint role that is no role id", (d) => {
     d.model.fact_types[0].constraints[0].role = "smokes";
+  }, false],
+  [
+    "a join path over role ids",
+    (d) => (d.model.constraints = [joinRing("Person_smokes.smokes")]),
+    true,
+  ],
+  ["a join path step with a UUID role", (d) => {
+    d.model.constraints = [joinRing("0193c8e2-6f4b-7c3a-9d1e-2b4f6a8c0e12")];
+  }, false],
+  ["a join path rooted at no local name", (d) => {
+    d.model.constraints = [joinRing("Person_smokes.smokes", "Per son")];
   }, false],
   ["orm_version 3.0", (d) => (d.orm_version = "3.0"), false],
 ];

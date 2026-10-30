@@ -9,6 +9,7 @@ import { type DecodedDocument, runDocumentDecode } from "../decode/document.js";
 import { type DecodedDocument40, runDocument40Decode } from "../decode/document40.js";
 import type { DecodeProblem } from "../decode/problems.js";
 import { describeConstraintRepeat, describeConstraintRepeats } from "../model/Constraint.js";
+import type { IdKind } from "../model/idIndex.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import { DeserializationError, refusingHeldIds } from "./deserializationError.js";
@@ -196,7 +197,8 @@ export class OrmYamlSerializer {
 }
 
 /**
- * Decode a 3.0 document, or refuse it with every problem it has, each
+ * Decode a 3.0 document (or, given its decoder, a 4.0 one), or refuse it
+ * with every problem it has, each
  * naming its element and field. The message is one line, its problems
  * sentences one after another, because surfaces print it after a file name
  * (`barwise migrate` gives one line per file); a line break inside a name
@@ -231,7 +233,8 @@ function decodeOrRefuse(
 }
 
 /**
- * Build the model from a decoded 3.0 document. What decoding cannot see is
+ * Build the model from a decoded 3.0 or 4.0 document, with the ids a 4.0
+ * file states reserved for the load. What decoding cannot see is
  * checked here, as it was on the validated document: constraint ids
  * repeated across the file, and, unless `lenient`, the references the
  * model's constructors check.
@@ -267,12 +270,13 @@ function addDecoded(
   // asks the same `groupRepeats` of the built model. Holders whose fact
   // types also share an id never reach it: the store refuses the second
   // fact type (`DuplicateIdError`, model-invariants WS3).
-  // A 4.0 file may leave a constraint's id to the model; only stated ids repeat.
   const stated = [
     ...doc.factTypes.flatMap((ft) => ft.constraints.map((c) => [c, ft.name] as const)),
     ...doc.constraints.map((c) => [c, undefined] as const),
-  ].filter(([c]) => c.id !== undefined);
-  const repeats = [...groupRepeats(stated, ([c]) => c.id!)];
+  ];
+  // `groupRepeats` passes over an absent key, so a 4.0 constraint that
+  // leaves its id to the model is never a repeat.
+  const repeats = [...groupRepeats(stated, ([c]) => c.id)];
   if (repeats.length > 0) {
     const named = describeConstraintRepeats(
       repeats.map(([id, holders]) => describeConstraintRepeat(id, holders)),
@@ -337,9 +341,7 @@ export function readDocument40(doc: unknown, options?: { lenient?: boolean; }): 
   const stated = statedIds40(decoded);
   const repeats = [...groupRepeats(stated, ([id]) => id)];
   if (repeats.length > 0) {
-    const named = repeats.map(([id, holders]) =>
-      `"${id}" (${holders.map(([, kind]) => kind).join(", ")})`
-    ).join("; ");
+    const named = repeats.map(([id, holders]) => `"${id}" (${holdersOf(holders)})`).join("; ");
     throw new DeserializationError(
       `Ids are stated by more than one element: ${named}. An id names one element.`,
     );
@@ -347,22 +349,30 @@ export function readDocument40(doc: unknown, options?: { lenient?: boolean; }): 
   return refusingHeldIds(() => fromDecoded(decoded, options, stated.map(([id]) => id)));
 }
 
+/** "an object type and a fact type", or "2 fact types". */
+function holdersOf(holders: readonly (readonly [string, IdKind])[]): string {
+  const kinds = [...new Set(holders.map(([, kind]) => kind))];
+  if (kinds.length === 1) return `${holders.length} ${kinds[0]}s`;
+  const article = (kind: string) => (/^[aeiou]/.test(kind) ? `an ${kind}` : `a ${kind}`);
+  return kinds.map(article).join(" and ");
+}
+
 /** Every id a 4.0 document states, with the kind of element stating it. */
-function statedIds40(doc: DecodedDocument40): (readonly [string, string])[] {
-  const ids: (readonly [string, string])[] = [];
-  const add = (id: string | undefined, kind: string) => {
+function statedIds40(doc: DecodedDocument40): (readonly [string, IdKind])[] {
+  const ids: (readonly [string, IdKind])[] = [];
+  const add = (id: string | undefined, kind: IdKind) => {
     if (id !== undefined) ids.push([id, kind]);
   };
-  for (const ot of doc.objectTypes) add(ot.record.id, "an object type");
+  for (const ot of doc.objectTypes) add(ot.record.id, "object type");
   for (const ft of doc.factTypes) {
-    add(ft.id, "a fact type");
-    for (const r of ft.roles) add(r.id, "a role");
-    for (const c of ft.constraints) add(c.id, "a constraint");
+    add(ft.id, "fact type");
+    for (const r of ft.roles) add(r.id, "role");
+    for (const c of ft.constraints) add(c.id, "constraint");
   }
-  for (const c of doc.constraints) add(c.id, "a constraint");
-  for (const sf of doc.subtypeFacts) add(sf.id, "a subtype fact");
-  for (const o of doc.objectifiedFactTypes) add(o.id, "an objectification");
-  for (const p of doc.populations) add(p.config.id, "a population");
+  for (const c of doc.constraints) add(c.id, "constraint");
+  for (const sf of doc.subtypeFacts) add(sf.id, "subtype fact");
+  for (const o of doc.objectifiedFactTypes) add(o.id, "objectification");
+  for (const p of doc.populations) add(p.config.id, "population");
   return ids;
 }
 
