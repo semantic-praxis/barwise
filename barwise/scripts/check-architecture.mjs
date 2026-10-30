@@ -31,6 +31,13 @@
  * to an ADR resolves -- see ADR_REF and citesAdrs below. Those inputs come
  * from the tracked listing, so the check needs git; no ADR at all is exit 2.
  *
+ * And it checks each ADR's `Enforced-by:` declarations
+ * (docs/specs/executable-adrs.spec.md): every decision has an id and an
+ * entry, each gate entry names a step CI runs, and each `none` names an
+ * open issue. Those inputs (barwise/package.json, ci.yml, the tracker) are
+ * read only when an entry needs them; one that cannot be read is exit 2,
+ * reported after the findings and never in place of them.
+ *
  * `--root <dir>` reads CLAUDE.md, barwise/scripts/lib/intended.cjs,
  * barwise/packages/* and the tracked files of another git tree, for this
  * check's own tests; nothing else passes it.
@@ -38,6 +45,13 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  decisionIds,
+  GATE_EXCEPTIONS,
+  gateName,
+  META_GATES,
+  parseEnforcedBy,
+} from "./lib/adr-enforcement.mjs";
 import {
   ADR_DIR,
   currentSection,
@@ -49,7 +63,9 @@ import {
   trackedPaths,
 } from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
+import { parseTracker } from "./lib/beads-merge.mjs";
 import { uncommittedPaths } from "./lib/changed-class.mjs";
+import { ciStepOccurrences, shouldRun } from "./lib/ci-gates.mjs";
 import { isInstructionFile } from "./lib/instruction-files.mjs";
 import { header, inSpecCorpus, touches } from "./lib/spec-reader.mjs";
 
@@ -364,6 +380,148 @@ for (const { f, text } of citing) {
   }
 }
 
+// Each ADR's `Enforced-by:` declarations (docs/specs/executable-adrs.spec.md,
+// WS1). An ADR without the header is not checked yet: the header becomes
+// required when the backfill (WS3) is done. `tests` entries are answered by
+// `check:adr-tests` from the runners' reports, never from source text.
+// Inputs are read only when an entry needs them, and an unreadable one is a
+// refusal recorded here, so it never hides a finding from the passes above.
+const enforcementProblems = [];
+const refusals = [];
+const lazily = (label, load) => {
+  let done = false;
+  let value = null;
+  return () => {
+    if (!done) {
+      done = true;
+      try {
+        value = load();
+      } catch (err) {
+        refusals.push(`${label}: ${err.message}`);
+      }
+    }
+    return value;
+  };
+};
+const rootScripts = lazily("barwise/package.json", () => {
+  const json = JSON.parse(readFileSync(join(root, "barwise", "package.json"), "utf8"));
+  if (!isMap(json?.scripts)) throw new Error("no scripts object");
+  return json.scripts;
+});
+const steps = lazily(".github/workflows/ci.yml", () => {
+  const found = ciStepOccurrences(join(root, ".github", "workflows", "ci.yml"));
+  if (found.length === 0) throw new Error("no steps found; has the workflow moved?");
+  return found;
+});
+const issues = lazily(".beads/issues.jsonl", () => {
+  const text = readFileSync(join(root, ".beads", "issues.jsonl"), "utf8");
+  const parsed = parseTracker(text, ".beads/issues.jsonl");
+  if (parsed.length === 0) throw new Error("the tracker holds no issues");
+  return new Map(parsed.map(({ obj }) => [obj.id, obj]));
+});
+// A step counts as the gate's when it runs in barwise/, cannot be told to
+// keep going on failure, and has a guard that runs it on every code change:
+// for both optimizer values, since a gate that runs only on optimizer
+// changes skips the rest.
+const guard = (condition) => {
+  const both = [true, false].map((optimizer) =>
+    shouldRun(condition, { docsOnly: false, optimizer })
+  );
+  return { understood: both.every((r) => r.understood), runs: both.every((r) => r.run) };
+};
+let declaring = 0;
+for (const { f, text } of adrs) {
+  const parsed = parseEnforcedBy(text);
+  if (!parsed.present) continue;
+  declaring++;
+  const name = f.slice(ADR_DIR.length, -".md".length);
+  const fail = (msg) => enforcementProblems.push(`${f}: ${msg}`);
+  for (const p of parsed.problems) fail(p);
+  const { decisions, problems: decisionProblems } = decisionIds(text);
+  for (const p of decisionProblems) fail(p);
+  if (decisions.length === 0) fail("its ## Decision section has no numbered decision");
+  const ids = new Map();
+  for (const d of decisions) {
+    if (d.id === null) fail(`decision ${d.n} (line ${d.line}) has no {#id} after its bold title`);
+    else if (ids.has(d.id)) fail(`decisions ${ids.get(d.id).n} and ${d.n} share the id ${d.id}`);
+    else ids.set(d.id, d);
+  }
+  const covered = new Set();
+  for (const entry of parsed.entries) {
+    for (const id of entry.ids) {
+      if (!ids.has(id)) fail(`"${entry.text}" lists ${id}, which no decision here has`);
+      covered.add(id);
+    }
+    if (entry.kind === "npm") {
+      const { script } = entry;
+      if (!gateName(script)) {
+        fail(
+          `"${entry.text}": ${script} is not a gate name (check:*, audit:*, or one of`
+            + ` ${Object.keys(GATE_EXCEPTIONS).join(", ")} in GATE_EXCEPTIONS)`,
+        );
+        continue;
+      }
+      if (Object.hasOwn(META_GATES, script) && !META_GATES[script].includes(name)) {
+        fail(`"${entry.text}": ${script} checks other gates and cannot vouch for this ADR`);
+        continue;
+      }
+      const scripts = rootScripts();
+      if (scripts !== null && !Object.hasOwn(scripts, script)) {
+        fail(`"${entry.text}": barwise/package.json has no script ${script}`);
+        continue;
+      }
+      const all = steps();
+      if (all === null) continue;
+      const want = entry.args === null ? `npm run ${script}` : `npm run ${script} -- ${entry.args}`;
+      const matching = all.filter((s) => s.run === want);
+      const inBarwise = matching.filter((s) => s.workingDirectory === "barwise");
+      const qualifies = inBarwise.filter((s) => {
+        const g = guard(s.condition);
+        return s.continueOnError === false && g.understood && g.runs;
+      });
+      if (qualifies.length > 0) continue;
+      const unreadable = inBarwise.filter((s) =>
+        s.continueOnError === null
+        || (s.continueOnError === false && !guard(s.condition).understood)
+      );
+      if (unreadable.length > 0) {
+        refusals.push(
+          `${f}: "${entry.text}": cannot tell whether the step runs; its`
+            + ` ${
+              unreadable[0].continueOnError === null
+                ? "continue-on-error"
+                : `if: ${unreadable[0].condition}`
+            }`
+            + " is not a form this check reads",
+        );
+        continue;
+      }
+      const why = matching.length === 0
+        ? `no ci.yml step's run: is exactly "${want}"`
+        : inBarwise.length === 0
+        ? `the step "${want}" does not run in barwise/`
+        : inBarwise.some((s) => s.continueOnError === true)
+        ? `the step "${want}" is continue-on-error, so it cannot fail CI`
+        : `the step "${want}" has a guard that does not run it on every code change`;
+      fail(`"${entry.text}": ${why}`);
+    } else if (entry.kind === "none") {
+      const tracker = issues();
+      if (tracker === null) continue;
+      const issue = tracker.get(entry.issue);
+      if (issue === undefined) {
+        fail(`"${entry.text}": ${entry.issue} is not in .beads/issues.jsonl`);
+      } else if (issue.status === "closed") {
+        fail(
+          `"${entry.text}": ${entry.issue} is closed; declare the enforcer it built, or reopen it`,
+        );
+      }
+    }
+  }
+  for (const [id, d] of ids) {
+    if (!covered.has(id)) fail(`decision ${d.n} {#${id}} has no Enforced-by: entry`);
+  }
+}
+
 // The generated section is rendered from these same inputs (the tracked
 // ADRs and INTENDED), so a stale section is one regen:architecture fixes.
 const stale = section !== renderSection(adrs, intended);
@@ -390,9 +548,28 @@ if (stale) {
       + " (an ADR or INTENDED changed); run npm run regen:architecture and commit the result.",
   );
 }
-if (problems.length > 0 || adrProblems.length > 0 || stale) process.exit(1);
+if (enforcementProblems.length > 0) {
+  console.error(
+    `check:architecture: FAIL -- ${enforcementProblems.length} Enforced-by: problem(s):`,
+  );
+  for (const p of enforcementProblems) console.error(`  ${p}`);
+  console.error(
+    "Every decision needs an entry: a gate, tests (<ids>), or none (<open gap issue>: <ids>)"
+      + " (docs/specs/executable-adrs.spec.md).",
+  );
+}
+if (refusals.length > 0) {
+  console.error(`check:architecture: cannot answer for ${refusals.length} declaration(s):`);
+  for (const r of refusals) console.error(`  ${r}`);
+}
+// Any finding is exit 1, and the refusals beside it are still listed above;
+// refusals alone are exit 2 (docs/adr/gate-refusal-contract.md).
+if (problems.length > 0 || adrProblems.length > 0 || stale || enforcementProblems.length > 0) {
+  process.exit(1);
+}
+if (refusals.length > 0) process.exit(2);
 console.log(
   `check:architecture: ${drawnEdges.size} edges in CLAUDE.md and ${manifests.length} package`
     + ` manifests agree with INTENDED; ${adrs.length} ADRs are well-formed and every reference`
-    + ` in ${citing.length} files resolves. OK`,
+    + ` in ${citing.length} files resolves; ${declaring} declare Enforced-by:. OK`,
 );

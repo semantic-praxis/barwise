@@ -1,9 +1,9 @@
 # Executable ADRs: each ADR declares what enforces it, and CI checks the declaration
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-10-30 (the declaration pass in check:architecture, adr-enforcement.mjs, ciStepOccurrences(); an absent header still allowed). WS2 to WS4 not yet built.
 
 Created: 2026-10-28
-Last-updated: 2026-10-29
+Last-updated: 2026-10-30
 Plan-reviewed: e247c807 (code-review, pr-review; the review's ten items are barwise-ym8.7jz, which supersedes this text where they conflict)
 Tracking: barwise-ym8, barwise-ym8.7jz (required implementation items
 from the plan review)
