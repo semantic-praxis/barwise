@@ -50,7 +50,8 @@ export class OrmYamlSerializer {
   /**
    * Compiled on first use, not in the constructor.
    *
-   * Only the 2.0 reader validates with ajv, and an ajv compile costs about 34ms -- so every caller that constructs a serializer to
+   * Only the 2.0 reader validates with ajv, and an ajv compile costs
+   * about 34ms -- so every caller that constructs a serializer to
    * SERIALIZE paid for a validator it never touched. `hashModel` builds
    * one per call, which made the laws that hash a model twice per
    * generated case take 25s under coverage instrumentation and time out

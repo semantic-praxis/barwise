@@ -39,14 +39,6 @@ export const notBlank = (what: string) =>
   );
 export const Name = notBlank("");
 
-/**
- * An integer no smaller than `min`, as JSON Schema's `integer` with a
- * `minimum` reads one. Not `Schema.Int`, which is `Number.isSafeInteger`
- * and so refused 2^53 + 2, which today's schema and constructor accept
- * (review of R1). The arbitrary constraint only steers derivation (M1) to
- * draw integers in range rather than discard almost every number it draws.
- * `message` is for a leaf with alternatives, a maximum's "unbounded".
- */
 /** Any integer, as JSON Schema's `integer` reads one: a diagram position. */
 export const Integer = Schema.Number.annotate({ message: "must be an integer." }).check(
   Schema.makeFilter((n: number) => Number.isInteger(n), {
@@ -55,6 +47,14 @@ export const Integer = Schema.Number.annotate({ message: "must be an integer." }
   }),
 );
 
+/**
+ * An integer no smaller than `min`, as JSON Schema's `integer` with a
+ * `minimum` reads one. Not `Schema.Int`, which is `Number.isSafeInteger`
+ * and so refused 2^53 + 2, which today's schema and constructor accept
+ * (review of R1). The arbitrary constraint only steers derivation (M1) to
+ * draw integers in range rather than discard almost every number it draws.
+ * `message` is for a leaf with alternatives, a maximum's "unbounded".
+ */
 export const intAtLeast = (
   min: number,
   message = min === 0

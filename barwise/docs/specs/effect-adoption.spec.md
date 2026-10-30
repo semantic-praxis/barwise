@@ -1125,6 +1125,24 @@ out of R3's fact type module so subtype facts share it.
   so the split path does not depend on the 2.0 reader. The test generator
   over the hand-written schema (`tests/helpers/jsonSchemaArbitrary.ts`)
   now reads the root's keywords and honours `pattern`.
+- The pre-merge review's `/code-review` found no design flaw and these
+  details, each fixed with a test that fails when it is planted back
+  where it changes behaviour: the refusal had become several lines, which
+  `barwise migrate` prints after a file name, and is one line again,
+  problems joined by "; " as ajv's were; a problem at the document itself
+  had the path "" where ajv gave "/"; a definition with no term read
+  "Definition of with no term"; an id of spaces labelled its element as
+  having none; `SchemaValidator` still compiled the 3.0 schema up front,
+  which only tests now use; the integer leaf was a second copy beside
+  `intAtLeast`; and three doc comments still said 3.0 is validated
+  against the JSON Schema. Declined, with the reason: building the
+  document decoder on first use, since building it costs nothing
+  measurable and the time is Effect's import, which a synchronous
+  `deserialize` cannot defer; and adding the modality default in one place
+  only, since S3's frozen record requires it stated and `main`'s model
+  stores none (`splitModel` reads only role ids from the record). S1, S4
+  and S5 were re-read after these fixes and are unchanged: S5 376 ms npm
+  and 339 ms bundle, `main` 285 and 335 back to back.
 - barwise-ehl's duplicated misplacement sentence is gone with
   `refuseMisplacedConstraints`, and its baseline row with it.
 
