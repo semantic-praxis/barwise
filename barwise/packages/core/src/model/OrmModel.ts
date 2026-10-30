@@ -647,13 +647,18 @@ export class OrmModel implements ConstraintModel {
    * @param options.skipPlayerValidation - When true, skip the check that
    *   all role player IDs exist in the model.  Used when deserializing
    *   merge fragments that reference types from a base model.
+   * @param options.suffixRepeatedRoleNames - When true, roles given one
+   *   name and no ids take the suffix rule (`<ft>.is_in`, `<ft>.is_in_2`)
+   *   instead of being refused: a migration or an import translating a
+   *   source that names its roles alike (iri-identity, decision 5).
    * @throws If any role references a nonexistent object type (unless skipPlayerValidation).
+   * @throws If two roles without ids share a name (unless suffixRepeatedRoleNames).
    * @throws DuplicateIdError if a fact type with the same id already exists.
    * @throws If a fact type with the same name already exists.
    */
   addFactType(
     config: FactTypeConfig,
-    options?: { skipPlayerValidation?: boolean; },
+    options?: { skipPlayerValidation?: boolean; suffixRepeatedRoleNames?: boolean; },
   ): FactType {
     this.refuseHeldId(this._factTypes, config, "fact type", (e) => `fact type ${quoted(e.name)}`);
     const existing = this.getFactTypeByName(config.name);
@@ -693,7 +698,12 @@ export class OrmModel implements ConstraintModel {
     const ft = new FactType({
       ...config,
       id,
-      roles: this.namedRoles(config, id, new Set([...stated, id])),
+      roles: this.namedRoles(
+        config,
+        id,
+        new Set([...stated, id]),
+        options?.suffixRepeatedRoleNames ?? false,
+      ),
       constraints: [],
     });
     this._factTypes.set(ft);
@@ -721,16 +731,21 @@ export class OrmModel implements ConstraintModel {
    * The roles with their ids: each its own, or `<fact type>.<role>`
    * (iri-identity, the role id rule). Two roles given without ids under one
    * name are refused, because neither id could say which role it is
-   * (decision 5, for new authoring); a file that repeats a name states its
-   * role ids.
+   * (decision 5, for hand authoring); a file that repeats a name states its
+   * role ids, and a migration or import asks for the suffix rule.
    */
   private namedRoles(
     config: FactTypeConfig,
     factTypeId: string,
     stated: ReadonlySet<string>,
+    suffixRepeats: boolean,
   ): FactTypeConfig["roles"] {
     const unnamed = config.roles.filter((r) => r.id === undefined);
-    for (const [local, roles] of groupRepeats(unnamed, (r) => localName(r.name))) {
+    for (
+      const [local, roles] of suffixRepeats
+        ? []
+        : groupRepeats(unnamed, (r) => localName(r.name))
+    ) {
       throw new Error(
         `Fact type "${config.name}" has ${roles.length} roles named "${roles[0]!.name}" `
           + `(${local}): give each role a name of its own, or state the role ids.`,

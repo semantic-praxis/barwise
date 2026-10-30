@@ -2,7 +2,7 @@
  * Phase 3: create fact types with roles and constraints.
  */
 
-import { generateId, type InternalConstraint } from "@barwise/core";
+import type { InternalConstraint } from "@barwise/core";
 import {
   combinationOf,
   compositeRoleColumns,
@@ -43,25 +43,24 @@ export function createFactTypes(ctx: DbtMapperContext): void {
       const vtName = ctx.model.getObjectType(vtId)?.name ?? toPascalCase(col.name);
       const factName = `${entityName} has ${vtName}`;
 
-      // Minted, never built from names: the id policy is generateId's, and
-      // the surface installs UUIDv7 behind it (importer-role-ids.spec.md).
-      const role1Id = generateId();
-      const role2Id = generateId();
+      // The model names the roles (`<fact type>.<role>`, iri-identity
+      // decision 17), so the constraints that name them are added once it has.
+      const ft = ctx.model.addFactType({
+        name: factName,
+        roles: [
+          { name: "has", playerId: entityId },
+          { name: "is of", playerId: vtId },
+        ],
+        readings: [`{0} has {1}`, `{1} is of {0}`],
+      });
+      const [role1Id, role2Id] = ft.roles.map((r) => r.id) as [string, string];
       ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, role1Id);
       ctx.farRoleIdMap.set(`${m.name}::${col.name}`, role2Id);
 
       // Build constraints from tests.
-      const constraints = buildConstraints(col, role1Id, role2Id, ctx.report, m.name);
-
-      ctx.model.addFactType({
-        name: factName,
-        roles: [
-          { id: role1Id, name: "has", playerId: entityId },
-          { id: role2Id, name: "is of", playerId: vtId },
-        ],
-        readings: [`{0} has {1}`, `{1} is of {0}`],
-        constraints,
-      });
+      for (const c of buildConstraints(col, role1Id, role2Id, ctx.report, m.name)) {
+        ft.addConstraint(c);
+      }
     }
 
     // Create fact types for FK (relationship) columns. A target reached
@@ -111,10 +110,22 @@ export function createFactTypes(ctx: DbtMapperContext): void {
         );
       }
 
-      // Minted, never built from names: the id policy is generateId's, and
-      // the surface installs UUIDv7 behind it (importer-role-ids.spec.md).
-      const role1Id = generateId();
-      const role2Id = generateId();
+      // The model names the roles (`<fact type>.<role>`, iri-identity
+      // decision 17), so the constraints that name them are added once it has.
+      const ft = ctx.model.addFactType({
+        name: factName,
+        roles: [
+          { name: "has", playerId: targetEntityId },
+          { name: "is of", playerId: entityId },
+        ],
+        // A qualified relationship reads source-first ("Leg has origin
+        // Port"). The unqualified one keeps its existing readings so no
+        // import that worked before moves (spec R3).
+        readings: qualifier
+          ? [`{1} has ${qualifier} {0}`, `{0} is ${qualifier} of {1}`]
+          : [`{0} has {1}`, `{1} is of {0}`],
+      });
+      const [role1Id, role2Id] = ft.roles.map((r) => r.id) as [string, string];
 
       // Mandatory when every one of its columns is not_null: a row with a
       // null in any of them references nothing.
@@ -165,20 +176,7 @@ export function createFactTypes(ctx: DbtMapperContext): void {
         if (ctx.farRoleIdMap.has(at)) ctx.sharedReferenceColumns.add(at);
         else ctx.farRoleIdMap.set(at, role1Id);
       }
-      ctx.model.addFactType({
-        name: factName,
-        roles: [
-          { id: role1Id, name: "has", playerId: targetEntityId },
-          { id: role2Id, name: "is of", playerId: entityId },
-        ],
-        // A qualified relationship reads source-first ("Leg has origin
-        // Port"). The unqualified one keeps its existing readings so no
-        // import that worked before moves (spec R3).
-        readings: qualifier
-          ? [`{1} has ${qualifier} {0}`, `{0} is ${qualifier} of {1}`]
-          : [`{0} has {1}`, `{1} is of {0}`],
-        constraints,
-      });
+      for (const c of constraints) ft.addConstraint(c);
 
       ctx.report.info(
         "relationship",

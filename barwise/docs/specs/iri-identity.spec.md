@@ -13,8 +13,9 @@ verbalization interface, `model/mint.ts` and `FactType.addConstraint`'s
 return; the test builders off `::` ids; lineage exports name their model);
 6b-1 implemented 2026-10-30 (the cross-kind id index and constraint
 admission); 6b-2a implemented 2026-10-30 (minting in the model); 6b-2b-1
-in progress (the 4.0 reader, unwired); 6b-4a, 6b-2b-2, 6b-3, 6b-4b, 6c to
-6f and WS7 to come
+implemented 2026-10-30 (the 4.0 reader, unwired); 6b-4a implemented
+2026-10-30 (the importers off role ids); 6b-2b-2, 6b-3, 6b-4b, 6c to 6f and
+WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-30
@@ -1498,7 +1499,12 @@ sites.
       `<local name>.<local name>`: the importers that state UUID role
       ids add the fact type without them and read them back, as 6b-4
       describes, so the writer never emits a role id the 4.0 schema
-      refuses.
+      refuses. The dbt composite-key and DDL relationship importers name
+      every role "is in", so they pass `suffixRepeatedRoleNames` (decision
+      5 as amended); a preferred identifier reads the id its constraint was
+      stored under. The CLI and MCP entry-point tests observe the UUIDv7
+      install through an Ossie import, the one importer still stating
+      generated ids, until 6b-4b retires the generator and those tests.
     - _6b-2b-2, the switch._ The 3.0 schema frozen as
       `orm-model-3.0.schema.json` and the 4.0 one renamed to
       `orm-model.schema.json`; decision 20; absent ids on subtype facts
@@ -1590,7 +1596,12 @@ accepted. The options stay, so a later reader sees what was weighed.
 5. **Two roles of one fact type with the same role name.** Required, but
    unique nowhere today. (a) the suffix rule (`.has`, `.has_2`). (b) refuse,
    and make the author rename one. **Decided: (a) for the migration and (b)
-   for new authoring**, which WS2's warning prepares.
+   for new authoring**, which WS2's warning prepares. Amended (owner,
+   2026-10-30): an import takes (a) as a migration does, because it
+   translates a source that may name its roles alike (the dbt composite-key
+   and DDL association-table importers name every role "is in"); (b) is for
+   hand authoring. Both reach it through `addFactType`'s
+   `suffixRepeatedRoleNames` option.
 6. **Minted names that are long.** A constraint's local name is a sentence
    (`Each_Person_either_drives_some_Car_or_rides_some_Bus_but_not_both`).
    **Decided: keep it whole**, as the owner chose: truncation collides.

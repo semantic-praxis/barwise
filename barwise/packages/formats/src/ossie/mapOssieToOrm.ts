@@ -518,8 +518,9 @@ function addRelationship(
   const name = ossieFactTypeName(c.concept, r.name);
   const players = rolePlayers(c, r);
   const keys = roleKeys(c, r);
+  // No role ids: the model names each `<fact type>.<role key>` (iri-identity
+  // decision 17), and Ossie's role keys already differ within a relationship.
   const roles: RoleConfig[] = players.map((player, i) => ({
-    id: generateId(),
     name: keys[i]!,
     playerId: playerId(model, player),
   }));
@@ -538,12 +539,11 @@ function addRelationship(
   const requires = r.requires ?? [];
   for (const expr of requires) warnings.push(kept(name, expr));
   const note = notes(requires, []);
-  model.addFactType({
+  const factType = model.addFactType({
     id: generateId(),
     name,
     roles,
     readings,
-    constraints: multiplicityConstraints(name, roles, r.multiplicity, warnings),
     ...(r.description ? { definition: r.description } : {}),
     ...(note ? { note } : {}),
     ...(r.derived_by && r.derived_by.length > 0
@@ -552,6 +552,10 @@ function addRelationship(
       }
       : {}),
   });
+  // Over the stored roles, which carry the ids the model gave them.
+  for (const c of multiplicityConstraints(name, factType.roles, r.multiplicity, warnings)) {
+    factType.addConstraint(c);
+  }
 }
 
 /**

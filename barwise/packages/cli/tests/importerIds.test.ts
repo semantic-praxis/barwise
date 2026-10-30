@@ -30,6 +30,7 @@ import {
   localName,
   mintedName,
   type OrmModel,
+  ROLE_ID_PATTERN,
   setIdGenerator,
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
@@ -318,6 +319,14 @@ describe("importer ids come from generateId", () => {
 
       const values = ids.map((e) => e.id);
       expect(new Set(values).size, `${name} emitted a repeated id`).toBe(values.length);
+
+      // No importer states a role id: each is the model's `<fact type>.<role>`,
+      // the one shape a 4.0 file accepts (iri-identity 6b-4a), so a 4.0 write
+      // of any import is a file the 4.0 reader takes.
+      const statedRoles = model.factTypes.flatMap((ft) => ft.roles)
+        .filter((r) => !ROLE_ID_PATTERN.test(r.id))
+        .map((r) => r.id);
+      expect(statedRoles, `${name} stated role ids of another shape`).toEqual([]);
     });
   }
 });

@@ -279,6 +279,27 @@ describe("a model naming what it is given", () => {
     expect(ft.roles.map((r) => r.id)).toEqual(["k0", "k1"]);
   });
 
+  it("suffixes roles given one name when asked, as a migration or an import does", () => {
+    const m = people();
+    const ft = m.addFactType(
+      {
+        name: "Person and Car are in Trip",
+        roles: [
+          { name: "is in", playerId: "Person" },
+          { name: "is in", playerId: "Car" },
+          { name: "is in", playerId: "Name" },
+        ],
+        readings: ["{0} and {1} are in {2}"],
+      },
+      { suffixRepeatedRoleNames: true },
+    );
+    expect(ft.roles.map((r) => [r.name, r.id])).toEqual([
+      ["is in", "Person_and_Car_are_in_Trip.is_in"],
+      ["is in", "Person_and_Car_are_in_Trip.is_in_2"],
+      ["is in", "Person_and_Car_are_in_Trip.is_in_3"],
+    ]);
+  });
+
   it("refuses a fact type's bad constraint before storing anything", () => {
     const m = people();
     const before = m.factTypes.length;

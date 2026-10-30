@@ -16,7 +16,7 @@
  * gets its plain name ahead of a non-key column that happens to share it.
  */
 
-import { generateId, type InternalConstraint, type ObjectType } from "@barwise/core";
+import type { ObjectType } from "@barwise/core";
 import type { DbtColumn } from "../DbtSchemaTypes.js";
 import {
   claimValueType,
@@ -58,29 +58,25 @@ export function createIdentifierTypes(ctx: DbtMapperContext): void {
     identifierOwner.set(identifier.id, identifierOwner.get(identifier.id) ?? m.name);
 
     const factName = `${entityName} has ${identifier.name}`;
-    // Minted, never built from names (importer-role-ids.spec.md).
-    const entityRoleId = generateId();
-    const valueRoleId = generateId();
+    // The model names the roles and constraints (iri-identity decision 17),
+    // so the constraints are added once the fact type has its role ids.
+    const ft = ctx.model.addFactType({
+      name: factName,
+      roles: [
+        { name: "has", playerId: entityId },
+        { name: "is of", playerId: identifier.id },
+      ],
+      readings: ["{0} has {1}", "{1} is of {0}"],
+    });
+    const [entityRoleId, valueRoleId] = ft.roles.map((r) => r.id) as [string, string];
     ctx.columnRoleIdMap.set(`${m.name}::${col.name}`, entityRoleId);
     ctx.farRoleIdMap.set(`${m.name}::${col.name}`, valueRoleId);
     // The value role's uniqueness is the entity's preferred identifier,
-    // named on the entity (orm-format-3 WS4b).
-    const identifyingId = generateId();
-    const constraints: InternalConstraint[] = [
-      { id: identifyingId, type: "internal_uniqueness", roleIds: [valueRoleId] },
-      { type: "internal_uniqueness", roleIds: [entityRoleId] },
-      { type: "mandatory", roleId: entityRoleId },
-    ];
-    ctx.model.addFactType({
-      name: factName,
-      roles: [
-        { id: entityRoleId, name: "has", playerId: entityId },
-        { id: valueRoleId, name: "is of", playerId: identifier.id },
-      ],
-      readings: ["{0} has {1}", "{1} is of {0}"],
-      constraints,
-    });
-    ctx.model.setPreferredIdentifier(entityId, identifyingId);
+    // named on the entity by the id it was stored under (orm-format-3 WS4b).
+    const identifying = ft.addConstraint({ type: "internal_uniqueness", roleIds: [valueRoleId] });
+    ft.addConstraint({ type: "internal_uniqueness", roleIds: [entityRoleId] });
+    ft.addConstraint({ type: "mandatory", roleId: entityRoleId });
+    ctx.model.setPreferredIdentifier(entityId, identifying.id!);
   }
 }
 

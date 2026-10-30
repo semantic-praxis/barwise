@@ -19,11 +19,9 @@
 import {
   claimValueTypeName,
   type ConceptualDataTypeName,
-  generateId,
   type ImportFormat,
   type ImportOptions,
   type ImportResult,
-  type InternalConstraint,
   type ObjectType,
   OrmModel,
 } from "@barwise/core";
@@ -345,43 +343,23 @@ export class OpenApiImportFormat implements ImportFormat {
     const factTypeName = `${entityType.name} ${verb} ${referencedEntity.name}`;
 
     try {
-      const constraints: any[] = [];
-
-      // Role ids are minted, never built from names: `<entity id>-<verb>-role`
-      // collided for two references with the same inferred verb, and the
-      // value-side `-has-role` form for every schema sharing a property name
-      // (importer-role-ids.spec.md).
-      const role0Id = generateId();
-      const role1Id = generateId();
-
-      // Uniqueness constraint (many-to-one by default)
-      constraints.push({
-        type: "internal_uniqueness",
-        roleIds: [role1Id],
-      });
-
-      // Mandatory constraint if property is required
-      if (requiredProps.includes(propName)) {
-        constraints.push({
-          type: "mandatory",
-          roleId: role1Id,
-        });
-      }
-
-      model.addFactType({
+      // The model names the roles (`<fact type>.<role>`, iri-identity
+      // decision 17), so the constraints that name them are added once it has.
+      const factType = model.addFactType({
         name: factTypeName,
         roles: [
-          {
-            name: verb,
-            playerId: referencedEntity.id,
-            id: role0Id,
-          },
-          { name: `is ${verb} by`, playerId: entityType.id, id: role1Id },
+          { name: verb, playerId: referencedEntity.id },
+          { name: `is ${verb} by`, playerId: entityType.id },
         ],
         readings: [`{0} ${verb} {1}`],
-        constraints,
         definition: propDef.description,
       });
+      const rowRoleId = factType.roles[1]!.id;
+      // Many-to-one by default; mandatory when the property is required.
+      factType.addConstraint({ type: "internal_uniqueness", roleIds: [rowRoleId] });
+      if (requiredProps.includes(propName)) {
+        factType.addConstraint({ type: "mandatory", roleId: rowRoleId });
+      }
     } catch (err) {
       warnings.push(
         `Failed to create fact type for $ref property ${propName}: ${
@@ -413,16 +391,8 @@ export class OpenApiImportFormat implements ImportFormat {
       model.addFactType({
         name: factTypeName,
         roles: [
-          {
-            name: "has",
-            playerId: entityType.id,
-            id: generateId(),
-          },
-          {
-            name: "belongs to",
-            playerId: referencedEntity.id,
-            id: generateId(),
-          },
+          { name: "has", playerId: entityType.id },
+          { name: "belongs to", playerId: referencedEntity.id },
         ],
         readings: [`{0} has {1}`],
         constraints: [], // Many-to-many has no uniqueness constraint on either side
@@ -473,35 +443,34 @@ export class OpenApiImportFormat implements ImportFormat {
         warnings,
       );
 
-      // Minted, not built from names; see the $ref case above.
-      const entityRoleId = generateId();
-      const valueRoleId = generateId();
-
-      // A key's value-role uniqueness is the entity's preferred identifier,
-      // named on the entity once the fact type exists (orm-format-3 WS4b).
-      const identifyingId = generateId();
-      const constraints: InternalConstraint[] = isKey
-        ? [
-          { id: identifyingId, type: "internal_uniqueness", roleIds: [valueRoleId] },
-          { type: "internal_uniqueness", roleIds: [entityRoleId] },
-          { type: "mandatory", roleId: entityRoleId },
-        ]
-        : [{ type: "internal_uniqueness", roleIds: [entityRoleId] }];
-      if (!isKey && requiredProps.includes(propName)) {
-        constraints.push({ type: "mandatory", roleId: entityRoleId });
-      }
-
-      model.addFactType({
+      // The model names the roles (iri-identity decision 17), so the
+      // constraints are added once the fact type has its role ids.
+      const factType = model.addFactType({
         name: `${entityType.name} has ${valueType.name}`,
         roles: [
-          { name: "has", playerId: entityType.id, id: entityRoleId },
-          { name: "is of", playerId: valueType.id, id: valueRoleId },
+          { name: "has", playerId: entityType.id },
+          { name: "is of", playerId: valueType.id },
         ],
         readings: ["{0} has {1}", "{1} is of {0}"],
-        constraints,
         definition: propDef.description,
       });
-      if (isKey) model.setPreferredIdentifier(entityType.id, identifyingId);
+      const [entityRoleId, valueRoleId] = factType.roles.map((r) => r.id) as [string, string];
+      if (isKey) {
+        // A key's value-role uniqueness is the entity's preferred identifier,
+        // named on the entity by the id it was stored under (orm-format-3 WS4b).
+        const identifying = factType.addConstraint({
+          type: "internal_uniqueness",
+          roleIds: [valueRoleId],
+        });
+        factType.addConstraint({ type: "internal_uniqueness", roleIds: [entityRoleId] });
+        factType.addConstraint({ type: "mandatory", roleId: entityRoleId });
+        model.setPreferredIdentifier(entityType.id, identifying.id!);
+      } else {
+        factType.addConstraint({ type: "internal_uniqueness", roleIds: [entityRoleId] });
+        if (requiredProps.includes(propName)) {
+          factType.addConstraint({ type: "mandatory", roleId: entityRoleId });
+        }
+      }
     } catch (err) {
       warnings.push(
         `Failed to create fact type for property ${propName}: ${
