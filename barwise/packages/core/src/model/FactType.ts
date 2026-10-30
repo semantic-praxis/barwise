@@ -5,6 +5,7 @@ import {
   isExternalConstraint,
   isInternalConstraint,
 } from "./Constraint.js";
+import type { ConstraintAdmission } from "./constraintAdmission.js";
 import { generateId } from "./id.js";
 import { ModelElement } from "./ModelElement.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
@@ -79,6 +80,7 @@ export class FactType extends ModelElement {
   private readonly _roles: Role[];
   private readonly _readings: ReadingOrder[];
   private readonly _constraints: InternalConstraint[];
+  private _admission: ConstraintAdmission | undefined;
   private _definition: string | undefined;
   private _note: string | undefined;
   private _derivation: DerivationRule | undefined;
@@ -167,6 +169,18 @@ export class FactType extends ModelElement {
     return this._derivation;
   }
 
+  /**
+   * The model that holds this fact type, as the narrow interface it admits
+   * constraints through; none until a model adds it. Called once, by
+   * `OrmModel.addFactType`, after the fact type's own constraints are in.
+   */
+  joinModel(admission: ConstraintAdmission): void {
+    if (this._admission !== undefined) {
+      throw new Error(`Fact type "${this.name}" is already in a model.`);
+    }
+    this._admission = admission;
+  }
+
   /** Find a role by its id. Returns undefined if not found. */
   getRoleById(roleId: string): Role | undefined {
     return this._roles.find((r) => r.id === roleId);
@@ -209,7 +223,9 @@ export class FactType extends ModelElement {
         }".`,
       );
     }
-    const stored = withId(c);
+    // In a model, the model stores it, so its id is in the model's index;
+    // standalone, the fact type gives it an id itself.
+    const stored = this._admission?.admitConstraint(c) ?? withId(c);
     this._constraints.push(stored);
     return stored;
   }

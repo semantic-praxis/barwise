@@ -11,7 +11,8 @@ decision 15 amended, decisions 18 to 20); 6a implemented 2026-10-29 (diff
 recognizes renames and merge refuses content and rename pairings; the
 verbalization interface, `model/mint.ts` and `FactType.addConstraint`'s
 return; the test builders off `::` ids; lineage exports name their model);
-6b to 6f and WS7 to come
+6b-1 implemented 2026-10-30 (the cross-kind id index and constraint
+admission); 6b-2 to 6f and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-30
@@ -1427,6 +1428,38 @@ version-1 manifest would go silently empty for impact analysis.
   change. The Ossie writer puts `iriOf`'s identity IRI, or
   `equivalent_iri` when present, into Ossie's `iri` (decision 1), and the
   namespace leaves its loss block (WS4).
+
+**6b ships in four parts** (owner, 2026-10-30), each merged on its own,
+with no release until 6f, because 6b alone is more than a session: the
+3.x replay rewrites every id a 3.x file states, which reaches 123 test
+files, 102 fixtures and 20 goldens, beside the 47 `generateId()` call
+sites.
+
+- _6b-1, the model groundwork; files stay 3.0._ The cross-kind id index
+  (`model/idIndex.ts`), kept by every add and remove. It counts holders
+  by kind rather than keeping them, because a model built in code or read
+  from 2.0 may repeat a constraint id (`structural/duplicate-constraint-id`
+  reports it) and a subtype fact's removal replaces a constraint with a
+  narrowed copy under its own id. `refuseHeldId` still refuses within a
+  kind, from the store: in 3.0 the index's same-kind answer is the
+  store's, and across kinds is a 4.0 rule, which 6b-2 turns on when 3.x
+  files reach the model through the replay. The admission interface
+  (`model/constraintAdmission.ts`): a fact type in a model hands each
+  later constraint to the model, which enters its id today and mints it
+  in 6b-2.
+- _6b-2, the format._ Minting at the add (local names, `<ft>.<role>`, the
+  suffix rule, the stated ids reserved for a load, decision 20), the
+  cross-kind refusal, absent ids on subtype facts and objectifications
+  (decision 19), the 4.0 JSON Schema and Effect decoders with the 3.0
+  pair frozen, the 4.0 writer, and the 3.x and 2.0 replay with its
+  in-memory id map for diff; and the test, fixture and golden churn.
+- _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
+  this format needs, `iriOf`, and the header change for `namespace` and
+  `imports`.
+- _6b-4, importers and retirement._ The importers switch off
+  `generateId`, and `generateId`, its installs and promptlab's
+  deterministic ids go. Until then an importer states UUID ids, which a
+  4.0 file accepts as local names.
 
 **Sizes, roughly.** 6a: about 400 lines of source for diff, 300 for the
 rest, each with tests. 6b: about 25 core files and 1,500 to 2,000 lines,
