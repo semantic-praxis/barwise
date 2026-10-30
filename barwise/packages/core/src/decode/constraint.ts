@@ -31,6 +31,7 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import {
+  type ConstraintModality,
   type InternalConstraint,
   placementOf,
   RING_TYPES,
@@ -50,9 +51,10 @@ import { type ElementLabel, elementOf, type MessageWithin } from "./problems.js"
 
 // -- Leaves -----------------------------------------------------------------
 
-const MODALITIES = ["alethic", "deontic"] as const;
+/** Total records, so a modality or operator added to the model fails to compile here. */
+const MODALITY_MEMBERS: Record<ConstraintModality, true> = { alethic: true, deontic: true };
+const MODALITIES = Object.keys(MODALITY_MEMBERS) as ConstraintModality[];
 
-/** A total record, so an operator added to the model fails to compile here. */
 const OPERATOR_MEMBERS: Record<ValueComparisonOperator, true> = {
   "<": true,
   "<=": true,
@@ -73,12 +75,28 @@ const OperatorFile = Schema.Literals(OPERATORS).annotate({
   message: `must be a comparison operator (one of ${OPERATORS.join(", ")}).`,
 });
 
+/**
+ * A list's minimum length, as a rule the harness runs: Effect runs a list's
+ * checks only once every item decodes, so a list both too short and
+ * holding a bad item reported the item alone (review of R2). It reads no
+ * field below the list, so it runs whenever the list is a list. The
+ * arbitrary constraint steers derivation only.
+ */
+const LIST_LENGTH: CrossFieldMark = { id: "list-min-length", reads: [] };
+const atLeastItems = (min: number, message: string) =>
+  Schema.makeFilter((xs: readonly unknown[]) => xs.length >= min, {
+    message,
+    crossField: LIST_LENGTH,
+    arbitraryConstraint: { minLength: min },
+  });
+
 const RoleId = nonEmpty("");
 const roleList = (min: number) =>
   Schema.Array(nonEmpty(" (a role id)")).check(
-    Schema.isMinLength(min, {
-      message: min === 1 ? "must list at least one role." : `must list at least ${min} roles.`,
-    }),
+    atLeastItems(
+      min,
+      min === 1 ? "must list at least one role." : `must list at least ${min} roles.`,
+    ),
   );
 const RoleIds = roleList(1);
 /** Subtype facts of one supertype; too few is validation's to report. */
@@ -104,8 +122,8 @@ type JoinOperandFileValue = (typeof JoinOperandFile)["Type"];
 
 /**
  * Two or more operands, typed as such: the record's narrowing, stated by the
- * check that enforces it, so the derived type carries it. The arbitrary
- * constraint steers derivation only.
+ * check that enforces it, so the derived type carries it. Marked as the
+ * role lists' minimum is, for the same reason.
  */
 const Operands = Schema.Array(JoinOperandFile).pipe(
   Schema.refine(
@@ -113,7 +131,11 @@ const Operands = Schema.Array(JoinOperandFile).pipe(
       ops,
     ): ops is readonly [JoinOperandFileValue, JoinOperandFileValue, ...JoinOperandFileValue[]] =>
       ops.length >= 2,
-    { message: "must list at least two operands.", arbitraryConstraint: { minLength: 2 } },
+    {
+      message: "must list at least two operands.",
+      crossField: LIST_LENGTH,
+      arbitraryConstraint: { minLength: 2 },
+    },
   ),
 );
 
@@ -222,8 +244,12 @@ function describeConstraint(raw: unknown): ElementLabel {
   const noun = typeof doc.type === "string" && placementOf(doc.type) !== undefined
     ? `The ${doc.type} constraint`
     : "The constraint";
-  return typeof doc.id === "string" && doc.id !== ""
-    ? { label: `${noun} "${doc.id}"`, identity: doc.id }
+  if (typeof doc.id === "string" && doc.id !== "") {
+    return { label: `${noun} "${doc.id}"`, identity: doc.id };
+  }
+  // An id of the wrong type is still how a reader finds the constraint.
+  return typeof doc.id === "number" || typeof doc.id === "boolean"
+    ? { label: `${noun} with id ${String(doc.id)}`, identity: String(doc.id) }
     : { label: `${noun} with no id`, identity: "" };
 }
 
@@ -253,13 +279,30 @@ const badTag = `must name a constraint kind (one of ${
   Object.keys(CONSTRAINT_KIND_FILES).join(", ")
 }).`;
 
+/** The kinds that live in `where`, at the type level, from `PLACEMENT` as the model derives it. */
+type PlacedIn<W extends "internal" | "external"> = W extends "internal" ? InternalConstraint["type"]
+  : Exclude<Kind, InternalConstraint["type"]>;
+
+/**
+ * Each member of a list's union, typed as the run-time map below builds it:
+ * a kind placed elsewhere carries the guard that never holds, and so decodes
+ * to nothing. Built by a map over the table, the members' types would merge
+ * into one, and the list's decoded type would hold every kind (review of R2,
+ * which a type test now pins).
+ */
+type ListMember<W extends "internal" | "external"> = {
+  [K in Kind]: K extends PlacedIn<W> ? Kinds[K] : Schema.refine<never, Kinds[K]>;
+}[Kind];
+
 /** One list's constraint: every kind read, and the other list's refused. */
 function listedIn<W extends "internal" | "external">(where: W) {
+  // The map decides with `placementOf`, and `ListMember` with the type
+  // `PLACEMENT` derives, so the run-time and type-level lists cannot part.
   const members = (Object.keys(CONSTRAINT_KIND_FILES) as Kind[]).map((k) =>
     placementOf(k) === where
       ? CONSTRAINT_KIND_FILES[k]
       : CONSTRAINT_KIND_FILES[k].pipe(misplacedIn(where))
-  );
+  ) as ListMember<W>[];
   return Schema.Union(members).annotate(
     elementOf({ noun: "Constraint", badTag, tagField: "type", describe: describeConstraint }),
   );
@@ -279,13 +322,14 @@ export const ExternalConstraintsFile = Schema.Array(ExternalConstraintFile);
 
 /** A new list, typed as the record's lists are: read-only. */
 const mapped = <A, B>(xs: readonly A[], f: (a: A) => B): readonly B[] => xs.map(f);
+const copied = <A>(xs: readonly A[]): readonly A[] => [...xs];
 
 const operandRecord = (o: JoinOperandFileValue) => ({
   path: {
     root: o.path.root,
     steps: mapped(o.path.steps, (s) => ({ entry: s.entry, exit: s.exit })),
   },
-  projection: mapped(o.projection, (n) => n),
+  projection: copied(o.projection),
 });
 
 /** An operand over roles or over subtype facts, as the record holds it. */
@@ -317,7 +361,7 @@ function operandsRecord(
  * from the Schemas: gate S3 reads it, so each kind has its own arm, and a
  * `type` that held two kinds would fail it.
  */
-export function constraintRecord(c: ConstraintFileValue) {
+function recordOf(c: ConstraintFileValue) {
   const head = { id: c.id, modality: c.modality ?? "alethic" };
   switch (c.type) {
     case "internal_uniqueness":
@@ -388,7 +432,15 @@ export function constraintRecord(c: ConstraintFileValue) {
 }
 
 /** A decoded constraint: the record, typed from the Schemas (gate S3). */
-export type DecodedConstraint = ReturnType<typeof constraintRecord>;
+export type DecodedConstraint = ReturnType<typeof recordOf>;
+
+/**
+ * `recordOf`, typed to keep its input's kind: every arm returns the
+ * input's `type`, so a list of internal kinds maps to internal records.
+ */
+export const constraintRecord = recordOf as <C extends ConstraintFileValue>(
+  c: C,
+) => Extract<DecodedConstraint, { readonly type: C["type"]; }>;
 
 /** A decoded constraint of a kind that lives in its fact type. */
 export type DecodedInternalConstraint = Extract<
@@ -408,20 +460,14 @@ const decodeExternalFile = decoderFor(ExternalConstraintsFile);
 export function decodeInternalConstraints(
   docs: unknown,
 ): Effect.Effect<readonly DecodedInternalConstraint[], DecodeProblems> {
-  // The list's decoded type holds only internal kinds, and the record keeps
-  // each kind, so each record is an internal one.
-  return decodeInternalFile(docs).pipe(
-    Effect.map((cs) => cs.map((c) => constraintRecord(c) as DecodedInternalConstraint)),
-  );
+  return decodeInternalFile(docs).pipe(Effect.map((cs) => cs.map(constraintRecord)));
 }
 
 /** Decode `model.constraints` as a 3.0 file lists them. */
 export function decodeExternalConstraints(
   docs: unknown,
 ): Effect.Effect<readonly DecodedExternalConstraint[], DecodeProblems> {
-  return decodeExternalFile(docs).pipe(
-    Effect.map((cs) => cs.map((c) => constraintRecord(c) as DecodedExternalConstraint)),
-  );
+  return decodeExternalFile(docs).pipe(Effect.map((cs) => cs.map(constraintRecord)));
 }
 
 /** The synchronous boundaries: the records, or every problem thrown at once. */

@@ -952,6 +952,28 @@ R2's head alike.
   required, ranges dropped from the record, a bad tag reported at the
   element rather than at `type`, the enclosing element ignored, the
   harness inert, and the decoder shell without the harness.
+- The implementation review found two design flaws, each fixed with a test
+  that fails when it is planted back:
+  - a list's minimum of two (roles, operands) is a check Effect runs only
+    once every item decodes, so a list too short and holding a bad item
+    reported the item alone; both minimums are now marked rules with pairs
+    in the planted-defect test;
+  - the claim that each list's decoded type holds only its own kinds was
+    false: building the members by a map over the table merged their types.
+    Each list's type is now stated from `InternalConstraint`, which
+    `PLACEMENT` derives, `constraintRecord` keeps its input's kind, and a
+    type test pins both, so the decoders narrow with no cast.
+- Detail findings from the same review, each now a test or fixed: the drift
+  test compares every field's numeric limits (list minimums, string
+  minimums, integer minimums), with three planted limit changes shown to
+  fail it; a mistyped id labels the constraint by it; the modalities are a
+  total record over `ConstraintModality`. Tracked instead: a tag that
+  selects no variant leaves the shared fields unchecked, as for R1's object
+  types (barwise-ui1). Declined: stating placement as one list-level rule.
+  The pinned sentence makes the constraint its subject, which a rule on the
+  list or on the fact type could produce only through a sentence-override
+  hook, the same plumbing as `messageWithin` in another place; and the
+  per-member guard is what narrows each list's decoded type.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,

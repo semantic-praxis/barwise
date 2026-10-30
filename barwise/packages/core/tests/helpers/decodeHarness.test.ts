@@ -61,7 +61,10 @@ describe("keysRead", () => {
   it("catches a nested read the rule does not declare", () => {
     // The planted defect barwise-nh5 names: declared `operand`, reads
     // `operand.path.root` and `ring_type` as well.
-    const S = Schema.Struct({ operand: Schema.Unknown, ring_type: Schema.String }).check(
+    const S = Schema.Struct({
+      operand: Schema.Struct({ path: Schema.Struct({ root: Schema.String }) }),
+      ring_type: Schema.String,
+    }).check(
       crossField(
         { id: "planted", reads: ["operand"] },
         (v: { readonly operand: { path: { root: string; }; }; readonly ring_type: string; }) =>
@@ -69,8 +72,8 @@ describe("keysRead", () => {
         "m",
       ),
     );
-    const [{ mark }] = markedChecks(S.ast);
-    expect(readsOf(S)[0]).not.toEqual(mark!.reads);
+    const mark = markedChecks(S.ast)[0]!.mark;
+    expect(readsOf(S)[0]).not.toEqual(mark.reads);
     expect(readsOf(S)).toEqual([["operand.path.root", "ring_type"]]);
   });
 });

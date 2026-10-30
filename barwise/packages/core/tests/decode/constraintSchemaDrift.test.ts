@@ -15,14 +15,19 @@ import {
   InternalConstraintFile,
 } from "../../src/decode/constraint.js";
 import { markOf } from "../../src/decode/harness.js";
-import { fields, literalsOf } from "../helpers/schemaFields.js";
+import { fields, limitsOf, literalsOf } from "../helpers/schemaFields.js";
 
 type JsonObject = {
+  type?: string;
   properties?: Record<string, JsonObject & { const?: string; enum?: string[]; }>;
   required?: string[];
   oneOf?: JsonObject[];
   items?: JsonObject;
   enum?: string[];
+  const?: string;
+  minItems?: number;
+  minLength?: number;
+  minimum?: number;
   $ref?: string;
 };
 
@@ -40,6 +45,26 @@ const branches = new Map(
 type Kind = keyof typeof CONSTRAINT_KIND_FILES;
 const KINDS = Object.keys(CONSTRAINT_KIND_FILES) as Kind[];
 const kindAst = (k: Kind) => CONSTRAINT_KIND_FILES[k].ast;
+
+/** A field's numeric limits as the shipped file states them, in `limitsOf`'s shape. */
+function jsonLimits(node: JsonObject): Record<string, unknown> {
+  const n = deref(node);
+  if (n.enum !== undefined || n.const !== undefined) return {};
+  if (n.oneOf) {
+    const integer = n.oneOf.find((b) => b.type === "integer");
+    return integer ? jsonLimits(integer) : {};
+  }
+  switch (n.type) {
+    case "array":
+      return { minItems: n.minItems ?? 0, items: jsonLimits(n.items!) };
+    case "string":
+      return { minLength: n.minLength ?? 0 };
+    case "integer":
+      return { minimum: n.minimum };
+    default:
+      return {};
+  }
+}
 
 /** The kinds a list's Schema accepts: every member not refused by placement. */
 function accepted(list: SchemaAST.AST): string[] {
@@ -84,6 +109,35 @@ describe("the constraint Schemas state what the shipped JSON Schema states", () 
           k,
           field,
           deref(branch.properties![field]!).enum,
+        ]);
+      }
+    }
+  });
+
+  it.each(KINDS.map((k) => [k] as const))("%s: each field's numeric limits", (k) => {
+    const f = fields(kindAst(k));
+    for (const [name, def] of Object.entries(branches.get(k)!.properties!)) {
+      expect([k, name, limitsOf(f.byName.get(name)!)]).toEqual([k, name, jsonLimits(def)]);
+    }
+  });
+
+  it("the nested definitions' numeric limits", () => {
+    const operand = fields(kindAst("join_ring")).byName.get("operand")!;
+    const path = fields(operand).byName.get("path")!;
+    const step = (fields(path).byName.get("steps")! as SchemaAST.Arrays).rest[0]!;
+    const nested: [string, JsonObject, SchemaAST.AST][] = [
+      ["join_operand_def", defs.join_operand_def!, operand],
+      ["role_path_def", defs.role_path_def!, path],
+      ["role_path_def steps", defs.role_path_def!.properties!.steps!.items!, step],
+    ];
+    for (const [name, def, ast] of nested) {
+      const f = fields(ast);
+      for (const [field, node] of Object.entries(def.properties!)) {
+        if (deref(node).type === "object") continue;
+        expect([name, field, limitsOf(f.byName.get(field)!)]).toEqual([
+          name,
+          field,
+          jsonLimits(node),
         ]);
       }
     }

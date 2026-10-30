@@ -13,11 +13,24 @@ import { DECODE_OPTIONS } from "../../src/decode/decoder.js";
 import { type CrossFieldMark, markOf } from "../../src/decode/harness.js";
 import { fieldPath, problemsOf } from "../../src/decode/problems.js";
 
+const decoders = new WeakMap<
+  Schema.Top,
+  (raw: unknown) => Effect.Effect<unknown, Schema.SchemaError>
+>();
+
 /** Every path a decode reports, through the shell's own walk, harness on or off. */
 export function reportedPaths(schema: Schema.Top, raw: unknown, harness = true): string[] {
-  const result = Effect.runSync(
-    Effect.result(Schema.decodeUnknownEffect(schema, DECODE_OPTIONS)(raw)),
-  );
+  // One decoder per Schema: the constraint harness decodes tens of thousands of inputs.
+  if (!decoders.has(schema)) {
+    // The element Schemas need no services, so the decode runs synchronously.
+    decoders.set(
+      schema,
+      Schema.decodeUnknownEffect(schema, DECODE_OPTIONS) as (
+        raw: unknown,
+      ) => Effect.Effect<unknown, Schema.SchemaError>,
+    );
+  }
+  const result = Effect.runSync(Effect.result(decoders.get(schema)!(raw)));
   if (Result.isSuccess(result)) return [];
   return problemsOf(result.failure.issue, raw, { harness }).map((p) => fieldPath(p.path)).sort();
 }

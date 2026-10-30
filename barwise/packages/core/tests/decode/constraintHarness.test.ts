@@ -100,7 +100,39 @@ const PLANTS: readonly Plant[] = [
     plant: edit(ofType("value_constraint"), (d) => ({ ...d, ranges: [{}] })),
     paths: ["ranges.0"],
   },
-  // Pairs: each rule broken beside a field error in the same struct.
+  {
+    name: "two roles required, one given",
+    plant: edit(
+      ofType(...OPERAND_KINDS),
+      (d) => ({ ...without(d, "subtype_facts"), roles: ["a"] }),
+    ),
+    paths: ["roles"],
+  },
+  {
+    name: "two operands required, one given",
+    plant: edit(
+      ofType("join_equality", "join_exclusion"),
+      (d) => ({ ...d, operands: [(d.operands as unknown[])[0]] }),
+    ),
+    paths: ["operands"],
+  },
+  // Pairs: each rule broken beside a field error in the same struct, or,
+  // for a list's length, beside a bad item in the same list.
+  {
+    name: "two roles required, one given and empty",
+    plant: edit(ofType(...OPERAND_KINDS), (d) => ({ ...without(d, "subtype_facts"), roles: [""] })),
+    paths: ["roles", "roles.0"],
+    rule: "list-min-length",
+  },
+  {
+    name: "two operands required, one given with an empty root",
+    plant: edit(ofType("join_equality", "join_exclusion"), (d) => ({
+      ...d,
+      operands: [{ path: { root: "", steps: [] }, projection: [0] }],
+    })),
+    paths: ["operands", "operands.0.path.root"],
+    rule: "list-min-length",
+  },
   {
     name: "listed in the other list, beside an unknown field",
     plant: (input) => ({ where: other(input.where), doc: { ...input.doc, colour: 1 } }),
