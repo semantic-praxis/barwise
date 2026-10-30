@@ -206,7 +206,10 @@ if (findings.length > 0) {
   for (const f of findings) console.error(`  ${f}`);
 }
 if (refusals.length > 0) {
-  console.error(`check:adr-tests: cannot answer for ${refusals.length} report(s):`);
+  console.error(
+    `check:adr-tests: cannot answer -- ${unreadableReports} report(s) not read,`
+      + ` ${refusals.length - unreadableReports} decision(s) left unproven by them:`,
+  );
   for (const r of refusals) console.error(`  ${r}`);
 }
 if (findings.length > 0) process.exit(1);

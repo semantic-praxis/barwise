@@ -30,7 +30,7 @@ const DOCS_ONLY = /\.md$|^\.beads\//;
  * the tests have run (docs/specs/executable-adrs.spec.md, WS2). ADRs change
  * rarely, so a full CI run for one costs little.
  */
-const GATE_INPUT = /^barwise\/docs\/adr\//;
+const GATE_INPUT = /^barwise\/docs\/adr\/(?!(?:.*\/)?README\.md$)/;
 
 /**
  * The optimizer lane runs when it is touched, or when the CLI it shells out

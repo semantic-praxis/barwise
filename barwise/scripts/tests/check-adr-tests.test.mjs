@@ -180,7 +180,10 @@ test("check:adr-tests refuses, exit 2, a missing or misshapen report, and lists 
   withFixture({ core: "{", trial: jsonl([["t [adr:a-concern#retired]", "passed"]]) }, (_, r) => {
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stderr, /a-concern#retired/);
-    assert.match(r.stderr, /cannot answer for \d+ report/);
+    assert.match(
+      r.stderr,
+      /cannot answer -- 1 report\(s\) not read, 1 decision\(s\) left unproven/,
+    );
   });
 });
 
@@ -236,6 +239,8 @@ test("the test:trial script writes its report where check:adr-tests reads it", (
   const fromBarwise = TRIAL_REPORT.replace(/^barwise\//, "");
   assert.ok(script.includes(`--test-reporter-destination=${fromBarwise}`), script);
   assert.ok(script.includes(`mkdir -p ${dirname(fromBarwise)}`), script);
+  // The same reporter run-script-tests.mjs uses, by the same file.
+  assert.ok(script.includes("--test-reporter=./scripts/lib/test-tag-reporter.mjs"), script);
 });
 
 test("vitest.shared.ts keeps vitest's computed reporters and adds json", () => {

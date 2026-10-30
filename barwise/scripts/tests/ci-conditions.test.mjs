@@ -48,6 +48,8 @@ test("classify: an ADR is Markdown but not docs-only, so check:adr-tests runs wh
   assert.equal(classify(["barwise/docs/adr/determinism-in-core.md"]).docsOnly, false);
   assert.equal(classify(["barwise/docs/adr/x.md", "README.md"]).docsOnly, false);
   assert.equal(classify(["barwise/docs/specs/x.spec.md"]).docsOnly, true);
+  // The index of ADRs is not one, as isAdr has it.
+  assert.equal(classify(["barwise/docs/adr/README.md"]).docsOnly, true);
 });
 
 test("classify: optimizer fires on the lane or the CLI it shells out to, and nothing else", () => {
