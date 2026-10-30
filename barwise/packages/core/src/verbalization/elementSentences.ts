@@ -18,12 +18,23 @@ import {
 } from "./Verbalization.js";
 
 /**
+ * What a subtype fact's sentence reads: an element in a model, or the
+ * config of one being added, which is named before it is built.
+ */
+export type SubtypeFactShape = Pick<
+  SubtypeFact,
+  "id" | "subtypeId" | "supertypeId" | "definingRule"
+>;
+/** What an objectification's sentence reads, likewise. */
+export type ObjectificationShape = Pick<ObjectifiedFactType, "id" | "factTypeId" | "objectTypeId">;
+
+/**
  * Verbalize a subtype fact: "{Subtype} is a subtype of {Supertype}." When
  * the subtype is defined by a rule, the rule is appended: "..., defined as:
  * {expression}."
  */
 export function verbalizeSubtypeFact(
-  sf: SubtypeFact,
+  sf: SubtypeFactShape,
   model: ConstraintModel,
 ): Verbalization {
   const subtype = model.getObjectType(sf.subtypeId);
@@ -51,7 +62,7 @@ export function verbalizeSubtypeFact(
  * For example: "Marriage is where Person marries Person."
  */
 export function verbalizeObjectifiedFactType(
-  oft: ObjectifiedFactType,
+  oft: ObjectificationShape,
   model: ConstraintModel,
 ): Verbalization {
   const objectType = model.getObjectType(oft.objectTypeId);

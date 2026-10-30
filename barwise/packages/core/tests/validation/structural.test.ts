@@ -370,7 +370,7 @@ describe("structural/diagram-dangling-reference", () => {
     const m = model();
     m.addDiagramLayout({
       name: "V",
-      elements: ["Customer"],
+      elements: ["ot-missing"],
       positions: { "ot-gone": { x: 0, y: 0 } },
       orientations: { "ft-gone": "vertical" },
     });
@@ -379,7 +379,7 @@ describe("structural/diagram-dangling-reference", () => {
       [
         "warning",
         "V",
-        'Diagram "V" lists "Customer" in elements, but no object type has that id.',
+        'Diagram "V" lists "ot-missing" in elements, but no object type has that id.',
       ],
       [
         "warning",

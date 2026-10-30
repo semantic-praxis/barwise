@@ -2,27 +2,27 @@ orm_version: "3.0"
 model:
   name: clinic-appointments
   object_types:
-    - id: 00000000-0000-7001-ad34-3b424950575e
+    - id: Patient
       name: Patient
       kind: entity
       reference_mode: medical_record_number
       definition: A person who receives medical care at the clinic, identified by a medical record number.
-    - id: 00000000-0000-7002-8c53-5a61686f767d
+    - id: Doctor
       name: Doctor
       kind: entity
       reference_mode: provider_id
       definition: A medical practitioner at the clinic, identified by a state-issued provider ID.
-    - id: 00000000-0000-7003-ab72-7980878e959c
+    - id: Appointment
       name: Appointment
       kind: entity
       reference_mode: confirmation_number
       definition: A scheduled visit between a patient and a doctor, identified by a confirmation number.
-    - id: 00000000-0000-7004-8a91-989fa6adb4bb
+    - id: ExamRoom
       name: ExamRoom
       kind: entity
       reference_mode: room_number
       definition: A physical examination room at the clinic, identified by a room number.
-    - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
+    - id: Specialty
       name: Specialty
       kind: value
       definition: The medical specialty of a doctor.
@@ -33,11 +33,11 @@ model:
           - family medicine
           - orthopedics
           - pediatrics
-    - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
+    - id: AppointmentDate
       name: AppointmentDate
       kind: value
       definition: The calendar date of an appointment.
-    - id: 00000000-0000-7007-a7ee-f5fc030a1118
+    - id: TimeSlot
       name: TimeSlot
       kind: value
       definition: A half-hour time slot during clinic hours.
@@ -59,11 +59,11 @@ model:
           - 15:30
           - 16:00
           - 16:30
-    - id: 00000000-0000-7008-860d-141b22293037
+    - id: VisitReason
       name: VisitReason
       kind: value
       definition: Free-text reason for the appointment as described by the patient.
-    - id: 00000000-0000-7009-a52c-333a41484f56
+    - id: AppointmentStatus
       name: AppointmentStatus
       kind: value
       definition: The current status of an appointment in its lifecycle.
@@ -75,19 +75,19 @@ model:
           - completed
           - cancelled
           - no-show
-    - id: 00000000-0000-700a-844b-525960676e75
+    - id: FollowUpNote
       name: FollowUpNote
       kind: value
       definition: Free-text follow-up note attached to a completed appointment.
   fact_types:
-    - id: 00000000-0000-700b-a36a-71787f868d94
+    - id: Patient_books_Appointment
       name: Patient books Appointment
       roles:
-        - id: 00000000-0000-700c-8289-90979ea5acb3
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Patient_books_Appointment.books
+          player: Patient
           role_name: books
-        - id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Patient_books_Appointment.is_booked_by
+          player: Appointment
           role_name: is booked by
       readings:
         - "{0} books {1}"
@@ -95,19 +95,19 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-700d-a1a8-afb6bdc4cbd2
-          id: 00000000-0000-7027-87ce-d5dce3eaf1f8
+            - Patient_books_Appointment.is_booked_by
+          id: 00000000-0000-7002-8c53-5a61686f767d
         - type: mandatory
-          role: 00000000-0000-700d-a1a8-afb6bdc4cbd2
-          id: 00000000-0000-7028-a6ed-f4fb02091017
-    - id: 00000000-0000-700e-80c7-ced5dce3eaf1
+          role: Patient_books_Appointment.is_booked_by
+          id: Each_Appointment_is_booked_by_at_least_one_Patient
+    - id: Appointment_is_with_Doctor
       name: Appointment is with Doctor
       roles:
-        - id: 00000000-0000-700f-9fe6-edf4fb020910
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Appointment_is_with_Doctor.is_with
+          player: Appointment
           role_name: is with
-        - id: 00000000-0000-7010-be05-0c131a21282f
-          player: 00000000-0000-7002-8c53-5a61686f767d
+        - id: Appointment_is_with_Doctor.sees
+          player: Doctor
           role_name: sees
       readings:
         - "{0} is with {1}"
@@ -115,19 +115,19 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-700f-9fe6-edf4fb020910
-          id: 00000000-0000-7029-850c-131a21282f36
+            - Appointment_is_with_Doctor.is_with
+          id: 00000000-0000-7003-ab72-7980878e959c
         - type: mandatory
-          role: 00000000-0000-700f-9fe6-edf4fb020910
-          id: 00000000-0000-702a-a42b-323940474e55
-    - id: 00000000-0000-7011-9d24-2b323940474e
+          role: Appointment_is_with_Doctor.is_with
+          id: Each_Appointment_is_with_at_least_one_Doctor
+    - id: Doctor_has_Specialty
       name: Doctor has Specialty
       roles:
-        - id: 00000000-0000-7012-bc43-4a51585f666d
-          player: 00000000-0000-7002-8c53-5a61686f767d
+        - id: Doctor_has_Specialty.has
+          player: Doctor
           role_name: has
-        - id: 00000000-0000-7013-9b62-6970777e858c
-          player: 00000000-0000-7005-a9b0-b7bec5ccd3da
+        - id: Doctor_has_Specialty.is_of
+          player: Specialty
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -135,19 +135,19 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7012-bc43-4a51585f666d
-          id: 00000000-0000-702b-834a-51585f666d74
+            - Doctor_has_Specialty.has
+          id: 00000000-0000-7004-8a91-989fa6adb4bb
         - type: mandatory
-          role: 00000000-0000-7012-bc43-4a51585f666d
-          id: 00000000-0000-702c-a269-70777e858c93
-    - id: 00000000-0000-7014-ba81-888f969da4ab
+          role: Doctor_has_Specialty.has
+          id: Each_Doctor_has_at_least_one_Specialty
+    - id: Appointment_is_on_AppointmentDate
       name: Appointment is on AppointmentDate
       roles:
-        - id: 00000000-0000-7015-99a0-a7aeb5bcc3ca
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Appointment_is_on_AppointmentDate.is_on
+          player: Appointment
           role_name: is on
-        - id: 00000000-0000-7016-b8bf-c6cdd4dbe2e9
-          player: 00000000-0000-7006-88cf-d6dde4ebf2f9
+        - id: Appointment_is_on_AppointmentDate.is_of
+          player: AppointmentDate
           role_name: is of
       readings:
         - "{0} is on {1}"
@@ -155,19 +155,19 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7015-99a0-a7aeb5bcc3ca
-          id: 00000000-0000-702d-8188-8f969da4abb2
+            - Appointment_is_on_AppointmentDate.is_on
+          id: 00000000-0000-7005-a9b0-b7bec5ccd3da
         - type: mandatory
-          role: 00000000-0000-7015-99a0-a7aeb5bcc3ca
-          id: 00000000-0000-702e-a0a7-aeb5bcc3cad1
-    - id: 00000000-0000-7017-97de-e5ecf3fa0108
+          role: Appointment_is_on_AppointmentDate.is_on
+          id: Each_Appointment_is_on_at_least_one_AppointmentDate
+    - id: Appointment_is_at_TimeSlot
       name: Appointment is at TimeSlot
       roles:
-        - id: 00000000-0000-7018-b6fd-040b12192027
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Appointment_is_at_TimeSlot.is_at
+          player: Appointment
           role_name: is at
-        - id: 00000000-0000-7019-951c-232a31383f46
-          player: 00000000-0000-7007-a7ee-f5fc030a1118
+        - id: Appointment_is_at_TimeSlot.is_of
+          player: TimeSlot
           role_name: is of
       readings:
         - "{0} is at {1}"
@@ -175,19 +175,19 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7018-b6fd-040b12192027
-          id: 00000000-0000-702f-bfc6-cdd4dbe2e9f0
+            - Appointment_is_at_TimeSlot.is_at
+          id: 00000000-0000-7006-88cf-d6dde4ebf2f9
         - type: mandatory
-          role: 00000000-0000-7018-b6fd-040b12192027
-          id: 00000000-0000-7030-9ee5-ecf3fa01080f
-    - id: 00000000-0000-701a-b43b-424950575e65
+          role: Appointment_is_at_TimeSlot.is_at
+          id: Each_Appointment_is_at_at_least_one_TimeSlot
+    - id: Appointment_has_VisitReason
       name: Appointment has VisitReason
       roles:
-        - id: 00000000-0000-701b-935a-61686f767d84
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Appointment_has_VisitReason.has
+          player: Appointment
           role_name: has
-        - id: 00000000-0000-701c-b279-80878e959ca3
-          player: 00000000-0000-7008-860d-141b22293037
+        - id: Appointment_has_VisitReason.is_of
+          player: VisitReason
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -195,16 +195,16 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-701b-935a-61686f767d84
-          id: 00000000-0000-7026-a8af-b6bdc4cbd2d9
-    - id: 00000000-0000-701d-9198-9fa6adb4bbc2
+            - Appointment_has_VisitReason.has
+          id: 00000000-0000-7001-ad34-3b424950575e
+    - id: Appointment_has_AppointmentStatus
       name: Appointment has AppointmentStatus
       roles:
-        - id: 00000000-0000-701e-b0b7-bec5ccd3dae1
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Appointment_has_AppointmentStatus.has
+          player: Appointment
           role_name: has
-        - id: 00000000-0000-701f-8fd6-dde4ebf2f900
-          player: 00000000-0000-7009-a52c-333a41484f56
+        - id: Appointment_has_AppointmentStatus.is_of
+          player: AppointmentStatus
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -212,19 +212,19 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-701e-b0b7-bec5ccd3dae1
-          id: 00000000-0000-7031-bd04-0b121920272e
+            - Appointment_has_AppointmentStatus.has
+          id: 00000000-0000-7007-a7ee-f5fc030a1118
         - type: mandatory
-          role: 00000000-0000-701e-b0b7-bec5ccd3dae1
-          id: 00000000-0000-7032-9c23-2a31383f464d
-    - id: 00000000-0000-7020-aef5-fc030a11181f
+          role: Appointment_has_AppointmentStatus.has
+          id: Each_Appointment_has_at_least_one_AppointmentStatus
+    - id: Appointment_has_FollowUpNote
       name: Appointment has FollowUpNote
       roles:
-        - id: 00000000-0000-7021-8d14-1b222930373e
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Appointment_has_FollowUpNote.has
+          player: Appointment
           role_name: has
-        - id: 00000000-0000-7022-ac33-3a41484f565d
-          player: 00000000-0000-700a-844b-525960676e75
+        - id: Appointment_has_FollowUpNote.is_of
+          player: FollowUpNote
           role_name: is of
       readings:
         - "{0} has {1}"
@@ -232,16 +232,16 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7021-8d14-1b222930373e
-          id: 00000000-0000-7033-bb42-4950575e656c
-    - id: 00000000-0000-7023-8b52-5960676e757c
+            - Appointment_has_FollowUpNote.has
+          id: 00000000-0000-7008-860d-141b22293037
+    - id: Patient_has_primary_Doctor
       name: Patient has primary Doctor
       roles:
-        - id: 00000000-0000-7024-aa71-787f868d949b
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Patient_has_primary_Doctor.has_primary
+          player: Patient
           role_name: has primary
-        - id: 00000000-0000-7025-8990-979ea5acb3ba
-          player: 00000000-0000-7002-8c53-5a61686f767d
+        - id: Patient_has_primary_Doctor.is_primary_doctor_of
+          player: Doctor
           role_name: is primary doctor of
       readings:
         - "{0} has primary {1}"
@@ -249,8 +249,8 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7024-aa71-787f868d949b
-          id: 00000000-0000-7034-9a61-686f767d848b
+            - Patient_has_primary_Doctor.has_primary
+          id: 00000000-0000-7009-a52c-333a41484f56
         - type: mandatory
-          role: 00000000-0000-7024-aa71-787f868d949b
-          id: 00000000-0000-7035-b980-878e959ca3aa
+          role: Patient_has_primary_Doctor.has_primary
+          id: Each_Patient_has_primary_at_least_one_Doctor

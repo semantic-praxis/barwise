@@ -14,6 +14,10 @@
 import type { InternalConstraint } from "./Constraint.js";
 
 export interface ConstraintAdmission {
-  /** The constraint as the model stores it, with its id. */
-  admitConstraint<C extends InternalConstraint>(constraint: C): C;
+  /**
+   * The constraint as the model stores it, with its id, for the fact type
+   * `hostId` names. By id, not the fact type itself: a type naming
+   * `FactType` here would close the cycle this module exists to avoid.
+   */
+  admitConstraint<C extends InternalConstraint>(constraint: C, hostId: string): C;
 }

@@ -1,6 +1,7 @@
 /**
- * Every registered importer mints element ids through `generateId()`
- * (docs/specs/importer-role-ids.spec.md).
+ * Every registered importer gives element ids through `generateId()`, or
+ * leaves the id to the model, which names the element by its rule
+ * (docs/specs/importer-role-ids.spec.md; iri-identity 6b).
  *
  * The id policy lives in one place, core's `generateId`, and the surfaces
  * install UUIDv7 behind it. An importer that passes a hand-built `id` to a
@@ -8,10 +9,13 @@
  * writing `Customers has CustomerName::role1` and `<uuid>-has-Name-role`,
  * and the DDL/OpenAPI form collided across tables that share a column name.
  *
- * So the oracle is the generator itself: install one that mints `gen-1`,
- * `gen-2`, ..., run each importer, and require every object type, fact
- * type, role and constraint id to be one it minted, with no repeats. Any
- * hand-built id -- textual, or a real UUID with a suffix -- fails.
+ * So the oracle is the generator and the model's naming rule: install a
+ * generator that mints `gen-1`, `gen-2`, ..., run each importer, and
+ * require every object type, fact type, role and constraint id to be one
+ * it minted or the one the model's rule gives the element (its local name;
+ * `<fact type>.<role>`; its minted sentence), with the suffix rule's `_N`,
+ * and no repeats. Any hand-built id -- textual, or a real UUID with a
+ * suffix -- fails.
  *
  * The test iterates the format registry rather than a list of its own, and
  * an importer with neither a fixture nor an exemption below fails, so a new
@@ -23,6 +27,8 @@ import {
   generateId,
   type ImportFormat,
   listImporters,
+  localName,
+  mintedName,
   type OrmModel,
   setIdGenerator,
 } from "@barwise/core";
@@ -226,24 +232,50 @@ function text(name: string, input: string): OrmModel {
   return importerFor(name).parse!(input).model;
 }
 
-/** Every id an importer could mint, labelled for a readable failure. */
-function allIds(model: OrmModel): string[] {
-  const ids: string[] = [];
-  for (const ot of model.objectTypes) ids.push(`object type ${ot.name}: ${ot.id}`);
+interface GivenId {
+  readonly label: string;
+  readonly id: string;
+  /** The id the model's rule gives the element when the importer states none. */
+  readonly rule: string | undefined;
+}
+
+/** Every id an importer could give, labelled for a readable failure. */
+function allIds(model: OrmModel): GivenId[] {
+  const ids: GivenId[] = [];
+  const add = (label: string, id: string, rule: string | undefined) =>
+    ids.push({ label: `${label}: ${id}`, id, rule });
+  for (const ot of model.objectTypes) add(`object type ${ot.name}`, ot.id, localName(ot.name));
   for (const ft of model.factTypes) {
-    ids.push(`fact type ${ft.name}: ${ft.id}`);
-    for (const r of ft.roles) ids.push(`role ${ft.name}/${r.name}: ${r.id}`);
+    add(`fact type ${ft.name}`, ft.id, localName(ft.name));
+    for (const r of ft.roles) {
+      add(`role ${ft.name}/${r.name}`, r.id, `${ft.id}.${localName(r.name)}`);
+    }
   }
   // Subtype facts too: an importer that maps a supertype (Ossie's extends)
   // mints their ids, and a hand-built one there passed unseen before.
   for (const sf of model.subtypeFacts) {
     const end = (id: string) => model.getObjectType(id)?.name ?? id;
-    ids.push(`subtype fact ${end(sf.subtypeId)} -> ${end(sf.supertypeId)}: ${sf.id}`);
+    add(
+      `subtype fact ${end(sf.subtypeId)} -> ${end(sf.supertypeId)}`,
+      sf.id,
+      mintedName({ kind: "subtypeFact", subtypeFact: sf }, model),
+    );
   }
-  for (const [c, ft] of model.everyConstraint()) {
-    ids.push(`constraint ${ft?.name ?? "(across fact types)"}/${c.type}: ${c.id}`);
+  for (const inView of model.everyConstraint()) {
+    const [c, ft] = inView;
+    add(
+      `constraint ${ft?.name ?? "(across fact types)"}/${c.type}`,
+      c.id!,
+      mintedName({ kind: "constraint", inView }, model),
+    );
   }
   return ids;
+}
+
+/** The id is the rule's, or the rule's under the suffix rule (`_2`, `_3`). */
+function byRule(id: string, rule: string | undefined): boolean {
+  if (rule === undefined) return false;
+  return id === rule || (id.startsWith(`${rule}_`) && /^\d+$/.test(id.slice(rule.length + 1)));
 }
 
 let minted: Set<string>;
@@ -280,12 +312,11 @@ describe("importer ids come from generateId", () => {
       const ids = allIds(model);
       expect(ids.length, `${name} produced no elements`).toBeGreaterThan(0);
 
-      const handBuilt = ids.filter((entry) =>
-        !minted.has(entry.slice(entry.lastIndexOf(": ") + 2))
-      );
-      expect(handBuilt, `${name} emitted ids the generator did not mint`).toEqual([]);
+      const handBuilt = ids.filter((e) => !minted.has(e.id) && !byRule(e.id, e.rule))
+        .map((e) => e.label);
+      expect(handBuilt, `${name} gave ids neither the generator nor the model gave`).toEqual([]);
 
-      const values = ids.map((entry) => entry.slice(entry.lastIndexOf(": ") + 2));
+      const values = ids.map((e) => e.id);
       expect(new Set(values).size, `${name} emitted a repeated id`).toBe(values.length);
     });
   }

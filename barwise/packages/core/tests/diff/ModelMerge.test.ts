@@ -843,6 +843,7 @@ describe("mergeModels", () => {
     // Role ids are preserved by the merge, so the steps pass through.
     const existing = new OrmModel({ name: "Test" });
     const existingPerson = existing.addObjectType({
+      id: "base-person",
       name: "Person",
       kind: "entity",
       referenceMode: "person_id",

@@ -22,20 +22,20 @@ import { serializeConstraint } from "../serialization/yaml/constraint.js";
 import { sentenceHolds } from "../verbalization/constraints/assumptions.js";
 import { ConstraintVerbalizer } from "../verbalization/ConstraintVerbalizer.js";
 import {
+  type ObjectificationShape,
+  type SubtypeFactShape,
   verbalizeObjectifiedFactType,
   verbalizeSubtypeFact,
 } from "../verbalization/elementSentences.js";
 import type { ConstraintInView, ConstraintModel } from "./constraintModel.js";
 import type { FactType } from "./FactType.js";
 import { localName } from "./name.js";
-import type { ObjectifiedFactType } from "./ObjectifiedFactType.js";
-import type { SubtypeFact } from "./SubtypeFact.js";
 
 /** An element that takes a minted name. */
 export type Mintable =
   | { readonly kind: "constraint"; readonly inView: ConstraintInView; }
-  | { readonly kind: "subtypeFact"; readonly subtypeFact: SubtypeFact; }
-  | { readonly kind: "objectification"; readonly objectification: ObjectifiedFactType; };
+  | { readonly kind: "subtypeFact"; readonly subtypeFact: SubtypeFactShape; }
+  | { readonly kind: "objectification"; readonly objectification: ObjectificationShape; };
 
 /** A minted name and the key it was minted from. */
 export interface Minted {

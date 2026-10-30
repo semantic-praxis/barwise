@@ -38,11 +38,9 @@ export function setIdGenerator(generator: IdGenerator | undefined): void {
 
 /**
  * The value with an id: its own, or a fresh one from the installed
- * generator. The one rule every way a constraint enters a model follows --
- * `FactType`'s constructor and `addConstraint`, `OrmModel.addConstraint`,
- * and a constraint a fact type in a model hands the model -- so the ways
- * in cannot give ids by different rules (barwise-nkq), and 6b-2's minting
- * replaces it in one place.
+ * generator. What a constraint given to a fact type outside any model
+ * takes, by the constructor and `addConstraint` alike (barwise-nkq); a
+ * model names its constraints instead (`OrmModel`, iri-identity 6b).
  */
 export function withId<T extends { readonly id?: string; }>(
   value: T,

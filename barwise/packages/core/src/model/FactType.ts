@@ -219,23 +219,10 @@ export class FactType extends ModelElement {
    * (iri-identity 6a; in 6b the id may be minted rather than generated).
    */
   addConstraint(constraint: InternalConstraint): InternalConstraint {
-    const c = constraint as Constraint;
-    if (isExternalConstraint(c)) {
-      throw new Error(
-        `A ${c.type} constraint spans fact types, so it lives in the model, `
-          + `not in fact type "${this.name}": add it with OrmModel.addConstraint.`,
-      );
-    }
-    if (!isInternalConstraint(c)) {
-      throw new Error(
-        `Fact type "${this.name}" has no constraint kind "${
-          String((constraint as { type?: unknown; }).type)
-        }".`,
-      );
-    }
-    // In a model, the model stores it, so its id is in the model's index;
-    // standalone, the fact type gives it an id itself.
-    const stored = this._admission?.admitConstraint(c) ?? withId(c);
+    const c = checkInternalConstraint(constraint, this.name);
+    // In a model, the model names it and enters its id in the model's
+    // index; standalone, the fact type gives it an id itself.
+    const stored = this._admission?.admitConstraint(c, this.id) ?? withId(c);
     this._constraints.push(stored);
     return stored;
   }
@@ -244,6 +231,33 @@ export class FactType extends ModelElement {
   rolesForPlayer(playerId: string): readonly Role[] {
     return this._roles.filter((r) => r.playerId === playerId);
   }
+}
+
+/**
+ * Refuse what a fact type cannot hold: a constraint across fact types,
+ * which lives in the model, or a kind that is no constraint. The check is
+ * for a value whose type was asserted, such as a parsed file. Exported so
+ * `OrmModel.addFactType` refuses a config before storing anything.
+ */
+export function checkInternalConstraint(
+  constraint: InternalConstraint,
+  factTypeName: string,
+): InternalConstraint {
+  const c = constraint as Constraint;
+  if (isExternalConstraint(c)) {
+    throw new Error(
+      `A ${c.type} constraint spans fact types, so it lives in the model, `
+        + `not in fact type "${factTypeName}": add it with OrmModel.addConstraint.`,
+    );
+  }
+  if (!isInternalConstraint(c)) {
+    throw new Error(
+      `Fact type "${factTypeName}" has no constraint kind "${
+        String((constraint as { type?: unknown; }).type)
+      }".`,
+    );
+  }
+  return c;
 }
 
 /**

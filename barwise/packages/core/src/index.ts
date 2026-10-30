@@ -117,6 +117,7 @@ export {
   resolvePreferredIdentifier,
   storePreferredFlags,
 } from "./model/identification.js";
+export { type Mintable, mintedName } from "./model/mint.js";
 export { ModelElement } from "./model/ModelElement.js";
 export { localName } from "./model/name.js";
 export { type DomainRef, namespaceOf } from "./model/namespace.js";

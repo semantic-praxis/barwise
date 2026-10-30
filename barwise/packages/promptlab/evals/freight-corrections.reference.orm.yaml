@@ -2,58 +2,58 @@ orm_version: "3.0"
 model:
   name: freight-corrections
   object_types:
-    - id: 00000000-0000-7001-ad34-3b424950575e
+    - id: Shipment
       name: Shipment
       kind: entity
       reference_mode: shipment_number
       definition: A consignment of products moving through the warehouse network.
       aliases:
         - Consignment
-    - id: 00000000-0000-7002-8c53-5a61686f767d
+    - id: Product
       name: Product
       kind: entity
       reference_mode: sku
       definition: A stocked item that shipments carry.
-    - id: 00000000-0000-7003-ab72-7980878e959c
+    - id: Warehouse
       name: Warehouse
       kind: entity
       reference_mode: warehouse_code
       definition: A physical storage location shipments sit in.
-    - id: 00000000-0000-7004-8a91-989fa6adb4bb
+    - id: Quantity
       name: Quantity
       kind: value
       definition: How many units of a product a shipment contains.
       data_type:
         name: integer
   fact_types:
-    - id: 00000000-0000-7005-a9b0-b7bec5ccd3da
+    - id: Shipment_contains_Product_in_Quantity
       name: Shipment contains Product in Quantity
       roles:
-        - id: 00000000-0000-7006-88cf-d6dde4ebf2f9
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Shipment_contains_Product_in_Quantity.contains
+          player: Shipment
           role_name: contains
-        - id: 00000000-0000-7007-a7ee-f5fc030a1118
-          player: 00000000-0000-7002-8c53-5a61686f767d
+        - id: Shipment_contains_Product_in_Quantity.is_contained_in
+          player: Product
           role_name: is contained in
-        - id: 00000000-0000-7008-860d-141b22293037
-          player: 00000000-0000-7004-8a91-989fa6adb4bb
+        - id: Shipment_contains_Product_in_Quantity.is_the_quantity_for
+          player: Quantity
           role_name: is the quantity for
       readings:
         - "{0} contains {1} in quantity {2}"
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-7006-88cf-d6dde4ebf2f9
-            - 00000000-0000-7007-a7ee-f5fc030a1118
-          id: 00000000-0000-700c-8289-90979ea5acb3
-    - id: 00000000-0000-7009-a52c-333a41484f56
+            - Shipment_contains_Product_in_Quantity.contains
+            - Shipment_contains_Product_in_Quantity.is_contained_in
+          id: 00000000-0000-7001-ad34-3b424950575e
+    - id: Shipment_is_stored_in_Warehouse
       name: Shipment is stored in Warehouse
       roles:
-        - id: 00000000-0000-700a-844b-525960676e75
-          player: 00000000-0000-7001-ad34-3b424950575e
+        - id: Shipment_is_stored_in_Warehouse.is_stored_in
+          player: Shipment
           role_name: is stored in
-        - id: 00000000-0000-700b-a36a-71787f868d94
-          player: 00000000-0000-7003-ab72-7980878e959c
+        - id: Shipment_is_stored_in_Warehouse.stores
+          player: Warehouse
           role_name: stores
       readings:
         - "{0} is stored in {1}"
@@ -61,22 +61,22 @@ model:
       constraints:
         - type: internal_uniqueness
           roles:
-            - 00000000-0000-700a-844b-525960676e75
-            - 00000000-0000-700b-a36a-71787f868d94
-          id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+            - Shipment_is_stored_in_Warehouse.is_stored_in
+            - Shipment_is_stored_in_Warehouse.stores
+          id: 00000000-0000-7002-8c53-5a61686f767d
         - type: frequency
-          role: 00000000-0000-700a-844b-525960676e75
+          role: Shipment_is_stored_in_Warehouse.is_stored_in
           min: 1
           max: 2
-          id: 00000000-0000-700e-80c7-ced5dce3eaf1
+          id: Each_Shipment_that_is_stored_in_some_Warehouse_is_stored_in_at_least_1_and_at_most_2_instances_of_Warehouse
   populations:
-    - id: 00000000-0000-700f-9fe6-edf4fb020910
-      fact_type: 00000000-0000-7005-a9b0-b7bec5ccd3da
+    - id: Shipment_contains_Product_in_Quantity.population
+      fact_type: Shipment_contains_Product_in_Quantity
       instances:
-        - id: 00000000-0000-7010-be05-0c131a21282f
+        - id: Shipment_contains_Product_in_Quantity.population.1
           role_values:
-            00000000-0000-7006-88cf-d6dde4ebf2f9: S-100
-            00000000-0000-7007-a7ee-f5fc030a1118: P-77
-            00000000-0000-7008-860d-141b22293037: "5"
+            Shipment_contains_Product_in_Quantity.contains: S-100
+            Shipment_contains_Product_in_Quantity.is_contained_in: P-77
+            Shipment_contains_Product_in_Quantity.is_the_quantity_for: "5"
       description: Worked example given in the session.
       sample: true

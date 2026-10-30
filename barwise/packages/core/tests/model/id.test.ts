@@ -16,6 +16,7 @@ import {
   type Uuidv7Sources,
 } from "../../src/model/id.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { Population } from "../../src/model/Population.js";
 
 const V4_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -80,9 +81,12 @@ describe("generateId seam", () => {
     setIdGenerator(() => `id-${++n}`);
     expect(generateId()).toBe("id-1");
 
+    // An element built outside a model takes the generator's id; one added
+    // to a model is named from its name instead (iri-identity 6b).
+    expect(new Population({ factTypeId: "f" }).id).toBe("id-2");
     const model = new OrmModel({ name: "Seam" });
     const ot = model.addObjectType({ name: "Thing", kind: "entity", referenceMode: "id" });
-    expect(ot.id).toBe("id-2");
+    expect(ot.id).toBe("Thing");
 
     setIdGenerator(undefined);
     expect(generateId()).toMatch(V4_SHAPE);

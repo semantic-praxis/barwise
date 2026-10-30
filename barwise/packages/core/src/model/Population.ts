@@ -84,6 +84,12 @@ export class Population {
   /** See `PopulationConfig.sample`. Positive evidence only when true. */
   readonly sample: boolean;
   private readonly _instances: FactInstance[] = [];
+  /**
+   * The number the next unnamed instance takes: one past the highest this
+   * population has used, stated or given, so a number is never reused once
+   * an instance holding it is removed (iri-identity, decision 7).
+   */
+  private _next = 1;
 
   constructor(config: PopulationConfig) {
     this.id = config.id ?? generateId();
@@ -93,9 +99,25 @@ export class Population {
 
     if (config.instances) {
       for (const inst of config.instances) {
-        this._instances.push(createInstance(inst));
+        this._instances.push(this.createInstance(inst));
       }
     }
+  }
+
+  /**
+   * An instance with its id: its own, or the population's id and the next
+   * number (`<population>.3`). A stated id of that form moves the count
+   * past it, so a later unnamed instance cannot take it.
+   */
+  private createInstance(config: FactInstanceConfig): FactInstance {
+    const prefix = `${this.id}.`;
+    let id = config.id;
+    if (id === undefined) id = `${prefix}${this._next++}`;
+    else if (id.startsWith(prefix)) {
+      const n = Number(id.slice(prefix.length));
+      if (Number.isInteger(n) && n >= this._next) this._next = n + 1;
+    }
+    return { id, roleValues: { ...config.roleValues } };
   }
 
   /** All fact instances in this population. */
@@ -113,7 +135,7 @@ export class Population {
    * @returns The created instance.
    */
   addInstance(config: FactInstanceConfig): FactInstance {
-    const instance = createInstance(config);
+    const instance = this.createInstance(config);
     this._instances.push(instance);
     return instance;
   }
@@ -136,13 +158,6 @@ export class Population {
   getInstance(id: string): FactInstance | undefined {
     return this._instances.find((i) => i.id === id);
   }
-}
-
-function createInstance(config: FactInstanceConfig): FactInstance {
-  return {
-    id: config.id ?? generateId(),
-    roleValues: { ...config.roleValues },
-  };
 }
 
 /**
