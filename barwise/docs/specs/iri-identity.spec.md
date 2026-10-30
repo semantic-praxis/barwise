@@ -14,7 +14,7 @@ return; the test builders off `::` ids; lineage exports name their model);
 6b to 6f and WS7 to come
 
 Created: 2026-10-28
-Last-updated: 2026-10-29
+Last-updated: 2026-10-30
 Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: 15d6f18e (pr-review x5, code-review x3; re-pointed after WS6 was grounded and decisions 18 to 20 taken)
 Touches: barwise/packages/core/src/model/,
@@ -818,19 +818,28 @@ owner's answers of 2026-10-29 (decisions 15, 18 and 19, and the order
 against `effect-adoption.spec.md` below), and corrected by one round of
 plan review. Paths are under `barwise/packages/`.
 
-**Order against the Effect adoption.** `effect-adoption.spec.md` rebuilds
-core's record types and YAML codec, the code this workstream changes. The
-owner chose WS6 first (2026-10-29): the Effect spike (#672) continues on
-its branch to decide adoption, and any Effect rebuild starts from the 4.0
-model, so nothing is built twice. That branch predates format 3.0
-(its base reads `CURRENT_ORM_VERSION = "2.0"`; 3.0 shipped in #708), so
-a format change it proposes is a 3.x minor or waits for this spec.
+**Order against the Effect adoption** (re-grounded 2026-10-30, on main at
+`16e657fc`). The order chosen on 2026-10-29 -- WS6 first, Effect on its
+branch -- did not hold: `effect-adoption.spec.md` R1 to R4 merged first
+(#873), so the 3.0 load path decodes with Effect Schema decoders
+(`core/src/decode/`: `decodeOrRefuse` then `fromDecoded` in
+`OrmYamlSerializer.ts`), not ajv, and the 2.0 `deserialize*` functions
+moved beside the 2.0 reader (`reader20.ts`). The model's own classes are
+unchanged, and the shipped JSON Schema is still hand-written, held to the
+decoders field by field by a drift test (`decode/documentSchemaDrift.test.ts`)
+until Effect's part C generates it. So 6b writes the 4.0 reader as Effect
+decoders, modelled on the 3.0 decoders R1 to R4 added, and changes the
+hand-written `orm-model.schema.json` with them; the 3.0 decoders and a
+frozen `orm-model-3.0.schema.json` become the 3.x reader, each pair with
+its drift test. Effect's remaining parts (WS1b's B3, C, D, E) are not this
+workstream's: 6b changes the decoder modules and, only if it must, the
+shared harness, the smallest change that works.
 
 **What the code already gives.** Every element in production source is
 constructed inside an `OrmModel` add method: `createObjectType`,
 `new FactType`, `new SubtypeFact`, `new ObjectifiedFactType` and
 `new Population` each have one source call site, in
-`core/src/model/OrmModel.ts` (225, 571, 656, 788, 917), and `new Role` is
+`core/src/model/OrmModel.ts` (217, 563, 648, 780, 909), and `new Role` is
 reached only through `FactType`. A fact type outside a model exists only
 in tests (18 sites); counterexample populations
 (`CounterexampleGenerator.ts:434,502,634,737,754`) are the one standalone
@@ -845,11 +854,12 @@ callback interface declared in a leaf module (`{ admitConstraint(c):
 Constraint }`), which `OrmModel` supplies, not as `OrmModel`: `FactType`
 holding the model would close `FactType` -> `OrmModel` -> `FactType`, and
 `FactType` minting itself would close `FactType` -> `mint.ts` ->
-`ConstraintVerbalizer` -> `FactType` (`ConstraintVerbalizer.ts:8`
+`ConstraintVerbalizer` -> `FactType` (`ConstraintVerbalizer.ts:9`
 type-imports `FactType`). The model mints; the fact type asks it to. The 3.0 reader adds every kind after
 everything its sentence reads (object types, fact types with internal
 constraints, subtype facts, external constraints, preferred identifiers,
-then objectifications and populations, `OrmYamlSerializer.ts:244-308`),
+then objectifications and populations, `fromDecoded`,
+`OrmYamlSerializer.ts:228-289`),
 and no constraint's sentence reads a preferred identifier or an
 objectification, so a name minted at the add reads the same as one minted
 after that load. An importer that adds in another order is held to the
@@ -1142,8 +1152,9 @@ version-1 manifest would go silently empty for impact analysis.
   - _Mint at the add, with the file's stated ids reserved for the load._
     A reader collects every id the file states before its first add --
     the pre-pass the 3.0 reader already runs for constraint repeats
-    (`OrmYamlSerializer.ts:260-279`), and the `taken` set the 2.0 reader
-    already builds for derived ids (`:507`, `derivedId.ts`) -- and passes
+    (`fromDecoded`, `OrmYamlSerializer.ts:245-261`), and the taken set the
+    2.0 reader already builds for derived ids (`reader20.ts:416`,
+    `derivedId.ts`) -- and passes
     it to the model as reserved for that load. A minted name, or a
     derived local name, that meets a reserved or held id takes the next
     free `_N`, so a stated id wins wherever it sits in the file, and the
@@ -1160,15 +1171,15 @@ version-1 manifest would go silently empty for impact analysis.
     displacing a minted holder when a stated id arrives later, because a
     caller may already have read the minted id.
   - _The cross-kind index_ replaces the per-kind `refuseHeldId`
-    (`OrmModel.ts:185-196`) beside the per-kind maps, keyed by id, over
+    (`OrmModel.ts:177-192`) beside the per-kind maps, keyed by id, over
     object types, fact types, roles, named constraints, subtype facts,
     objectifications and populations (`Ft.population` can equal a role
-    id, which `structural.ts:311` already reports); the WS2 rule's map
-    (`structural.ts:243-317`) reads it. Decision 5 needs no flag: deriving
+    id, which `structural.ts:310-312` already reports); the WS2 rule's map
+    (`checkLocalNames`, `structural.ts:244-323`) reads it. Decision 5 needs no flag: deriving
     role ids refuses a repeated role name, the 3.x replay passes a suffix
     option, and a 4.0 file's stated ids are kept.
   - _Decision 4 at import._ An importer adds objectifications after fact
-    types (`NormaToOrmMapper.ts:121-124`,
+    types (`NormaToOrmMapper.ts:123-124`,
     `llm/src/parse/objectifications.ts:59`), so at `addFactType` the model
     cannot know a fact type will be objectified, and a NORMA-convention
     pair (`Enrollment` and `Enrollment`, where all 22 corpus cases come
@@ -1206,9 +1217,12 @@ version-1 manifest would go silently empty for impact analysis.
     only beside an `id`; `imports` as a map from alias to a context name
     or an absolute IRI; the pattern held once as a constant in
     `model/name.ts`, drift-tested against the schema as `iri.ts` is. The
-    3.0 schema is frozen as `orm-model-3.0.schema.json`, as 2.0's was.
-  - _The 3.x reader_ reads with today's `fromDocument` against the frozen
-    schema, then replays that model into a fresh 4.0 model through the
+    3.0 schema is frozen as `orm-model-3.0.schema.json`, as 2.0's was. Format 4.0 is stated twice,
+    as 3.0 is: the hand-written JSON Schema and the 4.0 Effect decoders,
+    held together by the document drift test; the frozen 3.0 schema keeps
+    its own drift test against the 3.0 decoders.
+  - _The 3.x reader_ reads with today's 3.0 decoders and `fromDecoded`,
+    kept as the frozen 3.x reader, then replays that model into a fresh 4.0 model through the
     existing `to*Config` projections, dropping ids and mapping each
     reference through the growing UUID-to-local-name map (one reference
     rewriter, shared with rename), with the migration option set: suffix
@@ -1218,7 +1232,8 @@ version-1 manifest would go silently empty for impact analysis.
     not define, which only a lenient load admits, is carried across as
     written, so validation reports it as it does today. The inverse map
     is kept on the model in memory, never written, and diff's id passes
-    (`identity.ts:81-97`, `elementDiff.ts:233-235,635-639`) use it only
+    (`pairElements`, `identity.ts:323`; `elementDiff.ts:235`, `pairById`
+    at `:497-507`) use it only
     when both models carry one, so `barwise history` pairs two 3.x
     revisions exactly with no change to `history.ts`. The 2.0 reader
     feeds the same replay (decision 18), so `planRead`'s one legacy slot
@@ -1243,7 +1258,7 @@ version-1 manifest would go silently empty for impact analysis.
     type ends the exemption, and the rule then reports the fact type's
     decision-20 id; that is expected, because a rename of the fact type can
     now give it `localName(name)`, which is the repair. In 4.0
-    `structural/local-name-collision` (`structural.ts:255-280`), which
+    `structural/local-name-collision` (`checkLocalNames`, `structural.ts:255-280`), which
     compares `localName(name)` today, compares ids, so the 22 corpus
     pairs and every NORMA import stop warning once their ids differ, and
     its 3.x message, which says the migration "will rename the fact
@@ -1270,12 +1285,12 @@ version-1 manifest would go silently empty for impact analysis.
     editor opened does not decide which project it belongs to. The callers
     that need IRIs have the project: `barwise export` and MCP
     `export_model` already take a `.orm-project.yaml` with `--domain`
-    (`cli/src/commands/export.ts:43,49`), so an Ossie export of a domain
+    (`cli/src/commands/export.ts`, `--domain` at `:59`), so an Ossie export of a domain
     goes through its project; exporting the domain file alone in an
     `iri_base` project gives no IRIs, and decision 11's request for a
     namespace says so. A project export writes no lineage manifest
-    (`export.ts:155`, "Project export does not write a lineage
-    manifest"; MCP `export_model` writes none), so an Ossie export that
+    (`export.ts:164`, "no lineage manifest"; MCP `export_model` writes
+    none), so an Ossie export that
     holds IRIs is not lineage-tracked, as no project export is today;
     tracking project exports is its own change, filed when 6f lands, not
     this spec's.
@@ -1287,7 +1302,7 @@ version-1 manifest would go silently empty for impact analysis.
     namespace-qualified ids and does not hold for local names, so no
     project-level diff is needed for identity. Diff does not compare a
     model's header today (merge only carries `namespace` across,
-    `ModelMerge.ts:75`), so 6b adds a header change for `namespace` and
+    `ModelMerge.ts:97`), so 6b adds a header change for `namespace` and
     `imports`, which makes such an edit visible in `barwise diff`.
     Renaming a context changes the alias in every other domain's shadows
     and imports; that is a project-level rename of its own, not in this
@@ -1337,7 +1352,7 @@ version-1 manifest would go silently empty for impact analysis.
   the per-fact-type loop, right after the first fact type it spans
   (`factTypes.ts:84`), before the others exist, which 6b's guard would
   leave unnamed; 6c adds external constraints in a pass after every fact
-  type. Export changes one seam, `toNormaId` (`normaId.ts:39`, 64 uses),
+  type. Export changes one seam, `toNormaId` (`normaId.ts:38`, 64 uses),
   to decision 12(a), and drops its `startsWith("_")` pass-through, which
   would skip derivation for a local name such as `_internal`. Decision
   12(c) is recorded as not viable, subject to confirming NORMA's id type:
@@ -1348,20 +1363,20 @@ version-1 manifest would go silently empty for impact analysis.
   before 6c lands.
 - **6d, merge and split.** Merge keeps the base's fact type id on a
   modification and rewrites the incoming roles to `<base>.<role>`, where
-  today it takes the incoming roles (`ModelMerge.ts:141-151,196`); pairs
-  the internal constraints with the diff's id-then-key pairing, exported
-  from `elementDiff.ts` (`diffConstraints`, `:646-701`, reports only
-  changes), and keeps the base's id and stored key for each pair
+  today it takes the incoming roles (`mergeModels`, the role handling at
+  `ModelMerge.ts:106-130,197-221`); pairs the internal constraints with
+  the diff's id-then-key pairing, exported from `elementDiff.ts`
+  (`diffConstraints`, `:509-564`, reports only changes), and keeps the base's id and stored key for each pair
   (section 3). A clash on a minted id (subtype fact, objectification,
   population) takes the model's suffix rule in place of `mergedId`'s
-  UUIDv8 (`:808-818`, `MERGE_ID_TAG`), reported; a clash between two
+  UUIDv8 (`:830-840`, `MERGE_ID_TAG`), reported; a clash between two
   stated ids, now across kinds, is refused by `refuseNameClashes`
-  (`:835-867`, one kind today). Split gives each shadow the id
+  (`:895-925`, one kind today). Split gives each shadow the id
   `<owner>:<the owner's id>`, which can differ from `localName(name)` (a
   suffixed id, a name edited without a rename), and rewrites every reference to it in the
   domain (role players, subtype ends, `objectified.object_type`), emits
   `imports: { <owner>: <owner> }`, drops `source_context`, and writes 4.0
-  (`splitModel.ts:340-360,441-444`). The 3.x reader, which sees only the
+  (`splitModel.ts:340-360,440`). The 3.x reader, which sees only the
   shadow's name and `source_context`, builds `<context>:localName(name)`,
   and the 4.0 project load's name check (Scope) catches the one case where
   that binds the wrong owner element. A core `aliasOf(id)` replaces the field for its
@@ -1370,16 +1385,21 @@ version-1 manifest would go silently empty for impact analysis.
   `breakingLevel.ts:38`, kept and derived from the alias), and, missing
   from the draft's Inventory, `rename/renameInModel.ts:114`,
   `rename/renameInProject.ts:82,230-234`, `ossie/writeOssie.ts:455,803`
-  and `serialization/yaml/objectType.ts:22,61-62,102`. 21 tracked YAML
+  and the object type's `source_context` in its writer
+  (`serialization/yaml/objectType.ts:15,54-55`), its 3.0 decoder
+  (`decode/objectType.ts`) and the 2.0 reader (`reader20.ts`). 21 tracked YAML
   files set `source_context` (WS7).
-- **6e, lineage.** The manifest goes to `version: 2` (`types.ts:40-45`)
-  and `canonicalizeIds` goes (`manifest.ts:106-147`). The marker is per
+- **6e, lineage.** The manifest goes to `version: 2` (`types.ts:55`)
+  and `canonicalizeIds` goes (`manifest.ts:124-`). The marker is per
   export, because `updateManifest` keeps every export it does not
-  replace (`manifest.ts:76-84`): when a 4.0 build writes a version-1
+  replace (`manifest.ts:54-`): when a 4.0 build writes a version-1
   manifest, each export it keeps is marked as written under 3.x ids, so
   under decision 15 as amended it reads stale with the reason "ids
-  changed to 4.0" (`staleness.ts:51-61`), and impact analysis says that
-  export predates 4.0 instead of returning nothing (`impact.ts:35-67`).
+  changed to 4.0" (`checkStaleness`, `staleness.ts:54-`), and impact
+  analysis says that export predates 4.0 instead of returning nothing
+  (`analyzeImpact`, `impact.ts:44-`). Since 6a an export names its model
+  (`sourceModel`) and both read one model's exports through `ModelScope`;
+  the marker sits beside that field.
   The marker is written from the manifest's version, not guessed from
   the shape of `elementId`, which would miss exports with no sources,
   NORMA `_GUID` ids and hand-written ids. `hashModel` hashes the
@@ -1387,7 +1407,7 @@ version-1 manifest would go silently empty for impact analysis.
   hash; `iri_base` and contexts are in the project file, which is not.
   That settles WS4's "which namespace inputs lineage tracks": the model's
   own, which the hash covers, so an export of a domain file that declares
-  its own `namespace` (`export.ts:96-108`) is tracked through it; and the
+  its own `namespace` (`export.ts:106-141`) is tracked through it; and the
   project's none, because a project export, whose IRIs come from
   `iri_base` and the context, records no lineage (6b's `iriOf`). Renames rewrite the manifests
   they can see through a pure core helper, `renameInManifest(manifest,
@@ -1402,7 +1422,7 @@ version-1 manifest would go silently empty for impact analysis.
   becomes a map per domain, because a shadow's id changes in each domain
   that holds it.
 - **6f, the outputs.** DDL comments (`DdlExportFormat.ts:185`), Ossie's
-  loss block (`writeOssie.ts:89,318,347,350`) and SVG `data-id`
+  loss block (`lose`, `writeOssie.ts:156`; the namespace line at `:361-364`) and SVG `data-id`
   (`diagram-ui/src/parts/*Node.tsx`) print local names with no code
   change. The Ossie writer puts `iriOf`'s identity IRI, or
   `equivalent_iri` when present, into Ossie's `iri` (decision 1), and the
@@ -1410,7 +1430,8 @@ version-1 manifest would go silently empty for impact analysis.
 
 **Sizes, roughly.** 6a: about 400 lines of source for diff, 300 for the
 rest, each with tests. 6b: about 25 core files and 1,500 to 2,000 lines,
-the frozen 3.0 schema (a 1,500-line mechanical copy), 300 to 450 lines
+the frozen 3.0 schema (a 1,500-line mechanical copy) and the 4.0
+Effect decoders beside the frozen 3.0 ones, 300 to 450 lines
 across the importers, and tests as large again; it may split along
 `orm-format-3`'s lines with no release between. 6c: 250 to 400. 6d:
 about 250 plus tests. 6e: 350 to 500 across 12 files. 6f: under 100.
