@@ -31,6 +31,7 @@ import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { crossField } from "./harness.js";
 import {
   intAtLeast,
+  Name,
   nonEmpty,
   rangeRecord,
   RangesFile,
@@ -40,11 +41,6 @@ import {
 import { type ElementLabel, elementOf } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
-
-/** A name `requireName` accepts: something left after trimming. */
-const Name = Schema.String.check(
-  Schema.makeFilter((name: string) => name.trim() !== "", { message: "must not be blank." }),
-);
 
 const NonNegativeInt = intAtLeast(0);
 

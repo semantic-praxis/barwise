@@ -2,7 +2,7 @@
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
-restarted on format 3.0 2026-10-29 (1r), R0 to R2 done, R3 onward not started; WS1b
+restarted on format 3.0 2026-10-29 (1r), R0 to R3 done, R4 not started; WS1b
 follows the restart's WS1 reading; WS2 onward not started
 Created: 2026-10-15
 Last-updated: 2026-10-30
@@ -974,6 +974,63 @@ R2's head alike.
   list or on the fact type could produce only through a sentence-override
   hook, the same plumbing as `messageWithin` in another place; and the
   per-member guard is what narrows each list's decoded type.
+
+**R3, done 2026-10-30: fact types and roles**, in `core/src/decode/factType.ts`,
+still off the load path.
+
+- The fact type, its roles and its derivation in the file's own keys, with
+  the fact type's `constraints` held by R2's internal list, so a fact type
+  and its constraints decode in one pass. `factTypeConfig` maps a decoded
+  value to the `FactTypeConfig` `deserializeFactType` builds, its
+  constraints R2's records: the `FactType` class still builds the element.
+- The reading rule is a harness check on the Schema, reported at each
+  reading at fault whatever else is wrong with the fact type; a blank
+  reading is its own leaf's, as the constructor refuses it. The rule reads
+  `readings.*` and `roles`, so a reading that is not a string suspends it
+  for the fact type's other readings, which the harness's skip rule
+  requires.
+- The misplacement sentence now names the enclosing fact type through
+  `messageWithin`, and a test compares it with today's: for every kind that
+  lives in the model, with its id, an empty id and none, the decoder's
+  problems hold `refuseMisplacedConstraints`'s sentence exactly. The copy
+  barwise-ehl tracks is therefore checked until R4 deletes the old one.
+- Agreement with `main`, both ways: 2,000 fact types drawn from the
+  hand-written schema, half given readings that name each role, and the
+  decoder accepts exactly what today's schema and the `FactType` constructor
+  accept (660 of them valid), to the same config; all 1,515 corpus fact
+  types decode to today's config. The 17 3.0 fact type cases, the 11
+  constraint cases among them, are refused at their declared path, with
+  `fact-type-without-roles`'s declared consequence (R0's notes) and
+  `frequency-max-below-min` loading as on `main`.
+- Changed scope: barwise-f9t, R2's review details, landed here, since R3
+  reuses those modules: the kind table is total over `Constraint["type"]`,
+  `crossField` takes extra annotations and has a guard form that every
+  marked rule goes through, a maximum's refusal names "unbounded", an id or
+  role id that is not a string is refused as such, and the constraint's
+  label matches `refuseMisplacedConstraints` for an empty or absent id.
+- Found while building it: annotating a checked Schema annotates its last
+  check, not the node, so the walk labelled the fact type's problems "The
+  document". The annotation goes before the check, and a test refuses an
+  element annotation on any check in any of the decoders' Schemas.
+- The reads check fills each field with a value of the Schema's own shape
+  as well as with nothing and the wrong kinds, so a rule that calls a
+  list's methods (`readings.flatMap`) meets a list.
+
+**R3's readings.** M1 for fact types reads no: `Arbitrary.schema` over the
+fact type Schema generates nothing (0 values, 201 discards at sizes 3 and
+10), because a derived reading almost never names each role, so the
+reading rule discards every value. The construct is the reading rule, a
+filter over two fields that derivation can only apply by rejection; a
+fact type generator needs readings built from its roles, which is WS1b
+part D's question, not a gate. S1, S5 and S6 are unchanged by
+construction, as for R1 and R2.
+
+- Planted against, each failing its test: the reading rule declaring too
+  little, the rule off (twice: agreement and harness), a blank reading
+  accepted, blank names accepted, the default storage dropped, a note
+  dropped, the constraints unchecked, the fact type labelled by id only, a
+  maximum's message without "unbounded", ids with no wrong-type message,
+  an empty id labelled as none, and the element annotation after the check.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,

@@ -13,7 +13,7 @@
  */
 import type * as SchemaAST from "effect/SchemaAST";
 import * as SchemaIssue from "effect/SchemaIssue";
-import { extraChecks } from "./harness.js";
+import { extraChecks, type MessageWithin } from "./harness.js";
 
 /** One thing wrong with one element. */
 export interface DecodeProblem {
@@ -71,15 +71,6 @@ const isMapping = (v: unknown): boolean => typeof v === "object" && v !== null &
 
 const defaultFormat = SchemaIssue.makeFormatterDefault();
 
-/**
- * A rule's message that names the element enclosing the one at fault, read
- * with that element's label in sentence case (`fact type "F"`), or with
- * none when the element is decoded alone. A constraint listed under the
- * wrong fact type is the case: its own Schema cannot know the fact type's
- * name, and the sentence `format30.test.ts` pins names it (R2).
- */
-export type MessageWithin = (enclosing: string | undefined) => string;
-
 /** The message an issue carries itself, if it has one. */
 function ownMessage(issue: SchemaIssue.Issue, enclosing?: ElementLabel): string | undefined {
   const within = issue._tag === "Filter"
@@ -124,8 +115,6 @@ interface Context {
   readonly base: number;
   /** The element this one sits in, if it is decoded inside one. */
   readonly enclosing?: ElementLabel;
-  /** Whether this context is an element's, not the bare root's. */
-  readonly element: boolean;
 }
 
 const ROOTLESS: ElementLabel = { label: "The document", identity: "" };
@@ -160,8 +149,8 @@ export function problemsOf(
       ? {
         label: element.describe(value),
         base: path.length,
-        element: true,
-        ...(context.element ? { enclosing: context.label } : {}),
+        // The bare root is no element, so an element directly in it has none around it.
+        ...(context.label !== ROOTLESS ? { enclosing: context.label } : {}),
       }
       : context;
   };
@@ -176,7 +165,6 @@ export function problemsOf(
           identity: "",
         },
         base: path.length,
-        element: true,
       },
       path,
       "must be a mapping of fields.",
@@ -252,6 +240,6 @@ export function problemsOf(
     }
   };
 
-  walk(issue, raw, [], { label: ROOTLESS, base: 0, element: false }, undefined);
+  walk(issue, raw, [], { label: ROOTLESS, base: 0 }, undefined);
   return out;
 }

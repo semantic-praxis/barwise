@@ -54,10 +54,50 @@ export function crossField<T>(
   mark: CrossFieldMark,
   holds: (value: T) => Schema.FilterOutput,
   message: string,
+  annotations: CrossFieldAnnotations = {},
 ) {
   // The mark rides on the filter's annotations, which Effect hands back on
   // the issue it reports.
-  return Schema.makeFilter((value: T) => holds(value), { message, crossField: mark });
+  return Schema.makeFilter((value: T) => holds(value), {
+    ...annotations,
+    message,
+    crossField: mark,
+  });
+}
+
+/**
+ * What else a marked rule may carry: an `arbitraryConstraint` that steers
+ * derivation, and a `messageWithin` that names the enclosing element
+ * (`problems.ts`).
+ */
+export interface CrossFieldAnnotations {
+  readonly arbitraryConstraint?: { readonly minLength?: number; };
+  readonly messageWithin?: MessageWithin;
+}
+
+/**
+ * A rule's message that names the element enclosing the one at fault, read
+ * with that element's label in sentence case (`fact type "F"`), or with
+ * none when the element is decoded alone. A constraint listed under the
+ * wrong fact type is the case: its own Schema cannot know the fact type's
+ * name, and the sentence `format30.test.ts` pins names it (R2).
+ */
+export type MessageWithin = (enclosing: string | undefined) => string;
+
+/**
+ * A marked rule that is also a type guard, as `Schema.refine` takes one:
+ * the value's decoded type narrows to what the guard proves. For a rule
+ * that fails at the node itself, such as a list's minimum stated as a
+ * tuple, or a guard that never holds, which removes a member from a union's
+ * decoded type.
+ */
+export function crossFieldGuard<S extends Schema.Top, T extends S["Type"]>(
+  mark: CrossFieldMark,
+  guard: (value: S["Type"]) => value is T,
+  message: string,
+  annotations: CrossFieldAnnotations = {},
+): (schema: S) => Schema.refine<T, S> {
+  return Schema.refine<S, T>(guard, { ...annotations, message, crossField: mark });
 }
 
 /** The cross-field mark on a check, if it has one. */

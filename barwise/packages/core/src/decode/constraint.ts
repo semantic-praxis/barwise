@@ -31,6 +31,7 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import {
+  type Constraint,
   type ConstraintModality,
   type InternalConstraint,
   placementOf,
@@ -38,7 +39,7 @@ import {
   type ValueComparisonOperator,
 } from "../model/Constraint.js";
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
-import { crossField, type CrossFieldMark } from "./harness.js";
+import { crossField, crossFieldGuard, type CrossFieldMark, type MessageWithin } from "./harness.js";
 import {
   intAtLeast,
   nonEmpty,
@@ -47,7 +48,7 @@ import {
   ValuesFile,
   valuesOrRanges,
 } from "./leaves.js";
-import { type ElementLabel, elementOf, type MessageWithin } from "./problems.js";
+import { type ElementLabel, elementOf } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
 
@@ -84,9 +85,7 @@ const OperatorFile = Schema.Literals(OPERATORS).annotate({
  */
 const LIST_LENGTH: CrossFieldMark = { id: "list-min-length", reads: [] };
 const atLeastItems = (min: number, message: string) =>
-  Schema.makeFilter((xs: readonly unknown[]) => xs.length >= min, {
-    message,
-    crossField: LIST_LENGTH,
+  crossField(LIST_LENGTH, (xs: readonly unknown[]) => xs.length >= min, message, {
     arbitraryConstraint: { minLength: min },
   });
 
@@ -102,12 +101,15 @@ const RoleIds = roleList(1);
 /** Subtype facts of one supertype; too few is validation's to report. */
 const SubtypeFactIds = Schema.Array(nonEmpty(" (a subtype fact id)"));
 
-const bound = (min: number) =>
-  Schema.Union([intAtLeast(min), Schema.Literal("unbounded")]).annotate({
-    message: min === 0
-      ? 'must be a non-negative integer or "unbounded".'
-      : `must be an integer of at least ${min} or "unbounded".`,
+/** A maximum: an integer no smaller than `min`, or "unbounded", named whichever part fails. */
+const bound = (min: number) => {
+  const message = min === 0
+    ? 'must be a non-negative integer or "unbounded".'
+    : `must be an integer of at least ${min} or "unbounded".`;
+  return Schema.Union([intAtLeast(min, message), Schema.Literal("unbounded")]).annotate({
+    message,
   });
+};
 
 const RolePathFile = Schema.Struct({
   root: nonEmpty(""),
@@ -126,16 +128,14 @@ type JoinOperandFileValue = (typeof JoinOperandFile)["Type"];
  * role lists' minimum is, for the same reason.
  */
 const Operands = Schema.Array(JoinOperandFile).pipe(
-  Schema.refine(
+  crossFieldGuard(
+    LIST_LENGTH,
     (
       ops,
     ): ops is readonly [JoinOperandFileValue, JoinOperandFileValue, ...JoinOperandFileValue[]] =>
       ops.length >= 2,
-    {
-      message: "must list at least two operands.",
-      crossField: LIST_LENGTH,
-      arbitraryConstraint: { minLength: 2 },
-    },
+    "must list at least two operands.",
+    { arbitraryConstraint: { minLength: 2 } },
   ),
 );
 
@@ -217,7 +217,7 @@ export const CONSTRAINT_KIND_FILES = {
   join_equality: kind("join_equality", { operands: Operands }),
   join_exclusion: kind("join_exclusion", { operands: Operands }),
   join_ring: kind("join_ring", { operand: JoinOperandFile, ring_type: RingTypeFile }),
-};
+} satisfies Record<Constraint["type"], Schema.Top>;
 
 type Kinds = typeof CONSTRAINT_KIND_FILES;
 type Kind = keyof Kinds;
@@ -244,13 +244,14 @@ function describeConstraint(raw: unknown): ElementLabel {
   const noun = typeof doc.type === "string" && placementOf(doc.type) !== undefined
     ? `The ${doc.type} constraint`
     : "The constraint";
-  if (typeof doc.id === "string" && doc.id !== "") {
-    return { label: `${noun} "${doc.id}"`, identity: doc.id };
-  }
-  // An id of the wrong type is still how a reader finds the constraint.
+  // An empty id is quoted and an absent one left out, as
+  // `refuseMisplacedConstraints` words them; an id of the wrong type is
+  // still how a reader finds the constraint. One with no id is found by the
+  // problem's `at`.
+  if (typeof doc.id === "string") return { label: `${noun} "${doc.id}"`, identity: doc.id };
   return typeof doc.id === "number" || typeof doc.id === "boolean"
     ? { label: `${noun} with id ${String(doc.id)}`, identity: String(doc.id) }
-    : { label: `${noun} with no id`, identity: "" };
+    : { label: noun, identity: "" };
 }
 
 const PLACEMENT_MARK: CrossFieldMark = { id: "constraint-placement", reads: [] };
@@ -268,11 +269,14 @@ function misplacedIn(where: "internal" | "external") {
     : () =>
       "is listed in model.constraints, but its kind lives in its fact type: "
       + "move it under the fact type whose roles it names.";
-  return Schema.refine((_: unknown): _ is never => false, {
-    message: messageWithin(undefined),
-    messageWithin,
-    crossField: PLACEMENT_MARK,
-  });
+  return crossFieldGuard(
+    PLACEMENT_MARK,
+    (_: unknown): _ is never => false,
+    messageWithin(undefined),
+    {
+      messageWithin,
+    },
+  );
 }
 
 const badTag = `must name a constraint kind (one of ${
@@ -322,15 +326,6 @@ export const ExternalConstraintsFile = Schema.Array(ExternalConstraintFile);
 
 /** A new list, typed as the record's lists are: read-only. */
 const mapped = <A, B>(xs: readonly A[], f: (a: A) => B): readonly B[] => xs.map(f);
-const copied = <A>(xs: readonly A[]): readonly A[] => [...xs];
-
-const operandRecord = (o: JoinOperandFileValue) => ({
-  path: {
-    root: o.path.root,
-    steps: mapped(o.path.steps, (s) => ({ entry: s.entry, exit: s.exit })),
-  },
-  projection: copied(o.projection),
-});
 
 /** An operand over roles or over subtype facts, as the record holds it. */
 function rolesOrSubtypeFactsRecord<
@@ -345,14 +340,6 @@ function rolesOrSubtypeFactsRecord<
   return c.subtype_facts !== undefined
     ? { type: c.type as C["type"], subtypeFactIds: c.subtype_facts }
     : { type: c.type as C["type"], roleIds: c.roles ?? [] };
-}
-
-/** Two or more operands, as the record holds them. */
-function operandsRecord(
-  ops: readonly [JoinOperandFileValue, JoinOperandFileValue, ...JoinOperandFileValue[]],
-) {
-  const [first, second, ...rest] = ops;
-  return [operandRecord(first), operandRecord(second), ...mapped(rest, operandRecord)] as const;
 }
 
 /**
@@ -419,15 +406,16 @@ function recordOf(c: ConstraintFileValue) {
       return {
         ...head,
         type: c.type,
-        subset: operandRecord(c.subset),
-        superset: operandRecord(c.superset),
+        // An operand's file shape is the record's, and the decode built it fresh.
+        subset: c.subset,
+        superset: c.superset,
       };
     case "join_equality":
-      return { ...head, type: c.type, operands: operandsRecord(c.operands) };
+      return { ...head, type: c.type, operands: c.operands };
     case "join_exclusion":
-      return { ...head, type: c.type, operands: operandsRecord(c.operands) };
+      return { ...head, type: c.type, operands: c.operands };
     case "join_ring":
-      return { ...head, type: c.type, operand: operandRecord(c.operand), ringType: c.ring_type };
+      return { ...head, type: c.type, operand: c.operand, ringType: c.ring_type };
   }
 }
 

@@ -12,8 +12,23 @@ import * as Schema from "effect/Schema";
 import type { ValueRange } from "../model/ObjectType.js";
 import { crossField } from "./harness.js";
 
+/** A string with something in it; one of another type is refused as not a string. */
 export const nonEmpty = (what: string) =>
-  Schema.String.check(Schema.isMinLength(1, { message: `must not be empty${what}.` }));
+  Schema.String.annotate({ message: `must be a string${what}.` }).check(
+    Schema.isMinLength(1, { message: `must not be empty${what}.` }),
+  );
+
+/**
+ * A name `requireName` accepts: something left after trimming. An object
+ * type's, a fact type's and a role's.
+ */
+export const Name = Schema.String.annotate({ message: "must be a string." }).check(
+  Schema.makeFilter((name: string) => name.trim() !== "", {
+    message: "must not be blank.",
+    // Not blank implies a length of at least one: the schema's minLength.
+    arbitraryConstraint: { minLength: 1 },
+  }),
+);
 
 /**
  * An integer no smaller than `min`, as JSON Schema's `integer` with a
@@ -21,13 +36,17 @@ export const nonEmpty = (what: string) =>
  * and so refused 2^53 + 2, which today's schema and constructor accept
  * (review of R1). The arbitrary constraint only steers derivation (M1) to
  * draw integers in range rather than discard almost every number it draws.
+ * `message` is for a leaf with alternatives, a maximum's "unbounded".
  */
-export const intAtLeast = (min: number) =>
+export const intAtLeast = (
+  min: number,
+  message = min === 0
+    ? "must be a non-negative integer."
+    : `must be an integer of at least ${min}.`,
+) =>
   Schema.Number.check(
     Schema.makeFilter((n: number) => Number.isInteger(n) && n >= min, {
-      message: min === 0
-        ? "must be a non-negative integer."
-        : `must be an integer of at least ${min}.`,
+      message,
       arbitraryConstraint: { number: "integer", minimum: min },
     }),
   );
