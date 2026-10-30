@@ -79,6 +79,16 @@ test("decisionIds finds the id after a bold title that wraps, and reports what i
   );
   assert.match(problems.join("\n"), /decision 4 .*\{#Bad_Id\} is not a kebab-case id/);
   assert.match(problems.join("\n"), /decision 5 .*has no bold title/);
+  // The malformed id is flagged so the caller does not also call it missing.
+  assert.deepEqual(decisions.map((d) => d.malformed), [false, false, false, true, false]);
+});
+
+test("decisionIds ignores numbered lines inside a fenced block", () => {
+  const { decisions, problems } = decisionIds(
+    adr("Tracking: x", "1. **One.** {#one} Text.\n\n```text\n1. an example step\n2. another\n```"),
+  );
+  assert.deepEqual(decisions.map((d) => d.id), ["one"]);
+  assert.deepEqual(problems, []);
 });
 
 test("tagsIn credits every tag in a title, not only the first", () => {

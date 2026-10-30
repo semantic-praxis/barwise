@@ -7460,6 +7460,15 @@ test("check:architecture refuses, exit 2, only where it cannot tell, and lists i
       s.replace("steps.changes.outputs.docs_only != 'true'", "github.ref == 'refs/heads/main'");
     const refused = archPlanted(dir, CI_PATH, unknownGuard);
     assert.equal(refused.status, 2, refused.stdout + refused.stderr);
+    // A gate switched off with `if: false` must not keep counting as an
+    // enforcer; the check cannot evaluate the form, so it refuses.
+    const off = archPlanted(
+      dir,
+      CI_PATH,
+      (s) => s.replace("steps.changes.outputs.docs_only != 'true'", "false"),
+    );
+    assert.equal(off.status, 2, off.stdout + off.stderr);
+    assert.match(off.stderr, /audit:y -- --check.*if: false/);
     assert.match(
       refused.stderr,
       /cannot answer for 1 declaration.*\n.*audit:y -- --check.*if: github\.ref/,

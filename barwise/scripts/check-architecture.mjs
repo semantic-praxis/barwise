@@ -65,7 +65,8 @@ import {
 import { opt } from "./lib/args.mjs";
 import { parseTracker } from "./lib/beads-merge.mjs";
 import { uncommittedPaths } from "./lib/changed-class.mjs";
-import { ciStepOccurrences, shouldRun } from "./lib/ci-gates.mjs";
+import { shouldRun } from "./lib/ci-gates.mjs";
+import { ciStepOccurrences } from "./lib/ci-occurrences.mjs";
 import { isInstructionFile } from "./lib/instruction-files.mjs";
 import { header, inSpecCorpus, touches } from "./lib/spec-reader.mjs";
 
@@ -442,8 +443,10 @@ for (const { f, text } of adrs) {
   if (decisions.length === 0) fail("its ## Decision section has no numbered decision");
   const ids = new Map();
   for (const d of decisions) {
-    if (d.id === null) fail(`decision ${d.n} (line ${d.line}) has no {#id} after its bold title`);
-    else if (ids.has(d.id)) fail(`decisions ${ids.get(d.id).n} and ${d.n} share the id ${d.id}`);
+    // A malformed id was already reported by decisionIds().
+    if (d.id === null) {
+      if (!d.malformed) fail(`decision ${d.n} (line ${d.line}) has no {#id} after its bold title`);
+    } else if (ids.has(d.id)) fail(`decisions ${ids.get(d.id).n} and ${d.n} share the id ${d.id}`);
     else ids.set(d.id, d);
   }
   const covered = new Set();
@@ -475,15 +478,15 @@ for (const { f, text } of adrs) {
       const want = entry.args === null ? `npm run ${script}` : `npm run ${script} -- ${entry.args}`;
       const matching = all.filter((s) => s.run === want);
       const inBarwise = matching.filter((s) => s.workingDirectory === "barwise");
-      const qualifies = inBarwise.filter((s) => {
-        const g = guard(s.condition);
-        return s.continueOnError === false && g.understood && g.runs;
-      });
-      if (qualifies.length > 0) continue;
-      const unreadable = inBarwise.filter((s) =>
-        s.continueOnError === null
-        || (s.continueOnError === false && !guard(s.condition).understood)
-      );
+      const judged = inBarwise.map((s) => ({ s, g: guard(s.condition) }));
+      if (judged.some(({ s, g }) => s.continueOnError === false && g.understood && g.runs)) {
+        continue;
+      }
+      const unreadable = judged
+        .filter(({ s, g }) =>
+          s.continueOnError === null || (s.continueOnError === false && !g.understood)
+        )
+        .map(({ s }) => s);
       if (unreadable.length > 0) {
         refusals.push(
           `${f}: "${entry.text}": cannot tell whether the step runs; its`

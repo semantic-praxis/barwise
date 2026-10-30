@@ -132,7 +132,11 @@ export function parseEnforcedBy(text) {
   const value = header(text, "Enforced-by");
   if (value === undefined) return { present: false, entries: [], problems: [] };
   const problems = [];
-  const fields = [...headerBlock(text).matchAll(/^([A-Z][A-Za-z-]*):/gm)].map((m) => m[1]);
+  // The same field-line test header() ends a value at, so the two readers
+  // agree on what follows the field.
+  const fields = [...headerBlock(text).matchAll(/^([A-Z][A-Za-z-]*):(?:[ \t]|$)/gm)].map((m) =>
+    m[1]
+  );
   if (fields.at(-1) !== "Enforced-by") {
     problems.push(`Enforced-by: is not the last header field (${fields.at(-1)} follows it)`);
   }
@@ -159,6 +163,7 @@ export function decisionIds(text) {
   const decisions = [];
   const problems = [];
   let inDecision = false;
+  let fence = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (/^## Decision\s*$/.test(line)) {
@@ -167,11 +172,14 @@ export function decisionIds(text) {
     }
     if (/^## /.test(line)) inDecision = false;
     if (!inDecision) continue;
+    // A numbered line inside a fenced block is an example, not a decision.
+    if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+    if (fence) continue;
     const item = /^(\d+)\. (.*)$/.exec(line);
     if (!item) continue;
     const n = Number(item[1]);
     if (!item[2].startsWith("**")) {
-      decisions.push({ n, id: null, line: i + 1 });
+      decisions.push({ n, id: null, malformed: false, line: i + 1 });
       problems.push(`decision ${n} (line ${i + 1}) has no bold title for an id to follow`);
       continue;
     }
@@ -189,7 +197,14 @@ export function decisionIds(text) {
     else if (id && !ID.test(id[1])) {
       problems.push(`decision ${n} (line ${i + 1}): {#${id[1]}} is not a kebab-case id`);
     }
-    decisions.push({ n, id: id && ID.test(id[1]) ? id[1] : null, line: i + 1 });
+    // A malformed id is reported once, above; `malformed` keeps the caller
+    // from reporting the same decision again as having no id.
+    decisions.push({
+      n,
+      id: id && ID.test(id[1]) ? id[1] : null,
+      malformed: Boolean(id) && !ID.test(id[1]),
+      line: i + 1,
+    });
   }
   return { decisions, problems };
 }
