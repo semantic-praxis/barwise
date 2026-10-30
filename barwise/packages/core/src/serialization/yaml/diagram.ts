@@ -29,12 +29,3 @@ export function serializeDiagramLayout(dl: DiagramLayout): OrmYamlDiagramLayout 
   }
   return result;
 }
-
-export function deserializeDiagramLayout(dlDoc: OrmYamlDiagramLayout): DiagramLayout {
-  return {
-    name: dlDoc.name,
-    elements: dlDoc.elements,
-    positions: dlDoc.positions ?? {},
-    orientations: dlDoc.orientations ?? {},
-  };
-}

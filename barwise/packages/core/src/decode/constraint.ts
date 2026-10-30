@@ -14,8 +14,8 @@
  * **Placement.** A file lists a constraint under a fact type or in
  * `model.constraints`, as `PLACEMENT` says of its kind. Each list's Schema
  * reads every kind, and a kind that lives in the other list fails a rule
- * of its own, in the wording `refuseMisplacedConstraints` uses today, which
- * the harness runs whatever else is wrong with the constraint. So a
+ * of its own, in the wording `format30.test.ts` pins, which the harness
+ * runs whatever else is wrong with the constraint. So a
  * misplaced constraint's other problems are reported in the same pass, and
  * the decoded type of each list holds only the kinds that live there.
  *
@@ -26,7 +26,7 @@
  * a role or subtype fact that does not exist -- are validation's for the
  * same reason, as WS0's rule has it.
  *
- * Nothing on the load path calls this until R4.
+ * The 3.0 loader reads constraints through this (`decode/document.ts`, R4).
  */
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -235,9 +235,9 @@ export type ConstraintFileValue = (typeof ConstraintFile)["Type"];
 // -- Placement --------------------------------------------------------------
 
 /**
- * What a message calls a constraint: by its kind and id, as
- * `refuseMisplacedConstraints` does (`The ring constraint "c-1"`), and with
- * no kind when the kind is the problem.
+ * What a message calls a constraint: by its kind and id
+ * (`The ring constraint "c-1"`), and with no kind when the kind is the
+ * problem.
  */
 function describeConstraint(raw: unknown): ElementLabel {
   const doc = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
@@ -245,11 +245,9 @@ function describeConstraint(raw: unknown): ElementLabel {
     ? `The ${doc.type} constraint`
     : "The constraint";
   // A string id is quoted, an empty one included, and an absent one left
-  // out, as `refuseMisplacedConstraints` words them; `factType.test.ts`
-  // holds the two sentences together until R4 deletes that copy
-  // (barwise-ehl). A number or a flag is still how a reader finds the
-  // constraint, so it labels this one's every problem, where today's
-  // sentence leaves it out: such an id is refused either way (review of R3).
+  // out, as the refusal before R4 worded them, which `format30.test.ts`
+  // pins. A number or a flag is still how a reader finds the constraint, so
+  // it labels the constraint's every problem (review of R3).
   if (typeof doc.id === "string") return { label: `${noun} "${doc.id}"`, identity: doc.id };
   return typeof doc.id === "number" || typeof doc.id === "boolean"
     ? { label: `${noun} with id ${String(doc.id)}`, identity: String(doc.id) }
@@ -431,6 +429,20 @@ export type DecodedConstraint = ReturnType<typeof recordOf>;
 export const constraintRecord = recordOf as <C extends ConstraintFileValue>(
   c: C,
 ) => Extract<DecodedConstraint, { readonly type: C["type"]; }>;
+
+/**
+ * A decoded constraint as the model holds one today: the alethic default
+ * left out, as `deserializeConstraint` leaves it. The record states its
+ * modality (barwise-973's narrowing, which S3 reads); the model's
+ * `Constraint` keeps it optional until WS4 makes the record the model's,
+ * so the loader hands the model today's shape and a loaded model is the
+ * one today's reader builds (S1).
+ */
+export function modelConstraint<C extends DecodedConstraint>(c: C): C {
+  if (c.modality !== "alethic") return c;
+  const { modality: _alethic, ...rest } = c;
+  return rest as C;
+}
 
 /** A decoded constraint of a kind that lives in its fact type. */
 export type DecodedInternalConstraint = Extract<

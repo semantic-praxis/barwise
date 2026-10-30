@@ -16,11 +16,3 @@ export function serializeDefinition(d: Definition): OrmYamlDefinition {
   }
   return result;
 }
-
-export function deserializeDefinition(defDoc: OrmYamlDefinition): Definition {
-  return {
-    term: defDoc.term,
-    definition: defDoc.definition,
-    context: defDoc.context,
-  };
-}

@@ -4,13 +4,8 @@ import type {
   RingType,
   ValueComparisonOperator,
 } from "../../model/Constraint.js";
+import { type OrmYamlJoinOperand, serializeJoinOperand } from "./rolePath.js";
 import {
-  deserializeJoinOperand,
-  type OrmYamlJoinOperand,
-  serializeJoinOperand,
-} from "./rolePath.js";
-import {
-  deserializeValueConstraintBody,
   type OrmYamlValueConstraintBody,
   serializeValueConstraintBody,
 } from "./valueConstraint.js";
@@ -148,110 +143,5 @@ export function serializeConstraint(c: Constraint): OrmYamlConstraint {
   if (c.modality === "deontic") {
     result.modality = "deontic";
   }
-  return result;
-}
-
-export function deserializeConstraint(c: OrmYamlConstraint): Constraint {
-  let result: Constraint;
-  const id = (c as { id?: string; }).id;
-
-  switch (c.type) {
-    case "internal_uniqueness": {
-      // A 2.0 file's `is_preferred` is the 2.0 reader's to place on an
-      // entity (`storePreferredFlags`); the constraint does not carry it.
-      result = { type: "internal_uniqueness", roleIds: c.roles };
-      break;
-    }
-    case "mandatory":
-      result = { type: "mandatory", roleId: c.role };
-      break;
-    case "external_uniqueness":
-      result = { type: "external_uniqueness", roleIds: c.roles };
-      break;
-    case "value_constraint": {
-      const body = deserializeValueConstraintBody(c);
-      result = body.ranges
-        ? { type: "value_constraint", roleId: c.role, values: body.values, ranges: body.ranges }
-        : { type: "value_constraint", roleId: c.role, values: body.values };
-      break;
-    }
-    case "disjunctive_mandatory":
-      result = c.subtype_facts
-        ? { type: "disjunctive_mandatory", subtypeFactIds: c.subtype_facts }
-        : { type: "disjunctive_mandatory", roleIds: c.roles };
-      break;
-    case "exclusion":
-      result = c.subtype_facts
-        ? { type: "exclusion", subtypeFactIds: c.subtype_facts }
-        : { type: "exclusion", roleIds: c.roles };
-      break;
-    case "exclusive_or":
-      result = c.subtype_facts
-        ? { type: "exclusive_or", subtypeFactIds: c.subtype_facts }
-        : { type: "exclusive_or", roleIds: c.roles };
-      break;
-    case "subset":
-      result = {
-        type: "subset",
-        subsetRoleIds: c.subset_roles,
-        supersetRoleIds: c.superset_roles,
-      };
-      break;
-    case "equality":
-      result = { type: "equality", roleIds1: c.roles_1, roleIds2: c.roles_2 };
-      break;
-    case "ring":
-      result = { type: "ring", roleId1: c.role_1, roleId2: c.role_2, ringType: c.ring_type };
-      break;
-    case "frequency":
-      result = {
-        type: "frequency",
-        roleIds: c.roles ?? (c.role !== undefined ? [c.role] : []),
-        min: c.min,
-        max: c.max,
-      };
-      break;
-    case "value_comparison":
-      result = {
-        type: "value_comparison",
-        roleId1: c.role_1,
-        roleId2: c.role_2,
-        operator: c.operator,
-      };
-      break;
-    case "cardinality":
-      result = { type: "cardinality", roleId: c.role, min: c.min, max: c.max };
-      break;
-    case "join_subset":
-      result = {
-        type: "join_subset",
-        subset: deserializeJoinOperand(c.subset),
-        superset: deserializeJoinOperand(c.superset),
-      };
-      break;
-    case "join_equality":
-      result = { type: "join_equality", operands: c.operands.map(deserializeJoinOperand) };
-      break;
-    case "join_exclusion":
-      result = { type: "join_exclusion", operands: c.operands.map(deserializeJoinOperand) };
-      break;
-    case "join_ring":
-      result = {
-        type: "join_ring",
-        operand: deserializeJoinOperand(c.operand),
-        ringType: c.ring_type,
-      };
-      break;
-  }
-
-  // Preserve ID if present in serialized form
-  if (id) {
-    result = { ...result, id };
-  }
-  // Preserve deontic modality (alethic is the omitted default).
-  if (c.modality === "deontic") {
-    result = { ...result, modality: "deontic" };
-  }
-
   return result;
 }
