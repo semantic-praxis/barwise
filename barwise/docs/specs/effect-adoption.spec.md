@@ -2,10 +2,10 @@
 
 Status: WS0 implemented 2026-10-15 (the instruments and their baselines;
 see WS0); WS1 read on format 2.0 at #672 and passed (see 1r); the spike
-restarted on format 3.0 2026-10-29 (1r), R0 and R1 done, R2 onward not started; WS1b
+restarted on format 3.0 2026-10-29 (1r), R0 to R2 done, R3 onward not started; WS1b
 follows the restart's WS1 reading; WS2 onward not started
 Created: 2026-10-15
-Last-updated: 2026-10-29
+Last-updated: 2026-10-30
 Tracking: barwise-jo5 (this spec); barwise-4r3 (Effect alone on load,
 WS1b part B); barwise-r27 (the blind-spot harness, part A); barwise-wia (generated JSON
 Schema, part C); barwise-5ly (one format definition, part E); barwise-s6q
@@ -898,6 +898,60 @@ barrel does not export.
   `if/then/else` (the side's requirements and forbidden fields), so the
   object type property accepts 1,896 of its 3,000 values (floor 1,600).
   Running a rule under the decode's parse options is barwise-yn2.
+
+**R2, done 2026-10-30: constraints**, in `core/src/decode/constraint.ts`,
+still off the load path: `validate` loads 313 modules on `main` and on
+R2's head alike.
+
+- All 17 kinds, in the file's own keys, with `constraintRecord` mapping
+  each to `main`'s record with barwise-973's narrowings: the modality
+  stated (alethic when the file states none) and two or more operands. The
+  record's type is derived from the Schemas through that mapping, with one
+  arm per kind, so it is what S3 reads.
+- Two list Schemas, a fact type's and the model's, each built from one
+  table of kinds and placed by `placementOf`. A kind listed in the wrong
+  place fails a rule that reads no field, so the harness reports it beside
+  the constraint's other problems; as a guard that never holds, it also
+  removes that kind from the list's decoded type. Its sentence is the one
+  `format30.test.ts` pins, fact type name included: a rule's message may
+  name the element enclosing the one at fault (`messageWithin`), so R3's
+  fact type supplies the name without the constraint Schema knowing it.
+- Changed scope: a frequency or cardinality whose max is below its min is
+  accepted, as `main` loads it and leaves it to validation; refusing it
+  would make S1 differ at R4. Of the 14 3.0 malformed constraint cases, the
+  13 others are refused at their declared field, and
+  `frequency-max-below-min` loads, as it does on `main`.
+- Agreement with `main`, both ways: 3,000 values per list from the
+  hand-written schema, both lists' definitions feeding each list, and the
+  decoder accepts exactly what `main` accepts (1,099 and 948 of them
+  valid), to the same records; all 3,024 corpus constraints under fact
+  types and 91 in `model.constraints` decode to `main`'s records.
+- The leaves the object type and a role's value constraint share (ranges,
+  the values and ranges lists and their one rule, integers) moved to
+  `decode/leaves.ts`; the duplication audit found the copies.
+- barwise-nh5 is done: the reads check follows dotted and wildcard paths,
+  with a planted undeclared nested read shown to fail it.
+
+**R2's readings.**
+
+| Gate | Reading                                                                                                                                                                                              |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S3   | the decoder's record matches the frozen `ConstraintRecord` kind by kind; a `ring_type` widened to a string and a modality left undefaulted each fail it                                              |
+| M1   | yes on Effect 4.0.5, for the union and each of the 17 kinds alone; 1,000 union values (seed 1) and 100 per kind each pass the hand-written schema in their kind's list and decode to `main`'s record |
+
+- M1's union weights members by size: at seed 1 it draws `join_equality`
+  and `join_exclusion` once or twice in 1,000, which is why each kind is
+  also derived alone. A kind with two or more operands derives only below
+  size 5, since Effect's cost budget grows with `size` and so does every
+  list it draws; integers derive only once `intAtLeast` carries an
+  `arbitraryConstraint`, which steers derivation and changes no decode.
+- Planted against, each failing its test: placement off, a placement rule
+  declaring a read it does not make, a rule reading an undeclared field,
+  `ring_type` widened, the modality undefaulted, max below min refused, one
+  operand allowed, `role` winning over `roles`, two subtype facts
+  required, ranges dropped from the record, a bad tag reported at the
+  element rather than at `type`, the enclosing element ignored, the
+  harness inert, and the decoder shell without the harness.
 
 **Each step merges to `main` (owner's direction, 2026-10-29).** There
 is no long-lived spike branch: R1 to R4, and WS1b's parts after them,

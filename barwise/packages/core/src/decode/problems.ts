@@ -52,6 +52,11 @@ export interface ElementAnnotation {
   readonly badTag: string;
   /** What a value that is not a mapping is called: "Object type". */
   readonly noun: string;
+  /**
+   * The field the tag lives in, where a tag that selects no variant is
+   * reported: a constraint's `type`. Without it, at the element itself.
+   */
+  readonly tagField?: string;
 }
 
 /** Mark a Schema as an element, for `problemsOf`. */
@@ -66,8 +71,21 @@ const isMapping = (v: unknown): boolean => typeof v === "object" && v !== null &
 
 const defaultFormat = SchemaIssue.makeFormatterDefault();
 
+/**
+ * A rule's message that names the element enclosing the one at fault, read
+ * with that element's label in sentence case (`fact type "F"`), or with
+ * none when the element is decoded alone. A constraint listed under the
+ * wrong fact type is the case: its own Schema cannot know the fact type's
+ * name, and the sentence `format30.test.ts` pins names it (R2).
+ */
+export type MessageWithin = (enclosing: string | undefined) => string;
+
 /** The message an issue carries itself, if it has one. */
-function ownMessage(issue: SchemaIssue.Issue): string | undefined {
+function ownMessage(issue: SchemaIssue.Issue, enclosing?: ElementLabel): string | undefined {
+  const within = issue._tag === "Filter"
+    ? (issue.filter.annotations as { messageWithin?: MessageWithin; } | undefined)?.messageWithin
+    : undefined;
+  if (within) return within(enclosing && inSentence(enclosing.label));
   const message = issue._tag === "InvalidType"
     ? issue.ast.annotations?.message
     : issue._tag === "InvalidValue" || issue._tag === "MissingKey"
@@ -97,10 +115,17 @@ function predicateOf(issue: SchemaIssue.Issue, fallback: string | undefined): st
     ?? `is invalid: ${defaultFormat(issue).replace(/\s*\n\s*/g, " ")}.`;
 }
 
+/** A label as it reads inside a sentence: `Fact type "F"` as `fact type "F"`. */
+const inSentence = (label: string) => label.charAt(0).toLowerCase() + label.slice(1);
+
 interface Context {
   readonly label: ElementLabel;
   /** Where the element starts: a problem's path is reported below it. */
   readonly base: number;
+  /** The element this one sits in, if it is decoded inside one. */
+  readonly enclosing?: ElementLabel;
+  /** Whether this context is an element's, not the bare root's. */
+  readonly element: boolean;
 }
 
 const ROOTLESS: ElementLabel = { label: "The document", identity: "" };
@@ -131,7 +156,14 @@ export function problemsOf(
     context: Context,
   ): Context => {
     const element = elementAt(ast);
-    return element ? { label: element.describe(value), base: path.length } : context;
+    return element
+      ? {
+        label: element.describe(value),
+        base: path.length,
+        element: true,
+        ...(context.element ? { enclosing: context.label } : {}),
+      }
+      : context;
   };
 
   // An element that is not a mapping: named by its noun, and, below the
@@ -144,6 +176,7 @@ export function problemsOf(
           identity: "",
         },
         base: path.length,
+        element: true,
       },
       path,
       "must be a mapping of fields.",
@@ -186,8 +219,8 @@ export function problemsOf(
         // No member, or several, took the value. At an element that is a
         // wrong tag -- or, for a value that is not a mapping at all, that.
         if (element) {
-          if (isMapping(value)) push(here, path, element.badTag);
-          else notAMapping(element, path);
+          if (!isMapping(value)) notAMapping(element, path);
+          else push(here, element.tagField ? [...path, element.tagField] : path, element.badTag);
           return;
         }
         push(context, path, predicateOf(node, fallback));
@@ -196,7 +229,7 @@ export function problemsOf(
       case "Filter": {
         // A rule's own failure: its issues are reported where they point,
         // each in its own words or, lacking any, the rule's.
-        const message = ownMessage(node) ?? fallback;
+        const message = ownMessage(node, context.enclosing) ?? fallback;
         const inner = node.issue;
         if (inner._tag === "Pointer") {
           walk(inner, value, path, context, message);
@@ -219,6 +252,6 @@ export function problemsOf(
     }
   };
 
-  walk(issue, raw, [], { label: ROOTLESS, base: 0 }, undefined);
+  walk(issue, raw, [], { label: ROOTLESS, base: 0, element: false }, undefined);
   return out;
 }

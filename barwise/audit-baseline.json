@@ -250,6 +250,11 @@
       "status": "accepted-benign",
       "note": "guarded restatement: typed Record / derived Set, completeness compile-checked (barwise-869)",
       "detail": "ConceptualDataTypeName restated as record in packages/formats/src/ossie/writeOssie.ts"
+    },
+    "literal:9133a7a7fd33": {
+      "status": "tracked:barwise-ehl",
+      "note": "the misplaced-constraint sentence, stated by the R2 decoder and by refuseMisplacedConstraints until R4 deletes the latter (effect-adoption 1r)",
+      "detail": "packages/core/src/decode/constraint.ts, packages/core/src/serialization/OrmYamlSerializer.ts"
     }
   }
 }

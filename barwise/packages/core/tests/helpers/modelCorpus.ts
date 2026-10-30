@@ -47,3 +47,29 @@ export function modelCorpus(): readonly CorpusModel[] {
   cached = loaded;
   return loaded;
 }
+
+/** A corpus constraint, with the list a 3.0 file holds it in. */
+export interface CorpusConstraint {
+  readonly file: string;
+  /** `internal` under a fact type, `external` in `model.constraints`. */
+  readonly where: "internal" | "external";
+  readonly constraint: Record<string, unknown>;
+}
+
+/** Every constraint of every corpus model, where its document lists it. */
+export function corpusConstraints(): readonly CorpusConstraint[] {
+  return modelCorpus().flatMap(({ file, doc }) => [
+    ...(doc.model.fact_types ?? []).flatMap((ft) =>
+      (ft.constraints ?? []).map((c) => ({
+        file,
+        where: "internal" as const,
+        constraint: c as unknown as Record<string, unknown>,
+      }))
+    ),
+    ...(doc.model.constraints ?? []).map((c) => ({
+      file,
+      where: "external" as const,
+      constraint: c as unknown as Record<string, unknown>,
+    })),
+  ]);
+}
