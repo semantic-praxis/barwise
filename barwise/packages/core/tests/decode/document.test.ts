@@ -212,6 +212,58 @@ describe("the 3.0 malformed cases, through the loader", () => {
     expect(() => serializer.deserialize(text)).toThrow(`in fact type "${factType}": `);
   });
 
+  it('refuses in one line, with the document itself at "/", as ajv did', () => {
+    let error: unknown;
+    try {
+      serializer.deserialize('orm_version: "3.0"\nmodel: []\n');
+    } catch (e) {
+      error = e;
+    }
+    expect((error as DeserializationError).validationResult!.errors.map((e) => e.path))
+      .toEqual(["/model"]);
+    try {
+      serializer.deserialize("just text\n");
+    } catch (e) {
+      error = e;
+    }
+    expect((error as DeserializationError).validationResult!.errors.map((e) => e.path))
+      .toEqual(["/"]);
+    try {
+      serializer.deserialize('orm_version: "3.0"\nmodel:\n  name: ""\n  object_types: 5\n');
+    } catch (e) {
+      error = e;
+    }
+    const refused = error as DeserializationError;
+    expect(refused.validationResult!.errors).toHaveLength(2);
+    expect(refused.message).not.toContain("\n");
+  });
+
+  it("labels a definition by its term, and an element by any id it states", () => {
+    const doc = {
+      orm_version: "3.0",
+      model: {
+        name: "M",
+        definitions: [{ definition: "x" }, { term: "T", definition: "" }],
+        populations: [{
+          id: "p",
+          fact_type: "f",
+          instances: [{ id: "  ", role_values: { r: 1 } }],
+        }],
+      },
+    };
+    let error: unknown;
+    try {
+      runDocumentDecode(doc);
+    } catch (e) {
+      error = e;
+    }
+    expect((error as DecodeError).problems.map((p) => p.message)).toEqual(expect.arrayContaining([
+      "Definition with no term: term is missing.",
+      expect.stringMatching(/^Definition of "T": definition /),
+      expect.stringMatching(/^Fact instance " {2}" in population "p": role_values\.r /),
+    ]));
+  });
+
   it("an instance's problem names its population", () => {
     const doc = {
       orm_version: "3.0",

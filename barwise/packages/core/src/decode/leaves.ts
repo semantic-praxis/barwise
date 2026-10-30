@@ -47,6 +47,14 @@ export const Name = notBlank("");
  * draw integers in range rather than discard almost every number it draws.
  * `message` is for a leaf with alternatives, a maximum's "unbounded".
  */
+/** Any integer, as JSON Schema's `integer` reads one: a diagram position. */
+export const Integer = Schema.Number.annotate({ message: "must be an integer." }).check(
+  Schema.makeFilter((n: number) => Number.isInteger(n), {
+    message: "must be an integer.",
+    arbitraryConstraint: { number: "integer" },
+  }),
+);
+
 export const intAtLeast = (
   min: number,
   message = min === 0

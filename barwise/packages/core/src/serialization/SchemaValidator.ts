@@ -21,21 +21,18 @@ export interface SchemaError {
 /**
  * Validates parsed .orm.yaml documents against the JSON Schema.
  *
- * Uses ajv internally. The schema is compiled once and reused across
- * validation calls.
+ * Uses ajv internally. Each schema is compiled on first use and reused:
+ * the loader reads 3.0 through the Effect decoders, so only the 2.0 reader
+ * and the decoders' agreement tests validate here.
  */
 export class SchemaValidator {
-  private readonly validate;
   private readonly ajv = new Ajv({ allErrors: true });
+  private current?: ReturnType<Ajv["compile"]>;
   private legacy?: ReturnType<Ajv["compile"]>;
-
-  constructor() {
-    this.validate = this.ajv.compile(ormModelSchema);
-  }
 
   /**
    * Validate a 2.0 document against the 2.0 schema, before the 2.0 reader
-   * reads it into the model. Compiled on first use: most loads are 3.0.
+   * reads it into the model.
    */
   validateLegacyModel(data: unknown): SchemaValidationResult {
     this.legacy ??= this.ajv.compile(legacyOrmModelSchema);
@@ -47,7 +44,8 @@ export class SchemaValidator {
    * orm-model.schema.json schema.
    */
   validateModel(data: unknown): SchemaValidationResult {
-    return this.report(this.validate, data);
+    this.current ??= this.ajv.compile(ormModelSchema);
+    return this.report(this.current, data);
   }
 
   private report(validate: ReturnType<Ajv["compile"]>, data: unknown): SchemaValidationResult {

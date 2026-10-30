@@ -30,33 +30,25 @@ import {
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { DerivationFile, derivationRule } from "./derivation.js";
 import { type DecodedFactType, factTypeConfig, FactTypeFile } from "./factType.js";
-import { Flag, Name, nonEmpty, Text } from "./leaves.js";
+import { Flag, Integer, Name, nonEmpty, Text } from "./leaves.js";
 import { type DecodedObjectType, ObjectTypeFile, toRecord } from "./objectType.js";
 import { type ElementLabel, elementOf } from "./problems.js";
 
 // -- Leaves -----------------------------------------------------------------
 
-/** Any integer, as JSON Schema's `integer` reads one: a diagram position. */
-const Integer = Schema.Number.annotate({ message: "must be an integer." }).check(
-  Schema.makeFilter((n: number) => Number.isInteger(n), {
-    message: "must be an integer.",
-    arbitraryConstraint: { number: "integer" },
-  }),
-);
-
 /** How a message names an element by one of its fields, else by its noun. */
-const labelBy = (noun: string, key: string) => (raw: unknown): ElementLabel => {
+const labelBy = (noun: string, key: string, labelled?: string) => (raw: unknown): ElementLabel => {
   const value = raw !== null && typeof raw === "object"
     ? (raw as Record<string, unknown>)[key]
     : undefined;
-  return typeof value === "string" && value.trim() !== ""
-    ? { label: `${noun} "${value}"`, identity: value }
+  return typeof value === "string" && value !== ""
+    ? { label: `${labelled ?? noun} "${value}"`, identity: value }
     : { label: `${noun} with no ${key}`, identity: "" };
 };
 
 /** Annotate a struct as an element named by one field. */
-const element = (noun: string, key: string) =>
-  elementOf({ noun, badTag: "", describe: labelBy(noun, key) });
+const element = (noun: string, key: string, labelled?: string) =>
+  elementOf({ noun, badTag: "", describe: labelBy(noun, key, labelled) });
 
 // -- The remaining elements -------------------------------------------------
 
@@ -98,7 +90,7 @@ const DefinitionFile = Schema.Struct({
   term: nonEmpty(""),
   definition: nonEmpty(""),
   context: Schema.optionalKey(Text),
-}).annotate(element("Definition of", "term"));
+}).annotate(element("Definition", "term", "Definition of"));
 
 const ORIENTATIONS = ["horizontal", "vertical"] as const;
 

@@ -42,15 +42,15 @@ export interface MigrationResult {
  * YAML strings back to OrmModel instances.
  *
  * The serializer produces YAML that conforms to the orm-model.schema.json
- * schema. The deserializer validates incoming YAML against the schema
- * before constructing the model.
+ * schema. The deserializer reads a 3.0 file through the Effect decoders in
+ * `src/decode/`, and a file below 3.0 through the 2.0 reader, which
+ * validates it against the frozen 2.0 schema, before constructing the model.
  */
 export class OrmYamlSerializer {
   /**
    * Compiled on first use, not in the constructor.
    *
-   * Only `deserialize` validates, and `new Ajv().compile(ormModelSchema)`
-   * costs about 34ms -- so every caller that constructs a serializer to
+   * Only the 2.0 reader validates with ajv, and an ajv compile costs about 34ms -- so every caller that constructs a serializer to
    * SERIALIZE paid for a validator it never touched. `hashModel` builds
    * one per call, which made the laws that hash a model twice per
    * generated case take 25s under coverage instrumentation and time out
@@ -77,8 +77,9 @@ export class OrmYamlSerializer {
   /**
    * Deserialize a YAML string into an OrmModel.
    *
-   * The YAML is first validated against the JSON Schema. If validation
-   * fails, a DeserializationError is thrown with the validation errors.
+   * A 3.0 document is first decoded by the Effect decoders, and a document
+   * below 3.0 validated against the frozen 2.0 schema. If either fails, a
+   * DeserializationError is thrown with every problem found.
    *
    * The model is then constructed from the validated document. Construction
    * errors (e.g. referential integrity violations) are thrown as
@@ -189,10 +190,12 @@ export class OrmYamlSerializer {
 }
 
 /**
- * Decode a 3.0 document, or refuse it with every problem it has, one per
- * line, each naming its element and field. The problems are also kept as
- * a `validationResult`, its paths JSON Pointers into the file, as ajv's
- * were before the decoders replaced it (effect-adoption 1r, R4).
+ * Decode a 3.0 document, or refuse it with every problem it has, each
+ * naming its element and field. The message is one line, problems joined
+ * by "; " as ajv's were, because surfaces print it after a file name
+ * (`barwise migrate` gives one line per file). The problems are also kept
+ * as a `validationResult`, its paths JSON Pointers into the file, "/" for
+ * the document itself, as ajv's were (effect-adoption 1r, R4).
  */
 function decodeOrRefuse(doc: unknown): DecodedDocument {
   try {
@@ -201,10 +204,10 @@ function decodeOrRefuse(doc: unknown): DecodedDocument {
     if (!(err instanceof DecodeError)) throw err;
     const pointer = (p: DecodeProblem) =>
       [...p.at, ...p.path].map((s) => `/${String(s).replace(/~/g, "~0").replace(/\//g, "~1")}`)
-        .join("");
+        .join("") || "/";
     throw new DeserializationError(
-      `The model file does not conform to format 3.0:\n${
-        err.problems.map((p) => p.message).join("\n")
+      `The model file does not conform to format 3.0: ${
+        err.problems.map((p) => p.message).join("; ")
       }`,
       {
         valid: false,
