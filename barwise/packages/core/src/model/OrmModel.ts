@@ -50,7 +50,7 @@ const quoted = (text: string): string => JSON.stringify(text);
  * the store's to hold). One list for the add and the removal, so the
  * index takes and gives back the same ids.
  */
-function idsWithin(ft: FactType): [string | undefined, IdKind][] {
+export function idsWithin(ft: FactType): [string | undefined, IdKind][] {
   return [
     ...ft.roles.map((r): [string, IdKind] => [r.id, "role"]),
     ...ft.internalConstraints.map((c): [string | undefined, IdKind] => [c.id, "constraint"]),
@@ -140,6 +140,11 @@ export class OrmModel implements ConstraintModel {
       return stored;
     },
   };
+  /**
+   * The ids a load states, held back from minting while it runs
+   * (`withReserved`), so a stated id wins wherever it sits in the file.
+   */
+  private _reserved: ReadonlySet<string> = new Set();
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
   private readonly _constraints: ExternalConstraint[] = [];
@@ -229,6 +234,25 @@ export class OrmModel implements ConstraintModel {
   }
 
   /**
+   * Run a load with the ids its file states reserved: a name minted while
+   * it runs, for an element the file gives no id, skips them as it skips a
+   * held id, so the element that states one takes it whether it comes
+   * before or after (iri-identity WS6, "Mint at the add, with the file's
+   * stated ids reserved for the load"). A stated id is still refused at
+   * its own add if something already holds it. Reservations nest, and end
+   * with the load, thrown or not.
+   */
+  withReserved<T>(ids: Iterable<string>, load: () => T): T {
+    const before = this._reserved;
+    this._reserved = new Set([...before, ...ids]);
+    try {
+      return load();
+    } finally {
+      this._reserved = before;
+    }
+  }
+
+  /**
    * `base` when nothing in the model holds it, else the first of
    * `base_2`, `base_3`, ... that nothing holds: the suffix rule, across
    * every kind, because in format 4.0 a local name is unique in its model
@@ -236,7 +260,7 @@ export class OrmModel implements ConstraintModel {
    * load gives are a function of its input.
    */
   private mintedId(base: string, taken: ReadonlySet<string> = new Set()): string {
-    const free = (id: string) => !this._ids.holds(id) && !taken.has(id);
+    const free = (id: string) => !this._ids.holds(id) && !this._reserved.has(id) && !taken.has(id);
     if (free(base)) return base;
     for (let n = 2;; n++) {
       if (free(`${base}_${n}`)) return `${base}_${n}`;

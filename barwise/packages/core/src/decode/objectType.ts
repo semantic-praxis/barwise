@@ -29,6 +29,7 @@ import {
 } from "../model/ObjectType.js";
 import { type DecodeProblems, decoderFor, runDecode } from "./decoder.js";
 import { crossField } from "./harness.js";
+import { type FormatIds, IDS_30 } from "./ids.js";
 import {
   Flag,
   intAtLeast,
@@ -91,8 +92,8 @@ function describeObjectType(raw: unknown): ElementLabel {
 
 // -- The two variants -------------------------------------------------------
 
-const baseFields = {
-  id: nonEmpty(""),
+const baseFieldsOf = (ids: FormatIds<Schema.Struct.Fields>) => ({
+  id: ids.objectType,
   name: Name,
   definition: Schema.optionalKey(Text),
   source_context: Schema.optionalKey(Text),
@@ -100,7 +101,7 @@ const baseFields = {
   independent: Schema.optionalKey(Flag),
   note: Schema.optionalKey(Text),
   cardinality: Schema.optionalKey(CardinalityFile),
-};
+});
 
 /** A field one variant may not have: refused by name, not as unknown. */
 const forbidden = (message: string) => Schema.optionalKey(Schema.Never.annotate({ message }));
@@ -125,41 +126,47 @@ const forbiddenOnEntity = Object.fromEntries(
   >;
 };
 
-const EntityTypeFile = Schema.Struct({
-  ...baseFields,
-  kind: Schema.Literal("entity"),
-  reference_mode: nonEmpty("").pipe(
-    Schema.annotateKey({
-      messageMissingKey: "is missing: an entity type must have a reference mode.",
-    }),
-  ),
-  preferred_identifier: Schema.optionalKey(nonEmpty("")),
-  ...forbiddenOnEntity,
-});
-
-const ValueTypeFile = Schema.Struct({
-  ...baseFields,
-  kind: Schema.Literal("value"),
-  reference_mode: forbidden("is not allowed: a value type has no reference mode."),
-  preferred_identifier: forbidden(
-    "is not allowed: only an entity type has a preferred identifier.",
-  ),
-  data_type: Schema.optionalKey(DataTypeFile),
-  value_constraint: Schema.optionalKey(ValueConstraintFile),
-  default_value: Schema.optionalKey(Text),
-});
-
 /**
- * An object type as a 3.0 file states it. Discriminated by `kind`, so a
- * malformed object type is checked against its own variant only.
+ * An object type as a format states it, for that format's id leaves.
+ * Discriminated by `kind`, so a malformed object type is checked against
+ * its own variant only.
  */
-export const ObjectTypeFile = Schema.Union([EntityTypeFile, ValueTypeFile]).annotate(
-  elementOf({
-    noun: "Object type",
-    badTag: 'must have kind "entity" or "value".',
-    describe: describeObjectType,
-  }),
-);
+export function objectTypeFileOf(ids: FormatIds<Schema.Struct.Fields>) {
+  const EntityTypeFile = Schema.Struct({
+    ...baseFieldsOf(ids),
+    kind: Schema.Literal("entity"),
+    reference_mode: nonEmpty("").pipe(
+      Schema.annotateKey({
+        messageMissingKey: "is missing: an entity type must have a reference mode.",
+      }),
+    ),
+    preferred_identifier: Schema.optionalKey(ids.localRef),
+    ...forbiddenOnEntity,
+  });
+
+  const ValueTypeFile = Schema.Struct({
+    ...baseFieldsOf(ids),
+    kind: Schema.Literal("value"),
+    reference_mode: forbidden("is not allowed: a value type has no reference mode."),
+    preferred_identifier: forbidden(
+      "is not allowed: only an entity type has a preferred identifier.",
+    ),
+    data_type: Schema.optionalKey(DataTypeFile),
+    value_constraint: Schema.optionalKey(ValueConstraintFile),
+    default_value: Schema.optionalKey(Text),
+  });
+
+  return Schema.Union([EntityTypeFile, ValueTypeFile]).annotate(
+    elementOf({
+      noun: "Object type",
+      badTag: 'must have kind "entity" or "value".',
+      describe: describeObjectType,
+    }),
+  );
+}
+
+/** An object type as a 3.0 file states it. */
+export const ObjectTypeFile = objectTypeFileOf(IDS_30);
 
 /** A decoded file object type: exactly what the file states. */
 export type ObjectTypeFileValue = typeof ObjectTypeFile.Type;

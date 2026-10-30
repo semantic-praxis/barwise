@@ -87,14 +87,16 @@ describe("a model naming what it is given", () => {
       instances: [{ roleValues: {} }, { id: "Person_drives_Car.population.7", roleValues: {} }],
     });
     expect(pop.id).toBe("Person_drives_Car.population");
+    // Past every number the config states, wherever it is listed, so a
+    // stated `.1` after an unnamed instance could not be taken by it.
     expect(pop.instances.map((i) => i.id)).toEqual([
-      "Person_drives_Car.population.1",
+      "Person_drives_Car.population.8",
       "Person_drives_Car.population.7",
     ]);
     // Past the highest number used, stated or given; and a removed
     // instance's number is not given again.
-    pop.removeInstance("Person_drives_Car.population.7");
-    expect(pop.addInstance({ roleValues: {} }).id).toBe("Person_drives_Car.population.8");
+    pop.removeInstance("Person_drives_Car.population.8");
+    expect(pop.addInstance({ roleValues: {} }).id).toBe("Person_drives_Car.population.9");
     expect(m.addPopulation({ factTypeId: "Person_drives_Car" }).id).toBe(
       "Person_drives_Car.population_2",
     );
@@ -211,6 +213,29 @@ describe("a model naming what it is given", () => {
     expect(m.addObjectType({ name: "Person ", kind: "entity", referenceMode: "x" }).id).toBe(
       "Person_4",
     );
+  });
+
+  it("skips the ids a load reserves, and forgets them when the load ends", () => {
+    const m = new OrmModel({ name: "M" });
+    const ids = m.withReserved(["Person", "Person_2"], () => {
+      // A minted name meets a reserved id before the element stating it.
+      const first = m.addObjectType({ name: "Person", kind: "entity", referenceMode: "nr" }).id;
+      const stated =
+        m.addObjectType({ id: "Person", name: "Human", kind: "entity", referenceMode: "x" }).id;
+      return [first, stated];
+    });
+    expect(ids).toEqual(["Person_3", "Person"]);
+    // Ended: "Person_2" is free again.
+    expect(m.addObjectType({ name: "Person ", kind: "entity", referenceMode: "y" }).id).toBe(
+      "Person_2",
+    );
+    // A load that throws ends its reservation too.
+    expect(() =>
+      m.withReserved(["Car"], () => {
+        throw new Error("bad file");
+      })
+    ).toThrow("bad file");
+    expect(m.addObjectType({ name: "Car", kind: "entity", referenceMode: "vin" }).id).toBe("Car");
   });
 
   it("keeps an id it is given, as written", () => {

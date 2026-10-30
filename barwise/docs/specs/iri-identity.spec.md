@@ -12,7 +12,8 @@ recognizes renames and merge refuses content and rename pairings; the
 verbalization interface, `model/mint.ts` and `FactType.addConstraint`'s
 return; the test builders off `::` ids; lineage exports name their model);
 6b-1 implemented 2026-10-30 (the cross-kind id index and constraint
-admission); 6b-2a implemented 2026-10-30 (minting in the model); 6b-2b to
+admission); 6b-2a implemented 2026-10-30 (minting in the model); 6b-2b-1
+in progress (the 4.0 reader, unwired); 6b-4a, 6b-2b-2, 6b-3, 6b-4b, 6c to
 6f and WS7 to come
 
 Created: 2026-10-28
@@ -1466,19 +1467,57 @@ sites.
     minted. Cross-kind refusal waits for the replay too. Tests that relied
     on two builds giving unrelated ids now state them; the ten promptlab
     references are regenerated.
-  - _6b-2b, the format._ The stated ids reserved for a load, decision 20,
-    the cross-kind refusal, absent ids on subtype facts and
-    objectifications (decision 19), the 4.0 JSON Schema and Effect
-    decoders with the 3.0 pair frozen, the 4.0 writer, and the 3.x and
-    2.0 replay with its in-memory id map for diff; and the fixture and
-    golden churn.
+  - _6b-2b, the format, in two parts_ (owner, 2026-10-30), read before
+    write, so main never holds a build that reads 4.0 and saves it as 3.0
+    (which would drop `imports`, `minted_from` and absent ids).
+    - _6b-2b-1, the 4.0 reader, unwired._ The stated ids reserved for a
+      load (`OrmModel.withReserved`), and a population numbering past
+      every number its config states. Format 4.0's id patterns, stated
+      once in `model/name.ts`: a local name; an object type's id or a
+      reference, a local name or `alias:local`; a role's and a
+      population's, `<local name>.<local name>`; an instance's, three
+      (owner, 2026-10-30: strict, the shapes the rules give). The 4.0
+      JSON Schema, shipped as `orm-model-4.0.schema.json` beside the
+      current one. The 4.0 Effect decoders (`decode/document40.ts`): the
+      object type, fact type and constraint Schemas become builders over a
+      format's id leaves (`decode/ids.ts`), applied once to 3.0's leaves,
+      which leave every 3.0 Schema as it was, and once to 4.0's; the
+      smaller elements are stated in `document40.ts`, because 3.0 is
+      frozen and the two need not agree from here on. A drift test holds
+      the decoders to the file by fields, by the patterns' sources, and by
+      a corpus both must accept or refuse alike. `readDocument40` collects
+      every stated id, refuses one stated twice across kinds, and reads
+      through `fromDecoded` with the rest reserved. `planRead` still
+      refuses 4.0 and the writer still writes 3.0, so nothing outside
+      tests reaches it. `imports` and `minted_from` are decoded and not
+      yet kept, and an element its sentence cannot name still takes
+      6b-2a's generated id. barwise-wcg.f1s's test injections go through
+      `addFactType` or a helper that keeps the index whole.
+    - _6b-4a, the importers off role ids_ (owner, 2026-10-30), moved
+      ahead of 6b-2b-2 because a 4.0 role id is strictly
+      `<local name>.<local name>`: the importers that state UUID role
+      ids add the fact type without them and read them back, as 6b-4
+      describes, so the writer never emits a role id the 4.0 schema
+      refuses.
+    - _6b-2b-2, the switch._ The 3.0 schema frozen as
+      `orm-model-3.0.schema.json` and the 4.0 one renamed to
+      `orm-model.schema.json`; decision 20; absent ids on subtype facts
+      and objectifications (decision 19) and `minted_from` stored; the
+      model-level cross-kind refusal; the 4.0 writer; the 3.x and 2.0
+      replay with its in-memory id map for diff, and `planRead`'s two
+      legacy slots; and the fixture and golden churn. Required test, from
+      6b-2b-1's review: a lenient 4.0 load of an element whose sentence
+      cannot be minted (a dangling reference) gives the same model on every
+      read, because decision 19 leaves it unnamed; 6b-2b-1 still gives it
+      6b-2a's generated id, which is why that reader stays unwired.
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
   `imports`.
 - _6b-4, importers and retirement._ The importers switch off
-  `generateId`, and `generateId`, its installs and promptlab's
-  deterministic ids go. Until then an importer states UUID ids, which a
-  4.0 file accepts as local names.
+  `generateId` (role ids first, as 6b-4a above), and `generateId`, its
+  installs and promptlab's deterministic ids go (6b-4b). Until then an
+  importer states UUID ids for the other kinds, which a 4.0 file accepts
+  as local names.
 
 **Sizes, roughly.** 6a: about 400 lines of source for diff, 300 for the
 rest, each with tests. 6b: about 25 core files and 1,500 to 2,000 lines,
