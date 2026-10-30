@@ -27,6 +27,13 @@ function coe(value) {
   return null;
 }
 
+/**
+ * A working directory in one spelling: `./barwise` and `barwise/` are the
+ * directory GitHub runs `barwise` in, so they compare equal.
+ */
+const dir = (value) =>
+  typeof value === "string" ? value.replace(/^\.\//, "").replace(/\/+$/, "") || "." : null;
+
 /** An `if:` as text; YAML reads `if: false` as a boolean, kept as `"false"`. */
 const condition = (value) => (value === undefined || value === null ? "" : String(value).trim());
 
@@ -41,7 +48,8 @@ const condition = (value) => (value === undefined || value === null ? "" : Strin
  * - `continueOnError` is `true` if the job or the step says so, else `null`
  *   if either is an expression, else `false`.
  * - `workingDirectory` is the step's, else the job's
- *   `defaults.run.working-directory`, else `null`.
+ *   `defaults.run.working-directory`, else the workflow's, else `null`,
+ *   without a leading `./` or a trailing `/`.
  *
  * Throws when the file cannot be read or is not a workflow with jobs.
  */
@@ -52,9 +60,10 @@ export function ciStepOccurrences(workflow) {
     throw new Error(`${workflow} has no jobs: map`);
   }
   const out = [];
+  const workflowWd = doc.defaults?.run?.["working-directory"] ?? null;
   for (const [name, job] of Object.entries(jobs)) {
     if (job === null || typeof job !== "object" || !Array.isArray(job.steps)) continue;
-    const jobWd = job.defaults?.run?.["working-directory"] ?? null;
+    const jobWd = job.defaults?.run?.["working-directory"] ?? workflowWd;
     for (const step of job.steps) {
       if (step === null || typeof step !== "object") continue;
       const flags = [coe(job["continue-on-error"]), coe(step["continue-on-error"])];
@@ -63,7 +72,7 @@ export function ciStepOccurrences(workflow) {
         run: typeof step.run === "string" ? step.run.trim() : null,
         condition: [condition(job.if), condition(step.if)].filter(Boolean).join(" && "),
         continueOnError: flags.includes(true) ? true : flags.includes(null) ? null : false,
-        workingDirectory: step["working-directory"] ?? jobWd,
+        workingDirectory: dir(step["working-directory"] ?? jobWd),
       });
     }
   }

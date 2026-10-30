@@ -250,6 +250,34 @@ test("ciStepOccurrences reads job keys written after steps:, and a compact step 
   }
 });
 
+test("ciStepOccurrences reads workflow-level defaults and one spelling of a directory", () => {
+  const dir = mkdtempSync(join(tmpdir(), "barwise-steps-"));
+  try {
+    const wf = join(dir, "ci.yml");
+    writeFileSync(
+      wf,
+      [
+        "defaults:",
+        "  run:",
+        "    working-directory: ./barwise/",
+        "jobs:",
+        "  ci:",
+        "    steps:",
+        "      - run: npm run check:x",
+        "      - run: npm run check:y",
+        "        working-directory: barwise/packages/core",
+        "",
+      ].join("\n"),
+    );
+    assert.deepEqual(ciStepOccurrences(wf).map((s) => s.workingDirectory), [
+      "barwise",
+      "barwise/packages/core",
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("ciStepOccurrences and ciSteps read the real ci.yml the same way", () => {
   // Two readers of one file (ci-gates.mjs stays on builtins for ci:local's
   // copied fixtures), so they are held to one answer: the first occurrence

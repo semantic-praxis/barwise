@@ -7495,6 +7495,19 @@ test("check:architecture refuses, exit 2, only where it cannot tell, and lists i
         + "      - run: npm run audit:y -- --check\n        if: github.ref == 'refs/heads/main'\n",
     );
     assert.equal(mixed.status, 2, mixed.stdout + mixed.stderr);
+    // An expression continue-on-error on a step whose guard never runs it
+    // on a code change cannot qualify either way: a finding, not a refusal.
+    const never = archPlanted(
+      dir,
+      CI_PATH,
+      (s) =>
+        s.replace("!= 'true'", "== 'true'").replace(
+          "audit:y -- --check\n",
+          "audit:y -- --check\n        continue-on-error: ${{ matrix.x }}\n",
+        ),
+    );
+    assert.equal(never.status, 1, never.stdout + never.stderr);
+    assert.match(never.stderr, /a guard that does not run it on every code change/);
     // A finding with a refusal beside it is exit 1, and both are listed.
     writeFileSync(join(dir, CI_PATH), unknownGuard(ENFORCED_CI));
     const both = archPlanted(dir, ENFORCED_PATH, (s) => s.replace("check:x (one)", "lint (one)"));

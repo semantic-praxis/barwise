@@ -89,6 +89,22 @@ test("decisionIds ignores numbered lines inside a fenced block", () => {
   );
   assert.deepEqual(decisions.map((d) => d.id), ["one"]);
   assert.deepEqual(problems, []);
+  // A heading inside the fence ends neither the fence nor the section.
+  const later = decisionIds(
+    adr(
+      "Tracking: x",
+      "1. **One.** {#one}\n\n```markdown\n## Consequences\n1. not a decision\n```\n\n2. **Two.** {#two}",
+    ),
+  );
+  assert.deepEqual(later.decisions.map((d) => d.id), ["one", "two"]);
+});
+
+test("decisionIds does not read an unclosed title into the next decision", () => {
+  const { decisions, problems } = decisionIds(
+    adr("Tracking: x", "1. **One. {#one}\n2. **Two.** {#two}"),
+  );
+  assert.deepEqual(decisions.map((d) => [d.n, d.id]), [[1, null], [2, "two"]]);
+  assert.match(problems.join("\n"), /decision 1 .*its bold title does not close/);
 });
 
 test("tagsIn credits every tag in a title, not only the first", () => {

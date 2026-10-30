@@ -66,7 +66,6 @@ import { opt } from "./lib/args.mjs";
 import { parseTracker } from "./lib/beads-merge.mjs";
 import { uncommittedPaths } from "./lib/changed-class.mjs";
 import { shouldRun } from "./lib/ci-gates.mjs";
-import { ciStepOccurrences } from "./lib/ci-occurrences.mjs";
 import { isInstructionFile } from "./lib/instruction-files.mjs";
 import { header, inSpecCorpus, touches } from "./lib/spec-reader.mjs";
 
@@ -409,7 +408,22 @@ const rootScripts = lazily("barwise/package.json", () => {
   if (!isMap(json?.scripts)) throw new Error("no scripts object");
   return json.scripts;
 });
+// ci-occurrences.mjs needs the `yaml` package, so it is imported only when
+// some ADR declares a gate: a tree with no such entry runs on builtins, as
+// this check always has.
+const needsWorkflow = adrs.some(({ text }) =>
+  parseEnforcedBy(text).entries.some((e) => e.kind === "npm")
+);
+let ciStepOccurrences = null;
+if (needsWorkflow) {
+  try {
+    ({ ciStepOccurrences } = await import("./lib/ci-occurrences.mjs"));
+  } catch (err) {
+    refusals.push(`scripts/lib/ci-occurrences.mjs: ${err.message}`);
+  }
+}
 const steps = lazily(".github/workflows/ci.yml", () => {
+  if (ciStepOccurrences === null) throw new Error("its reader could not be loaded");
   const found = ciStepOccurrences(join(root, ".github", "workflows", "ci.yml"));
   if (found.length === 0) throw new Error("no steps found; has the workflow moved?");
   return found;
@@ -482,9 +496,13 @@ for (const { f, text } of adrs) {
       if (judged.some(({ s, g }) => s.continueOnError === false && g.understood && g.runs)) {
         continue;
       }
+      // Unreadable means it might still qualify. An expression
+      // continue-on-error on a step whose guard plainly never runs it on a
+      // code change cannot qualify either way, so that stays a finding.
       const unreadable = judged
         .filter(({ s, g }) =>
-          s.continueOnError === null || (s.continueOnError === false && !g.understood)
+          (s.continueOnError === null && (!g.understood || g.runs))
+          || (s.continueOnError === false && !g.understood)
         )
         .map(({ s }) => s);
       if (unreadable.length > 0) {

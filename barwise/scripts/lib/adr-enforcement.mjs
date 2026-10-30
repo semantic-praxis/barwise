@@ -10,7 +10,7 @@
  * `regen:architecture`, where a throw would crash a writer over a typo the
  * check exists to report.
  */
-import { header, headerBlock } from "./spec-reader.mjs";
+import { FIELD_LINE, header, headerBlock } from "./spec-reader.mjs";
 
 /**
  * A tag in a test's own title: `[adr:<adr-name>#<decision-id>]`. Global,
@@ -132,11 +132,11 @@ export function parseEnforcedBy(text) {
   const value = header(text, "Enforced-by");
   if (value === undefined) return { present: false, entries: [], problems: [] };
   const problems = [];
-  // The same field-line test header() ends a value at, so the two readers
-  // agree on what follows the field.
-  const fields = [...headerBlock(text).matchAll(/^([A-Z][A-Za-z-]*):(?:[ \t]|$)/gm)].map((m) =>
-    m[1]
-  );
+  // FIELD_LINE is header()'s own test for where a field ends, so the two
+  // agree on what follows. `Enforced-by:` with nothing after it is still a
+  // field here, so an empty one is not misread as another field's.
+  const fieldLine = new RegExp(`^(?:(?=${FIELD_LINE})([A-Z][A-Za-z-]*):|(Enforced-by):$)`, "gm");
+  const fields = [...headerBlock(text).matchAll(fieldLine)].map((m) => m[1] ?? m[2]);
   if (fields.at(-1) !== "Enforced-by") {
     problems.push(`Enforced-by: is not the last header field (${fields.at(-1)} follows it)`);
   }
@@ -166,15 +166,19 @@ export function decisionIds(text) {
   let fence = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    // A fenced block is an example: a numbered line or a `## ` heading in
+    // it is not a decision and does not end the section.
+    if (inDecision && /^\s*(```|~~~)/.test(line)) {
+      fence = !fence;
+      continue;
+    }
+    if (fence) continue;
     if (/^## Decision\s*$/.test(line)) {
       inDecision = true;
       continue;
     }
     if (/^## /.test(line)) inDecision = false;
     if (!inDecision) continue;
-    // A numbered line inside a fenced block is an example, not a decision.
-    if (/^\s*(```|~~~)/.test(line)) fence = !fence;
-    if (fence) continue;
     const item = /^(\d+)\. (.*)$/.exec(line);
     if (!item) continue;
     const n = Number(item[1]);
@@ -186,7 +190,10 @@ export function decisionIds(text) {
     // The title closes within the item's first lines; read on until it does.
     let rest = item[2].slice(2);
     let j = i;
-    while (!rest.includes("**") && j + 1 < lines.length && j < i + 5) {
+    while (
+      !rest.includes("**") && j + 1 < lines.length && j < i + 5
+      && !/^\d+\. /.test(lines[j + 1]) && lines[j + 1].trim() !== ""
+    ) {
       j++;
       rest += ` ${lines[j].trim()}`;
     }
