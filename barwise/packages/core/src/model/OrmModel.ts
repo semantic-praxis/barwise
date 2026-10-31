@@ -173,6 +173,8 @@ export class OrmModel implements ConstraintModel {
    * stated ids it checked across kinds before holding them.
    */
   private _addingFactType = false;
+  /** See `priorIds`. */
+  private _priorIds: ReadonlyMap<string, string> | undefined;
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
   private readonly _constraints: ExternalConstraint[] = [];
@@ -192,6 +194,22 @@ export class OrmModel implements ConstraintModel {
 
   get name(): string {
     return this._name;
+  }
+
+  /**
+   * For a model replayed from a 3.x file, each element's id in that file,
+   * by its id here (iri-identity WS6, the 3.x replay). Held in memory and
+   * never written, so diff can pair two replayed revisions of one file by
+   * their old ids. Undefined for any other model.
+   */
+  get priorIds(): ReadonlyMap<string, string> | undefined {
+    return this._priorIds;
+  }
+
+  /** Set once, by the replay that built this model. */
+  recordPriorIds(ids: ReadonlyMap<string, string>): void {
+    if (this._priorIds !== undefined) throw new Error("A model's prior ids are recorded once.");
+    this._priorIds = ids;
   }
 
   set name(value: string) {

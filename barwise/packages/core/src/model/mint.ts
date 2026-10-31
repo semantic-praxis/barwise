@@ -175,7 +175,7 @@ function factTypeKey(ft: FactType, model: ConstraintModel): unknown {
   };
 }
 
-type Reference =
+export type Reference =
   | { readonly kind: "role"; readonly id: string; }
   | { readonly kind: "subtypeFact"; readonly id: string; }
   | { readonly kind: "objectType"; readonly id: string; };
@@ -245,6 +245,53 @@ function walk(
           onRef({ kind: "role", id: s.entry }),
           onRef({ kind: "role", id: s.exit }),
         ]),
+        projection: o.projection,
+      });
+      out[field] = Array.isArray(value) ? value.map(operand) : operand(value as never);
+    } else {
+      throw new Error(
+        `mint: constraint field "${field}" is not classified as a reference or a statement.`,
+      );
+    }
+  }
+  return out;
+}
+
+/**
+ * The constraint's serialized form with every reference it holds replaced
+ * by `onRef`'s answer, in the same shape, its id kept: for a caller that
+ * rewrites ids (the 3.x replay into 4.0). Reads the same field sets as
+ * `walk`, and refuses a field neither classifies, as `walk` does, so a
+ * kind added later cannot slip through with its references unmapped.
+ */
+export function mapConstraintReferences(
+  constraint: Parameters<typeof serializeConstraint>[0],
+  onRef: (ref: Reference) => string,
+): Record<string, unknown> {
+  const form = serializeConstraint(constraint) as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(form)) {
+    if (DROPPED_FIELDS.has(field) || STATED_FIELDS.has(field)) out[field] = value;
+    else if (ROLE_FIELDS.has(field)) {
+      out[field] = Array.isArray(value)
+        ? value.map((id: string) => onRef({ kind: "role", id }))
+        : onRef({ kind: "role", id: value as string });
+    } else if (field === "subtype_facts") {
+      out[field] = (value as string[]).map((id) => onRef({ kind: "subtypeFact", id }));
+    } else if (OPERAND_FIELDS.has(field)) {
+      const operand = (
+        o: {
+          path: { root: string; steps: { entry: string; exit: string; }[]; };
+          projection: number[];
+        },
+      ) => ({
+        path: {
+          root: onRef({ kind: "objectType", id: o.path.root }),
+          steps: o.path.steps.map((st) => ({
+            entry: onRef({ kind: "role", id: st.entry }),
+            exit: onRef({ kind: "role", id: st.exit }),
+          })),
+        },
         projection: o.projection,
       });
       out[field] = Array.isArray(value) ? value.map(operand) : operand(value as never);
