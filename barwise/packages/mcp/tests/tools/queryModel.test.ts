@@ -103,18 +103,20 @@ describe("query_model tool", () => {
   it("names each constraint by its own id and the fact types it applies to (orm-format-3, Open decision 9)", () => {
     const parsed = parse(executeQueryModel(roomsModel, "constraints-of Room"));
     const result = parsed.result as { constraints: Record<string, unknown>[]; };
+    // A 1.0 file, read through the replay into 4.0's ids: each constraint
+    // is named from its sentence (iri-identity WS6).
     expect(result.constraints.map(({ id, factTypes, factTypeIds }) => ({
       id,
       factTypes,
       factTypeIds,
     }))).toEqual([
-      { id: "c-one-building", factTypes: ["Room is in Building"], factTypeIds: ["ft-in"] },
+      { id: "Each_Room_is_in_at_most_one_Building", factTypes: ["Room is in Building"], factTypeIds: ["Room_is_in_Building"] },
       {
-        id: "c-room-key",
+        id: "The_combination_of_Building_and_RoomNumber_is_unique_across_fact_types",
         factTypes: ["Room is in Building", "Room has RoomNumber"],
-        factTypeIds: ["ft-in", "ft-nr"],
+        factTypeIds: ["Room_is_in_Building", "Room_has_RoomNumber"],
       },
-      { id: "c-one-nr", factTypes: ["Room has RoomNumber"], factTypeIds: ["ft-nr"] },
+      { id: "Each_Room_has_at_most_one_RoomNumber", factTypes: ["Room has RoomNumber"], factTypeIds: ["Room_has_RoomNumber"] },
     ]);
   });
 

@@ -9,7 +9,7 @@
  * goes through the writer, as a save does.
  */
 
-import { OrmYamlSerializer, writeDocument } from "@barwise/core";
+import { OrmYamlSerializer, writeDocument40 } from "@barwise/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFileSync } from "node:fs";
@@ -43,7 +43,7 @@ export function registerOrmModelResource(server: McpServer): void {
           {
             uri: uri.href,
             mimeType: "application/json",
-            text: JSON.stringify(writeDocument(model), null, 2),
+            text: JSON.stringify(writeDocument40(model), null, 2),
           },
         ],
       };

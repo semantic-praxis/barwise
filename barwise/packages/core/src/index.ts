@@ -208,6 +208,7 @@ export {
   OrmYamlSerializer,
   readDocument20,
   writeDocument,
+  writeDocument40,
 } from "./serialization/OrmYamlSerializer.js";
 export {
   assembleProject,

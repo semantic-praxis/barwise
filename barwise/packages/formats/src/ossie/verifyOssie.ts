@@ -113,8 +113,10 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
   // refers to its element, so replacing every string equal to a minted id
   // reaches each reference without a list of the fields that hold one. Done on the
   // document, not its text: a minted id may be a prefix of another, and a
-  // source id may need quoting in YAML ("1", "true").
-  return new OrmYamlSerializer().deserialize(stringify(reId(doc, ids)));
+  // source id may need quoting in YAML ("1", "true"). Read as written: the
+  // point is the source's ids, which a load would replay into 4.0's
+  // (iri-identity WS6), and a model built in code may hold ids 4.0 refuses.
+  return new OrmYamlSerializer().deserializeAsWritten(stringify(reId(doc, ids)));
 }
 
 function reId(value: unknown, ids: ReadonlyMap<string, string>): unknown {
