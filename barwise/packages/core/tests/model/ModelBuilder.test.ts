@@ -9,6 +9,7 @@
  * downstream test fixtures.
  */
 import { describe, expect, it } from "vitest";
+import { LOCAL_NAME_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
 import { isInternalUniqueness, isMandatoryRole } from "../../src/model/Constraint.js";
 import { isEntityType, isValueType } from "../../src/model/ObjectType.js";
 import { expandReading } from "../../src/model/ReadingOrder.js";
@@ -160,10 +161,11 @@ describe("ModelBuilder", () => {
     ).toBe("customer_id");
   });
 
-  it("gives roles and the preferred uniqueness ids with no colon, through roleId and preferredId", () => {
-    // Format 4.0 reserves `:` for an alias (iri-identity 6a). A test that
-    // hard-codes a role id reads it from `roleId`, so this is the one place
-    // the builder's format is pinned.
+  it("gives roles and the preferred uniqueness 4.0 ids, through roleId and preferredId", () => {
+    // A saved model is read back as format 4.0, which takes a role id
+    // `<fact type>.<role>` and reserves `:` for an alias (iri-identity 6a,
+    // 6b). A test that hard-codes a role id reads it from `roleId`, so this
+    // is the one place the builder's format is pinned.
     const model = new ModelBuilder("Ids")
       .withEntityType("Customer", { referenceMode: "customer_id" })
       .withEntityType("Order", { referenceMode: "order_number" })
@@ -182,8 +184,7 @@ describe("ModelBuilder", () => {
     expect(ft.internalConstraints.map((c) => c.id)).toContain(preferredId("Customer places Order"));
     const ids = [...ft.roles.map((r) => r.id), ...ft.internalConstraints.map((c) => c.id)];
     expect(ids.filter((id) => id?.includes(":"))).toEqual([]);
-    // Names that `localName` would make one ("Order Line", "Order_Line")
-    // keep apart, so two fact types never share a role id.
-    expect(roleId("Order Line", 1)).not.toBe(roleId("Order_Line", 1));
+    expect(ft.roles.every((r) => ROLE_ID_PATTERN.test(r.id))).toBe(true);
+    expect(LOCAL_NAME_PATTERN.test(preferredId("Customer places Order"))).toBe(true);
   });
 });

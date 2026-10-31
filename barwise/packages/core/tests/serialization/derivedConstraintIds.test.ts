@@ -48,9 +48,13 @@ model:
 ${constraints}`;
 }
 
-/** Constraint ids of ft-1, loaded from a whole document. */
+/**
+ * Constraint ids of ft-1, loaded from a whole document as the 2.0 reader
+ * builds it: the derived ids are its own, before the replay into 4.0's
+ * ids renames every constraint (iri-identity WS6).
+ */
 function idsIn(yaml: string): (string | undefined)[] {
-  const model = new OrmYamlSerializer().deserialize(yaml);
+  const model = new OrmYamlSerializer().deserializeAsWritten(yaml);
   return model.getFactType("ft-1")!.internalConstraints.map((c) => c.id);
 }
 
@@ -60,7 +64,7 @@ function idsOf(constraints: string): (string | undefined)[] {
 }
 
 function constraintIds(yaml: string): string[] {
-  const model = new OrmYamlSerializer().deserialize(yaml);
+  const model = new OrmYamlSerializer().deserializeAsWritten(yaml);
   return model.everyConstraint().map(([c]) => c.id!);
 }
 
@@ -199,15 +203,19 @@ describe("constraint ids a 2.0 file omits", () => {
     expect(ids[1]).not.toBe(saved);
   });
 
-  it("is written to the file on save, so a reload states it", () => {
+  it("gives way to the 4.0 name on load, which a save states and a reload keeps", () => {
+    // The derived id lives only between the 2.0 reader and the replay:
+    // the loaded model names the constraint from its sentence.
     const serializer = new OrmYamlSerializer();
     const model = serializer.deserialize(withConstraints(`        - type: mandatory
           role: r-1
 `));
     const saved = serializer.serialize(model);
-    const derived = model.getFactType("ft-1")!.internalConstraints[0]!.id!;
-    expect(saved).toContain(`id: ${derived}`);
-    expect(idsIn(saved)).toEqual([derived]);
+    const named = model.getFactTypeByName("Person has Name")!.internalConstraints[0]!.id!;
+    expect(named).not.toMatch(UUID_V8);
+    expect(saved).toContain(`id: ${named}`);
+    const reloaded = serializer.deserialize(saved);
+    expect(reloaded.getFactTypeByName("Person has Name")!.internalConstraints[0]!.id).toBe(named);
   });
 
   it("are pinned: a change to the derivation or the read shape moves them", () => {

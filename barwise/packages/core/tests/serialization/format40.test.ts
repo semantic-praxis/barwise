@@ -3,7 +3,7 @@
  * is kept; an absent one is minted by the model and skips every id the
  * file states, wherever it sits; an id stated twice, of any kinds, is
  * refused; a malformed id is refused in the decoder's words; and the
- * loader still refuses 4.0, because nothing writes it until 6b-2b-2.
+ * loader reads 4.0 through it (6b-2b-2b-2).
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -212,10 +212,10 @@ describe("reading a format 4.0 document", () => {
       .toThrow(/Id "Person_smokes" is held by a fact type/);
   });
 
-  it("is not reached by the loader yet: 4.0 is refused until the writer writes it", () => {
-    const yaml = 'orm_version: "4.0"\nmodel:\n  name: M\n';
-    expect(() => new OrmYamlSerializer().deserialize(yaml)).toThrow(
-      /Unsupported orm_version "4\.0"/,
-    );
+  it("is what the loader reads a 4.0 file with, and what a save writes", () => {
+    const serializer = new OrmYamlSerializer();
+    const model = serializer.deserialize('orm_version: "4.0"\nmodel:\n  name: M\n');
+    expect(model.name).toBe("M");
+    expect(serializer.serialize(model)).toContain('orm_version: "4.0"');
   });
 });

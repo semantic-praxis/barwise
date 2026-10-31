@@ -190,11 +190,12 @@ describe("Round-trip serialization integration", () => {
     expect(model.objectifiedFactTypes).toHaveLength(1);
     expect(model.definitions).toHaveLength(1);
 
-    // Verify the objectified fact type loaded correctly.
+    // Verify the objectified fact type loaded correctly, under the ids the
+    // replay into 4.0 gives a 3.x file (iri-identity WS6).
     const oft = model.objectifiedFactTypes[0]!;
-    expect(oft.id).toBe("oft-enrollment");
-    expect(oft.factTypeId).toBe("ft-student-enrolls-course");
-    expect(oft.objectTypeId).toBe("ot-enrollment");
+    expect(oft.id).toBe("Enrollment_is_where_Student_enrolls_in_Course");
+    expect(oft.factTypeId).toBe("Student_enrolls_in_Course");
+    expect(oft.objectTypeId).toBe("Enrollment");
 
     // Round-trip.
     const reserialized = serializer.serialize(model);
@@ -226,13 +227,13 @@ describe("Round-trip serialization integration", () => {
     }
 
     // Verify the objectification query helpers work on the round-tripped model.
-    const oft = roundTripped.objectificationOf("ft-student-enrolls-course");
+    const oft = roundTripped.objectificationOf("Student_enrolls_in_Course");
     expect(oft).toBeDefined();
-    expect(oft!.objectTypeId).toBe("ot-enrollment");
+    expect(oft!.objectTypeId).toBe("Enrollment");
 
-    const oftForEntity = roundTripped.objectificationFor("ot-enrollment");
+    const oftForEntity = roundTripped.objectificationFor("Enrollment");
     expect(oftForEntity).toBeDefined();
-    expect(oftForEntity!.factTypeId).toBe("ft-student-enrolls-course");
+    expect(oftForEntity!.factTypeId).toBe("Student_enrolls_in_Course");
   });
 
   it("round-trips the Population Instances model", () => {

@@ -67,7 +67,9 @@ ${opts.extra ?? ""}  constraints:
 `;
 }
 
-const load = (yaml: string): OrmModel => new OrmYamlSerializer().deserialize(yaml);
+// As the 3.0 reader builds it: the subject is identification, and the
+// tests name elements by the ids the file states (iri-identity WS6).
+const load = (yaml: string): OrmModel => new OrmYamlSerializer().deserializeAsWritten(yaml);
 const errors = (m: OrmModel) =>
   new ValidationEngine().validate(m).filter((d) => d.severity === "error");
 const tableOf = (m: OrmModel, name: string) =>

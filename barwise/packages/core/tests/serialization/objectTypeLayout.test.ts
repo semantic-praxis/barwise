@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
-const EXPECTED = `orm_version: "3.0"
+const EXPECTED = `orm_version: "4.0"
 model:
   name: Layout
   object_types:
