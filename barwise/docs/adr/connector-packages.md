@@ -6,7 +6,8 @@ Tracking: barwise-ubc, barwise-2uz, barwise-5zi, barwise-5f9,
 docs/specs/archive/connector-io-migration.spec.md,
 docs/specs/ossie-ontology-format.spec.md,
 docs/specs/archive/code-analysis.spec.md, docs/specs/norma-export.spec.md
-Enforced-by: npm run purity (connector-owns-io), none (barwise-ym8.paz: core-no-interop),
+Enforced-by: npm run purity (connector-owns-io),
+tests (core-no-interop, explicit-registration), none (barwise-ym8.paz: core-no-interop),
 none (barwise-ym8.iyw: connector-owns-io), none (barwise-ym8.y5z: descriptor-wraps-core),
 none (barwise-ym8.2n3: explicit-registration)
 

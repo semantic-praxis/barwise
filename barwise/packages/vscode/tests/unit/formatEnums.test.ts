@@ -39,11 +39,11 @@ function formatEnum(tool: string): string[] {
 }
 
 describe("language-model tool format enums", () => {
-  it("barwise_import_model lists exactly the registered importers", () => {
+  it("barwise_import_model lists exactly the registered importers [adr:connector-packages#core-no-interop] [adr:connector-packages#explicit-registration]", () => {
     expect(formatEnum("barwise_import_model")).toEqual(listImporters().map((f) => f.name).sort());
   });
 
-  it("barwise_export_model lists exactly the registered exporters", () => {
+  it("barwise_export_model lists exactly the registered exporters [adr:connector-packages#core-no-interop] [adr:connector-packages#explicit-registration]", () => {
     expect(formatEnum("barwise_export_model")).toEqual(listExporters().map((f) => f.name).sort());
   });
 });

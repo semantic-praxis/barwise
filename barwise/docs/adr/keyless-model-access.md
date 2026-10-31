@@ -5,8 +5,7 @@ Date: 2026-09-12
 Tracking: barwise-ubc, barwise-1029, barwise-1030, barwise-1031, barwise-ybi, barwise-xsg,
 barwise-ppb, barwise-2n1,
 docs/specs/keyless-model-access.spec.md
-Enforced-by: npm run depcruise (measurement-key),
-tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key),
+Enforced-by: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key),
 none (barwise-ym8.4gl: no-key-in-argv), none (barwise-ym8.nw4: no-key-in-setting),
 none (barwise-ym8.52o: keyless-defaults), none (barwise-ym8.esi: measurement-key),
 none (barwise-ym8.dxy: library-takes-key)

@@ -37,9 +37,9 @@ gates skip a docs-only change.
 
 Architecture:
 
-- [Connector packages](adr/connector-packages.md) -- 2026-10-24 -- declared: purity (connector-owns-io); gap: barwise-ym8.paz (core-no-interop); gap: barwise-ym8.iyw (connector-owns-io); gap: barwise-ym8.y5z (descriptor-wraps-core); gap: barwise-ym8.2n3 (explicit-registration)
+- [Connector packages](adr/connector-packages.md) -- 2026-10-24 -- declared: purity (connector-owns-io), tests (core-no-interop, explicit-registration); gap: barwise-ym8.paz (core-no-interop); gap: barwise-ym8.iyw (connector-owns-io); gap: barwise-ym8.y5z (descriptor-wraps-core); gap: barwise-ym8.2n3 (explicit-registration)
 - [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity (pure-ops, ambient-as-argument); gap: barwise-ym8.lxl (pure-ops); gap: barwise-ym8.r6i (ambient-as-argument); gap: barwise-ym8.kys (one-layer-out); gap: barwise-ym8.sit (mint-on-create)
-- [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12 -- declared: depcruise (measurement-key), tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key); gap: barwise-ym8.4gl (no-key-in-argv); gap: barwise-ym8.nw4 (no-key-in-setting); gap: barwise-ym8.52o (keyless-defaults); gap: barwise-ym8.esi (measurement-key); gap: barwise-ym8.dxy (library-takes-key)
+- [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12 -- declared: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key); gap: barwise-ym8.4gl (no-key-in-argv); gap: barwise-ym8.nw4 (no-key-in-setting); gap: barwise-ym8.52o (keyless-defaults); gap: barwise-ym8.esi (measurement-key); gap: barwise-ym8.dxy (library-takes-key)
 - [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17
 - [Ossie interchange](adr/ossie-interchange.md) -- 2026-10-28
 - [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23 -- declared: depcruise (intended-is-graph), check:architecture (claude-md-rendering, runtime-deps-within); gap: barwise-ym8.d3m (intended-is-graph)
