@@ -30,9 +30,10 @@ February 2026 design record.
 After an ADR's date: `declared:` names the gates and tagged tests its
 `Enforced-by:` header lists, which `check:architecture` and
 `check:adr-tests` hold to existing and running in CI, not to catching a
-violation; `gap:` names the open issue for a decision nothing enforces
-yet. A declared gate blocks a merge only if `main` requires the `ci`
-check (barwise-raw), and most gates skip a docs-only change.
+violation; `gap:` names the open issue for what a decision's gates and
+tests leave unguarded, beside them or alone. A declared gate blocks a
+merge only if `main` requires the `ci` check (barwise-raw), and most
+gates skip a docs-only change.
 
 Architecture:
 
@@ -44,7 +45,7 @@ Architecture:
 - [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23 -- declared: depcruise (intended-is-graph), check:architecture (claude-md-rendering, runtime-deps-within); gap: barwise-ym8.d3m (intended-is-graph)
 - [Production prompt resolution](adr/production-prompt-resolution.md) -- 2026-08-26
 - [Schema versioning](adr/schema-versioning.md) -- 2026-10-28
-- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-09-10 -- declared: tests (pinned-tool-lists); gap: barwise-ym8.wfy (matrix-records-reach); gap: barwise-ym8.3nm (matrix-same-commit); gap: barwise-ym8.0hi (vscode-yes-means)
+- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-09-10 -- declared: tests (pinned-tool-lists); gap: barwise-ym8.0pq (pinned-tool-lists); gap: barwise-ym8.wfy (matrix-records-reach); gap: barwise-ym8.3nm (matrix-same-commit); gap: barwise-ym8.0hi (vscode-yes-means)
 
 Process:
 
