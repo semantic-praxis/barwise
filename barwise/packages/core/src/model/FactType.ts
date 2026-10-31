@@ -231,6 +231,8 @@ export class FactType extends ModelElement {
    * `OrmModel.addConstraint` does: a caller that needs the id right away
    * -- a preferred identifier set just after the add -- reads it here
    * (iri-identity 6a; in 6b the id may be minted rather than generated).
+   * In a model that refuses ids across kinds (a 4.0 model), one whose
+   * sentence cannot be minted comes back with no id (decision 19).
    */
   addConstraint(constraint: InternalConstraint): InternalConstraint {
     const c = checkInternalConstraint(constraint, this.name);

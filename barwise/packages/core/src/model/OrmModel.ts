@@ -34,6 +34,13 @@ import {
 
 import type { ConstraintAdmission } from "./constraintAdmission.js";
 import type { ConstraintInView, ConstraintModel } from "./constraintModel.js";
+
+/** The id an element the model names takes, and the key it was minted from. */
+interface Named {
+  readonly id: string | undefined;
+  readonly key?: string;
+}
+
 export type { ConstraintInView } from "./constraintModel.js";
 
 /**
@@ -131,8 +138,13 @@ export class OrmModel implements ConstraintModel {
   private _note: string | undefined;
   private _namespace: string | undefined;
 
+  /**
+   * The key each minted id was minted from (`mintedFromOf`), dropped when
+   * the last element holding the id goes or a second one takes it.
+   */
+  private readonly _mintedFrom = new Map<string, string>();
   /** Every id the stores hold, across kinds (`idIndex.ts`); each store keeps it. */
-  private readonly _ids = new IdIndex();
+  private readonly _ids = new IdIndex((id) => this._mintedFrom.delete(id));
   private readonly _objectTypes = new IdKeyedStore<ObjectType>("object type", this._ids);
   private readonly _factTypes = new IdKeyedStore<FactType>("fact type", this._ids);
   private readonly _subtypeFacts = new IdKeyedStore<SubtypeFact>("subtype fact", this._ids);
@@ -155,19 +167,18 @@ export class OrmModel implements ConstraintModel {
           `Model "${this._name}" holds no fact type "${hostId}" to admit a constraint to.`,
         );
       }
-      const stored = constraint.id === undefined
-        ? {
-          ...constraint,
-          id: this.constraintIdFor({
-            kind: "constraint",
-            inView: [constraint, host] as ConstraintInView,
-          }),
-        }
-        : constraint;
+      const named = constraint.id === undefined
+        ? this.constraintIdFor({
+          kind: "constraint",
+          inView: [constraint, host] as ConstraintInView,
+        })
+        : undefined;
+      const stored = named?.id === undefined ? constraint : { ...constraint, id: named.id };
       if (!this._addingFactType) {
         this.refuseAcrossKinds(constraint.id, "constraint", `a constraint of ${quoted(host.name)}`);
       }
       this._ids.hold(stored.id, "constraint");
+      this.keepMinted(named);
       return stored;
     },
   };
@@ -213,6 +224,34 @@ export class OrmModel implements ConstraintModel {
    */
   get priorIds(): ReadonlyMap<string, string> | undefined {
     return this._priorIds;
+  }
+
+  /**
+   * The content key the element holding `id` was named from: the one its
+   * name was minted from here, or the one the 4.0 file it was read from
+   * states beside it (`minted_from`, iri-identity decision 14). Undefined
+   * for an id a person or a tool chose, which is never stale. It goes with
+   * the id when the last element holding it does, and when a second element
+   * states the id, as a model that admits a repeat allows, so it never
+   * passes to the element that stated it.
+   */
+  mintedFromOf(id: string): string | undefined {
+    return this._mintedFrom.get(id);
+  }
+
+  /** Record the key a held id was minted from, as a 4.0 file states it. */
+  recordMintedFrom(id: string, key: string): void {
+    if (!this._ids.holds(id)) {
+      throw new Error(`No element holds "${id}" to record what it was minted from.`);
+    }
+    this._mintedFrom.set(id, key);
+  }
+
+  /** Keep the key an element was just named from, once it holds its id. */
+  private keepMinted(named: Named | undefined): void {
+    if (named?.id !== undefined && named.key !== undefined) {
+      this._mintedFrom.set(named.id, named.key);
+    }
   }
 
   /** Set once, by the replay that built this model. */
@@ -342,20 +381,23 @@ export class OrmModel implements ConstraintModel {
    * would not be of it -- a reference that dangles -- is left unnamed
    * (decisions 17 and 19), and validation reports the dangling reference.
    */
-  private nameFor(element: Mintable): string | undefined {
+  private nameFor(element: Mintable): Named | undefined {
     const minted = mint(element, this);
-    return minted ? this.mintedId(minted.name) : undefined;
+    return minted ? { id: this.mintedId(minted.name), key: minted.key } : undefined;
   }
 
   /**
-   * The id a constraint takes: its minted name, or, for one whose sentence
-   * cannot be built (a malformed constraint, a ring over two players), a
-   * generated id. Decision 19 would leave it unnamed too, but format 3.0,
-   * which this build still writes, requires every constraint's id; the
-   * switch to the 4.0 writer (6b-2b-2b) drops the fallback.
+   * The id a constraint takes: its minted name. One whose sentence cannot
+   * be built (a malformed constraint, a ring over two players) is left
+   * unnamed in a model that refuses ids across kinds, which only the 4.0
+   * reader and the replay build (decision 19); any other model gives it a
+   * generated id, because format 3.0, which this build still writes,
+   * requires every constraint's id. The switch to the 4.0 writer
+   * (6b-2b-2b) drops that fallback.
    */
-  private constraintIdFor(element: Mintable): string {
-    return this.nameFor(element) ?? generateId();
+  private constraintIdFor(element: Mintable): Named {
+    return this.nameFor(element)
+      ?? { id: this._idsAcrossKinds ? undefined : generateId() };
   }
 
   /** An object type by name where the model holds it, else by its id. */
@@ -514,14 +556,13 @@ export class OrmModel implements ConstraintModel {
    */
   addConstraint(constraint: ExternalConstraint): ExternalConstraint {
     this.refuseAcrossKinds(constraint.id, "constraint", "a constraint across fact types");
-    const stored = constraint.id === undefined
-      ? {
-        ...constraint,
-        id: this.constraintIdFor({ kind: "constraint", inView: [constraint, undefined] }),
-      }
-      : constraint;
+    const named = constraint.id === undefined
+      ? this.constraintIdFor({ kind: "constraint", inView: [constraint, undefined] })
+      : undefined;
+    const stored = named?.id === undefined ? constraint : { ...constraint, id: named.id };
     this._constraints.push(stored);
     this._ids.hold(stored.id, "constraint");
+    this.keepMinted(named);
     return stored;
   }
 
@@ -966,23 +1007,20 @@ export class OrmModel implements ConstraintModel {
     const refusal = this.subtypeFactRefusal(config, options);
     if (refusal !== undefined) throw new Error(refusal);
 
-    const sf = new SubtypeFact(
-      config.id === undefined
-        ? {
-          ...config,
-          id: this.nameFor({
-            kind: "subtypeFact",
-            subtypeFact: {
-              id: "",
-              subtypeId: config.subtypeId,
-              supertypeId: config.supertypeId,
-              definingRule: config.definingRule,
-            },
-          }),
-        }
-        : config,
-    );
+    const named = config.id === undefined
+      ? this.nameFor({
+        kind: "subtypeFact",
+        subtypeFact: {
+          id: "",
+          subtypeId: config.subtypeId,
+          supertypeId: config.supertypeId,
+          definingRule: config.definingRule,
+        },
+      })
+      : undefined;
+    const sf = new SubtypeFact(config.id === undefined ? { ...config, id: named?.id } : config);
     this._subtypeFacts.set(sf);
+    this.keepMinted(named);
     return sf;
   }
 
@@ -1120,22 +1158,21 @@ export class OrmModel implements ConstraintModel {
     const refusal = this.objectificationRefusal(config, options);
     if (refusal !== undefined) throw new Error(refusal);
 
+    const named = config.id === undefined
+      ? this.nameFor({
+        kind: "objectification",
+        objectification: {
+          id: "",
+          factTypeId: config.factTypeId,
+          objectTypeId: config.objectTypeId,
+        },
+      })
+      : undefined;
     const oft = new ObjectifiedFactType(
-      config.id === undefined
-        ? {
-          ...config,
-          id: this.nameFor({
-            kind: "objectification",
-            objectification: {
-              id: "",
-              factTypeId: config.factTypeId,
-              objectTypeId: config.objectTypeId,
-            },
-          }),
-        }
-        : config,
+      config.id === undefined ? { ...config, id: named?.id } : config,
     );
     this._objectifiedFactTypes.set(oft);
+    this.keepMinted(named);
     return oft;
   }
 

@@ -175,6 +175,8 @@ export interface DecodedDocument40 {
   readonly populations: DecodedDocument["populations"];
   readonly definitions: DecodedDocument["definitions"];
   readonly diagrams: DecodedDocument["diagrams"];
+  /** Each id the file states `minted_from` beside, with that key. */
+  readonly mintedFrom: readonly (readonly [id: string, key: string])[];
 }
 
 /**
@@ -207,6 +209,14 @@ function document40Configs(file: (typeof Document40File)["Type"]): DecodedDocume
     factTypes: shared.factTypes as DecodedDocument40["factTypes"],
     constraints: shared.constraints as DecodedDocument40["constraints"],
     ...smallElementConfigs(m),
+    mintedFrom: ([
+      ...(m.fact_types ?? []).flatMap((ft) => ft.constraints ?? []),
+      ...(m.constraints ?? []),
+      ...(m.subtype_facts ?? []),
+      ...(m.objectified_fact_types ?? []),
+    ] as readonly { readonly id?: string; readonly minted_from?: string; }[]).flatMap((e) =>
+      e.id !== undefined && e.minted_from !== undefined ? [[e.id, e.minted_from] as const] : []
+    ),
   };
 }
 

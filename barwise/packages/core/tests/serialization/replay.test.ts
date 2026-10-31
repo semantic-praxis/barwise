@@ -361,6 +361,73 @@ model:
     expect(model.getObjectTypeByName("Order")!.id).toBe("Order_Management:Order");
   });
 
+  it("gives a dangling role reference 4.0 could not read a shape it can, still dangling", () => {
+    const source = new OrmModel({ name: "Fragment" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    // A fact type named like the reshaped references' fact type part: it
+    // must not take that id, or they would resolve to it.
+    source.addFactType({
+      id: "f1",
+      name: "unresolved",
+      roles: [{ id: "r1", name: "a", playerId: "x1" }, { id: "r2", name: "b", playerId: "x1" }],
+      readings: ["{0} a {1}"],
+    });
+    // Unmintable (a role dangles), so it keeps its old id unless something
+    // holds it -- here the reshaped reference does.
+    source.addConstraint({
+      id: "unresolved.r-elsewhere",
+      type: "subset",
+      subsetRoleIds: ["r1"],
+      supersetRoleIds: ["r-elsewhere", "Other.role"],
+    });
+    const model = replayInto40(source);
+    expect(model.factTypes[0]!.id).toBe("unresolved_2");
+    // Not shaped like a role id: reshaped. Shaped: carried as written.
+    expect(model.constraints[0]).toMatchObject({
+      supersetRoleIds: ["unresolved.r-elsewhere", "Other.role"],
+    });
+    expect(model.factTypesHolding(["unresolved.r-elsewhere"])).toEqual([]);
+    expect(model.priorIds!.get("unresolved.r-elsewhere")).toBe("r-elsewhere");
+    expect(model.constraints[0]!.id).not.toBe("unresolved.r-elsewhere");
+  });
+
+  it("keeps an unmintable constraint's old id only when 4.0 can read it back", () => {
+    const source = new OrmModel({ name: "Rings" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "x2", name: "Dog", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "f1",
+      name: "Person owns Dog",
+      roles: [{ id: "r1", name: "owns", playerId: "x1" }, {
+        id: "r2",
+        name: "is owned by",
+        playerId: "x2",
+      }],
+      readings: ["{0} owns {1}"],
+      // A ring over two players: its sentence cannot be minted.
+      constraints: [
+        { id: "ring.1", type: "ring", roleId1: "r1", roleId2: "r2", ringType: "irreflexive" },
+        { id: "ring-2", type: "ring", roleId1: "r1", roleId2: "r2", ringType: "asymmetric" },
+      ],
+    });
+    const ids = replayInto40(source).factTypes[0]!.internalConstraints.map((c) => c.id!);
+    expect(ids[1]).toBe("ring-2");
+    expect(ids[0]).not.toBe("ring.1");
+    expect(ids.every((id) => LOCAL_NAME_PATTERN.test(id))).toBe(true);
+  });
+
+  it("leaves a fact type named unresolved alone when nothing is reshaped", () => {
+    const source = new OrmModel({ name: "Clean" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "f1",
+      name: "unresolved",
+      roles: [{ id: "r1", name: "a", playerId: "x1" }],
+      readings: ["{0} a"],
+    });
+    expect(replayInto40(source).factTypes[0]!.id).toBe("unresolved");
+  });
+
   it("gives one model for one input, on every run", () => {
     for (const c of corpus) {
       const load = () => new OrmYamlSerializer().deserialize(JSON.stringify(c.doc));

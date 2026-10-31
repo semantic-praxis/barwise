@@ -9,8 +9,11 @@ import { type DecodedDocument, runDocumentDecode } from "../decode/document.js";
 import { type DecodedDocument40, runDocument40Decode } from "../decode/document40.js";
 import type { DecodeProblem } from "../decode/problems.js";
 import { describeConstraintRepeat, describeConstraintRepeats } from "../model/Constraint.js";
+import type { Constraint } from "../model/Constraint.js";
 import type { IdKind } from "../model/idIndex.js";
+import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import { OrmModel } from "../model/OrmModel.js";
+import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import { DeserializationError, refusingHeldIds } from "./deserializationError.js";
 import { type MigrationNote, migrationNotes, readLegacy } from "./reader20.js";
@@ -22,15 +25,18 @@ import {
   planRead,
   unsupportedVersionMessage,
 } from "./schemaVersion.js";
-import { serializeConstraint } from "./yaml/constraint.js";
+import { type OrmYamlConstraint, serializeConstraint } from "./yaml/constraint.js";
 import { serializeDefinition } from "./yaml/definition.js";
 import { serializeDiagramLayout } from "./yaml/diagram.js";
-import type { OrmYamlDocument } from "./yaml/document.js";
-import { serializeFactType } from "./yaml/factType.js";
-import { serializeObjectifiedFactType } from "./yaml/objectified.js";
+import type { OrmYamlDocument, OrmYamlDocument40 } from "./yaml/document.js";
+import { type OrmYamlFactType, serializeFactType } from "./yaml/factType.js";
+import {
+  serializeObjectifiedFactType,
+  serializeObjectifiedFactType40,
+} from "./yaml/objectified.js";
 import { serializeObjectType } from "./yaml/objectType.js";
 import { serializePopulation } from "./yaml/population.js";
-import { serializeSubtypeFact } from "./yaml/subtype.js";
+import { serializeSubtypeFact, serializeSubtypeFact40 } from "./yaml/subtype.js";
 
 export { DeserializationError } from "./deserializationError.js";
 export { type MigrationNote, readDocument20 } from "./reader20.js";
@@ -349,7 +355,11 @@ export function readDocument40(doc: unknown, options?: { lenient?: boolean; }): 
   }
   // The pre-pass names every repeat in one message; the model refuses
   // across kinds as well, for an id added in code after the load.
-  return refusingHeldIds(() => fromDecoded(decoded, options, stated.map(([id]) => id), true));
+  return refusingHeldIds(() => {
+    const model = fromDecoded(decoded, options, stated.map(([id]) => id), true);
+    for (const [id, key] of decoded.mintedFrom) model.recordMintedFrom(id, key);
+    return model;
+  });
 }
 
 /** "an object type and a fact type", or "2 fact types". */
@@ -385,65 +395,125 @@ function statedIds40(doc: DecodedDocument40): (readonly [string, IdKind])[] {
  * and each entity's preferred identifier by constraint id.
  */
 export function writeDocument(model: OrmModel): OrmYamlDocument {
-  const doc: OrmYamlDocument = {
-    orm_version: CURRENT_ORM_VERSION,
+  return documentOf(model, CURRENT_ORM_VERSION, {
+    constraint: (c) => {
+      if (c.id === undefined) {
+        throw new Error(
+          `Format 3.0 states every constraint's id, and this ${c.type} constraint has none `
+            + "(its sentence cannot be minted, iri-identity decision 19); format 4.0 writes it "
+            + "without one.",
+        );
+      }
+      return serializeConstraint(c);
+    },
+    subtypeFact: serializeSubtypeFact,
+    objectification: serializeObjectifiedFactType,
+  });
+}
+
+/**
+ * The format 4.0 document for a model (iri-identity WS6, 6b-2b-2b): 3.0's
+ * layout, with a constraint, subtype fact or objectification the model
+ * left unnamed written without an id (decision 19), and beside each id the
+ * model minted, or read with one, the key it was minted from
+ * (`minted_from`, decision 14).
+ *
+ * Not yet reached from `serialize`, which writes 3.0 until the switch
+ * reads 3.x through the replay, so no file is written in a format the
+ * loader refuses.
+ */
+export function writeDocument40(model: OrmModel): OrmYamlDocument40 {
+  // A constraint's written form types no id (`serializeConstraint` sets
+  // one when it has one), so the id is read off the record as written; the
+  // key goes right after it, beside the id it names.
+  const minted = <R extends object>(record: R): R & { minted_from?: string; } => {
+    const id = (record as { readonly id?: string; }).id;
+    const key = id === undefined ? undefined : model.mintedFromOf(id);
+    if (key === undefined) return record;
+    return Object.fromEntries(
+      Object.entries(record).flatMap(([k, v]) =>
+        k === "id" ? [[k, v], ["minted_from", key]] : [[k, v]]
+      ),
+    ) as R & { minted_from: string; };
+  };
+  return documentOf(model, "4.0", {
+    constraint: (c) => minted(serializeConstraint(c)),
+    subtypeFact: (sf) => minted(serializeSubtypeFact40(sf)),
+    objectification: (o) => minted(serializeObjectifiedFactType40(o)),
+  });
+}
+
+/** How one format writes the elements its ids differ on. */
+interface ElementWriters<C extends OrmYamlConstraint, S, O> {
+  constraint(c: Constraint): C;
+  subtypeFact(sf: SubtypeFact): S;
+  objectification(o: ObjectifiedFactType): O;
+}
+
+/**
+ * The document both formats share the layout of, its elements written by
+ * the format's own writers, whose return types type the lists they write.
+ */
+function documentOf<V extends string, C extends OrmYamlConstraint, S, O>(
+  model: OrmModel,
+  version: V,
+  writers: ElementWriters<C, S, O>,
+): {
+  orm_version: V;
+  model:
+    & Omit<
+      OrmYamlDocument["model"],
+      "fact_types" | "constraints" | "subtype_facts" | "objectified_fact_types"
+    >
+    & {
+      fact_types?: (Omit<OrmYamlFactType, "constraints"> & { constraints?: C[]; })[];
+      constraints?: C[];
+      subtype_facts?: S[];
+      objectified_fact_types?: O[];
+    };
+} {
+  const listed = <E, R>(elements: readonly E[], write: (e: E) => R): R[] | undefined =>
+    elements.length > 0 ? elements.map(write) : undefined;
+  const lists = {
+    object_types: listed(
+      model.objectTypes,
+      (ot) => serializeObjectType(ot, model.preferredIdentifierOf(ot.id)),
+    ),
+    fact_types: listed(model.factTypes, (ft) => serializeFactType(ft, writers.constraint)),
+    constraints: listed(model.constraints, writers.constraint),
+    subtype_facts: listed(model.subtypeFacts, writers.subtypeFact),
+    objectified_fact_types: listed(model.objectifiedFactTypes, writers.objectification),
+    populations: listed(model.populations, serializePopulation),
+    definitions: listed(model.definitions, serializeDefinition),
+    diagrams: listed(model.diagramLayouts, serializeDiagramLayout),
+  };
+  const {
+    object_types,
+    fact_types,
+    constraints,
+    subtype_facts,
+    objectified_fact_types,
+    populations,
+    definitions,
+    diagrams,
+  } = lists;
+  // Each key spelled once more, so the compiler checks it against the
+  // document; an absent list is left out, and the order is the file's.
+  return {
+    orm_version: version,
     model: {
       name: model.name,
+      ...(model.domainContext ? { domain_context: model.domainContext } : {}),
+      ...(model.namespace ? { namespace: model.namespace } : {}),
+      ...(model.note ? { note: model.note } : {}),
+      ...(object_types ? { object_types } : {}),
+      ...(fact_types ? { fact_types } : {}),
+      ...(constraints ? { constraints } : {}),
+      ...(subtype_facts ? { subtype_facts } : {}),
+      ...(objectified_fact_types ? { objectified_fact_types } : {}),
+      ...(populations ? { populations } : {}),
+      ...(definitions ? { definitions } : {}),
+      ...(diagrams ? { diagrams } : {}),
     },
   };
-
-  if (model.domainContext) {
-    doc.model.domain_context = model.domainContext;
-  }
-  if (model.namespace) {
-    doc.model.namespace = model.namespace;
-  }
-  if (model.note) {
-    doc.model.note = model.note;
-  }
-
-  const objectTypes = model.objectTypes;
-  if (objectTypes.length > 0) {
-    doc.model.object_types = objectTypes.map((ot) =>
-      serializeObjectType(ot, model.preferredIdentifierOf(ot.id))
-    );
-  }
-
-  const factTypes = model.factTypes;
-  if (factTypes.length > 0) {
-    doc.model.fact_types = factTypes.map((ft) => serializeFactType(ft));
-  }
-
-  if (model.constraints.length > 0) {
-    doc.model.constraints = model.constraints.map((c) => serializeConstraint(c));
-  }
-
-  const subtypeFacts = model.subtypeFacts;
-  if (subtypeFacts.length > 0) {
-    doc.model.subtype_facts = subtypeFacts.map((sf) => serializeSubtypeFact(sf));
-  }
-
-  const objectifiedFactTypes = model.objectifiedFactTypes;
-  if (objectifiedFactTypes.length > 0) {
-    doc.model.objectified_fact_types = objectifiedFactTypes.map((oft) =>
-      serializeObjectifiedFactType(oft)
-    );
-  }
-
-  const populations = model.populations;
-  if (populations.length > 0) {
-    doc.model.populations = populations.map((p) => serializePopulation(p));
-  }
-
-  const definitions = model.definitions;
-  if (definitions.length > 0) {
-    doc.model.definitions = definitions.map((d) => serializeDefinition(d));
-  }
-
-  const diagrams = model.diagramLayouts;
-  if (diagrams.length > 0) {
-    doc.model.diagrams = diagrams.map((dl) => serializeDiagramLayout(dl));
-  }
-
-  return doc;
 }

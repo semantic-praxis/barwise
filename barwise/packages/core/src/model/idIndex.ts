@@ -31,9 +31,18 @@ export type IdKind = IdKeyedKind | "role" | "constraint";
 export class IdIndex {
   private readonly held = new Map<string, Map<IdKind, number>>();
 
+  /**
+   * @param unshared Told when an id stops naming one element alone: its
+   *   last holder released it, or a second element took it. What a model
+   *   keeps for the one element (the key its name was minted from) goes
+   *   then, so it never passes to an element that stated the id.
+   */
+  constructor(private readonly unshared: (id: string) => void = () => {}) {}
+
   /** One more element of `kind` holds `id`; an element with no id holds none. */
   hold(id: string | undefined, kind: IdKind): void {
     if (id === undefined) return;
+    if (this.held.has(id)) this.unshared(id);
     const kinds = this.held.get(id) ?? new Map<IdKind, number>();
     kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
     this.held.set(id, kinds);
@@ -49,7 +58,10 @@ export class IdIndex {
     }
     if (count > 1) kinds.set(kind, count - 1);
     else kinds.delete(kind);
-    if (kinds.size === 0) this.held.delete(id);
+    if (kinds.size === 0) {
+      this.held.delete(id);
+      this.unshared(id);
+    }
   }
 
   /** The kinds holding `id`, sorted; empty when nothing does. */
