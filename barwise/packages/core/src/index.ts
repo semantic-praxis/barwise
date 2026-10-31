@@ -122,6 +122,7 @@ export { ModelElement } from "./model/ModelElement.js";
 export { localName, ROLE_ID_PATTERN } from "./model/name.js";
 export { type DomainRef, namespaceOf } from "./model/namespace.js";
 export {
+  objectificationRef,
   ObjectifiedFactType,
   type ObjectifiedFactTypeConfig,
 } from "./model/ObjectifiedFactType.js";
@@ -177,7 +178,7 @@ export {
 } from "./model/ReadingOrder.js";
 export { Role, type RoleConfig } from "./model/Role.js";
 export { SemanticConflict, type SemanticConflictConfig } from "./model/SemanticConflict.js";
-export { SubtypeFact, type SubtypeFactConfig } from "./model/SubtypeFact.js";
+export { SubtypeFact, type SubtypeFactConfig, subtypeFactRef } from "./model/SubtypeFact.js";
 export { assertNever } from "./util/assertNever.js";
 
 // Serialization

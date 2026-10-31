@@ -37,6 +37,7 @@ import {
   resolvePreferredIdentifier,
   type RoleConfig,
   subtypeConstraintsFromFlags,
+  subtypeFactRef,
   type ValueConstraintDef,
 } from "@barwise/core";
 import { objectificationGivesKey } from "@barwise/core/mapping";
@@ -1139,7 +1140,8 @@ export class DdlImportFormat implements ImportFormat {
         ...(link.definingRule ? { definingRule: link.definingRule } : {}),
       });
       flagged.push({
-        id: sf.id,
+        // Its ends are the entities just resolved, so the model named it.
+        id: subtypeFactRef(sf),
         supertype: supertype.id,
         is_exclusive: link.isExclusive,
         is_exhaustive: link.isExhaustive,

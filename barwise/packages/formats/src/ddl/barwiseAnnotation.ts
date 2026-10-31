@@ -13,7 +13,12 @@
  * test over the trial kernels and the examples pins it.
  */
 
-import { type OrmModel, subtypeFlagsFromConstraints, validateReadingTemplate } from "@barwise/core";
+import {
+  type OrmModel,
+  subtypeFactRef,
+  subtypeFlagsFromConstraints,
+  validateReadingTemplate,
+} from "@barwise/core";
 import type { DerivationKind, DerivationRule, DerivationStorage, FactType } from "@barwise/core";
 import type { RelationalSchema, RoutedUnique, Table } from "@barwise/core/mapping";
 
@@ -169,14 +174,17 @@ export function annotateTable(
   const flags = links.length > 0 ? subtypeFlagsFromConstraints(model.constraints) : undefined;
   for (const sf of links) {
     const supertype = model.getObjectType(sf.supertypeId);
-    const fk = table.foreignKeys.find((f) => f.sourceConstraintId === sf.id);
+    // An unnamed subtype fact (decision 19) has no foreign key keyed to it.
+    const fk = sf.id === undefined
+      ? undefined
+      : table.foreignKeys.find((f) => f.sourceConstraintId === sf.id);
     if (!supertype || !fk) continue;
     supertypes.push({
       entity: supertype.name,
       columns: [...fk.columnNames],
       providesIdentification: sf.providesIdentification,
-      isExclusive: flags?.get(sf.id)?.exclusive ?? false,
-      isExhaustive: flags?.get(sf.id)?.exhaustive ?? false,
+      isExclusive: flags?.get(subtypeFactRef(sf))?.exclusive ?? false,
+      isExhaustive: flags?.get(subtypeFactRef(sf))?.exhaustive ?? false,
       ...(sf.definingRule ? { definingRule: sf.definingRule } : {}),
     });
   }

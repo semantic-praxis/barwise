@@ -26,7 +26,8 @@ describe("SubtypeFact", () => {
       expect(sf.subtypeId).toBe("sub-1");
       expect(sf.supertypeId).toBe("super-1");
       expect(sf.providesIdentification).toBe(true);
-      expect(sf.id).toBeTruthy();
+      // Unnamed until a model names it (iri-identity decision 19).
+      expect(sf.id).toBeUndefined();
     });
 
     it("accepts custom id", () => {

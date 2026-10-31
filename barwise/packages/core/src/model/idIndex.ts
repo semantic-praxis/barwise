@@ -74,25 +74,31 @@ export class IdIndex {
  * store and the index cannot fall out of step by a method that writes one
  * and forgets the other (review of 6b-1).
  */
-export class IdKeyedStore<E extends { readonly id: string; }> {
-  private readonly byId = new Map<string, E>();
+export class IdKeyedStore<E extends { readonly id: string | undefined; }> {
+  /**
+   * Every element, in the order added. A named one is keyed by its id; one
+   * the model could not name (a subtype fact or objectification whose ends
+   * do not resolve, iri-identity decision 19) by a symbol of its own, so it
+   * keeps its place, holds no id in the index, and is never found by id.
+   */
+  private readonly byKey = new Map<string | symbol, E>();
 
   constructor(private readonly kind: IdKeyedKind, private readonly index: IdIndex) {}
 
   get(id: string): E | undefined {
-    return this.byId.get(id);
+    return this.byKey.get(id);
   }
 
   has(id: string): boolean {
-    return this.byId.has(id);
+    return this.byKey.has(id);
   }
 
   get size(): number {
-    return this.byId.size;
+    return this.byKey.size;
   }
 
   values(): IterableIterator<E> {
-    return this.byId.values();
+    return this.byKey.values();
   }
 
   /**
@@ -101,17 +107,32 @@ export class IdKeyedStore<E extends { readonly id: string; }> {
    * forgot cannot overwrite an element and leave the index counting both.
    */
   set(element: E): void {
-    if (this.byId.has(element.id)) {
+    if (element.id === undefined) {
+      this.byKey.set(Symbol(this.kind), element);
+      return;
+    }
+    if (this.byKey.has(element.id)) {
       throw new Error(`IdKeyedStore: a ${this.kind} already holds ${JSON.stringify(element.id)}.`);
     }
-    this.byId.set(element.id, element);
+    this.byKey.set(element.id, element);
     this.index.hold(element.id, this.kind);
   }
 
   /** Drop the element under `id`, if any; whether one was there. */
   delete(id: string): boolean {
-    if (!this.byId.delete(id)) return false;
+    if (!this.byKey.delete(id)) return false;
     this.index.release(id, this.kind);
     return true;
+  }
+
+  /** Drop this element, named or not; whether it was here. */
+  remove(element: E): boolean {
+    if (element.id !== undefined) {
+      return this.byKey.get(element.id) === element && this.delete(element.id);
+    }
+    for (const [key, held] of this.byKey) {
+      if (held === element) return this.byKey.delete(key);
+    }
+    return false;
   }
 }

@@ -10,6 +10,7 @@
 import { type DiagramLayout, isScopedView } from "./DiagramLayout.js";
 import { preferredIdentifiers, preferredIdentifyingBinary } from "./identification.js";
 import type { OrmModel } from "./OrmModel.js";
+import { subtypeFactRef } from "./SubtypeFact.js";
 
 /** The elements a view draws, by id. Fresh sets: the caller owns them. */
 export interface ViewMembership {
@@ -81,7 +82,7 @@ export function containedRelations(
   }
   for (const sf of model.subtypeFacts) {
     if (objectTypeIds.has(sf.subtypeId) && objectTypeIds.has(sf.supertypeId)) {
-      subtypeFactIds.add(sf.id);
+      subtypeFactIds.add(subtypeFactRef(sf));
     }
   }
   return { factTypeIds, subtypeFactIds };
@@ -98,7 +99,7 @@ export function viewMembership(model: OrmModel, layout: DiagramLayout): ViewMemb
     return {
       objectTypeIds: new Set(model.objectTypes.map((ot) => ot.id)),
       factTypeIds: new Set(model.factTypes.map((ft) => ft.id)),
-      subtypeFactIds: new Set(model.subtypeFacts.map((sf) => sf.id)),
+      subtypeFactIds: new Set(model.subtypeFacts.map(subtypeFactRef)),
     };
   }
   const objectTypeIds = new Set(

@@ -16,11 +16,21 @@ import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { mint, type Mintable } from "./mint.js";
 import { localName } from "./name.js";
-import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
+import {
+  objectificationRef,
+  ObjectifiedFactType,
+  type ObjectifiedFactTypeConfig,
+} from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
+import { expandReading } from "./ReadingOrder.js";
 import type { Role } from "./Role.js";
-import { SubtypeFact, type SubtypeFactConfig, subtypePairKey } from "./SubtypeFact.js";
+import {
+  SubtypeFact,
+  type SubtypeFactConfig,
+  subtypeFactRef,
+  subtypePairKey,
+} from "./SubtypeFact.js";
 
 import type { ConstraintAdmission } from "./constraintAdmission.js";
 import type { ConstraintInView, ConstraintModel } from "./constraintModel.js";
@@ -41,6 +51,13 @@ export interface OrmModelConfig {
    * iri-identity WS4). Ends in `/` or `#`.
    */
   readonly namespace?: string;
+  /**
+   * Refuse a stated id any element holds, of any kind: format 4.0's rule,
+   * where every id is a local name and names one element (iri-identity
+   * WS6). Off for a 3.x model, whose file may give an object type and a
+   * fact type one id.
+   */
+  readonly idsAcrossKinds?: boolean;
 }
 
 const quoted = (text: string): string => JSON.stringify(text);
@@ -84,7 +101,7 @@ export type { IdKeyedKind, IdKind } from "./idIndex.js";
 export class DuplicateIdError extends Error {
   constructor(
     readonly id: string,
-    readonly kind: IdKeyedKind,
+    readonly kind: IdKind,
     held: string,
     adding: string,
   ) {
@@ -98,6 +115,7 @@ export interface AddFactTypeOptions {
   readonly skipPlayerValidation?: boolean;
   readonly suffixRepeatedRoleNames?: boolean;
   readonly constraintsOver?: (roleIds: readonly string[]) => readonly InternalConstraint[];
+  readonly idFromFirstReading?: boolean;
 }
 
 /**
@@ -140,9 +158,15 @@ export class OrmModel implements ConstraintModel {
       const stored = constraint.id === undefined
         ? {
           ...constraint,
-          id: this.nameFor({ kind: "constraint", inView: [constraint, host] as ConstraintInView }),
+          id: this.constraintIdFor({
+            kind: "constraint",
+            inView: [constraint, host] as ConstraintInView,
+          }),
         }
         : constraint;
+      if (!this._addingFactType) {
+        this.refuseAcrossKinds(constraint.id, "constraint", `a constraint of ${quoted(host.name)}`);
+      }
       this._ids.hold(stored.id, "constraint");
       return stored;
     },
@@ -152,6 +176,14 @@ export class OrmModel implements ConstraintModel {
    * (`withReserved`), so a stated id wins wherever it sits in the file.
    */
   private _reserved: ReadonlySet<string> = new Set();
+  private readonly _idsAcrossKinds: boolean;
+  /**
+   * True while `addFactType` adds a fact type's own constraints, whose
+   * stated ids it checked across kinds before holding them.
+   */
+  private _addingFactType = false;
+  /** See `priorIds`. */
+  private _priorIds: ReadonlyMap<string, string> | undefined;
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
   private readonly _constraints: ExternalConstraint[] = [];
@@ -166,10 +198,27 @@ export class OrmModel implements ConstraintModel {
     this._domainContext = config.domainContext;
     this._note = config.note;
     this._namespace = checkedIri(config.namespace, NAMESPACE_PATTERN, "namespace");
+    this._idsAcrossKinds = config.idsAcrossKinds ?? false;
   }
 
   get name(): string {
     return this._name;
+  }
+
+  /**
+   * For a model replayed from a 3.x file, each element's id in that file,
+   * by its id here (iri-identity WS6, the 3.x replay). Held in memory and
+   * never written, so diff can pair two replayed revisions of one file by
+   * their old ids. Undefined for any other model.
+   */
+  get priorIds(): ReadonlyMap<string, string> | undefined {
+    return this._priorIds;
+  }
+
+  /** Set once, by the replay that built this model. */
+  recordPriorIds(ids: ReadonlyMap<string, string>): void {
+    if (this._priorIds !== undefined) throw new Error("A model's prior ids are recorded once.");
+    this._priorIds = ids;
   }
 
   set name(value: string) {
@@ -238,6 +287,19 @@ export class OrmModel implements ConstraintModel {
     if (held !== undefined) {
       throw new DuplicateIdError(config.id!, kind, describe(held), describe(config));
     }
+    this.refuseAcrossKinds(config.id, kind, describe(config));
+  }
+
+  /**
+   * In a model that refuses across kinds, throw `DuplicateIdError` when any
+   * element of any kind holds a stated id.
+   */
+  private refuseAcrossKinds(id: string | undefined, kind: IdKind, adding: string): void {
+    if (!this._idsAcrossKinds || id === undefined || !this._ids.holds(id)) return;
+    const holders = this._ids.kindsHolding(id)
+      .map((k) => `${/^[aeiou]/.test(k) ? "an" : "a"} ${k}`)
+      .join(" and ");
+    throw new DuplicateIdError(id, kind, holders, adding);
   }
 
   /**
@@ -275,15 +337,25 @@ export class OrmModel implements ConstraintModel {
   }
 
   /**
-   * The id an element its sentence names takes: the minted name, under the
-   * suffix rule (`mint.ts`). An element whose sentence would not be of it
-   * -- a reference that dangles, a shape the sentence misreads -- is left
-   * unnamed in format 4.0 (decisions 17 and 19); until 4.0 lets an id be
-   * absent (6b-2b), it gets a generated id, because format 3.0 requires one.
+   * The id a subtype fact or objectification its sentence names takes: the
+   * minted name, under the suffix rule (`mint.ts`). One whose sentence
+   * would not be of it -- a reference that dangles -- is left unnamed
+   * (decisions 17 and 19), and validation reports the dangling reference.
    */
-  private nameFor(element: Mintable): string {
+  private nameFor(element: Mintable): string | undefined {
     const minted = mint(element, this);
-    return minted ? this.mintedId(minted.name) : generateId();
+    return minted ? this.mintedId(minted.name) : undefined;
+  }
+
+  /**
+   * The id a constraint takes: its minted name, or, for one whose sentence
+   * cannot be built (a malformed constraint, a ring over two players), a
+   * generated id. Decision 19 would leave it unnamed too, but format 3.0,
+   * which this build still writes, requires every constraint's id; the
+   * switch to the 4.0 writer (6b-2b-2b) drops the fallback.
+   */
+  private constraintIdFor(element: Mintable): string {
+    return this.nameFor(element) ?? generateId();
   }
 
   /** An object type by name where the model holds it, else by its id. */
@@ -441,10 +513,11 @@ export class OrmModel implements ConstraintModel {
    * validation reports it.
    */
   addConstraint(constraint: ExternalConstraint): ExternalConstraint {
+    this.refuseAcrossKinds(constraint.id, "constraint", "a constraint across fact types");
     const stored = constraint.id === undefined
       ? {
         ...constraint,
-        id: this.nameFor({ kind: "constraint", inView: [constraint, undefined] }),
+        id: this.constraintIdFor({ kind: "constraint", inView: [constraint, undefined] }),
       }
       : constraint;
     this._constraints.push(stored);
@@ -662,6 +735,11 @@ export class OrmModel implements ConstraintModel {
    *   them once the model has named the roles: for a caller whose roles have
    *   no ids yet (an importer). Added after the config's constraints, and
    *   inside the same rollback, so a refused one leaves the model as it was.
+   * @param options.idFromFirstReading - When true, a fact type given no id
+   *   mints it from its first reading, rendered with its players' names,
+   *   instead of from its name: decision 20, for an objectified fact type
+   *   whose name's local name is its objectifying type's id, so the two do
+   *   not collide. Only the id; the name stays as written.
    * @throws If any role references a nonexistent object type (unless skipPlayerValidation).
    * @throws If two roles without ids share a name (unless suffixRepeatedRoleNames).
    * @throws DuplicateIdError if a fact type with the same id already exists.
@@ -701,11 +779,42 @@ export class OrmModel implements ConstraintModel {
     // and the stated constraint ids are held while the unnamed constraints
     // are named, then released for the admission's own hold.
     const statedConstraints = constraints.flatMap((c) => (c.id === undefined ? [] : [c.id]));
+    if (this._idsAcrossKinds) {
+      // One config stating an id twice -- the fact type and a role, two
+      // constraints -- is refused too: nothing holds them yet to refuse by.
+      const own: [string | undefined, IdKind][] = [
+        [config.id, "fact type"],
+        ...config.roles.map((r): [string | undefined, IdKind] => [r.id, "role"]),
+        ...statedConstraints.map((c): [string | undefined, IdKind] => [c, "constraint"]),
+      ];
+      const [repeat] = groupRepeats(own, ([held]) => held);
+      if (repeat !== undefined) {
+        const [id, holders] = repeat;
+        throw new DuplicateIdError(
+          id,
+          holders[1]![1],
+          `its own ${holders[0]![1]}`,
+          `fact type ${quoted(config.name)}`,
+        );
+      }
+    }
+    for (const r of config.roles) {
+      this.refuseAcrossKinds(r.id, "role", `role ${quoted(r.name)} of ${quoted(config.name)}`);
+    }
+    for (const held of statedConstraints) {
+      this.refuseAcrossKinds(held, "constraint", `a constraint of ${quoted(config.name)}`);
+    }
     const stated = new Set([
       ...config.roles.flatMap((r) => (r.id === undefined ? [] : [r.id])),
       ...statedConstraints,
     ]);
-    const id = config.id ?? this.mintedId(localName(config.name), stated);
+    const base = options?.idFromFirstReading && config.readings[0] !== undefined
+      ? expandReading(
+        config.readings[0],
+        config.roles.map((r) => this._objectTypes.get(r.playerId)?.name ?? r.playerId),
+      )
+      : config.name;
+    const id = config.id ?? this.mintedId(localName(base), stated);
     const ft = new FactType({
       ...config,
       id,
@@ -728,13 +837,17 @@ export class OrmModel implements ConstraintModel {
     // so a refused add leaves the model as it was, as it did when the
     // constructor refused it.
     try {
+      // Checked across kinds above, before their ids were held.
+      this._addingFactType = true;
       for (const c of constraints) ft.addConstraint(c);
+      this._addingFactType = false;
       const over = options?.constraintsOver?.(ft.roles.map((r) => r.id)) ?? [];
       for (const c of over) ft.addConstraint(c);
     } catch (err) {
       this.removeFactType(ft.id);
       throw err;
     } finally {
+      this._addingFactType = false;
       for (const held of statedConstraints) this._ids.release(held, "constraint");
     }
     return ft;
@@ -920,11 +1033,18 @@ export class OrmModel implements ConstraintModel {
    * a constraint's roles: a model holding an id that names nothing does not
    * load after its next save.
    */
-  removeSubtypeFact(id: string): void {
-    if (!this._subtypeFacts.has(id)) {
-      throw new Error(`Subtype fact with id "${id}" not found.`);
+  removeSubtypeFact(target: string | SubtypeFact): void {
+    // By element too: one the model left unnamed (decision 19) has no id.
+    const sf = typeof target === "string" ? this._subtypeFacts.get(target) : target;
+    if (sf === undefined || !this._subtypeFacts.remove(sf)) {
+      throw new Error(
+        `Subtype fact ${
+          JSON.stringify(typeof target === "string" ? target : subtypeFactRef(target))
+        } not found.`,
+      );
     }
-    this._subtypeFacts.delete(id);
+    const id = sf.id;
+    if (id === undefined) return;
     for (let i = this._constraints.length - 1; i >= 0; i--) {
       const kept = withoutSubtypeFacts(this._constraints[i]!, (sf) => sf === id);
       if (kept === undefined) this.dropConstraintAt(i);
@@ -1067,11 +1187,16 @@ export class OrmModel implements ConstraintModel {
   }
 
   /** Remove an objectified fact type from the model. */
-  removeObjectifiedFactType(id: string): void {
-    if (!this._objectifiedFactTypes.has(id)) {
-      throw new Error(`Objectified fact type with id "${id}" not found.`);
+  removeObjectifiedFactType(target: string | ObjectifiedFactType): void {
+    // By element too: one the model left unnamed (decision 19) has no id.
+    const oft = typeof target === "string" ? this._objectifiedFactTypes.get(target) : target;
+    if (oft === undefined || !this._objectifiedFactTypes.remove(oft)) {
+      throw new Error(
+        `Objectified fact type ${
+          JSON.stringify(typeof target === "string" ? target : objectificationRef(target))
+        } not found.`,
+      );
     }
-    this._objectifiedFactTypes.delete(id);
   }
 
   /**

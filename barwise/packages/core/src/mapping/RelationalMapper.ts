@@ -203,7 +203,7 @@ export class RelationalMapper {
       }
     }
 
-    const settledBySubtypeFact = new Set<string>();
+    const settledBySubtypeFact = new Set<SubtypeFact>();
     for (const entityId of order) {
       const oft = objectifiedByType.get(entityId);
       if (settleable && this.absorbsAKey(oft, model)) {
@@ -225,7 +225,7 @@ export class RelationalMapper {
       const sf = identifyingSubtypeFacts.get(entityId);
       if (sf) {
         this.settleSubtypeKey(sf, settling);
-        settledBySubtypeFact.add(sf.id);
+        settledBySubtypeFact.add(sf);
       }
     }
 
@@ -251,7 +251,7 @@ export class RelationalMapper {
     }
 
     for (const sf of model.subtypeFacts) {
-      if (settledBySubtypeFact.has(sf.id)) continue;
+      if (settledBySubtypeFact.has(sf)) continue;
       this.addSubtypeForeignKey(sf, entityTables);
     }
 
