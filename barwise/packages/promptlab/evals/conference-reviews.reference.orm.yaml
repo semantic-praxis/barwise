@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: conference-reviews
   object_types:
@@ -62,6 +62,7 @@ model:
         - type: mandatory
           role: Review_has_ReviewScore.has
           id: Each_Review_has_at_least_one_ReviewScore
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Review has ReviewScore","readings":["{0} has {1}","{1} is of {0}"],"players":["Review","ReviewScore"]}],"fact_type":{"name":"Review has ReviewScore","readings":["{0} has {1}","{1} is of {0}"],"players":["Review","ReviewScore"]}}'
         - type: value_constraint
           values:
             - "1"
@@ -71,7 +72,9 @@ model:
             - "5"
           role: Review_has_ReviewScore.is_of
           id: The_possible_values_of_ReviewScore_are%3A_%7B'1',_'2',_'3',_'4',_'5'%7D
+          minted_from: '{"type":"value_constraint","values":["1","2","3","4","5"],"role":[1,"is of",{"name":"Review has ReviewScore","readings":["{0} has {1}","{1} is of {0}"],"players":["Review","ReviewScore"]}],"fact_type":{"name":"Review has ReviewScore","readings":["{0} has {1}","{1} is of {0}"],"players":["Review","ReviewScore"]}}'
   objectified_fact_types:
     - id: Review_is_where_Reviewer_reviews_Paper
+      minted_from: '{"fact_type":{"name":"Reviewer reviews Paper","readings":["{0} reviews {1}","{1} is reviewed by {0}"],"players":["Reviewer","Paper"]},"object_type":"Review"}'
       fact_type: Reviewer_reviews_Paper
       object_type: Review

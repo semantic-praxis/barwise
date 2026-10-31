@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: clinic-appointments
   object_types:
@@ -100,6 +100,7 @@ model:
         - type: mandatory
           role: Patient_books_Appointment.is_booked_by
           id: Each_Appointment_is_booked_by_at_least_one_Patient
+          minted_from: '{"type":"mandatory","role":[1,"is booked by",{"name":"Patient books Appointment","readings":["{0} books {1}","{1} is booked by {0}"],"players":["Patient","Appointment"]}],"fact_type":{"name":"Patient books Appointment","readings":["{0} books {1}","{1} is booked by {0}"],"players":["Patient","Appointment"]}}'
     - id: Appointment_is_with_Doctor
       name: Appointment is with Doctor
       roles:
@@ -120,6 +121,7 @@ model:
         - type: mandatory
           role: Appointment_is_with_Doctor.is_with
           id: Each_Appointment_is_with_at_least_one_Doctor
+          minted_from: '{"type":"mandatory","role":[0,"is with",{"name":"Appointment is with Doctor","readings":["{0} is with {1}","{1} sees {0}"],"players":["Appointment","Doctor"]}],"fact_type":{"name":"Appointment is with Doctor","readings":["{0} is with {1}","{1} sees {0}"],"players":["Appointment","Doctor"]}}'
     - id: Doctor_has_Specialty
       name: Doctor has Specialty
       roles:
@@ -140,6 +142,7 @@ model:
         - type: mandatory
           role: Doctor_has_Specialty.has
           id: Each_Doctor_has_at_least_one_Specialty
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Doctor has Specialty","readings":["{0} has {1}","{1} is of {0}"],"players":["Doctor","Specialty"]}],"fact_type":{"name":"Doctor has Specialty","readings":["{0} has {1}","{1} is of {0}"],"players":["Doctor","Specialty"]}}'
     - id: Appointment_is_on_AppointmentDate
       name: Appointment is on AppointmentDate
       roles:
@@ -160,6 +163,7 @@ model:
         - type: mandatory
           role: Appointment_is_on_AppointmentDate.is_on
           id: Each_Appointment_is_on_at_least_one_AppointmentDate
+          minted_from: '{"type":"mandatory","role":[0,"is on",{"name":"Appointment is on AppointmentDate","readings":["{0} is on {1}","{1} is of {0}"],"players":["Appointment","AppointmentDate"]}],"fact_type":{"name":"Appointment is on AppointmentDate","readings":["{0} is on {1}","{1} is of {0}"],"players":["Appointment","AppointmentDate"]}}'
     - id: Appointment_is_at_TimeSlot
       name: Appointment is at TimeSlot
       roles:
@@ -180,6 +184,7 @@ model:
         - type: mandatory
           role: Appointment_is_at_TimeSlot.is_at
           id: Each_Appointment_is_at_at_least_one_TimeSlot
+          minted_from: '{"type":"mandatory","role":[0,"is at",{"name":"Appointment is at TimeSlot","readings":["{0} is at {1}","{1} is of {0}"],"players":["Appointment","TimeSlot"]}],"fact_type":{"name":"Appointment is at TimeSlot","readings":["{0} is at {1}","{1} is of {0}"],"players":["Appointment","TimeSlot"]}}'
     - id: Appointment_has_VisitReason
       name: Appointment has VisitReason
       roles:
@@ -217,6 +222,7 @@ model:
         - type: mandatory
           role: Appointment_has_AppointmentStatus.has
           id: Each_Appointment_has_at_least_one_AppointmentStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Appointment has AppointmentStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Appointment","AppointmentStatus"]}],"fact_type":{"name":"Appointment has AppointmentStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Appointment","AppointmentStatus"]}}'
     - id: Appointment_has_FollowUpNote
       name: Appointment has FollowUpNote
       roles:
@@ -254,3 +260,4 @@ model:
         - type: mandatory
           role: Patient_has_primary_Doctor.has_primary
           id: Each_Patient_has_primary_at_least_one_Doctor
+          minted_from: '{"type":"mandatory","role":[0,"has primary",{"name":"Patient has primary Doctor","readings":["{0} has primary {1}","{1} is primary doctor of {0}"],"players":["Patient","Doctor"]}],"fact_type":{"name":"Patient has primary Doctor","readings":["{0} has primary {1}","{1} is primary doctor of {0}"],"players":["Patient","Doctor"]}}'

@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: order-management
   object_types:
@@ -61,6 +61,7 @@ model:
         - type: mandatory
           role: Customer_places_Order.is_placed_by
           id: Each_Order_is_placed_by_at_least_one_Customer
+          minted_from: '{"type":"mandatory","role":[1,"is placed by",{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}],"fact_type":{"name":"Customer places Order","readings":["{0} places {1}","{1} is placed by {0}"],"players":["Customer","Order"]}}'
     - id: Order_contains_Product_with_Quantity
       name: Order contains Product with Quantity
       roles:
@@ -101,6 +102,7 @@ model:
         - type: mandatory
           role: Order_has_OrderStatus.has
           id: Each_Order_has_at_least_one_OrderStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Order has OrderStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Order","OrderStatus"]}],"fact_type":{"name":"Order has OrderStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Order","OrderStatus"]}}'
     - id: Customer_has_Name
       name: Customer has Name
       roles:
@@ -121,3 +123,4 @@ model:
         - type: mandatory
           role: Customer_has_Name.has
           id: Each_Customer_has_at_least_one_Name
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Customer has Name","readings":["{0} has {1}","{1} is of {0}"],"players":["Customer","Name"]}],"fact_type":{"name":"Customer has Name","readings":["{0} has {1}","{1} is of {0}"],"players":["Customer","Name"]}}'

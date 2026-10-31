@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: subscription-billing
   object_types:
@@ -161,6 +161,7 @@ model:
         - type: mandatory
           role: Account_has_AccountNumber.has
           id: Each_Account_has_at_least_one_AccountNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountNumber"]}],"fact_type":{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountNumber"]}}'
     - id: Subscription_has_SubscriptionID
       name: Subscription has SubscriptionID
       roles:
@@ -185,6 +186,7 @@ model:
         - type: mandatory
           role: Subscription_has_SubscriptionID.has
           id: Each_Subscription_has_at_least_one_SubscriptionID
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Subscription has SubscriptionID","readings":["{0} has {1}","{1} identifies {0}"],"players":["Subscription","SubscriptionID"]}],"fact_type":{"name":"Subscription has SubscriptionID","readings":["{0} has {1}","{1} identifies {0}"],"players":["Subscription","SubscriptionID"]}}'
     - id: Product_has_ProductCode
       name: Product has ProductCode
       roles:
@@ -209,6 +211,7 @@ model:
         - type: mandatory
           role: Product_has_ProductCode.has
           id: Each_Product_has_at_least_one_ProductCode
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Product has ProductCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Product","ProductCode"]}],"fact_type":{"name":"Product has ProductCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Product","ProductCode"]}}'
     - id: PricePlan_has_PlanCode
       name: PricePlan has PlanCode
       roles:
@@ -233,6 +236,7 @@ model:
         - type: mandatory
           role: PricePlan_has_PlanCode.has
           id: Each_PricePlan_has_at_least_one_PlanCode
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PricePlan has PlanCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["PricePlan","PlanCode"]}],"fact_type":{"name":"PricePlan has PlanCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["PricePlan","PlanCode"]}}'
     - id: FeatureBundle_has_BundleName
       name: FeatureBundle has BundleName
       roles:
@@ -257,6 +261,7 @@ model:
         - type: mandatory
           role: FeatureBundle_has_BundleName.has
           id: Each_FeatureBundle_has_at_least_one_BundleName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"FeatureBundle has BundleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["FeatureBundle","BundleName"]}],"fact_type":{"name":"FeatureBundle has BundleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["FeatureBundle","BundleName"]}}'
     - id: PlanChange_has_ChangeID
       name: PlanChange has ChangeID
       roles:
@@ -281,6 +286,7 @@ model:
         - type: mandatory
           role: PlanChange_has_ChangeID.has
           id: Each_PlanChange_has_at_least_one_ChangeID
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PlanChange has ChangeID","readings":["{0} has {1}","{1} identifies {0}"],"players":["PlanChange","ChangeID"]}],"fact_type":{"name":"PlanChange has ChangeID","readings":["{0} has {1}","{1} identifies {0}"],"players":["PlanChange","ChangeID"]}}'
     - id: Subscription_belongs_to_Account
       name: Subscription belongs to Account
       roles:
@@ -297,6 +303,7 @@ model:
         - type: mandatory
           role: Subscription_belongs_to_Account.belongs_to
           id: Each_Subscription_belongs_to_at_least_one_Account
+          minted_from: '{"type":"mandatory","role":[0,"belongs to",{"name":"Subscription belongs to Account","readings":["{0} belongs to {1}","{1} has {0}"],"players":["Subscription","Account"]}],"fact_type":{"name":"Subscription belongs to Account","readings":["{0} belongs to {1}","{1} has {0}"],"players":["Subscription","Account"]}}'
         - type: internal_uniqueness
           roles:
             - Subscription_belongs_to_Account.belongs_to
@@ -317,6 +324,7 @@ model:
         - type: mandatory
           role: Subscription_is_for_Product.is_for
           id: Each_Subscription_is_for_at_least_one_Product
+          minted_from: '{"type":"mandatory","role":[0,"is for",{"name":"Subscription is for Product","readings":["{0} is for {1}","{1} has {0}"],"players":["Subscription","Product"]}],"fact_type":{"name":"Subscription is for Product","readings":["{0} is for {1}","{1} has {0}"],"players":["Subscription","Product"]}}'
         - type: internal_uniqueness
           roles:
             - Subscription_is_for_Product.is_for
@@ -337,6 +345,7 @@ model:
         - type: mandatory
           role: Subscription_uses_PricePlan.uses
           id: Each_Subscription_uses_at_least_one_PricePlan
+          minted_from: '{"type":"mandatory","role":[0,"uses",{"name":"Subscription uses PricePlan","readings":["{0} uses {1}","{1} is used by {0}"],"players":["Subscription","PricePlan"]}],"fact_type":{"name":"Subscription uses PricePlan","readings":["{0} uses {1}","{1} is used by {0}"],"players":["Subscription","PricePlan"]}}'
         - type: internal_uniqueness
           roles:
             - Subscription_uses_PricePlan.uses
@@ -357,6 +366,7 @@ model:
         - type: mandatory
           role: Subscription_has_StartDate.has
           id: Each_Subscription_has_at_least_one_StartDate
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Subscription has StartDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","StartDate"]}],"fact_type":{"name":"Subscription has StartDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","StartDate"]}}'
         - type: internal_uniqueness
           roles:
             - Subscription_has_StartDate.has
@@ -394,6 +404,7 @@ model:
         - type: mandatory
           role: Subscription_has_BillingPeriod.has
           id: Each_Subscription_has_at_least_one_BillingPeriod
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Subscription has BillingPeriod","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","BillingPeriod"]}],"fact_type":{"name":"Subscription has BillingPeriod","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","BillingPeriod"]}}'
         - type: internal_uniqueness
           roles:
             - Subscription_has_BillingPeriod.has
@@ -414,6 +425,7 @@ model:
         - type: mandatory
           role: Subscription_has_SubscriptionStatus.has
           id: Each_Subscription_has_at_least_one_SubscriptionStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Subscription has SubscriptionStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","SubscriptionStatus"]}],"fact_type":{"name":"Subscription has SubscriptionStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","SubscriptionStatus"]}}'
         - type: internal_uniqueness
           roles:
             - Subscription_has_SubscriptionStatus.has
@@ -434,6 +446,7 @@ model:
         - type: mandatory
           role: PricePlan_entitles_FeatureBundle.entitles
           id: Each_PricePlan_entitles_at_least_one_FeatureBundle
+          minted_from: '{"type":"mandatory","role":[0,"entitles",{"name":"PricePlan entitles FeatureBundle","readings":["{0} entitles {1}","{1} is entitled by {0}"],"players":["PricePlan","FeatureBundle"]}],"fact_type":{"name":"PricePlan entitles FeatureBundle","readings":["{0} entitles {1}","{1} is entitled by {0}"],"players":["PricePlan","FeatureBundle"]}}'
         - type: internal_uniqueness
           roles:
             - PricePlan_entitles_FeatureBundle.entitles
@@ -454,6 +467,7 @@ model:
         - type: mandatory
           role: PlanChange_is_for_Subscription.is_for
           id: Each_PlanChange_is_for_at_least_one_Subscription
+          minted_from: '{"type":"mandatory","role":[0,"is for",{"name":"PlanChange is for Subscription","readings":["{0} is for {1}","{1} has {0}"],"players":["PlanChange","Subscription"]}],"fact_type":{"name":"PlanChange is for Subscription","readings":["{0} is for {1}","{1} has {0}"],"players":["PlanChange","Subscription"]}}'
         - type: internal_uniqueness
           roles:
             - PlanChange_is_for_Subscription.is_for
@@ -474,6 +488,7 @@ model:
         - type: mandatory
           role: PlanChange_specifies_PricePlan.specifies
           id: Each_PlanChange_specifies_at_least_one_PricePlan
+          minted_from: '{"type":"mandatory","role":[0,"specifies",{"name":"PlanChange specifies PricePlan","readings":["{0} specifies {1}","{1} is specified by {0}"],"players":["PlanChange","PricePlan"]}],"fact_type":{"name":"PlanChange specifies PricePlan","readings":["{0} specifies {1}","{1} is specified by {0}"],"players":["PlanChange","PricePlan"]}}'
         - type: internal_uniqueness
           roles:
             - PlanChange_specifies_PricePlan.specifies
@@ -494,6 +509,7 @@ model:
         - type: mandatory
           role: PlanChange_has_EffectiveDate.has
           id: Each_PlanChange_has_at_least_one_EffectiveDate
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PlanChange has EffectiveDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PlanChange","EffectiveDate"]}],"fact_type":{"name":"PlanChange has EffectiveDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PlanChange","EffectiveDate"]}}'
         - type: internal_uniqueness
           roles:
             - PlanChange_has_EffectiveDate.has
@@ -514,6 +530,7 @@ model:
         - type: mandatory
           role: PlanChange_has_Requester.has
           id: Each_PlanChange_has_at_least_one_Requester
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PlanChange has Requester","readings":["{0} has {1}","{1} requested {0}"],"players":["PlanChange","Requester"]}],"fact_type":{"name":"PlanChange has Requester","readings":["{0} has {1}","{1} requested {0}"],"players":["PlanChange","Requester"]}}'
         - type: internal_uniqueness
           roles:
             - PlanChange_has_Requester.has

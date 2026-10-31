@@ -5,7 +5,7 @@
  * element with exit 0 -- behind green unit tests of generators nothing
  * called. This is the surface test whose absence allowed that (R4).
  */
-import { registerFormat } from "@barwise/core";
+import { OrmYamlSerializer, registerFormat } from "@barwise/core";
 import { type LineageManifest, parseManifest, serializeManifest } from "@barwise/core/lineage";
 import {
   copyFileSync,
@@ -24,6 +24,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCli } from "../workspace/run.js";
 
 const fixtures = resolve(dirname(fileURLToPath(import.meta.url)), "../fixtures");
+
+/**
+ * The id an element of a 3.x file has once loaded, which is what an export
+ * records and every surface shows: the file states the id it had before
+ * the load replayed it into 4.0's (iri-identity WS6).
+ */
+const loadedId = (file: string, stated: string): string =>
+  new OrmYamlSerializer().deserialize(readFileSync(file, "utf8")).idFromPrior(stated)!;
 
 describe("export, then lineage impact", () => {
   let dir: string;
@@ -50,7 +58,7 @@ describe("export, then lineage impact", () => {
         "impact",
         model,
         "--element",
-        "ot-customer",
+        loadedId(model, "ot-customer"),
         "--format",
         "json",
       ]);
@@ -80,7 +88,7 @@ describe("export, then lineage impact", () => {
         "impact",
         hierarchy,
         "--element",
-        "9bb914ef-c751-469b-80f1-b449d0364495",
+        loadedId(hierarchy, "9bb914ef-c751-469b-80f1-b449d0364495"),
         "--format",
         "json",
       ]);

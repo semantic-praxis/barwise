@@ -1,6 +1,6 @@
 -- Constraint (not expressible in SQL DDL): Each Document that has status some DocumentStatus has status exactly 1 instance of DocumentStatus.
 -- Table: document
--- Source: Document (6e0d1386-6da7-495c-b47d-b06bf4d08f78)
+-- Source: Document (Document)
 -- Definition: An incoming document submitted from a source system that undergoes PII scanning, review, redaction, and release.
 -- NOTE(barwise): Definition available from ORM model: "An incoming document submitted from a source system that undergoes PII scanni..."
 -- barwise:v1 {"kind":"table","table":"document","entity":"Document","referenceMode":"document_id","definition":"An incoming document submitted from a source system that undergoes PII scanning, review, redaction, and release.","supertypes":[]}
@@ -25,7 +25,7 @@ CREATE TABLE document (
 );
 
 -- Table: finding
--- Source: Finding (fd60ab67-7d91-4e80-9b35-96796b987960)
+-- Source: Finding (Finding)
 -- Definition: A detected PII occurrence within a specific document and scan version, identified by document + scan version + start position.
 -- NOTE(barwise): Definition available from ORM model: "A detected PII occurrence within a specific document and scan version, identi..."
 -- barwise:v1 {"kind":"table","table":"finding","entity":"Finding","referenceMode":"(ambiguous)","definition":"A detected PII occurrence within a specific document and scan version, identified by document + scan version + start position.","supertypes":[]}
@@ -46,7 +46,7 @@ CREATE TABLE finding (
 );
 
 -- Table: reviewer
--- Source: Reviewer (635fcd85-5d99-4e70-a048-e1761dacb7c2)
+-- Source: Reviewer (Reviewer)
 -- Definition: An employee who reviews findings in the compliance department.
 -- NOTE(barwise): Definition available from ORM model: "An employee who reviews findings in the compliance department."
 -- barwise:v1 {"kind":"table","table":"reviewer","entity":"Reviewer","referenceMode":"employee_id","definition":"An employee who reviews findings in the compliance department.","supertypes":[]}
@@ -64,7 +64,7 @@ CREATE TABLE reviewer (
 );
 
 -- Table: review_decision
--- Source: ReviewDecision (0b8e87ca-853b-488e-a66f-cf492b8fee60)
+-- Source: ReviewDecision (ReviewDecision)
 -- Definition: A decision made by a reviewer on a single finding, recording the decision type, timestamp and optional note.
 -- NOTE(barwise): Definition available from ORM model: "A decision made by a reviewer on a single finding, recording the decision typ..."
 -- barwise:v1 {"kind":"table","table":"review_decision","entity":"ReviewDecision","referenceMode":"(ambiguous)","definition":"A decision made by a reviewer on a single finding, recording the decision type, timestamp and optional note.","supertypes":[]}
@@ -74,7 +74,7 @@ CREATE TABLE review_decision (
 );
 
 -- Table: audit_entry
--- Source: AuditEntry (16ee349a-72f4-478c-90f5-80aaac3bb9de)
+-- Source: AuditEntry (AuditEntry)
 -- Definition: A logged action on a document capturing who performed it, when, and details.
 -- NOTE(barwise): Definition available from ORM model: "A logged action on a document capturing who performed it, when, and details."
 -- barwise:v1 {"kind":"table","table":"audit_entry","entity":"AuditEntry","referenceMode":"audit_id","definition":"A logged action on a document capturing who performed it, when, and details.","supertypes":[]}
@@ -90,7 +90,7 @@ CREATE TABLE audit_entry (
 );
 
 -- Table: scan
--- Source: Scan (7a290595-e44f-4545-b019-7cd694a8f0d3)
+-- Source: Scan (Scan)
 -- Definition: A scan operation run over a document using a model version that produces findings; scans have an integer scan version.
 -- NOTE(barwise): Definition available from ORM model: "A scan operation run over a document using a model version that produces find..."
 -- barwise:v1 {"kind":"table","table":"scan","entity":"Scan","referenceMode":"scan_version","definition":"A scan operation run over a document using a model version that produces findings; scans have an integer scan version.","supertypes":[]}
@@ -104,7 +104,7 @@ CREATE TABLE scan (
 );
 
 -- Table: release
--- Source: Release (510a6c60-7478-4daf-a620-5b3763836371)
+-- Source: Release (Release)
 -- Definition: A record that a redacted document was released to a downstream system, identified by document and downstream system.
 -- NOTE(barwise): Definition available from ORM model: "A record that a redacted document was released to a downstream system, identi..."
 -- NOTE(barwise): Composite primary key (document_id, downstream_system): unique as a combination.
@@ -124,7 +124,7 @@ CREATE TABLE release (
 );
 
 -- Table: document_has_scan
--- Source: Document has Scan (5fa5ce9a-6bb5-43a7-8570-bb9cf271be8a)
+-- Source: Document has Scan (Document_has_Scan)
 -- NOTE(barwise): Composite primary key (document_id, scan_version): unique as a combination.
 -- barwise:v1 {"kind":"factTable","table":"document_has_scan","factType":"Document has Scan","readings":["{0} has scan {1}","{1} is scan of {0}"],"roles":[{"name":"has scan","player":"Document","columns":["document_id"]},{"name":"is scan of","player":"Scan","columns":["scan_version"]}]}
 CREATE TABLE document_has_scan (
@@ -138,7 +138,7 @@ CREATE TABLE document_has_scan (
 );
 
 -- Table: scan_produced_finding
--- Source: Scan produced Finding (95f1e779-55fb-4a67-ac62-70e5b23643ab)
+-- Source: Scan produced Finding (Scan_produced_Finding)
 -- NOTE(barwise): Composite primary key (scan_version, (ambiguous)): unique as a combination.
 -- barwise:v1 {"kind":"factTable","table":"scan_produced_finding","factType":"Scan produced Finding","readings":["{0} produced {1}","{1} is produced by {0}"],"roles":[{"name":"produced","player":"Scan","columns":["scan_version"]},{"name":"is produced by","player":"Finding","columns":["(ambiguous)"]}]}
 CREATE TABLE scan_produced_finding (
@@ -153,7 +153,7 @@ CREATE TABLE scan_produced_finding (
 
 -- Constraint (each instance must appear in another table, which no column can require): Each Finding is reviewed by at least one Reviewer.
 -- Table: finding_reviewed_by_reviewer
--- Source: Finding reviewedBy Reviewer (3c821c8f-c2bd-4570-856b-d34370b7d39c)
+-- Source: Finding reviewedBy Reviewer (Finding_reviewedBy_Reviewer)
 -- NOTE(barwise): Composite primary key ((ambiguous), employee_id): unique as a combination.
 -- barwise:v1 {"kind":"factTable","table":"finding_reviewed_by_reviewer","factType":"Finding reviewedBy Reviewer","readings":["{0} is reviewed by {1}","{1} reviews {0}"],"roles":[{"name":"is reviewed by","player":"Finding","columns":["(ambiguous)"]},{"name":"reviews","player":"Reviewer","columns":["employee_id"]}]}
 CREATE TABLE finding_reviewed_by_reviewer (
@@ -166,7 +166,7 @@ CREATE TABLE finding_reviewed_by_reviewer (
 
 -- Constraint (each instance must appear in another table, which no column can require): Each ReviewDecision is decision of at least one Finding.
 -- Table: review_decision_is_decision_of_finding
--- Source: ReviewDecision isDecisionOf Finding (1875b69e-d864-4faa-84dd-4e60407b0c1f)
+-- Source: ReviewDecision isDecisionOf Finding (ReviewDecision_isDecisionOf_Finding)
 -- NOTE(barwise): Composite primary key ((ambiguous), has_decision_about_(ambiguous)): unique as a combination.
 -- barwise:v1 {"kind":"factTable","table":"review_decision_is_decision_of_finding","factType":"ReviewDecision isDecisionOf Finding","readings":["{0} is decision of {1}","{1} has decision {0}"],"roles":[{"name":"is decision of","player":"ReviewDecision","columns":["(ambiguous)"]},{"name":"has decision about","player":"Finding","columns":["has_decision_about_(ambiguous)"]}]}
 CREATE TABLE review_decision_is_decision_of_finding (
@@ -179,7 +179,7 @@ CREATE TABLE review_decision_is_decision_of_finding (
 
 -- Constraint (each instance must appear in another table, which no column can require): Each AuditEntry is about at least one Document.
 -- Table: audit_entry_about_document
--- Source: AuditEntry about Document (72cca336-4aa4-4c09-a562-3793d481b10e)
+-- Source: AuditEntry about Document (AuditEntry_about_Document)
 -- NOTE(barwise): Composite primary key (audit_id, document_id): unique as a combination.
 -- barwise:v1 {"kind":"factTable","table":"audit_entry_about_document","factType":"AuditEntry about Document","readings":["{0} is about {1}","{1} has audit entry {0}"],"roles":[{"name":"is about","player":"AuditEntry","columns":["audit_id"]},{"name":"applies to","player":"Document","columns":["document_id"]}]}
 CREATE TABLE audit_entry_about_document (
@@ -193,7 +193,7 @@ CREATE TABLE audit_entry_about_document (
 );
 
 -- Table: audit_entry_performed_by_reviewer
--- Source: AuditEntry performedBy Reviewer (1b422114-da9e-43f2-a2a6-08cc964a1d68)
+-- Source: AuditEntry performedBy Reviewer (AuditEntry_performedBy_Reviewer)
 -- NOTE(barwise): Composite primary key (audit_id, employee_id): unique as a combination.
 -- barwise:v1 {"kind":"factTable","table":"audit_entry_performed_by_reviewer","factType":"AuditEntry performedBy Reviewer","readings":["{0} performed by {1}","{1} performed {0}"],"roles":[{"name":"performed by","player":"AuditEntry","columns":["audit_id"]},{"name":"performed","player":"Reviewer","columns":["employee_id"]}]}
 CREATE TABLE audit_entry_performed_by_reviewer (

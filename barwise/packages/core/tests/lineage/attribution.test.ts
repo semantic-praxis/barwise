@@ -21,6 +21,7 @@ import { resolveArtifactInManifest } from "../../src/lineage/resolveArtifact.js"
 import { checkStaleness } from "../../src/lineage/staleness.js";
 import type { LineageManifest, ManifestExport } from "../../src/lineage/types.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { replayInto40 } from "../../src/serialization/replay.js";
 
 // Built on `OrmModel` directly: the exports below name element ids, and
 // which domain holds which id is what the tests vary.
@@ -93,6 +94,15 @@ function manifest(exports: ManifestExport[]): LineageManifest {
 }
 
 describe("claiming an export that names no model", () => {
+  it("claims an export written under the 3.x ids its file states, once replayed", () => {
+    // Loading a 3.x file replays it into 4.0's ids; an export written
+    // before the switch still names the old ones (iri-identity WS6).
+    const replayed = replayInto40(sales());
+    expect(replayed.getObjectType("cust")).toBeUndefined();
+    expect(claimsExport(replayed, exp("orders.sql", ["cust", "ord", "places"]))).toBe(true);
+    expect(claimsExport(replayed, exp("orders.sql", ["cust", "nobody"]))).toBe(false);
+  });
+
   it("is the owner's: it holds every source id and owns one", () => {
     expect(claimsExport(sales(), exp("orders.sql", ["cust", "ord", "places"]))).toBe(true);
   });

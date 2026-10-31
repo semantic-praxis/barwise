@@ -103,8 +103,9 @@ describe("barwise validate (project)", () => {
     ]);
 
     expect(asProject.exitCode).toBe(1);
+    // Replayed at load: the population named after the fact type it names.
     expect(asProject.stdout).toContain(
-      'Population "pop-dangling" references fact type id "ft-missing"',
+      'Population "ft-missing.population" references fact type id "ft-missing"',
     );
     for (const line of asModel.stdout.split("\n")) {
       const message = line.trim().replace(/^(ERROR|WARNING|INFO)\s+/, "");

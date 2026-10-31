@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: university-enrollment
   object_types:
@@ -97,6 +97,7 @@ model:
         - type: mandatory
           role: CourseOffering_is_of_Course.is_of
           id: Each_CourseOffering_is_of_at_least_one_Course
+          minted_from: '{"type":"mandatory","role":[0,"is of",{"name":"CourseOffering is of Course","readings":["{0} is of {1}","{1} has offering {0}"],"players":["CourseOffering","Course"]}],"fact_type":{"name":"CourseOffering is of Course","readings":["{0} is of {1}","{1} has offering {0}"],"players":["CourseOffering","Course"]}}'
     - id: CourseOffering_is_in_Semester
       name: CourseOffering is in Semester
       roles:
@@ -117,6 +118,7 @@ model:
         - type: mandatory
           role: CourseOffering_is_in_Semester.is_in
           id: Each_CourseOffering_is_in_at_least_one_Semester
+          minted_from: '{"type":"mandatory","role":[0,"is in",{"name":"CourseOffering is in Semester","readings":["{0} is in {1}","{1} includes {0}"],"players":["CourseOffering","Semester"]}],"fact_type":{"name":"CourseOffering is in Semester","readings":["{0} is in {1}","{1} includes {0}"],"players":["CourseOffering","Semester"]}}'
     - id: Instructor_teaches_CourseOffering
       name: Instructor teaches CourseOffering
       roles:
@@ -137,6 +139,7 @@ model:
         - type: mandatory
           role: Instructor_teaches_CourseOffering.is_taught_by
           id: Each_CourseOffering_is_taught_by_at_least_one_Instructor
+          minted_from: '{"type":"mandatory","role":[1,"is taught by",{"name":"Instructor teaches CourseOffering","readings":["{0} teaches {1}","{1} is taught by {0}"],"players":["Instructor","CourseOffering"]}],"fact_type":{"name":"Instructor teaches CourseOffering","readings":["{0} teaches {1}","{1} is taught by {0}"],"players":["Instructor","CourseOffering"]}}'
     - id: Course_has_Title
       name: Course has Title
       roles:

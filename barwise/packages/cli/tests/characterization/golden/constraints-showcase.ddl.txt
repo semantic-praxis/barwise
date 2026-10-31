@@ -1,7 +1,7 @@
 -- Constraint (not expressible in SQL DDL): Each Person either drives some Car or rides some Bus but not both.
 -- Constraint (not expressible in SQL DDL): If Person in Person purchases Ticket then Person in Person rides Bus.
 -- Table: person
--- Source: Person (ot-person)
+-- Source: Person (Person)
 -- TODO(barwise): No model description. Add a definition to the entity type.
 -- barwise:v1 {"kind":"table","table":"person","entity":"Person","referenceMode":"person_id","supertypes":[]}
 CREATE TABLE person (
@@ -22,7 +22,7 @@ CREATE TABLE person (
 );
 
 -- Table: car
--- Source: Car (ot-car)
+-- Source: Car (Car)
 -- TODO(barwise): No model description. Add a definition to the entity type.
 -- barwise:v1 {"kind":"table","table":"car","entity":"Car","referenceMode":"vin","supertypes":[]}
 CREATE TABLE car (
@@ -33,7 +33,7 @@ CREATE TABLE car (
 );
 
 -- Table: bus
--- Source: Bus (ot-bus)
+-- Source: Bus (Bus)
 -- TODO(barwise): No model description. Add a definition to the entity type.
 -- barwise:v1 {"kind":"table","table":"bus","entity":"Bus","referenceMode":"bus_number","supertypes":[]}
 CREATE TABLE bus (
@@ -44,7 +44,7 @@ CREATE TABLE bus (
 );
 
 -- Table: ticket
--- Source: Ticket (ot-ticket)
+-- Source: Ticket (Ticket)
 -- TODO(barwise): No model description. Add a definition to the entity type.
 -- barwise:v1 {"kind":"table","table":"ticket","entity":"Ticket","referenceMode":"ticket_id","supertypes":[]}
 CREATE TABLE ticket (
@@ -62,7 +62,7 @@ CREATE TABLE ticket (
 -- Constraint (not expressible in SQL DDL): No Person is parent of that same Person.
 -- Constraint (not expressible in SQL DDL): If Person1 is parent of Person2 then Person2 does not is parent of Person1.
 -- Table: person_is_parent_of_person
--- Source: Person is parent of Person (ft-person-parent-of)
+-- Source: Person is parent of Person (Person_is_parent_of_Person)
 -- NOTE(barwise): Composite primary key (person_id, is_child_of_person_id): unique as a combination.
 -- barwise:v1 {"kind":"factTable","table":"person_is_parent_of_person","factType":"Person is parent of Person","readings":["{0} is parent of {1}","{1} is child of {0}"],"roles":[{"name":"is parent of","player":"Person","columns":["person_id"]},{"name":"is child of","player":"Person","columns":["is_child_of_person_id"]}]}
 CREATE TABLE person_is_parent_of_person (

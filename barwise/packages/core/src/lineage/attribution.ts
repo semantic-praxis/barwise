@@ -37,7 +37,19 @@ export function claimsExport(model: OrmModel, exp: ManifestExport): boolean {
   return owns;
 }
 
+/**
+ * How the model holds a source id: as it is, or -- for an export written
+ * under the 3.x ids its model file still states -- under the id the load
+ * replayed that one into (iri-identity WS6).
+ */
 function holding(model: OrmModel, id: string): "owns" | "shadow" | "none" {
+  const held = holdingAsIs(model, id);
+  if (held !== "none") return held;
+  const now = model.idFromPrior(id);
+  return now === undefined ? "none" : holdingAsIs(model, now);
+}
+
+function holdingAsIs(model: OrmModel, id: string): "owns" | "shadow" | "none" {
   const ot = model.getObjectType(id);
   if (ot) return ot.sourceContext === undefined ? "owns" : "shadow";
   const held = model.getFactType(id) ?? model.findRole(id) ?? model.getConstraint(id)

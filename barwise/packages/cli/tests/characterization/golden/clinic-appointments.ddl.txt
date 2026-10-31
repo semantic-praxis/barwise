@@ -1,5 +1,5 @@
 -- Table: patient
--- Source: Patient (04eaeae4-50c4-40ab-909b-b05f5215daee)
+-- Source: Patient (Patient)
 -- Definition: A person who books appointments at the clinic, identified by a medical record number assigned at registration.
 -- NOTE(barwise): Definition available from ORM model: "A person who books appointments at the clinic, identified by a medical record..."
 -- barwise:v1 {"kind":"table","table":"patient","entity":"Patient","referenceMode":"medical_record_number","definition":"A person who books appointments at the clinic, identified by a medical record number assigned at registration.","supertypes":[]}
@@ -13,7 +13,7 @@ CREATE TABLE patient (
 );
 
 -- Table: doctor
--- Source: Doctor (0f321168-50ce-4b6f-accd-2a56cf810a2c)
+-- Source: Doctor (Doctor)
 -- Definition: A medical provider at the clinic, identified by a state-issued provider ID.
 -- NOTE(barwise): Definition available from ORM model: "A medical provider at the clinic, identified by a state-issued provider ID."
 -- barwise:v1 {"kind":"table","table":"doctor","entity":"Doctor","referenceMode":"provider_id","definition":"A medical provider at the clinic, identified by a state-issued provider ID.","supertypes":[]}
@@ -29,7 +29,7 @@ CREATE TABLE doctor (
 
 -- Constraint (not expressible in SQL DDL): If Appointment in Appointment has FollowUpNote then Appointment in Appointment has AppointmentStatus.
 -- Table: appointment
--- Source: Appointment (283bb11c-11a1-4564-aaa5-3393ffc81d94)
+-- Source: Appointment (Appointment)
 -- Definition: A scheduled visit between a patient and a doctor, identified by a unique confirmation number.
 -- NOTE(barwise): Definition available from ORM model: "A scheduled visit between a patient and a doctor, identified by a unique conf..."
 -- barwise:v1 {"kind":"table","table":"appointment","entity":"Appointment","referenceMode":"confirmation_number","definition":"A scheduled visit between a patient and a doctor, identified by a unique confirmation number.","supertypes":[]}
@@ -48,7 +48,7 @@ CREATE TABLE appointment (
 );
 
 -- Table: exam_room
--- Source: ExamRoom (14837c15-141e-41fb-8774-4a118124e8f1)
+-- Source: ExamRoom (ExamRoom)
 -- Definition: A physical examination room in the clinic, identified by a room number.
 -- NOTE(barwise): Definition available from ORM model: "A physical examination room in the clinic, identified by a room number."
 -- barwise:v1 {"kind":"table","table":"exam_room","entity":"ExamRoom","referenceMode":"room_number","definition":"A physical examination room in the clinic, identified by a room number.","supertypes":[]}
@@ -60,7 +60,7 @@ CREATE TABLE exam_room (
 
 -- Constraint (each instance must appear in another table, which no column can require): Each Appointment is for some Patient with some Doctor on some AppointmentDate at some TimeSlot.
 -- Table: appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot
--- Source: Appointment is for Patient with Doctor on AppointmentDate at TimeSlot (a0831743-6a6a-4ad3-aa2a-80c2b3200d76)
+-- Source: Appointment is for Patient with Doctor on AppointmentDate at TimeSlot (Appointment_is_for_Patient_with_Doctor_on_AppointmentDate_at_TimeSlot)
 -- barwise:v1 {"kind":"factTable","table":"appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot","factType":"Appointment is for Patient with Doctor on AppointmentDate at TimeSlot","readings":["{0} is for {1} with {2} on {3} at {4}"],"roles":[{"name":"is for","player":"Appointment","columns":["confirmation_number"]},{"name":"attends","player":"Patient","columns":["medical_record_number"]},{"name":"sees","player":"Doctor","columns":["provider_id"]},{"name":"is on","player":"AppointmentDate","columns":["appointment_date"],"valueDefinition":"The calendar date of an appointment."},{"name":"is at","player":"TimeSlot","columns":["time_slot"],"valueDefinition":"A half-hour time slot during which an appointment can be scheduled."}]}
 CREATE TABLE appointment_is_for_patient_with_doctor_on_appointment_date_at_time_slot (
   confirmation_number VARCHAR(20) NOT NULL,
@@ -79,7 +79,7 @@ CREATE TABLE appointment_is_for_patient_with_doctor_on_appointment_date_at_time_
 );
 
 -- Table: doctor_is_assigned_to_exam_room_on_appointment_date
--- Source: Doctor is assigned to ExamRoom on AppointmentDate (8ece7c1e-ce10-4caa-a0bf-45af182c6028)
+-- Source: Doctor is assigned to ExamRoom on AppointmentDate (Doctor_is_assigned_to_ExamRoom_on_AppointmentDate)
 -- NOTE(barwise): Composite primary key (provider_id, appointment_date): unique as a combination.
 -- barwise:v1 {"kind":"factTable","table":"doctor_is_assigned_to_exam_room_on_appointment_date","factType":"Doctor is assigned to ExamRoom on AppointmentDate","readings":["{0} is assigned to {1} on {2}"],"roles":[{"name":"is assigned to","player":"Doctor","columns":["provider_id"]},{"name":"is used by","player":"ExamRoom","columns":["room_number"]},{"name":"is on","player":"AppointmentDate","columns":["appointment_date"],"valueDefinition":"The calendar date of an appointment."}]}
 CREATE TABLE doctor_is_assigned_to_exam_room_on_appointment_date (

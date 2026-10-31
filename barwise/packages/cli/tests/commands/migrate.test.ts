@@ -63,27 +63,30 @@ describe("barwise migrate", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("rewrites a 2.0 file in place as 3.0, saying where it came from and what it dropped [adr:schema-versioning#load-forward]", async () => {
+  it("rewrites a 2.0 file in place as 4.0, saying where it came from and what it dropped [adr:schema-versioning#load-forward]", async () => {
     const path = file("shop.orm.yaml", V20);
     const result = await runCli(["migrate", path]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe(
-      `${path}: 2.0 -> 3.0\n`
+      `${path}: 2.0 -> 4.0\n`
         + `  dropped the is_preferred flag on constraint "u-cn" in "Customer has Name": it identifies no entity type\n`,
     );
     const written = readFileSync(path, "utf-8");
-    expect(written).toMatch(/^orm_version: "3\.0"/);
-    expect(written).toContain("preferred_identifier: u-nr");
+    expect(written).toMatch(/^orm_version: "4\.0"/);
+    // Replayed into 4.0's ids: the identifier the flag kept, by its minted name.
+    expect(written).toContain(
+      "preferred_identifier: For_each_CustomerNr,_at_most_one_Customer_has_that_CustomerNr",
+    );
     expect(written).not.toContain("is_preferred");
   });
 
-  it("leaves a 3.0 file untouched and says so", async () => {
+  it("leaves a 4.0 file untouched and says so", async () => {
     const path = file("shop.orm.yaml", V20);
     await runCli(["migrate", path]);
     const once = readFileSync(path, "utf-8");
     const result = await runCli(["migrate", path]);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe(`${path}: already 3.0\n`);
+    expect(result.stdout).toBe(`${path}: already 4.0\n`);
     expect(readFileSync(path, "utf-8")).toBe(once);
   });
 
@@ -91,7 +94,7 @@ describe("barwise migrate", () => {
     const path = file("shop.orm.yaml", V20);
     const result = await runCli(["migrate", "--check", path]);
     expect(result.exitCode).toBe(1);
-    expect(result.stdout).toContain(`${path}: 2.0 would migrate to 3.0\n`);
+    expect(result.stdout).toContain(`${path}: 2.0 would migrate to 4.0\n`);
     expect(readFileSync(path, "utf-8")).toBe(V20);
   });
 
@@ -110,8 +113,8 @@ describe("barwise migrate", () => {
     const lines = result.stdout.split("\n");
     expect(lines[0]).toMatch(new RegExp(`^${broken}: YAML does not conform`));
     expect(lines[1]).toBe(`${missing}: File not found: ${missing}`);
-    expect(lines[2]).toBe(`${good}: 2.0 -> 3.0`);
-    expect(readFileSync(good, "utf-8")).toMatch(/^orm_version: "3\.0"/);
+    expect(lines[2]).toBe(`${good}: 2.0 -> 4.0`);
+    expect(readFileSync(good, "utf-8")).toMatch(/^orm_version: "4\.0"/);
   });
 
   it("migrates a fragment that names an element it does not define, as validate would load it", async () => {
@@ -125,16 +128,17 @@ describe("barwise migrate", () => {
     expect(readFileSync(path, "utf-8")).toContain("ft-typo");
   });
 
-  it("refuses a 2.0 file whose rewrite would not load, and leaves it untouched", async () => {
-    // 2.0 accepted two constraints sharing an id; 3.0 refuses them.
+  it("migrates a 2.0 file holding one constraint id twice, naming each apart", async () => {
+    // 2.0 accepted two constraints sharing an id, and 3.0 refused them, so
+    // this file used to stay unmigrated. The replay into 4.0 names every
+    // constraint from its sentence, so the repeat does not survive it.
     const twice = V20.replace("id: u-cn,", "id: u-nr,");
     const path = file("twice.orm.yaml", twice);
     const result = await runCli(["migrate", path]);
-    expect(result.exitCode).toBe(2);
-    expect(result.stdout).toBe(
-      `${path}: not migrated: its 3.0 form would not load: Constraint ids are held by more than one constraint: "u-nr" (internal_uniqueness in fact type "Customer has CustomerNr" over roles r-nr; internal_uniqueness in fact type "Customer has Name" over roles r-cn). A constraint id names one constraint.\n`,
-    );
-    expect(readFileSync(path, "utf-8")).toBe(twice);
+    expect(result.exitCode).toBe(0);
+    const written = readFileSync(path, "utf-8");
+    expect(written).toMatch(/^orm_version: "4\.0"/);
+    expect(written).not.toContain("u-nr");
   });
 
   it("refuses a fragment whose flag names an object type it does not define", async () => {
@@ -169,7 +173,7 @@ describe("barwise migrate", () => {
     const result = await runCli(["migrate", link]);
     expect(result.exitCode).toBe(0);
     expect(lstatSync(link).isSymbolicLink()).toBe(true);
-    expect(readFileSync(target, "utf-8")).toMatch(/^orm_version: "3\.0"/);
+    expect(readFileSync(target, "utf-8")).toMatch(/^orm_version: "4\.0"/);
     expect(statSync(target).mode & 0o777).toBe(0o664);
     expect(existsSync(`${target}.migrating`)).toBe(false);
   });

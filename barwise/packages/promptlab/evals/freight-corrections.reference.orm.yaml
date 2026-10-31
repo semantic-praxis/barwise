@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: freight-corrections
   object_types:
@@ -69,6 +69,7 @@ model:
           min: 1
           max: 2
           id: Each_Shipment_that_is_stored_in_some_Warehouse_is_stored_in_at_least_1_and_at_most_2_instances_of_Warehouse
+          minted_from: '{"type":"frequency","role":[0,"is stored in",{"name":"Shipment is stored in Warehouse","readings":["{0} is stored in {1}","{1} stores {0}"],"players":["Shipment","Warehouse"]}],"min":1,"max":2,"fact_type":{"name":"Shipment is stored in Warehouse","readings":["{0} is stored in {1}","{1} stores {0}"],"players":["Shipment","Warehouse"]}}'
   populations:
     - id: Shipment_contains_Product_in_Quantity.population
       fact_type: Shipment_contains_Product_in_Quantity
