@@ -114,6 +114,55 @@ describe("writing a format 4.0 document", () => {
     expect(model.mintedFromOf("Each_Person_smokes")).toBeUndefined();
   });
 
+  it("keeps the key of a constraint across fact types and of an objectification", () => {
+    const model = smokers();
+    model.addObjectType({ id: "Habit", name: "Habit", kind: "entity", referenceMode: "nr" });
+    model.addFactType({
+      id: "Person_runs",
+      name: "Person runs",
+      roles: [{ id: "Person_runs.runs", name: "runs", playerId: "Person" }],
+      readings: ["{0} runs"],
+    });
+    const c = model.addConstraint({
+      type: "exclusion",
+      roleIds: ["Person_smokes.smokes", "Person_runs.runs"],
+    });
+    const o = model.addObjectifiedFactType({ factTypeId: "Person_runs", objectTypeId: "Habit" });
+    const doc = plain(writeDocument40(model));
+    expect(doc.model.constraints[0].minted_from).toEqual(expect.any(String));
+    expect(doc.model.objectified_fact_types[0].minted_from).toEqual(expect.any(String));
+    model.removeConstraint(c);
+    model.removeObjectifiedFactType(o);
+    expect([model.mintedFromOf(c.id!), model.mintedFromOf(o.id!)]).toEqual([undefined, undefined]);
+  });
+
+  it("writes the key right after the id it names", () => {
+    const [subtypeFact] = plain(writeDocument40(smokers())).model.subtype_facts;
+    expect(Object.keys(subtypeFact).slice(0, 2)).toEqual(["id", "minted_from"]);
+  });
+
+  it("never passes a key to an element that states the id, in a model that admits a repeat", () => {
+    const model = smokers({ idsAcrossKinds: false });
+    model.addFactType({
+      id: "Person_runs",
+      name: "Person runs",
+      roles: [{ id: "Person_runs.runs", name: "runs", playerId: "Person" }],
+      readings: ["{0} runs"],
+    });
+    const a = model.addConstraint({
+      type: "exclusion",
+      roleIds: ["Person_smokes.smokes", "Person_runs.runs"],
+    });
+    expect(model.mintedFromOf(a.id!)).toBeDefined();
+    model.addConstraint({
+      id: a.id!,
+      type: "equality",
+      roleIds: ["Person_smokes.smokes", "Person_runs.runs"],
+    });
+    model.removeConstraint(a);
+    expect(model.mintedFromOf(a.id!)).toBeUndefined();
+  });
+
   it("refuses a key for an id nothing holds", () => {
     expect(() => smokers().recordMintedFrom("Nobody", "{}")).toThrow(/No element holds "Nobody"/);
   });

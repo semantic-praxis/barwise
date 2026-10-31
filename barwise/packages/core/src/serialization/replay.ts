@@ -29,7 +29,7 @@ import type { ConstraintInView } from "../model/constraintModel.js";
 import { toFactTypeConfig } from "../model/FactType.js";
 import type { FactType } from "../model/FactType.js";
 import { isMintable, mapConstraintReferences, type Reference } from "../model/mint.js";
-import { localName, ROLE_ID_PATTERN } from "../model/name.js";
+import { LOCAL_NAME_PATTERN, localName, ROLE_ID_PATTERN } from "../model/name.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectTypeConfig } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -80,9 +80,10 @@ export function replayInto40(source: OrmModel): OrmModel {
    * The constraint over the new ids, without its id when the model can name
    * it. One it cannot -- a malformed constraint, an internal one naming
    * another fact type's role -- keeps an id the replay states: its old one
-   * when nothing holds it, else one derived from it, so the replay gives one
-   * model for one input. (At the switch to the 4.0 writer such a constraint
-   * is left unnamed instead, 6b-2b-2b.)
+   * when it is a local name nothing holds, else one derived from it (a local
+   * name), so the replay gives one model for one input and a file 4.0 reads
+   * back. (At the switch to the 4.0 writer such a constraint is left unnamed
+   * instead, 6b-2b-2b-2.)
    */
   const remap = <C extends Constraint>(c: C, host: FactType | undefined): C => {
     const form = mapConstraintReferences(c, (ref: Reference) => to(ref.kind, ref.id));
@@ -103,7 +104,7 @@ export function replayInto40(source: OrmModel): OrmModel {
       target.idKindsHolding(id).length === 0 && !dangling.has(id) && !reshaped.has(id)
       && !kept.has(id);
     const take = (id: string) => (kept.add(id), id);
-    if (free(old)) return take(old);
+    if (LOCAL_NAME_PATTERN.test(old) && free(old)) return take(old);
     for (let n = 1;; n++) {
       const id = derivedId("replay.constraint", [old, String(n)]);
       if (free(id)) return take(id);

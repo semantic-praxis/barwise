@@ -140,7 +140,7 @@ export class OrmModel implements ConstraintModel {
 
   /**
    * The key each minted id was minted from (`mintedFromOf`), dropped when
-   * the last element holding the id goes.
+   * the last element holding the id goes or a second one takes it.
    */
   private readonly _mintedFrom = new Map<string, string>();
   /** Every id the stores hold, across kinds (`idIndex.ts`); each store keeps it. */
@@ -231,7 +231,9 @@ export class OrmModel implements ConstraintModel {
    * name was minted from here, or the one the 4.0 file it was read from
    * states beside it (`minted_from`, iri-identity decision 14). Undefined
    * for an id a person or a tool chose, which is never stale. It goes with
-   * the id when the last element holding it does.
+   * the id when the last element holding it does, and when a second element
+   * states the id, as a model that admits a repeat allows, so it never
+   * passes to the element that stated it.
    */
   mintedFromOf(id: string): string | undefined {
     return this._mintedFrom.get(id);

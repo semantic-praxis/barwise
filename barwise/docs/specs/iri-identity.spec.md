@@ -1554,10 +1554,13 @@ sites.
           and `minted_from` beside each id the model minted or read with
           one. The model keeps the key per id (`mintedFromOf`), set when
           it mints a name and by the 4.0 reader for each `minted_from` a
-          file states, and dropped when the last element holding the id
-          goes. A model that refuses ids across kinds (the 4.0 reader's
+          file states. The writer puts it right after the id. It is dropped
+          when the last element holding the id goes or a second element
+          states it, so it never passes to an id a person chose. A model that refuses ids across kinds (the 4.0 reader's
           and the replay's) leaves an unmintable constraint unnamed; any
-          other keeps the generated fallback until the switch. The
+          other keeps the generated fallback until the switch. The replay
+          keeps an unmintable constraint's old id only when it is a local
+          name, else a derived one, so what it writes 4.0 reads back. The
           required test from 6b-2b-1's review lands here: a lenient 4.0
           load of what cannot be minted gives the same model on every
           read. Every tracked model, replayed, writes a document the 4.0
@@ -1574,7 +1577,9 @@ sites.
           `orm-model-3.0.schema.json` and the 4.0 one renamed to
           `orm-model.schema.json` (the MCP schema resource moves with
           it); `planRead`'s two legacy slots, 3.x and 2.0 through the
-          replay; `serialize` writes 4.0; the constraint fallback dropped.
+          replay; `serialize` writes 4.0; the constraint fallback dropped, so
+          the replay too leaves an unmintable constraint unnamed rather
+          than keeping its old id; barwise-wcg.1tf settled first.
         - _6b-2b-2b-3, the fixture and golden churn_, if it does not fit
           in 6b-2b-2b-2.
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules

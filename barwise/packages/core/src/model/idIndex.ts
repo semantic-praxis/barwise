@@ -32,14 +32,17 @@ export class IdIndex {
   private readonly held = new Map<string, Map<IdKind, number>>();
 
   /**
-   * @param freed Told when the last holder of an id releases it, so what a
-   *   model keeps per id (the key a name was minted from) goes with it.
+   * @param unshared Told when an id stops naming one element alone: its
+   *   last holder released it, or a second element took it. What a model
+   *   keeps for the one element (the key its name was minted from) goes
+   *   then, so it never passes to an element that stated the id.
    */
-  constructor(private readonly freed: (id: string) => void = () => {}) {}
+  constructor(private readonly unshared: (id: string) => void = () => {}) {}
 
   /** One more element of `kind` holds `id`; an element with no id holds none. */
   hold(id: string | undefined, kind: IdKind): void {
     if (id === undefined) return;
+    if (this.held.has(id)) this.unshared(id);
     const kinds = this.held.get(id) ?? new Map<IdKind, number>();
     kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
     this.held.set(id, kinds);
@@ -57,7 +60,7 @@ export class IdIndex {
     else kinds.delete(kind);
     if (kinds.size === 0) {
       this.held.delete(id);
-      this.freed(id);
+      this.unshared(id);
     }
   }
 

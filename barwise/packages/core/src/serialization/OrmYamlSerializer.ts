@@ -424,11 +424,17 @@ export function writeDocument(model: OrmModel): OrmYamlDocument {
  */
 export function writeDocument40(model: OrmModel): OrmYamlDocument40 {
   // A constraint's written form types no id (`serializeConstraint` sets
-  // one when it has one), so the id is read off the record as written.
+  // one when it has one), so the id is read off the record as written; the
+  // key goes right after it, beside the id it names.
   const minted = <R extends object>(record: R): R & { minted_from?: string; } => {
     const id = (record as { readonly id?: string; }).id;
     const key = id === undefined ? undefined : model.mintedFromOf(id);
-    return key === undefined ? record : { ...record, minted_from: key };
+    if (key === undefined) return record;
+    return Object.fromEntries(
+      Object.entries(record).flatMap(([k, v]) =>
+        k === "id" ? [[k, v], ["minted_from", key]] : [[k, v]]
+      ),
+    ) as R & { minted_from: string; };
   };
   return documentOf(model, "4.0", {
     constraint: (c) => minted(serializeConstraint(c)),
