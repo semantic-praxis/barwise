@@ -43,7 +43,7 @@ const PROJECT = (version?: string, extra = "") =>
 ${extra}`;
 
 describe("format_version", () => {
-  it("is pinned by each schema to the constant its serializer stamps", () => {
+  it("is pinned by each schema to the constant its serializer stamps [adr:schema-versioning#version-signal]", () => {
     expect(schemaConst("orm-project.schema.json")).toBe(CURRENT_PROJECT_FORMAT_VERSION);
     expect(schemaConst("context-mapping.schema.json")).toBe(CURRENT_MAPPING_FORMAT_VERSION);
   });
@@ -73,7 +73,7 @@ describe("format_version", () => {
     expect(mappings.deserialize(MAPPING("1.0"), "m").sourceContext).toBe("crm");
   });
 
-  it("refuses a newer project file as newer, before the schema sees its fields", () => {
+  it("refuses a newer project file as newer, before the schema sees its fields [adr:schema-versioning#version-signal]", () => {
     // A 1.1 field this build does not know: the schema would call it an
     // additional property, and the version check must answer first.
     const yaml = PROJECT("1.1", "  future_field: x\n");

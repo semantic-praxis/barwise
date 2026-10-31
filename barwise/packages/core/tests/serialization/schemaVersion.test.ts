@@ -150,7 +150,7 @@ describe("planRead", () => {
     expect(planRead("3.0", gap)).toEqual({ ok: false, reason: "unregistered" });
   });
 
-  it("calls a 3.1 build that forgot its 3.0 step a bug in barwise", () => {
+  it("calls a 3.1 build that forgot its 3.0 step a bug in barwise [adr:schema-versioning#minor-and-major]", () => {
     expect(planRead("3.0", { ...AT_3_1, migrations: AT_3_1.migrations.slice(0, 2) })).toEqual({
       ok: false,
       reason: "unregistered",
@@ -193,7 +193,7 @@ describe("this build's versions", () => {
     expect(compareOrmVersions(CURRENT_MAJOR_FIRST_VERSION, LEGACY_ORM_VERSION)).toBeGreaterThan(0);
   });
 
-  it("reach the current version from its major's first through registered steps", () => {
+  it("reach the current version from its major's first through registered steps [adr:schema-versioning#minor-and-major]", () => {
     // Fails when a minor bump forgets its step: the earlier minor would be
     // refused. A step that skips a minor (3.0 to 3.2) still
     // passes here and leaves 3.1 files unreadable; nothing checks that.

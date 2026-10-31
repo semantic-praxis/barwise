@@ -41,7 +41,7 @@ describe("barwise merge", () => {
     expect(`${result.stdout}${result.stderr}`).toContain("ft-typo");
   });
 
-  it("leaves both inputs untouched", async () => {
+  it("leaves both inputs untouched [adr:schema-versioning#load-forward]", async () => {
     // The destructive default is the risk this command carries, so the
     // absence of writes is asserted directly rather than assumed. The
     // MCP tool writes back to its base file; this deliberately does not.

@@ -6473,7 +6473,7 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
  * disagreement is seen. Returns the directory and how many manifests it
  * copied, so no count is restated here.
  */
-function architectureRepo({ declared = true } = {}) {
+function architectureRepo() {
   const dir = tempRepo();
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
@@ -6494,21 +6494,17 @@ function architectureRepo({ declared = true } = {}) {
   let declaring = 0;
   for (const rel of adrList.split("\0").filter(Boolean)) {
     const text = readFileSync(join(REPO, rel), "utf8");
-    if (!parseEnforcedBy(text).present) {
-      copy(rel);
-      continue;
-    }
+    assert.ok(parseEnforcedBy(text).present, `${rel}: has no Enforced-by: header to rewrite`);
     const ids = decisionIds(text).decisions.map((d) => d.id);
     // Enforced-by: is the last header field (check:architecture holds it to
-    // that), so it runs to the blank line. With `declared: false` the header
-    // goes, for a case that needs a tree where no ADR declares.
-    const value = declared ? `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n` : "";
+    // that, and requires it), so it runs to the blank line.
+    const value = `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n`;
     const rewritten = text.replace(/^Enforced-by:[^]*?\n(?=\n)/m, value);
     assert.notEqual(rewritten, text, `${rel}: its Enforced-by: header was not rewritten`);
     stage(dir, rel, rewritten);
     declaring += 1;
   }
-  if (declaring > 0 && declared) {
+  if (declaring > 0) {
     stage(dir, ".beads/issues.jsonl", '{"id":"barwise-fx1","status":"open","title":"fixture"}\n');
   }
   let manifests = 0;
@@ -6537,7 +6533,7 @@ function architectureRepo({ declared = true } = {}) {
     );
   }
   execFileSync("git", ["commit", "-qm", "inputs"], { cwd: dir });
-  return { dir, manifests, declaring: declared ? declaring : 0 };
+  return { dir, manifests, declaring };
 }
 
 const ARCH_CMD = [process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
@@ -7023,8 +7019,10 @@ function stageAdr(dir, name, text) {
   stage(dir, "barwise/docs/ARCHITECTURE.md", readFileSync(doc, "utf8"));
 }
 
-const ADR_OK = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n\n"
-  + "## Context\n\nWhy.\n\n## Decision\n\nThe rule.\n\n## Consequences\n\nWhat follows.\n";
+const ADR_OK = "# A concern\n\nScope: process\nDate: 2026-10-24\nTracking: barwise-ubc\n"
+  + "Enforced-by: none (barwise-fx1: the-rule)\n\n"
+  + "## Context\n\nWhy.\n\n## Decision\n\n1. **The rule.** {#the-rule} It holds.\n\n"
+  + "## Consequences\n\nWhat follows.\n";
 
 test("check:architecture checks each ADR's shape", () => {
   const { dir } = architectureRepo();
@@ -7580,16 +7578,24 @@ test("check:architecture refuses, exit 2, only where it cannot tell, and lists i
   }
 });
 
-test("check:architecture does not read ci.yml, scripts or the tracker for an ADR without Enforced-by:", () => {
-  // A tree where no ADR declares: no ci.yml, root package.json or tracker,
-  // and an ADR with no header needs none of them, so none is a refusal.
-  const { dir } = architectureRepo({ declared: false });
+test("check:architecture requires Enforced-by:, and reads no ci.yml or scripts when no ADR declares a gate", () => {
+  // The fixture has no ci.yml or root package.json, and every ADR in it
+  // declares `none` only, which needs neither, so neither is a refusal.
+  const { dir, declaring } = architectureRepo();
   try {
     stageAdr(dir, "a-concern", ADR_OK);
     execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-    assert.match(ok.stdout, /; 0 declare Enforced-by:/);
+    assert.match(ok.stdout, new RegExp(`; ${declaring + 1} declare Enforced-by:`));
+    // An ADR without the header is a finding naming it, not a skip.
+    const bare = archPlanted(
+      dir,
+      "barwise/docs/adr/a-concern.md",
+      (s) => s.replace("Enforced-by: none (barwise-fx1: the-rule)\n", ""),
+    );
+    assert.equal(bare.status, 1, bare.stdout + bare.stderr);
+    assert.match(bare.stderr, /a-concern\.md: no Enforced-by: header/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -130,7 +130,7 @@ describe("Ossie export: the pinned flights example", () => {
     expect(result.constraintSpecs).toBeUndefined();
   });
 
-  it("comes back equal in every construct the import did not warn about, compared by meaning", () => {
+  it("comes back equal in every construct the import did not warn about, compared by meaning [adr:ossie-interchange#nothing-lost-silently]", () => {
     const original = parse(source) as OssieDocument;
     // A value-type chain is flattened on import, with a warning naming it.
     const flattened = new Set(
