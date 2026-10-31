@@ -100,7 +100,8 @@ export function replayInto40(source: OrmModel): OrmModel {
   const kept = new Set<string>();
   const freeId = (old: string): string => {
     const free = (id: string) =>
-      target.idKindsHolding(id).length === 0 && !dangling.has(id) && !kept.has(id);
+      target.idKindsHolding(id).length === 0 && !dangling.has(id) && !reshaped.has(id)
+      && !kept.has(id);
     const take = (id: string) => (kept.add(id), id);
     if (free(old)) return take(old);
     for (let n = 1;; n++) {
@@ -116,8 +117,10 @@ export function replayInto40(source: OrmModel): OrmModel {
   // A dangling role reference 4.0 could not read back, as a 3.0 fragment
   // naming another file's role holds, takes `unresolved.<local name>`:
   // still dangling, so validation still reports it, and the old id still
-  // legible in the new one (owner, 2026-10-31). `unresolved` is reserved,
-  // so no fact type the replay names takes it and makes the role resolve.
+  // legible in the new one (owner, 2026-10-31). `unresolved` is reserved
+  // when one is reshaped, so no fact type the replay names takes it and
+  // makes the role resolve; a model with none keeps a fact type of that
+  // name as it is.
   const reshaped = new Set<string>();
   for (const old of [...danglingRoles].sort()) {
     if (ROLE_ID_PATTERN.test(old)) continue;
@@ -127,7 +130,8 @@ export function replayInto40(source: OrmModel): OrmModel {
     reshaped.add(id);
     mapOf("role").set(old, id);
   }
-  target.withReserved([...dangling, ...reshaped, UNRESOLVED], () => {
+  const reserved = reshaped.size > 0 ? [...dangling, ...reshaped, UNRESOLVED] : dangling;
+  target.withReserved(reserved, () => {
     // Object types first: everything else refers to them. A shadow, which
     // holds another domain's element, takes `<context>:<local name>`, its
     // context a local name too, as a 4.0 alias is.

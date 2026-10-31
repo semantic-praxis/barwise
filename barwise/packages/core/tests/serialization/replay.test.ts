@@ -372,8 +372,10 @@ model:
       roles: [{ id: "r1", name: "a", playerId: "x1" }, { id: "r2", name: "b", playerId: "x1" }],
       readings: ["{0} a {1}"],
     });
+    // Unmintable (a role dangles), so it keeps its old id unless something
+    // holds it -- here the reshaped reference does.
     source.addConstraint({
-      id: "c1",
+      id: "unresolved.r-elsewhere",
       type: "subset",
       subsetRoleIds: ["r1"],
       supersetRoleIds: ["r-elsewhere", "Other.role"],
@@ -386,6 +388,19 @@ model:
     });
     expect(model.factTypesHolding(["unresolved.r-elsewhere"])).toEqual([]);
     expect(model.priorIds!.get("unresolved.r-elsewhere")).toBe("r-elsewhere");
+    expect(model.constraints[0]!.id).not.toBe("unresolved.r-elsewhere");
+  });
+
+  it("leaves a fact type named unresolved alone when nothing is reshaped", () => {
+    const source = new OrmModel({ name: "Clean" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "f1",
+      name: "unresolved",
+      roles: [{ id: "r1", name: "a", playerId: "x1" }],
+      readings: ["{0} a"],
+    });
+    expect(replayInto40(source).factTypes[0]!.id).toBe("unresolved");
   });
 
   it("gives one model for one input, on every run", () => {

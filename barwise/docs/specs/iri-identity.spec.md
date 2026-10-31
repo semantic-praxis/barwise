@@ -1380,7 +1380,10 @@ version-1 manifest would go silently empty for impact analysis.
   population) takes the model's suffix rule in place of `mergedId`'s
   UUIDv8 (`:830-840`, `MERGE_ID_TAG`), reported; a clash between two
   stated ids, now across kinds, is refused by `refuseNameClashes`
-  (`:895-925`, one kind today). Split gives each shadow the id
+  (`:895-925`, one kind today). Required test, from 6b-2b-2b-1's
+  review: a merged or split model, written as 4.0, keeps the
+  `minted_from` of each element it kept with its id; both rebuild a
+  fresh model today, which carries no key across. Split gives each shadow the id
   `<owner>:<the owner's id>`, which can differ from `localName(name)` (a
   suffixed id, a name edited without a rename), and rewrites every reference to it in the
   domain (role players, subtype ends, `objectified.object_type`), emits
@@ -1562,7 +1565,8 @@ sites.
           dangling role reference a strict 3.0 load admits (a constraint's
           roles are not checked) in a shape 4.0 refuses; the replay gives
           such a reference `unresolved.<local name>`, with `unresolved`
-          reserved, so it still dangles and validation still reports it
+          reserved when one is reshaped, so it still dangles and
+          validation still reports it
           (owner, 2026-10-31). Only role references are reshaped: no
           tracked file today's loader accepts holds another kind of
           dangling reference 4.0 refuses (barwise-wcg.1tf tracks the rest).

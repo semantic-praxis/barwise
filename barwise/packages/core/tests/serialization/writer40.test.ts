@@ -131,8 +131,18 @@ describe("writing a format 4.0 document", () => {
       { type: "external_uniqueness", roles: ["nowhere.a", "nowhere.b"] },
     ]);
     expect(validate(doc)).toBe(true);
-    // The 3.0 writer cannot state it, and says why.
+    // The 3.0 writer cannot state either, and says why.
+    expect(() => writeDocument(model)).toThrow(/Format 3\.0 states every constraint's id/);
+    model.removeConstraint(model.constraints[0]!);
     expect(() => writeDocument(model)).toThrow(/Format 3\.0 states every subtype fact's id/);
+  });
+
+  it("refuses to write an unnamed constraint as 3.0, which states every id", () => {
+    const model = new OrmModel({ name: "M", idsAcrossKinds: true });
+    model.addConstraint({ type: "external_uniqueness", roleIds: ["nowhere.a", "nowhere.b"] });
+    expect(() => writeDocument(model)).toThrow(
+      /Format 3\.0 states every constraint's id, and this external_uniqueness constraint has none/,
+    );
   });
 
   it("gives one model on every lenient read of what cannot be named", () => {

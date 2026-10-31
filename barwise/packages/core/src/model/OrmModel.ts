@@ -138,12 +138,12 @@ export class OrmModel implements ConstraintModel {
   private _note: string | undefined;
   private _namespace: string | undefined;
 
-  /** Every id the stores hold, across kinds (`idIndex.ts`); each store keeps it. */
   /**
    * The key each minted id was minted from (`mintedFromOf`), dropped when
    * the last element holding the id goes.
    */
   private readonly _mintedFrom = new Map<string, string>();
+  /** Every id the stores hold, across kinds (`idIndex.ts`); each store keeps it. */
   private readonly _ids = new IdIndex((id) => this._mintedFrom.delete(id));
   private readonly _objectTypes = new IdKeyedStore<ObjectType>("object type", this._ids);
   private readonly _factTypes = new IdKeyedStore<FactType>("fact type", this._ids);
