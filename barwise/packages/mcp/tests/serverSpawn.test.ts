@@ -31,7 +31,7 @@ describe("MCP server stdio spawn", () => {
     await client?.close();
   });
 
-  it("answers the handshake and lists every registered tool", async () => {
+  it("answers the handshake and lists every registered tool [adr:surface-capability-parity#pinned-tool-lists]", async () => {
     // The complete list, not a sample: with four names sampled, the
     // whole suite stayed green while `review_model` and `merge_models`
     // were unregistered (the 2026-08-25 assertion audit ran exactly

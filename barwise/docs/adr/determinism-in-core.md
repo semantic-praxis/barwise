@@ -5,6 +5,9 @@ Date: 2026-10-24
 Tracking: barwise-ubc, docs/specs/archive/uuid7-identifiers.spec.md,
 docs/specs/uuid7-generator-factory.spec.md,
 docs/specs/archive/architecture-analysis.spec.md
+Enforced-by: npm run purity (pure-ops, ambient-as-argument),
+none (barwise-ym8.lxl: pure-ops), none (barwise-ym8.r6i: ambient-as-argument),
+none (barwise-ym8.kys: one-layer-out), none (barwise-ym8.sit: mint-on-create)
 
 ## Context
 
@@ -23,23 +26,23 @@ architecture-analysis spec.
 
 ## Decision
 
-1. **Core's operations are deterministic.** Validation, verbalization,
+1. **Core's operations are deterministic.** {#pure-ops} Validation, verbalization,
    mapping, diff and query return the same output for the same input
    on any machine: no file system, subprocess, network, environment
    variable, working directory, locale, clock, random number or LLM
    SDK in `barwise/packages/core/src`. Orderings use a fixed comparison
    (code-unit order, or a collator with an explicit locale), never the
    process locale.
-2. **Non-determinism lives one layer out.** A capability that cannot be
+2. **Non-determinism lives one layer out.** {#one-layer-out} A capability that cannot be
    deterministic goes in an outer package: `@barwise/llm` for model
    calls, a connector package (`@barwise/formats`, `@barwise/dbt`,
    `@barwise/code-analysis`) for a format that owns its own I/O, and
    the tool layer (`cli`, `mcp`, `vscode`) for anything else.
 3. **When core needs a clock or randomness, it takes it as an
-   argument.** The logic stays in core and the ambient source stays at
+   argument.** {#ambient-as-argument} The logic stays in core and the ambient source stays at
    the surface: `createUuidv7Generator({ now, randomBytes })` is the
    worked example, installed by each surface with `setIdGenerator(...)`.
-4. **Ids are minted only when an element is created.** `generateId()`
+4. **Ids are minted only when an element is created.** {#mint-on-create} `generateId()`
    is the one ambient source core keeps: with no generator installed it
    falls back to `randomUUID()` (v4), which reads no clock. An
    operation's output may depend on which ids its input carries -- diff
