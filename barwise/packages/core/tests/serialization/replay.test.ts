@@ -8,6 +8,7 @@
  * that hold ids are mapped, so a name equal to some new id stays a name.
  */
 import { describe, expect, it } from "vitest";
+import { diffModels } from "../../src/diff/ModelDiff.js";
 import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
 import type { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument } from "../../src/serialization/OrmYamlSerializer.js";
@@ -169,6 +170,61 @@ model:
       elements: ["Student", "catalog:Course"],
       positions: { Student: { x: 1, y: 2 } },
     });
+  });
+
+  it("lets diff pair two replayed revisions of one file by their old ids", () => {
+    const revision = (cardName: string, ownMax: string, exclusion: string) =>
+      replayInto40(new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: u1, name: Customer, kind: entity, reference_mode: nr }
+    - { id: u2, name: ${cardName}, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: f1
+      name: Customer owns ${cardName}
+      roles:
+        - { id: r1, player: u1, role_name: owns }
+        - { id: r2, player: u2, role_name: is owned by }
+      readings: ["{0} owns {1}"]
+      constraints:
+        - { id: c1, type: ${ownMax} }
+    - id: f2
+      name: Customer lends ${cardName}
+      roles:
+        - { id: r3, player: u1, role_name: lends }
+        - { id: r4, player: u2, role_name: is lent by }
+      readings: ["{0} lends {1}"]
+  constraints:
+    - { id: x1, type: exclusion, roles: [r1, r3]${exclusion} }
+`)).model;
+    // The second revision renames the card and changes the constraint, so
+    // every replayed id that names them differs between the two.
+    const before = revision("Card", "internal_uniqueness, roles: [r2]", "");
+    const after = revision(
+      "Voucher",
+      "internal_uniqueness, roles: [r1, r2]",
+      ", modality: deontic",
+    );
+    expect(before.getObjectType("Card")).toBeDefined();
+    expect(after.getObjectType("Voucher")).toBeDefined();
+    const deltas = diffModels(before, after).deltas
+      .filter((d) => d.kind !== "unchanged")
+      .map((d) => [d.elementType, d.kind]);
+    // Paired through the old ids: a change each, nothing removed or added
+    // (a fact type's own constraint changes with its fact type).
+    expect(deltas).toEqual([
+      ["object_type", "modified"],
+      ["fact_type", "modified"],
+      ["fact_type", "modified"],
+      ["constraint", "modified"],
+    ]);
+    // Without the old ids, the same two models pair by name and lose them.
+    const plain = (m: OrmModel) =>
+      new OrmYamlSerializer().deserialize(new OrmYamlSerializer().serialize(m));
+    expect(diffModels(plain(before), plain(after)).deltas.some((d) => d.kind === "removed")).toBe(
+      true,
+    );
   });
 
   it("gives one model for one input, on every run", () => {
