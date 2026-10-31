@@ -17,7 +17,7 @@
  * 4.0 model does. Its map back to the old ids stays on it in memory, never
  * written, for diff to pair two replayed revisions exactly.
  *
- * Not yet reached by the loader: 6b-2b-2b switches \`deserialize\` to it.
+ * The loader replays every 3.0 and 2.0 file through it (6b-2b-2b-2).
  */
 import {
   type ConstraintFileValue,
@@ -25,10 +25,8 @@ import {
   modelConstraint,
 } from "../decode/constraint.js";
 import type { Constraint, ExternalConstraint, InternalConstraint } from "../model/Constraint.js";
-import type { ConstraintInView } from "../model/constraintModel.js";
 import { toFactTypeConfig } from "../model/FactType.js";
-import type { FactType } from "../model/FactType.js";
-import { isMintable, mapConstraintReferences, type Reference } from "../model/mint.js";
+import { mapConstraintReferences, type Reference } from "../model/mint.js";
 import {
   LOCAL_NAME_PATTERN,
   localName,
@@ -40,7 +38,6 @@ import type { ObjectTypeConfig } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { toPopulationConfig } from "../model/Population.js";
 import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
-import { derivedId } from "./derivedId.js";
 
 /** Which element an old id names: a 3.x file may give two kinds one id. */
 type Kind =
@@ -82,38 +79,19 @@ export function replayInto40(source: OrmModel): OrmModel {
   const toElement = (id: string) => mapOf("objectType").get(id) ?? to("factType", id);
 
   /**
-   * The constraint over the new ids, without its id when the model can name
-   * it. One it cannot -- a malformed constraint, an internal one naming
-   * another fact type's role -- keeps an id the replay states: its old one
-   * when it is a local name nothing holds, else one derived from it (a local
-   * name), so the replay gives one model for one input and a file 4.0 reads
-   * back. (At the switch to the 4.0 writer such a constraint is left unnamed
-   * instead, 6b-2b-2b-2.)
+   * The constraint over the new ids, without its id: the model names it
+   * from its sentence, and leaves one it cannot -- a malformed constraint,
+   * an internal one naming another fact type's role -- unnamed, as it does
+   * a subtype fact or objectification whose references dangle (decision
+   * 19). A reference to such a constraint, a preferred identifier, then
+   * names nothing, and validation reports it.
    */
-  const remap = <C extends Constraint>(c: C, host: FactType | undefined): C => {
+  const remap = <C extends Constraint>(c: C): C => {
     const form = mapConstraintReferences(c, (ref: Reference) => to(ref.kind, ref.id));
     const { id: _dropped, ...rest } = modelConstraint(
       constraintRecord({ ...form, id: "" } as unknown as ConstraintFileValue),
     );
-    if (c.id === undefined) return rest as unknown as C;
-    if (isMintable({ kind: "constraint", inView: [rest, host] as ConstraintInView }, target)) {
-      return rest as unknown as C;
-    }
-    return { ...rest, id: freeId(c.id) } as unknown as C;
-  };
-  // Ids handed out but not yet added: one fact type's constraints are all
-  // remapped before any is added, so the model cannot see them yet.
-  const kept = new Set<string>();
-  const freeId = (old: string): string => {
-    const free = (id: string) =>
-      target.idKindsHolding(id).length === 0 && !dangling.has(id) && !reshaped.has(id)
-      && !kept.has(id);
-    const take = (id: string) => (kept.add(id), id);
-    if (LOCAL_NAME_PATTERN.test(old) && free(old)) return take(old);
-    for (let n = 1;; n++) {
-      const id = derivedId("replay.constraint", [old, String(n)]);
-      if (free(id)) return take(id);
-    }
+    return rest as unknown as C;
   };
 
   // Every reference the old model does not resolve, reserved for the whole
@@ -175,8 +153,7 @@ export function replayInto40(source: OrmModel): OrmModel {
           idFromFirstReading: by !== undefined && localName(ft.name) === to("objectType", by),
           constraintsOver: (roleIds) => {
             ft.roles.forEach((r, i) => record("role", r.id, roleIds[i]));
-            const host = target.factTypesHolding([roleIds[0]!])[0];
-            return (constraints ?? []).map((c) => remap(c as InternalConstraint, host));
+            return (constraints ?? []).map((c) => remap(c as InternalConstraint));
           },
         },
       );
@@ -203,7 +180,7 @@ export function replayInto40(source: OrmModel): OrmModel {
       record(
         "constraint",
         c.id,
-        target.addConstraint(remap(c as ExternalConstraint, undefined)).id,
+        target.addConstraint(remap(c as ExternalConstraint)).id,
       );
     }
 

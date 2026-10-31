@@ -143,8 +143,8 @@ it, so knip sees an unused file where there is a live edge.
   model) and
   `OrmModel.getConstraint`. Since WS3c the model stores the external kinds
   (`OrmModel.addConstraint`); a fact type holds only its own, and a
-  save writes format 3.0, which lists the external ones in
-  `model.constraints` (`docs/specs/orm-format-3.spec.md`, WS3 and WS4). `FactType.addConstraint`
+  save writes format 4.0, which lists the external ones in
+  `model.constraints`, as 3.0 did (`docs/specs/orm-format-3.spec.md`, WS3 and WS4). `FactType.addConstraint`
   and `FactTypeConfig.constraints` take the internal kinds only, pinned by
   `tests/types/constraintPlacement.test-d.ts`, and refuse an external one at
   run time as well, for a value whose type was asserted: one stored there
@@ -153,14 +153,18 @@ it, so knip sees an unused file where there is a live edge.
   and it splits them after deriving ids.
 - **An entity names its preferred identifier; nothing infers it.** The
   model stores a constraint id per entity (`OrmModel.preferredIdentifierOf`,
-  written as `preferred_identifier` in 3.0), and every reader asks
+  written as `preferred_identifier` since 3.0), and every reader asks
   `preferredIdentifiers(model)`, which keeps a reference only when
   `resolvePreferredIdentifier` says the constraint identifies that entity.
   The 2.0 `is_preferred` flag is read once, by `readDocument20` and the
   llm parser through `storePreferredFlags`; do not add a reader that
   looks for a flag, because no constraint carries one any more. A file
   below 3.0 is read by the 2.0 reader against the frozen
-  `schemas/orm-model-2.0.schema.json`, and saved as 3.0.
+  `schemas/orm-model-2.0.schema.json`, a 3.0 file by the frozen 3.0
+  decoders, and either is replayed into format 4.0's ids
+  (`serialization/replay.ts`) and saved as 4.0. The model keeps the 3.x ids
+  in memory (`priorIds`, `idFromPrior`) for diff and for a 3.x-era
+  reference from another file (a tutorial step, a lineage export).
 - **A held id is refused, not replaced.** The five id-keyed stores
   (object types, fact types, subtype facts, objectifications,
   populations) are `Map`s, and `set` overwrites without a word, so each
@@ -206,12 +210,14 @@ it, so knip sees an unused file where there is a live edge.
 - Serialization round-trips must be lossless. Any new model field must
   have a corresponding serialization path and a round-trip test.
 - JSON Schemas in `schemas/` are first-class artifacts, read by editors
-  and by LLM clients through the MCP server. A 3.0 file is validated on
+  and by LLM clients through the MCP server. A 4.0 file is validated on
   load by the decoders in `src/decode/`, not by `orm-model.schema.json`, so
   the two are copies that must agree: each decoder has a drift test against
   the schema (`tests/decode/*SchemaDrift.test.ts`), until WS1b part C
   generates the file from the Schemas. Keep both in sync with the
-  serializers. The frozen 2.0 schema still validates a 2.0 file on load.
+  serializers. The frozen 2.0 schema still validates a 2.0 file on load;
+  the frozen `orm-model-3.0.schema.json` keeps its own drift tests against
+  the 3.0 decoders, which still read a 3.0 file.
 
 ## Testing
 

@@ -14,7 +14,6 @@ import { OrmModel } from "../../src/model/OrmModel.js";
 import {
   OrmYamlSerializer,
   readDocument40,
-  writeDocument,
   writeDocument40,
 } from "../../src/serialization/OrmYamlSerializer.js";
 import { replayInto40 } from "../../src/serialization/replay.js";
@@ -67,7 +66,49 @@ function mapIds(value: unknown, back: (id: string) => string, field?: string): u
 /** Each old id to the id it now has, from the model's map back. */
 const oldToNew = (model: OrmModel) => new Map([...model.priorIds!].map(([now, old]) => [old, now]));
 
-const asText = (model: OrmModel) => JSON.parse(JSON.stringify(writeDocument(model)));
+/**
+ * The model as a 3.0-shaped document: the 4.0 writer's, which has 3.0's
+ * layout, without the keys a name was minted from, which 3.0 has no field
+ * for. The 4.0 writer, because a constraint the replay leaves unnamed has
+ * no id, which the 3.0 writer refuses.
+ */
+const asText = (model: OrmModel) => {
+  const strip = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(strip)
+      : v !== null && typeof v === "object"
+      ? Object.fromEntries(
+        Object.entries(v).filter(([k]) => k !== "minted_from").map(([k, x]) => [k, strip(x)]),
+      )
+      : v;
+  const doc = strip(JSON.parse(JSON.stringify(writeDocument40(model)))) as Record<string, unknown>;
+  return { ...doc, orm_version: "3.0" };
+};
+
+/** The document without the ids of the constraints the replay left unnamed. */
+function withoutUnnamed(doc: Record<string, any>, model: OrmModel): Record<string, any> {
+  const named = new Set(model.priorIds!.values());
+  const drop = (c: Record<string, unknown>) => {
+    if (typeof c.id !== "string" || named.has(c.id)) return c;
+    const { id: _unnamed, ...rest } = c;
+    return rest;
+  };
+  return {
+    ...doc,
+    model: {
+      ...doc.model,
+      ...(doc.model.fact_types
+        ? {
+          fact_types: doc.model.fact_types.map((ft: Record<string, any>) => ({
+            ...ft,
+            ...(ft.constraints ? { constraints: ft.constraints.map(drop) } : {}),
+          })),
+        }
+        : {}),
+      ...(doc.model.constraints ? { constraints: doc.model.constraints.map(drop) } : {}),
+    },
+  };
+}
 
 describe("replaying a 3.x model into format 4.0", () => {
   const corpus = modelCorpus();
@@ -84,7 +125,9 @@ describe("replaying a 3.x model into format 4.0", () => {
       const ids = oldToNew(model);
       const prior = model.priorIds!;
       const back = (id: string) => prior.get(id) ?? id;
-      expect(mapIds(asText(model), back)).toEqual(c.doc);
+      // A constraint the model cannot name is left unnamed (decision 19), so
+      // its id is the one thing the replayed model does not state.
+      expect(mapIds(asText(model), back)).toEqual(withoutUnnamed(c.doc, model));
       // And the ids are 4.0's: a replay that kept the old ones would pass
       // the line above with an empty map.
       const off = [
@@ -160,12 +203,15 @@ model:
       r3: "Student_enrolls_in_Course.is_in",
       r4: "Student_enrolls_in_Course.is_in_2",
       c1: "For_each_Nr,_at_most_one_Student_has_that_Nr",
-      // An internal constraint naming another fact type's role cannot be
-      // named, so it keeps its old id.
-      bad: "bad",
       p1: "Student_has_Nr.population",
       i1: "Student_has_Nr.population.1",
     });
+    // An internal constraint naming another fact type's role cannot be
+    // named, so it is left unnamed (decision 19), and has no new id.
+    expect(ids.has("bad")).toBe(false);
+    expect(
+      model.getFactType("Student_enrolls_in_Course")!.internalConstraints.map((c) => c.id),
+    ).toContain(undefined);
     expect(model.getFactType("Student_enrolls_in_Course")!.name).toBe("Enrollment");
     expect(model.preferredIdentifierOf("Student")).toBe(
       "For_each_Nr,_at_most_one_Student_has_that_Nr",
@@ -279,7 +325,7 @@ model:
     expect(new Set(kept).size).toBe(kept.length);
   });
 
-  it("replays one fact type's two unnamable constraints sharing an id, as a 2.0 file may hold them", () => {
+  it("leaves one fact type's two unnamable constraints sharing an id both unnamed", () => {
     const source = new OrmModel({ name: "Rings" });
     source.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "nr" });
     source.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "nr" });
@@ -297,9 +343,9 @@ model:
       readings: ["{0} r {1}"],
       constraints: [ring, { ...ring, ringType: "acyclic" }],
     });
+    // A 2.0 file may hold them; a ring over two players has no sentence.
     const ids = replayInto40(source).factTypes[0]!.internalConstraints.map((c) => c.id);
-    expect(ids[0]).toBe("k");
-    expect(new Set(ids).size).toBe(2);
+    expect(ids).toEqual([undefined, undefined]);
   });
 
   it("leaves a reference to a subtype fact it leaves unnamed dangling (decisions 17 and 19)", () => {
@@ -394,7 +440,7 @@ model:
     expect(model.constraints[0]!.id).not.toBe("unresolved.r-elsewhere");
   });
 
-  it("keeps an unmintable constraint's old id only when 4.0 can read it back", () => {
+  it("leaves an unmintable constraint unnamed, whatever its old id", () => {
     const source = new OrmModel({ name: "Rings" });
     source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
     source.addObjectType({ id: "x2", name: "Dog", kind: "entity", referenceMode: "nr" });
@@ -413,10 +459,10 @@ model:
         { id: "ring-2", type: "ring", roleId1: "r1", roleId2: "r2", ringType: "asymmetric" },
       ],
     });
-    const ids = replayInto40(source).factTypes[0]!.internalConstraints.map((c) => c.id!);
-    expect(ids[1]).toBe("ring-2");
-    expect(ids[0]).not.toBe("ring.1");
-    expect(ids.every((id) => LOCAL_NAME_PATTERN.test(id))).toBe(true);
+    // Neither a 4.0-shaped old id (ring-2) nor one 4.0 refuses (ring.1) is
+    // kept: the model names a constraint, and one it cannot is unnamed.
+    const ids = replayInto40(source).factTypes[0]!.internalConstraints.map((c) => c.id);
+    expect(ids).toEqual([undefined, undefined]);
   });
 
   it("gives a dangling reference of any kind 4.0 could not read its local name, still dangling", () => {

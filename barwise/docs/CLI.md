@@ -262,7 +262,7 @@ Options:
 
 ### migrate
 
-Rewrite `.orm.yaml` files in place as the current format (3.0).
+Rewrite `.orm.yaml` files in place as the current format (4.0).
 
 ```sh
 barwise migrate model.orm.yaml
@@ -270,10 +270,11 @@ barwise migrate domains/*.orm.yaml
 barwise migrate --check models/*.orm.yaml
 ```
 
-Every barwise build reads older files without this command: a 2.0 file
-loads unchanged and is written as 3.0 on its next save. `migrate` does
-that rewrite for every named file at once, and says what reading each
-one changed beyond the format. A 2.0 `is_preferred` flag that identifies
+Every barwise build reads older files without this command: a 3.0 or 2.0
+file loads, its ids replayed into 4.0's local names (a UUID becomes the
+name the element's rule gives), and is written as 4.0 on its next save.
+`migrate` does that rewrite for every named file at once, and says what
+reading each one changed beyond the format. A 2.0 `is_preferred` flag that identifies
 no entity type is dropped, and of two flags that name one entity type,
 one is kept. Each is printed under its file. Run `barwise validate` with
 your 2.x build first if you want to see those cases before they are
@@ -281,9 +282,9 @@ resolved.
 
 This is one of the two commands that modify their inputs, with `rename`. The file is written
 from the model, so YAML comments and hand layout in it are not kept. A
-file already at 3.0 is left untouched. A file is not written, and is
-reported, when it cannot be read or does not load, when its 3.0 form would
-not load back (2.0 allowed two constraints to share an id), or when it
+file already at 4.0 is left untouched. A file is not written, and is
+reported, when it cannot be read or does not load, when its 4.0 form would
+not load back, or when it
 names elements it does not define (a fragment) and carries `is_preferred`
 flags, which cannot be placed without the rest of the model. The rest are still migrated.
 A file is also refused when `<file>.migrating` already exists beside it:
