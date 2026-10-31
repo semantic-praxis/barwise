@@ -635,7 +635,32 @@ export function mergeModels(
   // Phase 7: the one kind the diff deliberately does not model.
   carryUnmodelledElements(merged, existing);
 
+  // Phase 8: the key each minted id was minted from (iri-identity decision
+  // 14). The merged model is built fresh and holds none, and a merge that
+  // dropped them would turn every minted name into one a person chose, never
+  // reported stale.
+  carryMintedKeys(merged, existing, incoming);
+
   return merged;
+}
+
+/**
+ * Give each id the merged model holds the key it was minted from: the
+ * base's for an id the base holds, which is what a kept or modified
+ * element keeps (iri-identity 6d), else the incoming side's, for an element
+ * the merge added. An id the merged model minted itself already has its own.
+ */
+function carryMintedKeys(merged: OrmModel, existing: OrmModel, incoming: OrmModel): void {
+  const ids = [
+    ...merged.everyConstraint().map(([c]) => c.id),
+    ...merged.subtypeFacts.map((sf) => sf.id),
+    ...merged.objectifiedFactTypes.map((o) => o.id),
+  ];
+  for (const id of ids) {
+    if (id === undefined || merged.mintedFromOf(id) !== undefined) continue;
+    const key = existing.mintedFromOf(id) ?? incoming.mintedFromOf(id);
+    if (key !== undefined) merged.recordMintedFrom(id, key);
+  }
 }
 
 /**

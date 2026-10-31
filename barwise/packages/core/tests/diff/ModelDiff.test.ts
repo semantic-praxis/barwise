@@ -13,7 +13,8 @@
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
+import { OrmYamlSerializer, writeDocument } from "../../src/serialization/OrmYamlSerializer.js";
+import { stringify } from "yaml";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 import { loadNestedUnder } from "../helpers/nestedUnder.js";
 import { placeFlags } from "../helpers/placeFlags.js";
@@ -1657,13 +1658,16 @@ describe("a constraint over roles of other fact types", () => {
   // The same model with every role id replaced, as an import mints them.
   // The ids are read from the model, not matched by a pattern, so a change
   // to the builder's id format cannot leave this rewriting nothing.
+  // Through 3.0 text and the frozen reader: these models hold ids 4.0
+  // refuses (a role id two fact types share), and the subject is diff.
+  const text30 = (m: OrmModel) => stringify(writeDocument(m));
+  const read30 = (text: string) => new OrmYamlSerializer().deserializeAsWritten(text);
   const withNewRoleIds = (m: OrmModel) => {
-    const yaml = new OrmYamlSerializer();
-    let text = yaml.serialize(m);
+    let text = text30(m);
     for (const [i, id] of m.factTypes.flatMap((ft) => ft.roles.map((r) => r.id)).entries()) {
       text = text.split(id).join(`minted-role-${i}`);
     }
-    return yaml.deserialize(text);
+    return read30(text);
   };
   // A constraint across fact types has its own delta since WS3c; read an
   // added or removed one as the change kind a fact type used to report.
@@ -1708,11 +1712,10 @@ describe("a constraint over roles of other fact types", () => {
     // the other. With the raw id, regenerated ids read as a change, which
     // is the conservative answer.
     const ambiguous = (m: OrmModel) => {
-      const yaml = new OrmYamlSerializer();
-      const text = yaml.serialize(m);
+      const text = text30(m);
       const id = m.getFactTypeByName("Room is in Building")!.roles[1]!.id;
       const other = m.getFactTypeByName("Room has RoomName")!.roles[1]!.id;
-      return yaml.deserialize(text.split(other).join(id));
+      return read30(text.split(other).join(id));
     };
     // Unrelated constraint ids, as two 3.x imports of one schema give, so
     // the pairing falls to the key.
@@ -1724,10 +1727,9 @@ describe("a constraint over roles of other fact types", () => {
   it("keys a host role id another fact type also holds by its raw id", () => {
     // The host's own position is no safer an answer than either holder.
     const ambiguousHost = (m: OrmModel) => {
-      const yaml = new OrmYamlSerializer();
       const id = m.getFactTypeByName("Room has RoomNumber")!.roles[1]!.id;
       const other = m.getFactTypeByName("Room has RoomName")!.roles[1]!.id;
-      return yaml.deserialize(yaml.serialize(m).split(other).join(id));
+      return read30(text30(m).split(other).join(id));
     };
     const a = ambiguousHost(model("number", 1, undefined, undefined, "eu-a"));
     const b = ambiguousHost(withNewRoleIds(model("number", 1, undefined, undefined, "eu-b")));

@@ -25,16 +25,16 @@ function twoFactTypes(firstId: string, secondId: string): OrmModel {
   model.addFactType({
     id: "f1",
     name: "A runs",
-    roles: [{ id: "r1", name: "runs", playerId: "x" }],
+    roles: [{ id: "f1.r1", name: "runs", playerId: "x" }],
     readings: ["{0} runs"],
-    constraints: [{ type: "mandatory", id: firstId, roleId: "r1" }],
+    constraints: [{ type: "mandatory", id: firstId, roleId: "f1.r1" }],
   });
   model.addFactType({
     id: "f2",
     name: "A walks",
-    roles: [{ id: "r2", name: "walks", playerId: "x" }],
+    roles: [{ id: "f2.r2", name: "walks", playerId: "x" }],
     readings: ["{0} walks"],
-    constraints: [{ type: "mandatory", id: secondId, roleId: "r2" }],
+    constraints: [{ type: "mandatory", id: secondId, roleId: "f2.r2" }],
   });
   return model;
 }
@@ -47,8 +47,8 @@ describe("structural/duplicate-constraint-id", () => {
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ severity: "error", elementId: "c" });
     expect(found[0]!.message).toBe(
-      'Constraint id "c" (mandatory in fact type "A runs" over roles r1; '
-        + 'mandatory in fact type "A walks" over roles r2) is held by more than one constraint. '
+      'Constraint id "c" (mandatory in fact type "A runs" over roles f1.r1; '
+        + 'mandatory in fact type "A walks" over roles f2.r2) is held by more than one constraint. '
         + "A constraint id names one constraint.",
     );
   });
@@ -59,20 +59,20 @@ describe("structural/duplicate-constraint-id", () => {
 
   it("names a constraint stored on the model by the roles it names", () => {
     const model = twoFactTypes("c1", "c2");
-    model.addConstraint({ type: "exclusion", id: "c1", roleIds: ["r1", "r2"] });
+    model.addConstraint({ type: "exclusion", id: "c1", roleIds: ["f1.r1", "f2.r2"] });
     const found = findings(model, RULE);
     expect(found).toHaveLength(1);
     expect(found[0]!.message).toContain(
-      'mandatory in fact type "A runs" over roles r1; exclusion over roles r1, r2',
+      'mandatory in fact type "A runs" over roles f1.r1; exclusion over roles f1.r1, f2.r2',
     );
   });
 
   it("tells apart two constraints of one kind stored on the model", () => {
     const model = twoFactTypes("c1", "c2");
-    model.addConstraint({ type: "exclusion", id: "x", roleIds: ["r1", "r2"] });
-    model.addConstraint({ type: "exclusion", id: "x", roleIds: ["r2", "r1"] });
+    model.addConstraint({ type: "exclusion", id: "x", roleIds: ["f1.r1", "f2.r2"] });
+    model.addConstraint({ type: "exclusion", id: "x", roleIds: ["f2.r2", "f1.r1"] });
     expect(findings(model, RULE)[0]!.message).toContain(
-      "exclusion over roles r1, r2; exclusion over roles r2, r1",
+      "exclusion over roles f1.r1, f2.r2; exclusion over roles f2.r2, f1.r1",
     );
   });
 
@@ -97,26 +97,55 @@ model:
         - { id: c, type: exclusion, roles: [r1, ${secondRole}] }
 `;
 
-  it("reports it from a 2.0 file, which the 2.0 reader does not refuse", () => {
-    const found = findings(serializer.deserialize(twoZero("r2")), RULE);
+  it("is reported from a 2.0 file as the 2.0 reader builds it, which does not refuse it", () => {
+    const found = findings(serializer.deserializeAsWritten(twoZero("r2")), RULE);
     expect(found).toHaveLength(1);
     expect(found[0]!.message).toContain(
       'mandatory in fact type "A runs" over roles r1; exclusion over roles r1, r2',
     );
   });
 
+  it("is gone once a 2.0 file is read: the replay names each constraint apart", () => {
+    // Loading replays the 2.0 model into 4.0's ids (iri-identity WS6),
+    // minting each constraint's name from its sentence, so the repeat the
+    // file states does not survive the load.
+    const model = serializer.deserialize(twoZero("r2"));
+    expect(findings(model, RULE)).toEqual([]);
+    expect(new Set(model.everyConstraint().map(([c]) => c.id)).size).toBe(2);
+  });
+
   it("still reports it when the duplicated constraint's own role dangles", () => {
     // The holders are named from what the file states (kind, home, the
     // role ids as written), never from what a role resolves to, so the
     // dangling role that suppresses the graph-taking rules cannot hide it.
-    const model = serializer.deserialize(twoZero("nowhere"), { lenient: true });
+    const model = serializer.deserializeAsWritten(twoZero("nowhere"), { lenient: true });
     const all = new ValidationEngine().validate(model).map((d) => d.ruleId);
     expect(all).toContain("constraint/across-fact-types-unknown-role");
     expect(all.filter((id) => id === RULE)).toHaveLength(1);
   });
 
-  it("is refused at load in a 3.0 file, before any rule runs", () => {
+  it("is refused at load in a 4.0 file, before any rule runs", () => {
     const yaml = serializer.serialize(twoFactTypes("c", "c"));
+    expect(() => serializer.deserialize(yaml)).toThrow(
+      'Ids are stated by more than one element: "c" (2 constraints)',
+    );
+  });
+
+  it("is refused at load in a 3.0 file, before any rule runs", () => {
+    const yaml = threeZero(`  fact_types:
+    - id: f1
+      name: A runs
+      roles: [{ id: r1, role_name: runs, player: x }]
+      readings: ["{0} runs"]
+      constraints:
+        - { id: c, type: mandatory, role: r1 }
+    - id: f2
+      name: A walks
+      roles: [{ id: r2, role_name: walks, player: x }]
+      readings: ["{0} walks"]
+      constraints:
+        - { id: c, type: mandatory, role: r2 }
+`);
     expect(() => serializer.deserialize(yaml)).toThrow(
       'Constraint ids are held by more than one constraint: "c"',
     );
@@ -130,10 +159,10 @@ model:
     - { id: x, name: A, kind: entity, reference_mode: a_id }
 ${body}`;
 
-  it("is refused under a lenient 3.0 load too, which barwise migrate relies on", () => {
+  it("is refused under a lenient load too, which barwise migrate relies on", () => {
     const yaml = serializer.serialize(twoFactTypes("c", "c"));
     expect(() => serializer.deserialize(yaml, { lenient: true })).toThrow(
-      'Constraint ids are held by more than one constraint: "c"',
+      'Ids are stated by more than one element: "c" (2 constraints)',
     );
   });
 
@@ -162,12 +191,11 @@ ${body}`;
 
   it("names every repeated id and its holders when it refuses", () => {
     const model = twoFactTypes("c", "c");
-    model.addConstraint({ type: "exclusion", id: "d", roleIds: ["r1", "r2"] });
-    model.addConstraint({ type: "exclusion", id: "d", roleIds: ["r2", "r1"] });
+    model.addConstraint({ type: "exclusion", id: "d", roleIds: ["f1.r1", "f2.r2"] });
+    model.addConstraint({ type: "exclusion", id: "d", roleIds: ["f2.r2", "f1.r1"] });
     expect(() => serializer.deserialize(serializer.serialize(model))).toThrow(
-      'Constraint ids are held by more than one constraint: "c" (mandatory in fact type "A runs" '
-        + 'over roles r1; mandatory in fact type "A walks" over roles r2), "d" (exclusion over '
-        + "roles r1, r2; exclusion over roles r2, r1). A constraint id names one constraint.",
+      'Ids are stated by more than one element: "c" (2 constraints); "d" (2 constraints). '
+        + "An id names one element.",
     );
   });
 
@@ -205,7 +233,7 @@ ${body}`;
     );
   });
 
-  it("refuses a merge that would write it, which the 3.0 loader could not read back", () => {
+  it("refuses a merge that would write it, which the loader could not read back", () => {
     // An added fact type keeps its own constraints' ids (ModelMerge
     // addFactTypeToMerged), so a fact type that reads as removed-plus-added
     // brings a second constraint under the kept one's id. Before this rule
@@ -216,9 +244,9 @@ ${body}`;
     incoming.addFactType({
       id: "g",
       name: "A swims",
-      roles: [{ id: "r3", name: "swims", playerId: "x" }],
+      roles: [{ id: "g.r3", name: "swims", playerId: "x" }],
       readings: ["{0} swims"],
-      constraints: [{ type: "mandatory", id: "c", roleId: "r3" }],
+      constraints: [{ type: "mandatory", id: "c", roleId: "g.r3" }],
     });
     const diff = diffModels(existing, incoming, MERGE_DIFF_OPTIONS);
     const additions = new Set(
@@ -231,8 +259,8 @@ ${body}`;
 });
 
 describe("a merge whose base already holds a duplicate constraint id", () => {
-  it("is refused, since the merged file would not load as 3.0", () => {
-    // The merge did not add the repeat, but it writes 3.0, and the 3.0
+  it("is refused, since the merged file would not load", () => {
+    // The merge did not add the repeat, but it writes 4.0, and the 4.0
     // loader refuses a repeated constraint id: refusing here is what
     // stops a merge from writing a file nothing can read back.
     const existing = twoFactTypes("c", "c");
@@ -267,12 +295,17 @@ model:
 
   for (const version of ["2.0", "3.0"] as const) {
     it(`reports the pair from a lenient ${version} load, once, naming both ids`, () => {
+      // Loading replays the pair into 4.0's ids, each minted from its
+      // sentence under the suffix rule, and the pair survives it.
       const found = findings(serializer.deserialize(file(version), { lenient: true }), RULE);
       expect(found).toHaveLength(1);
-      expect(found[0]).toMatchObject({ severity: "error", elementId: "sf2" });
+      expect(found[0]).toMatchObject({
+        severity: "error",
+        elementId: "Manager_is_a_subtype_of_Person_2",
+      });
       expect(found[0]!.message).toBe(
-        'Subtype facts "sf1", "sf2" each make "Manager" a subtype of "Person"; '
-          + "a subtype relationship is stated once.",
+        'Subtype facts "Manager_is_a_subtype_of_Person", "Manager_is_a_subtype_of_Person_2" '
+          + 'each make "Manager" a subtype of "Person"; a subtype relationship is stated once.',
       );
     });
 
@@ -285,7 +318,10 @@ model:
     const yaml = file("3.0") + "    - { id: sf3, subtype: m, supertype: p }\n";
     const found = findings(serializer.deserialize(yaml, { lenient: true }), RULE);
     expect(found).toHaveLength(1);
-    expect(found[0]!.message).toContain('Subtype facts "sf1", "sf2", "sf3" each make');
+    expect(found[0]!.message).toContain(
+      'Subtype facts "Manager_is_a_subtype_of_Person", "Manager_is_a_subtype_of_Person_2", '
+        + '"Manager_is_a_subtype_of_Person_3" each make',
+    );
   });
 
   it("is refused by addSubtypeFact in code", () => {

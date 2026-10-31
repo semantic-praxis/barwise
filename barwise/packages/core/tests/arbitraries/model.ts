@@ -509,7 +509,7 @@ function toFactTypeSkeletons(
       const player = raw.reflexive && k === 1
         ? pick(objectTypes, raw.playerPicks[0]!)
         : pick(objectTypes, raw.playerPicks[k]!);
-      roles.push({ id: `ft${j}r${k}`, name: `plays${k}`, playerId: player.id! });
+      roles.push({ id: `ft${j}.r${k}`, name: `plays${k}`, playerId: player.id! });
     }
 
     // A binary fact type with one reading is a structural warning, so
@@ -929,10 +929,10 @@ function toPopulations(
       for (const [r, role] of ft.roles.entries()) {
         roleValues[role.id!] = values[r] ?? "v1";
       }
-      return { id: `p${i}i${k}`, roleValues };
+      return { id: `pop.${i}.${k}`, roleValues };
     });
     return {
-      id: `pop${i}`,
+      id: `pop.${i}`,
       factTypeId: ft.id,
       ...(raw.description !== null ? { description: raw.description } : {}),
       sample: raw.sample,
