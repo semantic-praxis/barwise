@@ -3,6 +3,9 @@
 Scope: architecture
 Date: 2026-10-23
 Tracking: barwise-ubc, docs/specs/architecture-index.spec.md
+Enforced-by: npm run depcruise (intended-is-graph),
+npm run check:architecture (intended-is-graph, claude-md-rendering, runtime-deps-within),
+none (barwise-ym8.d3m: intended-is-graph)
 
 ## Context
 
@@ -17,13 +20,13 @@ the alternatives are in the spec named above.
 ## Decision
 
 1. **`INTENDED` in `barwise/scripts/lib/intended.cjs` is the package
-   graph.** It is the map dependency-cruiser enforces against real
+   graph.** {#intended-is-graph} It is the map dependency-cruiser enforces against real
    imports (`npm run depcruise`), and every script that needs the graph
    requires it; none keeps a copy.
-2. **The root `CLAUDE.md` block is a rendering of it for readers**,
+2. **The root `CLAUDE.md` block is a rendering of it for readers** {#claude-md-rendering},
    drawn to the grammar `npm run check:architecture` reads, and checked
    against it in both directions.
-3. **A package's runtime dependencies stay within it.** `dependencies`,
+3. **A package's runtime dependencies stay within it.** {#runtime-deps-within} `dependencies`,
    `peerDependencies` and `optionalDependencies` may name only the
    internal packages `INTENDED` allows; `devDependencies` may reach
    further, for tests.

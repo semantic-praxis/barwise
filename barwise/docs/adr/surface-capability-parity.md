@@ -5,6 +5,10 @@ Date: 2026-09-10
 Tracking: barwise-ubc, barwise-0wa, barwise-1fr, barwise-1005, barwise-xpt,
 docs/specs/cli-surface-parity.spec.md,
 docs/specs/getting-started-guides.spec.md
+Enforced-by: tests (pinned-tool-lists),
+none (barwise-ym8.c65: matrix-records-reach, matrix-same-commit),
+none (barwise-xpt: matrix-records-reach, matrix-same-commit),
+none (barwise-ym8.0hi: vscode-yes-means)
 
 ## Context
 
@@ -25,17 +29,17 @@ toolset; which gaps survive that direction is being decided row by row
 ## Decision
 
 1. **The capability matrix in the root `CLAUDE.md` records which
-   surface reaches which capability, and an unmarked gap is a bug.** A
+   surface reaches which capability, and an unmarked gap is a bug.** {#matrix-records-reach} A
    gap that stays is marked `deliberate` with its reason.
 2. **A change to a surface's reach updates the matrix in the same
-   commit.** The surface change is incomplete until the table agrees
+   commit.** {#matrix-same-commit} The surface change is incomplete until the table agrees
    with it.
-3. **"Yes" for VS Code means reachable from the editor**, by a
+3. **"Yes" for VS Code means reachable from the editor** {#vscode-yes-means}, by a
    `contributes.commands` palette entry or a language-model tool
    registered by `ToolRegistration.ts`. A "yes" that rests on the tool
    registration is qualified by `barwise.enableMcpServer`, which
    defaults on.
-4. **The tool lists behind the MCP and VS Code columns are pinned.**
+4. **The tool lists behind the MCP and VS Code columns are pinned.** {#pinned-tool-lists}
    A test on each surface asserts its complete sorted tool list with
    `toEqual`.
 
