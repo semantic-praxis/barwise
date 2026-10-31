@@ -3,7 +3,7 @@
 Status: WS1 implemented 2026-10-30 (the declaration pass in check:architecture, adr-enforcement.mjs, ciStepOccurrences(); an absent header still allowed). WS2 implemented 2026-10-30 (test reports from vitest and node --test, check:adr-tests and its ci.yml step, the turbo inputs fix for test and test:coverage, ADR changes not docs-only). WS4 implemented 2026-10-30 (the enforcement line in the generated ARCHITECTURE.md index, rendered once an ADR declares). WS3 in progress: batch 1 (2026-10-31) declares determinism-in-core, package-graph-authority, must-agree-copies and surface-capability-parity, and rewrites the architectureRepo() fixture; batch 2 (2026-10-31) declares python-from-the-lockfile, pinned-runtimes, credential-handling and gate-refusal-contract; the other 12 ADRs have no header yet; WS5 is provisional and not started.
 
 Created: 2026-10-28
-Last-updated: 2026-10-30
+Last-updated: 2026-10-31
 Plan-reviewed: e247c807 (code-review, pr-review; the review's ten items are barwise-ym8.7jz, which supersedes this text where they conflict)
 Tracking: barwise-ym8, barwise-ym8.7jz (required implementation items
 from the plan review)

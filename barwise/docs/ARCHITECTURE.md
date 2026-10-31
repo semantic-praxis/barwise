@@ -51,7 +51,7 @@ Process:
 
 - [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-10-23
 - [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27
-- [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (gitleaks-detects, wrapper-contract); gap: barwise-ym8.yhs (rotate-not-revert); gap: barwise-ym8.7zs (gitleaks-detects); gap: barwise-ym8.kf3 (scan-index-and-history); gap: barwise-ym8.gc7 (wrapper-contract); gap: barwise-ym8.nxs (pinned-gitleaks)
+- [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (wrapper-contract); gap: barwise-ym8.yhs (rotate-not-revert); gap: barwise-ym8.7zs (gitleaks-detects); gap: barwise-ym8.kf3 (scan-index-and-history); gap: barwise-ym8.gc7 (wrapper-contract); gap: barwise-ym8.nxs (pinned-gitleaks)
 - [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-08-29
 - [Gate refusal contract](adr/gate-refusal-contract.md) -- 2026-09-17 -- declared: tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third); gap: barwise-ym8.j31 (three-results); gap: barwise-ym8.rl7 (refuse-not-find); gap: barwise-ym8.c42 (cwd-invariant); gap: barwise-ym8.aep (readers-keep-third); gap: barwise-ym8.if3 (no-writes)
 - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18

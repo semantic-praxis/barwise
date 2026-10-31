@@ -766,7 +766,7 @@ function commitAll(dir, message) {
  * measuring.
  */
 for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
-  test(`check-secrets fails on a staged ${rule} [adr:credential-handling#gitleaks-detects]`, (t) => {
+  test(`check-secrets fails on a staged ${rule}`, (t) => {
     const dir = secretsRepo();
     try {
       const clean = gate("check-secrets.mjs", dir, "--staged");

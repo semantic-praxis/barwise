@@ -5,7 +5,7 @@ Date: 2026-09-12
 Tracking: barwise-ubc, barwise-1021, barwise-1022, barwise-1028, barwise-3wu, barwise-i23,
 barwise-jha, barwise-8fc, barwise-flw, barwise-sma,
 docs/specs/credential-scanning.spec.md
-Enforced-by: tests (gitleaks-detects, wrapper-contract),
+Enforced-by: tests (wrapper-contract),
 none (barwise-ym8.yhs: rotate-not-revert), none (barwise-ym8.7zs: gitleaks-detects),
 none (barwise-ym8.kf3: scan-index-and-history), none (barwise-ym8.gc7: wrapper-contract),
 none (barwise-ym8.nxs: pinned-gitleaks)
