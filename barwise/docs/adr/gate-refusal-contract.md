@@ -5,6 +5,10 @@ Date: 2026-09-17
 Tracking: barwise-ubc, barwise-987, barwise-989, barwise-1012,
 barwise-1019, barwise-ydl, barwise-shq, barwise-vt2, barwise-w43,
 docs/specs/gate-refusal-contract.spec.md
+Enforced-by: tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third),
+none (barwise-ym8.j31: three-results), none (barwise-ym8.rl7: refuse-not-find),
+none (barwise-ym8.c42: cwd-invariant), none (barwise-ym8.aep: readers-keep-third),
+none (barwise-ym8.if3: no-writes)
 
 ## Context
 
@@ -20,22 +24,22 @@ corrections made during grounding are in the spec above.
 ## Decision
 
 1. **A gate has three results: exit 0 pass, exit 1 a finding, exit 2
-   could not answer.** A refusal names what the gate could not see and
+   could not answer.**{#three-results} A refusal names what the gate could not see and
    never prints PASS.
 2. **A gate refuses when it cannot see its input, and never uses its
-   finding code for that.** That covers `git` failing or printing
+   finding code for that.**{#refuse-not-find} That covers `git` failing or printing
    nothing, an empty tracked-file listing, a missing tool, a missing
    manifest or lockfile, and a shallow clone when the gate reads
    history. Each gate names its own preconditions.
 3. **A gate gives the same reading from the repository root,
-   `barwise/` and a package directory**, the three directories the
+   `barwise/` and a package directory**{#cwd-invariant}, the three directories the
    spec requires and measures. No caller has to pass a root.
-4. **Whatever reads a gate keeps the third value.** `ci:local` reports
+4. **Whatever reads a gate keeps the third value.**{#readers-keep-third} `ci:local` reports
    REFUSED separately from FAIL and exits 2 when refusals are the only
    non-zero results. `mutate` refuses when its command already fails
    before any mutation. A test skips only when every run refuses, since
    a partial refusal is the defect itself.
-5. **A gate does not write to the tree it reads.**
+5. **A gate does not write to the tree it reads.**{#no-writes}
 
 ## Consequences
 

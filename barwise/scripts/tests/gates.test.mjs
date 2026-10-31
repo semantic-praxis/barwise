@@ -120,7 +120,7 @@ const ROOT_DEPENDENT_GATES = [
 
 for (const script of ROOT_DEPENDENT_GATES) {
   for (const mode of ["empty", "fail"]) {
-    test(`${script} refuses with exit 2 when git ${mode === "empty" ? "answers emptily" : "fails"}`, () => {
+    test(`${script} refuses with exit 2 when git ${mode === "empty" ? "answers emptily" : "fails"} [adr:gate-refusal-contract#three-results] [adr:gate-refusal-contract#refuse-not-find]`, () => {
       const r = gateWithStubGit(script, mode);
       assert.equal(
         r.status,
@@ -237,7 +237,7 @@ const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "co
 // its history mode depends on clone depth, so the invariance test uses
 // `--staged` and cannot share this loop's argument-free call.
 for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.mjs"]) {
-  test(`${script} reports the same coverage from every cwd`, (t) => {
+  test(`${script} reports the same coverage from every cwd [adr:gate-refusal-contract#cwd-invariant]`, (t) => {
     const runs = CWDS.map((cwd) => ({ cwd, ...gate(script, cwd) }));
     if (skippedForMissingTool(t, runs, `${script}'s tool`)) return;
     for (const r of runs) {
@@ -766,7 +766,7 @@ function commitAll(dir, message) {
  * measuring.
  */
 for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
-  test(`check-secrets fails on a staged ${rule}`, (t) => {
+  test(`check-secrets fails on a staged ${rule} [adr:credential-handling#gitleaks-detects]`, (t) => {
     const dir = secretsRepo();
     try {
       const clean = gate("check-secrets.mjs", dir, "--staged");
@@ -793,7 +793,7 @@ for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
   });
 }
 
-test("check-secrets refuses when gitleaks is absent rather than reporting clean", () => {
+test("check-secrets refuses when gitleaks is absent rather than reporting clean [adr:credential-handling#wrapper-contract]", () => {
   // The container this project develops in does not ship gitleaks, so this
   // is the reading a fresh session gets until the bootstrap installs it.
   const dir = secretsRepo();
@@ -815,7 +815,7 @@ test("check-secrets refuses when gitleaks is absent rather than reporting clean"
   }
 });
 
-test("check-secrets refuses a gitleaks status that is neither clean nor a finding", () => {
+test("check-secrets refuses a gitleaks status that is neither clean nor a finding [adr:credential-handling#wrapper-contract]", () => {
   // The distinction the wrapper exists for. gitleaks uses 1 for findings,
   // so any OTHER non-zero status is the tool failing to run -- and
   // reporting that as a finding would send the reader hunting a credential
@@ -843,7 +843,7 @@ test("check-secrets refuses a gitleaks status that is neither clean nor a findin
   }
 });
 
-test("check-secrets refuses when .gitleaks.toml is missing", (t) => {
+test("check-secrets refuses when .gitleaks.toml is missing [adr:credential-handling#wrapper-contract]", (t) => {
   // Without this, gitleaks falls back to its bundled defaults: it would
   // still find most things and would silently drop the Anthropic rule,
   // which is the credential this repository is most likely to leak and the
@@ -865,7 +865,7 @@ test("check-secrets refuses when .gitleaks.toml is missing", (t) => {
   }
 });
 
-test("check-secrets refuses a history scan of a shallow clone, but --staged still works", (t) => {
+test("check-secrets refuses a history scan of a shallow clone, but --staged still works [adr:credential-handling#wrapper-contract]", (t) => {
   // Every fresh session clone of this project is shallow. A history scan
   // there would report a clean bill of health over whatever few commits
   // arrived, which is why the default mode refuses -- while `--staged`
@@ -1263,7 +1263,7 @@ test("mutate reports a failed restore on an UNTRACKED file, which git diff canno
   }
 });
 
-test("mutate refuses a command that already fails WITHOUT the mutation", () => {
+test("mutate refuses a command that already fails WITHOUT the mutation [adr:gate-refusal-contract#readers-keep-third]", () => {
   // CAUGHT is decided from the command's exit status alone, so a command
   // that is already red reports CAUGHT for every mutation -- including ones
   // nothing catches. Five readings in PR #505 were recorded that way: the
@@ -2017,7 +2017,7 @@ function runCiLocal(repo, ...args) {
   return { ...r, all: `${r.stdout}${r.stderr}` };
 }
 
-test("ci-local reports a REFUSED gate apart from a failure, and exits 2", () => {
+test("ci-local reports a REFUSED gate apart from a failure, and exits 2 [adr:gate-refusal-contract#readers-keep-third]", () => {
   // The runner was binary -- status 0 or FAIL -- so the two gates that refuse
   // for want of shellcheck and gitleaks in any fresh container read as "3 of
   // 32 gates failed", indistinguishable from a real shellcheck finding or a
