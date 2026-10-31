@@ -22,7 +22,7 @@ describe("SchemaValidator", () => {
         model: { name: "Test" },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -74,7 +74,7 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -98,7 +98,7 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
     });
 
@@ -121,7 +121,7 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
     });
 
@@ -144,7 +144,7 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(true);
     });
   });
@@ -152,20 +152,20 @@ describe("SchemaValidator", () => {
   describe("invalid documents", () => {
     it("rejects a document missing orm_version", () => {
       const doc = { model: { name: "Test" } };
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
     it("rejects a document missing model", () => {
       const doc = { orm_version: "3.0" };
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects a document missing model name", () => {
       const doc = { orm_version: "3.0", model: {} };
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
@@ -174,7 +174,7 @@ describe("SchemaValidator", () => {
 
     describe("naming the element an error is in", () => {
       it("adds the name of the nearest model element to the message", () => {
-        const result = validator.validateModel({
+        const result = validator.validateModel30({
           orm_version: "3.0",
           model: {
             name: "Test",
@@ -192,7 +192,7 @@ describe("SchemaValidator", () => {
       });
 
       it("adds nothing when the element has no name, or the error is on the model", () => {
-        const unnamed = validator.validateModel({
+        const unnamed = validator.validateModel30({
           orm_version: "3.0",
           model: {
             name: "Test",
@@ -203,7 +203,7 @@ describe("SchemaValidator", () => {
           path: "/model/object_types/0",
           message: "must NOT have additional properties",
         });
-        const top = validator.validateModel({
+        const top = validator.validateModel30({
           orm_version: "3.0",
           model: { name: "Test", colour: 1 },
         });
@@ -225,13 +225,13 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects a wrong orm_version", () => {
       const doc = { orm_version: "2.0", model: { name: "Test" } };
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
@@ -251,7 +251,7 @@ describe("SchemaValidator", () => {
         },
       };
       expect(validator.validateLegacyModel(doc).valid).toBe(true);
-      expect(validator.validateModel(doc).valid).toBe(false);
+      expect(validator.validateModel30(doc).valid).toBe(false);
     });
 
     it("refuses a constraint without an id in 3.0", () => {
@@ -268,7 +268,7 @@ describe("SchemaValidator", () => {
           }],
         },
       };
-      expect(validator.validateModel(doc).valid).toBe(false);
+      expect(validator.validateModel30(doc).valid).toBe(false);
     });
 
     it("rejects additional properties at the top level", () => {
@@ -277,7 +277,7 @@ describe("SchemaValidator", () => {
         model: { name: "Test" },
         extra: "not allowed",
       };
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
@@ -292,7 +292,7 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
@@ -312,17 +312,17 @@ describe("SchemaValidator", () => {
         },
       };
 
-      const result = validator.validateModel(doc);
+      const result = validator.validateModel30(doc);
       expect(result.valid).toBe(false);
     });
 
     it("rejects non-object input", () => {
-      const result = validator.validateModel("not an object");
+      const result = validator.validateModel30("not an object");
       expect(result.valid).toBe(false);
     });
 
     it("rejects null input", () => {
-      const result = validator.validateModel(null);
+      const result = validator.validateModel30(null);
       expect(result.valid).toBe(false);
     });
   });

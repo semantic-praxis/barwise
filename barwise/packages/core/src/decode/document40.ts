@@ -1,6 +1,6 @@
 /**
  * A format 4.0 document as Effect Schemas (iri-identity WS6, 6b-2b-1),
- * held to `schemas/orm-model-4.0.schema.json` by
+ * held to `schemas/orm-model.schema.json` by
  * `tests/decode/document40SchemaDrift.test.ts`.
  *
  * 4.0 differs from 3.0 in its ids (`ids.ts`): each of the shape its rule

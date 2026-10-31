@@ -594,6 +594,18 @@ export function isJoinRing(c: Constraint): c is JoinRingConstraint {
  * must resolve. Two hand-written copies of "which fields hold role ids"
  * is the must-agree duplication the root CLAUDE.md forbids.
  */
+/**
+ * How a constraint is referred to where a string is needed -- a
+ * diagnostic's element, a lineage entry: its id, or for one the model left
+ * unnamed because its sentence cannot be minted (decision 19) a fixed
+ * reference built from its kind and what it constrains, as
+ * `subtypeFactRef` does for a subtype fact. No 4.0 id can take that form:
+ * a local name holds no `<`.
+ */
+export function constraintRef(c: Constraint): string {
+  return c.id ?? `unnamed:${c.type}<${[...roleIdsOf(c), ...subtypeFactIdsOf(c)].join(",")}`;
+}
+
 export function roleIdsOf(c: Constraint): string[] {
   switch (c.type) {
     case "internal_uniqueness":

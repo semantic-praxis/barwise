@@ -2,7 +2,7 @@
  * The JSON Schema's data type list and the metamodel's are one list
  * (barwise-0lf).
  *
- * `orm-model.schema.json` enumerates the data type names a `.orm.yaml` may
+ * `orm-model-3.0.schema.json` enumerates the data type names a `.orm.yaml` may
  * use, and the loader validates against it before the model sees the file;
  * `CONCEPTUAL_DATA_TYPE_NAMES` is the metamodel's list, compile-checked
  * against the `ConceptualDataTypeName` union. A name in only one of them is
@@ -29,7 +29,7 @@ interface SchemaWithDataTypes {
 }
 
 const schema = JSON.parse(
-  readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../schemas/orm-model-3.0.schema.json", import.meta.url), "utf8"),
 ) as SchemaWithDataTypes;
 
 describe("data type names", () => {

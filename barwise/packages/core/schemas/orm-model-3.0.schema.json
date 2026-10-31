@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://orm-modeler.dev/schemas/v1/orm-model-4.0.schema.json",
+  "$id": "https://orm-modeler.dev/schemas/v1/orm-model-3.0.schema.json",
   "title": "ORM Domain Model",
   "description": "Schema for .orm.yaml domain model files used by Barwise.",
   "type": "object",
@@ -12,8 +12,8 @@
   "properties": {
     "orm_version": {
       "type": "string",
-      "const": "4.0",
-      "description": "Schema version. Must be \"4.0\" for this schema revision."
+      "const": "3.0",
+      "description": "Schema version. Must be \"3.0\" for this schema revision."
     },
     "model": {
       "type": "object",
@@ -36,17 +36,6 @@
           "type": "string",
           "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:\\S*[/#]$",
           "description": "The absolute IRI this model's element IRIs start with, ending in / or #. For a model outside a project that declares iri_base; in such a project the project's namespace wins."
-        },
-        "imports": {
-          "type": "object",
-          "propertyNames": {
-            "$ref": "#/definitions/local_name"
-          },
-          "additionalProperties": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": "The contexts this model refers to, each by the alias its references use: alias to a context name or an absolute IRI."
         },
         "note": {
           "type": "string",
@@ -122,7 +111,9 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/reference"
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier (UUID)."
         },
         "name": {
           "type": "string",
@@ -183,7 +174,9 @@
           "description": "Bound on this object type's population (number of instances)."
         },
         "preferred_identifier": {
-          "$ref": "#/definitions/local_name"
+          "type": "string",
+          "minLength": 1,
+          "description": "An entity type's preferred identifier: the id of the uniqueness constraint that identifies it, internal (one fact type) or external (a reference scheme over several binaries the entity plays in)."
         }
       },
       "if": {
@@ -219,7 +212,9 @@
       "description": "A declared role path: a root object type (the join variable) and ordered single-fact-type hops.",
       "properties": {
         "root": {
-          "$ref": "#/definitions/reference"
+          "type": "string",
+          "minLength": 1,
+          "description": "The root object type id -- the correlation / join variable's type."
         },
         "steps": {
           "type": "array",
@@ -233,10 +228,14 @@
             ],
             "properties": {
               "entry": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1,
+                "description": "Entry role id (played by the current path node)."
               },
               "exit": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1,
+                "description": "Exit role id (another role of the entry role's fact type)."
               }
             }
           }
@@ -425,10 +424,14 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/role_id"
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier for this role."
         },
         "player": {
-          "$ref": "#/definitions/reference"
+          "type": "string",
+          "minLength": 1,
+          "description": "The id of the ObjectType that plays this role."
         },
         "role_name": {
           "type": "string",
@@ -448,7 +451,9 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/local_name"
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier."
         },
         "name": {
           "type": "string",
@@ -530,19 +535,26 @@
     "subtype_fact": {
       "type": "object",
       "required": [
+        "id",
         "subtype",
         "supertype"
       ],
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/local_name"
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier."
         },
         "subtype": {
-          "$ref": "#/definitions/reference"
+          "type": "string",
+          "minLength": 1,
+          "description": "The id of the subtype (child) entity type."
         },
         "supertype": {
-          "$ref": "#/definitions/reference"
+          "type": "string",
+          "minLength": 1,
+          "description": "The id of the supertype (parent) entity type."
         },
         "provides_identification": {
           "type": "boolean",
@@ -552,42 +564,33 @@
         "defining_rule": {
           "$ref": "#/definitions/derivation_rule_def",
           "description": "Defining rule when this subtype's membership is determined by a derivation rule; absent for an asserted subtype."
-        },
-        "minted_from": {
-          "$ref": "#/definitions/minted_from"
         }
-      },
-      "dependencies": {
-        "minted_from": [
-          "id"
-        ]
       }
     },
     "objectified_fact_type": {
       "type": "object",
       "required": [
+        "id",
         "fact_type",
         "object_type"
       ],
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/local_name"
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier."
         },
         "fact_type": {
-          "$ref": "#/definitions/local_name"
+          "type": "string",
+          "minLength": 1,
+          "description": "The id of the fact type being objectified."
         },
         "object_type": {
-          "$ref": "#/definitions/reference"
-        },
-        "minted_from": {
-          "$ref": "#/definitions/minted_from"
+          "type": "string",
+          "minLength": 1,
+          "description": "The id of the entity type created by objectification."
         }
-      },
-      "dependencies": {
-        "minted_from": [
-          "id"
-        ]
       }
     },
     "population": {
@@ -600,10 +603,14 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/population_id"
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier."
         },
         "fact_type": {
-          "$ref": "#/definitions/local_name"
+          "type": "string",
+          "minLength": 1,
+          "description": "The id of the fact type this population samples."
         },
         "description": {
           "type": "string",
@@ -631,17 +638,16 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/instance_id"
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable unique identifier for this instance."
         },
         "role_values": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Mapping of role id to concrete value.",
-          "propertyNames": {
-            "$ref": "#/definitions/role_id"
-          }
+          "description": "Mapping of role id to concrete value."
         }
       }
     },
@@ -684,7 +690,8 @@
         "elements": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/reference"
+            "type": "string",
+            "minLength": 1
           },
           "description": "Ids of the object types included in this view. An empty list is an empty view. When absent, all elements are shown."
         },
@@ -726,7 +733,8 @@
     "internal_constraint": {
       "type": "object",
       "required": [
-        "type"
+        "type",
+        "id"
       ],
       "description": "A constraint that lives in its fact type: every role it names is one of that fact type's roles.",
       "oneOf": [
@@ -736,7 +744,9 @@
               "const": "internal_uniqueness"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -749,25 +759,19 @@
             "roles": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 1,
               "description": "Role ids within the same fact type."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
-            "roles"
+            "roles",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -775,7 +779,9 @@
               "const": "mandatory"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -786,22 +792,17 @@
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role": {
-              "$ref": "#/definitions/role_id"
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
+              "type": "string",
+              "minLength": 1,
+              "description": "The single role id that is mandatory."
             }
           },
           "required": [
             "type",
-            "role"
+            "role",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -809,7 +810,9 @@
               "const": "value_constraint"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -820,7 +823,9 @@
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role": {
-              "$ref": "#/definitions/role_id"
+              "type": "string",
+              "minLength": 1,
+              "description": "The role id this constraint applies to."
             },
             "values": {
               "type": "array",
@@ -837,13 +842,11 @@
               },
               "minItems": 1,
               "description": "Allowed value ranges (inclusive/exclusive, possibly open-ended)."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
-            "type"
+            "type",
+            "id"
           ],
           "anyOf": [
             {
@@ -857,12 +860,7 @@
               ]
             }
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -870,7 +868,9 @@
               "const": "ring"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -881,30 +881,27 @@
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role_1": {
-              "$ref": "#/definitions/role_id"
+              "type": "string",
+              "minLength": 1,
+              "description": "First role id."
             },
             "role_2": {
-              "$ref": "#/definitions/role_id"
+              "type": "string",
+              "minLength": 1,
+              "description": "Second role id."
             },
             "ring_type": {
               "$ref": "#/definitions/ring_type_def"
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
             "role_1",
             "role_2",
-            "ring_type"
+            "ring_type",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -912,7 +909,9 @@
               "const": "frequency"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -923,12 +922,15 @@
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role": {
-              "$ref": "#/definitions/role_id"
+              "type": "string",
+              "minLength": 1,
+              "description": "The single role being frequency-constrained (legacy single-role form)."
             },
             "roles": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 1,
               "description": "The role sequence being frequency-constrained (a combination)."
@@ -950,15 +952,13 @@
                 }
               ],
               "description": "Maximum occurrences, or \"unbounded\"."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
             "min",
-            "max"
+            "max",
+            "id"
           ],
           "anyOf": [
             {
@@ -972,12 +972,7 @@
               ]
             }
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -985,7 +980,9 @@
               "const": "value_comparison"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -996,10 +993,14 @@
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role_1": {
-              "$ref": "#/definitions/role_id"
+              "type": "string",
+              "minLength": 1,
+              "description": "Left-hand role id."
             },
             "role_2": {
-              "$ref": "#/definitions/role_id"
+              "type": "string",
+              "minLength": 1,
+              "description": "Right-hand role id."
             },
             "operator": {
               "type": "string",
@@ -1012,23 +1013,16 @@
                 ">"
               ],
               "description": "value(role_1) <operator> value(role_2) must hold for every instance."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
             "role_1",
             "role_2",
-            "operator"
+            "operator",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -1036,7 +1030,9 @@
               "const": "cardinality"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1047,7 +1043,9 @@
               "description": "Alethic (necessity, the default) or deontic (obligation)."
             },
             "role": {
-              "$ref": "#/definitions/role_id"
+              "type": "string",
+              "minLength": 1,
+              "description": "The unary role whose occurrence count is bounded."
             },
             "min": {
               "type": "integer",
@@ -1066,30 +1064,24 @@
                 }
               ],
               "description": "Maximum number of instances, or \"unbounded\"."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
             "role",
             "min",
-            "max"
+            "max",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         }
       ]
     },
     "external_constraint": {
       "type": "object",
       "required": [
-        "type"
+        "type",
+        "id"
       ],
       "description": "A constraint that lives in the model: its roles may span fact types, or it constrains subtypes.",
       "oneOf": [
@@ -1099,7 +1091,9 @@
               "const": "external_uniqueness"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1112,25 +1106,19 @@
             "roles": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 1,
               "description": "Role ids spanning multiple fact types."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
-            "roles"
+            "roles",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -1138,7 +1126,9 @@
               "const": "disjunctive_mandatory"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1151,7 +1141,8 @@
             "roles": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 2,
               "description": "Two or more role ids (may span fact types)."
@@ -1159,17 +1150,16 @@
             "subtype_facts": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/local_name"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 0,
               "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
-            "type"
+            "type",
+            "id"
           ],
           "additionalProperties": false,
           "oneOf": [
@@ -1183,12 +1173,7 @@
                 "subtype_facts"
               ]
             }
-          ],
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          ]
         },
         {
           "properties": {
@@ -1196,7 +1181,9 @@
               "const": "exclusion"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1209,7 +1196,8 @@
             "roles": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 2,
               "description": "Two or more role ids (may span fact types)."
@@ -1217,17 +1205,16 @@
             "subtype_facts": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/local_name"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 0,
               "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
-            "type"
+            "type",
+            "id"
           ],
           "additionalProperties": false,
           "oneOf": [
@@ -1241,12 +1228,7 @@
                 "subtype_facts"
               ]
             }
-          ],
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          ]
         },
         {
           "properties": {
@@ -1254,7 +1236,9 @@
               "const": "exclusive_or"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1267,7 +1251,8 @@
             "roles": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 2,
               "description": "Two or more role ids (may span fact types)."
@@ -1275,17 +1260,16 @@
             "subtype_facts": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/local_name"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 0,
               "description": "Subtype fact ids of one supertype, when the constraint is over the supertype's subtypes rather than over roles. An empty or one-member list loads and is reported by validation (too few subtypes), as the model holds it."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
-            "type"
+            "type",
+            "id"
           ],
           "additionalProperties": false,
           "oneOf": [
@@ -1299,12 +1283,7 @@
                 "subtype_facts"
               ]
             }
-          ],
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          ]
         },
         {
           "properties": {
@@ -1312,7 +1291,9 @@
               "const": "subset"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1325,7 +1306,8 @@
             "subset_roles": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 1,
               "description": "Role ids forming the subset side."
@@ -1333,26 +1315,20 @@
             "superset_roles": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 1,
               "description": "Role ids forming the superset side."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
             "subset_roles",
-            "superset_roles"
+            "superset_roles",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -1360,7 +1336,9 @@
               "const": "equality"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1373,7 +1351,8 @@
             "roles_1": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 1,
               "description": "First role sequence."
@@ -1381,26 +1360,20 @@
             "roles_2": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/role_id"
+                "type": "string",
+                "minLength": 1
               },
               "minItems": 1,
               "description": "Second role sequence."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
             "roles_1",
-            "roles_2"
+            "roles_2",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -1408,7 +1381,9 @@
               "const": "join_subset"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1425,22 +1400,15 @@
             "superset": {
               "$ref": "#/definitions/join_operand_def",
               "description": "The operand whose projected tuples contain the subset's."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
             "subset",
-            "superset"
+            "superset",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -1448,7 +1416,9 @@
               "const": "join_equality"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1465,21 +1435,14 @@
               },
               "minItems": 2,
               "description": "Two or more operands whose projected tuple sets must be equal."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
-            "operands"
+            "operands",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -1487,7 +1450,9 @@
               "const": "join_exclusion"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1504,21 +1469,14 @@
               },
               "minItems": 2,
               "description": "Two or more operands whose projected tuple sets must be pairwise disjoint."
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
-            "operands"
+            "operands",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         },
         {
           "properties": {
@@ -1526,7 +1484,9 @@
               "const": "join_ring"
             },
             "id": {
-              "$ref": "#/definitions/local_name"
+              "type": "string",
+              "minLength": 1,
+              "description": "Stable unique identifier, required: other elements and other files refer to a constraint by it."
             },
             "modality": {
               "type": "string",
@@ -1541,54 +1501,17 @@
             },
             "ring_type": {
               "$ref": "#/definitions/ring_type_def"
-            },
-            "minted_from": {
-              "$ref": "#/definitions/minted_from"
             }
           },
           "required": [
             "type",
             "operand",
-            "ring_type"
+            "ring_type",
+            "id"
           ],
-          "additionalProperties": false,
-          "dependencies": {
-            "minted_from": [
-              "id"
-            ]
-          }
+          "additionalProperties": false
         }
       ]
-    },
-    "local_name": {
-      "type": "string",
-      "pattern": "^(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
-      "description": "A local name: an element's id, as localName() gives it from the element's name, or as a person stated it."
-    },
-    "reference": {
-      "type": "string",
-      "pattern": "^(?:(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+:)?(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
-      "description": "An object type's id: a local name, or a shadow's alias:local."
-    },
-    "role_id": {
-      "type": "string",
-      "pattern": "^(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+\\.(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
-      "description": "A role's id: <fact type>.<role>."
-    },
-    "population_id": {
-      "type": "string",
-      "pattern": "^(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+\\.(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
-      "description": "A population's id: <fact type>.population."
-    },
-    "instance_id": {
-      "type": "string",
-      "pattern": "^(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+\\.(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+\\.(?:[A-Za-z0-9\\-_~!$&'()*+,;=@]|%[0-9A-F]{2}|(?!\\s)[\\u00A0-\\u200D\\u2010-\\u2029\\u202F-\\u2065\\u206A-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFEF\\u{10000}-\\u{1FFFD}\\u{20000}-\\u{2FFFD}\\u{30000}-\\u{3FFFD}\\u{40000}-\\u{4FFFD}\\u{50000}-\\u{5FFFD}\\u{60000}-\\u{6FFFD}\\u{70000}-\\u{7FFFD}\\u{80000}-\\u{8FFFD}\\u{90000}-\\u{9FFFD}\\u{A0000}-\\u{AFFFD}\\u{B0000}-\\u{BFFFD}\\u{C0000}-\\u{CFFFD}\\u{D0000}-\\u{DFFFD}\\u{E1000}-\\u{EFFFD}])+$",
-      "description": "A fact instance's id: <population>.N."
-    },
-    "minted_from": {
-      "type": "string",
-      "minLength": 1,
-      "description": "The content key the id was minted from; present only beside the id it was minted for."
     }
   }
 }

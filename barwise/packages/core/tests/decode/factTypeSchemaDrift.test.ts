@@ -9,7 +9,7 @@
  */
 import type * as SchemaAST from "effect/SchemaAST";
 import { describe, expect, it } from "vitest";
-import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import schema from "../../schemas/orm-model-3.0.schema.json" with { type: "json" };
 import { InternalConstraintFile } from "../../src/decode/constraint.js";
 import { FactTypeFile } from "../../src/decode/factType.js";
 import { fields, limitsOf, literalsOf } from "../helpers/schemaFields.js";

@@ -5,25 +5,25 @@ import type {
   ObjectTypeKind,
   ValueConstraintDef,
 } from "../../src/model/ObjectType.js";
+import { localName } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig } from "../../src/model/Population.js";
 
 /**
  * The id the builder gives a binary fact type's role, by its position (1 or
- * 2, as `role1` and `role2` name them). A test that names a role by id
- * calls this, so the format is decided here. It avoids `:`, which format
- * 4.0 reserves for an alias, and keeps the fact type's name as written, so
- * two fact types whose names differ give different ids. The `#` is one
- * `localName` always encodes, so a builder id never reads as a 4.0 id
- * (iri-identity, WS6 6a).
+ * 2, as `role1` and `role2` name them): `<fact type>.roleN`, a format 4.0
+ * role id under the fact type's id, which the model mints from its name. A
+ * test that names a role by id calls this, so the format is decided here
+ * (iri-identity, WS6 6a and 6b). Two fact types whose names differ only in
+ * whitespace or `_` would share these ids; no test builds such a pair.
  */
 export function roleId(factTypeName: string, position: 1 | 2): string {
-  return `${factTypeName}#role${position}`;
+  return `${localName(factTypeName)}.role${position}`;
 }
 
-/** The id of the uniqueness a fact type's `isPreferred` flags. */
+/** The id of the uniqueness a fact type's `isPreferred` flags: a local name. */
 export function preferredId(factTypeName: string): string {
-  return `${factTypeName}#preferred`;
+  return `${localName(factTypeName)}_preferred`;
 }
 
 /**

@@ -21,7 +21,7 @@ import {
 
 const yaml = new OrmYamlSerializer();
 const schema = JSON.parse(
-  readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../schemas/orm-model-3.0.schema.json", import.meta.url), "utf8"),
 ) as { definitions: Record<string, unknown>; };
 
 /** Every `type` const anywhere under a schema node. */

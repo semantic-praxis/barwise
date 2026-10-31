@@ -130,10 +130,25 @@ export class OrmYamlSerializer {
    * them; every other caller wants only the model (orm-format-3 WS4b-iii).
    */
   migrate(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
-    return refusingHeldIds(() => this.read(yaml, options));
+    return refusingHeldIds(() => this.read(yaml, options, true));
   }
 
-  private read(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
+  /**
+   * The model a file states under its own ids: a 3.x or 2.0 file as the
+   * frozen readers build it, before the replay into 4.0's ids; a 4.0 file
+   * as `deserialize` reads it. For the tests that hold the frozen readers
+   * and the replay to the tracked corpus, which is mostly 3.x and 2.0.
+   */
+  deserializeAsWritten(yaml: string, options?: { lenient?: boolean; }): OrmModel {
+    return refusingHeldIds(() => this.read(yaml, options, false)).model;
+  }
+
+  private read(
+    yaml: string,
+    options: { lenient?: boolean; } | undefined,
+    replay: boolean,
+  ): MigrationResult {
+    const into40 = (model: OrmModel) => (replay ? replayInto40(model) : model);
     const raw = parse(yaml) as unknown;
     const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
@@ -146,11 +161,11 @@ export class OrmYamlSerializer {
       this.check(this.validator.validateLegacyModel(doc));
       const { model, placed, flags } = readLegacy(doc as OrmYamlDocument, options);
       const notes = migrationNotes(model, placed, flags);
-      return { model: replayInto40(model), from: from!, notes };
+      return { model: into40(model), from: from!, notes };
     }
     if (version === PREVIOUS_ORM_VERSION) {
       return {
-        model: replayInto40(fromDecoded(decodeOrRefuse(doc), options)),
+        model: into40(fromDecoded(decodeOrRefuse(doc), options)),
         from: from!,
         notes: [],
       };
@@ -406,7 +421,7 @@ function statedIds40(doc: DecodedDocument40): (readonly [string, IdKind])[] {
  * and each entity's preferred identifier by constraint id.
  */
 export function writeDocument(model: OrmModel): OrmYamlDocument {
-  return documentOf(model, CURRENT_ORM_VERSION, {
+  return documentOf(model, PREVIOUS_ORM_VERSION, {
     constraint: (c) => {
       if (c.id === undefined) {
         throw new Error(
@@ -447,7 +462,7 @@ export function writeDocument40(model: OrmModel): OrmYamlDocument40 {
       ),
     ) as R & { minted_from: string; };
   };
-  return documentOf(model, "4.0", {
+  return documentOf(model, CURRENT_ORM_VERSION, {
     constraint: (c) => minted(serializeConstraint(c)),
     subtypeFact: (sf) => minted(serializeSubtypeFact40(sf)),
     objectification: (o) => minted(serializeObjectifiedFactType40(o)),

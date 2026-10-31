@@ -79,9 +79,7 @@ describe("replaying a 3.x model into format 4.0", () => {
   it.each(corpus.map((c) => [c.file, c] as const))(
     "%s states the same model under new ids",
     (_, c) => {
-      const source = new OrmYamlSerializer().deserialize(new OrmYamlSerializer().serialize(
-        new OrmYamlSerializer().deserialize(JSON.stringify(c.doc)),
-      ));
+      const source = new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc));
       const model = replayInto40(source);
       const ids = oldToNew(model);
       const prior = model.priorIds!;
@@ -111,7 +109,7 @@ describe("replaying a 3.x model into format 4.0", () => {
   );
 
   it("names a shadow, an objectified fact type, repeated roles and the rest by 4.0's rules", () => {
-    const source = new OrmYamlSerializer().deserialize(
+    const source = new OrmYamlSerializer().deserializeAsWritten(
       `orm_version: "3.0"
 model:
   name: School
@@ -184,7 +182,7 @@ model:
 
   it("lets diff pair two replayed revisions of one file by their old ids", () => {
     const revision = (cardName: string, ownMax: string, exclusion: string) =>
-      replayInto40(new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+      replayInto40(new OrmYamlSerializer().deserializeAsWritten(`orm_version: "3.0"
 model:
   name: Shop
   object_types:
@@ -231,7 +229,7 @@ model:
     ]);
     // Without the old ids, the same two models pair by name and lose them.
     const plain = (m: OrmModel) =>
-      new OrmYamlSerializer().deserialize(new OrmYamlSerializer().serialize(m));
+      new OrmYamlSerializer().deserialize(new OrmYamlSerializer().serialize(m))!;
     expect(diffModels(plain(before), plain(after)).deltas.some((d) => d.kind === "removed")).toBe(
       true,
     );
@@ -305,7 +303,7 @@ model:
   });
 
   it("leaves a reference to a subtype fact it leaves unnamed dangling (decisions 17 and 19)", () => {
-    const source = new OrmYamlSerializer().deserialize(
+    const source = new OrmYamlSerializer().deserializeAsWritten(
       `orm_version: "3.0"
 model:
   name: Gone
@@ -458,7 +456,7 @@ model:
 
   it("gives one model for one input, on every run", () => {
     for (const c of corpus) {
-      const load = () => new OrmYamlSerializer().deserialize(JSON.stringify(c.doc));
+      const load = () => new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc));
       expect([c.file, asText(replayInto40(load()))]).toEqual([
         c.file,
         asText(replayInto40(load())),

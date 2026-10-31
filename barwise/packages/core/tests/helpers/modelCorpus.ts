@@ -35,7 +35,7 @@ export function modelCorpus(): readonly CorpusModel[] {
   for (const file of files) {
     let model;
     try {
-      model = serializer.deserialize(readFileSync(resolve(ROOT, file), "utf8"));
+      model = serializer.deserializeAsWritten(readFileSync(resolve(ROOT, file), "utf8"));
     } catch {
       continue;
     }

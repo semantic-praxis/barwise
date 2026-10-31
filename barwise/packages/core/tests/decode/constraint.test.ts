@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import schema from "../../schemas/orm-model-3.0.schema.json" with { type: "json" };
 import {
   ConstraintFile,
   type ConstraintFileValue,
@@ -74,7 +74,7 @@ const derived = (type: ConstraintKind) => derivedConstraints(type);
 
 /** Whether today's reader accepts one constraint where it is listed, and its record. */
 function todaysReading(where: Where, value: unknown): Reading {
-  if (!validator.validateModel(wrap(where, value)).valid) return { ok: false };
+  if (!validator.validateModel30(wrap(where, value)).valid) return { ok: false };
   return { ok: true, record: todays(value) };
 }
 
@@ -141,7 +141,7 @@ describe("the constraint decoder, against today's reader", () => {
   const holdsToToday = (values: readonly ConstraintFileValue[]) => {
     for (const value of values) {
       const where = placementOf(value.type)!;
-      expect([value, validator.validateModel(wrap(where, value)).errors]).toEqual([value, []]);
+      expect([value, validator.validateModel30(wrap(where, value)).errors]).toEqual([value, []]);
       expect(run(where, [value])[0]).toEqual(todays(value));
     }
   };

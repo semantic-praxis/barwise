@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import schema from "../../schemas/orm-model-3.0.schema.json" with { type: "json" };
 import { DecodeError } from "../../src/decode/decoder.js";
 import { runFactTypeDecode } from "../../src/decode/factType.js";
 import { FactType } from "../../src/model/FactType.js";
@@ -36,7 +36,7 @@ type Reading = { ok: true; config: unknown; } | { ok: false; };
 /** Whether today's reader accepts one fact type: its schema, then its constructor. */
 function todaysReading(value: unknown): Reading {
   const doc = { orm_version: "3.0", model: { name: "M", fact_types: [value] } };
-  if (!validator.validateModel(doc).valid) return { ok: false };
+  if (!validator.validateModel30(doc).valid) return { ok: false };
   const config = todays(value);
   try {
     new FactType(config as ConstructorParameters<typeof FactType>[0]);

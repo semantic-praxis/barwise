@@ -8,7 +8,7 @@
  */
 import type * as SchemaAST from "effect/SchemaAST";
 import { describe, expect, it } from "vitest";
-import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import schema from "../../schemas/orm-model-3.0.schema.json" with { type: "json" };
 import {
   CONSTRAINT_KIND_FILES,
   ExternalConstraintFile,

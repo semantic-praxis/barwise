@@ -1,6 +1,6 @@
 import { Ajv, type ErrorObject } from "ajv";
 import legacyOrmModelSchema from "../../schemas/orm-model-2.0.schema.json" with { type: "json" };
-import ormModelSchema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import ormModel30Schema from "../../schemas/orm-model-3.0.schema.json" with { type: "json" };
 
 /**
  * Result of validating a parsed YAML document against the JSON Schema.
@@ -22,12 +22,12 @@ export interface SchemaError {
  * Validates parsed .orm.yaml documents against the JSON Schema.
  *
  * Uses ajv internally. Each schema is compiled on first use and reused:
- * the loader reads 3.0 through the Effect decoders, so only the 2.0 reader
- * and the decoders' agreement tests validate here.
+ * the loader reads 4.0 and 3.0 through the Effect decoders, so only the
+ * 2.0 reader and the frozen 3.0 decoders' agreement tests validate here.
  */
 export class SchemaValidator {
   private readonly ajv = new Ajv({ allErrors: true });
-  private current?: ReturnType<Ajv["compile"]>;
+  private previous?: ReturnType<Ajv["compile"]>;
   private legacy?: ReturnType<Ajv["compile"]>;
 
   /**
@@ -40,12 +40,13 @@ export class SchemaValidator {
   }
 
   /**
-   * Validate a parsed YAML document (plain object) against the
-   * orm-model.schema.json schema.
+   * Validate a parsed YAML document (plain object) against the 3.0 schema,
+   * frozen as `orm-model-3.0.schema.json` when 4.0 landed: what the frozen
+   * 3.0 decoders are held to.
    */
-  validateModel(data: unknown): SchemaValidationResult {
-    this.current ??= this.ajv.compile(ormModelSchema);
-    return this.report(this.current, data);
+  validateModel30(data: unknown): SchemaValidationResult {
+    this.previous ??= this.ajv.compile(ormModel30Schema);
+    return this.report(this.previous, data);
   }
 
   private report(validate: ReturnType<Ajv["compile"]>, data: unknown): SchemaValidationResult {
