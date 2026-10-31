@@ -11,10 +11,10 @@
  *     valueConstraint, readings, role names, role players, constraints)
  */
 import { describe, expect, it } from "vitest";
+import { stringify } from "yaml";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument } from "../../src/serialization/OrmYamlSerializer.js";
-import { stringify } from "yaml";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 import { loadNestedUnder } from "../helpers/nestedUnder.js";
 import { placeFlags } from "../helpers/placeFlags.js";

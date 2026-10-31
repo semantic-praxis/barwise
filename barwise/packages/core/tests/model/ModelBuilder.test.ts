@@ -9,8 +9,8 @@
  * downstream test fixtures.
  */
 import { describe, expect, it } from "vitest";
-import { LOCAL_NAME_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
 import { isInternalUniqueness, isMandatoryRole } from "../../src/model/Constraint.js";
+import { LOCAL_NAME_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
 import { isEntityType, isValueType } from "../../src/model/ObjectType.js";
 import { expandReading } from "../../src/model/ReadingOrder.js";
 import { ModelBuilder, preferredId, roleId } from "../helpers/ModelBuilder.js";

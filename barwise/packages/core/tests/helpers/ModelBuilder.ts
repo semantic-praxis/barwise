@@ -1,11 +1,11 @@
 import type { Constraint } from "../../src/model/Constraint.js";
 import { storePreferredFlags } from "../../src/model/identification.js";
+import { localName } from "../../src/model/name.js";
 import type {
   DataTypeDef,
   ObjectTypeKind,
   ValueConstraintDef,
 } from "../../src/model/ObjectType.js";
-import { localName } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import type { FactInstanceConfig } from "../../src/model/Population.js";
 

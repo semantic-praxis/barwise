@@ -47,7 +47,9 @@ describe("writing a format 4.0 document", () => {
   it.each(corpus.map((c) => [c.file, c] as const))(
     "%s, replayed, writes a 4.0 document that reads back to itself",
     (_, c) => {
-      const model = replayInto40(new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc)));
+      const model = replayInto40(
+        new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc)),
+      );
       const doc = plain(writeDocument40(model));
       expect(doc.orm_version).toBe("4.0");
       expect([c.file, validate(doc) ? [] : validate.errors]).toEqual([c.file, []]);
@@ -59,7 +61,9 @@ describe("writing a format 4.0 document", () => {
     // A guard on the round trip above: it shows minted_from survives only
     // if some document carries one.
     const keys = corpus.flatMap((c) => {
-      const model = replayInto40(new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc)));
+      const model = replayInto40(
+        new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc)),
+      );
       return JSON.stringify(writeDocument40(model)).match(/"minted_from"/g) ?? [];
     });
     expect(keys.length).toBeGreaterThan(100);

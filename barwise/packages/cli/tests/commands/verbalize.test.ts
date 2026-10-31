@@ -156,7 +156,10 @@ describe("barwise verbalize", () => {
     const rows: Record<string, unknown>[] = JSON.parse(result.stdout).counterexamples;
     // A 3.x fixture, replayed at load: the constraint by its minted name.
     expect(rows.map((r) => [r.constraintId, r.factTypeIds])).toEqual([
-      ["No_Person_both_drives_some_Car_and_rides_some_Bus", ["Person_drives_Car", "Person_rides_Bus"]],
+      ["No_Person_both_drives_some_Car_and_rides_some_Bus", [
+        "Person_drives_Car",
+        "Person_rides_Bus",
+      ]],
     ]);
     expect(rows[0]).not.toHaveProperty("factTypeId");
   });
@@ -173,7 +176,9 @@ describe("barwise verbalize", () => {
     ]);
     expect(result.exitCode).toBe(0);
     const rows: Record<string, unknown>[] = JSON.parse(result.stdout).counterexamples;
-    expect(rows.map((r) => r.constraintId)).toEqual(["No_Person_both_drives_some_Car_and_rides_some_Bus"]);
+    expect(rows.map((r) => r.constraintId)).toEqual([
+      "No_Person_both_drives_some_Car_and_rides_some_Bus",
+    ]);
   });
 
   it("reports error for nonexistent fact type", async () => {

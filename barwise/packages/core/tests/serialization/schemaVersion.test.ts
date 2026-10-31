@@ -12,11 +12,11 @@ import {
   CURRENT_MAJOR_FIRST_VERSION,
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
-  PREVIOUS_ORM_VERSION,
   majorFirst,
   type OrmVersionMigration,
   planMigration,
   planRead,
+  PREVIOUS_ORM_VERSION,
   type ReadVersions,
 } from "../../src/serialization/schemaVersion.js";
 

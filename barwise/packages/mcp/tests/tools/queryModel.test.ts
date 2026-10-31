@@ -110,13 +110,21 @@ describe("query_model tool", () => {
       factTypes,
       factTypeIds,
     }))).toEqual([
-      { id: "Each_Room_is_in_at_most_one_Building", factTypes: ["Room is in Building"], factTypeIds: ["Room_is_in_Building"] },
+      {
+        id: "Each_Room_is_in_at_most_one_Building",
+        factTypes: ["Room is in Building"],
+        factTypeIds: ["Room_is_in_Building"],
+      },
       {
         id: "The_combination_of_Building_and_RoomNumber_is_unique_across_fact_types",
         factTypes: ["Room is in Building", "Room has RoomNumber"],
         factTypeIds: ["Room_is_in_Building", "Room_has_RoomNumber"],
       },
-      { id: "Each_Room_has_at_most_one_RoomNumber", factTypes: ["Room has RoomNumber"], factTypeIds: ["Room_has_RoomNumber"] },
+      {
+        id: "Each_Room_has_at_most_one_RoomNumber",
+        factTypes: ["Room has RoomNumber"],
+        factTypeIds: ["Room_has_RoomNumber"],
+      },
     ]);
   });
 

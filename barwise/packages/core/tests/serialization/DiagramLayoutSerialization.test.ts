@@ -276,7 +276,9 @@ ${diagram}
       positions:
         Customer: { x: 10, y: 20 }
         ot-customer: { x: 99, y: 99 }`;
-    const layout = serializer.deserializeAsWritten(v1Doc("1.1", collide)).getDiagramLayout("Sales")!;
+    const layout = serializer.deserializeAsWritten(v1Doc("1.1", collide)).getDiagramLayout(
+      "Sales",
+    )!;
     expect(layout.elements).toEqual(["ot-customer"]);
     expect(layout.positions).toEqual({ "ot-customer": { x: 10, y: 20 } });
   });
