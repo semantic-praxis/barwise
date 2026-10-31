@@ -6473,7 +6473,7 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
  * disagreement is seen. Returns the directory and how many manifests it
  * copied, so no count is restated here.
  */
-function architectureRepo() {
+function architectureRepo({ entry = "none" } = {}) {
   const dir = tempRepo();
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
@@ -6497,14 +6497,19 @@ function architectureRepo() {
     assert.ok(parseEnforcedBy(text).present, `${rel}: has no Enforced-by: header to rewrite`);
     const ids = decisionIds(text).decisions.map((d) => d.id);
     // Enforced-by: is the last header field (check:architecture holds it to
-    // that, and requires it), so it runs to the blank line.
-    const value = `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n`;
+    // that, and requires it), so it runs to the blank line. `entry: "tests"`
+    // declares every decision as tested instead, which check:architecture
+    // answers from no input at all, for a case that needs a tree with no
+    // tracker.
+    const value = entry === "tests"
+      ? `Enforced-by: tests (${ids.join(", ")})\n`
+      : `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n`;
     const rewritten = text.replace(/^Enforced-by:[^]*?\n(?=\n)/m, value);
     assert.notEqual(rewritten, text, `${rel}: its Enforced-by: header was not rewritten`);
     stage(dir, rel, rewritten);
     declaring += 1;
   }
-  if (declaring > 0) {
+  if (entry !== "tests") {
     stage(dir, ".beads/issues.jsonl", '{"id":"barwise-fx1","status":"open","title":"fixture"}\n');
   }
   let manifests = 0;
@@ -6517,7 +6522,7 @@ function architectureRepo() {
   }
   // The rewritten headers render differently in the index, so the copied
   // section is regenerated from them, as stageAdr() does for one ADR.
-  if (declaring > 0) {
+  {
     const r = spawnSync(
       process.execPath,
       [join(SCRIPTS, "regen-architecture.mjs"), "--root", dir],
@@ -7578,12 +7583,14 @@ test("check:architecture refuses, exit 2, only where it cannot tell, and lists i
   }
 });
 
-test("check:architecture requires Enforced-by:, and reads no ci.yml or scripts when no ADR declares a gate", () => {
-  // The fixture has no ci.yml or root package.json, and every ADR in it
-  // declares `none` only, which needs neither, so neither is a refusal.
-  const { dir, declaring } = architectureRepo();
+test("check:architecture requires Enforced-by:, and reads no ci.yml, scripts or tracker no entry needs", () => {
+  // The fixture has no ci.yml, root package.json or tracker, and every ADR
+  // in it declares `tests` only, which needs none of them, so none is a
+  // refusal.
+  const { dir, declaring } = architectureRepo({ entry: "tests" });
   try {
-    stageAdr(dir, "a-concern", ADR_OK);
+    assert.ok(!existsSync(join(dir, ".beads/issues.jsonl")), "the fixture must carry no tracker");
+    stageAdr(dir, "a-concern", ADR_OK.replace("none (barwise-fx1: the-rule)", "tests (the-rule)"));
     execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
@@ -7592,7 +7599,7 @@ test("check:architecture requires Enforced-by:, and reads no ci.yml or scripts w
     const bare = archPlanted(
       dir,
       "barwise/docs/adr/a-concern.md",
-      (s) => s.replace("Enforced-by: none (barwise-fx1: the-rule)\n", ""),
+      (s) => s.replace("Enforced-by: tests (the-rule)\n", ""),
     );
     assert.equal(bare.status, 1, bare.stdout + bare.stderr);
     assert.match(bare.stderr, /a-concern\.md: no Enforced-by: header/);

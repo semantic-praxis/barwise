@@ -270,7 +270,7 @@ describe("Ossie export: a native model", () => {
 });
 
 describe("Ossie export: the loss report", () => {
-  it("names each unexpressible constraint, and gives each with roles a constraint spec", () => {
+  it("names each unexpressible constraint, and gives each with roles a constraint spec [adr:ossie-interchange#nothing-lost-silently]", () => {
     const m = new OrmModel({ name: "M" });
     const p = entity(m, "Person");
     const ft = fact(m, "Person knows Person", [p, p], "{0} knows {1}", {

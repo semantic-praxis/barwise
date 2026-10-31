@@ -150,7 +150,7 @@ describe("planRead", () => {
     expect(planRead("3.0", gap)).toEqual({ ok: false, reason: "unregistered" });
   });
 
-  it("calls a 3.1 build that forgot its 3.0 step a bug in barwise [adr:schema-versioning#minor-and-major]", () => {
+  it("calls a 3.1 build that forgot its 3.0 step a bug in barwise", () => {
     expect(planRead("3.0", { ...AT_3_1, migrations: AT_3_1.migrations.slice(0, 2) })).toEqual({
       ok: false,
       reason: "unregistered",

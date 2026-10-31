@@ -8,7 +8,7 @@ docs/specs/archive/schema-versioning.spec.md,
 docs/specs/diagram-references-by-id.spec.md,
 docs/specs/orm-format-3.spec.md
 Enforced-by: tests (version-signal, minor-and-major, load-forward),
-none (barwise-ym8.31z: minor-and-major), none (barwise-ym8.8l3: shared-minor),
+none (barwise-ym8.4i2: version-signal), none (barwise-ym8.31z: minor-and-major), none (barwise-ym8.8l3: shared-minor),
 none (barwise-ym8.yfi: load-forward)
 
 ## Context
