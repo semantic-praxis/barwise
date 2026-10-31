@@ -6,6 +6,8 @@ Tracking: barwise-ubc, barwise-915, barwise-1059, barwise-920, barwise-g32,
 barwise-8hs, barwise-1045, barwise-921,
 docs/specs/session-node-pin.spec.md,
 docs/specs/deterministic-guards.spec.md
+Enforced-by: none (barwise-ym8.q89: node-from-nvmrc),
+none (barwise-ym8.52y: python-minor), none (barwise-ym8.eq3: verify-running)
 
 ## Context
 
@@ -27,13 +29,13 @@ declared authority is proposed, not built: workstream 4 of
 ## Decision
 
 1. **Node is the version `.nvmrc` names, and that file is its one
-   home.** CI workflows read it with `node-version-file`, and the
+   home.**{#node-from-nvmrc} CI workflows read it with `node-version-file`, and the
    web-session hook reads it rather than copying the number.
 2. **Python is pinned in `.python-version`, beside `.nvmrc`, to the minor
-   only.** The patch is left out because uv did not enforce one: with
+   only.**{#python-minor} The patch is left out because uv did not enforce one: with
    `3.13.12` in the file, uv 0.8.17 used 3.13.7 and exited 0
    (barwise-915).
-3. **Verify the interpreter that ran, never the file that asked.** A
+3. **Verify the interpreter that ran, never the file that asked.**{#verify-running} A
    claim that a run used the pinned runtime rests on reading the running
    version back.
 

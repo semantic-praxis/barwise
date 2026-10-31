@@ -5,6 +5,10 @@ Date: 2026-09-12
 Tracking: barwise-ubc, barwise-1021, barwise-1022, barwise-1028, barwise-3wu, barwise-i23,
 barwise-jha, barwise-8fc, barwise-flw, barwise-sma,
 docs/specs/credential-scanning.spec.md
+Enforced-by: tests (wrapper-contract),
+none (barwise-ym8.yhs: rotate-not-revert), none (barwise-ym8.7zs: gitleaks-detects),
+none (barwise-ym8.kf3: scan-index-and-history), none (barwise-ym8.gc7: wrapper-contract),
+none (barwise-ym8.nxs: pinned-gitleaks)
 
 ## Context
 
@@ -24,24 +28,24 @@ and the exit contract Decision 4 applies is
 
 ## Decision
 
-1. **A leaked credential is rotated, never reverted.** The remedy for a
+1. **A leaked credential is rotated, never reverted.**{#rotate-not-revert} The remedy for a
    real finding is rotation by a person in the provider console; history
    surgery is not a remedy and is never presented as one.
-2. **Detection is gitleaks', not ours.** No rules are added here:
+2. **Detection is gitleaks', not ours.**{#gitleaks-detects} No rules are added here:
    `.gitleaks.toml` is `[extend] useDefault = true` plus exactly one rule,
    for Anthropic keys, which gitleaks 8.28.0 does not detect.
-3. **Scan the index at the commit and all reachable history in CI.**
+3. **Scan the index at the commit and all reachable history in CI.**{#scan-index-and-history}
    `npm run check:secrets -- --staged` runs at the pre-commit hook;
    `npm run check:secrets` scans all reachable commits in CI with no
    docs-only skip.
-4. **The wrapper supplies the gate contract, not detection.**
+4. **The wrapper supplies the gate contract, not detection.**{#wrapper-contract}
    `scripts/check-secrets.mjs` exits `2`, never reporting a clean scan,
    when gitleaks is absent or cannot be executed, when `.gitleaks.toml` is
    absent, when a history scan is asked of a shallow clone, when the
    repository root cannot be resolved, or when gitleaks exits anything but
    0 or 1. It always passes `--redact` and `--verbose`, and on a finding
    exits `1` and says to rotate first.
-5. **One pinned version, verified.** `scripts/install-gitleaks.sh` is the
+5. **One pinned version, verified.**{#pinned-gitleaks} `scripts/install-gitleaks.sh` is the
    single home of the version and per-platform SHA-256, verified before
    unpacking, and is what both `ci.yml` and the session hook call.
 
