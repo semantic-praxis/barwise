@@ -63,7 +63,7 @@ describe("AnthropicLlmClient", () => {
       expect(constructed).toBe(false);
     });
 
-    it("constructs the SDK with the api key on first completion", async () => {
+    it("constructs the SDK with the api key on first completion [adr:keyless-model-access#library-takes-key]", async () => {
       const client = new AnthropicLlmClient({ apiKey: "sk-ant" });
       mockCreate.mockResolvedValueOnce(textResponse("hi"));
 

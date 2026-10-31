@@ -41,7 +41,7 @@ warmPromptCommand();
 
 describe("--api-key is refused", () => {
   for (const argv of COMMANDS) {
-    it(`refuses it on \`${argv.join(" ")}\``, async () => {
+    it(`refuses it on \`${argv.join(" ")}\` [adr:keyless-model-access#no-key-in-argv]`, async () => {
       const r = await runCli([...argv, "--api-key", KEY]);
 
       expect(r.exitCode).toBe(1);

@@ -168,7 +168,7 @@ function serverWithCapabilities(caps: ClientCapabilities | undefined) {
 }
 
 describe("resolveLlmClient", () => {
-  it("prefers sampling when the client advertises sampling.tools", () => {
+  it("prefers sampling when the client advertises sampling.tools [adr:keyless-model-access#keyless-defaults]", () => {
     const { client, route } = resolveLlmClient(
       serverWithCapabilities({ sampling: { tools: {} } }),
     );
@@ -188,7 +188,7 @@ describe("resolveLlmClient", () => {
     expect(client).not.toBeInstanceOf(SamplingLlmClient);
   });
 
-  it("falls back when the client advertises no capabilities at all", () => {
+  it("falls back when the client advertises no capabilities at all [adr:keyless-model-access#keyless-defaults]", () => {
     expect(resolveLlmClient(serverWithCapabilities(undefined)).route).toBe("api-key");
     expect(resolveLlmClient(serverWithCapabilities({})).route).toBe("api-key");
   });

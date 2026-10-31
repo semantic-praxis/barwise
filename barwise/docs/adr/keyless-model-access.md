@@ -5,6 +5,10 @@ Date: 2026-09-12
 Tracking: barwise-ubc, barwise-1029, barwise-1030, barwise-1031, barwise-ybi, barwise-xsg,
 barwise-ppb, barwise-2n1,
 docs/specs/keyless-model-access.spec.md
+Enforced-by: tests (no-key-in-argv, no-key-in-setting, keyless-defaults, library-takes-key),
+none (barwise-ym8.4gl: no-key-in-argv), none (barwise-ym8.nw4: no-key-in-setting),
+none (barwise-ym8.52o: keyless-defaults), none (barwise-ym8.esi: measurement-key),
+none (barwise-ym8.dxy: library-takes-key)
 
 ## Context
 
@@ -22,25 +26,25 @@ in `keyless-model-access.spec.md`; detecting a key that leaks anyway is
 
 ## Decision
 
-1. **No key in argv.** `--api-key` is refused on every CLI command. The
+1. **No key in argv.**{#no-key-in-argv} `--api-key` is refused on every CLI command. The
    five commands that took it still declare it, so the error can name
    `ANTHROPIC_API_KEY` as the replacement, and one `preAction` hook on the
    root program refuses it before any command body sees the value; every
    other command rejects it as an unknown option.
-2. **No key in an editor setting.** VS Code keeps the Anthropic key in
+2. **No key in an editor setting.**{#no-key-in-setting} VS Code keeps the Anthropic key in
    `ExtensionContext.secrets`. The old setting is `application`-scoped and
    deprecated, and is read only to migrate a value into secret storage and
    clear it.
-3. **The default paths need no key.** VS Code defaults to
+3. **The default paths need no key.**{#keyless-defaults} VS Code defaults to
    `CopilotLlmClient` over `vscode.lm`. The MCP server uses MCP sampling
    when the client advertises `sampling.tools`, falls back to
    `createLlmClient()` otherwise, and appends the route to the tool result.
-4. **The measurement lane is the one lane that must hold a key.**
+4. **The measurement lane is the one lane that must hold a key.**{#measurement-key}
    promptlab, `prompt run` and the optimizer keep direct API access,
    because a host-mediated call has no attributable model and a score
    through one measures nothing. That key must be a workspace-scoped key
    with a spend limit, never a personal one.
-5. **The library may take a key from its caller.** `@barwise/llm` keeps its
+5. **The library may take a key from its caller.**{#library-takes-key} `@barwise/llm` keeps its
    `apiKey` option; the hazard removed is a value in `process.argv` or a
    committable file, not a credential passed in code.
 
