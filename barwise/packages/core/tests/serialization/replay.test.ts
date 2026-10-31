@@ -322,7 +322,7 @@ model:
     expect(model.constraints[0]).toMatchObject({ subtypeFactIds: ["sf1", "sf2"] });
   });
 
-  it("maps a diagram's orientations by fact type, keeps a stale position key apart, and names a shadow's context locally", () => {
+  it("maps a diagram's orientations by fact type, keeps stale position and orientation keys apart, and names a shadow's context locally", () => {
     const source = new OrmModel({ name: "Layout" });
     source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
     source.addObjectType({ id: "u1", name: "Customer", kind: "entity", referenceMode: "nr" });
@@ -345,15 +345,19 @@ model:
     });
     source.addDiagramLayout({
       name: "Main",
-      // "Customer" is a stale key: no element holds that id in the file.
+      // "Customer" and "Person_knows_Customer" are stale keys: no element
+      // holds either id in the file, and each is a name the replay would mint.
       positions: { u1: { x: 1, y: 1 }, Customer: { x: 9, y: 9 } },
-      orientations: { x1: "vertical" },
+      orientations: { x1: "vertical", Person_knows_Customer: "horizontal" },
     });
     const model = replayInto40(source);
     const layout = model.diagramLayouts[0]!;
     expect(model.getObjectTypeByName("Customer")!.id).toBe("Customer_2");
     expect(layout.positions).toEqual({ Customer_2: { x: 1, y: 1 }, Customer: { x: 9, y: 9 } });
-    expect(layout.orientations).toEqual({ Person_knows_Customer: "vertical" });
+    expect(layout.orientations).toEqual({
+      Person_knows_Customer_2: "vertical",
+      Person_knows_Customer: "horizontal",
+    });
     expect(model.getObjectTypeByName("Order")!.id).toBe("Order_Management:Order");
   });
 
