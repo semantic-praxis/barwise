@@ -6,7 +6,7 @@ Tracking: barwise-ilb, barwise-1040, barwise-1050, barwise-953,
 barwise-nm8, barwise-16u, barwise-j9d, barwise-m9q, barwise-gin,
 docs/specs/tiered-pr-review.spec.md, docs/specs/review-md.spec.md,
 docs/specs/review-routing.spec.md
-Enforced-by: npm run check:review-tiers (tier-informs), tests (copilot-requested),
+Enforced-by: tests (copilot-requested, tier-informs),
 none (barwise-ym8.7y6: copilot-requested), none (barwise-ym8.8ya: copilot-never-blocks),
 none (barwise-ym8.f9u: review-md-owns-lanes), none (barwise-ym8.ehz: tier-informs),
 none (barwise-ym8.gwj: prevent-upstream)

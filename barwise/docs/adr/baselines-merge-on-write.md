@@ -7,7 +7,7 @@ barwise-tko, barwise-rh3, barwise-80d,
 docs/specs/baseline-write-preserves-verdicts.spec.md
 Enforced-by: tests (merge-not-regenerate, specs-write-on-ask, findings-order,
 duplication-no-writer), none (barwise-ym8.fi5: merge-not-regenerate),
-none (barwise-ym8.3yv: one-merge-owner), none (barwise-ym8.nhy: findings-order),
+none (barwise-ym8.3yv: one-merge-owner), none (barwise-ym8.6jy: specs-write-on-ask), none (barwise-ym8.nhy: findings-order),
 none (barwise-ym8.79m: duplication-no-writer)
 
 ## Context

@@ -34,7 +34,7 @@ function baselineFile(contents) {
 
 const PRESERVE = { verdict: "TODO", note: "TODO: classify" };
 
-test("a still-detected row keeps every human-owned field", () => {
+test("a still-detected row keeps every human-owned field [adr:baselines-merge-on-write#merge-not-regenerate]", () => {
   const { rows, kept, added } = mergeBaselineRows({
     fresh: { a: { message: "fresh message" } },
     existing: { a: { message: "stale message", verdict: "real", note: "why" } },
@@ -46,7 +46,7 @@ test("a still-detected row keeps every human-owned field", () => {
   assert.equal(added, 0);
 });
 
-test("a derived field is refreshed from the detector, not preserved", () => {
+test("a derived field is refreshed from the detector, not preserved [adr:baselines-merge-on-write#merge-not-regenerate]", () => {
   // The detector owns `message`; the human owns `verdict`. Preserving the
   // derived half too would pin a row's evidence to whenever it was first seen.
   const { rows } = mergeBaselineRows({
@@ -71,7 +71,7 @@ test("a falsy preserved value survives a non-empty placeholder", () => {
   assert.equal(kept, 1, "a row with one real verdict and one empty note was judged");
 });
 
-test("a new id gets the placeholder and counts as added", () => {
+test("a new id gets the placeholder and counts as added [adr:baselines-merge-on-write#merge-not-regenerate]", () => {
   const { rows, kept, added } = mergeBaselineRows({
     fresh: { a: { message: "m" }, b: { message: "n" } },
     existing: { a: { message: "m", verdict: "real", note: "why" } },
@@ -113,7 +113,7 @@ test("a partly classified row counts as kept", () => {
   assert.equal(unclassified, 0);
 });
 
-test("a row the detector no longer produces is reported, not written [adr:baselines-merge-on-write#findings-order]", () => {
+test("a row the detector no longer produces is reported, not written [adr:baselines-merge-on-write#findings-order] [adr:baselines-merge-on-write#merge-not-regenerate]", () => {
   const { rows, dropped } = mergeBaselineRows({
     fresh: { a: { message: "m" } },
     existing: {

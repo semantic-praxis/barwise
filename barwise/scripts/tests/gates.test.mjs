@@ -2769,7 +2769,7 @@ const BASELINE_WRITERS = [
 ];
 
 for (const w of BASELINE_WRITERS) {
-  test(`${w.script} rewrites without changing a committed verdict [adr:baselines-merge-on-write#merge-not-regenerate]`, (t) => {
+  test(`${w.script} rewrites without changing a committed verdict${w.needsDist === undefined ? " [adr:baselines-merge-on-write#merge-not-regenerate]" : ""}`, (t) => {
     if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
@@ -3957,7 +3957,7 @@ function fileList(dir, files) {
   return ["--files", path];
 }
 
-test("pr-risk classifies a real file list and exits 0 for either tier", () => {
+test("pr-risk classifies a real file list and exits 0 for either tier [adr:review-policy#tier-informs]", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
   try {
     const routine = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/docs/specs/a.spec.md"]));
@@ -4000,7 +4000,7 @@ test("pr-risk names the triggering heading and the file that triggered it", () =
  * printed, the path-triggered ones first with their files; and the
  * failure modes never change the tier or the exit status.
  */
-test("pr-risk leads with the routing and prints every REVIEW.md failure mode", () => {
+test("pr-risk leads with the routing and prints every REVIEW.md failure mode [adr:review-policy#tier-informs]", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
   try {
     const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/scripts/x.mjs"]));
@@ -4436,7 +4436,7 @@ test("pr-risk's git path keeps a rename's source and reads names exactly", () =>
   }
 });
 
-test("the Copilot workflow reads its allow-list from main, never from the pull request", () => {
+test("the Copilot workflow reads its allow-list from main, never from the pull request [adr:review-policy#copilot-requested]", () => {
   // pull_request would check out the PR's tree, and a PR could widen the
   // allow-list and exempt itself. This pins the trigger and the checkout.
   const wf = readFileSync(join(REPO, ".github/workflows/copilot-review.yml"), "utf8");
