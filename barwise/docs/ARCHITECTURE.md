@@ -37,14 +37,14 @@ check (barwise-raw), and most gates skip a docs-only change.
 Architecture:
 
 - [Connector packages](adr/connector-packages.md) -- 2026-10-24
-- [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity (pure-ops, ambient-as-argument); gap: barwise-fzd (pure-ops, ambient-as-argument); gap: barwise-ym8.lxl (pure-ops); gap: barwise-ym8.r6i (ambient-as-argument); gap: barwise-ym8.kys (one-layer-out); gap: barwise-ym8.sit (mint-on-create)
+- [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity (pure-ops, ambient-as-argument); gap: barwise-ym8.lxl (pure-ops); gap: barwise-ym8.r6i (ambient-as-argument); gap: barwise-ym8.kys (one-layer-out); gap: barwise-ym8.sit (mint-on-create)
 - [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12
 - [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17
 - [Ossie interchange](adr/ossie-interchange.md) -- 2026-10-28
 - [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23 -- declared: depcruise (intended-is-graph), check:architecture (claude-md-rendering, runtime-deps-within); gap: barwise-ym8.d3m (intended-is-graph)
 - [Production prompt resolution](adr/production-prompt-resolution.md) -- 2026-08-26
 - [Schema versioning](adr/schema-versioning.md) -- 2026-10-28
-- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-09-10 -- declared: tests (pinned-tool-lists); gap: barwise-1005 (matrix-records-reach, matrix-same-commit); gap: barwise-xpt (matrix-records-reach, matrix-same-commit); gap: barwise-ym8.0hi (vscode-yes-means)
+- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-09-10 -- declared: tests (pinned-tool-lists); gap: barwise-ym8.wfy (matrix-records-reach); gap: barwise-ym8.3nm (matrix-same-commit); gap: barwise-ym8.0hi (vscode-yes-means)
 
 Process:
 
@@ -54,7 +54,7 @@ Process:
 - [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-08-29
 - [Gate refusal contract](adr/gate-refusal-contract.md) -- 2026-09-17
 - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18
-- [Must-agree copies carry a check](adr/must-agree-copies.md) -- 2026-08-30 -- declared: audit:duplication -- --check (check-on-copy, every-candidate-verdict), check:parity (registered-sets-identical); gap: barwise-970 (check-on-copy); gap: barwise-1072 (check-on-copy); gap: barwise-tml (check-on-copy); gap: barwise-ym8.edf (check-on-copy); gap: barwise-ym8.3tg (check-first); gap: barwise-tdu (registered-sets-identical); gap: barwise-ym8.8nq (registered-sets-identical); gap: barwise-u5d (every-candidate-verdict)
+- [Must-agree copies carry a check](adr/must-agree-copies.md) -- 2026-08-30 -- declared: audit:duplication -- --check (every-candidate-verdict), check:parity (registered-sets-identical); gap: barwise-ym8.edf (check-on-copy); gap: barwise-ym8.3tg (check-first); gap: barwise-ym8.8nq (registered-sets-identical); gap: barwise-ym8.onf (every-candidate-verdict)
 - [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30
 - [Plan before code](adr/plan-before-code.md) -- 2026-10-25
 - [Python from the lockfile](adr/python-from-the-lockfile.md) -- 2026-09-26

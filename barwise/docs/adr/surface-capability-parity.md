@@ -6,8 +6,7 @@ Tracking: barwise-ubc, barwise-0wa, barwise-1fr, barwise-1005, barwise-xpt,
 docs/specs/cli-surface-parity.spec.md,
 docs/specs/getting-started-guides.spec.md
 Enforced-by: tests (pinned-tool-lists),
-none (barwise-1005: matrix-records-reach, matrix-same-commit),
-none (barwise-xpt: matrix-records-reach, matrix-same-commit),
+none (barwise-ym8.wfy: matrix-records-reach), none (barwise-ym8.3nm: matrix-same-commit),
 none (barwise-ym8.0hi: vscode-yes-means)
 
 ## Context

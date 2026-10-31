@@ -6,13 +6,11 @@ Tracking: barwise-ubc, barwise-868, barwise-871, barwise-872, barwise-tdu,
 barwise-u5d, barwise-tml, barwise-iil,
 barwise-919, docs/specs/duplication-drift-guards.spec.md,
 docs/specs/deterministic-guards.spec.md
-Enforced-by: npm run audit:duplication -- --check (check-on-copy, every-candidate-verdict),
+Enforced-by: npm run audit:duplication -- --check (every-candidate-verdict),
 npm run check:parity (registered-sets-identical),
-none (barwise-970: check-on-copy), none (barwise-1072: check-on-copy),
-none (barwise-tml: check-on-copy), none (barwise-ym8.edf: check-on-copy),
-none (barwise-ym8.3tg: check-first), none (barwise-tdu: registered-sets-identical),
+none (barwise-ym8.edf: check-on-copy), none (barwise-ym8.3tg: check-first),
 none (barwise-ym8.8nq: registered-sets-identical),
-none (barwise-u5d: every-candidate-verdict)
+none (barwise-ym8.onf: every-candidate-verdict)
 
 ## Context
 
@@ -76,7 +74,7 @@ members.
   - a set with one member, or with none, passes trivially, so dropping
     members is an unchecked partial retirement.
 - Nothing gates decision 3's retirement clause, or decision 4's verdict
-  content (barwise-u5d). `pr-review` lists both under "Ratchets
+  content (barwise-ym8.8nq, barwise-ym8.onf; related barwise-u5d). `pr-review` lists both under "Ratchets
   silenced". `REVIEW.md`'s "Do not report" tells reviewers to skip
   registered copies and the duplication ratchet because CI enforces
   them, so the review instructions contradict each other (barwise-iil).
