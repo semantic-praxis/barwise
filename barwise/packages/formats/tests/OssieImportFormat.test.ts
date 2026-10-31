@@ -876,7 +876,7 @@ describe("Ossie import: what the export could not split back", () => {
 });
 
 describe("Ossie import: refusals and warnings", () => {
-  it("refuses a version other than the pinned one, naming both", () => {
+  it("refuses a version other than the pinned one, naming both [adr:ossie-interchange#pinned-version]", () => {
     expect(() => new OssieImportFormat().parse("version: 0.3.0\nname: X\nontology: []\n")).toThrow(
       new OssieImportError(
         'Ossie version "0.3.0" is not supported; barwise reads version 0.2.0.dev0 only.',
@@ -898,7 +898,7 @@ ontology:
     ]);
   });
 
-  it("names everything the model cannot carry", () => {
+  it("names everything the model cannot carry [adr:ossie-interchange#ontology-layer-only]", () => {
     const { warnings, confidence } = load(`
 prefixes: { ex: "http://example.com/" }
 ai_context: Airline data.
@@ -930,7 +930,7 @@ describe("Ossie import: fields the pinned schema does not define", () => {
   const unknown = (path: string) =>
     `${path}: the Ossie 0.2.0.dev0 schema defines no such field; ignored.`;
 
-  it("names one at the top level, in a concept, a relationship and a role", () => {
+  it("names one at the top level, in a concept, a relationship and a role [adr:ossie-interchange#nothing-lost-silently]", () => {
     const { model, warnings, confidence } = load(`
 colour: blue
 ontology:

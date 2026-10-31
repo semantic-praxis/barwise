@@ -43,12 +43,12 @@ const PROJECT = (version?: string, extra = "") =>
 ${extra}`;
 
 describe("format_version", () => {
-  it("is pinned by each schema to the constant its serializer stamps", () => {
+  it("is pinned by each schema to the constant its serializer stamps [adr:schema-versioning#version-signal]", () => {
     expect(schemaConst("orm-project.schema.json")).toBe(CURRENT_PROJECT_FORMAT_VERSION);
     expect(schemaConst("context-mapping.schema.json")).toBe(CURRENT_MAPPING_FORMAT_VERSION);
   });
 
-  it("is stamped on every project and mapping file written", () => {
+  it("is stamped on every project and mapping file written [adr:schema-versioning#version-signal]", () => {
     const manifest = parse(new ProjectSerializer().serialize(new OrmProject({ name: "Acme" })));
     expect(manifest.format_version).toBe(CURRENT_PROJECT_FORMAT_VERSION);
     const mapping = parse(
@@ -64,7 +64,7 @@ describe("format_version", () => {
     expect(mapping.format_version).toBe(CURRENT_MAPPING_FORMAT_VERSION);
   });
 
-  it("reads a file from before versioning, and one at the current version", () => {
+  it("reads a file from before versioning, and one at the current version [adr:schema-versioning#version-signal]", () => {
     const projects = new ProjectSerializer();
     expect(projects.deserialize(PROJECT()).name).toBe("Acme");
     expect(projects.deserialize(PROJECT("1.0")).name).toBe("Acme");
@@ -73,7 +73,7 @@ describe("format_version", () => {
     expect(mappings.deserialize(MAPPING("1.0"), "m").sourceContext).toBe("crm");
   });
 
-  it("refuses a newer project file as newer, before the schema sees its fields", () => {
+  it("refuses a newer project file as newer, before the schema sees its fields [adr:schema-versioning#version-signal]", () => {
     // A 1.1 field this build does not know: the schema would call it an
     // additional property, and the version check must answer first.
     const yaml = PROJECT("1.1", "  future_field: x\n");
@@ -82,7 +82,7 @@ describe("format_version", () => {
     expect(() => new ProjectSerializer().deserialize(yaml)).not.toThrow(/additional/);
   });
 
-  it("refuses a newer mapping file as newer, before the schema sees its fields", () => {
+  it("refuses a newer mapping file as newer, before the schema sees its fields [adr:schema-versioning#version-signal]", () => {
     const yaml = `${MAPPING("2.0")}  future_field: x\n`;
     expect(() => new MappingSerializer().deserialize(yaml, "m")).toThrow(
       MappingDeserializationError,

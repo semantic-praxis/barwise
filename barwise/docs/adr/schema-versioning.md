@@ -7,6 +7,9 @@ barwise-jj8,
 docs/specs/archive/schema-versioning.spec.md,
 docs/specs/diagram-references-by-id.spec.md,
 docs/specs/orm-format-3.spec.md
+Enforced-by: tests (version-signal, minor-and-major, load-forward),
+none (barwise-ym8.4i2: version-signal), none (barwise-ym8.31z: minor-and-major), none (barwise-ym8.8l3: shared-minor),
+none (barwise-ym8.yfi: load-forward)
 
 ## Context
 
@@ -25,7 +28,7 @@ was a section of the metamodel ADR before this one.
 
 ## Decision
 
-1. **The version is the compatibility signal.** Every `.orm.yaml` states
+1. **The version is the compatibility signal.**{#version-signal} Every `.orm.yaml` states
    an `orm_version`. The serializer stamps `CURRENT_ORM_VERSION` on
    every file it writes, and the JSON Schema pins the same value as a
    `const`, so a reader given a file whose version exceeds its own
@@ -35,7 +38,7 @@ was a section of the metamodel ADR before this one.
    one current version per file kind; a file of either kind without one
    predates versioning and is read as its first version.
 2. **An additive change bumps the minor version; a breaking or
-   structural change bumps the major with a real migration.** Adding an
+   structural change bumps the major with a real migration.**{#minor-and-major} Adding an
    optional construct or field is a minor change: bump
    `CURRENT_ORM_VERSION` and the schema `const`, and register a forward
    migration (a no-op for a purely additive change). The loader reads every
@@ -44,13 +47,13 @@ was a section of the metamodel ADR before this one.
    major loadable; a major bump moves `CURRENT_MAJOR_FIRST_VERSION`. A change an older
    reader would misread rather than ignore is structural (diagram
    references moving from names to ids was one).
-3. **The minor bump is shared across its unreleased cycle.** The first
+3. **The minor bump is shared across its unreleased cycle.**{#shared-minor} The first
    additive change after a released version performs the bump; every
    later additive change before the next release adds its construct to
    the already-bumped schema without touching the version -- not one
    bump per construct or per pull request.
 4. **Older files load at the current version; a surface writes them
-   back only when it writes an edit.** A migration brings an older file
+   back only when it writes an edit.**{#load-forward} A migration brings an older file
    forward on load, either as a step on the raw document
    (`ORM_VERSION_MIGRATIONS`) or, where the step needs the model,
    through the previous major's reader (2.0 to 3.0). The file on disk
