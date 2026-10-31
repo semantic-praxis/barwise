@@ -33,7 +33,12 @@ import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
 import { type PopulationConfig, toPopulationConfig } from "../model/Population.js";
-import { type SubtypeFact, subtypePairKey, toSubtypeFactConfig } from "../model/SubtypeFact.js";
+import {
+  type SubtypeFact,
+  subtypeFactRef,
+  subtypePairKey,
+  toSubtypeFactConfig,
+} from "../model/SubtypeFact.js";
 import { derivedId, MERGE_ID_TAG } from "../serialization/derivedId.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import type { Diagnostic } from "../validation/Diagnostic.js";
@@ -383,6 +388,7 @@ export function mergeModels(
   }
   // Which source fact each merged subtype fact came from, so a repeated
   // pair is carried only beside its own sibling.
+  // Keyed by `subtypeFactRef`, so one left unnamed still has a key.
   const placedFrom = new Map<string, SubtypeFact>();
   const place = (id: string, fact: SubtypeFact) => {
     placedFrom.set(id, fact);
@@ -419,7 +425,7 @@ export function mergeModels(
     // modification can turn an end into a value type, and a rejected
     // removal plus an accepted addition can resolve to a pair already held.
     if (merged.canAddSubtypeFact({ subtypeId, supertypeId })) {
-      place(merged.addSubtypeFact(config).id, chosen);
+      place(subtypeFactRef(merged.addSubtypeFact(config)), chosen);
       continue;
     }
     // The same split the population phase makes below: an accepted
@@ -431,7 +437,7 @@ export function mergeModels(
       isDanglingPlayer(existing, incoming, chosen.subtypeId)
       || isDanglingPlayer(existing, incoming, chosen.supertypeId)
     ) {
-      place(merged.addSubtypeFact(config, { skipPlayerValidation: true }).id, chosen);
+      place(subtypeFactRef(merged.addSubtypeFact(config, { skipPlayerValidation: true })), chosen);
       continue;
     }
     // A pair its own model already repeated (a lenient load) is carried
@@ -443,7 +449,7 @@ export function mergeModels(
     // still dropped.
     if (isSiblingRepeat(source, chosen, subtypeId, supertypeId)) {
       const placed = merged.addSubtypeFact(config, { skipPlayerValidation: true });
-      place(placed.id, chosen);
+      place(subtypeFactRef(placed), chosen);
     }
   }
   function isSiblingRepeat(
@@ -458,7 +464,7 @@ export function mergeModels(
     // and is dropped below.
     const pair = subtypePairKey({ subtypeId, supertypeId });
     const holder = merged.subtypeFacts.find((sf) => subtypePairKey(sf) === pair);
-    const origin = holder && placedFrom.get(holder.id);
+    const origin = holder && placedFrom.get(subtypeFactRef(holder));
     if (origin === undefined) return false;
     // A sibling in this fact's own model, or in its partner's: an accepted
     // modification brings the incoming side, whose model may no longer
@@ -490,7 +496,7 @@ export function mergeModels(
       number,
     ][];
 
-  const objectificationId = (id: string) =>
+  const objectificationId = (id: string | undefined) =>
     mergedId("objectification", id, (x) => merged.getObjectifiedFactType(x) !== undefined);
   for (const [delta, idx] of oftDeltas) {
     const isAccepted = accepted.has(idx);
@@ -827,12 +833,13 @@ function remapPopulationRoles(
  * an element that kept a derived id from an earlier merge whose output is
  * being merged again.
  */
-function mergedId(
+function mergedId<P extends string | undefined>(
   kind: "subtype-fact" | "objectification" | "population",
-  preferred: string,
+  preferred: P,
   holds: (id: string) => boolean,
-): string {
-  if (!holds(preferred)) return preferred;
+): P | string {
+  // One its model left unnamed (decision 19) stays unnamed in the merge.
+  if (preferred === undefined || !holds(preferred)) return preferred;
   for (let attempt = 1;; attempt++) {
     const id = derivedId(`${MERGE_ID_TAG}.${kind}`, [preferred, String(attempt)]);
     if (!holds(id)) return id;

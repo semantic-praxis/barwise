@@ -89,6 +89,28 @@ export interface DiffIdentity {
    */
   objectTypeKey(model: OrmModel, id: string): string;
   factTypeKey(model: OrmModel, id: string): string;
+  /**
+   * The id an element of each side is paired by: its own, or, when both
+   * models were replayed from 3.x files (`OrmModel.priorIds`), the id it
+   * had in its file, so two replayed revisions of one file pair exactly
+   * although each replay named its elements afresh (iri-identity WS6).
+   */
+  readonly existingPairId: (id: string) => string;
+  readonly incomingPairId: (id: string) => string;
+}
+
+/** Each side's pairing id: its prior id when both models carry them, else its own. */
+function pairIds(
+  existing: OrmModel,
+  incoming: OrmModel,
+): { existingPairId: (id: string) => string; incomingPairId: (id: string) => string; } {
+  const a = existing.priorIds;
+  const b = incoming.priorIds;
+  if (a === undefined || b === undefined) {
+    const own = (id: string) => id;
+    return { existingPairId: own, incomingPairId: own };
+  }
+  return { existingPairId: (id) => a.get(id) ?? id, incomingPairId: (id) => b.get(id) ?? id };
 }
 
 export function diffIdentity(
@@ -97,8 +119,9 @@ export function diffIdentity(
   matching: ElementMatching,
   recognition: RenameRecognition = NO_RENAME_RECOGNITION,
 ): DiffIdentity {
-  let objectTypes = pairElements(existing.objectTypes, incoming.objectTypes, matching);
-  let factTypes = pairElements(existing.factTypes, incoming.factTypes, matching);
+  const ids = pairIds(existing, incoming);
+  let objectTypes = pairElements(existing.objectTypes, incoming.objectTypes, matching, ids);
+  let factTypes = pairElements(existing.factTypes, incoming.factTypes, matching, ids);
   for (const r of recognition.renames) {
     // Every kind spelled out: input from a tool call is not checked against
     // the type, and anything else read as a fact type would pair the wrong
@@ -147,6 +170,7 @@ export function diffIdentity(
       factTypes,
       objectTypeKey: otKeyer(objectTypes),
       factTypeKey: ftKey,
+      ...ids,
     };
   }
   return {
@@ -154,6 +178,7 @@ export function diffIdentity(
     factTypes,
     objectTypeKey: otKeyer(objectTypes),
     factTypeKey: ftKeyer(factTypes),
+    ...ids,
   };
 }
 
@@ -324,14 +349,15 @@ function pairElements<T extends { readonly id: string; readonly name: string; }>
   existing: readonly T[],
   incoming: readonly T[],
   matching: ElementMatching,
+  ids: Pick<DiffIdentity, "existingPairId" | "incomingPairId">,
 ): Paired<T>[] {
-  const byIdIncoming = new Map(incoming.map((e) => [e.id, e]));
+  const byIdIncoming = new Map(incoming.map((e) => [ids.incomingPairId(e.id), e]));
   const partner = new Map<T, T>();
   const byId = new Set<T>();
   const takenIncoming = new Set<T>();
   if (matching === "id-first") {
     for (const e of existing) {
-      const i = byIdIncoming.get(e.id);
+      const i = byIdIncoming.get(ids.existingPairId(e.id));
       if (i !== undefined && !takenIncoming.has(i)) {
         partner.set(e, i);
         byId.add(e);

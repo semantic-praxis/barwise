@@ -243,11 +243,12 @@ function fromDecoded(
   doc: DecodedDocument | DecodedDocument40,
   options?: { lenient?: boolean; },
   reserved: Iterable<string> = [],
+  idsAcrossKinds = false,
 ): OrmModel {
   // `imports` is decoded and not yet kept: the model carries it with 6b-3's
   // header change (iri-identity WS6), and nothing writes a 4.0 file yet.
   const { imports: _notKept, ...header } = doc.header as DecodedDocument40["header"];
-  const model = new OrmModel(header);
+  const model = new OrmModel({ ...header, idsAcrossKinds });
   return model.withReserved(reserved, () => addDecoded(model, doc, options));
 }
 
@@ -346,7 +347,9 @@ export function readDocument40(doc: unknown, options?: { lenient?: boolean; }): 
       `Ids are stated by more than one element: ${named}. An id names one element.`,
     );
   }
-  return refusingHeldIds(() => fromDecoded(decoded, options, stated.map(([id]) => id)));
+  // The pre-pass names every repeat in one message; the model refuses
+  // across kinds as well, for an id added in code after the load.
+  return refusingHeldIds(() => fromDecoded(decoded, options, stated.map(([id]) => id), true));
 }
 
 /** "an object type and a fact type", or "2 fact types". */

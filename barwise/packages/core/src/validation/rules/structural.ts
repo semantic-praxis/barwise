@@ -3,8 +3,9 @@ import { isScopedView } from "../../model/DiagramLayout.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
 import { localName, localNameEncodes } from "../../model/name.js";
+import { objectificationRef } from "../../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
-import { subtypePairKey } from "../../model/SubtypeFact.js";
+import { subtypeFactRef, subtypePairKey } from "../../model/SubtypeFact.js";
 import { groupRepeats } from "../../util/groupRepeats.js";
 import type { Diagnostic } from "../Diagnostic.js";
 import { report, RULE_ID } from "../ruleId.js";
@@ -115,8 +116,8 @@ function checkDuplicateSubtypeFacts(model: OrmModel): Diagnostic[] {
       report(
         RULE_ID.duplicateSubtypeFact,
         "default",
-        list[1]!.id,
-        list.map((sf) => `"${sf.id}"`).join(", "),
+        subtypeFactRef(list[1]!),
+        list.map((sf) => `"${subtypeFactRef(sf)}"`).join(", "),
         nameOf(list[0]!.subtypeId),
         nameOf(list[0]!.supertypeId),
       )
@@ -347,14 +348,26 @@ function checkSubtypeFactKinds(model: OrmModel, graph: ModelGraph): Diagnostic[]
     const subtype = graph.objectType(sf.subtypeId);
     if (subtype.kind !== "entity") {
       diagnostics.push(
-        report(RULE_ID.subtypeNotEntity, "subtypeSide", sf.id, subtype.name, subtype.kind),
+        report(
+          RULE_ID.subtypeNotEntity,
+          "subtypeSide",
+          subtypeFactRef(sf),
+          subtype.name,
+          subtype.kind,
+        ),
       );
     }
 
     const supertype = graph.objectType(sf.supertypeId);
     if (supertype.kind !== "entity") {
       diagnostics.push(
-        report(RULE_ID.subtypeNotEntity, "supertypeSide", sf.id, supertype.name, supertype.kind),
+        report(
+          RULE_ID.subtypeNotEntity,
+          "supertypeSide",
+          subtypeFactRef(sf),
+          supertype.name,
+          supertype.kind,
+        ),
       );
     }
   }
@@ -449,20 +462,38 @@ function checkObjectifiedFactTypeKinds(model: OrmModel, graph: ModelGraph): Diag
     const objectType = graph.objectType(oft.objectTypeId);
     if (objectType.kind !== "entity") {
       diagnostics.push(
-        report(RULE_ID.objectifiedNotEntity, "default", oft.id, objectType.name, objectType.kind),
+        report(
+          RULE_ID.objectifiedNotEntity,
+          "default",
+          objectificationRef(oft),
+          objectType.name,
+          objectType.kind,
+        ),
       );
     }
 
     // Check for duplicate objectification of the same fact type.
     if (seenFactTypes.has(oft.factTypeId)) {
-      diagnostics.push(report(RULE_ID.duplicateObjectification, "default", oft.id, oft.factTypeId));
+      diagnostics.push(
+        report(
+          RULE_ID.duplicateObjectification,
+          "default",
+          objectificationRef(oft),
+          oft.factTypeId,
+        ),
+      );
     }
     seenFactTypes.add(oft.factTypeId);
 
     // Check for duplicate use of the same object type as objectification.
     if (seenObjectTypes.has(oft.objectTypeId)) {
       diagnostics.push(
-        report(RULE_ID.duplicateObjectificationTarget, "default", oft.id, oft.objectTypeId),
+        report(
+          RULE_ID.duplicateObjectificationTarget,
+          "default",
+          objectificationRef(oft),
+          oft.objectTypeId,
+        ),
       );
     }
     seenObjectTypes.add(oft.objectTypeId);

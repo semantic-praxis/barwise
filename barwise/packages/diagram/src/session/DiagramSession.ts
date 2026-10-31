@@ -16,6 +16,7 @@ import {
   type DiagramLayout,
   isScopedView,
   type OrmModel,
+  subtypeFactRef,
   viewMembership,
 } from "@barwise/core";
 import { generateDiagram } from "../DiagramGenerator.js";
@@ -187,7 +188,7 @@ export class DiagramSession {
     this.positionOverrides = {};
 
     if (kind === "subtype_fact") {
-      const sf = this.model.subtypeFacts.find((s) => s.id === elementId);
+      const sf = this.model.subtypeFacts.find((s) => subtypeFactRef(s) === elementId);
       if (!sf) return;
       this.applySeedFilter([sf.subtypeId, sf.supertypeId], sf.subtypeId);
       return;
@@ -367,7 +368,7 @@ export class DiagramSession {
   private cleanStaleFilterIds(): void {
     const validOtIds = new Set(this.model.objectTypes.map((ot) => ot.id));
     const validFtIds = new Set(this.model.factTypes.map((ft) => ft.id));
-    const validSfIds = new Set(this.model.subtypeFacts.map((sf) => sf.id));
+    const validSfIds = new Set(this.model.subtypeFacts.map(subtypeFactRef));
 
     if (this.activeViewFilter) {
       for (const id of this.activeViewFilter.objectTypeIds) {
@@ -410,9 +411,10 @@ export class DiagramSession {
       }
     }
     for (const sf of this.model.subtypeFacts) {
-      if (subtypeFactIds.has(sf.id) || this.knownSubtypeFactIds.has(sf.id)) continue;
+      const ref = subtypeFactRef(sf);
+      if (subtypeFactIds.has(ref) || this.knownSubtypeFactIds.has(ref)) continue;
       if (seedIds.has(sf.subtypeId) || seedIds.has(sf.supertypeId)) {
-        subtypeFactIds.add(sf.id);
+        subtypeFactIds.add(ref);
         objectTypeIds.add(sf.subtypeId);
         objectTypeIds.add(sf.supertypeId);
       }
@@ -421,7 +423,7 @@ export class DiagramSession {
 
   private snapshotRelationIds(): void {
     this.knownFactTypeIds = new Set(this.model.factTypes.map((ft) => ft.id));
-    this.knownSubtypeFactIds = new Set(this.model.subtypeFacts.map((sf) => sf.id));
+    this.knownSubtypeFactIds = new Set(this.model.subtypeFacts.map(subtypeFactRef));
   }
 
   private seedOverridesFromSavedLayout(model: OrmModel, saved?: DiagramLayout): void {

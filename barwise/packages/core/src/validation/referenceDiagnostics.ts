@@ -31,8 +31,10 @@
 import type { ExternalConstraint, InternalConstraint, JoinOperand } from "../model/Constraint.js";
 import { joinOperandsOf } from "../model/Constraint.js";
 import type { UnresolvedReference } from "../model/graph.js";
+import { objectificationRef } from "../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { RolePathStep } from "../model/RolePath.js";
+import { subtypeFactRef } from "../model/SubtypeFact.js";
 import type { Diagnostic } from "./Diagnostic.js";
 import { report, RULE_ID } from "./ruleId.js";
 import { constraintElementId, constraintSpan, spanPhrase } from "./span.js";
@@ -193,7 +195,7 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
           ? RULE_ID.subtypeDanglingSubtype
           : RULE_ID.subtypeDanglingSupertype,
         "default",
-        u.from.subtypeFact.id,
+        subtypeFactRef(u.from.subtypeFact),
         u.missing,
       );
     case "objectifiedFactType":
@@ -202,7 +204,7 @@ function diagnosticFor(model: OrmModel, u: UnresolvedReference): Diagnostic {
           ? RULE_ID.objectifiedDanglingFactType
           : RULE_ID.objectifiedDanglingObjectType,
         "default",
-        u.from.objectifiedFactType.id,
+        objectificationRef(u.from.objectifiedFactType),
         u.missing,
       );
     case "population":

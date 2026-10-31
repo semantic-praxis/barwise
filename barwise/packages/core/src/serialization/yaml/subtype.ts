@@ -1,4 +1,4 @@
-import type { SubtypeFact } from "../../model/SubtypeFact.js";
+import { type SubtypeFact, subtypeFactRef } from "../../model/SubtypeFact.js";
 import { type OrmYamlDerivation, serializeDerivation } from "./derivation.js";
 
 export interface OrmYamlSubtypeFact {
@@ -14,6 +14,12 @@ export interface OrmYamlSubtypeFact {
 }
 
 export function serializeSubtypeFact(sf: SubtypeFact): OrmYamlSubtypeFact {
+  if (sf.id === undefined) {
+    throw new Error(
+      `Format 3.0 states every subtype fact's id, and ${subtypeFactRef(sf)} has none `
+        + "(its ends do not resolve, iri-identity decision 19); format 4.0 writes it without one.",
+    );
+  }
   const result: OrmYamlSubtypeFact = {
     id: sf.id,
     subtype: sf.subtypeId,

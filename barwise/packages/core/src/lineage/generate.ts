@@ -105,7 +105,8 @@ export function generateDdlLineage(
         // for an objectification's key. Resolving only constraint ids left
         // a changed subtype relationship with no affected artifact.
         const sf = model.getSubtypeFact(fk.sourceConstraintId);
-        if (sf && !sources.has(sf.id)) {
+        // One the model left unnamed has no id an impact query could name.
+        if (sf?.id !== undefined && !sources.has(sf.id)) {
           sources.set(sf.id, {
             elementId: sf.id,
             elementType: "SubtypeFact",
@@ -245,6 +246,7 @@ export function generateModelLineage(
     // impact on a subtype fact id must find this artifact too.
     for (const sf of model.subtypeFacts) {
       if (sf.subtypeId !== entity.id && sf.supertypeId !== entity.id) continue;
+      if (sf.id === undefined) continue;
       sources.push({
         elementId: sf.id,
         elementType: "SubtypeFact",

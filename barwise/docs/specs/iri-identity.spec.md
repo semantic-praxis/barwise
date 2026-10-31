@@ -14,7 +14,9 @@ return; the test builders off `::` ids; lineage exports name their model);
 6b-1 implemented 2026-10-30 (the cross-kind id index and constraint
 admission); 6b-2a implemented 2026-10-30 (minting in the model); 6b-2b-1
 implemented 2026-10-30 (the 4.0 reader, unwired); 6b-4a implemented
-2026-10-30 (the importers off role ids); 6b-2b-2, 6b-3, 6b-4b, 6c to 6f and
+2026-10-30 (the importers off role ids); 6b-2b-2a implemented 2026-10-31
+(decisions 19 and 20, the cross-kind refusal, the 3.x and 2.0 replay and
+diff's pairing by old ids, unwired); 6b-2b-2b, 6b-3, 6b-4b, 6c to 6f and
 WS7 to come
 
 Created: 2026-10-28
@@ -177,7 +179,9 @@ In scope:
   layout keys, report each suffix it added, and keep each element's
   original UUID in memory, so that diffing two 3.x revisions (`barwise
   history`) still pairs exactly. A shadow, which in 3.x carries its owner's
-  name and `source_context`, becomes `<source_context>:localName(name)`,
+  name and `source_context`, becomes
+  `localName(source_context):localName(name)` (the alias a local name, as
+  4.0's `imports` keys are),
   and the reader adds the import that alias needs; so domains of one
   project can be migrated in any order and still agree, and a surface may
   write any one of them as 4.0 on its next edit, as
@@ -1381,7 +1385,8 @@ version-1 manifest would go silently empty for impact analysis.
   domain (role players, subtype ends, `objectified.object_type`), emits
   `imports: { <owner>: <owner> }`, drops `source_context`, and writes 4.0
   (`splitModel.ts:340-360,440`). The 3.x reader, which sees only the
-  shadow's name and `source_context`, builds `<context>:localName(name)`,
+  shadow's name and `source_context`, builds
+  `localName(context):localName(name)`,
   and the 4.0 project load's name check (Scope) catches the one case where
   that binds the wrong owner element. A core `aliasOf(id)` replaces the field for its
   readers: `mcp/src/tools/split.ts:168-176`, the diff change kind
@@ -1500,23 +1505,51 @@ sites.
       ids add the fact type without them and state its constraints over
       the role ids the model gives, through `addFactType`'s
       `constraintsOver`, inside the same add and its rollback, so the
-      writer never emits a role id the 4.0 schema refuses. The dbt composite-key and DDL relationship importers name
-      every role "is in", so they pass `suffixRepeatedRoleNames` (decision
-      5 as amended); a preferred identifier reads the id its constraint was
+      writer never emits a role id the 4.0 schema refuses. The dbt
+      composite-key and DDL relationship importers name every role "is
+      in", so they pass `suffixRepeatedRoleNames` (decision 5 as
+      amended); a preferred identifier reads the id its constraint was
       stored under. The CLI and MCP entry-point tests observe the UUIDv7
       install through an Ossie import, the one importer still stating
       generated ids, until 6b-4b retires the generator and those tests.
-    - _6b-2b-2, the switch._ The 3.0 schema frozen as
-      `orm-model-3.0.schema.json` and the 4.0 one renamed to
-      `orm-model.schema.json`; decision 20; absent ids on subtype facts
-      and objectifications (decision 19) and `minted_from` stored; the
-      model-level cross-kind refusal; the 4.0 writer; the 3.x and 2.0
-      replay with its in-memory id map for diff, and `planRead`'s two
-      legacy slots; and the fixture and golden churn. Required test, from
-      6b-2b-1's review: a lenient 4.0 load of an element whose sentence
-      cannot be minted (a dangling reference) gives the same model on every
-      read, because decision 19 leaves it unnamed; 6b-2b-1 still gives it
-      6b-2a's generated id, which is why that reader stays unwired.
+    - _6b-2b-2, in two parts_ (owner, 2026-10-31: replay first, then
+      switch; 6b-2b-2a ships as one PR across sessions).
+      - _6b-2b-2a, the replay, unwired._ Decision 19: `SubtypeFact` and
+        `ObjectifiedFactType` no longer extend `ModelElement` and hold
+        `id: string | undefined`; one the model cannot name is left
+        unnamed, kept in its store's insertion order under a symbol key
+        the id index never sees, and referred to where a string is needed
+        by `subtypeFactRef` / `objectificationRef` (`unnamed:Sub<Super`,
+        `unnamed:Type=FactType`, a form no 4.0 id takes). The 3.0 writer
+        refuses an unnamed one. A constraint keeps 6b-2a's generated-id
+        fallback until the switch, because the 3.0 writer still requires
+        every constraint's id; so the determinism test below moves to
+        6b-2b-2b. Decision 20 as `addFactType`'s `idFromFirstReading`,
+        and the model-level cross-kind refusal as
+        `OrmModelConfig.idsAcrossKinds`, which the 4.0 reader and the
+        replay ask for. The replay (`serialization/replay.ts`,
+        `replayInto40`) adds a 3.x model's elements, in the readers'
+        order, to such a model, dropping every id and mapping every
+        reference through the growing old-to-new map; constraint
+        references through `mint.ts`'s `mapConstraintReferences`, which
+        reads the field sets `walk` reads. A shadow takes
+        `<context>:<local name>`; a constraint the model cannot name keeps
+        its old id until the switch leaves it unnamed, so the replay is one
+        model per input. The model keeps the map back to the old ids in
+        memory (`OrmModel.priorIds`), and `DiffIdentity`'s pairing ids
+        read it when both models carry one. Every tracked model, 2.0 files
+        included, replays to the same model under 4.0-shaped ids. A
+        reference to an element the replay leaves unnamed (decision 19)
+        dangles afterwards, as decision 17 has it ("nothing else may refer
+        to it by id"), and validation reports it; reachable only through a
+        lenient load.
+      - _6b-2b-2b, the switch._ The 3.0 schema frozen as
+        `orm-model-3.0.schema.json` and the 4.0 one renamed to
+        `orm-model.schema.json`; `minted_from` stored; the 4.0 writer;
+        `planRead`'s two legacy slots; the constraint fallback dropped;
+        and the fixture and golden churn. Required test, from 6b-2b-1's
+        review: a lenient 4.0 load of an element whose sentence cannot be
+        minted (a dangling reference) gives the same model on every read.
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
   `imports`.

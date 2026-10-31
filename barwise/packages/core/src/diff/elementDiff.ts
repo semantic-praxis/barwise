@@ -494,12 +494,15 @@ function pairById<C extends Constraint>(
   // The key for comparing a pair joined by id; see `pairRoleKeys`.
   const pairA = pairRoleKeys(keysA, holdersA, holdersB);
   const pairB = pairRoleKeys(keysB, holdersB, holdersA);
+  const { existingPairId, incomingPairId } = pairing.identity;
   const byIdB = new Map(
-    b.flatMap((c) => (c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[c.id, c]] : [])),
+    b.flatMap((c) =>
+      c.id !== undefined && !pairing.repeatedB.has(c.id) ? [[incomingPairId(c.id), c]] : []
+    ),
   );
   for (const ca of a) {
     if (ca.id === undefined || pairing.repeatedA.has(ca.id)) continue;
-    const cb = byIdB.get(ca.id);
+    const cb = byIdB.get(existingPairId(ca.id));
     if (!cb) continue;
     pairs.set(ca, { to: cb, changed: constraintKey(ca, pairA) !== constraintKey(cb, pairB) });
   }
