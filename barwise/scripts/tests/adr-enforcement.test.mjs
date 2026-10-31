@@ -14,6 +14,7 @@ import {
   splitEntries,
   tagsIn,
 } from "../lib/adr-enforcement.mjs";
+import { enforcementLine, renderSection } from "../lib/architecture-section.mjs";
 
 const adr = (headerLines, decision) =>
   `# A concern\n\nScope: process\nDate: 2026-10-24\n${headerLines}\n\n`
@@ -122,4 +123,58 @@ test("gateName admits check:*, audit:* and the named exceptions, and nothing els
   for (const s of ["lint", "test:coverage", "ci:local", "build", "checkx"]) {
     assert.equal(gateName(s), false, s);
   }
+});
+
+// --- WS4: the generated index ---
+
+test("enforcementLine renders gates, tests and gaps, from the ADR's text alone", () => {
+  const text = adr(
+    "Tracking: x\nEnforced-by: npm run purity (a, b), tests (c),\n"
+      + "npm run audit:specs -- --check (d), none (barwise-k3x: e)",
+    "1. **A.** {#a}",
+  );
+  assert.equal(
+    enforcementLine(text),
+    "declared: purity (a, b), tests (c), audit:specs -- --check (d); gap: barwise-k3x (e)",
+  );
+  // Only gaps: no "declared:" at all, rather than an empty list.
+  assert.equal(
+    enforcementLine(
+      adr("Enforced-by: none (barwise-zdd: a, b), none (barwise-x1: c)", "1. **A.** {#a}"),
+    ),
+    "gap: barwise-zdd (a, b); gap: barwise-x1 (c)",
+  );
+  // No header renders as before; an entry that does not parse is left out
+  // here (check:architecture reports it).
+  assert.equal(enforcementLine(adr("Tracking: x", "1. **A.** {#a}")), "");
+  assert.equal(
+    enforcementLine(adr("Enforced-by: tests (a), lint", "1. **A.** {#a}")),
+    "declared: tests (a)",
+  );
+});
+
+test("renderSection adds the line after an ADR's date, and explains it once, only when some ADR declares", () => {
+  const plain = { f: "barwise/docs/adr/plain.md", text: adr("Tracking: x", "1. **A.**") };
+  const declaring = {
+    f: "barwise/docs/adr/declaring.md",
+    text: adr("Tracking: x\nEnforced-by: tests (a)", "1. **A.** {#a}"),
+  };
+  const before = renderSection([plain], { core: [] });
+  assert.match(before, /- \[A concern\]\(adr\/plain\.md\) -- 2026-10-24\n/);
+  assert.doesNotMatch(before, /declared:/);
+  const after = renderSection([declaring, plain], { core: [] });
+  assert.match(
+    after,
+    /- \[A concern\]\(adr\/declaring\.md\) -- 2026-10-24 -- declared: tests \(a\)\n/,
+  );
+  assert.match(after, /- \[A concern\]\(adr\/plain\.md\) -- 2026-10-24\n/);
+  assert.equal(after.match(/`declared:` names the gates/g).length, 1);
+  assert.match(after, /barwise-raw/);
+  // A declaring ADR whose Scope puts it in no list shows no row, so no
+  // explanation of a line nobody can see.
+  const unscoped = {
+    f: declaring.f,
+    text: declaring.text.replace("Scope: process", "Scope: tooling"),
+  };
+  assert.doesNotMatch(renderSection([unscoped, plain], { core: [] }), /`declared:` names/);
 });

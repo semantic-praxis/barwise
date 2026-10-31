@@ -6,6 +6,11 @@ Tracking: barwise-ubc, barwise-868, barwise-871, barwise-872, barwise-tdu,
 barwise-u5d, barwise-tml, barwise-iil,
 barwise-919, docs/specs/duplication-drift-guards.spec.md,
 docs/specs/deterministic-guards.spec.md
+Enforced-by: npm run audit:duplication -- --check (every-candidate-verdict),
+npm run check:parity (registered-sets-identical),
+none (barwise-ym8.edf: check-on-copy), none (barwise-ym8.3tg: check-first),
+none (barwise-ym8.8nq: registered-sets-identical),
+none (barwise-ym8.onf: every-candidate-verdict)
 
 ## Context
 
@@ -26,11 +31,11 @@ members.
 ## Decision
 
 1. **A copy that must agree with other code carries a mechanical check,
-   in the commit that creates it.** The check is one of four: a shared
+   in the commit that creates it.** {#check-on-copy} The check is one of four: a shared
    owner, a derivation from the authority, an entry in
    `barwise/parity.manifest.json`, or a drift test. A comment asking
    the editor to update the other copy is not a check.
-2. **Check first; share case by case.** The spec settled this ("the
+2. **Check first; share case by case.** {#check-first} The spec settled this ("the
    check is the cheap, universal move and the share is a case-by-case
    optimization"). A check costs a manifest line and forbids nothing
    about the design. An extraction is a design change, decided each
@@ -38,7 +43,7 @@ members.
    behaviour. Where sharing would couple packages, the copies stay
    parallel.
 3. **A registered set stays identical, and a member that does not
-   resolve counts as drift.** A member is a whole file, a named
+   resolve counts as drift.** {#registered-sets-identical} A member is a whole file, a named
    symbol or a JSON field value. Per the spec, a whole file is
    compared by normalised text and a symbol by its printed syntax
    tree, so a difference in formatting alone is not drift. The one
@@ -46,7 +51,7 @@ members.
    ignored is not a parity pair: give it a behavioural test or a shared
    owner. An entry is retired only in a commit that shares or derives
    the pair, or gives it a behavioural test.
-4. **Every candidate the duplication detectors find carries a verdict.**
+4. **Every candidate the duplication detectors find carries a verdict.** {#every-candidate-verdict}
    `audit:duplication` finds candidates the same way every time, and a
    person classifies each one in `barwise/audit-baseline.json` as
    `accepted-benign` or `tracked:<issue>`. A new unclassified candidate
@@ -69,7 +74,7 @@ members.
   - a set with one member, or with none, passes trivially, so dropping
     members is an unchecked partial retirement.
 - Nothing gates decision 3's retirement clause, or decision 4's verdict
-  content (barwise-u5d). `pr-review` lists both under "Ratchets
+  content (barwise-ym8.8nq, barwise-ym8.onf; related barwise-u5d). `pr-review` lists both under "Ratchets
   silenced". `REVIEW.md`'s "Do not report" tells reviewers to skip
   registered copies and the duplication ratchet because CI enforces
   them, so the review instructions contradict each other (barwise-iil).

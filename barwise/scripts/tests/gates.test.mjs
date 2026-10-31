@@ -46,6 +46,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { decisionIds, parseEnforcedBy } from "../lib/adr-enforcement.mjs";
 import { ciLocalLibs } from "./ci-local-files.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -119,7 +120,7 @@ const ROOT_DEPENDENT_GATES = [
 
 for (const script of ROOT_DEPENDENT_GATES) {
   for (const mode of ["empty", "fail"]) {
-    test(`${script} refuses with exit 2 when git ${mode === "empty" ? "answers emptily" : "fails"}`, () => {
+    test(`${script} refuses with exit 2 when git ${mode === "empty" ? "answers emptily" : "fails"} [adr:gate-refusal-contract#three-results] [adr:gate-refusal-contract#refuse-not-find]`, () => {
       const r = gateWithStubGit(script, mode);
       assert.equal(
         r.status,
@@ -236,7 +237,7 @@ const CWDS = [REPO, join(REPO, "barwise"), join(REPO, "barwise", "packages", "co
 // its history mode depends on clone depth, so the invariance test uses
 // `--staged` and cannot share this loop's argument-free call.
 for (const script of ["check-no-nul.mjs", "check-shell.mjs", "audit-corrections.mjs"]) {
-  test(`${script} reports the same coverage from every cwd`, (t) => {
+  test(`${script} reports the same coverage from every cwd [adr:gate-refusal-contract#cwd-invariant]`, (t) => {
     const runs = CWDS.map((cwd) => ({ cwd, ...gate(script, cwd) }));
     if (skippedForMissingTool(t, runs, `${script}'s tool`)) return;
     for (const r of runs) {
@@ -792,7 +793,7 @@ for (const [rule, { probe, content }] of Object.entries(GITLEAKS_PROBES)) {
   });
 }
 
-test("check-secrets refuses when gitleaks is absent rather than reporting clean", () => {
+test("check-secrets refuses when gitleaks is absent rather than reporting clean [adr:credential-handling#wrapper-contract]", () => {
   // The container this project develops in does not ship gitleaks, so this
   // is the reading a fresh session gets until the bootstrap installs it.
   const dir = secretsRepo();
@@ -814,7 +815,7 @@ test("check-secrets refuses when gitleaks is absent rather than reporting clean"
   }
 });
 
-test("check-secrets refuses a gitleaks status that is neither clean nor a finding", () => {
+test("check-secrets refuses a gitleaks status that is neither clean nor a finding [adr:credential-handling#wrapper-contract]", () => {
   // The distinction the wrapper exists for. gitleaks uses 1 for findings,
   // so any OTHER non-zero status is the tool failing to run -- and
   // reporting that as a finding would send the reader hunting a credential
@@ -842,7 +843,7 @@ test("check-secrets refuses a gitleaks status that is neither clean nor a findin
   }
 });
 
-test("check-secrets refuses when .gitleaks.toml is missing", (t) => {
+test("check-secrets refuses when .gitleaks.toml is missing [adr:credential-handling#wrapper-contract]", (t) => {
   // Without this, gitleaks falls back to its bundled defaults: it would
   // still find most things and would silently drop the Anthropic rule,
   // which is the credential this repository is most likely to leak and the
@@ -864,7 +865,7 @@ test("check-secrets refuses when .gitleaks.toml is missing", (t) => {
   }
 });
 
-test("check-secrets refuses a history scan of a shallow clone, but --staged still works", (t) => {
+test("check-secrets refuses a history scan of a shallow clone, but --staged still works [adr:credential-handling#wrapper-contract]", (t) => {
   // Every fresh session clone of this project is shallow. A history scan
   // there would report a clean bill of health over whatever few commits
   // arrived, which is why the default mode refuses -- while `--staged`
@@ -1262,7 +1263,7 @@ test("mutate reports a failed restore on an UNTRACKED file, which git diff canno
   }
 });
 
-test("mutate refuses a command that already fails WITHOUT the mutation", () => {
+test("mutate refuses a command that already fails WITHOUT the mutation [adr:gate-refusal-contract#readers-keep-third]", () => {
   // CAUGHT is decided from the command's exit status alone, so a command
   // that is already red reports CAUGHT for every mutation -- including ones
   // nothing catches. Five readings in PR #505 were recorded that way: the
@@ -2016,7 +2017,7 @@ function runCiLocal(repo, ...args) {
   return { ...r, all: `${r.stdout}${r.stderr}` };
 }
 
-test("ci-local reports a REFUSED gate apart from a failure, and exits 2", () => {
+test("ci-local reports a REFUSED gate apart from a failure, and exits 2 [adr:gate-refusal-contract#readers-keep-third]", () => {
   // The runner was binary -- status 0 or FAIL -- so the two gates that refuse
   // for want of shellcheck and gitleaks in any fresh container read as "3 of
   // 32 gates failed", indistinguishable from a real shellcheck finding or a
@@ -6472,7 +6473,7 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
  * disagreement is seen. Returns the directory and how many manifests it
  * copied, so no count is restated here.
  */
-function architectureRepo() {
+function architectureRepo({ declared = true } = {}) {
   const dir = tempRepo();
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
@@ -6484,7 +6485,32 @@ function architectureRepo() {
     cwd: REPO,
     encoding: "utf8",
   });
-  for (const rel of adrList.split("\0").filter(Boolean)) copy(rel);
+  // An ADR that declares Enforced-by: names gates, tests and issues whose
+  // inputs (ci.yml, the root scripts, the live tracker) this fixture does
+  // not carry. Its header is rewritten to one open fixture issue covering
+  // every decision, so graph and shape cases keep testing what they test
+  // and never depend on the live tracker or ci.yml; the enforcement cases
+  // build their own inputs (executable-adrs.spec.md, WS3).
+  let declaring = 0;
+  for (const rel of adrList.split("\0").filter(Boolean)) {
+    const text = readFileSync(join(REPO, rel), "utf8");
+    if (!parseEnforcedBy(text).present) {
+      copy(rel);
+      continue;
+    }
+    const ids = decisionIds(text).decisions.map((d) => d.id);
+    // Enforced-by: is the last header field (check:architecture holds it to
+    // that), so it runs to the blank line. With `declared: false` the header
+    // goes, for a case that needs a tree where no ADR declares.
+    const value = declared ? `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n` : "";
+    const rewritten = text.replace(/^Enforced-by:[^]*?\n(?=\n)/m, value);
+    assert.notEqual(rewritten, text, `${rel}: its Enforced-by: header was not rewritten`);
+    stage(dir, rel, rewritten);
+    declaring += 1;
+  }
+  if (declaring > 0 && declared) {
+    stage(dir, ".beads/issues.jsonl", '{"id":"barwise-fx1","status":"open","title":"fixture"}\n');
+  }
   let manifests = 0;
   for (const pkg of readdirSync(join(REPO, "barwise", "packages"))) {
     const rel = `barwise/packages/${pkg}/package.json`;
@@ -6493,8 +6519,25 @@ function architectureRepo() {
       manifests += 1;
     }
   }
+  // The rewritten headers render differently in the index, so the copied
+  // section is regenerated from them, as stageAdr() does for one ADR.
+  if (declaring > 0) {
+    const r = spawnSync(
+      process.execPath,
+      [join(SCRIPTS, "regen-architecture.mjs"), "--root", dir],
+      {
+        encoding: "utf8",
+      },
+    );
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    stage(
+      dir,
+      "barwise/docs/ARCHITECTURE.md",
+      readFileSync(join(dir, "barwise/docs/ARCHITECTURE.md"), "utf8"),
+    );
+  }
   execFileSync("git", ["commit", "-qm", "inputs"], { cwd: dir });
-  return { dir, manifests };
+  return { dir, manifests, declaring: declared ? declaring : 0 };
 }
 
 const ARCH_CMD = [process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
@@ -7036,7 +7079,14 @@ test("check:architecture resolves each ADR reference in the files that act on it
     );
     // History is not read: the tracker, an archived spec, a dated record,
     // and a number, which is not a form at all.
-    stage(dir, ".beads/issues.jsonl", '{"d":"ADR `gone`"}\n');
+    stage(
+      dir,
+      ".beads/issues.jsonl",
+      (existsSync(join(dir, ".beads/issues.jsonl"))
+        ? readFileSync(join(dir, ".beads/issues.jsonl"), "utf8")
+        : "")
+        + '{"id":"barwise-h1","d":"ADR `gone`"}\n',
+    );
     stage(dir, "barwise/docs/specs/archive/old.spec.md", "# O\n\nADR `gone`\n");
     stage(dir, "barwise/docs/review-2026-08-27.md", "docs/adr/gone.md\n");
     stage(dir, "barwise/packages/core/CLAUDE.md", "See ADR `a-concern`. ADR 0001 too.\n");
@@ -7229,10 +7279,13 @@ test("check:architecture and regen:architecture refuse without the section's mar
   const { dir } = architectureRepo();
   try {
     const doc = join(dir, "barwise", "docs", "ARCHITECTURE.md");
+    // The fixture's own document: its section renders the fixture's ADRs,
+    // whose Enforced-by: headers architectureRepo() rewrote.
+    const original = readFileSync(doc, "utf8");
     stage(
       dir,
       "barwise/docs/ARCHITECTURE.md",
-      readFileSync(doc, "utf8").replace("<!-- END regen:architecture -->", ""),
+      original.replace("<!-- END regen:architecture -->", ""),
     );
     const check = runArch(dir);
     assert.equal(check.status, 2, check.stdout + check.stderr);
@@ -7241,7 +7294,7 @@ test("check:architecture and regen:architecture refuse without the section's mar
     assert.equal(regen.status, 2, regen.stdout + regen.stderr);
     assert.match(regen.stderr, /no regen:architecture markers/);
     // Prose quoting the END marker above the section does not hide it.
-    const quoted = readFileSync(join(REPO, "barwise", "docs", "ARCHITECTURE.md"), "utf8")
+    const quoted = original
       .replace(
         "**Last Updated:**",
         "Ends at `<!-- END regen:architecture -->`.\n\n**Last Updated:**",
@@ -7308,7 +7361,8 @@ const ENFORCED_ROOT_PKG = JSON.stringify({
     "check:adr-tests": "node scripts/check-adr-tests.mjs",
   },
 });
-const ENFORCED_TRACKER = '{"id":"barwise-gap","status":"open","title":"g"}\n'
+const ENFORCED_TRACKER = '{"id":"barwise-fx1","status":"open","title":"fixture"}\n'
+  + '{"id":"barwise-gap","status":"open","title":"g"}\n'
   + '{"id":"barwise-shut","status":"closed","title":"s"}\n';
 
 function enforcementRepo() {
@@ -7325,11 +7379,12 @@ const ENFORCED_PATH = "barwise/docs/adr/a-concern.md";
 const CI_PATH = ".github/workflows/ci.yml";
 
 test("check:architecture accepts every entry kind when each decision is accounted for", () => {
-  const { dir } = enforcementRepo();
+  const { dir, declaring } = enforcementRepo();
   try {
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-    assert.match(ok.stdout, /1 declare Enforced-by:/);
+    // The copied real ADRs that declare, and this fixture's own.
+    assert.match(ok.stdout, new RegExp(`; ${declaring + 1} declare Enforced-by:`));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -7526,15 +7581,15 @@ test("check:architecture refuses, exit 2, only where it cannot tell, and lists i
 });
 
 test("check:architecture does not read ci.yml, scripts or the tracker for an ADR without Enforced-by:", () => {
-  const { dir } = architectureRepo();
+  // A tree where no ADR declares: no ci.yml, root package.json or tracker,
+  // and an ADR with no header needs none of them, so none is a refusal.
+  const { dir } = architectureRepo({ declared: false });
   try {
-    // No ci.yml, root package.json or tracker in this fixture: an ADR with
-    // no header needs none of them, and none is a refusal.
     stageAdr(dir, "a-concern", ADR_OK);
     execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-    assert.match(ok.stdout, /0 declare Enforced-by:/);
+    assert.match(ok.stdout, /; 0 declare Enforced-by:/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -6,6 +6,10 @@ Tracking: barwise-ubc, barwise-921, barwise-1060, barwise-cpu, barwise-alv,
 barwise-c81, barwise-6ef, barwise-en2,
 docs/specs/python-lockfile-execution.spec.md,
 docs/specs/agent-python-uv-hook.spec.md
+Enforced-by: npm run check:python-uv (lockfile-only, no-outside-forms, uv-bootstrap),
+tests (project-ancestor), none (barwise-ym8.fq7: lockfile-only),
+none (barwise-ym8.l69: no-outside-forms), none (barwise-ym8.q07: project-ancestor),
+none (barwise-ym8.usv: groups-and-one-offs), none (barwise-ym8.suc: uv-bootstrap)
 
 ## Context
 
@@ -22,27 +26,27 @@ project, and the rejected alternatives are in the two specs above.
 
 ## Decision
 
-1. **Every Python execution resolves from `barwise/uv.lock`.** Code,
+1. **Every Python execution resolves from `barwise/uv.lock`.**{#lockfile-only} Code,
    scripts and commands use `uv run --frozen [--only-group <g>] ...`.
    CI asserts the lock with `--locked`, so a stale lock fails the build
    rather than being re-resolved. Apart from decision 5, a bare
    `python3`, `python`, `pip` or `pip3` is never used.
-2. **No form that resolves outside the lock.** `--with`,
+2. **No form that resolves outside the lock.**{#no-outside-forms} `--with`,
    `--with-requirements`, `--isolated`, `--no-project`, `uv pip`, `uvx`,
    `uv tool run` and PEP 723 inline script metadata are banned outright.
    `--frozen` and `--locked` do not stop `--with` from installing a
    version the lock does not pin, so these forms cannot be made safe by
    adding a flag.
-3. **`pyproject.toml` stays an ancestor of anything that runs Python.**
+3. **`pyproject.toml` stays an ancestor of anything that runs Python.**{#project-ancestor}
    uv finds the project by walking up from the working directory, so the
    project sits at `barwise/`, and a call site inside it needs no
    `--project`. One that runs from above `barwise/`, as `check-beads.sh`
    does, passes `--project`. An agent's `uv run` from outside `barwise/`
    is refused unless it passes `--project` naming it.
 4. **Optional tiers are dependency groups in the one `pyproject.toml`,
-   and a one-off is a run of this project.** sqlglot is the `sqlglot`
+   and a one-off is a run of this project.**{#groups-and-one-offs} sqlglot is the `sqlglot`
    group. A throwaway script goes in the repo and runs `--frozen`.
-5. **The one exception is bootstrapping uv itself.** CI installs uv with
+5. **The one exception is bootstrapping uv itself.**{#uv-bootstrap} CI installs uv with
    `python3 -m pip install uv==<pinned>`.
 
 ## Consequences

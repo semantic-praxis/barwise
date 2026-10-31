@@ -100,7 +100,7 @@ describe("VS Code language-model tool registration", () => {
     state.mcpEnabled = true;
   });
 
-  it("registers exactly these tools", () => {
+  it("registers exactly these tools [adr:surface-capability-parity#pinned-tool-lists]", () => {
     // The complete list, not a sample. Changing it means changing the
     // capability matrix in CLAUDE.md in the same commit.
     expect(registerAll()).toEqual([

@@ -27,30 +27,38 @@ February 2026 design record.
 
 ### Decisions
 
+After an ADR's date: `declared:` names the gates and tagged tests its
+`Enforced-by:` header lists, which `check:architecture` and
+`check:adr-tests` hold to existing and running in CI, not to catching a
+violation; `gap:` names the open issue for what a decision's gates and
+tests leave unguarded, beside them or alone. A declared gate blocks a
+merge only if `main` requires the `ci` check (barwise-raw), and most
+gates skip a docs-only change.
+
 Architecture:
 
 - [Connector packages](adr/connector-packages.md) -- 2026-10-24
-- [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24
+- [Determinism in core](adr/determinism-in-core.md) -- 2026-10-24 -- declared: purity (pure-ops, ambient-as-argument); gap: barwise-ym8.lxl (pure-ops); gap: barwise-ym8.r6i (ambient-as-argument); gap: barwise-ym8.kys (one-layer-out); gap: barwise-ym8.sit (mint-on-create)
 - [Keyless model access](adr/keyless-model-access.md) -- 2026-09-12
 - [Metamodel evolution policy](adr/metamodel-evolution-policy.md) -- 2026-10-17
 - [Ossie interchange](adr/ossie-interchange.md) -- 2026-10-28
-- [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23
+- [Package graph authority](adr/package-graph-authority.md) -- 2026-10-23 -- declared: depcruise (intended-is-graph), check:architecture (claude-md-rendering, runtime-deps-within); gap: barwise-ym8.d3m (intended-is-graph)
 - [Production prompt resolution](adr/production-prompt-resolution.md) -- 2026-08-26
 - [Schema versioning](adr/schema-versioning.md) -- 2026-10-28
-- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-09-10
+- [Surface capability parity](adr/surface-capability-parity.md) -- 2026-09-10 -- declared: tests (pinned-tool-lists); gap: barwise-ym8.0pq (pinned-tool-lists); gap: barwise-ym8.wfy (matrix-records-reach); gap: barwise-ym8.3nm (matrix-same-commit); gap: barwise-ym8.0hi (vscode-yes-means)
 
 Process:
 
 - [Baseline writers merge verdicts](adr/baselines-merge-on-write.md) -- 2026-10-23
 - [Constraint-extraction coverage policy](adr/constraint-coverage-policy.md) -- 2026-08-27
-- [Credential handling](adr/credential-handling.md) -- 2026-09-12
+- [Credential handling](adr/credential-handling.md) -- 2026-09-12 -- declared: tests (wrapper-contract); gap: barwise-ym8.yhs (rotate-not-revert); gap: barwise-ym8.7zs (gitleaks-detects); gap: barwise-ym8.kf3 (scan-index-and-history); gap: barwise-ym8.gc7 (wrapper-contract); gap: barwise-ym8.nxs (pinned-gitleaks)
 - [Findings close by mechanism](adr/findings-close-by-mechanism.md) -- 2026-08-29
-- [Gate refusal contract](adr/gate-refusal-contract.md) -- 2026-09-17
+- [Gate refusal contract](adr/gate-refusal-contract.md) -- 2026-09-17 -- declared: tests (three-results, refuse-not-find, cwd-invariant, readers-keep-third); gap: barwise-ym8.j31 (three-results); gap: barwise-ym8.rl7 (refuse-not-find); gap: barwise-ym8.c42 (cwd-invariant); gap: barwise-ym8.aep (readers-keep-third); gap: barwise-ym8.if3 (no-writes)
 - [Merge delegation](adr/merge-delegation.md) -- 2026-10-18
-- [Must-agree copies carry a check](adr/must-agree-copies.md) -- 2026-08-30
-- [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30
+- [Must-agree copies carry a check](adr/must-agree-copies.md) -- 2026-08-30 -- declared: audit:duplication -- --check (every-candidate-verdict), check:parity (registered-sets-identical); gap: barwise-ym8.edf (check-on-copy); gap: barwise-ym8.3tg (check-first); gap: barwise-ym8.8nq (registered-sets-identical); gap: barwise-ym8.onf (every-candidate-verdict)
+- [Pinned runtimes](adr/pinned-runtimes.md) -- 2026-08-30 -- gap: barwise-ym8.q89 (node-from-nvmrc); gap: barwise-ym8.52y (python-minor); gap: barwise-ym8.eq3 (verify-running)
 - [Plan before code](adr/plan-before-code.md) -- 2026-10-25
-- [Python from the lockfile](adr/python-from-the-lockfile.md) -- 2026-09-26
+- [Python from the lockfile](adr/python-from-the-lockfile.md) -- 2026-09-26 -- declared: check:python-uv (lockfile-only, no-outside-forms, uv-bootstrap), tests (project-ancestor); gap: barwise-ym8.fq7 (lockfile-only); gap: barwise-ym8.l69 (no-outside-forms); gap: barwise-ym8.q07 (project-ancestor); gap: barwise-ym8.usv (groups-and-one-offs); gap: barwise-ym8.suc (uv-bootstrap)
 - [Review policy](adr/review-policy.md) -- 2026-10-24
 
 ### Package graph
