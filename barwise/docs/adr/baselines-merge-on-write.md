@@ -5,6 +5,10 @@ Date: 2026-10-23
 Tracking: barwise-ubc, barwise-1026, barwise-qs8, barwise-eu6, barwise-5ij,
 barwise-tko, barwise-rh3, barwise-80d,
 docs/specs/baseline-write-preserves-verdicts.spec.md
+Enforced-by: tests (merge-not-regenerate, specs-write-on-ask, findings-order,
+duplication-no-writer), none (barwise-ym8.fi5: merge-not-regenerate),
+none (barwise-ym8.3yv: one-merge-owner), none (barwise-ym8.nhy: findings-order),
+none (barwise-ym8.79m: duplication-no-writer)
 
 ## Context
 
@@ -21,7 +25,7 @@ note, was decided when barwise-qs8 closed.
 
 ## Decision
 
-1. **A writer merges, and never regenerates over recorded verdicts.**
+1. **A writer merges, and never regenerates over recorded verdicts.**{#merge-not-regenerate}
    For each id the detector still produces, it keeps the row's
    human-owned fields and refreshes its derived fields. Only a new id
    gets the placeholder. A row no longer detected is reported and not
@@ -31,17 +35,17 @@ note, was decided when barwise-qs8 closed.
    `--check` fails until someone re-reads it. A row reopened again
    merges the commit lists and keeps the original note, not the
    intermediate `TODO`.
-2. **The merge has one owner.** Every writer calls
+2. **The merge has one owner.**{#one-merge-owner} Every writer calls
    `scripts/lib/baseline-merge.mjs` to read the existing rows, merge
    them and print the summary. Each writer declares its own
    human-owned fields and placeholders in `preserve`.
-3. **`audit:specs` writes only when asked.** A bare invocation reports
+3. **`audit:specs` writes only when asked.**{#specs-write-on-ask} A bare invocation reports
    and writes nothing; `--write` writes.
-4. **Row order depends only on the findings.** Rows are sorted by id,
+4. **Row order depends only on the findings.**{#findings-order} Rows are sorted by id,
    so rewriting an unchanged baseline changes nothing. The writer says
    how many verdicts it kept, how many rows are new, and which rows
    are no longer detected.
-5. **`audit-duplication` has no writer.** Its baseline is edited by
+5. **`audit-duplication` has no writer.**{#duplication-no-writer} Its baseline is edited by
    hand.
 
 ## Consequences

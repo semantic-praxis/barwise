@@ -113,7 +113,7 @@ test("a partly classified row counts as kept", () => {
   assert.equal(unclassified, 0);
 });
 
-test("a row the detector no longer produces is reported, not written", () => {
+test("a row the detector no longer produces is reported, not written [adr:baselines-merge-on-write#findings-order]", () => {
   const { rows, dropped } = mergeBaselineRows({
     fresh: { a: { message: "m" } },
     existing: {
@@ -126,7 +126,7 @@ test("a row the detector no longer produces is reported, not written", () => {
   assert.deepEqual(dropped, ["gone"]);
 });
 
-test("rows come out sorted by id, whatever order the detector emitted them in", () => {
+test("rows come out sorted by id, whatever order the detector emitted them in [adr:baselines-merge-on-write#findings-order]", () => {
   // Without this the file's order is the detector's traversal order, and a
   // rerun reshuffles it: regenerating the correction baseline moved 73 of its
   // 74 rows while changing nothing.

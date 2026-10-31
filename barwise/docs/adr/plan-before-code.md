@@ -4,6 +4,10 @@ Scope: process
 Date: 2026-10-25
 Tracking: barwise-ubc, docs/specs/plan-scope-check.spec.md,
 docs/specs/touches-required.spec.md
+Enforced-by: npm run check:plan-review (plan-reviewed),
+npm run check:spec-touches (touches-named), none (barwise-ym8.yg7: spec-first),
+none (barwise-ym8.ogi: plan-reviewed), none (barwise-ym8.8hq: touches-named),
+none (barwise-ym8.l7d: open-decisions-reviewer)
 
 ## Context
 
@@ -17,20 +21,20 @@ rejected alternatives are in the two specs above.
 
 ## Decision
 
-1. **A change starts from a spec.** Development begins with a spec in
+1. **A change starts from a spec.**{#spec-first} Development begins with a spec in
    `barwise/docs/specs/`, written to the `spec-writer` skill's format.
-2. **The plan is reviewed before it is implemented.** `/code-review`
+2. **The plan is reviewed before it is implemented.**{#plan-reviewed} `/code-review`
    and `/pr-review` run on the spec, and its header records the commit
    they read as `Plan-reviewed: <commit> (code-review, pr-review)`,
    committed before any implementation commit. The line vouches for the
    spec's body as it stood at that commit; a plan edited afterwards
    needs the review again.
-3. **A plan names what it will touch.** A spec's `Touches:` header
+3. **A plan names what it will touch.**{#touches-named} A spec's `Touches:` header
    lists the paths it changes: unmarked for files that must be tracked,
    `+` for files it creates, `-` for files it deletes. A new spec must
    carry at least one unmarked or `-` entry that resolves to a path
    outside `barwise/docs/specs/`; `+` entries alone do not count.
-4. **Open decisions are the reviewer's to settle.** A spec states each
+4. **Open decisions are the reviewer's to settle.**{#open-decisions-reviewer} A spec states each
    one with its options, the trade-off and a recommended default, and
    does not decide it silently (`template.spec.md`, Open decisions).
 
