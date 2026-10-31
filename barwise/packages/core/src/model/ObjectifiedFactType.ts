@@ -55,7 +55,7 @@ export function objectificationRef(
     readonly objectTypeId: string;
   },
 ): string {
-  return oft.id ?? `unnamed:${oft.objectTypeId}=${oft.factTypeId}`;
+  return oft.id ?? `unnamed:${oft.objectTypeId}<>${oft.factTypeId}`;
 }
 
 /** See {@link toSubtypeFactConfig}: the same projection, one kind over. */

@@ -405,6 +405,38 @@ describe("a model naming what it is given", () => {
     ).not.toThrow();
   });
 
+  it("refuses one fact type's config stating an id twice, in a model that refuses across kinds", () => {
+    const m = new OrmModel({ name: "M", idsAcrossKinds: true });
+    m.addObjectType({ name: "Person", kind: "entity", referenceMode: "nr" });
+    expect(() =>
+      m.addFactType({
+        id: "F",
+        name: "Person smokes",
+        roles: [{ id: "F", name: "smokes", playerId: "Person" }],
+        readings: ["{0} smokes"],
+      })
+    ).toThrow(/Id "F" is held by its own fact type/);
+    expect(m.factTypes).toEqual([]);
+  });
+
+  it("removes an unnamed subtype fact or objectification by the element", () => {
+    const m = new OrmModel({ name: "M" });
+    m.addObjectType({ name: "Person", kind: "entity", referenceMode: "nr" });
+    const sf = m.addSubtypeFact({ subtypeId: "Person", supertypeId: "gone" }, {
+      skipPlayerValidation: true,
+    });
+    const oft = m.addObjectifiedFactType({ factTypeId: "no-ft", objectTypeId: "Person" }, {
+      skipPlayerValidation: true,
+    });
+    expect(() => m.removeObjectType("Person")).toThrow();
+    m.removeSubtypeFact(sf);
+    m.removeObjectifiedFactType(oft);
+    expect(m.subtypeFacts).toEqual([]);
+    expect(m.objectifiedFactTypes).toEqual([]);
+    m.removeObjectType("Person");
+    expect(m.objectTypes).toEqual([]);
+  });
+
   it("refuses a fact type's bad constraint before storing anything", () => {
     const m = people();
     const before = m.factTypes.length;

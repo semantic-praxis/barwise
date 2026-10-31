@@ -367,6 +367,6 @@ function subtypeItem(
     kind: "subtype_fact",
     label: `${subName} is a ${supName}`,
     description: flags.length > 0 ? flags.join(", ") : undefined,
-    id: sf.id,
+    id: subtypeFactRef(sf),
   };
 }

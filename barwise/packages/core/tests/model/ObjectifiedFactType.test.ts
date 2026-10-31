@@ -43,7 +43,7 @@ describe("ObjectifiedFactType", () => {
 
     it("is referred to by its id, or by what it relates when it has none", () => {
       const unnamed = new ObjectifiedFactType({ factTypeId: "ft-1", objectTypeId: "ot-1" });
-      expect(objectificationRef(unnamed)).toBe("unnamed:ot-1=ft-1");
+      expect(objectificationRef(unnamed)).toBe("unnamed:ot-1<>ft-1");
       const named = new ObjectifiedFactType({ id: "o", factTypeId: "ft-1", objectTypeId: "ot-1" });
       expect(objectificationRef(named)).toBe("o");
     });

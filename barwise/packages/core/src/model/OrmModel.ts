@@ -16,12 +16,21 @@ import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { mint, type Mintable } from "./mint.js";
 import { localName } from "./name.js";
-import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
+import {
+  objectificationRef,
+  ObjectifiedFactType,
+  type ObjectifiedFactTypeConfig,
+} from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
 import { expandReading } from "./ReadingOrder.js";
 import type { Role } from "./Role.js";
-import { SubtypeFact, type SubtypeFactConfig, subtypePairKey } from "./SubtypeFact.js";
+import {
+  SubtypeFact,
+  type SubtypeFactConfig,
+  subtypeFactRef,
+  subtypePairKey,
+} from "./SubtypeFact.js";
 
 import type { ConstraintAdmission } from "./constraintAdmission.js";
 import type { ConstraintInView, ConstraintModel } from "./constraintModel.js";
@@ -770,6 +779,25 @@ export class OrmModel implements ConstraintModel {
     // and the stated constraint ids are held while the unnamed constraints
     // are named, then released for the admission's own hold.
     const statedConstraints = constraints.flatMap((c) => (c.id === undefined ? [] : [c.id]));
+    if (this._idsAcrossKinds) {
+      // One config stating an id twice -- the fact type and a role, two
+      // constraints -- is refused too: nothing holds them yet to refuse by.
+      const own: [string | undefined, IdKind][] = [
+        [config.id, "fact type"],
+        ...config.roles.map((r): [string | undefined, IdKind] => [r.id, "role"]),
+        ...statedConstraints.map((c): [string | undefined, IdKind] => [c, "constraint"]),
+      ];
+      const [repeat] = groupRepeats(own, ([held]) => held);
+      if (repeat !== undefined) {
+        const [id, holders] = repeat;
+        throw new DuplicateIdError(
+          id,
+          holders[1]![1],
+          `its own ${holders[0]![1]}`,
+          `fact type ${quoted(config.name)}`,
+        );
+      }
+    }
     for (const r of config.roles) {
       this.refuseAcrossKinds(r.id, "role", `role ${quoted(r.name)} of ${quoted(config.name)}`);
     }
@@ -1005,11 +1033,18 @@ export class OrmModel implements ConstraintModel {
    * a constraint's roles: a model holding an id that names nothing does not
    * load after its next save.
    */
-  removeSubtypeFact(id: string): void {
-    if (!this._subtypeFacts.has(id)) {
-      throw new Error(`Subtype fact with id "${id}" not found.`);
+  removeSubtypeFact(target: string | SubtypeFact): void {
+    // By element too: one the model left unnamed (decision 19) has no id.
+    const sf = typeof target === "string" ? this._subtypeFacts.get(target) : target;
+    if (sf === undefined || !this._subtypeFacts.remove(sf)) {
+      throw new Error(
+        `Subtype fact ${
+          JSON.stringify(typeof target === "string" ? target : subtypeFactRef(target))
+        } not found.`,
+      );
     }
-    this._subtypeFacts.delete(id);
+    const id = sf.id;
+    if (id === undefined) return;
     for (let i = this._constraints.length - 1; i >= 0; i--) {
       const kept = withoutSubtypeFacts(this._constraints[i]!, (sf) => sf === id);
       if (kept === undefined) this.dropConstraintAt(i);
@@ -1152,11 +1187,16 @@ export class OrmModel implements ConstraintModel {
   }
 
   /** Remove an objectified fact type from the model. */
-  removeObjectifiedFactType(id: string): void {
-    if (!this._objectifiedFactTypes.has(id)) {
-      throw new Error(`Objectified fact type with id "${id}" not found.`);
+  removeObjectifiedFactType(target: string | ObjectifiedFactType): void {
+    // By element too: one the model left unnamed (decision 19) has no id.
+    const oft = typeof target === "string" ? this._objectifiedFactTypes.get(target) : target;
+    if (oft === undefined || !this._objectifiedFactTypes.remove(oft)) {
+      throw new Error(
+        `Objectified fact type ${
+          JSON.stringify(typeof target === "string" ? target : objectificationRef(target))
+        } not found.`,
+      );
     }
-    this._objectifiedFactTypes.delete(id);
   }
 
   /**

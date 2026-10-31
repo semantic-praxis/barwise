@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
-import type { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument } from "../../src/serialization/OrmYamlSerializer.js";
 import { replayInto40 } from "../../src/serialization/replay.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
@@ -59,6 +59,9 @@ function mapIds(value: unknown, back: (id: string) => string, field?: string): u
   return value;
 }
 
+/** Each old id to the id it now has, from the model's map back. */
+const oldToNew = (model: OrmModel) => new Map([...model.priorIds!].map(([now, old]) => [old, now]));
+
 const asText = (model: OrmModel) => JSON.parse(JSON.stringify(writeDocument(model)));
 
 describe("replaying a 3.x model into format 4.0", () => {
@@ -74,7 +77,8 @@ describe("replaying a 3.x model into format 4.0", () => {
       const source = new OrmYamlSerializer().deserialize(new OrmYamlSerializer().serialize(
         new OrmYamlSerializer().deserialize(JSON.stringify(c.doc)),
       ));
-      const { model, ids } = replayInto40(source);
+      const model = replayInto40(source);
+      const ids = oldToNew(model);
       const prior = model.priorIds!;
       const back = (id: string) => prior.get(id) ?? id;
       expect(mapIds(asText(model), back)).toEqual(c.doc);
@@ -141,7 +145,8 @@ model:
 `,
       { lenient: true },
     );
-    const { model, ids } = replayInto40(source);
+    const model = replayInto40(source);
+    const ids = oldToNew(model);
     expect(Object.fromEntries(ids)).toMatchObject({
       u1: "Student",
       u2: "catalog:Course",
@@ -197,7 +202,7 @@ model:
       readings: ["{0} lends {1}"]
   constraints:
     - { id: x1, type: exclusion, roles: [r1, r3]${exclusion} }
-`)).model;
+`));
     // The second revision renames the card and changes the constraint, so
     // every replayed id that names them differs between the two.
     const before = revision("Card", "internal_uniqueness, roles: [r2]", "");
@@ -227,12 +232,56 @@ model:
     );
   });
 
+  it("keeps two kinds that shared an old id apart, and leaves a dangling reference dangling", () => {
+    // Built in code: a 3.0 file refuses a repeated constraint id, and a 2.0
+    // file or a model built in code is how one reaches the replay.
+    const source = new OrmModel({ name: "Shared" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "ot-7", name: "Order", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "x1",
+      name: "Person places Order",
+      roles: [
+        { id: "r1", name: "places", playerId: "x1" },
+        { id: "r2", name: "is placed by", playerId: "Order" },
+      ],
+      readings: ["{0} places {1}"],
+      // A ring over two players: no sentence names it.
+      constraints: [{
+        id: "c9",
+        type: "ring",
+        roleId1: "r1",
+        roleId2: "r2",
+        ringType: "irreflexive",
+      }],
+    }, { skipPlayerValidation: true });
+    source.addConstraint({ id: "c9", type: "exclusion", roleIds: ["r1", "gone"] } as never);
+    // A reference to the object type x1 read after the fact type x1 is in.
+    source.addDiagramLayout({ name: "Main", elements: ["x1"], positions: {}, orientations: {} });
+    const model = replayInto40(source);
+    const ft = model.factTypes[0]!;
+    // The role's player is the object type, though a fact type shared x1.
+    expect(ft.id).toBe("Person_places_Order");
+    expect(ft.roles[0]!.playerId).toBe("Person");
+    // "Order" was a dangling player in the file; the object type named
+    // Order is not given that id, so the reference still resolves to nothing.
+    expect(model.getObjectTypeByName("Order")!.id).toBe("Order_2");
+    expect(ft.roles[1]!.playerId).toBe("Order");
+    expect(model.diagramLayouts[0]!.elements).toEqual(["Person"]);
+    // Two constraints the model cannot name, sharing an old id: the second
+    // takes one derived from it, rather than the replay refusing the file.
+    const kept = model.everyConstraint().map(([c]) => c.id).filter((id) =>
+      id?.startsWith("c9") || /^[0-9a-f]{8}-/.test(id ?? "")
+    );
+    expect(new Set(kept).size).toBe(kept.length);
+  });
+
   it("gives one model for one input, on every run", () => {
     for (const c of corpus) {
       const load = () => new OrmYamlSerializer().deserialize(JSON.stringify(c.doc));
-      expect([c.file, asText(replayInto40(load()).model)]).toEqual([
+      expect([c.file, asText(replayInto40(load()))]).toEqual([
         c.file,
-        asText(replayInto40(load()).model),
+        asText(replayInto40(load())),
       ]);
     }
   });

@@ -213,60 +213,49 @@ const STATED_FIELDS = new Set([
 const DROPPED_FIELDS = new Set(["id"]);
 
 /**
- * Walk the constraint's serialized form, field by field. A field this
- * walk does not know is an error, not a pass: a constraint kind added
- * later must say which of its fields are references, or its key would
- * carry raw ids and every import would read its name as stale.
+ * Walk the constraint's serialized form, field by field, into its key: the
+ * shared traversal below, less the id the name replaces, with each join
+ * operand flattened to its root, its steps as pairs and its projection. A
+ * field the traversal does not know is an error, not a pass: a constraint
+ * kind added later must say which of its fields are references, or its key
+ * would carry raw ids and every import would read its name as stale.
  */
 function walk(
   constraint: Parameters<typeof serializeConstraint>[0],
   onRef: (ref: Reference) => unknown,
 ): Record<string, unknown> {
-  const form = serializeConstraint(constraint) as unknown as Record<string, unknown>;
   const out: Record<string, unknown> = {};
-  for (const [field, value] of Object.entries(form)) {
+  for (const [field, value] of Object.entries(mapConstraintReferences(constraint, onRef))) {
     if (DROPPED_FIELDS.has(field)) continue;
-    if (STATED_FIELDS.has(field)) out[field] = value;
-    else if (ROLE_FIELDS.has(field)) {
-      out[field] = Array.isArray(value)
-        ? value.map((id: string) => onRef({ kind: "role", id }))
-        : onRef({ kind: "role", id: value as string });
-    } else if (field === "subtype_facts") {
-      out[field] = (value as string[]).map((id) => onRef({ kind: "subtypeFact", id }));
-    } else if (OPERAND_FIELDS.has(field)) {
-      const operand = (
-        o: {
-          path: { root: string; steps: { entry: string; exit: string; }[]; };
-          projection: number[];
-        },
-      ) => ({
-        root: onRef({ kind: "objectType", id: o.path.root }),
-        steps: o.path.steps.map((s) => [
-          onRef({ kind: "role", id: s.entry }),
-          onRef({ kind: "role", id: s.exit }),
-        ]),
-        projection: o.projection,
-      });
-      out[field] = Array.isArray(value) ? value.map(operand) : operand(value as never);
-    } else {
-      throw new Error(
-        `mint: constraint field "${field}" is not classified as a reference or a statement.`,
-      );
+    if (!OPERAND_FIELDS.has(field)) {
+      out[field] = value;
+      continue;
     }
+    const operand = (
+      o: {
+        path: { root: unknown; steps: { entry: unknown; exit: unknown; }[]; };
+        projection: number[];
+      },
+    ) => ({
+      root: o.path.root,
+      steps: o.path.steps.map((st) => [st.entry, st.exit]),
+      projection: o.projection,
+    });
+    out[field] = Array.isArray(value) ? value.map(operand) : operand(value as never);
   }
   return out;
 }
 
 /**
  * The constraint's serialized form with every reference it holds replaced
- * by `onRef`'s answer, in the same shape, its id kept: for a caller that
- * rewrites ids (the 3.x replay into 4.0). Reads the same field sets as
- * `walk`, and refuses a field neither classifies, as `walk` does, so a
- * kind added later cannot slip through with its references unmapped.
+ * by `onRef`'s answer, in the same shape, its id kept: the one traversal
+ * of a constraint's references, which `walk` builds the content key on and
+ * the 3.x replay rewrites ids with. It refuses a field it does not
+ * classify, so a kind added later cannot slip through unmapped.
  */
 export function mapConstraintReferences(
   constraint: Parameters<typeof serializeConstraint>[0],
-  onRef: (ref: Reference) => string,
+  onRef: (ref: Reference) => unknown,
 ): Record<string, unknown> {
   const form = serializeConstraint(constraint) as unknown as Record<string, unknown>;
   const out: Record<string, unknown> = {};

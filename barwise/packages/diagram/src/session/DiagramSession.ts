@@ -368,7 +368,7 @@ export class DiagramSession {
   private cleanStaleFilterIds(): void {
     const validOtIds = new Set(this.model.objectTypes.map((ot) => ot.id));
     const validFtIds = new Set(this.model.factTypes.map((ft) => ft.id));
-    const validSfIds = new Set(this.model.subtypeFacts.map((sf) => sf.id));
+    const validSfIds = new Set(this.model.subtypeFacts.map(subtypeFactRef));
 
     if (this.activeViewFilter) {
       for (const id of this.activeViewFilter.objectTypeIds) {

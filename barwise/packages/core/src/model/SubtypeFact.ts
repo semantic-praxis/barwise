@@ -82,15 +82,6 @@ export function subtypePairKey(
 }
 
 /**
- * Project a SubtypeFact back to the config shape that constructed it,
- * listing every field once -- the `toObjectTypeConfig` convention
- * (barwise-927) applied to the element kinds the merge started carrying
- * through in barwise-937. A caller that rebuilds a subtype fact spreads
- * this instead of hand-copying its fields, and the `Complete<...>`
- * annotation makes the next field added to `SubtypeFactConfig` a
- * compile error here until it is listed.
- */
-/**
  * How a subtype fact is referred to where a string is needed -- a
  * diagnostic, a verbalization, a diagram view: its id, or for one the model
  * left unnamed (decision 19) a fixed reference built from what it relates.
@@ -106,6 +97,15 @@ export function subtypeFactRef(
   return sf.id ?? `unnamed:${sf.subtypeId}<${sf.supertypeId}`;
 }
 
+/**
+ * Project a SubtypeFact back to the config shape that constructed it,
+ * listing every field once -- the `toObjectTypeConfig` convention
+ * (barwise-927) applied to the element kinds the merge started carrying
+ * through in barwise-937. A caller that rebuilds a subtype fact spreads
+ * this instead of hand-copying its fields, and the `Complete<...>`
+ * annotation makes the next field added to `SubtypeFactConfig` a
+ * compile error here until it is listed.
+ */
 export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
   const config: Complete<SubtypeFactConfig> = {
     id: sf.id,

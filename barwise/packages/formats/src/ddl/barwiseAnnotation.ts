@@ -174,7 +174,10 @@ export function annotateTable(
   const flags = links.length > 0 ? subtypeFlagsFromConstraints(model.constraints) : undefined;
   for (const sf of links) {
     const supertype = model.getObjectType(sf.supertypeId);
-    const fk = table.foreignKeys.find((f) => f.sourceConstraintId === sf.id);
+    // An unnamed subtype fact (decision 19) has no foreign key keyed to it.
+    const fk = sf.id === undefined
+      ? undefined
+      : table.foreignKeys.find((f) => f.sourceConstraintId === sf.id);
     if (!supertype || !fk) continue;
     supertypes.push({
       entity: supertype.name,
