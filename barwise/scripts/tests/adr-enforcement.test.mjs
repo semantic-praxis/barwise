@@ -135,7 +135,7 @@ test("enforcementLine renders gates, tests and gaps, from the ADR's text alone",
   );
   assert.equal(
     enforcementLine(text),
-    "declared: purity (a, b), tests (c), audit:specs (d); gap: barwise-k3x (e)",
+    "declared: purity (a, b), tests (c), audit:specs -- --check (d); gap: barwise-k3x (e)",
   );
   // Only gaps: no "declared:" at all, rather than an empty list.
   assert.equal(
@@ -170,4 +170,11 @@ test("renderSection adds the line after an ADR's date, and explains it once, onl
   assert.match(after, /- \[A concern\]\(adr\/plain\.md\) -- 2026-10-24\n/);
   assert.equal(after.match(/`declared:` names the gates/g).length, 1);
   assert.match(after, /barwise-raw/);
+  // A declaring ADR whose Scope puts it in no list shows no row, so no
+  // explanation of a line nobody can see.
+  const unscoped = {
+    f: declaring.f,
+    text: declaring.text.replace("Scope: process", "Scope: tooling"),
+  };
+  assert.doesNotMatch(renderSection([unscoped, plain], { core: [] }), /`declared:` names/);
 });

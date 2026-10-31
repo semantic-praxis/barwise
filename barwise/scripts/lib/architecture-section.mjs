@@ -76,9 +76,11 @@ export function loadIntended(root) {
  * What an ADR's `Enforced-by:` header declares, as the index shows it, or
  * "" for an ADR without one (docs/specs/executable-adrs.spec.md, WS4). Read
  * from the ADR's own text through parseEnforcedBy(), the reader the check
- * uses, so the index never reads ci.yml or the tracker and cannot show an
- * entry differently from how the check reads it. An entry that does not
- * parse is left out here; check:architecture reports it.
+ * uses, so the index never reads ci.yml or the tracker and parses an entry
+ * as the check does. It renders what the header declares, not what the
+ * check accepted: an entry that does not parse is left out, and one that
+ * parses but fails the check (`lint`, an unknown id) is shown, because the
+ * same check:architecture run that compares this section fails on it.
  *
  *   declared: purity (no-io, no-clock), tests (pure-ids); gap: barwise-k3x (same-output)
  */
@@ -87,7 +89,9 @@ export function enforcementLine(text) {
   if (!present) return "";
   const ids = (e) => `(${e.ids.join(", ")})`;
   const declared = entries.filter((e) => e.kind !== "none").map((e) =>
-    e.kind === "tests" ? `tests ${ids(e)}` : `${e.script} ${ids(e)}`
+    e.kind === "tests"
+      ? `tests ${ids(e)}`
+      : `${e.script}${e.args === null ? "" : ` -- ${e.args}`} ${ids(e)}`
   );
   const parts = [
     ...(declared.length > 0 ? [`declared: ${declared.join(", ")}`] : []),
@@ -124,7 +128,8 @@ export function renderSection(adrs, intended) {
   ];
   // Said once, and only when some ADR declares: what "declared" means and
   // the two limits under it (the spec, "What does executable buy").
-  if (entries.some((e) => e.enforcement !== "")) {
+  const shown = entries.filter((e) => e.scope === "architecture" || e.scope === "process");
+  if (shown.some((e) => e.enforcement !== "")) {
     out.push(
       "",
       "After an ADR's date: `declared:` names the gates and tagged tests its",

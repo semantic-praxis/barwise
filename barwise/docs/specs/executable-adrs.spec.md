@@ -1,6 +1,6 @@
 # Executable ADRs: each ADR declares what enforces it, and CI checks the declaration
 
-Status: WS1 implemented 2026-10-30 (the declaration pass in check:architecture, adr-enforcement.mjs, ciStepOccurrences(); an absent header still allowed). WS4 implemented 2026-10-30 (the enforcement line in the generated ARCHITECTURE.md index, rendered once an ADR declares). WS2 and WS3 not yet built.
+Status: WS1 implemented 2026-10-30 (the declaration pass in check:architecture, adr-enforcement.mjs, ciStepOccurrences(); an absent header still allowed). WS4 implemented 2026-10-30 (the enforcement line in the generated ARCHITECTURE.md index, rendered once an ADR declares). WS2 and WS3 not yet built; WS5 is provisional and not started.
 
 Created: 2026-10-28
 Last-updated: 2026-10-30
