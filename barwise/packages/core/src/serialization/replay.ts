@@ -70,7 +70,8 @@ export function replayInto40(source: OrmModel): OrmModel {
   const record = (kind: Kind, from: string | undefined, now: string | undefined) => {
     if (from !== undefined && now !== undefined) mapOf(kind).set(from, now);
   };
-  // A diagram position or orientation keys an object type or a fact type.
+  // A diagram position keys an object type or a fact type; an orientation,
+  // a fact type only (`DiagramLayout`).
   const toElement = (id: string) => mapOf("objectType").get(id) ?? to("factType", id);
 
   /**
@@ -92,12 +93,17 @@ export function replayInto40(source: OrmModel): OrmModel {
     }
     return { ...rest, id: freeId(c.id) } as unknown as C;
   };
+  // Ids handed out but not yet added: one fact type's constraints are all
+  // remapped before any is added, so the model cannot see them yet.
+  const kept = new Set<string>();
   const freeId = (old: string): string => {
-    const free = (id: string) => target.idKindsHolding(id).length === 0 && !dangling.has(id);
-    if (free(old)) return old;
+    const free = (id: string) =>
+      target.idKindsHolding(id).length === 0 && !dangling.has(id) && !kept.has(id);
+    const take = (id: string) => (kept.add(id), id);
+    if (free(old)) return take(old);
     for (let n = 1;; n++) {
       const id = derivedId("replay.constraint", [old, String(n)]);
-      if (free(id)) return id;
+      if (free(id)) return take(id);
     }
   };
 
@@ -107,11 +113,12 @@ export function replayInto40(source: OrmModel): OrmModel {
   const dangling = danglingReferences(source);
   target.withReserved(dangling, () => {
     // Object types first: everything else refers to them. A shadow, which
-    // holds another domain's element, takes `<context>:<local name>`.
+    // holds another domain's element, takes `<context>:<local name>`, its
+    // context a local name too, as a 4.0 alias is.
     for (const ot of source.objectTypes) {
       const { id: _old, ...config } = ot as ObjectTypeConfig & { readonly id: string; };
       const id = ot.sourceContext !== undefined
-        ? `${ot.sourceContext}:${localName(ot.name)}`
+        ? `${localName(ot.sourceContext)}:${localName(ot.name)}`
         : undefined;
       record("objectType", ot.id, target.addObjectType({ ...config, ...(id ? { id } : {}) }).id);
     }
@@ -207,15 +214,15 @@ export function replayInto40(source: OrmModel): OrmModel {
 
     for (const d of source.definitions) target.addDefinition(d);
     for (const layout of source.diagramLayouts) {
-      const keyed = <V>(rec: Readonly<Record<string, V>>) =>
-        Object.fromEntries(Object.entries(rec).map(([k, v]) => [toElement(k), v]));
+      const keyed = <V>(rec: Readonly<Record<string, V>>, key: (k: string) => string) =>
+        Object.fromEntries(Object.entries(rec).map(([k, v]) => [key(k), v]));
       target.addDiagramLayout({
         ...layout,
         ...(layout.elements !== undefined
           ? { elements: layout.elements.map((e) => to("objectType", e)) }
           : {}),
-        positions: keyed(layout.positions),
-        orientations: keyed(layout.orientations),
+        positions: keyed(layout.positions, toElement),
+        orientations: keyed(layout.orientations, (k) => to("factType", k)),
       });
     }
   });
@@ -265,6 +272,11 @@ function danglingReferences(model: OrmModel): Set<string> {
   }
   for (const layout of model.diagramLayouts) {
     for (const e of layout.elements ?? []) objectType(e);
+    // A stale key reserved, so no element renamed to it takes over a position.
+    for (const k of Object.keys(layout.positions)) {
+      if (model.getObjectType(k) === undefined) factType(k);
+    }
+    for (const k of Object.keys(layout.orientations)) factType(k);
   }
   return out;
 }

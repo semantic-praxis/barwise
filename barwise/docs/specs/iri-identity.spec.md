@@ -179,7 +179,9 @@ In scope:
   layout keys, report each suffix it added, and keep each element's
   original UUID in memory, so that diffing two 3.x revisions (`barwise
   history`) still pairs exactly. A shadow, which in 3.x carries its owner's
-  name and `source_context`, becomes `<source_context>:localName(name)`,
+  name and `source_context`, becomes
+  `localName(source_context):localName(name)` (the alias a local name, as
+  4.0's `imports` keys are),
   and the reader adds the import that alias needs; so domains of one
   project can be migrated in any order and still agree, and a surface may
   write any one of them as 4.0 on its next edit, as
@@ -1383,7 +1385,8 @@ version-1 manifest would go silently empty for impact analysis.
   domain (role players, subtype ends, `objectified.object_type`), emits
   `imports: { <owner>: <owner> }`, drops `source_context`, and writes 4.0
   (`splitModel.ts:340-360,440`). The 3.x reader, which sees only the
-  shadow's name and `source_context`, builds `<context>:localName(name)`,
+  shadow's name and `source_context`, builds
+  `localName(context):localName(name)`,
   and the 4.0 project load's name check (Scope) catches the one case where
   that binds the wrong owner element. A core `aliasOf(id)` replaces the field for its
   readers: `mcp/src/tools/split.ts:168-176`, the diff change kind
@@ -1535,7 +1538,11 @@ sites.
         model per input. The model keeps the map back to the old ids in
         memory (`OrmModel.priorIds`), and `DiffIdentity`'s pairing ids
         read it when both models carry one. Every tracked model, 2.0 files
-        included, replays to the same model under 4.0-shaped ids.
+        included, replays to the same model under 4.0-shaped ids. A
+        reference to an element the replay leaves unnamed (decision 19)
+        dangles afterwards, as decision 17 has it ("nothing else may refer
+        to it by id"), and validation reports it; reachable only through a
+        lenient load.
       - _6b-2b-2b, the switch._ The 3.0 schema frozen as
         `orm-model-3.0.schema.json` and the 4.0 one renamed to
         `orm-model.schema.json`; `minted_from` stored; the 4.0 writer;

@@ -276,6 +276,87 @@ model:
     expect(new Set(kept).size).toBe(kept.length);
   });
 
+  it("replays one fact type's two unnamable constraints sharing an id, as a 2.0 file may hold them", () => {
+    const source = new OrmModel({ name: "Rings" });
+    source.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "nr" });
+    const ring = {
+      id: "k",
+      type: "ring",
+      roleId1: "r1",
+      roleId2: "r2",
+      ringType: "irreflexive",
+    } as const;
+    source.addFactType({
+      id: "f",
+      name: "A r B",
+      roles: [{ id: "r1", name: "r", playerId: "a" }, { id: "r2", name: "s", playerId: "b" }],
+      readings: ["{0} r {1}"],
+      constraints: [ring, { ...ring, ringType: "acyclic" }],
+    });
+    const ids = replayInto40(source).factTypes[0]!.internalConstraints.map((c) => c.id);
+    expect(ids[0]).toBe("k");
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it("leaves a reference to a subtype fact it leaves unnamed dangling (decisions 17 and 19)", () => {
+    const source = new OrmYamlSerializer().deserialize(
+      `orm_version: "3.0"
+model:
+  name: Gone
+  object_types:
+    - { id: a, name: A, kind: entity, reference_mode: nr }
+    - { id: b, name: B, kind: entity, reference_mode: nr }
+  subtype_facts:
+    - { id: sf1, subtype: a, supertype: gone }
+    - { id: sf2, subtype: b, supertype: gone }
+  constraints:
+    - { id: x, type: exclusion, subtype_facts: [sf1, sf2] }
+`,
+      { lenient: true },
+    );
+    const model = replayInto40(source);
+    expect(model.subtypeFacts.map((sf) => sf.id)).toEqual([undefined, undefined]);
+    // Nothing may refer to an unnamed element by id, so the constraint
+    // names the old ids, which resolve to nothing, and validation says so.
+    expect(model.constraints[0]).toMatchObject({ subtypeFactIds: ["sf1", "sf2"] });
+  });
+
+  it("maps a diagram's orientations by fact type, keeps a stale position key apart, and names a shadow's context locally", () => {
+    const source = new OrmModel({ name: "Layout" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "u1", name: "Customer", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({
+      id: "s1",
+      name: "Order",
+      kind: "entity",
+      referenceMode: "nr",
+      sourceContext: "Order Management",
+    });
+    source.addFactType({
+      id: "x1",
+      name: "Person knows Customer",
+      roles: [{ id: "r1", name: "knows", playerId: "x1" }, {
+        id: "r2",
+        name: "is known by",
+        playerId: "u1",
+      }],
+      readings: ["{0} knows {1}"],
+    });
+    source.addDiagramLayout({
+      name: "Main",
+      // "Customer" is a stale key: no element holds that id in the file.
+      positions: { u1: { x: 1, y: 1 }, Customer: { x: 9, y: 9 } },
+      orientations: { x1: "vertical" },
+    });
+    const model = replayInto40(source);
+    const layout = model.diagramLayouts[0]!;
+    expect(model.getObjectTypeByName("Customer")!.id).toBe("Customer_2");
+    expect(layout.positions).toEqual({ Customer_2: { x: 1, y: 1 }, Customer: { x: 9, y: 9 } });
+    expect(layout.orientations).toEqual({ Person_knows_Customer: "vertical" });
+    expect(model.getObjectTypeByName("Order")!.id).toBe("Order_Management:Order");
+  });
+
   it("gives one model for one input, on every run", () => {
     for (const c of corpus) {
       const load = () => new OrmYamlSerializer().deserialize(JSON.stringify(c.doc));

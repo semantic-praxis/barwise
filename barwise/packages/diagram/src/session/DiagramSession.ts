@@ -188,7 +188,7 @@ export class DiagramSession {
     this.positionOverrides = {};
 
     if (kind === "subtype_fact") {
-      const sf = this.model.subtypeFacts.find((s) => s.id === elementId);
+      const sf = this.model.subtypeFacts.find((s) => subtypeFactRef(s) === elementId);
       if (!sf) return;
       this.applySeedFilter([sf.subtypeId, sf.supertypeId], sf.subtypeId);
       return;

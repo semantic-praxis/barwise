@@ -85,7 +85,7 @@ export function subtypePairKey(
  * How a subtype fact is referred to where a string is needed -- a
  * diagnostic, a verbalization, a diagram view: its id, or for one the model
  * left unnamed (decision 19) a fixed reference built from what it relates.
- * No 4.0 id can take that form (a local name holds no `:`).
+ * No 4.0 id can take that form: a local name holds no `<`.
  */
 export function subtypeFactRef(
   sf: {
