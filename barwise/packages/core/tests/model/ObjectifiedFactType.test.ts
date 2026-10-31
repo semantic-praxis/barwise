@@ -15,7 +15,7 @@
  *   - ModelBuilder integration
  */
 import { describe, expect, it } from "vitest";
-import { ObjectifiedFactType } from "../../src/model/ObjectifiedFactType.js";
+import { objectificationRef, ObjectifiedFactType } from "../../src/model/ObjectifiedFactType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
@@ -28,7 +28,8 @@ describe("ObjectifiedFactType", () => {
       });
       expect(oft.factTypeId).toBe("ft-1");
       expect(oft.objectTypeId).toBe("ot-1");
-      expect(oft.id).toBeTruthy();
+      // Unnamed until a model names it (iri-identity decision 19).
+      expect(oft.id).toBeUndefined();
     });
 
     it("accepts custom id", () => {
@@ -40,12 +41,11 @@ describe("ObjectifiedFactType", () => {
       expect(oft.id).toBe("custom-id");
     });
 
-    it("derives name from relationship", () => {
-      const oft = new ObjectifiedFactType({
-        factTypeId: "ft-1",
-        objectTypeId: "ot-1",
-      });
-      expect(oft.name).toBe("objectified:ft-1:ot-1");
+    it("is referred to by its id, or by what it relates when it has none", () => {
+      const unnamed = new ObjectifiedFactType({ factTypeId: "ft-1", objectTypeId: "ot-1" });
+      expect(objectificationRef(unnamed)).toBe("unnamed:ot-1=ft-1");
+      const named = new ObjectifiedFactType({ id: "o", factTypeId: "ft-1", objectTypeId: "ot-1" });
+      expect(objectificationRef(named)).toBe("o");
     });
 
     it("throws when factTypeId equals objectTypeId", () => {

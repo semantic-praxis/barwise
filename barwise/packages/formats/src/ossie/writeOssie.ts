@@ -18,12 +18,14 @@ import {
   type FactType,
   type IdentifyingComponent,
   type IdentifyingUniqueness,
+  objectificationRef,
   type ObjectType,
   type OrmModel,
   type PreferredIdentifiers,
   preferredIdentifiers,
   resolvePreferredIdentifier,
   roleIdsOf,
+  subtypeFactRef,
 } from "@barwise/core";
 import { buildConstraintSpec } from "@barwise/core/annotation";
 import type { ChangeKind, ElementType } from "@barwise/core/diff";
@@ -347,9 +349,9 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     lose(`population ${p.id}`, "Ossie has no populations", { kind: "population", id: p.id });
   }
   for (const o of model.objectifiedFactTypes) {
-    lose(`objectification ${o.id}`, "Ossie has no objectification", {
+    lose(`objectification ${objectificationRef(o)}`, "Ossie has no objectification", {
       kind: "objectified_fact_type",
-      id: o.id,
+      id: objectificationRef(o),
     });
   }
   for (const d of model.definitions) {
@@ -961,7 +963,7 @@ function subtypeLinks(
   for (const sf of model.subtypeFacts) {
     const entry = out.get(sf.subtypeId) ?? { names: [] };
     const sub = model.getObjectType(sf.subtypeId)!.name;
-    const key: LossKey = { kind: "subtype_fact", id: sf.id };
+    const key: LossKey = { kind: "subtype_fact", id: subtypeFactRef(sf) };
     const expected = entry.names.length === 0 && !identifyBy.has(sf.subtypeId);
     if (sf.providesIdentification !== expected) {
       lose(

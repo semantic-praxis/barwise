@@ -16,6 +16,7 @@ import {
   type DiagramLayout,
   isScopedView,
   type OrmModel,
+  subtypeFactRef,
   viewMembership,
 } from "@barwise/core";
 import { generateDiagram } from "../DiagramGenerator.js";
@@ -410,9 +411,10 @@ export class DiagramSession {
       }
     }
     for (const sf of this.model.subtypeFacts) {
-      if (subtypeFactIds.has(sf.id) || this.knownSubtypeFactIds.has(sf.id)) continue;
+      const ref = subtypeFactRef(sf);
+      if (subtypeFactIds.has(ref) || this.knownSubtypeFactIds.has(ref)) continue;
       if (seedIds.has(sf.subtypeId) || seedIds.has(sf.supertypeId)) {
-        subtypeFactIds.add(sf.id);
+        subtypeFactIds.add(ref);
         objectTypeIds.add(sf.subtypeId);
         objectTypeIds.add(sf.supertypeId);
       }
@@ -421,7 +423,7 @@ export class DiagramSession {
 
   private snapshotRelationIds(): void {
     this.knownFactTypeIds = new Set(this.model.factTypes.map((ft) => ft.id));
-    this.knownSubtypeFactIds = new Set(this.model.subtypeFacts.map((sf) => sf.id));
+    this.knownSubtypeFactIds = new Set(this.model.subtypeFacts.map(subtypeFactRef));
   }
 
   private seedOverridesFromSavedLayout(model: OrmModel, saved?: DiagramLayout): void {

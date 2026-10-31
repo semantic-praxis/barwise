@@ -7,6 +7,7 @@
  * exist.
  */
 import type { ExternalConstraint } from "@barwise/core";
+import { subtypeFactRef } from "@barwise/core";
 import { derivedNormaElementId, NORMA_ID_TAGS } from "../normaId.js";
 import type { NormaConstraint } from "../NormaXmlTypes.js";
 import { type NormaMappingContext, NormaMappingError } from "./context.js";
@@ -39,7 +40,7 @@ export function mapSubtypeFacts(ctx: NormaMappingContext): void {
       supertypeId,
       providesIdentification: sf.providesIdentification,
     });
-    bySupertypeRole.set(sf.supertypeRoleId, added.id);
+    bySupertypeRole.set(sf.supertypeRoleId, subtypeFactRef(added));
   }
   for (const c of subtypeConstraints(ctx, bySupertypeRole)) model.addConstraint(c);
 }

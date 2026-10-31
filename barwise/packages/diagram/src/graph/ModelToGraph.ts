@@ -5,6 +5,7 @@ import {
   pureObjectifyingEntityIds,
   referenceModeOf,
   type RingType,
+  subtypeFactRef,
 } from "@barwise/core";
 import type {
   ConstraintEdge,
@@ -101,7 +102,7 @@ function constraintNodeIds(
   const taken = new Set<string>([
     ...model.objectTypes.map((ot) => ot.id),
     ...model.factTypes.map((ft) => ft.id),
-    ...model.subtypeFacts.map((sf) => sf.id),
+    ...model.subtypeFacts.map(subtypeFactRef),
   ]);
   const uses = new Map<string, number>();
   for (const c of constraints) {
@@ -391,7 +392,7 @@ export function modelToGraph(
 
   // Create subtype edges (skip filtered-out subtypes).
   for (const sf of model.subtypeFacts) {
-    if (filter && !filter.subtypeFactIds.has(sf.id)) continue;
+    if (filter && !filter.subtypeFactIds.has(subtypeFactRef(sf))) continue;
     subtypeEdges.push({
       subtypeNodeId: sf.subtypeId,
       supertypeNodeId: sf.supertypeId,

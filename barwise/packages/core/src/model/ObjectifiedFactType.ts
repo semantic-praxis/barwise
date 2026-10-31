@@ -1,5 +1,4 @@
 import type { Complete } from "../util/complete.js";
-import { ModelElement } from "./ModelElement.js";
 
 /**
  * Configuration for creating a new ObjectifiedFactType.
@@ -29,15 +28,14 @@ export interface ObjectifiedFactTypeConfig {
  * table whose primary key is the composite of the underlying fact
  * type's role columns, unless the entity has its own reference mode.
  */
-export class ObjectifiedFactType extends ModelElement {
+export class ObjectifiedFactType {
+  /** Its id, or none: see `SubtypeFact.id` (iri-identity, decision 19). */
+  readonly id: string | undefined;
   readonly factTypeId: string;
   readonly objectTypeId: string;
 
   constructor(config: ObjectifiedFactTypeConfig) {
-    super(
-      `objectified:${config.factTypeId}:${config.objectTypeId}`,
-      config.id,
-    );
+    this.id = config.id;
     this.factTypeId = config.factTypeId;
     this.objectTypeId = config.objectTypeId;
 
@@ -47,6 +45,17 @@ export class ObjectifiedFactType extends ModelElement {
       );
     }
   }
+}
+
+/** See `subtypeFactRef`: the same reference, one kind over. */
+export function objectificationRef(
+  oft: {
+    readonly id: string | undefined;
+    readonly factTypeId: string;
+    readonly objectTypeId: string;
+  },
+): string {
+  return oft.id ?? `unnamed:${oft.objectTypeId}=${oft.factTypeId}`;
 }
 
 /** See {@link toSubtypeFactConfig}: the same projection, one kind over. */

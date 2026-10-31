@@ -9,7 +9,13 @@
  * display-ready readings and constraint labels, and subtype links.
  * Pure and deterministic; order follows model declaration order.
  */
-import { dataTypeOf, expandReading, type OrmModel, referenceModeOf } from "@barwise/core";
+import {
+  dataTypeOf,
+  expandReading,
+  type OrmModel,
+  referenceModeOf,
+  subtypeFactRef,
+} from "@barwise/core";
 
 export interface SummaryRole {
   readonly id: string;
@@ -118,7 +124,7 @@ export function buildModelSummary(model: OrmModel): ModelSummary {
   });
 
   const subtypes: SummarySubtype[] = model.subtypeFacts.map((sf) => ({
-    id: sf.id,
+    id: subtypeFactRef(sf),
     subtypeId: sf.subtypeId,
     subtypeName: model.getObjectType(sf.subtypeId)?.name ?? sf.subtypeId,
     supertypeId: sf.supertypeId,

@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";
 import { setIdGenerator } from "../../src/model/id.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { subtypeFactRef } from "../../src/model/SubtypeFact.js";
 
 /** Person drives Car, Person has Name, all without ids. */
 function people(): OrmModel {
@@ -353,17 +354,31 @@ describe("a model naming what it is given", () => {
     expect(m.idKindsHolding("Person_rides_Car")).toEqual([]);
   });
 
-  it("gives a generated id, until 6b-2b, to what its sentence cannot name", () => {
-    // A subtype fact whose ends dangle cannot be verbalized; format 3.0
-    // requires an id, so it gets the generator's (decision 19 lands with
-    // the 4.0 schema).
+  it("leaves unnamed what its sentence cannot name, and keeps it (decision 19)", () => {
+    // A subtype fact or objectification whose ends dangle cannot be
+    // verbalized, so it takes no id rather than a generated one: the same
+    // input gives the same model. It is still in the model, in order, for
+    // validation to report its dangling reference.
     setIdGenerator(() => "generated");
     try {
       const m = new OrmModel({ name: "M" });
+      m.addObjectType({ name: "Person", kind: "entity", referenceMode: "nr" });
+      m.addObjectType({ name: "Driver", kind: "entity", referenceMode: "nr" });
       const sf = m.addSubtypeFact({ subtypeId: "gone", supertypeId: "also-gone" }, {
         skipPlayerValidation: true,
       });
-      expect(sf.id).toBe("generated");
+      m.addSubtypeFact({ subtypeId: "Driver", supertypeId: "Person" });
+      const oft = m.addObjectifiedFactType({ factTypeId: "no-ft", objectTypeId: "no-ot" }, {
+        skipPlayerValidation: true,
+      });
+      expect(sf.id).toBeUndefined();
+      expect(oft.id).toBeUndefined();
+      expect(m.subtypeFacts.map(subtypeFactRef)).toEqual([
+        "unnamed:gone<also-gone",
+        "Driver_is_a_subtype_of_Person",
+      ]);
+      expect(m.objectifiedFactTypes).toEqual([oft]);
+      expect(m.idKindsHolding("generated")).toEqual([]);
     } finally {
       setIdGenerator(undefined);
     }

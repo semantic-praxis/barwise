@@ -1,6 +1,5 @@
 import type { Complete } from "../util/complete.js";
 import type { DerivationRule } from "./FactType.js";
-import { ModelElement } from "./ModelElement.js";
 
 /**
  * Configuration for creating a new SubtypeFact.
@@ -42,19 +41,20 @@ export interface SubtypeFactConfig {
  * is absorbed into the supertype's table or gets its own table with
  * a FK back to the supertype.
  */
-export class SubtypeFact extends ModelElement {
+export class SubtypeFact {
+  /**
+   * Its id, or none: a subtype fact the model could not name, because the
+   * ends its sentence reads do not resolve, is left unnamed rather than
+   * given a generated id (iri-identity, decision 19).
+   */
+  readonly id: string | undefined;
   readonly subtypeId: string;
   readonly supertypeId: string;
   readonly providesIdentification: boolean;
   readonly definingRule: DerivationRule | undefined;
 
   constructor(config: SubtypeFactConfig) {
-    // Name is derived from the relationship for display purposes.
-    // The actual subtype/supertype names are resolved by the model.
-    super(
-      `subtype:${config.subtypeId}:${config.supertypeId}`,
-      config.id,
-    );
+    this.id = config.id;
     this.subtypeId = config.subtypeId;
     this.supertypeId = config.supertypeId;
     this.providesIdentification = config.providesIdentification ?? true;
@@ -90,6 +90,22 @@ export function subtypePairKey(
  * annotation makes the next field added to `SubtypeFactConfig` a
  * compile error here until it is listed.
  */
+/**
+ * How a subtype fact is referred to where a string is needed -- a
+ * diagnostic, a verbalization, a diagram view: its id, or for one the model
+ * left unnamed (decision 19) a fixed reference built from what it relates.
+ * No 4.0 id can take that form (a local name holds no `:`).
+ */
+export function subtypeFactRef(
+  sf: {
+    readonly id: string | undefined;
+    readonly subtypeId: string;
+    readonly supertypeId: string;
+  },
+): string {
+  return sf.id ?? `unnamed:${sf.subtypeId}<${sf.supertypeId}`;
+}
+
 export function toSubtypeFactConfig(sf: SubtypeFact): SubtypeFactConfig {
   const config: Complete<SubtypeFactConfig> = {
     id: sf.id,

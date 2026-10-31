@@ -6,9 +6,9 @@
  * the whole-model verbalization and a minted name read one sentence.
  */
 import type { ConstraintModel } from "../model/constraintModel.js";
-import type { ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
+import { objectificationRef, type ObjectifiedFactType } from "../model/ObjectifiedFactType.js";
 import { expandReading } from "../model/ReadingOrder.js";
-import type { SubtypeFact } from "../model/SubtypeFact.js";
+import { type SubtypeFact, subtypeFactRef } from "../model/SubtypeFact.js";
 import {
   buildVerbalization,
   refSeg,
@@ -52,7 +52,7 @@ export function verbalizeSubtypeFact(
   }
   segments.push(textSeg("."));
 
-  return buildVerbalization(sf.id, "subtype", segments);
+  return buildVerbalization(subtypeFactRef(sf), "subtype", segments);
 }
 
 /**
@@ -88,5 +88,5 @@ export function verbalizeObjectifiedFactType(
 
   segments.push(textSeg("."));
 
-  return buildVerbalization(oft.id, "objectification", segments);
+  return buildVerbalization(objectificationRef(oft), "objectification", segments);
 }

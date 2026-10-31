@@ -28,6 +28,7 @@ import {
   type FactType,
   isOverSubtypes,
   type JoinOperand,
+  objectificationRef,
   type ObjectType,
   type OrmModel,
   type PreferredIdentifiers,
@@ -36,6 +37,7 @@ import {
   type Role,
   type RoleOrSubtypeOperand,
   subtypeFactIdsOf,
+  subtypeFactRef,
   type ValueComparisonOperator,
   type ValueRange,
   type ValueType,
@@ -80,7 +82,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   for (const oft of model.objectifiedFactTypes) {
     objectifiedObjectTypeIds.add(oft.objectTypeId);
     objectifiedByObjectType.set(oft.objectTypeId, oft.factTypeId);
-    objectificationIdByObjectType.set(oft.objectTypeId, oft.id);
+    objectificationIdByObjectType.set(oft.objectTypeId, objectificationRef(oft));
   }
 
   // Index roles played by each object type (across all fact types) so each
@@ -757,7 +759,7 @@ function writeSubtypeFacts(
   // constraints are written over.
   const metaRole = new Map<string, { roleId: string; supertypeId: string; }>();
   for (const sf of model.subtypeFacts) {
-    const id = toNormaId(sf.id);
+    const id = toNormaId(subtypeFactRef(sf));
     const subtypeRoleId = derivedNormaId(id, "_sub");
     const supertypeRoleId = derivedNormaId(id, "_super");
     out.push({
@@ -768,7 +770,7 @@ function writeSubtypeFacts(
       supertypePlayerRef: toNormaId(sf.supertypeId),
       providesIdentification: sf.providesIdentification,
     });
-    metaRole.set(sf.id, { roleId: supertypeRoleId, supertypeId: sf.supertypeId });
+    metaRole.set(subtypeFactRef(sf), { roleId: supertypeRoleId, supertypeId: sf.supertypeId });
   }
 
   // Each constraint over subtypes, over the meta-roles of the subtype facts

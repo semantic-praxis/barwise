@@ -140,7 +140,10 @@ export class OrmModel implements ConstraintModel {
       const stored = constraint.id === undefined
         ? {
           ...constraint,
-          id: this.nameFor({ kind: "constraint", inView: [constraint, host] as ConstraintInView }),
+          id: this.constraintIdFor({
+            kind: "constraint",
+            inView: [constraint, host] as ConstraintInView,
+          }),
         }
         : constraint;
       this._ids.hold(stored.id, "constraint");
@@ -275,15 +278,25 @@ export class OrmModel implements ConstraintModel {
   }
 
   /**
-   * The id an element its sentence names takes: the minted name, under the
-   * suffix rule (`mint.ts`). An element whose sentence would not be of it
-   * -- a reference that dangles, a shape the sentence misreads -- is left
-   * unnamed in format 4.0 (decisions 17 and 19); until 4.0 lets an id be
-   * absent (6b-2b), it gets a generated id, because format 3.0 requires one.
+   * The id a subtype fact or objectification its sentence names takes: the
+   * minted name, under the suffix rule (`mint.ts`). One whose sentence
+   * would not be of it -- a reference that dangles -- is left unnamed
+   * (decisions 17 and 19), and validation reports the dangling reference.
    */
-  private nameFor(element: Mintable): string {
+  private nameFor(element: Mintable): string | undefined {
     const minted = mint(element, this);
-    return minted ? this.mintedId(minted.name) : generateId();
+    return minted ? this.mintedId(minted.name) : undefined;
+  }
+
+  /**
+   * The id a constraint takes: its minted name, or, for one whose sentence
+   * cannot be built (a malformed constraint, a ring over two players), a
+   * generated id. Decision 19 would leave it unnamed too, but format 3.0,
+   * which this build still writes, requires every constraint's id; the
+   * switch to the 4.0 writer (6b-2b-2b) drops the fallback.
+   */
+  private constraintIdFor(element: Mintable): string {
+    return this.nameFor(element) ?? generateId();
   }
 
   /** An object type by name where the model holds it, else by its id. */
@@ -444,7 +457,7 @@ export class OrmModel implements ConstraintModel {
     const stored = constraint.id === undefined
       ? {
         ...constraint,
-        id: this.nameFor({ kind: "constraint", inView: [constraint, undefined] }),
+        id: this.constraintIdFor({ kind: "constraint", inView: [constraint, undefined] }),
       }
       : constraint;
     this._constraints.push(stored);

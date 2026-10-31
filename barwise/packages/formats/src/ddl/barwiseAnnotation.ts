@@ -13,7 +13,12 @@
  * test over the trial kernels and the examples pins it.
  */
 
-import { type OrmModel, subtypeFlagsFromConstraints, validateReadingTemplate } from "@barwise/core";
+import {
+  type OrmModel,
+  subtypeFactRef,
+  subtypeFlagsFromConstraints,
+  validateReadingTemplate,
+} from "@barwise/core";
 import type { DerivationKind, DerivationRule, DerivationStorage, FactType } from "@barwise/core";
 import type { RelationalSchema, RoutedUnique, Table } from "@barwise/core/mapping";
 
@@ -175,8 +180,8 @@ export function annotateTable(
       entity: supertype.name,
       columns: [...fk.columnNames],
       providesIdentification: sf.providesIdentification,
-      isExclusive: flags?.get(sf.id)?.exclusive ?? false,
-      isExhaustive: flags?.get(sf.id)?.exhaustive ?? false,
+      isExclusive: flags?.get(subtypeFactRef(sf))?.exclusive ?? false,
+      isExhaustive: flags?.get(subtypeFactRef(sf))?.exhaustive ?? false,
       ...(sf.definingRule ? { definingRule: sf.definingRule } : {}),
     });
   }

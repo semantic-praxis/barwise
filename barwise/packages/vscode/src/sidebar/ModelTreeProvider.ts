@@ -23,6 +23,7 @@ import {
   roleIdsOf,
   type SubtypeFact,
   subtypeFactIdsOf,
+  subtypeFactRef,
   subtypeFlagsFromConstraints,
   type ValueType,
 } from "@barwise/core";
@@ -359,7 +360,7 @@ function subtypeItem(
   const flags: string[] = [];
   if (sf.providesIdentification) flags.push("identifies");
   // What the constraints over this supertype's subtypes say of this one.
-  const partition = partitions.get(sf.id);
+  const partition = partitions.get(subtypeFactRef(sf));
   if (partition?.exclusive) flags.push("exclusive");
   if (partition?.exhaustive) flags.push("exhaustive");
   return {

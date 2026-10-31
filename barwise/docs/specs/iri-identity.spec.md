@@ -14,8 +14,8 @@ return; the test builders off `::` ids; lineage exports name their model);
 6b-1 implemented 2026-10-30 (the cross-kind id index and constraint
 admission); 6b-2a implemented 2026-10-30 (minting in the model); 6b-2b-1
 implemented 2026-10-30 (the 4.0 reader, unwired); 6b-4a implemented
-2026-10-30 (the importers off role ids); 6b-2b-2, 6b-3, 6b-4b, 6c to 6f and
-WS7 to come
+2026-10-30 (the importers off role ids); 6b-2b-2a in progress (decision 19
+landed; the replay to come); 6b-2b-2b, 6b-3, 6b-4b, 6c to 6f and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-30
@@ -1506,17 +1506,28 @@ sites.
       stored under. The CLI and MCP entry-point tests observe the UUIDv7
       install through an Ossie import, the one importer still stating
       generated ids, until 6b-4b retires the generator and those tests.
-    - _6b-2b-2, the switch._ The 3.0 schema frozen as
-      `orm-model-3.0.schema.json` and the 4.0 one renamed to
-      `orm-model.schema.json`; decision 20; absent ids on subtype facts
-      and objectifications (decision 19) and `minted_from` stored; the
-      model-level cross-kind refusal; the 4.0 writer; the 3.x and 2.0
-      replay with its in-memory id map for diff, and `planRead`'s two
-      legacy slots; and the fixture and golden churn. Required test, from
-      6b-2b-1's review: a lenient 4.0 load of an element whose sentence
-      cannot be minted (a dangling reference) gives the same model on every
-      read, because decision 19 leaves it unnamed; 6b-2b-1 still gives it
-      6b-2a's generated id, which is why that reader stays unwired.
+    - _6b-2b-2, in two parts_ (owner, 2026-10-31: replay first, then
+      switch; 6b-2b-2a ships as one PR across sessions).
+      - _6b-2b-2a, the replay, unwired._ Decision 19: `SubtypeFact` and
+        `ObjectifiedFactType` no longer extend `ModelElement` and hold
+        `id: string | undefined`; one the model cannot name is left
+        unnamed, kept in its store's insertion order under a symbol key
+        the id index never sees, and referred to where a string is needed
+        by `subtypeFactRef` / `objectificationRef` (`unnamed:Sub<Super`,
+        `unnamed:Type=FactType`, a form no 4.0 id takes). The 3.0 writer
+        refuses an unnamed one. A constraint keeps 6b-2a's generated-id
+        fallback until the switch, because the 3.0 writer still requires
+        every constraint's id; so the determinism test below moves to
+        6b-2b-2b. Then decision 20, the model-level cross-kind refusal,
+        and the 3.x and 2.0 replay with its in-memory id map for diff,
+        tested over the tracked corpus.
+      - _6b-2b-2b, the switch._ The 3.0 schema frozen as
+        `orm-model-3.0.schema.json` and the 4.0 one renamed to
+        `orm-model.schema.json`; `minted_from` stored; the 4.0 writer;
+        `planRead`'s two legacy slots; the constraint fallback dropped;
+        and the fixture and golden churn. Required test, from 6b-2b-1's
+        review: a lenient 4.0 load of an element whose sentence cannot be
+        minted (a dangling reference) gives the same model on every read.
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
   `imports`.
