@@ -44,6 +44,14 @@ test("classify: Markdown and .beads/ only is docs-only; one source file is not",
   assert.equal(classify(["notes.md.bak"]).docsOnly, false);
 });
 
+test("classify: an ADR is Markdown but not docs-only, so check:adr-tests runs when one changes", () => {
+  assert.equal(classify(["barwise/docs/adr/determinism-in-core.md"]).docsOnly, false);
+  assert.equal(classify(["barwise/docs/adr/x.md", "README.md"]).docsOnly, false);
+  assert.equal(classify(["barwise/docs/specs/x.spec.md"]).docsOnly, true);
+  // The index of ADRs is not one, as isAdr has it.
+  assert.equal(classify(["barwise/docs/adr/README.md"]).docsOnly, true);
+});
+
 test("classify: optimizer fires on the lane or the CLI it shells out to, and nothing else", () => {
   assert.equal(classify(["barwise/optimizer/CLAUDE.md"]).optimizer, true);
   assert.equal(classify(["barwise/packages/cli/src/index.ts"]).optimizer, true);

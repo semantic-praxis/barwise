@@ -498,6 +498,14 @@ jobs:
       - run: npm run test:coverage
         if: steps.changes.outputs.docs_only != 'true'
 
+      # Each decision an ADR declares as tested has a test carrying its tag
+      # that ran and passed above: read from the reports test:scripts,
+      # test:trial and test:coverage wrote in this job, never from source
+      # (docs/specs/executable-adrs.spec.md, WS2). Same guard as the tests
+      # it reads; an ADR change is not docs-only (changed-class.mjs).
+      - run: npm run check:adr-tests
+        if: steps.changes.outputs.docs_only != 'true'
+
       - run: npm run validate:examples
         if: steps.changes.outputs.docs_only != 'true'
 
