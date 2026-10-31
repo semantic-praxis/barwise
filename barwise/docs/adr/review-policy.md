@@ -6,6 +6,10 @@ Tracking: barwise-ilb, barwise-1040, barwise-1050, barwise-953,
 barwise-nm8, barwise-16u, barwise-j9d, barwise-m9q, barwise-gin,
 docs/specs/tiered-pr-review.spec.md, docs/specs/review-md.spec.md,
 docs/specs/review-routing.spec.md
+Enforced-by: tests (copilot-requested, tier-informs),
+none (barwise-ym8.7y6: copilot-requested), none (barwise-ym8.8ya: copilot-never-blocks),
+none (barwise-ym8.f9u: review-md-owns-lanes), none (barwise-ym8.ehz: tier-informs),
+none (barwise-ym8.gwj: prevent-upstream)
 
 ## Context
 
@@ -26,28 +30,28 @@ condition, is a separate decision (`steward` section 4b).
 ## Decision
 
 1. **Every non-trivial pull request not opened by Dependabot has one
-   Copilot review requested.** A pull request is trivial only when every
+   Copilot review requested.**{#copilot-requested} A pull request is trivial only when every
    change is an edit to a path on the `trivial` allow-list in
    `barwise/review-tiers.json`, read from `main`'s copy. Every
    uncertainty -- an unreadable file list, a classifier refusal --
    resolves toward requesting.
-2. **Nothing blocks a merge on Copilot.** A refusal from an exhausted
+2. **Nothing blocks a merge on Copilot.**{#copilot-never-blocks} A refusal from an exhausted
    quota is not a review and not a blocker: work carries on without it,
    and the workflow asks again on the next push.
-3. **`REVIEW.md` owns which review lane runs when.** CI on every push
+3. **`REVIEW.md` owns which review lane runs when.**{#review-md-owns-lanes} CI on every push
    to `main` and every pull request into it;
    `/code-review` by the author before opening; `/security-review`
    before opening when the diff meets a trigger REVIEW.md lists;
    `/pr-review`, which runs `/code-review` itself, on the head being
    merged; the Claude Code Review service on every pull request once an
    Owner enables it. A review does not report what CI enforces.
-4. **The tier is information, and routing orders rather than filters.**
+4. **The tier is information, and routing orders rather than filters.**{#tier-informs}
    `npm run pr:risk` prints the tier, the checklist groups and the
    REVIEW.md failure modes a diff triggers, with the files. Author and
    reviewer run every group it lists, every group no path can detect,
    and every failure mode, and the reviewer says which ran. Nothing
    fails on the tier or the routing.
-5. **What reviews keep finding is prevented upstream.** Copilot's
+5. **What reviews keep finding is prevented upstream.**{#prevent-upstream} Copilot's
    findings are classified by failure mode and the most common one gets
    a mechanism in front of review; REVIEW.md's "Always check" list,
    drawn from a month of all reviews' findings, ranks the modes every

@@ -2518,7 +2518,7 @@ const A_CORRECTION =
   "# Probe\n\nThe draft said the loader was pure, and implementing it showed the\n"
   + "loader reads the environment, so the claim was wrong in kind.\n";
 
-test("audit-corrections fails on a correction record missing from the baseline", () => {
+test("audit-corrections fails on a correction record missing from the baseline [adr:findings-close-by-mechanism#ratchet-both-ways]", () => {
   const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
   try {
     const red = gate("audit-corrections.mjs", dir, "--check");
@@ -2530,7 +2530,7 @@ test("audit-corrections fails on a correction record missing from the baseline",
   }
 });
 
-test("audit-corrections fails on a baseline entry no longer detected", () => {
+test("audit-corrections fails on a baseline entry no longer detected [adr:findings-close-by-mechanism#ratchet-both-ways]", () => {
   const dir = correctionRepo({ "probe.spec.md": A_CORRECTION }, {});
   try {
     const id = idOf(dir, "the draft said the loader was pure");
@@ -2769,7 +2769,7 @@ const BASELINE_WRITERS = [
 ];
 
 for (const w of BASELINE_WRITERS) {
-  test(`${w.script} rewrites without changing a committed verdict`, (t) => {
+  test(`${w.script} rewrites without changing a committed verdict${w.needsDist === undefined ? " [adr:baselines-merge-on-write#merge-not-regenerate]" : ""}`, (t) => {
     if (w.needsDist !== undefined && !existsSync(join(REPO, "barwise", w.needsDist))) {
       t.skip(`${w.needsDist} not built; run npm run build first`);
       return;
@@ -2966,7 +2966,7 @@ test("audit-corrections --write reports a row it dropped rather than dropping it
   }
 });
 
-test("audit-spec-status writes nothing without --write", () => {
+test("audit-spec-status writes nothing without --write [adr:baselines-merge-on-write#specs-write-on-ask]", () => {
   // The write path used to be the `else` of `--check`, so bare
   // `npm run audit:specs` -- the spelling a reader tries first to see what the
   // gate says -- rewrote the baseline and blanked every note. The operator
@@ -2983,7 +2983,7 @@ test("audit-spec-status writes nothing without --write", () => {
   }
 });
 
-test("audit-duplication.mjs still has no baseline writer", () => {
+test("audit-duplication.mjs still has no baseline writer [adr:baselines-merge-on-write#duplication-no-writer]", () => {
   // docs/adr/baselines-merge-on-write.md (decision 5) and
   // baseline-write-preserves-verdicts.spec.md both say this gate
   // never had the clobber defect BECAUSE it has no writer -- its 48 candidates
@@ -3957,7 +3957,7 @@ function fileList(dir, files) {
   return ["--files", path];
 }
 
-test("pr-risk classifies a real file list and exits 0 for either tier", () => {
+test("pr-risk classifies a real file list and exits 0 for either tier [adr:review-policy#tier-informs]", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
   try {
     const routine = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/docs/specs/a.spec.md"]));
@@ -4000,7 +4000,7 @@ test("pr-risk names the triggering heading and the file that triggered it", () =
  * printed, the path-triggered ones first with their files; and the
  * failure modes never change the tier or the exit status.
  */
-test("pr-risk leads with the routing and prints every REVIEW.md failure mode", () => {
+test("pr-risk leads with the routing and prints every REVIEW.md failure mode [adr:review-policy#tier-informs]", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-risk-"));
   try {
     const run = gate("pr-risk.mjs", dir, ...fileList(dir, ["barwise/scripts/x.mjs"]));
@@ -4436,7 +4436,7 @@ test("pr-risk's git path keeps a rename's source and reads names exactly", () =>
   }
 });
 
-test("the Copilot workflow reads its allow-list from main, never from the pull request", () => {
+test("the Copilot workflow reads its allow-list from main, never from the pull request [adr:review-policy#copilot-requested]", () => {
   // pull_request would check out the PR's tree, and a PR could widen the
   // allow-list and exempt itself. This pins the trigger and the checkout.
   const wf = readFileSync(join(REPO, ".github/workflows/copilot-review.yml"), "utf8");
@@ -4742,7 +4742,7 @@ test("workflow, decide: requests only when Copilot has neither reviewed nor been
   }
 });
 
-test("workflow, classify: skips only an edit to the tracker; every other shape requests", () => {
+test("workflow, classify: skips only an edit to the tracker; every other shape requests [adr:review-policy#copilot-requested]", () => {
   const rec = (status, filename, previous_filename) =>
     previous_filename ? { filename, status, previous_filename } : { filename, status };
   const skip = runWorkflowStep(CLASSIFY, { files: [rec("modified", ".beads/issues.jsonl")] });
@@ -4773,7 +4773,7 @@ test("workflow, classify: skips only an edit to the tracker; every other shape r
   }
 });
 
-test("workflow, classify: every uncertainty requests, and a request that did not land is red", () => {
+test("workflow, classify: every uncertainty requests, and a request that did not land is red [adr:review-policy#copilot-requested]", () => {
   const tracker = { filename: ".beads/issues.jsonl", status: "modified" };
   const uncertain = [
     ["the files API failing", {}, ["files"], /::warning::Could not read the changed files/],
@@ -6373,7 +6373,7 @@ test("audit-spec-status reads Touches: instead of every cited path, and ignores 
  * verdict never recorded, without failing on them, and --write reopens the
  * note so the refresh cannot stand in for a re-read.
  */
-test("audit-spec-status reports commits a verdict never covered, and --write reopens the note", () => {
+test("audit-spec-status reports commits a verdict never covered, and --write reopens the note [adr:baselines-merge-on-write#merge-not-regenerate]", () => {
   const dir = mkdtempSync(join(tmpdir(), "barwise-specaudit-"));
   const g = (...args) =>
     execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })

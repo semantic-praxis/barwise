@@ -6,6 +6,10 @@ Tracking: barwise-ubc, barwise-903, barwise-910, barwise-2af, barwise-uuy,
 barwise-uuh, barwise-u5d, barwise-iil,
 docs/specs/duplication-drift-guards.spec.md,
 docs/specs/correction-record-ratchet.spec.md
+Enforced-by: npm run audit:specs -- --check (person-classifies),
+tests (ratchet-both-ways), none (barwise-ym8.1b2: mechanism-closes),
+none (barwise-ym8.k4d: ratchet-both-ways), none (barwise-ym8.h0l: person-classifies),
+none (barwise-ym8.ld2: ratchet-in-ci)
 
 ## Context
 
@@ -20,22 +24,22 @@ verdict on every row is safe to gate on, when raw detection is not.
 
 ## Decision
 
-1. **A finding is closed by a mechanism, not by a document.** The rule
+1. **A finding is closed by a mechanism, not by a document.**{#mechanism-closes} The rule
    for must-agree copies applies to anything an audit turns up. In the
    same commit, land a check that fails if the finding comes back, or a
    baseline row that has to be removed when the finding is fixed. A
    findings document can record the reasoning, but it does not close
    the finding.
-2. **A ratchet fails both ways.** A detector reports candidates, and a
+2. **A ratchet fails both ways.**{#ratchet-both-ways} A detector reports candidates, and a
    committed baseline holds a verdict for each. `--check` fails on a
    new candidate with no row and on a row no longer detected, so the
    baseline always lists exactly what is open.
-3. **A script detects, and a person classifies.** The detector assigns
+3. **A script detects, and a person classifies.**{#person-classifies} The detector assigns
    no verdict. A person records each verdict in the baseline:
    `tracked:<issue>` for an open finding, or a classification with its
    reason. (`audit:specs --write` reopens a verdict whose commits
    grew, asking for it again; barwise-qs8.)
-4. **An audit's ratchet is wired into CI.**
+4. **An audit's ratchet is wired into CI.**{#ratchet-in-ci}
 
 ## Consequences
 
