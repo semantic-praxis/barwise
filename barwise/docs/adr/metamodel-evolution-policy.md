@@ -4,6 +4,9 @@ Scope: architecture
 Date: 2026-10-17
 Tracking: barwise-5t9 (+ children), docs/NORMA_VS_ORM_YAML.md,
 docs/specs/norma-export.spec.md
+Enforced-by: none (barwise-ym8.qpz: deliberately-lossy),
+none (barwise-ym8.gfk: four-filters), none (barwise-ym8.26v: tiering),
+none (barwise-ym8.e05: design-against-book), none (barwise-ym8.3ai: recompute-derived)
 
 ## Context
 
@@ -24,11 +27,11 @@ decide what comes off the menu.
 
 ## Decision
 
-1. **The metamodel stays deliberately lossy.** barwise-5t9 is a menu.
+1. **The metamodel stays deliberately lossy.**{#deliberately-lossy} barwise-5t9 is a menu.
    Constructs earn their place by serving data engineers and AI
    workflows, not by existing in NORMA or the book.
 
-2. **Four filters gate every candidate construct.**
+2. **Four filters gate every candidate construct.**{#four-filters}
    - _Verbalizable._ It must read as a natural FORML business rule.
      Verbalization is the differentiator and the AI grounding; a
      construct we cannot verbalize cleanly does not serve the mission.
@@ -48,11 +51,11 @@ decide what comes off the menu.
      `orm_version` bump (one per release cycle, not one per field -- see
      `docs/adr/schema-versioning.md`). Batch related fields; resist one-offs.
 
-3. **Tiering (below) sequences the menu.** Tier 1 ships soon; Tier 3 is a
+3. **Tiering (below) sequences the menu.**{#tiering} Tier 1 ships soon; Tier 3 is a
    single deliberate architectural fork we may never fully take; Tier 4
    is declared a non-goal so the omission is intentional.
 
-4. **Design the hard constructs against the book, not NORMA's tooling.**
+4. **Design the hard constructs against the book, not NORMA's tooling.**{#design-against-book}
    The cited research found NORMA's _schema_ is a faithful near-superset
    of the book, but its _tooling_ lags in two spots. So model the full
    alethic/deontic modality theory (not NORMA's single-main-operator
@@ -60,7 +63,7 @@ decide what comes off the menu.
    semiderived/partial, `**` derived-and-stored as a separate eager/lazy
    axis) rather than mirroring NORMA's partial formal-rule support.
 
-5. **Keep recomputing derived artifacts; never persist them.** Relational
+5. **Keep recomputing derived artifacts; never persist them.**{#recompute-derived} Relational
    mapping, DDL, and any OIAL-style layer stay _recomputed_ from the
    conceptual model. Persisting them (as NORMA does) is what keeps core
    deterministic and the file lean; not adding them is itself a decision.

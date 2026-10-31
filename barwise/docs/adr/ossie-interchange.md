@@ -5,6 +5,10 @@ Date: 2026-10-28
 Tracking: barwise-pf2.4, barwise-pf2, barwise-wcg,
 docs/specs/ossie-ontology-format.spec.md,
 docs/specs/iri-identity.spec.md
+Enforced-by: tests (ontology-layer-only, pinned-version, nothing-lost-silently),
+none (barwise-ym8.zec: peer-standard), none (barwise-ym8.k74: ontology-layer-only),
+none (barwise-ym8.oor: pinned-version), none (barwise-ym8.zkd: nothing-lost-silently),
+none (barwise-ym8.m1l: readable-iri), none (barwise-ym8.yc6: own-vocabulary)
 
 ## Context
 
@@ -37,7 +41,7 @@ recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
 
 ## Decision
 
-1. **Ossie is a peer standard; barwise neither replaces nor absorbs it.**
+1. **Ossie is a peer standard; barwise neither replaces nor absorbs it.**{#peer-standard}
    barwise's model stays the ORM 2 metamodel stored as `.orm.yaml`, and
    Ossie documents enter and leave only through the `ossie` descriptor in
    `@barwise/formats` (`docs/adr/connector-packages.md`). An idea from
@@ -53,25 +57,25 @@ recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
    and its vendor converters. The spec's deferral of value-type subtyping
    and an `ExportResult` warnings field until a second format needs them
    stands (its Open decisions 1 and 5).
-2. **Only the ontology layer.** barwise does not read or write Ossie's core
+2. **Only the ontology layer.**{#ontology-layer-only} barwise does not read or write Ossie's core
    layer or its mapping documents. Reading a logical schema up into a
    model, which is what those mapping documents describe, is
    barwise-pf2.3's question.
-3. **One pinned version, and any other is refused.** The importer reads
+3. **One pinned version, and any other is refused.**{#pinned-version} The importer reads
    exactly the version string `@barwise/formats` pins (`OSSIE_VERSION`,
    `0.2.0.dev0`) and refuses any other, naming both. The schema that
    version means is Ossie commit `01a5488d`: its schema files are vendored
    in `formats/schemas/ossie/`, which the importer reads at run time and
    the tests read too, and its example is a test fixture. Moving the pin is
    a spec change, with the diff of those files in the same PR.
-4. **Nothing is lost silently.** The importer names in
+4. **Nothing is lost silently.**{#nothing-lost-silently} The importer names in
    `ImportResult.warnings` every construct it cannot carry; the exporter
    names every construct it cannot write in the loss comment block at the
    top of the document, and a constraint also as a `constraintSpecs`
    entry where the shared builder can describe it. Ossie expressions are
    kept as text: only three `requires` shapes are read as constraints,
    until barwise has an expression language of its own (barwise-pf2.2).
-5. **Identity is a readable IRI, after Ossie's naming.** Every barwise
+5. **Identity is a readable IRI, after Ossie's naming.**{#readable-iri} Every barwise
    element is identified by one IRI, replacing the UUIDs barwise mints
    today, and by nothing else: a declared base that is a standard IRI and
    carries the project and any subprojects, then the domain, as the
@@ -89,7 +93,7 @@ recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
    name of a fact type, which in barwise belongs to no concept, is its
    decision 2.
 6. **Each side keeps its own vocabulary, and the `ossie` format
-   translates.** barwise speaks ORM 2 and Ossie speaks Ossie: neither
+   translates.**{#own-vocabulary} barwise speaks ORM 2 and Ossie speaks Ossie: neither
    renames its terms to match the other, and nothing outside the `ossie`
    descriptor -- its importer, `mapOssieToOrm.ts`, and its exporter,
    `writeOssie.ts` -- translates between them. The construct-by-construct

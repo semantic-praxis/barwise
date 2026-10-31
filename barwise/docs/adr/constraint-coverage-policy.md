@@ -7,6 +7,9 @@ lives in `docs/specs/constraint-extraction-coverage.spec.md`, the
 living companion to this record), barwise-845, barwise-846. Prompted
 by barwise-863, which restored the Ring/Subset/Equality instruction
 blocks to the default extraction prompt.
+Enforced-by: none (barwise-ym8.fmt: trust-statement),
+none (barwise-ym8.nzv: compares-not-certifies), none (barwise-ym8.5yl: two-instances),
+none (barwise-ym8.vq8: tiered-types), none (barwise-ym8.k6g: inventory-outside)
 
 ## Context
 
@@ -31,14 +34,14 @@ every type -- runs into arithmetic and realism, below.
 
 ## Decision
 
-1. **The trust statement.** Until a constraint type has rubric-tested
+1. **The trust statement.**{#trust-statement} Until a constraint type has rubric-tested
    instances in the eval suite, that type in an extracted model is an
    unreviewed suggestion: plausible, schema-valid, population-checked
    for internal consistency, and unmeasured against the transcript.
    Consumers treat it as they would any unreviewed model content --
    reviewed by a human before it carries weight.
 
-2. **The suite compares; it never certifies.** General-case
+2. **The suite compares; it never certifies.**{#compares-not-certifies} General-case
    reliability is priced by the rule of three: n distinct passing
    instances bound the true miss rate below roughly 3/n at 95%
    confidence, where an instance is a distinct domain phrasing the
@@ -51,7 +54,7 @@ every type -- runs into arithmetic and realism, below.
    in this suite supports a certification claim, and none should be
    made.
 
-3. **Two instances per common type is the coverage threshold** -- one
+3. **Two instances per common type is the coverage threshold**{#two-instances} -- one
    train, one dev, in different domains with different surface
    phrasing. One instance cannot distinguish "the prompt cannot do X"
    from "the prompt cannot do X in this phrasing"; two domains start
@@ -61,7 +64,7 @@ every type -- runs into arithmetic and realism, below.
    jobs, regression detection and variant comparison.
 
 4. **Types are tiered by natural occurrence, and the rare tier never
-   enters an eval transcript.** Common tier (each owed two instances):
+   enters an eval transcript.**{#tiered-types} Common tier (each owed two instances):
    `irreflexive`, `acyclic`, `symmetric`, `subset`, set-comparison
    `exclusion` -- rules real facilitated sessions state ("cannot
    approve their own request", "no circular reporting", "is paired
@@ -74,7 +77,7 @@ every type -- runs into arithmetic and realism, below.
    sit outside the validated envelope and the trust statement applies
    to them indefinitely.
 
-5. **The living inventory stays out of this record.** Which types are
+5. **The living inventory stays out of this record.**{#inventory-outside} Which types are
    covered today, and the workstreams closing the gaps, live in
    `docs/specs/constraint-extraction-coverage.spec.md`, updated in the
    same commit that adds a type's first or second tested instance --

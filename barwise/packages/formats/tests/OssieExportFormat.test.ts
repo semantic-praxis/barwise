@@ -130,7 +130,7 @@ describe("Ossie export: the pinned flights example", () => {
     expect(result.constraintSpecs).toBeUndefined();
   });
 
-  it("comes back equal in every construct the import did not warn about, compared by meaning", () => {
+  it("comes back equal in every construct the import did not warn about, compared by meaning [adr:ossie-interchange#nothing-lost-silently]", () => {
     const original = parse(source) as OssieDocument;
     // A value-type chain is flattened on import, with a warning naming it.
     const flattened = new Set(
@@ -270,7 +270,7 @@ describe("Ossie export: a native model", () => {
 });
 
 describe("Ossie export: the loss report", () => {
-  it("names each unexpressible constraint, and gives each with roles a constraint spec", () => {
+  it("names each unexpressible constraint, and gives each with roles a constraint spec [adr:ossie-interchange#nothing-lost-silently]", () => {
     const m = new OrmModel({ name: "M" });
     const p = entity(m, "Person");
     const ft = fact(m, "Person knows Person", [p, p], "{0} knows {1}", {

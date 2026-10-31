@@ -32,8 +32,8 @@
  * from the tracked listing, so the check needs git; no ADR at all is exit 2.
  *
  * And it checks each ADR's `Enforced-by:` declarations
- * (docs/specs/executable-adrs.spec.md): every decision has an id and an
- * entry, each gate entry names a step CI runs, and each `none` names an
+ * (docs/specs/executable-adrs.spec.md): every ADR has the header, every
+ * decision has an id and an entry, each gate entry names a step CI runs, and each `none` names an
  * open issue. Those inputs (barwise/package.json, ci.yml, the tracker) are
  * read only when an entry needs them; one that cannot be read is exit 2,
  * reported after the findings and never in place of them.
@@ -381,8 +381,10 @@ for (const { f, text } of citing) {
 }
 
 // Each ADR's `Enforced-by:` declarations (docs/specs/executable-adrs.spec.md,
-// WS1). An ADR without the header is not checked yet: the header becomes
-// required when the backfill (WS3) is done. `tests` entries are answered by
+// WS1). Every ADR carries the header since the backfill (WS3): one without it
+// is a finding, so a new ADR cannot leave its decisions unaccounted for, and
+// a decision with no enforcer says so as `none` on its own gap issue rather
+// than by silence. `tests` entries are answered by
 // `check:adr-tests` from the runners' reports, never from source text.
 // Inputs are read only when an entry needs them, and an unreadable one is a
 // refusal recorded here, so it never hides a finding from the passes above.
@@ -447,10 +449,15 @@ const guard = (condition) => {
 let declaring = 0;
 for (const { f, text } of adrs) {
   const parsed = parseEnforcedBy(text);
-  if (!parsed.present) continue;
+  const fail = (msg) => enforcementProblems.push(`${f}: ${msg}`);
+  if (!parsed.present) {
+    fail(
+      "no Enforced-by: header; every ADR names what holds each decision, and `none (<issue>: <ids>)` for one with no enforcer",
+    );
+    continue;
+  }
   declaring++;
   const name = f.slice(ADR_DIR.length, -".md".length);
-  const fail = (msg) => enforcementProblems.push(`${f}: ${msg}`);
   for (const p of parsed.problems) fail(p);
   const { decisions, problems: decisionProblems } = decisionIds(text);
   for (const p of decisionProblems) fail(p);

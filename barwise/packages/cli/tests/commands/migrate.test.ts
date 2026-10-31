@@ -63,7 +63,7 @@ describe("barwise migrate", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("rewrites a 2.0 file in place as 3.0, saying where it came from and what it dropped", async () => {
+  it("rewrites a 2.0 file in place as 3.0, saying where it came from and what it dropped [adr:schema-versioning#load-forward]", async () => {
     const path = file("shop.orm.yaml", V20);
     const result = await runCli(["migrate", path]);
     expect(result.exitCode).toBe(0);

@@ -193,7 +193,7 @@ describe("this build's versions", () => {
     expect(compareOrmVersions(CURRENT_MAJOR_FIRST_VERSION, LEGACY_ORM_VERSION)).toBeGreaterThan(0);
   });
 
-  it("reach the current version from its major's first through registered steps", () => {
+  it("reach the current version from its major's first through registered steps [adr:schema-versioning#minor-and-major]", () => {
     // Fails when a minor bump forgets its step: the earlier minor would be
     // refused. A step that skips a minor (3.0 to 3.2) still
     // passes here and leaves 3.1 files unreadable; nothing checks that.
