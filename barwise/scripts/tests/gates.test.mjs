@@ -6473,7 +6473,7 @@ test("audit-spec-status reports commits a verdict never covered, and --write reo
  * disagreement is seen. Returns the directory and how many manifests it
  * copied, so no count is restated here.
  */
-function architectureRepo() {
+function architectureRepo({ declared = true } = {}) {
   const dir = tempRepo();
   const copy = (rel) => stage(dir, rel, readFileSync(join(REPO, rel), "utf8"));
   copy("CLAUDE.md");
@@ -6499,11 +6499,16 @@ function architectureRepo() {
       continue;
     }
     const ids = decisionIds(text).decisions.map((d) => d.id);
-    const value = `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n`;
-    stage(dir, rel, text.replace(/^Enforced-by:[^]*?\n(?=\n)/m, value));
+    // Enforced-by: is the last header field (check:architecture holds it to
+    // that), so it runs to the blank line. With `declared: false` the header
+    // goes, for a case that needs a tree where no ADR declares.
+    const value = declared ? `Enforced-by: none (barwise-fx1: ${ids.join(", ")})\n` : "";
+    const rewritten = text.replace(/^Enforced-by:[^]*?\n(?=\n)/m, value);
+    assert.notEqual(rewritten, text, `${rel}: its Enforced-by: header was not rewritten`);
+    stage(dir, rel, rewritten);
     declaring += 1;
   }
-  if (declaring > 0) {
+  if (declaring > 0 && declared) {
     stage(dir, ".beads/issues.jsonl", '{"id":"barwise-fx1","status":"open","title":"fixture"}\n');
   }
   let manifests = 0;
@@ -6532,7 +6537,7 @@ function architectureRepo() {
     );
   }
   execFileSync("git", ["commit", "-qm", "inputs"], { cwd: dir });
-  return { dir, manifests };
+  return { dir, manifests, declaring: declared ? declaring : 0 };
 }
 
 const ARCH_CMD = [process.execPath, join(SCRIPTS, "check-architecture.mjs"), "--root", "."];
@@ -7077,7 +7082,9 @@ test("check:architecture resolves each ADR reference in the files that act on it
     stage(
       dir,
       ".beads/issues.jsonl",
-      readFileSync(join(dir, ".beads/issues.jsonl"), "utf8")
+      (existsSync(join(dir, ".beads/issues.jsonl"))
+        ? readFileSync(join(dir, ".beads/issues.jsonl"), "utf8")
+        : "")
         + '{"id":"barwise-h1","d":"ADR `gone`"}\n',
     );
     stage(dir, "barwise/docs/specs/archive/old.spec.md", "# O\n\nADR `gone`\n");
@@ -7372,12 +7379,12 @@ const ENFORCED_PATH = "barwise/docs/adr/a-concern.md";
 const CI_PATH = ".github/workflows/ci.yml";
 
 test("check:architecture accepts every entry kind when each decision is accounted for", () => {
-  const { dir } = enforcementRepo();
+  const { dir, declaring } = enforcementRepo();
   try {
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-    // Counted with the copied real ADRs that declare, so only "at least one".
-    assert.match(ok.stdout, /[1-9]\d* declare Enforced-by:/);
+    // The copied real ADRs that declare, and this fixture's own.
+    assert.match(ok.stdout, new RegExp(`; ${declaring + 1} declare Enforced-by:`));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -7574,17 +7581,15 @@ test("check:architecture refuses, exit 2, only where it cannot tell, and lists i
 });
 
 test("check:architecture does not read ci.yml, scripts or the tracker for an ADR without Enforced-by:", () => {
-  const { dir } = architectureRepo();
+  // A tree where no ADR declares: no ci.yml, root package.json or tracker,
+  // and an ADR with no header needs none of them, so none is a refusal.
+  const { dir } = architectureRepo({ declared: false });
   try {
-    // No ci.yml or root package.json in this fixture: an ADR with no
-    // header needs neither, and neither is a refusal.
     stageAdr(dir, "a-concern", ADR_OK);
     execFileSync("git", ["commit", "-qm", "adr"], { cwd: dir });
     const ok = runArch(dir);
     assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-    // The copied real ADRs that declare carry only the fixture's none
-    // entries, which need the tracker and nothing else.
-    assert.match(ok.stdout, /declare Enforced-by:\. OK/);
+    assert.match(ok.stdout, /; 0 declare Enforced-by:/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

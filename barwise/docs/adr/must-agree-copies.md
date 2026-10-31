@@ -9,9 +9,10 @@ docs/specs/deterministic-guards.spec.md
 Enforced-by: npm run audit:duplication -- --check (check-on-copy, every-candidate-verdict),
 npm run check:parity (registered-sets-identical),
 none (barwise-970: check-on-copy), none (barwise-1072: check-on-copy),
-none (barwise-tml: check-on-copy), none (barwise-ym8.3tg: check-first),
-none (barwise-tdu: registered-sets-identical),
-none (barwise-u5d: registered-sets-identical, every-candidate-verdict)
+none (barwise-tml: check-on-copy), none (barwise-ym8.edf: check-on-copy),
+none (barwise-ym8.3tg: check-first), none (barwise-tdu: registered-sets-identical),
+none (barwise-ym8.8nq: registered-sets-identical),
+none (barwise-u5d: every-candidate-verdict)
 
 ## Context
 

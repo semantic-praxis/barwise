@@ -4,7 +4,7 @@ Scope: architecture
 Date: 2026-10-23
 Tracking: barwise-ubc, docs/specs/architecture-index.spec.md
 Enforced-by: npm run depcruise (intended-is-graph),
-npm run check:architecture (intended-is-graph, claude-md-rendering, runtime-deps-within),
+npm run check:architecture (claude-md-rendering, runtime-deps-within),
 none (barwise-ym8.d3m: intended-is-graph)
 
 ## Context
@@ -39,4 +39,4 @@ the alternatives are in the spec named above.
 - A layering decision taken in a `package.json`, where depcruise does not
   look, fails `check:architecture` instead of shipping.
 - The per-package `CLAUDE.md` dependency-rule prose is not yet checked
-  against the map (barwise-873).
+  against the map (barwise-ym8.d3m).

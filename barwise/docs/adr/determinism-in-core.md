@@ -7,6 +7,7 @@ docs/specs/uuid7-generator-factory.spec.md,
 docs/specs/archive/architecture-analysis.spec.md
 Enforced-by: npm run purity (pure-ops, ambient-as-argument),
 none (barwise-fzd: pure-ops, ambient-as-argument),
+none (barwise-ym8.lxl: pure-ops), none (barwise-ym8.r6i: ambient-as-argument),
 none (barwise-ym8.kys: one-layer-out), none (barwise-ym8.sit: mint-on-create)
 
 ## Context
