@@ -18,7 +18,7 @@ import { IRI_BASE_PATTERN } from "../model/iri.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";
-import { OrmYamlSerializer, writeDocument } from "../serialization/OrmYamlSerializer.js";
+import { OrmYamlSerializer, writeDocument40 } from "../serialization/OrmYamlSerializer.js";
 import { ProjectSerializer } from "../serialization/ProjectSerializer.js";
 
 // ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
     );
   }
 
-  const doc = writeDocument(source) as unknown as RawModelDoc;
+  const doc = writeDocument40(source) as unknown as RawModelDoc;
   const model = doc.model;
   const modelConstraints = model.constraints ?? [];
   const objectTypes = model.object_types ?? [];

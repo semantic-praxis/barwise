@@ -5,9 +5,9 @@
  * model held is dropped and every reference goes through the growing map
  * from old id to new, so a 3.x file's UUIDs become local names and nothing
  * else moves. A reference the old model never defined is carried across
- * as written, so validation reports it as it does today -- unless it is a
- * role reference 4.0 could not read back, which takes
- * `unresolved.<local name>` and still resolves to nothing (owner,
+ * as written, so validation reports it as it does today -- unless 4.0
+ * could not read it back, when it takes its old id's local name (a role
+ * `unresolved.<local name>`) and still resolves to nothing (owner,
  * 2026-10-31).
  *
  * The replay asks for what a migration takes and new authoring does not:
@@ -29,7 +29,12 @@ import type { ConstraintInView } from "../model/constraintModel.js";
 import { toFactTypeConfig } from "../model/FactType.js";
 import type { FactType } from "../model/FactType.js";
 import { isMintable, mapConstraintReferences, type Reference } from "../model/mint.js";
-import { LOCAL_NAME_PATTERN, localName, ROLE_ID_PATTERN } from "../model/name.js";
+import {
+  LOCAL_NAME_PATTERN,
+  localName,
+  REFERENCE_PATTERN,
+  ROLE_ID_PATTERN,
+} from "../model/name.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectTypeConfig } from "../model/ObjectType.js";
 import { OrmModel } from "../model/OrmModel.js";
@@ -114,24 +119,29 @@ export function replayInto40(source: OrmModel): OrmModel {
   // Every reference the old model does not resolve, reserved for the whole
   // replay, so no element the replay names takes one and a dangling
   // reference carried across as written still resolves to nothing.
-  const { ids: dangling, roles: danglingRoles } = danglingReferences(source);
-  // A dangling role reference 4.0 could not read back, as a 3.0 fragment
-  // naming another file's role holds, takes `unresolved.<local name>`:
-  // still dangling, so validation still reports it, and the old id still
-  // legible in the new one (owner, 2026-10-31). `unresolved` is reserved
-  // when one is reshaped, so no fact type the replay names takes it and
-  // makes the role resolve; a model with none keeps a fact type of that
-  // name as it is.
+  const { ids: dangling, byKind } = danglingReferences(source);
+  // A dangling reference 4.0 could not read back -- as a 3.0 fragment
+  // naming another file's element holds -- takes a shape it can: a role
+  // `unresolved.<local name>`, anything else `<local name>`. Still
+  // dangling, so validation still reports it, and the old id still legible
+  // in the new one (owner, 2026-10-31). `unresolved` is reserved when a
+  // role is reshaped, so no fact type the replay names takes it and makes
+  // the role resolve; a model with none keeps a fact type of that name.
   const reshaped = new Set<string>();
-  for (const old of [...danglingRoles].sort()) {
-    if (ROLE_ID_PATTERN.test(old)) continue;
-    const base = `${UNRESOLVED}.${localName(old) || "role"}`;
-    let id = base;
-    for (let n = 2; reshaped.has(id) || dangling.has(id); n++) id = `${base}_${n}`;
-    reshaped.add(id);
-    mapOf("role").set(old, id);
+  let rolesReshaped = false;
+  for (const [kind, olds] of [...byKind].sort(([a], [b]) => a.localeCompare(b))) {
+    const { pattern, shape } = RESHAPE[kind];
+    for (const old of [...olds].sort()) {
+      if (pattern.test(old)) continue;
+      const base = shape(localName(old) || kind);
+      let id = base;
+      for (let n = 2; reshaped.has(id) || dangling.has(id); n++) id = `${base}_${n}`;
+      reshaped.add(id);
+      mapOf(kind).set(old, id);
+      rolesReshaped ||= kind === "role";
+    }
   }
-  const reserved = reshaped.size > 0 ? [...dangling, ...reshaped, UNRESOLVED] : dangling;
+  const reserved = [...dangling, ...reshaped, ...(rolesReshaped ? [UNRESOLVED] : [])];
   target.withReserved(reserved, () => {
     // Object types first: everything else refers to them. A shadow, which
     // holds another domain's element, takes `<context>:<local name>`, its
@@ -258,20 +268,45 @@ export function replayInto40(source: OrmModel): OrmModel {
 /** The fact type part of a reshaped dangling role reference. */
 const UNRESOLVED = "unresolved";
 
+/** The kinds a reference can dangle as. */
+type DanglingKind = "objectType" | "factType" | "role" | "subtypeFact" | "constraint";
+
+/**
+ * What 4.0 reads at a reference of each kind, and the shape a dangling one
+ * that does not match takes from its old id's local name. A constraint
+ * dangles only as an entity's preferred identifier.
+ */
+const RESHAPE: Record<DanglingKind, { pattern: RegExp; shape: (local: string) => string; }> = {
+  objectType: { pattern: REFERENCE_PATTERN, shape: (l) => l },
+  factType: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
+  role: { pattern: ROLE_ID_PATTERN, shape: (l) => `${UNRESOLVED}.${l}` },
+  subtypeFact: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
+  constraint: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
+};
+
 /**
  * Every id the model refers to and does not define, each reference
- * checked against the kind it names; and which of them are role
- * references. A strict load admits one where it does not check the
- * reference, as for a constraint's roles.
+ * checked against the kind it names; and the same, by that kind. A strict
+ * load admits one where it does not check the reference, as for a
+ * constraint's roles or a preferred identifier.
  */
-function danglingReferences(model: OrmModel): { ids: Set<string>; roles: Set<string>; } {
+function danglingReferences(
+  model: OrmModel,
+): { ids: Set<string>; byKind: Map<DanglingKind, Set<string>>; } {
   const out = new Set<string>();
-  const roles = new Set<string>();
-  const objectType = (id: string) => model.getObjectType(id) !== undefined || out.add(id);
-  const factType = (id: string) => model.getFactType(id) !== undefined || out.add(id);
-  const role = (id: string) =>
-    model.factTypesHolding([id]).length > 0 || (roles.add(id), out.add(id));
-  const subtypeFact = (id: string) => model.getSubtypeFact(id) !== undefined || out.add(id);
+  const byKind = new Map<DanglingKind, Set<string>>();
+  const dangles = (kind: DanglingKind, id: string) => {
+    out.add(id);
+    let ids = byKind.get(kind);
+    if (!ids) byKind.set(kind, ids = new Set());
+    ids.add(id);
+  };
+  const objectType = (id: string) =>
+    model.getObjectType(id) !== undefined || dangles("objectType", id);
+  const factType = (id: string) => model.getFactType(id) !== undefined || dangles("factType", id);
+  const role = (id: string) => model.factTypesHolding([id]).length > 0 || dangles("role", id);
+  const subtypeFact = (id: string) =>
+    model.getSubtypeFact(id) !== undefined || dangles("subtypeFact", id);
   const constraintIds = new Set(model.everyConstraint().map(([c]) => c.id));
   for (const ft of model.factTypes) for (const r of ft.roles) objectType(r.playerId);
   for (const [c] of model.everyConstraint()) {
@@ -288,7 +323,7 @@ function danglingReferences(model: OrmModel): { ids: Set<string>; roles: Set<str
   }
   for (const ot of model.objectTypes) {
     const preferred = model.preferredIdentifierOf(ot.id);
-    if (preferred !== undefined && !constraintIds.has(preferred)) out.add(preferred);
+    if (preferred !== undefined && !constraintIds.has(preferred)) dangles("constraint", preferred);
   }
   for (const o of model.objectifiedFactTypes) {
     factType(o.factTypeId);
@@ -306,5 +341,5 @@ function danglingReferences(model: OrmModel): { ids: Set<string>; roles: Set<str
     }
     for (const k of Object.keys(layout.orientations)) factType(k);
   }
-  return { ids: out, roles };
+  return { ids: out, byKind };
 }

@@ -11,7 +11,12 @@ import { describe, expect, it } from "vitest";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
-import { OrmYamlSerializer, writeDocument } from "../../src/serialization/OrmYamlSerializer.js";
+import {
+  OrmYamlSerializer,
+  readDocument40,
+  writeDocument,
+  writeDocument40,
+} from "../../src/serialization/OrmYamlSerializer.js";
 import { replayInto40 } from "../../src/serialization/replay.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
@@ -414,6 +419,29 @@ model:
     expect(ids[1]).toBe("ring-2");
     expect(ids[0]).not.toBe("ring.1");
     expect(ids.every((id) => LOCAL_NAME_PATTERN.test(id))).toBe(true);
+  });
+
+  it("gives a dangling reference of any kind 4.0 could not read its local name, still dangling", () => {
+    const source = new OrmModel({ name: "Fragment" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    // An object type reference with a space, a fact type reference with a
+    // dot, and a preferred identifier with a dot: none is a 4.0 reference.
+    source.addSubtypeFact({ id: "s1", subtypeId: "x1", supertypeId: "Some Thing" }, {
+      skipPlayerValidation: true,
+    });
+    source.addPopulation({ id: "p1", factTypeId: "ft.gone" }, { skipPlayerValidation: true });
+    source.setPreferredIdentifier("x1", "uc.1");
+    const model = replayInto40(source);
+    expect(model.subtypeFacts[0]!.supertypeId).toBe("Some_Thing");
+    expect(model.populations[0]!.factTypeId).toBe("ft%2Egone");
+    expect(model.preferredIdentifierOf("Person")).toBe("uc%2E1");
+    expect([model.getObjectType("Some_Thing"), model.getFactType("ft%2Egone")]).toEqual([
+      undefined,
+      undefined,
+    ]);
+    // And the 4.0 reader reads back what the writer makes of it.
+    const doc = JSON.parse(JSON.stringify(writeDocument40(model)));
+    expect(() => readDocument40(doc, { lenient: true })).not.toThrow();
   });
 
   it("leaves a fact type named unresolved alone when nothing is reshaped", () => {

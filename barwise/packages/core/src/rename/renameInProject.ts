@@ -14,9 +14,9 @@ import { toSnake } from "../mapping/columnNames.js";
 import type { ContextMappingConfig } from "../model/ContextMapping.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
-import { writeDocument } from "../serialization/OrmYamlSerializer.js";
+import { writeDocument40 } from "../serialization/OrmYamlSerializer.js";
 import { toMappingConfig } from "../serialization/projectAssembly.js";
-import type { OrmYamlDocument } from "../serialization/yaml/document.js";
+import type { OrmYamlDocument40 as OrmYamlDocument } from "../serialization/yaml/document.js";
 import {
   applyToDocument,
   definitionLeftBecause,
@@ -66,7 +66,7 @@ export function renameInProject(
   const docOf = (ctx: string): OrmYamlDocument => {
     let doc = docs.get(ctx);
     if (!doc) {
-      doc = writeDocument(models.get(ctx)!);
+      doc = writeDocument40(models.get(ctx)!);
       docs.set(ctx, doc);
     }
     return doc;

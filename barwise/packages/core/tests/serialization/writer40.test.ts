@@ -156,7 +156,7 @@ describe("writing a format 4.0 document", () => {
     expect(model.mintedFromOf(a.id!)).toBeDefined();
     model.addConstraint({
       id: a.id!,
-      type: "equality",
+      type: "exclusion",
       roleIds: ["Person_smokes.smokes", "Person_runs.runs"],
     });
     model.removeConstraint(a);

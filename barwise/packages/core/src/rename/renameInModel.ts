@@ -18,9 +18,9 @@ import type { FactType } from "../model/FactType.js";
 import { localName } from "../model/name.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
-import { OrmYamlSerializer, writeDocument } from "../serialization/OrmYamlSerializer.js";
+import { OrmYamlSerializer, writeDocument40 } from "../serialization/OrmYamlSerializer.js";
 import { CURRENT_ORM_VERSION } from "../serialization/schemaVersion.js";
-import type { OrmYamlDocument } from "../serialization/yaml/document.js";
+import type { OrmYamlDocument40 as OrmYamlDocument } from "../serialization/yaml/document.js";
 
 /**
  * What to rename. Explicit by kind, because an object type and a fact type
@@ -58,7 +58,7 @@ export class RenameError extends Error {
  */
 export function renameInModel(model: OrmModel, target: RenameTarget, to: string): RenameResult {
   const plan = planRename(model, target, to, { shadow: "refuse" });
-  const doc = writeDocument(model);
+  const doc = writeDocument40(model);
   const changes: string[] = [];
   applyToDocument(doc, model, plan, changes, {
     definitionTermFree: (old) => !holdsName(model, old, plan.elementId),

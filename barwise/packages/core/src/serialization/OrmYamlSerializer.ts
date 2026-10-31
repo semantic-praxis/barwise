@@ -17,11 +17,13 @@ import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import { DeserializationError, refusingHeldIds } from "./deserializationError.js";
 import { type MigrationNote, migrationNotes, readLegacy } from "./reader20.js";
+import { replayInto40 } from "./replay.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
   applyMigrations,
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
+  PREVIOUS_ORM_VERSION,
   planRead,
   unsupportedVersionMessage,
 } from "./schemaVersion.js";
@@ -136,19 +138,28 @@ export class OrmYamlSerializer {
     const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
     // A 2.0 file is read by the 2.0 reader, against the 2.0 schema frozen
-    // when 3.0 landed; a 3.0 file by the 3.0 reader. Reading 2.0 directly
-    // into the model is the migration: the model is what both formats
-    // state, and a 2.0 file saved writes 3.0 (orm-format-3 WS4b).
+    // when 3.0 landed, and a 3.0 file by the frozen 3.0 decoders; each
+    // model is then replayed into 4.0's ids (iri-identity WS6, decision
+    // 18), and saved as 4.0. A note names an element by its id in the file
+    // read, which is what it describes.
     if (version === LEGACY_ORM_VERSION) {
       this.check(this.validator.validateLegacyModel(doc));
       const { model, placed, flags } = readLegacy(doc as OrmYamlDocument, options);
-      return { model, from: from!, notes: migrationNotes(model, placed, flags) };
+      const notes = migrationNotes(model, placed, flags);
+      return { model: replayInto40(model), from: from!, notes };
     }
-    // Every other document is read as 3.0, by the Effect decoders alone
+    if (version === PREVIOUS_ORM_VERSION) {
+      return {
+        model: replayInto40(fromDecoded(decodeOrRefuse(doc), options)),
+        from: from!,
+        notes: [],
+      };
+    }
+    // Every other document is read as 4.0, by the Effect decoders alone
     // (effect-adoption 1r, R4): every problem the file has, each named by
     // its element and field, in one pass. A document with no orm_version
     // comes here too, and is told it is missing.
-    return { model: fromDecoded(decodeOrRefuse(doc), options), from: from!, notes: [] };
+    return { model: readDocument40(doc, options), from: from!, notes: [] };
   }
 
   private check(result: SchemaValidationResult): void {
@@ -197,8 +208,8 @@ export class OrmYamlSerializer {
 
   // -- Internal: model -> document --
 
-  private toDocument(model: OrmModel): OrmYamlDocument {
-    return writeDocument(model);
+  private toDocument(model: OrmModel): OrmYamlDocument40 {
+    return writeDocument40(model);
   }
 }
 

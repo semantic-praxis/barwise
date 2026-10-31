@@ -11,7 +11,6 @@ import {
 import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { checkInternalConstraint, FactType, type FactTypeConfig } from "./FactType.js";
-import { generateId } from "./id.js";
 import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.js";
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { mint, type Mintable } from "./mint.js";
@@ -389,15 +388,12 @@ export class OrmModel implements ConstraintModel {
   /**
    * The id a constraint takes: its minted name. One whose sentence cannot
    * be built (a malformed constraint, a ring over two players) is left
-   * unnamed in a model that refuses ids across kinds, which only the 4.0
-   * reader and the replay build (decision 19); any other model gives it a
-   * generated id, because format 3.0, which this build still writes,
-   * requires every constraint's id. The switch to the 4.0 writer
-   * (6b-2b-2b) drops that fallback.
+   * unnamed, as a subtype fact or objectification is (decision 19), and
+   * validation reports what is wrong with it; format 4.0 writes it without
+   * an id.
    */
   private constraintIdFor(element: Mintable): Named {
-    return this.nameFor(element)
-      ?? { id: this._idsAcrossKinds ? undefined : generateId() };
+    return this.nameFor(element) ?? { id: undefined };
   }
 
   /** An object type by name where the model holds it, else by its id. */
