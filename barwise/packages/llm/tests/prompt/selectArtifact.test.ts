@@ -58,7 +58,7 @@ describe("selectArtifact", () => {
     })).toBe(haiku);
   });
 
-  it("prefers an explicit override to the variant the target would resolve", () => {
+  it("prefers an explicit override to the variant the target would resolve [adr:production-prompt-resolution#library-seam]", () => {
     expect(selectArtifact("extraction", {
       provider: "anthropic",
       model: "claude-haiku-4-5",
@@ -72,7 +72,7 @@ describe("selectArtifact", () => {
       .toThrow(/surface "extraction" cannot drive model review/);
   });
 
-  it("does not consult the filesystem", () => {
+  it("does not consult the filesystem [adr:production-prompt-resolution#shipped-only]", () => {
     // The candidate set is compiled in. A resolver that read a
     // directory would work in this repo and fail in a global install,
     // a published package, and the VS Code bundle alike.
@@ -88,7 +88,7 @@ describe("assertArtifactSurface", () => {
     expect(() => assertArtifactSurface(extractionOverride, "extraction")).not.toThrow();
   });
 
-  it("names the surface the artifact declared and the one it cannot drive", () => {
+  it("names the surface the artifact declared and the one it cannot drive [adr:production-prompt-resolution#library-seam]", () => {
     // Both halves: a message naming only one of them leaves the reader
     // to guess which end is wrong.
     expect(() => assertArtifactSurface(reviewOverride, "extraction"))

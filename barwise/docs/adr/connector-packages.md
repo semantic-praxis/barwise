@@ -6,6 +6,9 @@ Tracking: barwise-ubc, barwise-2uz, barwise-5zi, barwise-5f9,
 docs/specs/archive/connector-io-migration.spec.md,
 docs/specs/ossie-ontology-format.spec.md,
 docs/specs/archive/code-analysis.spec.md, docs/specs/norma-export.spec.md
+Enforced-by: npm run purity (connector-owns-io), none (barwise-ym8.paz: core-no-interop),
+none (barwise-ym8.iyw: connector-owns-io), none (barwise-ym8.y5z: descriptor-wraps-core),
+none (barwise-ym8.2n3: explicit-registration)
 
 ## Context
 
@@ -29,27 +32,27 @@ format lives and how it reaches the surfaces.
 
 ## Decision
 
-1. **Core ships no interop format.** `@barwise/core` holds the
+1. **Core ships no interop format.**{#core-no-interop} `@barwise/core` holds the
    `FormatDescriptor` registry, the `ImportFormat` and
    `ExportFormatAdapter` interfaces, and the native `.orm.yaml`
    serializer with its JSON Schema. Every other import or export format
    is a descriptor registered from outside core.
 2. **A format lives in a connector package, which owns whatever I/O the
-   format needs.** A connector package here is one that registers
+   format needs.**{#connector-owns-io} A connector package here is one that registers
    formats, through one `register*Formats()` function: `@barwise/formats`
    (DDL, OpenAPI, Avro, NORMA, SQL, Ossie; the SQL importer scans
    directories and runs the sqlglot subprocess), `@barwise/dbt` (its
    file-system and `dbt compile` I/O), and `@barwise/code-analysis`
    (TypeScript, Java and Kotlin, with LSP sessions and repository
    scanning).
-3. **A descriptor wraps core's capability where core has one.** The
+3. **A descriptor wraps core's capability where core has one.**{#descriptor-wraps-core} The
    mapping and rendering logic stays in core -- `RelationalMapper`,
    `renderDdl`, `renderOpenApi`, `renderAvro`, `renderDbt` -- and the
    DDL, OpenAPI, Avro and dbt exporters are thin shells over it; the SQL
    and dbt importers call core's `parseSqlFile`. A format core has no
    renderer for keeps its writer in the connector, as NORMA and Ossie
    do.
-4. **Registration is explicit and by name.** Each tool surface calls the
+4. **Registration is explicit and by name.**{#explicit-registration} Each tool surface calls the
    `register*Formats()` functions it needs; the registry discovers
    nothing on its own, and a format no one registered fails as an
    unknown format.

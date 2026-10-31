@@ -4,6 +4,9 @@ Scope: process
 Date: 2026-10-18
 Tracking: barwise-zdd, barwise-4q0, barwise-raw, docs/specs/steward-skill.spec.md,
 docs/specs/pr-skills.spec.md
+Enforced-by: none (barwise-ym8.2ds: review-before-merge),
+none (barwise-ym8.vl9: pinned-merge), none (barwise-ym8.2vy: no-size-exemption),
+none (barwise-ym8.oof: ask-owner), none (barwise-ym8.n0m: owner-overrides)
 
 ## Context
 
@@ -22,24 +25,24 @@ run on which changes is a separate decision, owned by the root
 
 1. **The agent driving a pull request may merge it only after the
    `pr-review` skill has recommended `merge` on the exact head being
-   merged.** `pr-review` runs `/code-review` as its correctness engine.
+   merged.**{#review-before-merge} `pr-review` runs `/code-review` as its correctness engine.
    "Merge after", "do not merge" and "cannot tell" do not license a
    merge, and neither does a review run where `/code-review` was
    unavailable.
-2. **The merge is pinned to the reviewed commit.** The agent merges
+2. **The merge is pinned to the reviewed commit.**{#pinned-merge} The agent merges
    with that SHA as the expected head (`expectedHeadSha`, or `gh pr
    merge --match-head-commit`), so a later push is refused rather than
    merged, and then posts one comment naming the SHA and the
    recommendation. Any push after the review needs a new review.
-3. **No pull request is exempt by size.** Tracker-only and docs-only
+3. **No pull request is exempt by size.**{#no-size-exemption} Tracker-only and docs-only
    pull requests, including the closure follow-up after a merge, get the
    same review before merging.
-4. **The agent asks the owner instead of merging** when the review
+4. **The agent asks the owner instead of merging**{#ask-owner} when the review
    cannot tell, when `/code-review` could not run, when the pull
    request's body leaves the owner a decision not yet answered, or after
    two reviews of the pull request that did not recommend `merge`. The
    owner's answer decides and resets the count.
-5. **The owner's instruction overrides the condition.** When the owner
+5. **The owner's instruction overrides the condition.**{#owner-overrides} When the owner
    says to merge a pull request, the agent merges it. A reviewer who is
    not the driving agent recommends and never approves or merges.
 

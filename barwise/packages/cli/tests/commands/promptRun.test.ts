@@ -227,12 +227,12 @@ describe("the production surfaces stay narrow", () => {
   // flag, the recorded prompt hash stops resolving to a shipped
   // artifact and this decision has been reversed without anyone saying
   // so (docs/specs/artifact-resolution-parity.spec.md, open decision 1).
-  it("barwise review has no --artifacts", async () => {
+  it("barwise review has no --artifacts [adr:production-prompt-resolution#candidates-in-prompt-lane]", async () => {
     const { stdout } = await runCli(["review", "--help"]);
     expect(stdout).not.toContain("--artifacts");
   });
 
-  it("barwise import transcript has no --artifacts", async () => {
+  it("barwise import transcript has no --artifacts [adr:production-prompt-resolution#candidates-in-prompt-lane]", async () => {
     const { stdout } = await runCli(["import", "transcript", "--help"]);
     expect(stdout).not.toContain("--artifacts");
   });

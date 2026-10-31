@@ -5,6 +5,10 @@ Date: 2026-08-26
 Tracking: barwise-ubc, barwise-855, barwise-882, barwise-qxt, barwise-9z7, barwise-49k,
 docs/specs/artifact-resolution-parity.spec.md,
 docs/specs/artifact-resolution-in-production.spec.md
+Enforced-by: tests (shipped-only, candidates-in-prompt-lane, recovered-not-recorded,
+library-seam), none (barwise-ym8.mdg: shipped-only),
+none (barwise-ym8.w0p: candidates-in-prompt-lane),
+none (barwise-ym8.x2g: recovered-not-recorded), none (barwise-ym8.29c: library-seam)
 
 ## Context
 
@@ -22,26 +26,26 @@ are in `artifact-resolution-parity.spec.md`.
 
 ## Decision
 
-1. **Production resolves over the shipped artifacts alone.** On a
+1. **Production resolves over the shipped artifacts alone.**{#shipped-only} On a
    production path -- `barwise import transcript`, `barwise review`, the
    MCP tools, and the VS Code commands and language-model tools -- the
    prompt is chosen by
    `selectArtifact` over `builtinArtifacts`, falling back to the surface's
    default. A prompt reaches that set only through `regen:builtins`, the
    drift test and review.
-2. **Unshipped candidates stay in the `prompt` lane.** `barwise prompt
+2. **Unshipped candidates stay in the `prompt` lane.**{#candidates-in-prompt-lane} `barwise prompt
    eval`, `prompt artifact` and `prompt run` may take `--artifacts <dir>`
    (and `eval` and `artifact` take `--artifact-version`); `import
    transcript` and `review` must not. Trying a candidate against a live
    model is `prompt run`.
-3. **What production sent is recovered, not recorded.** Because of 1, the
+3. **What production sent is recovered, not recorded.**{#recovered-not-recorded} Because of 1, the
    prompt a production run sent follows from barwise version, surface,
    provider and model, plus, for extraction, whether `--alternatives` was
    set, which appends a section. `barwise prompt artifact` prints
    `version@hash` for that join. `withCallLog` records `promptHash` of the
    system prompt only -- never the user message -- and no
    `artifactVersion`.
-4. **The library seam stays open.** `processTranscript` and `reviewModel`
+4. **The library seam stays open.**{#library-seam} `processTranscript` and `reviewModel`
    still accept an explicit `artifact`, guarded by `assertArtifactSurface`;
    what does not exist is a production CLI flag that passes one.
 

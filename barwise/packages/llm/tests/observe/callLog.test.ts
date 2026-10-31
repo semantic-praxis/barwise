@@ -70,7 +70,7 @@ describe("withCallLog", () => {
     expect(wrapped.model).toBe("claude-haiku-4-5");
   });
 
-  it("records no prompt or response text", async () => {
+  it("records no prompt or response text [adr:production-prompt-resolution#recovered-not-recorded]", async () => {
     // The exclusion this design turns on. Transcripts are client
     // material; a telemetry log is not the place they end up.
     const s = sink();
@@ -168,7 +168,7 @@ describe("withCallLog prompt provenance", () => {
     expect(s.entries[0]!.promptHash).toBe(hashPrompt("SECRET-SYSTEM-PROMPT"));
   });
 
-  it("hashes the system prompt and not the user message", async () => {
+  it("hashes the system prompt and not the user message [adr:production-prompt-resolution#recovered-not-recorded]", async () => {
     // The content rule applied rather than bent: the system prompt is
     // authored in this repository, the user message is the transcript a
     // client handed us. Two requests differing only in user message must
