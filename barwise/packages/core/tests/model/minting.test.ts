@@ -11,7 +11,7 @@
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";
 import { setIdGenerator } from "../../src/model/id.js";
-import { OrmModel } from "../../src/model/OrmModel.js";
+import { DuplicateIdError, OrmModel } from "../../src/model/OrmModel.js";
 import { subtypeFactRef } from "../../src/model/SubtypeFact.js";
 
 /** Person drives Car, Person has Name, all without ids. */
@@ -334,6 +334,75 @@ describe("a model naming what it is given", () => {
     ).toThrow();
     expect(m.getFactTypeByName("Person sells Car")).toBeUndefined();
     expect(m.idKindsHolding("Person_sells_Car.sells")).toEqual([]);
+  });
+
+  it("takes an objectified fact type's id from its first reading when asked (decision 20)", () => {
+    const m = new OrmModel({ name: "School" });
+    m.addObjectType({ name: "Student", kind: "entity", referenceMode: "nr" });
+    m.addObjectType({ name: "Course", kind: "entity", referenceMode: "code" });
+    m.addObjectType({ name: "Enrollment", kind: "entity", referenceMode: "nr" });
+    const ft = m.addFactType(
+      {
+        name: "Enrollment",
+        roles: [
+          { name: "enrolls in", playerId: "Student" },
+          { name: "has enrolled", playerId: "Course" },
+        ],
+        readings: ["{0} enrolls in {1}"],
+      },
+      { idFromFirstReading: true },
+    );
+    // The name stays as written; only the id comes from the reading.
+    expect([ft.name, ft.id]).toEqual(["Enrollment", "Student_enrolls_in_Course"]);
+    expect(ft.roles[0]!.id).toBe("Student_enrolls_in_Course.enrolls_in");
+  });
+
+  it("refuses an id any element holds, of any kind, in a model that asks for it", () => {
+    const m = new OrmModel({ name: "M", idsAcrossKinds: true });
+    m.addObjectType({ id: "Person", name: "Person", kind: "entity", referenceMode: "nr" });
+    // A fact type, a role and a constraint each stating the object type's id.
+    expect(() =>
+      m.addFactType({
+        id: "Person",
+        name: "Person smokes",
+        roles: [{ name: "smokes", playerId: "Person" }],
+        readings: ["{0} smokes"],
+      })
+    ).toThrow(
+      /Id "Person" is held by an object type, so fact type "Person smokes" cannot be added/,
+    );
+    expect(() =>
+      m.addFactType({
+        name: "Person smokes",
+        roles: [{ id: "Person", name: "smokes", playerId: "Person" }],
+        readings: ["{0} smokes"],
+      })
+    ).toThrow(DuplicateIdError);
+    const ft = m.addFactType({
+      name: "Person smokes",
+      roles: [{ name: "smokes", playerId: "Person" }],
+      readings: ["{0} smokes"],
+      // Its own stated constraint id is not refused by its own hold.
+      constraints: [{ id: "Smokers", type: "mandatory", roleId: "Person_smokes.smokes" }],
+    });
+    expect(() => ft.addConstraint({ id: "Person", type: "mandatory", roleId: ft.roles[0]!.id }))
+      .toThrow(DuplicateIdError);
+    expect(() =>
+      m.addConstraint(
+        { id: "Person_smokes", type: "exclusion", roleIds: ["Person_smokes.smokes"] } as never,
+      )
+    ).toThrow(DuplicateIdError);
+    // Off by default: a 3.x model may give two kinds one id.
+    const loose = new OrmModel({ name: "M" });
+    loose.addObjectType({ id: "x", name: "Person", kind: "entity", referenceMode: "nr" });
+    expect(() =>
+      loose.addFactType({
+        id: "x",
+        name: "Person smokes",
+        roles: [{ name: "smokes", playerId: "x" }],
+        readings: ["{0} smokes"],
+      })
+    ).not.toThrow();
   });
 
   it("refuses a fact type's bad constraint before storing anything", () => {

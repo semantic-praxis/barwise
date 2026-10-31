@@ -19,6 +19,7 @@ import { localName } from "./name.js";
 import { ObjectifiedFactType, type ObjectifiedFactTypeConfig } from "./ObjectifiedFactType.js";
 import { createObjectType, type ObjectType, type ObjectTypeConfig } from "./ObjectType.js";
 import { Population, type PopulationConfig } from "./Population.js";
+import { expandReading } from "./ReadingOrder.js";
 import type { Role } from "./Role.js";
 import { SubtypeFact, type SubtypeFactConfig, subtypePairKey } from "./SubtypeFact.js";
 
@@ -41,6 +42,13 @@ export interface OrmModelConfig {
    * iri-identity WS4). Ends in `/` or `#`.
    */
   readonly namespace?: string;
+  /**
+   * Refuse a stated id any element holds, of any kind: format 4.0's rule,
+   * where every id is a local name and names one element (iri-identity
+   * WS6). Off for a 3.x model, whose file may give an object type and a
+   * fact type one id.
+   */
+  readonly idsAcrossKinds?: boolean;
 }
 
 const quoted = (text: string): string => JSON.stringify(text);
@@ -84,7 +92,7 @@ export type { IdKeyedKind, IdKind } from "./idIndex.js";
 export class DuplicateIdError extends Error {
   constructor(
     readonly id: string,
-    readonly kind: IdKeyedKind,
+    readonly kind: IdKind,
     held: string,
     adding: string,
   ) {
@@ -98,6 +106,7 @@ export interface AddFactTypeOptions {
   readonly skipPlayerValidation?: boolean;
   readonly suffixRepeatedRoleNames?: boolean;
   readonly constraintsOver?: (roleIds: readonly string[]) => readonly InternalConstraint[];
+  readonly idFromFirstReading?: boolean;
 }
 
 /**
@@ -146,6 +155,9 @@ export class OrmModel implements ConstraintModel {
           }),
         }
         : constraint;
+      if (!this._addingFactType) {
+        this.refuseAcrossKinds(constraint.id, "constraint", `a constraint of ${quoted(host.name)}`);
+      }
       this._ids.hold(stored.id, "constraint");
       return stored;
     },
@@ -155,6 +167,12 @@ export class OrmModel implements ConstraintModel {
    * (`withReserved`), so a stated id wins wherever it sits in the file.
    */
   private _reserved: ReadonlySet<string> = new Set();
+  private readonly _idsAcrossKinds: boolean;
+  /**
+   * True while `addFactType` adds a fact type's own constraints, whose
+   * stated ids it checked across kinds before holding them.
+   */
+  private _addingFactType = false;
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
   private readonly _constraints: ExternalConstraint[] = [];
@@ -169,6 +187,7 @@ export class OrmModel implements ConstraintModel {
     this._domainContext = config.domainContext;
     this._note = config.note;
     this._namespace = checkedIri(config.namespace, NAMESPACE_PATTERN, "namespace");
+    this._idsAcrossKinds = config.idsAcrossKinds ?? false;
   }
 
   get name(): string {
@@ -241,6 +260,19 @@ export class OrmModel implements ConstraintModel {
     if (held !== undefined) {
       throw new DuplicateIdError(config.id!, kind, describe(held), describe(config));
     }
+    this.refuseAcrossKinds(config.id, kind, describe(config));
+  }
+
+  /**
+   * In a model that refuses across kinds, throw `DuplicateIdError` when any
+   * element of any kind holds a stated id.
+   */
+  private refuseAcrossKinds(id: string | undefined, kind: IdKind, adding: string): void {
+    if (!this._idsAcrossKinds || id === undefined || !this._ids.holds(id)) return;
+    const holders = this._ids.kindsHolding(id)
+      .map((k) => `${/^[aeiou]/.test(k) ? "an" : "a"} ${k}`)
+      .join(" and ");
+    throw new DuplicateIdError(id, kind, holders, adding);
   }
 
   /**
@@ -454,6 +486,7 @@ export class OrmModel implements ConstraintModel {
    * validation reports it.
    */
   addConstraint(constraint: ExternalConstraint): ExternalConstraint {
+    this.refuseAcrossKinds(constraint.id, "constraint", "a constraint across fact types");
     const stored = constraint.id === undefined
       ? {
         ...constraint,
@@ -675,6 +708,11 @@ export class OrmModel implements ConstraintModel {
    *   them once the model has named the roles: for a caller whose roles have
    *   no ids yet (an importer). Added after the config's constraints, and
    *   inside the same rollback, so a refused one leaves the model as it was.
+   * @param options.idFromFirstReading - When true, a fact type given no id
+   *   mints it from its first reading, rendered with its players' names,
+   *   instead of from its name: decision 20, for an objectified fact type
+   *   whose name's local name is its objectifying type's id, so the two do
+   *   not collide. Only the id; the name stays as written.
    * @throws If any role references a nonexistent object type (unless skipPlayerValidation).
    * @throws If two roles without ids share a name (unless suffixRepeatedRoleNames).
    * @throws DuplicateIdError if a fact type with the same id already exists.
@@ -714,11 +752,23 @@ export class OrmModel implements ConstraintModel {
     // and the stated constraint ids are held while the unnamed constraints
     // are named, then released for the admission's own hold.
     const statedConstraints = constraints.flatMap((c) => (c.id === undefined ? [] : [c.id]));
+    for (const r of config.roles) {
+      this.refuseAcrossKinds(r.id, "role", `role ${quoted(r.name)} of ${quoted(config.name)}`);
+    }
+    for (const held of statedConstraints) {
+      this.refuseAcrossKinds(held, "constraint", `a constraint of ${quoted(config.name)}`);
+    }
     const stated = new Set([
       ...config.roles.flatMap((r) => (r.id === undefined ? [] : [r.id])),
       ...statedConstraints,
     ]);
-    const id = config.id ?? this.mintedId(localName(config.name), stated);
+    const base = options?.idFromFirstReading && config.readings[0] !== undefined
+      ? expandReading(
+        config.readings[0],
+        config.roles.map((r) => this._objectTypes.get(r.playerId)?.name ?? r.playerId),
+      )
+      : config.name;
+    const id = config.id ?? this.mintedId(localName(base), stated);
     const ft = new FactType({
       ...config,
       id,
@@ -741,13 +791,17 @@ export class OrmModel implements ConstraintModel {
     // so a refused add leaves the model as it was, as it did when the
     // constructor refused it.
     try {
+      // Checked across kinds above, before their ids were held.
+      this._addingFactType = true;
       for (const c of constraints) ft.addConstraint(c);
+      this._addingFactType = false;
       const over = options?.constraintsOver?.(ft.roles.map((r) => r.id)) ?? [];
       for (const c of over) ft.addConstraint(c);
     } catch (err) {
       this.removeFactType(ft.id);
       throw err;
     } finally {
+      this._addingFactType = false;
       for (const held of statedConstraints) this._ids.release(held, "constraint");
     }
     return ft;
