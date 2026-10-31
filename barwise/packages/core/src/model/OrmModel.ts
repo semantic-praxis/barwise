@@ -34,6 +34,18 @@ import {
 import type { ConstraintAdmission } from "./constraintAdmission.js";
 import type { ConstraintInView, ConstraintModel } from "./constraintModel.js";
 
+/** A map read backwards, leaving out a value two keys share. */
+function invertUnique(map: ReadonlyMap<string, string>): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  const shared = new Set<string>();
+  for (const [key, value] of map) {
+    if (out.has(value)) shared.add(value);
+    out.set(value, key);
+  }
+  for (const value of shared) out.delete(value);
+  return out;
+}
+
 /** The id an element the model names takes, and the key it was minted from. */
 interface Named {
   readonly id: string | undefined;
@@ -194,6 +206,8 @@ export class OrmModel implements ConstraintModel {
   private _addingFactType = false;
   /** See `priorIds`. */
   private _priorIds: ReadonlyMap<string, string> | undefined;
+  /** `priorIds` backwards, built on first use by `idFromPrior`. */
+  private _fromPrior: ReadonlyMap<string, string> | undefined;
   private readonly _definitions: Definition[] = [];
   private readonly _diagramLayouts: DiagramLayout[] = [];
   private readonly _constraints: ExternalConstraint[] = [];
@@ -257,6 +271,22 @@ export class OrmModel implements ConstraintModel {
   recordPriorIds(ids: ReadonlyMap<string, string>): void {
     if (this._priorIds !== undefined) throw new Error("A model's prior ids are recorded once.");
     this._priorIds = ids;
+  }
+
+  /**
+   * The id an element holds now, given the id the 3.x file this model was
+   * replayed from stated for it (`priorIds`, read backwards). For a
+   * reference another 3.x-era file makes into this one -- a tutorial step
+   * naming a constraint in its model snapshot -- until those files are
+   * migrated too (iri-identity WS7). Undefined for a model that was not
+   * replayed, for an id the file did not state, and for one it stated for
+   * two elements of different kinds, which 3.x allowed and no lookup by id
+   * alone can tell apart.
+   */
+  idFromPrior(prior: string): string | undefined {
+    if (this._priorIds === undefined) return undefined;
+    this._fromPrior ??= invertUnique(this._priorIds);
+    return this._fromPrior.get(prior);
   }
 
   set name(value: string) {

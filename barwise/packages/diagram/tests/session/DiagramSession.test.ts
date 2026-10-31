@@ -276,8 +276,8 @@ describe("DiagramSession", () => {
       id: "ft-a-d",
       name: "A owns D",
       roles: [
-        { id: "r-a-d-1", name: "owns", playerId: otId(edited, "A") },
-        { id: "r-a-d-2", name: "is owned by", playerId: "ot-d" },
+        { id: "ft-a-d.r1", name: "owns", playerId: otId(edited, "A") },
+        { id: "ft-a-d.r2", name: "is owned by", playerId: "ot-d" },
       ],
       readings: ["{0} owns {1}"],
     });
@@ -311,8 +311,8 @@ describe("DiagramSession", () => {
       id: "ft-a-d",
       name: "A owns D",
       roles: [
-        { id: "r-a-d-1", name: "owns", playerId: otId(model, "A") },
-        { id: "r-a-d-2", name: "is owned by", playerId: "ot-d" },
+        { id: "ft-a-d.r1", name: "owns", playerId: otId(model, "A") },
+        { id: "ft-a-d.r2", name: "is owned by", playerId: "ot-d" },
       ],
       readings: ["{0} owns {1}"],
     });

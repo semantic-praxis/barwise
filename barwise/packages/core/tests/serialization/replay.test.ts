@@ -442,6 +442,23 @@ model:
     expect(() => readDocument40(doc, { lenient: true })).not.toThrow();
   });
 
+  it("finds an element by the id its 3.x file stated, unless two kinds stated it", () => {
+    const source = new OrmModel({ name: "Shared" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    // 3.x let an object type and a fact type share an id.
+    source.addFactType({
+      id: "x1",
+      name: "Person smokes",
+      roles: [{ id: "r1", name: "smokes", playerId: "x1" }],
+      readings: ["{0} smokes"],
+    });
+    const model = replayInto40(source);
+    expect(model.idFromPrior("r1")).toBe("Person_smokes.smokes");
+    expect(model.idFromPrior("x1")).toBeUndefined();
+    expect(model.idFromPrior("nothing")).toBeUndefined();
+    expect(new OrmModel({ name: "Plain" }).idFromPrior("r1")).toBeUndefined();
+  });
+
   it("leaves a fact type named unresolved alone when nothing is reshaped", () => {
     const source = new OrmModel({ name: "Clean" });
     source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
