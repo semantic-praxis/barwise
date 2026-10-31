@@ -2,6 +2,7 @@ import type { Complete } from "../util/complete.js";
 import {
   type Constraint,
   type InternalConstraint,
+  type InternalUniquenessConstraint,
   isExternalConstraint,
   isInternalConstraint,
 } from "./Constraint.js";
@@ -199,6 +200,18 @@ export class FactType extends ModelElement {
   /** Check whether a role id belongs to this fact type. */
   hasRole(roleId: string): boolean {
     return this._roles.some((r) => r.id === roleId);
+  }
+
+  /**
+   * The uniqueness constraint spanning exactly these roles, in any order:
+   * how a caller that added one without an id finds it again, to name it as
+   * a preferred identifier, without depending on the order it was listed in.
+   */
+  uniquenessOver(roleIds: readonly string[]): InternalUniquenessConstraint | undefined {
+    const want = [...roleIds].sort().join("\u0000");
+    return this._constraints.find((c): c is InternalUniquenessConstraint =>
+      c.type === "internal_uniqueness" && [...c.roleIds].sort().join("\u0000") === want
+    );
   }
 
   /**

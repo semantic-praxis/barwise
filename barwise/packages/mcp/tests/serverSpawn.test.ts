@@ -89,9 +89,12 @@ describe("MCP server stdio spawn", () => {
     // (docs/specs/uuid7-generator-factory.spec.md).
     const result = await client.callTool({
       name: "import_model",
+      // Ossie, because it still states generated ids for object types until
+      // 6b-4b retires the generator; the DDL importer no longer calls it.
       arguments: {
-        source: "CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name TEXT);",
-        format: "ddl",
+        source:
+          "version: 0.2.0.dev0\nname: T\nontology:\n  - { concept: Customer, type: EntityType }\n",
+        format: "ossie",
       },
     });
     const text = (result.content as Array<{ type: string; text: string; }>)[0]!.text;

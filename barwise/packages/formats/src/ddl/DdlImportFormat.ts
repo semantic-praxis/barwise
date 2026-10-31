@@ -26,8 +26,8 @@ import {
   claimValueTypeName,
   type DataTypeDef,
   type FactType,
+  type FactTypeConfig,
   type FlaggedSubtypeFact,
-  generateId,
   type ImportFormat,
   type ImportOptions,
   type ImportResult,
@@ -35,6 +35,7 @@ import {
   type ObjectType,
   OrmModel,
   resolvePreferredIdentifier,
+  type RoleConfig,
   subtypeConstraintsFromFlags,
   type ValueConstraintDef,
 } from "@barwise/core";
@@ -1201,42 +1202,24 @@ export class DdlImportFormat implements ImportFormat {
       warnings,
       this.columnAnnotation(model, annotations, table, column, entity, undefined, warnings),
     );
-    // Minted, never built from names (importer-role-ids.spec.md).
-    const entityRoleId = generateId();
-    const valueRoleId = generateId();
     // The value role's uniqueness is the entity's preferred identifier,
-    // named on the entity once the fact type exists (orm-format-3 WS4b).
-    const identifyingId = generateId();
-    const constraints: InternalConstraint[] = [
-      { id: identifyingId, type: "internal_uniqueness", roleIds: [valueRoleId] },
-      { type: "internal_uniqueness", roleIds: [entityRoleId] },
-      { type: "mandatory", roleId: entityRoleId },
-    ];
-    if (annotation) {
-      const factType = model.addFactType(
-        annotatedFactType(
-          annotation,
-          entity.id,
-          identifier.id,
-          entityRoleId,
-          valueRoleId,
-          constraints,
-        ),
-      );
-      model.setPreferredIdentifier(entity.id, identifyingId);
-      return { factType, farRoleId: valueRoleId };
-    }
-    const factType = model.addFactType({
-      name: `${entity.name} has ${identifier.name}`,
-      roles: [
-        { id: entityRoleId, name: "has", playerId: entity.id },
-        { id: valueRoleId, name: "is of", playerId: identifier.id },
+    // named on the entity by the id it was stored under (orm-format-3 WS4b).
+    const added = addBinary(
+      model,
+      annotation
+        ? annotatedFactType(annotation, entity.id, identifier.id)
+        : hasFactType(`${entity.name} has ${identifier.name}`, entity.id, identifier.id),
+      (row, value) => [
+        { type: "internal_uniqueness", roleIds: [value] },
+        { type: "internal_uniqueness", roleIds: [row] },
+        { type: "mandatory", roleId: row },
       ],
-      readings: ["{0} has {1}", "{1} is of {0}"],
-      constraints,
-    });
-    model.setPreferredIdentifier(entity.id, identifyingId);
-    return { factType, farRoleId: valueRoleId };
+    );
+    model.setPreferredIdentifier(
+      entity.id,
+      added.factType.uniquenessOver([added.otherRoleId])!.id,
+    );
+    return { factType: added.factType, farRoleId: added.otherRoleId };
   }
 
   /**
@@ -1343,26 +1326,20 @@ export class DdlImportFormat implements ImportFormat {
       referencedEntity.name,
       warnings,
     );
+    // Each row references at most one target; NOT NULL makes it mandatory;
+    // a UNIQUE on the reference makes it one-to-one.
+    const referenceConstraints = (row: string, far: string): InternalConstraint[] => [
+      { type: "internal_uniqueness", roleIds: [row] },
+      ...(mandatory ? [{ type: "mandatory" as const, roleId: row }] : []),
+      ...(farUnique ? [{ type: "internal_uniqueness" as const, roleIds: [far] }] : []),
+    ];
     if (annotation) {
-      const rowRoleId = generateId();
-      const constraints: InternalConstraint[] = [{
-        type: "internal_uniqueness",
-        roleIds: [rowRoleId],
-      }];
-      if (mandatory) constraints.push({ type: "mandatory", roleId: rowRoleId });
-      const farRoleId = generateId();
-      if (farUnique) constraints.push({ type: "internal_uniqueness", roleIds: [farRoleId] });
-      const factType = model.addFactType(
-        annotatedFactType(
-          annotation,
-          entityType.id,
-          referencedEntity.id,
-          rowRoleId,
-          farRoleId,
-          constraints,
-        ),
+      const added = addBinary(
+        model,
+        annotatedFactType(annotation, entityType.id, referencedEntity.id),
+        referenceConstraints,
       );
-      return { factType, farRoleId, ...roleColumns };
+      return { factType: added.factType, farRoleId: added.otherRoleId, ...roleColumns };
     }
 
     // Infer a reading pattern from the column name
@@ -1371,39 +1348,21 @@ export class DdlImportFormat implements ImportFormat {
     const factTypeName = `${entityType.name} ${verb} ${referencedEntity.name}`;
 
     try {
-      const constraints: any[] = [];
-
-      // Add uniqueness constraint on the foreign key side (many-to-one)
-      // Role ids are minted, never built from names: `<entity id>-<verb>-role`
-      // collided for two foreign keys with the same inferred verb, and
-      // `<value type id>-has-role` for every table sharing a column name,
-      // producing models that fail validation (importer-role-ids.spec.md).
-      const role1Id = generateId();
-      const role2Id = generateId();
-      constraints.push({
-        type: "internal_uniqueness",
-        roleIds: [role2Id],
-      });
-
-      // Add mandatory constraint if every column is NOT NULL
-      if (mandatory) {
-        constraints.push({
-          type: "mandatory",
-          roleId: role2Id,
-        });
-      }
-      if (farUnique) constraints.push({ type: "internal_uniqueness", roleIds: [role1Id] });
-
-      const factType = model.addFactType({
-        name: factTypeName,
-        roles: [
-          { name: verb, playerId: referencedEntity.id, id: role1Id },
-          { name: `is ${verb} by`, playerId: entityType.id, id: role2Id },
-        ],
-        readings: [`{0} ${verb} {1}`],
-        constraints,
-      });
-      return { factType, farRoleId: role1Id, ...roleColumns };
+      // The referenced entity's role first, so the row's is role 1.
+      const added = addBinary(
+        model,
+        {
+          name: factTypeName,
+          roles: [
+            { name: verb, playerId: referencedEntity.id },
+            { name: `is ${verb} by`, playerId: entityType.id },
+          ],
+          readings: [`{0} ${verb} {1}`],
+          rowRole: 1,
+        },
+        referenceConstraints,
+      );
+      return { factType: added.factType, farRoleId: added.otherRoleId, ...roleColumns };
     } catch (err) {
       warnings.push(
         `Failed to create fact type for foreign key ${column.name}: ${
@@ -1444,46 +1403,21 @@ export class DdlImportFormat implements ImportFormat {
         warnings,
         this.columnAnnotation(model, annotations, table, column, entityType, undefined, warnings),
       );
-      // Minted, not built from names; see createForeignKeyFactType.
-      const entityRoleId = generateId();
-      const valueRoleId = generateId();
-
-      const constraints: InternalConstraint[] = [
-        { type: "internal_uniqueness", roleIds: [entityRoleId] },
-      ];
-      if (!column.nullable) {
-        constraints.push({ type: "mandatory", roleId: entityRoleId });
-      }
       const isUnique = table.uniqueConstraints.some(
         (cols) => cols.length === 1 && cols[0] === column.name,
       );
-      if (isUnique) {
-        constraints.push({ type: "internal_uniqueness", roleIds: [valueRoleId] });
-      }
-
-      if (annotation) {
-        const factType = model.addFactType(
-          annotatedFactType(
-            annotation,
-            entityType.id,
-            valueType.id,
-            entityRoleId,
-            valueRoleId,
-            constraints,
-          ),
-        );
-        return { factType, farRoleId: valueRoleId };
-      }
-      const factType = model.addFactType({
-        name: `${entityType.name} has ${valueType.name}`,
-        roles: [
-          { name: "has", playerId: entityType.id, id: entityRoleId },
-          { name: "is of", playerId: valueType.id, id: valueRoleId },
+      const added = addBinary(
+        model,
+        annotation
+          ? annotatedFactType(annotation, entityType.id, valueType.id)
+          : hasFactType(`${entityType.name} has ${valueType.name}`, entityType.id, valueType.id),
+        (row, value) => [
+          { type: "internal_uniqueness", roleIds: [row] },
+          ...(!column.nullable ? [{ type: "mandatory" as const, roleId: row }] : []),
+          ...(isUnique ? [{ type: "internal_uniqueness" as const, roleIds: [value] }] : []),
         ],
-        readings: ["{0} has {1}", "{1} is of {0}"],
-        constraints,
-      });
-      return { factType, farRoleId: valueRoleId };
+      );
+      return { factType: added.factType, farRoleId: added.otherRoleId };
     } catch (err) {
       warnings.push(
         `Failed to create fact type for column ${column.name}: ${
@@ -1581,16 +1515,15 @@ export class DdlImportFormat implements ImportFormat {
       return "its primary key does not fall on whole roles";
     }
 
-    const roleIds = relationship.roles.map(() => generateId());
-    const constraints: InternalConstraint[] = [];
+    // Each uniqueness by the positions of the roles it spans, once each:
+    // the model names the roles when the fact type is added.
+    const uniqueness: number[][] = [];
     const uniqueOver = (idx: number[] | undefined) => {
       if (!idx) return;
-      const over = idx.map((i) => roleIds[i]!);
-      const key = [...over].sort().join();
-      const seen = constraints.some((c) =>
-        c.type === "internal_uniqueness" && [...c.roleIds].sort().join() === key
-      );
-      if (!seen) constraints.push({ type: "internal_uniqueness", roleIds: over });
+      const key = [...idx].sort((a, b) => a - b).join();
+      if (!uniqueness.some((u) => [...u].sort((a, b) => a - b).join() === key)) {
+        uniqueness.push(idx);
+      }
     };
     uniqueOver(keyRoles);
     for (const cols of table.uniqueConstraints) uniqueOver(rolesOver(cols));
@@ -1614,15 +1547,25 @@ export class DdlImportFormat implements ImportFormat {
             ...(role.valueDefinition ? { definition: role.valueDefinition } : {}),
           }).id;
       }
-      return { id: roleIds[i]!, name: role.name, playerId };
+      return { name: role.name, playerId };
     });
+    // A guessed relationship names every role "is in", so the ids take the
+    // suffix rule (`<ft>.is_in`, `<ft>.is_in_2`), as an import may
+    // (iri-identity, decision 5 as amended).
     const factType = model.addFactType({
       name: relationship.factType,
       roles,
       readings: [...relationship.readings],
-      constraints,
       ...(relationship.definition ? { definition: relationship.definition } : {}),
+    }, {
+      suffixRepeatedRoleNames: true,
+      constraintsOver: (ids) =>
+        uniqueness.map((idx) => ({
+          type: "internal_uniqueness" as const,
+          roleIds: idx.map((i) => ids[i]!),
+        })),
     });
+    const roleIds = factType.roles.map((r) => r.id);
     if (objectifier) {
       model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: objectifier.id });
     }
@@ -2165,29 +2108,66 @@ function foreignKeysOfKey(table: ParsedTable): ParsedForeignKey[] | undefined {
   return [...fks];
 }
 
+/** A binary fact type before the model names its roles, and which role is the row's. */
+interface BinaryConfig extends Omit<FactTypeConfig, "roles" | "constraints"> {
+  readonly roles: readonly [RoleConfig, RoleConfig];
+  readonly rowRole: 0 | 1;
+}
+
 /**
  * A binary fact type as its annotation names it: its name, readings,
  * definition and role names, with the roles in the annotation's order.
- * The players and the constraints come from the DDL, through the caller.
+ * The players come from the DDL, through the caller.
  */
 function annotatedFactType(
   annotation: ColumnAnnotation,
   rowPlayerId: string,
   otherPlayerId: string,
-  rowRoleId: string,
-  otherRoleId: string,
-  constraints: InternalConstraint[],
-) {
-  const role = (i: 0 | 1) =>
-    i === annotation.rowRole
-      ? { id: rowRoleId, name: annotation.roles[i].name, playerId: rowPlayerId }
-      : { id: otherRoleId, name: annotation.roles[i].name, playerId: otherPlayerId };
+): BinaryConfig {
+  const role = (i: 0 | 1) => ({
+    name: annotation.roles[i].name,
+    playerId: i === annotation.rowRole ? rowPlayerId : otherPlayerId,
+  });
   return {
     name: annotation.factType,
     roles: [role(0), role(1)],
     readings: [...annotation.readings],
-    constraints,
+    rowRole: annotation.rowRole,
     ...(annotation.definition ? { definition: annotation.definition } : {}),
+  };
+}
+
+/** `<Entity> has <Value>`, the entity's role first. */
+function hasFactType(name: string, rowPlayerId: string, otherPlayerId: string): BinaryConfig {
+  return {
+    name,
+    roles: [{ name: "has", playerId: rowPlayerId }, { name: "is of", playerId: otherPlayerId }],
+    readings: ["{0} has {1}", "{1} is of {0}"],
+    rowRole: 0,
+  };
+}
+
+/**
+ * Add a binary fact type with its constraints, stated over the row's role
+ * and the other one. The model names the roles (`<fact type>.<role>`,
+ * iri-identity decision 17) and adds the constraints inside the same add,
+ * so a refused one leaves the model as it was. An annotation may name both
+ * roles alike, and an import takes the suffix rule for that (decision 5 as
+ * amended).
+ */
+function addBinary(
+  model: OrmModel,
+  { rowRole, roles, ...config }: BinaryConfig,
+  constraintsOver: (rowRoleId: string, otherRoleId: string) => InternalConstraint[],
+): { factType: FactType; rowRoleId: string; otherRoleId: string; } {
+  const factType = model.addFactType({ ...config, roles: [...roles] }, {
+    suffixRepeatedRoleNames: true,
+    constraintsOver: (ids) => constraintsOver(ids[rowRole]!, ids[1 - rowRole]!),
+  });
+  return {
+    factType,
+    rowRoleId: factType.roles[rowRole]!.id,
+    otherRoleId: factType.roles[1 - rowRole]!.id,
   };
 }
 

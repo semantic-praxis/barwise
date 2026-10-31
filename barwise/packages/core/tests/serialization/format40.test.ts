@@ -137,7 +137,7 @@ describe("reading a format 4.0 document", () => {
     ["an object type and an objectification", {
       objectified: [{ id: "Person", fact_type: "Person_smokes", object_type: "Person" }],
     }, /"Person" \(an object type and an objectification\)/],
-    ["two fact types' worth: one kind twice", {
+    ["two object types", {
       objectTypes: [{ id: "Person", name: "Human", kind: "entity", reference_mode: "x" }],
     }, /"Person" \(2 object types\)/],
   ];

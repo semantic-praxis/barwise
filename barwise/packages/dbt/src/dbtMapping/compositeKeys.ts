@@ -10,7 +10,7 @@
  * skipped and named on stderr (barwise-nkn, three trial imports).
  */
 
-import { generateId, type InternalConstraint, resolvePreferredIdentifier } from "@barwise/core";
+import { resolvePreferredIdentifier } from "@barwise/core";
 import { DBT_KEY_TEST } from "@barwise/core/mapping";
 import type { DbtModel, DbtTest } from "../DbtSchemaTypes.js";
 import {
@@ -331,10 +331,13 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
     const entityId = ctx.entityIdMap.get(m.name);
     const entityName = toPascalCase(m.name);
     const rels = ctx.relMap.get(m.name) ?? [];
-    const roles: { id: string; name: string; playerId: string; }[] = [];
+    const roles: { name: string; playerId: string; }[] = [];
+    // Each role's columns, by the role's position: the model names the
+    // roles when the fact type is added, so what refers to one waits for it.
+    const roleColumns: (readonly string[])[] = [];
     // An accepted_values test on a value role is its value constraint, as
     // buildConstraints reads it on any other column (PR #621 review).
-    const valueConstraints: InternalConstraint[] = [];
+    const valueConstraints: { readonly role: number; readonly values: string[]; }[] = [];
     for (const cols of info.roles) {
       const colName = cols[0]!;
       const col = m.columns.find((c) => c.name === colName)!;
@@ -370,29 +373,16 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
           }).id;
         if (claim.kind !== "share") reportColumnType(ctx, m.name, col, resolved);
       }
-      const roleId = generateId();
-      roles.push({ id: roleId, name: "is in", playerId });
-      // So reportColumnRenames can match the column to the mapper output, as
-      // it does for identifier and ordinary columns (PR #621 review).
-      // Every column of a multi-column role records it, as the mapper
-      // writes it on each of the columns it makes for the role.
-      for (const c of cols) {
-        ctx.columnRoleIdMap.set(`${m.name}::${c}`, roleId);
-        // A role of the relationship stands for itself in a uniqueness over
-        // the model's columns, as DDL step 3b reads a taken column.
-        ctx.farRoleIdMap.set(`${m.name}::${c}`, roleId);
-      }
+      const role = roles.length;
+      roles.push({ name: "is in", playerId });
+      roleColumns.push(cols);
       const accepted = rel
         ? undefined
         : col.tests.find((t): t is Extract<DbtTest, { type: "accepted_values"; }> =>
           t.type === "accepted_values"
         );
       if (accepted && accepted.values.length > 0) {
-        valueConstraints.push({
-          type: "value_constraint",
-          roleId,
-          values: accepted.values as string[],
-        });
+        valueConstraints.push({ role, values: accepted.values as string[] });
       } else if (accepted) {
         ctx.report.warning(
           "constraint",
@@ -410,33 +400,54 @@ export function createCompositeFactTypes(ctx: DbtMapperContext): void {
       items.length === 2
         ? items.join(" and ")
         : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-    const keyRoleIds = info.roles.flatMap((
-      [c],
-      i,
-    ) => (info.key.includes(c!) ? [roles[i]!.id] : []));
-    // The key's uniqueness identifies the objectifier, as the DDL import
-    // reads it (import-key-identifier-follow-ups.spec.md, barwise-fuo).
-    const keyId = generateId();
-    const constraints: InternalConstraint[] = [
-      { id: keyId, type: "internal_uniqueness", roleIds: keyRoleIds },
-      ...valueConstraints,
-    ];
+    const keyRoles = info.roles.flatMap(([c], i) => (info.key.includes(c!) ? [i] : []));
+    // Every role is "is in", so the ids take the suffix rule
+    // (`<ft>.is_in`, `<ft>.is_in_2`), as an import may (iri-identity,
+    // decision 5 as amended).
     const factType = ctx.model.addFactType({
       name: `${list(players)} ${words}`,
       roles,
       readings: [`${list(roles.map((_, i) => `{${i}}`))} have ${words}`],
-      constraints,
       // Unobjectified, the fact type is all that stands for the model, so
       // it carries an explicit description; objectified, the entity does
       // (PR #621 review). An inferred one is not invented for it.
       ...(!info.objectified && m.description ? { definition: m.description } : {}),
+    }, {
+      suffixRepeatedRoleNames: true,
+      constraintsOver: (ids) => [
+        // The key's uniqueness identifies the objectifier, as the DDL import
+        // reads it (import-key-identifier-follow-ups.spec.md, barwise-fuo).
+        { type: "internal_uniqueness", roleIds: keyRoles.map((i) => ids[i]!) },
+        ...valueConstraints.map(({ role, values }) => ({
+          type: "value_constraint" as const,
+          roleId: ids[role]!,
+          values,
+        })),
+      ],
     });
+    const roleIds = factType.roles.map((r) => r.id);
+    for (const [i, cols] of roleColumns.entries()) {
+      // So reportColumnRenames can match the column to the mapper output, as
+      // it does for identifier and ordinary columns (PR #621 review).
+      // Every column of a multi-column role records it, as the mapper
+      // writes it on each of the columns it makes for the role.
+      for (const c of cols) {
+        ctx.columnRoleIdMap.set(`${m.name}::${c}`, roleIds[i]!);
+        // A role of the relationship stands for itself in a uniqueness over
+        // the model's columns, as DDL step 3b reads a taken column.
+        ctx.farRoleIdMap.set(`${m.name}::${c}`, roleIds[i]!);
+      }
+    }
+
     if (info.objectified && entityId) {
       ctx.model.addObjectifiedFactType({ factTypeId: factType.id, objectTypeId: entityId });
       // Checked as the DDL import checks it (`preferUniquenessOver`), so a
       // key the reading ever widens past a reference scheme stores nothing
       // rather than an identifier validation refuses.
-      ctx.model.setPreferredIdentifier(entityId, keyId);
+      ctx.model.setPreferredIdentifier(
+        entityId,
+        factType.uniquenessOver(keyRoles.map((i) => roleIds[i]!))!.id,
+      );
       if (!resolvePreferredIdentifier(ctx.model, entityId).ok) {
         ctx.model.setPreferredIdentifier(entityId, undefined);
       }

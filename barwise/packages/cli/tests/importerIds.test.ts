@@ -30,6 +30,7 @@ import {
   localName,
   mintedName,
   type OrmModel,
+  ROLE_ID_PATTERN,
   setIdGenerator,
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
@@ -44,8 +45,10 @@ registerDbtFormats();
 registerCodeFormats();
 
 /**
- * Two tables share a `name` column (the value-side collision), and `orders`
- * has two foreign keys, so both of the DDL importer's role-minting paths run.
+ * Two tables share a `name` column (the value-side collision), `orders`
+ * has two foreign keys, and `customer_suppliers` is keyed on its foreign
+ * keys, so the DDL importer's binary paths and its relationship path, whose
+ * roles are all "is in", run.
  * Table-level `FOREIGN KEY` lines, because the importer does not read an
  * inline `REFERENCES` on a column: with inline clauses the foreign-key path
  * never ran, and reverting its fix left this test green (caught in review).
@@ -58,6 +61,13 @@ CREATE TABLE orders (
   customer_id INTEGER NOT NULL,
   supplier_id INTEGER,
   total DECIMAL(10,2),
+  FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)
+);
+CREATE TABLE customer_suppliers (
+  customer_id INTEGER NOT NULL,
+  supplier_id INTEGER NOT NULL,
+  PRIMARY KEY (customer_id, supplier_id),
   FOREIGN KEY (customer_id) REFERENCES customers (customer_id),
   FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)
 );
@@ -126,6 +136,17 @@ models:
         tests:
           - accepted_values:
               values: ['open', 'closed']
+  - name: order_lines
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [order_id, line_no]
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships: { to: "ref('orders')", field: order_id }
+      - name: line_no
+        data_tests: [not_null]
 `;
 
 /**
@@ -318,6 +339,14 @@ describe("importer ids come from generateId", () => {
 
       const values = ids.map((e) => e.id);
       expect(new Set(values).size, `${name} emitted a repeated id`).toBe(values.length);
+
+      // No importer states a role id: each is the model's `<fact type>.<role>`,
+      // the one shape a 4.0 file accepts (iri-identity 6b-4a), so a 4.0 write
+      // of any import is a file the 4.0 reader takes.
+      const statedRoles = model.factTypes.flatMap((ft) => ft.roles)
+        .filter((r) => !ROLE_ID_PATTERN.test(r.id))
+        .map((r) => r.id);
+      expect(statedRoles, `${name} stated role ids of another shape`).toEqual([]);
     });
   }
 });

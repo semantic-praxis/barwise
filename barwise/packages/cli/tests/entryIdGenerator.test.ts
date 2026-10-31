@@ -26,11 +26,16 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 describe("CLI entry point", () => {
   it("mints UUIDv7 ids in an import run through the built binary", () => {
     expect(existsSync(CLI_ENTRY), `built entry missing: ${CLI_ENTRY}`).toBe(true);
-    const sql = join(dir, "t.sql");
-    writeFileSync(sql, "CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name TEXT);\n");
+    // Ossie, because it still states generated ids for object types until
+    // 6b-4b retires the generator; the DDL importer no longer calls it.
+    const source = join(dir, "t.ossie.yaml");
+    writeFileSync(
+      source,
+      "version: 0.2.0.dev0\nname: T\nontology:\n  - { concept: Customer, type: EntityType }\n",
+    );
     const yaml = execFileSync(
       process.execPath,
-      [CLI_ENTRY, "import", "model", sql, "--format", "ddl"],
+      [CLI_ENTRY, "import", "model", source, "--format", "ossie"],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     );
     // Elements the model names take local names (iri-identity 6b); the ids

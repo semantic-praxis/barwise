@@ -279,6 +279,62 @@ describe("a model naming what it is given", () => {
     expect(ft.roles.map((r) => r.id)).toEqual(["k0", "k1"]);
   });
 
+  it("suffixes roles given one name when asked, as a migration or an import does", () => {
+    const m = people();
+    const ft = m.addFactType(
+      {
+        name: "Person and Car are in Trip",
+        roles: [
+          { name: "is in", playerId: "Person" },
+          { name: "is in", playerId: "Car" },
+          { name: "is in", playerId: "Name" },
+        ],
+        readings: ["{0} and {1} are in {2}"],
+      },
+      { suffixRepeatedRoleNames: true },
+    );
+    expect(ft.roles.map((r) => [r.name, r.id])).toEqual([
+      ["is in", "Person_and_Car_are_in_Trip.is_in"],
+      ["is in", "Person_and_Car_are_in_Trip.is_in_2"],
+      ["is in", "Person_and_Car_are_in_Trip.is_in_3"],
+    ]);
+  });
+
+  it("states constraints over the role ids it gives, inside the add's rollback", () => {
+    const m = people();
+    const ft = m.addFactType(
+      {
+        name: "Person owns Car",
+        roles: [{ name: "owns", playerId: "Person" }, { name: "is owned by", playerId: "Car" }],
+        readings: ["{0} owns {1}"],
+      },
+      {
+        constraintsOver: ([owner, car]) => [
+          { type: "internal_uniqueness", roleIds: [car!] },
+          { type: "mandatory", roleId: owner! },
+        ],
+      },
+    );
+    expect(ft.internalConstraints.map((c) => c.type)).toEqual(["internal_uniqueness", "mandatory"]);
+    expect(ft.uniquenessOver(["Person_owns_Car.is_owned_by"])?.id).toBe(
+      "For_each_Car,_at_most_one_Person_owns_that_Car",
+    );
+    expect(ft.uniquenessOver(["Person_owns_Car.owns"])).toBeUndefined();
+    // A constraint the callback states badly takes the fact type back out.
+    expect(() =>
+      m.addFactType(
+        {
+          name: "Person sells Car",
+          roles: [{ name: "sells", playerId: "Person" }, { name: "is sold by", playerId: "Car" }],
+          readings: ["{0} sells {1}"],
+        },
+        { constraintsOver: () => [{ type: "internal_uniqueness" } as never] },
+      )
+    ).toThrow();
+    expect(m.getFactTypeByName("Person sells Car")).toBeUndefined();
+    expect(m.idKindsHolding("Person_sells_Car.sells")).toEqual([]);
+  });
+
   it("refuses a fact type's bad constraint before storing anything", () => {
     const m = people();
     const before = m.factTypes.length;

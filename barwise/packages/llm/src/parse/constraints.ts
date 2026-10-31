@@ -62,7 +62,7 @@ export function parseConstraints(
         // A flagged duplicate flags the uniqueness already present: the
         // identifier it names is that one, and dropping the flag with the
         // duplicate lost it.
-        const held = heldUniqueness(ft, roleIds);
+        const held = ft.uniquenessOver(roleIds);
         if (held) {
           if (ic.is_preferred && held.id !== undefined) preferred.add(held.id);
           constraintProvenance.push({
@@ -425,7 +425,7 @@ export function parseConstraints(
  * Check whether a structurally identical constraint already exists: on the
  * fact type for one of its own, anywhere in the model for one across fact
  * types (orm-format-3, Open decision 9), whichever fact type holds it.
- * A uniqueness is not checked here but by `heldUniqueness`, so a flagged
+ * A uniqueness is not checked here but by `FactType.uniquenessOver`, so a flagged
  * duplicate can flag the one already present.
  */
 function isDuplicateConstraint(
@@ -521,12 +521,4 @@ function arraysEqual(
 ): boolean {
   if (a.length !== b.length) return false;
   return a.every((v, i) => v === b[i]);
-}
-
-/** The fact type's uniqueness over exactly these roles, in any order. */
-function heldUniqueness(ft: FactType, roleIds: readonly string[]): InternalConstraint | undefined {
-  const want = [...roleIds].sort().join("\u0000");
-  return ft.internalConstraints.find((c) =>
-    c.type === "internal_uniqueness" && [...c.roleIds].sort().join("\u0000") === want
-  );
 }

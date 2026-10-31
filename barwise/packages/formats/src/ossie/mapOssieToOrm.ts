@@ -7,8 +7,10 @@
  * by whichever core constructor first trips over it with a message about
  * barwise internals.
  *
- * Every id comes from `generateId()`, as every importer's does but NORMA's
- * (`docs/specs/importer-role-ids.spec.md`, R1): elements are found again
+ * Role ids are the model's `<fact type>.<role key>` (iri-identity 6b-4a);
+ * every other id comes from `generateId()` until 6b-4b retires it, as
+ * every importer's does but NORMA's (`docs/specs/importer-role-ids.spec.md`,
+ * R1). Elements are found again
  * by name -- Ossie concept names are unique, and a relationship imports as
  * `Concept.rel` -- never by an id built from one. A re-import diffs by
  * content, which diff falls back to when ids differ.
@@ -518,8 +520,11 @@ function addRelationship(
   const name = ossieFactTypeName(c.concept, r.name);
   const players = rolePlayers(c, r);
   const keys = roleKeys(c, r);
+  // No role ids: the model names each `<fact type>.<role key>` (iri-identity
+  // decision 17). Ossie refuses two keys that are equal, but two that differ
+  // only in spacing or Unicode form give one local name, so they take the
+  // suffix rule, as an import may (decision 5 as amended).
   const roles: RoleConfig[] = players.map((player, i) => ({
-    id: generateId(),
     name: keys[i]!,
     playerId: playerId(model, player),
   }));
@@ -543,7 +548,6 @@ function addRelationship(
     name,
     roles,
     readings,
-    constraints: multiplicityConstraints(name, roles, r.multiplicity, warnings),
     ...(r.description ? { definition: r.description } : {}),
     ...(note ? { note } : {}),
     ...(r.derived_by && r.derived_by.length > 0
@@ -551,6 +555,10 @@ function addRelationship(
         derivation: { kind: "derived" as const, expression: joinDerivation(r.derived_by) },
       }
       : {}),
+  }, {
+    suffixRepeatedRoleNames: true,
+    // Over the role ids the model gives them.
+    constraintsOver: (ids) => multiplicityConstraints(name, ids, r.multiplicity, warnings),
   });
 }
 
@@ -604,7 +612,7 @@ function reading(
  */
 function multiplicityConstraints(
   name: string,
-  roles: readonly RoleConfig[],
+  ids: readonly string[],
   multiplicity: OssieRelationship["multiplicity"],
   warnings: string[],
 ): InternalConstraint[] {
@@ -613,7 +621,6 @@ function multiplicityConstraints(
     id: generateId(),
     roleIds: ids,
   });
-  const ids = roles.map((r) => r.id!);
   if (multiplicity === "OneToOne") {
     if (ids.length === 2) return [uc([ids[0]!]), uc([ids[1]!])];
     warnings.push(
