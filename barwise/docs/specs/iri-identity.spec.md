@@ -14,8 +14,10 @@ return; the test builders off `::` ids; lineage exports name their model);
 6b-1 implemented 2026-10-30 (the cross-kind id index and constraint
 admission); 6b-2a implemented 2026-10-30 (minting in the model); 6b-2b-1
 implemented 2026-10-30 (the 4.0 reader, unwired); 6b-4a implemented
-2026-10-30 (the importers off role ids); 6b-2b-2a in progress (decision 19
-landed; the replay to come); 6b-2b-2b, 6b-3, 6b-4b, 6c to 6f and WS7 to come
+2026-10-30 (the importers off role ids); 6b-2b-2a implemented 2026-10-31
+(decisions 19 and 20, the cross-kind refusal, the 3.x and 2.0 replay and
+diff's pairing by old ids, unwired); 6b-2b-2b, 6b-3, 6b-4b, 6c to 6f and
+WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-30
@@ -1500,9 +1502,10 @@ sites.
       ids add the fact type without them and state its constraints over
       the role ids the model gives, through `addFactType`'s
       `constraintsOver`, inside the same add and its rollback, so the
-      writer never emits a role id the 4.0 schema refuses. The dbt composite-key and DDL relationship importers name
-      every role "is in", so they pass `suffixRepeatedRoleNames` (decision
-      5 as amended); a preferred identifier reads the id its constraint was
+      writer never emits a role id the 4.0 schema refuses. The dbt
+      composite-key and DDL relationship importers name every role "is
+      in", so they pass `suffixRepeatedRoleNames` (decision 5 as
+      amended); a preferred identifier reads the id its constraint was
       stored under. The CLI and MCP entry-point tests observe the UUIDv7
       install through an Ossie import, the one importer still stating
       generated ids, until 6b-4b retires the generator and those tests.
@@ -1518,9 +1521,21 @@ sites.
         refuses an unnamed one. A constraint keeps 6b-2a's generated-id
         fallback until the switch, because the 3.0 writer still requires
         every constraint's id; so the determinism test below moves to
-        6b-2b-2b. Then decision 20, the model-level cross-kind refusal,
-        and the 3.x and 2.0 replay with its in-memory id map for diff,
-        tested over the tracked corpus.
+        6b-2b-2b. Decision 20 as `addFactType`'s `idFromFirstReading`,
+        and the model-level cross-kind refusal as
+        `OrmModelConfig.idsAcrossKinds`, which the 4.0 reader and the
+        replay ask for. The replay (`serialization/replay.ts`,
+        `replayInto40`) adds a 3.x model's elements, in the readers'
+        order, to such a model, dropping every id and mapping every
+        reference through the growing old-to-new map; constraint
+        references through `mint.ts`'s `mapConstraintReferences`, which
+        reads the field sets `walk` reads. A shadow takes
+        `<context>:<local name>`; a constraint the model cannot name keeps
+        its old id until the switch leaves it unnamed, so the replay is one
+        model per input. The model keeps the map back to the old ids in
+        memory (`OrmModel.priorIds`), and `DiffIdentity`'s pairing ids
+        read it when both models carry one. Every tracked model, 2.0 files
+        included, replays to the same model under 4.0-shaped ids.
       - _6b-2b-2b, the switch._ The 3.0 schema frozen as
         `orm-model-3.0.schema.json` and the 4.0 one renamed to
         `orm-model.schema.json`; `minted_from` stored; the 4.0 writer;
