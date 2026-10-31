@@ -13,6 +13,9 @@ export interface OrmYamlSubtypeFact {
   defining_rule?: OrmYamlDerivation;
 }
 
+/** Format 4.0's: the id left out when the model left the subtype fact unnamed. */
+export type OrmYamlSubtypeFact40 = Omit<OrmYamlSubtypeFact, "id"> & { id?: string; };
+
 export function serializeSubtypeFact(sf: SubtypeFact): OrmYamlSubtypeFact {
   if (sf.id === undefined) {
     throw new Error(
@@ -20,8 +23,13 @@ export function serializeSubtypeFact(sf: SubtypeFact): OrmYamlSubtypeFact {
         + "(its ends do not resolve, iri-identity decision 19); format 4.0 writes it without one.",
     );
   }
-  const result: OrmYamlSubtypeFact = {
-    id: sf.id,
+  return { id: sf.id, ...serializeSubtypeFact40(sf) };
+}
+
+/** A subtype fact as format 4.0 writes it (iri-identity decision 19). */
+export function serializeSubtypeFact40(sf: SubtypeFact): OrmYamlSubtypeFact40 {
+  const result: OrmYamlSubtypeFact40 = {
+    ...(sf.id !== undefined ? { id: sf.id } : {}),
     subtype: sf.subtypeId,
     supertype: sf.supertypeId,
   };

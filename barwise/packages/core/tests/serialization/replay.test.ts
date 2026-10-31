@@ -361,6 +361,33 @@ model:
     expect(model.getObjectTypeByName("Order")!.id).toBe("Order_Management:Order");
   });
 
+  it("gives a dangling role reference 4.0 could not read a shape it can, still dangling", () => {
+    const source = new OrmModel({ name: "Fragment" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    // A fact type named like the reshaped references' fact type part: it
+    // must not take that id, or they would resolve to it.
+    source.addFactType({
+      id: "f1",
+      name: "unresolved",
+      roles: [{ id: "r1", name: "a", playerId: "x1" }, { id: "r2", name: "b", playerId: "x1" }],
+      readings: ["{0} a {1}"],
+    });
+    source.addConstraint({
+      id: "c1",
+      type: "subset",
+      subsetRoleIds: ["r1"],
+      supersetRoleIds: ["r-elsewhere", "Other.role"],
+    });
+    const model = replayInto40(source);
+    expect(model.factTypes[0]!.id).toBe("unresolved_2");
+    // Not shaped like a role id: reshaped. Shaped: carried as written.
+    expect(model.constraints[0]).toMatchObject({
+      supersetRoleIds: ["unresolved.r-elsewhere", "Other.role"],
+    });
+    expect(model.factTypesHolding(["unresolved.r-elsewhere"])).toEqual([]);
+    expect(model.priorIds!.get("unresolved.r-elsewhere")).toBe("r-elsewhere");
+  });
+
   it("gives one model for one input, on every run", () => {
     for (const c of corpus) {
       const load = () => new OrmYamlSerializer().deserialize(JSON.stringify(c.doc));

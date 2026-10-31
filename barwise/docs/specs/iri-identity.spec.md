@@ -16,11 +16,12 @@ admission); 6b-2a implemented 2026-10-30 (minting in the model); 6b-2b-1
 implemented 2026-10-30 (the 4.0 reader, unwired); 6b-4a implemented
 2026-10-30 (the importers off role ids); 6b-2b-2a implemented 2026-10-31
 (decisions 19 and 20, the cross-kind refusal, the 3.x and 2.0 replay and
-diff's pairing by old ids, unwired); 6b-2b-2b, 6b-3, 6b-4b, 6c to 6f and
-WS7 to come
+diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
+(the 4.0 writer and stored `minted_from`, unwired); 6b-2b-2b-2, 6b-2b-2b-3,
+6b-3, 6b-4b, 6c to 6f and WS7 to come
 
 Created: 2026-10-28
-Last-updated: 2026-10-30
+Last-updated: 2026-10-31
 Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: 15d6f18e (pr-review x5, code-review x3; re-pointed after WS6 was grounded and decisions 18 to 20 taken)
 Touches: barwise/packages/core/src/model/,
@@ -1520,7 +1521,7 @@ sites.
         unnamed, kept in its store's insertion order under a symbol key
         the id index never sees, and referred to where a string is needed
         by `subtypeFactRef` / `objectificationRef` (`unnamed:Sub<Super`,
-        `unnamed:Type=FactType`, a form no 4.0 id takes). The 3.0 writer
+        `unnamed:Type<>FactType`, a form no 4.0 id takes). The 3.0 writer
         refuses an unnamed one. A constraint keeps 6b-2a's generated-id
         fallback until the switch, because the 3.0 writer still requires
         every constraint's id; so the determinism test below moves to
@@ -1533,7 +1534,7 @@ sites.
         reference through the growing old-to-new map; constraint
         references through `mint.ts`'s `mapConstraintReferences`, which
         reads the field sets `walk` reads. A shadow takes
-        `<context>:<local name>`; a constraint the model cannot name keeps
+        `localName(context):localName(name)`; a constraint the model cannot name keeps
         its old id until the switch leaves it unnamed, so the replay is one
         model per input. The model keeps the map back to the old ids in
         memory (`OrmModel.priorIds`), and `DiffIdentity`'s pairing ids
@@ -1543,13 +1544,35 @@ sites.
         dangles afterwards, as decision 17 has it ("nothing else may refer
         to it by id"), and validation reports it; reachable only through a
         lenient load.
-      - _6b-2b-2b, the switch._ The 3.0 schema frozen as
-        `orm-model-3.0.schema.json` and the 4.0 one renamed to
-        `orm-model.schema.json`; `minted_from` stored; the 4.0 writer;
-        `planRead`'s two legacy slots; the constraint fallback dropped;
-        and the fixture and golden churn. Required test, from 6b-2b-1's
-        review: a lenient 4.0 load of an element whose sentence cannot be
-        minted (a dangling reference) gives the same model on every read.
+      - _6b-2b-2b, the switch, in three PRs_ (owner, 2026-10-31), no
+        release between.
+        - _6b-2b-2b-1, the 4.0 writer, unwired._ `writeDocument40` writes
+          3.0's layout, an element the model left unnamed without an id,
+          and `minted_from` beside each id the model minted or read with
+          one. The model keeps the key per id (`mintedFromOf`), set when
+          it mints a name and by the 4.0 reader for each `minted_from` a
+          file states, and dropped when the last element holding the id
+          goes. A model that refuses ids across kinds (the 4.0 reader's
+          and the replay's) leaves an unmintable constraint unnamed; any
+          other keeps the generated fallback until the switch. The
+          required test from 6b-2b-1's review lands here: a lenient 4.0
+          load of what cannot be minted gives the same model on every
+          read. Every tracked model, replayed, writes a document the 4.0
+          schema accepts and reads back to itself. That check found a
+          dangling role reference a strict 3.0 load admits (a constraint's
+          roles are not checked) in a shape 4.0 refuses; the replay gives
+          such a reference `unresolved.<local name>`, with `unresolved`
+          reserved, so it still dangles and validation still reports it
+          (owner, 2026-10-31). Only role references are reshaped: no
+          tracked file today's loader accepts holds another kind of
+          dangling reference 4.0 refuses (barwise-wcg.1tf tracks the rest).
+        - _6b-2b-2b-2, the switch._ The 3.0 schema frozen as
+          `orm-model-3.0.schema.json` and the 4.0 one renamed to
+          `orm-model.schema.json` (the MCP schema resource moves with
+          it); `planRead`'s two legacy slots, 3.x and 2.0 through the
+          replay; `serialize` writes 4.0; the constraint fallback dropped.
+        - _6b-2b-2b-3, the fixture and golden churn_, if it does not fit
+          in 6b-2b-2b-2.
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
   `imports`.

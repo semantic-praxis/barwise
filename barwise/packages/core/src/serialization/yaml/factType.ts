@@ -33,7 +33,11 @@ function serializeRole(role: Role): OrmYamlRole {
  * constraints across fact types are written to `model.constraints` by
  * `writeDocument`, not here (format 3.0).
  */
-export function serializeFactType(ft: FactType): OrmYamlFactType {
+export function serializeFactType(
+  ft: FactType,
+  constraint: (c: FactType["internalConstraints"][number]) => OrmYamlConstraint =
+    serializeConstraint,
+): OrmYamlFactType {
   const result: OrmYamlFactType = {
     id: ft.id,
     name: ft.name,
@@ -49,7 +53,7 @@ export function serializeFactType(ft: FactType): OrmYamlFactType {
   }
 
   if (ft.internalConstraints.length > 0) {
-    result.constraints = ft.internalConstraints.map((c) => serializeConstraint(c));
+    result.constraints = ft.internalConstraints.map((c) => constraint(c));
   }
   if (ft.derivation) {
     result.derivation = serializeDerivation(ft.derivation);

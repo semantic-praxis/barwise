@@ -15,8 +15,20 @@ export function serializeObjectifiedFactType(
         + "(its references do not resolve, iri-identity decision 19); format 4.0 writes it without one.",
     );
   }
+  return { id: oft.id, ...serializeObjectifiedFactType40(oft) };
+}
+
+/** Format 4.0's: the id left out when the model left the objectification unnamed. */
+export type OrmYamlObjectifiedFactType40 = Omit<OrmYamlObjectifiedFactType, "id"> & {
+  id?: string;
+};
+
+/** An objectification as format 4.0 writes it (iri-identity decision 19). */
+export function serializeObjectifiedFactType40(
+  oft: ObjectifiedFactType,
+): OrmYamlObjectifiedFactType40 {
   return {
-    id: oft.id,
+    ...(oft.id !== undefined ? { id: oft.id } : {}),
     fact_type: oft.factTypeId,
     object_type: oft.objectTypeId,
   };

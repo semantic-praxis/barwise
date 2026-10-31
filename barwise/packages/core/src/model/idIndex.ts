@@ -31,6 +31,12 @@ export type IdKind = IdKeyedKind | "role" | "constraint";
 export class IdIndex {
   private readonly held = new Map<string, Map<IdKind, number>>();
 
+  /**
+   * @param freed Told when the last holder of an id releases it, so what a
+   *   model keeps per id (the key a name was minted from) goes with it.
+   */
+  constructor(private readonly freed: (id: string) => void = () => {}) {}
+
   /** One more element of `kind` holds `id`; an element with no id holds none. */
   hold(id: string | undefined, kind: IdKind): void {
     if (id === undefined) return;
@@ -49,7 +55,10 @@ export class IdIndex {
     }
     if (count > 1) kinds.set(kind, count - 1);
     else kinds.delete(kind);
-    if (kinds.size === 0) this.held.delete(id);
+    if (kinds.size === 0) {
+      this.held.delete(id);
+      this.freed(id);
+    }
   }
 
   /** The kinds holding `id`, sorted; empty when nothing does. */
