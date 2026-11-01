@@ -138,8 +138,10 @@ export class OrmYamlSerializer {
   /**
    * The model a file states under its own ids: a 3.x or 2.0 file as the
    * frozen readers build it, before the replay into 4.0's ids; a 4.0 file
-   * as `deserialize` reads it. For the tests that hold the frozen readers
-   * and the replay to the tracked corpus, which is mostly 3.x and 2.0.
+   * as `deserialize` reads it. For a document whose ids are the point: the
+   * tests that hold the frozen readers and the replay to the tracked corpus,
+   * and Ossie's export check, which reads back a model under its source's
+   * ids. Not for a file a person opened: that is `deserialize`'s.
    */
   deserializeAsWritten(yaml: string, options?: { lenient?: boolean; }): OrmModel {
     return refusingHeldIds(() => this.read(yaml, options, false)).model;
@@ -192,12 +194,13 @@ export class OrmYamlSerializer {
 
   /**
    * Bring a freshly parsed document to a version a reader exists for:
-   * the current version, which earlier minors of its major migrate to, or
-   * 2.0, which older documents migrate to first (`planRead`).
+   * the current version, which earlier minors of its major migrate to;
+   * 3.0; or 2.0, which older documents migrate to first (`planRead`).
    *
    * Documents whose `orm_version` is missing or malformed are passed
    * through untouched so that the reader reports them: the decoders for
-   * 3.0, which name the missing or malformed version as a problem. A present-but-unsupported version throws a
+   * 4.0, which name the missing or malformed version as a problem. A
+   * present-but-unsupported version throws a
    * {@link DeserializationError} describing whether the file is too new or
    * simply unreachable.
    */

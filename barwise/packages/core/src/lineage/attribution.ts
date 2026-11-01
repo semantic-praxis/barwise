@@ -38,13 +38,14 @@ export function claimsExport(model: OrmModel, exp: ManifestExport): boolean {
 }
 
 /**
- * How the model holds a source id: as it is, or -- for an export written
- * under the 3.x ids its model file still states -- under the id the load
- * replayed that one into (iri-identity WS6).
+ * How the model holds a source id. An export that names no model was
+ * written before exports named theirs, so under the ids the model file
+ * stated then: for a model replayed from a 3.x file, the id the load
+ * replayed each one into (iri-identity WS6), never the id as it is, which
+ * may now be another element's.
  */
 function holding(model: OrmModel, id: string): "owns" | "shadow" | "none" {
-  const held = holdingAsIs(model, id);
-  if (held !== "none") return held;
+  if (model.priorIds === undefined) return holdingAsIs(model, id);
   const now = model.idFromPrior(id);
   return now === undefined ? "none" : holdingAsIs(model, now);
 }

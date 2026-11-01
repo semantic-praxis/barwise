@@ -13,6 +13,7 @@ import {
   type ConceptualDataTypeName,
   type Constraint,
   type ConstraintInView,
+  constraintRef,
   type ConstraintSpec,
   externalIdentifies,
   type FactType,
@@ -172,7 +173,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     const [c, ft] = inView;
     const key: OtherLossKey = ft
       ? { kind: "fact_type", id: ft.id }
-      : { kind: "constraint", id: c.id! };
+      : { kind: "constraint", id: constraintRef(c) };
     lose(element, what, key, explains);
     specs.push(buildConstraintSpec(inView, model, verbalizer));
   };
@@ -282,7 +283,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     // so one whose components are not single-valued is reported, not
     // claimed as an identifier (external-preferred-identifier.spec.md).
     for (const ext of model.constraints) {
-      if (ext.type !== "external_uniqueness" || covered.has(ext.id!)) continue;
+      if (ext.type !== "external_uniqueness" || covered.has(constraintRef(ext))) continue;
       const resolvedExt = externalIdentifies(model, ext, ot.id);
       const external = resolvedExt.ok && resolvedExt.at.kind === "external"
         ? resolvedExt.at
@@ -290,7 +291,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
       const rels = external && componentRelationships(external.components, written);
       if (external && rels) {
         identifyBy.set(ot.id, rels);
-        covered.add(ext.id!);
+        covered.add(constraintRef(ext));
         predictImpliedMandatory(ot, external);
         break;
       }
@@ -314,7 +315,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
 
   // External constraints not written as an identifier.
   for (const ext of model.constraints) {
-    if (covered.has(ext.id!)) continue;
+    if (covered.has(constraintRef(ext))) continue;
     loseConstraint(
       [ext, undefined],
       `constraint ${ext.id}`,
@@ -667,12 +668,12 @@ function writeRelationship(
   const one1 = n === 2 ? on([1]) : undefined;
   if (one0 && one1) {
     multiplicity = "OneToOne";
-    covered.add(one0.id!).add(one1.id!);
+    covered.add(constraintRef(one0)).add(constraintRef(one1));
   } else if (n >= 2) {
     const head = on(order.slice(0, -1).map((_, p) => p));
     if (head) {
       multiplicity = "ManyToOne";
-      covered.add(head.id!);
+      covered.add(constraintRef(head));
     }
   }
 
@@ -684,7 +685,7 @@ function writeRelationship(
     lose(element, "has no uniqueness spanning every role; Ossie's set semantics add one", key);
   }
   for (const c of w.own) {
-    if (covered.has(c.id!)) continue;
+    if (covered.has(constraintRef(c))) continue;
     // Implied: by set semantics with no multiplicity written, and by the
     // narrower uniqueness a multiplicity writes otherwise. Dropping it on
     // the way back loses no meaning.

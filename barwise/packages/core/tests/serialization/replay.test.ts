@@ -7,8 +7,11 @@
  * ids, and requiring the document the original model writes. Only fields
  * that hold ids are mapped, so a name equal to some new id stays a name.
  */
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
+import { IDS_40 } from "../../src/decode/ids.js";
 import { diffModels } from "../../src/diff/ModelDiff.js";
+import { constraintRef } from "../../src/model/Constraint.js";
 import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import {
@@ -16,7 +19,7 @@ import {
   readDocument40,
   writeDocument40,
 } from "../../src/serialization/OrmYamlSerializer.js";
-import { replayInto40 } from "../../src/serialization/replay.js";
+import { replayInto40, RESHAPE } from "../../src/serialization/replay.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
 /** Fields whose string value, or each string in whose list, is an id. */
@@ -87,7 +90,10 @@ const asText = (model: OrmModel) => {
 
 /** The document without the ids of the constraints the replay left unnamed. */
 function withoutUnnamed(doc: Record<string, any>, model: OrmModel): Record<string, any> {
-  const named = new Set(model.priorIds!.values());
+  // A key the model holds: an unnamed constraint's is its reference.
+  const named = new Set(
+    [...model.priorIds!].filter(([now]) => !now.startsWith("unnamed:")).map(([, old]) => old),
+  );
   const drop = (c: Record<string, unknown>) => {
     if (typeof c.id !== "string" || named.has(c.id)) return c;
     const { id: _unnamed, ...rest } = c;
@@ -207,8 +213,9 @@ model:
       i1: "Student_has_Nr.population.1",
     });
     // An internal constraint naming another fact type's role cannot be
-    // named, so it is left unnamed (decision 19), and has no new id.
-    expect(ids.has("bad")).toBe(false);
+    // named, so it is left unnamed (decision 19); its old id is kept against
+    // its reference, which is what a diagnostic about it names.
+    expect(ids.get("bad")).toMatch(/^unnamed:internal_uniqueness</);
     expect(
       model.getFactType("Student_enrolls_in_Course")!.internalConstraints.map((c) => c.id),
     ).toContain(undefined);
@@ -440,6 +447,39 @@ model:
     expect(model.constraints[0]!.id).not.toBe("unresolved.r-elsewhere");
   });
 
+  it("points a preferred identifier that named an unnamed constraint at nothing 4.0 can read", () => {
+    const source = new OrmModel({ name: "Keys" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "x2", name: "Nr", kind: "value" });
+    source.addFactType({
+      id: "f1",
+      name: "Person has Nr",
+      roles: [{ id: "r1", name: "has", playerId: "x1" }, {
+        id: "r2",
+        name: "is of",
+        playerId: "x2",
+      }],
+      readings: ["{0} has {1}"],
+      // Names a role of no fact type, so it cannot be minted.
+      constraints: [{ id: "Person.pk", type: "internal_uniqueness", roleIds: ["r2", "elsewhere"] }],
+    });
+    source.setPreferredIdentifier("x1", "Person.pk");
+    const model = replayInto40(source);
+    const preferred = model.preferredIdentifierOf("Person")!;
+    expect(preferred).toBe("Person%2Epk");
+    expect(model.getConstraint(preferred)).toBeUndefined();
+    const doc = JSON.parse(JSON.stringify(writeDocument40(model)));
+    expect(() => readDocument40(doc, { lenient: true })).not.toThrow();
+  });
+
+  it("refers to two unnamed constraints over one pair apart", () => {
+    const ring = (ringType: "irreflexive" | "asymmetric") =>
+      ({ type: "ring", roleId1: "f.a", roleId2: "f.b", ringType }) as const;
+    expect(constraintRef(ring("irreflexive"))).not.toBe(constraintRef(ring("asymmetric")));
+    expect(constraintRef(ring("irreflexive"))).toMatch(/^unnamed:ring<f\.a,f\.b>#[0-9a-f]{8}$/);
+    expect(constraintRef(ring("irreflexive"))).toBe(constraintRef(ring("irreflexive")));
+  });
+
   it("leaves an unmintable constraint unnamed, whatever its old id", () => {
     const source = new OrmModel({ name: "Rings" });
     source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
@@ -525,5 +565,38 @@ model:
         asText(replayInto40(load())),
       ]);
     }
+  });
+});
+
+describe("the replay's reshape table, against the 4.0 decoders", () => {
+  // RESHAPE restates which id shape 4.0 reads at each reference; IDS_40 is
+  // the authority. A sample of shapes either side could get wrong.
+  const leaves = {
+    objectType: IDS_40.objectTypeRef,
+    factType: IDS_40.factType,
+    role: IDS_40.roleInList,
+    subtypeFact: IDS_40.subtypeFactInList,
+    constraint: IDS_40.localRef,
+  } as const;
+  const samples = [
+    "a",
+    "a_b",
+    "a.b",
+    "a.b.c",
+    "a:b",
+    ":b",
+    "a b",
+    "%2E",
+    "%2e",
+    "Ü",
+    "r-1",
+    "",
+    "a b",
+  ];
+  it.each(Object.keys(leaves) as (keyof typeof leaves)[])("agrees for a %s reference", (kind) => {
+    const is = Schema.is(leaves[kind]);
+    expect(samples.map((s) => [s, RESHAPE[kind].pattern.test(s)])).toEqual(
+      samples.map((s) => [s, is(s)]),
+    );
   });
 });

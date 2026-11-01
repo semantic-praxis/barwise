@@ -5,6 +5,7 @@ export {
   CONSTRAINT_TYPES,
   type ConstraintBase,
   type ConstraintModality,
+  constraintRef,
   type DisjunctiveMandatoryConstraint,
   type EqualityConstraint,
   type ExclusionConstraint,

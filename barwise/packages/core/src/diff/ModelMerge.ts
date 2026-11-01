@@ -647,8 +647,10 @@ export function mergeModels(
 /**
  * Give each id the merged model holds the key it was minted from: the
  * base's for an id the base holds, which is what a kept or modified
- * element keeps (iri-identity 6d), else the incoming side's, for an element
- * the merge added. An id the merged model minted itself already has its own.
+ * element keeps (iri-identity 6d) -- none, when the base's id was chosen
+ * by a person, so a draft cannot turn it into a minted one -- else the
+ * incoming side's, for an element the merge added. An id the merged model
+ * minted itself already has its own.
  */
 function carryMintedKeys(merged: OrmModel, existing: OrmModel, incoming: OrmModel): void {
   const ids = [
@@ -658,7 +660,9 @@ function carryMintedKeys(merged: OrmModel, existing: OrmModel, incoming: OrmMode
   ];
   for (const id of ids) {
     if (id === undefined || merged.mintedFromOf(id) !== undefined) continue;
-    const key = existing.mintedFromOf(id) ?? incoming.mintedFromOf(id);
+    const key = existing.idKindsHolding(id).length > 0
+      ? existing.mintedFromOf(id)
+      : incoming.mintedFromOf(id);
     if (key !== undefined) merged.recordMintedFrom(id, key);
   }
 }

@@ -211,8 +211,8 @@ export function readBack(doc: OrmYamlDocument): OrmModel {
   try {
     return new OrmYamlSerializer().deserialize(stringify(doc), { lenient: true });
   } catch (err) {
-    // A 2.0 file can hold what 3.0 refuses (two constraints sharing an
-    // id), and `barwise migrate` refuses such a file in the same words.
+    // A model built in code can hold what 4.0 refuses (an id two kinds
+    // share), and `barwise migrate` refuses such a file in the same words.
     throw new RenameError(
       `Not renamed: its ${CURRENT_ORM_VERSION} form would not load: ${(err as Error).message}`,
     );

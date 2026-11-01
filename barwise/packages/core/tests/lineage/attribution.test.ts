@@ -101,6 +101,9 @@ describe("claiming an export that names no model", () => {
     expect(replayed.getObjectType("cust")).toBeUndefined();
     expect(claimsExport(replayed, exp("orders.sql", ["cust", "ord", "places"]))).toBe(true);
     expect(claimsExport(replayed, exp("orders.sql", ["cust", "nobody"]))).toBe(false);
+    // A 4.0 id is not what an export that names no model states: one
+    // equal to an element's new id is not read as that element.
+    expect(claimsExport(replayed, exp("orders.sql", ["Customer"]))).toBe(false);
   });
 
   it("is the owner's: it holds every source id and owns one", () => {

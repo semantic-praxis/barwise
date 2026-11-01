@@ -24,7 +24,12 @@ import {
   constraintRecord,
   modelConstraint,
 } from "../decode/constraint.js";
-import type { Constraint, ExternalConstraint, InternalConstraint } from "../model/Constraint.js";
+import {
+  type Constraint,
+  constraintRef,
+  type ExternalConstraint,
+  type InternalConstraint,
+} from "../model/Constraint.js";
 import { toFactTypeConfig } from "../model/FactType.js";
 import { mapConstraintReferences, type Reference } from "../model/mint.js";
 import {
@@ -94,6 +99,36 @@ export function replayInto40(source: OrmModel): OrmModel {
     return rest as unknown as C;
   };
 
+  // A constraint the model left unnamed has no id to map to; its old id is
+  // kept against its reference (`constraintRef`), so a diagnostic about it
+  // still finds the line the file states it on, and a preferred identifier
+  // that named it is told apart from one that dangled in the file.
+  const unnamedPrior = new Map<string, string>();
+  const kept = (old: string | undefined, added: Constraint | undefined) => {
+    if (old === undefined || added === undefined) return;
+    if (added.id !== undefined) record("constraint", old, added.id);
+    else unnamedPrior.set(constraintRef(added), old);
+  };
+  const leftUnnamed = () => new Set(unnamedPrior.values());
+  /**
+   * A preferred identifier as the new model states it: through the map,
+   * or as written when it dangled in the file (reshaped if 4.0 could not
+   * read it). One naming a constraint the replay left unnamed names
+   * nothing now, as decision 19 has a reference to such an element; it
+   * takes its old id's local name, under the suffix rule past every id
+   * the model holds, so it is one 4.0 reads and no element answers to.
+   */
+  const preferredNow = (old: string): string => {
+    if (!leftUnnamed().has(old)) return to("constraint", old);
+    const base = localName(old) || "constraint";
+    const free = (id: string) =>
+      target.idKindsHolding(id).length === 0 && !dangling.has(id) && !reshaped.has(id);
+    let id = base;
+    for (let n = 2; !free(id); n++) id = `${base}_${n}`;
+    reshaped.add(id);
+    return id;
+  };
+
   // Every reference the old model does not resolve, reserved for the whole
   // replay, so no element the replay names takes one and a dangling
   // reference carried across as written still resolves to nothing.
@@ -158,9 +193,7 @@ export function replayInto40(source: OrmModel): OrmModel {
         },
       );
       record("factType", ft.id, added.id);
-      (constraints ?? []).forEach((c, i) =>
-        record("constraint", c.id, added.internalConstraints[i]?.id)
-      );
+      (constraints ?? []).forEach((c, i) => kept(c.id, added.internalConstraints[i]));
     }
 
     for (const sf of source.subtypeFacts) {
@@ -177,18 +210,14 @@ export function replayInto40(source: OrmModel): OrmModel {
     }
 
     for (const c of source.constraints) {
-      record(
-        "constraint",
-        c.id,
-        target.addConstraint(remap(c as ExternalConstraint)).id,
-      );
+      kept(c.id, target.addConstraint(remap(c as ExternalConstraint)));
     }
 
     // After every constraint, as the readers set them.
     for (const ot of source.objectTypes) {
       const preferred = source.preferredIdentifierOf(ot.id);
       if (preferred !== undefined) {
-        target.setPreferredIdentifier(to("objectType", ot.id), to("constraint", preferred));
+        target.setPreferredIdentifier(to("objectType", ot.id), preferredNow(preferred));
       }
     }
 
@@ -238,6 +267,7 @@ export function replayInto40(source: OrmModel): OrmModel {
   // New ids are unique across kinds in a 4.0 model, so the map back is one.
   const back = new Map<string, string>();
   for (const m of maps.values()) for (const [from, now] of m) back.set(now, from);
+  for (const [ref, old] of unnamedPrior) back.set(ref, old);
   target.recordPriorIds(back);
   return target;
 }
@@ -246,20 +276,23 @@ export function replayInto40(source: OrmModel): OrmModel {
 const UNRESOLVED = "unresolved";
 
 /** The kinds a reference can dangle as. */
-type DanglingKind = "objectType" | "factType" | "role" | "subtypeFact" | "constraint";
+export type DanglingKind = "objectType" | "factType" | "role" | "subtypeFact" | "constraint";
 
 /**
  * What 4.0 reads at a reference of each kind, and the shape a dangling one
  * that does not match takes from its old id's local name. A constraint
- * dangles only as an entity's preferred identifier.
+ * dangles only as an entity's preferred identifier. Each pattern must
+ * accept what the 4.0 decoder's leaf for that reference accepts
+ * (`decode/ids.ts`, `IDS_40`); `replay.test.ts` holds them together.
  */
-const RESHAPE: Record<DanglingKind, { pattern: RegExp; shape: (local: string) => string; }> = {
-  objectType: { pattern: REFERENCE_PATTERN, shape: (l) => l },
-  factType: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
-  role: { pattern: ROLE_ID_PATTERN, shape: (l) => `${UNRESOLVED}.${l}` },
-  subtypeFact: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
-  constraint: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
-};
+export const RESHAPE: Record<DanglingKind, { pattern: RegExp; shape: (local: string) => string; }> =
+  {
+    objectType: { pattern: REFERENCE_PATTERN, shape: (l) => l },
+    factType: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
+    role: { pattern: ROLE_ID_PATTERN, shape: (l) => `${UNRESOLVED}.${l}` },
+    subtypeFact: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
+    constraint: { pattern: LOCAL_NAME_PATTERN, shape: (l) => l },
+  };
 
 /**
  * Every id the model refers to and does not define, each reference
