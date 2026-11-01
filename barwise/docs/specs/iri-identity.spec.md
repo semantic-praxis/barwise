@@ -1586,7 +1586,7 @@ sites.
           and the 3.0 writer stamps 3.0. The constraint fallback is
           dropped, so the model and the replay leave an unmintable
           constraint unnamed, referred to where a string is needed by
-          `constraintRef` (`unnamed:<type><<roles>`), as decision 19 has
+          `constraintRef` (`unnamed:<type><<roles>>#<8 hex of what it states>`), as decision 19 has
           it. barwise-wcg.1tf settled (owner, 2026-10-31): a dangling
           reference of any kind 4.0 could not read back takes its old id's
           local name (a role `unresolved.<local name>`).
@@ -1602,7 +1602,15 @@ sites.
             switched build needs at once, or a no-op merge changed the
             file. Ossie's export check rebuilds the read-back model through
             a document read as written (`deserializeAsWritten`), not
-            through the replay, which renamed what it aligned.
+            through the replay, which renamed what it aligned. Diff and
+            merge read a 3.x fragment's reference to a base element it does
+            not restate through the base's map back (`fromBasePrior`),
+            barwise-957's rule applied to 3.x ids, when both sides were
+            replayed. NORMA, which states every constraint's id, gives an
+            unnamed one `unnamed_<type>_<hash>` from `constraintRef`'s hash.
+            A preferred identifier that named a constraint the replay left
+            unnamed takes its old id's local name under the suffix rule, so
+            it names nothing in a shape 4.0 reads.
           - _Tests._ A test whose subject is not the read or the replay
             loads its 3.x fixture as the frozen reader builds it
             (`deserializeAsWritten`): the nesting helpers, identification,

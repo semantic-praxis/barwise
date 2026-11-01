@@ -395,6 +395,23 @@ function pairElements<T extends { readonly id: string; readonly name: string; }>
   return out;
 }
 
+/**
+ * Each 3.x id the base was replayed from that a 3.x fragment names and does
+ * not define, with the id the base holds it under now. Empty unless both
+ * sides were replayed: a 4.0 side states 4.0 ids, which need no reading.
+ */
+export function fromBasePrior(
+  existing: OrmModel,
+  incoming: OrmModel,
+): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  if (incoming.priorIds === undefined || existing.priorIds === undefined) return out;
+  for (const [now, old] of existing.priorIds) {
+    if (incoming.idKindsHolding(old).length === 0) out.set(old, now);
+  }
+  return out;
+}
+
 function keyer<T extends { readonly id: string; }>(
   existing: OrmModel,
   incoming: OrmModel,
@@ -416,8 +433,14 @@ function keyer<T extends { readonly id: string; }>(
     const paired = (side === "e" ? pairKeyOfExisting : pairKeyOfIncoming).get(id);
     return paired ?? `${side}${JSON.stringify(id)}`;
   };
+  // A 3.x fragment names a base element it does not restate by the base's
+  // 3.x id, which the replayed base holds under its 4.0 id.
+  const viaBase = fromBasePrior(existing, incoming);
   return (model, id) => {
     const side = model === incoming && model !== existing ? "i" : "e";
-    return read(side, id) ?? read(side === "e" ? "i" : "e", id) ?? `x${JSON.stringify(id)}`;
+    const other = side === "e" ? "i" : "e";
+    const now = side === "i" ? viaBase.get(id) : undefined;
+    return read(side, id) ?? read(other, id) ?? (now === undefined ? undefined : read("e", now))
+      ?? `x${JSON.stringify(id)}`;
   };
 }

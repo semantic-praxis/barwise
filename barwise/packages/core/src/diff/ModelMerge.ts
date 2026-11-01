@@ -47,6 +47,7 @@ import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
 import { type DeltaKind, elementName, type ModelDiffResult, renamePairing } from "./deltas.js";
 import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
+import { fromBasePrior } from "./identity.js";
 import type {
   ConstraintDelta,
   DefinitionDelta,
@@ -134,6 +135,16 @@ export function mergeModels(
   // (barwise-941). Only an accepted modification rewrites roles; every
   // other outcome keeps the existing fact type and needs no entry.
   const roleIdMap = new Map<string, string | null>();
+
+  // A fragment replayed from a 3.x file names the base's elements it does
+  // not restate by the 3.x ids, which the base, replayed too, now holds
+  // under 4.0's (iri-identity WS6): read those through the base's map
+  // back, as every other cross-model reference is read (barwise-957).
+  for (const [old, now] of fromBasePrior(existing, incoming)) {
+    if (existing.getObjectType(now)) incomingIdToMergedId.set(old, now);
+    else if (existing.getFactType(now)) incomingFtIdToMergedId.set(old, now);
+    else if (existing.findRole(now)) incomingRoleIdToMergedId.set(old, now);
+  }
 
   // Phase 1: object types (must be added before fact types).
   const otDeltas = deltas

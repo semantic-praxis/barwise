@@ -99,11 +99,12 @@ export function replayInto40(source: OrmModel): OrmModel {
   // kept against its reference (`constraintRef`), so a diagnostic about it
   // still finds the line the file states it on, and a preferred identifier
   // that named it is told apart from one that dangled in the file.
-  const unnamedPrior = new Map<string, string>();
+  // By the constraint, not its reference: two identical ones share one.
+  const unnamedPrior = new Map<Constraint, string>();
   const kept = (old: string | undefined, added: Constraint | undefined) => {
     if (old === undefined || added === undefined) return;
     if (added.id !== undefined) record("constraint", old, added.id);
-    else unnamedPrior.set(constraintRef(added), old);
+    else unnamedPrior.set(added, old);
   };
   const leftUnnamed = () => new Set(unnamedPrior.values());
   /**
@@ -263,7 +264,8 @@ export function replayInto40(source: OrmModel): OrmModel {
   // New ids are unique across kinds in a 4.0 model, so the map back is one.
   const back = new Map<string, string>();
   for (const m of maps.values()) for (const [from, now] of m) back.set(now, from);
-  for (const [ref, old] of unnamedPrior) back.set(ref, old);
+  // Two identical unnamed constraints share a reference, and keep one here.
+  for (const [c, old] of unnamedPrior) back.set(constraintRef(c), old);
   target.recordPriorIds(back);
   return target;
 }

@@ -472,6 +472,50 @@ model:
     expect(() => readDocument40(doc, { lenient: true })).not.toThrow();
   });
 
+  it("gives that preferred identifier the suffix rule past an id the model holds", () => {
+    // The old id is the object type's new one: taking it as it is would make
+    // the preferred identifier name the entity itself.
+    const source = new OrmModel({ name: "Keys" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "x2", name: "Nr", kind: "value" });
+    source.addFactType({
+      id: "f1",
+      name: "Person has Nr",
+      roles: [{ id: "r1", name: "has", playerId: "x1" }, {
+        id: "r2",
+        name: "is of",
+        playerId: "x2",
+      }],
+      readings: ["{0} has {1}"],
+      constraints: [{ id: "Person", type: "internal_uniqueness", roleIds: ["r2", "elsewhere"] }],
+    });
+    source.setPreferredIdentifier("x1", "Person");
+    expect(replayInto40(source).preferredIdentifierOf("Person")).toBe("Person_2");
+  });
+
+  it("keeps the old id of each of two identical unnamed constraints", () => {
+    const source = new OrmModel({ name: "Twice" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "x2", name: "Nr", kind: "value" });
+    const twice = { type: "internal_uniqueness", roleIds: ["r2", "elsewhere"] } as const;
+    source.addFactType({
+      id: "f1",
+      name: "Person has Nr",
+      roles: [{ id: "r1", name: "has", playerId: "x1" }, {
+        id: "r2",
+        name: "is of",
+        playerId: "x2",
+      }],
+      readings: ["{0} has {1}"],
+      constraints: [{ id: "u.1", ...twice }, { id: "u.2", ...twice }],
+    });
+    // The first names the entity. Were the two kept under their shared
+    // reference, its old id would be lost and pass through as written, a
+    // shape 4.0 refuses.
+    source.setPreferredIdentifier("x1", "u.1");
+    expect(replayInto40(source).preferredIdentifierOf("Person")).toBe("u%2E1");
+  });
+
   it("refers to two unnamed constraints over one pair apart", () => {
     const ring = (ringType: "irreflexive" | "asymmetric") =>
       ({ type: "ring", roleId1: "f.a", roleId2: "f.b", ringType }) as const;

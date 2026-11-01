@@ -24,6 +24,7 @@ import {
   type CardinalityConstraint,
   type ConceptualDataTypeName,
   type Constraint,
+  constraintRef,
   type DiagramLayout,
   type FactType,
   isOverSubtypes,
@@ -165,7 +166,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
     if (isOverSubtypes(c)) continue;
     writeTopLevel(
       c,
-      toNormaId(constraintId(c, "across fact types")),
+      toNormaId(constraintId(c)),
       constraints,
       seenConstraintIds,
       preferred,
@@ -258,8 +259,7 @@ function collectPreferredIdentifiers(
 ): Map<string, string> {
   const ids = new Map<string, string>();
   for (const [entityId, at] of identifiers.byEntity) {
-    const where = at.kind === "internal" ? onFactType(at.factType) : "across fact types";
-    ids.set(entityId, toNormaId(constraintId(at.constraint, where)));
+    ids.set(entityId, toNormaId(constraintId(at.constraint)));
   }
   return ids;
 }
@@ -323,7 +323,7 @@ function writeFactType(
     if (c.type === "cardinality") continue;
     const written = writeTopLevel(
       c,
-      toNormaId(constraintId(c, onFactType(ft))),
+      toNormaId(constraintId(c)),
       constraints,
       seen,
       preferred,
@@ -420,7 +420,7 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
     ...(card
       ? {
         cardinality: {
-          id: toNormaId(constraintId(card, onFactType(ft))),
+          id: toNormaId(constraintId(card)),
           ranges: [{ from: card.min, ...(card.max !== "unbounded" ? { to: card.max } : {}) }],
           ...(card.modality === "deontic" ? { modality: "deontic" as const } : {}),
         },
@@ -457,22 +457,16 @@ function listedInInternalConstraints(c: Constraint): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * A constraint's id, which every path into a model now supplies: a file's
- * load states or derives it (orm-format-3 WS2), and the fact type
- * constructor and `addConstraint` fill one from the generator
- * (barwise-nkq). The type keeps it optional, so the writer says so rather
- * than inventing the positional `<ft>_c<i>` id it once fell back to,
- * which moved when a constraint was inserted before it.
+ * A constraint's id. Since format 4.0 the model leaves a constraint whose
+ * sentence cannot be minted unnamed (iri-identity decision 19), and NORMA
+ * states every constraint's id, so such a constraint takes one built from
+ * the hash `constraintRef` gives what it states: the same on every export,
+ * unlike the positional `<ft>_c<i>` id the writer once fell back to, which
+ * moved when a constraint was inserted before it, and an NCName, which
+ * `constraintRef` itself is not.
  */
-function onFactType(ft: FactType): string {
-  return `on fact type "${ft.name}"`;
-}
-
-function constraintId(c: Constraint, where: string): string {
-  if (!c.id) {
-    throw new Error(`A ${c.type} constraint ${where} has no id.`);
-  }
-  return c.id;
+function constraintId(c: Constraint): string {
+  return c.id ?? `unnamed_${c.type}_${constraintRef(c).split("#").pop()}`;
 }
 
 function writeConstraint(
@@ -785,7 +779,7 @@ function writeSubtypeFacts(
   const idFor = (kind: "excl" | "exh", supertypeId: string, c: Constraint) => {
     const byGroup = toNormaId(`subtype_${kind}_${supertypeId}`);
     const chosen = used.has(byGroup)
-      ? toNormaId(`subtype_${kind}_${constraintId(c, "subtype")}`)
+      ? toNormaId(`subtype_${kind}_${constraintId(c)}`)
       : byGroup;
     used.add(chosen);
     return chosen;
