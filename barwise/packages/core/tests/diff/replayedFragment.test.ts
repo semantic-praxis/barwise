@@ -74,3 +74,39 @@ describe("a 3.x fragment over a 3.x base, both replayed at load", () => {
     expect(ships.roles.map((r) => r.playerId)).toEqual(["Order", "Customer"]);
   });
 });
+
+describe("a 3.x fragment's constraint over a role only the base defines", () => {
+  it("merges it onto the base's role, which the fragment's own replay reshaped", () => {
+    // `r-placed` dangles in the fragment and is no 4.0 role id, so the
+    // fragment's replay reshaped it to `unresolved.r-placed` before the
+    // merge sees it.
+    const { base, incoming } = load(
+      BASE,
+      `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-date, name: OrderDate, kind: value, data_type: { name: date } }
+  fact_types:
+    - id: ft-dated
+      name: Order is dated OrderDate
+      roles:
+        - { id: r-dated, player: ot-order, role_name: is dated }
+        - { id: r-date, player: ot-date, role_name: is date of }
+      readings: ["{0} is dated {1}"]
+  constraints:
+    - { id: c-x, type: subset, subset_roles: [r-dated], superset_roles: [r-placed] }
+`,
+    );
+    expect(incoming.constraints[0]).toMatchObject({ supersetRoleIds: ["unresolved.r-placed"] });
+    const diff = diffModels(base, incoming, MERGE_DIFF_OPTIONS);
+    const accepted = new Set(
+      diff.deltas.flatMap((d, i) => (d.kind === "added" || d.kind === "modified" ? [i] : [])),
+    );
+    const result = mergeAndValidate(base, incoming, diff, accepted);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.model!.constraints).toEqual([
+      expect.objectContaining({ supersetRoleIds: ["Customer_places_Order.placed_by"] }),
+    ]);
+  });
+});
