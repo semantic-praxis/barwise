@@ -9,7 +9,7 @@
  */
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
-import schema from "../../schemas/orm-model-4.0.schema.json" with { type: "json" };
+import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import { mintedKey } from "../../src/model/mint.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import {
@@ -47,7 +47,9 @@ describe("writing a format 4.0 document", () => {
   it.each(corpus.map((c) => [c.file, c] as const))(
     "%s, replayed, writes a 4.0 document that reads back to itself",
     (_, c) => {
-      const model = replayInto40(new OrmYamlSerializer().deserialize(JSON.stringify(c.doc)));
+      const model = replayInto40(
+        new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc)),
+      );
       const doc = plain(writeDocument40(model));
       expect(doc.orm_version).toBe("4.0");
       expect([c.file, validate(doc) ? [] : validate.errors]).toEqual([c.file, []]);
@@ -59,7 +61,9 @@ describe("writing a format 4.0 document", () => {
     // A guard on the round trip above: it shows minted_from survives only
     // if some document carries one.
     const keys = corpus.flatMap((c) => {
-      const model = replayInto40(new OrmYamlSerializer().deserialize(JSON.stringify(c.doc)));
+      const model = replayInto40(
+        new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc)),
+      );
       return JSON.stringify(writeDocument40(model)).match(/"minted_from"/g) ?? [];
     });
     expect(keys.length).toBeGreaterThan(100);
@@ -156,7 +160,7 @@ describe("writing a format 4.0 document", () => {
     expect(model.mintedFromOf(a.id!)).toBeDefined();
     model.addConstraint({
       id: a.id!,
-      type: "equality",
+      type: "exclusion",
       roleIds: ["Person_smokes.smokes", "Person_runs.runs"],
     });
     model.removeConstraint(a);
@@ -209,13 +213,12 @@ describe("writing a format 4.0 document", () => {
     expect(read()).toEqual(first);
   });
 
-  it("still names an unmintable constraint in a model that writes 3.0", () => {
+  it("leaves an unmintable constraint unnamed in any model, the generated fallback gone", () => {
     const model = new OrmModel({ name: "M" });
     const stored = model.addConstraint({
       type: "external_uniqueness",
       roleIds: ["nowhere.a", "nowhere.b"],
     });
-    expect(stored.id).toBeDefined();
-    expect(model.mintedFromOf(stored.id!)).toBeUndefined();
+    expect(stored.id).toBeUndefined();
   });
 });

@@ -47,7 +47,9 @@ export class DiagnosticsProvider {
       const ormDiagnostics = this.validationEngine.validate(model);
 
       for (const d of ormDiagnostics) {
-        const pos = sourceMap.getPosition(d.elementId);
+        // A 3.x file states the id the element had before the load replayed
+        // it into 4.0's (iri-identity WS6), so that is the one its text holds.
+        const pos = sourceMap.getPosition(model.priorIds?.get(d.elementId) ?? d.elementId);
         const range = pos
           ? {
             start: { line: pos.line, character: pos.character },

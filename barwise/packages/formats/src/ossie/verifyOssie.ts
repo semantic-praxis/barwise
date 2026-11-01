@@ -10,12 +10,18 @@
  * prediction can drift from `mapOssieToOrm`; this cannot.
  */
 import {
+  type Constraint,
+  constraintRef,
   type ConstraintSpec,
   type ExternalConstraint,
   type OrmModel,
   OrmYamlSerializer,
-  writeDocument,
+  type writeDocument,
+  writeDocument40,
 } from "@barwise/core";
+
+/** A 3.0 document, as the 3.0 writer types it. */
+type OrmYamlDocument = ReturnType<typeof writeDocument>;
 import { buildConstraintSpec } from "@barwise/core/annotation";
 import { type ChangeKind, deltaLabel, diffModels, type ModelDelta } from "@barwise/core/diff";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
@@ -88,7 +94,7 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
   }
 
   const byImportedName = new Map(written.factTypes.map((w) => [w.importedName, w]));
-  const doc = writeDocument(back);
+  const doc = document30(back);
   for (const ftDoc of doc.model.fact_types ?? []) {
     const w = byImportedName.get(ftDoc.name);
     const src = w && source.getFactType(w.id);
@@ -113,8 +119,40 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
   // refers to its element, so replacing every string equal to a minted id
   // reaches each reference without a list of the fields that hold one. Done on the
   // document, not its text: a minted id may be a prefix of another, and a
-  // source id may need quoting in YAML ("1", "true").
-  return new OrmYamlSerializer().deserialize(stringify(reId(doc, ids)));
+  // source id may need quoting in YAML ("1", "true"). Read as written: the
+  // point is the source's ids, which a load would replay into 4.0's
+  // (iri-identity WS6), and a model built in code may hold ids 4.0 refuses.
+  return new OrmYamlSerializer().deserializeAsWritten(stringify(reId(doc, ids)));
+}
+
+/**
+ * `back` as a 3.0 document, the intermediate `align` edits and reads back
+ * as written. The 4.0 writer's, which has 3.0's layout, without the keys
+ * minted ids were minted from, and with a placeholder id on each element
+ * the model left unnamed (iri-identity decision 19): 3.0 states every id,
+ * and the diff pairs such an element by content, as it did the generated
+ * id a model gave it before format 4.0.
+ */
+function document30(back: OrmModel): OrmYamlDocument {
+  const doc = writeDocument40(back) as unknown as {
+    orm_version: string;
+    model: Record<string, unknown>;
+  };
+  let n = 0;
+  const fill = (elements: unknown) => {
+    for (const e of (elements ?? []) as Record<string, unknown>[]) {
+      delete e["minted_from"];
+      e["id"] ??= `unnamed.${++n}`;
+    }
+  };
+  for (const ft of (doc.model["fact_types"] ?? []) as Record<string, unknown>[]) {
+    fill(ft["constraints"]);
+  }
+  fill(doc.model["constraints"]);
+  fill(doc.model["subtype_facts"]);
+  fill(doc.model["objectified_fact_types"]);
+  doc.orm_version = "3.0";
+  return doc as unknown as OrmYamlDocument;
 }
 
 function reId(value: unknown, ids: ReadonlyMap<string, string>): unknown {
@@ -133,7 +171,10 @@ function reId(value: unknown, ids: ReadonlyMap<string, string>): unknown {
 function sourceKey(delta: ModelDelta): string | undefined {
   if (delta.kind === "added") return undefined;
   if (delta.elementType === "definition") return lossKey({ kind: "definition", id: delta.term });
-  const id = delta.existing?.id;
+  // An unnamed constraint's key is its reference, as `writeOssie` keys it.
+  const id = delta.elementType === "constraint" && delta.existing
+    ? constraintRef(delta.existing as Constraint)
+    : delta.existing?.id;
   return id === undefined ? undefined : lossKey({ kind: delta.elementType, id });
 }
 

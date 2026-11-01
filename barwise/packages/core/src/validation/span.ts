@@ -1,4 +1,5 @@
 import { type Constraint, roleIdsOf } from "../model/Constraint.js";
+import { constraintRef } from "../model/constraintRef.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 
@@ -30,17 +31,13 @@ export function spanPhrase(names: readonly string[]): string {
 }
 
 /**
- * A constraint's id as a diagnostic's element id. Every constraint in a
- * model has one -- loading derives it, construction fills it
- * (barwise-nkq) -- so a missing id is a caller that built a constraint
- * around both, and a diagnostic pointing at the empty string would hide
- * that. The optional type goes in WS3c.
+ * A constraint's id as a diagnostic's element id: its id, or for one the
+ * model left unnamed because its sentence cannot be minted -- which is
+ * itself what validation reports -- the fixed reference `constraintRef`
+ * builds (iri-identity decision 19).
  */
 export function constraintElementId(c: Constraint): string {
-  if (c.id === undefined) {
-    throw new Error(`A ${c.type} constraint reached validation without an id.`);
-  }
-  return c.id;
+  return constraintRef(c);
 }
 
 /**

@@ -19,7 +19,7 @@ import { populationValidationRules } from "../../src/validation/rules/population
 import { ConstraintVerbalizer } from "../../src/verbalization/ConstraintVerbalizer.js";
 import { graphFor } from "../helpers/graphFor.js";
 
-const parenthood = { entry: "r-child", exit: "r-parent" };
+const parenthood = { entry: "r.child", exit: "r.parent" };
 const grandparent: JoinOperand = {
   path: { root: "person", steps: [parenthood, parenthood] },
   projection: [0, 2],
@@ -42,8 +42,8 @@ function model(
     id: "ft-parent",
     name: "Person is child of Person",
     roles: [
-      { id: "r-child", name: "is child of", playerId: "person" },
-      { id: "r-parent", name: "is parent of", playerId: "person" },
+      { id: "r.child", name: "is child of", playerId: "person" },
+      { id: "r.parent", name: "is parent of", playerId: "person" },
     ],
     readings: ["{0} is child of {1}"],
   });
@@ -51,8 +51,8 @@ function model(
     id: "ft-born",
     name: "Person was born in Country",
     roles: [
-      { id: "r-born", name: "was born in", playerId: "person" },
-      { id: "r-place", name: "is birthplace of", playerId: "country" },
+      { id: "r.born", name: "was born in", playerId: "person" },
+      { id: "r.place", name: "is birthplace of", playerId: "country" },
     ],
     readings: ["{0} was born in {1}"],
   });
@@ -60,7 +60,7 @@ function model(
   if (rows.length > 0) {
     const pop = m.addPopulation({ id: "pop", factTypeId: "ft-parent", sample });
     for (const [child, parent] of rows) {
-      pop.addInstance({ roleValues: { "r-child": child, "r-parent": parent } });
+      pop.addInstance({ roleValues: { "r.child": child, "r.parent": parent } });
     }
   }
   return m;
@@ -101,7 +101,7 @@ describe("structural rules", () => {
 
   it("report projected ends played by different object types", () => {
     const personCountry = {
-      path: { root: "person", steps: [{ entry: "r-born", exit: "r-place" }] },
+      path: { root: "person", steps: [{ entry: "r.born", exit: "r.place" }] },
       projection: [0, 1],
     };
     // Only that: the one-hop advice would name a plain ring over two
@@ -127,7 +127,7 @@ describe("structural rules", () => {
 
   it("report a bad step as the other join kinds do", () => {
     const badStep = {
-      path: { root: "person", steps: [{ entry: "r-child", exit: "r-place" }] },
+      path: { root: "person", steps: [{ entry: "r.child", exit: "r.place" }] },
       projection: [0, 1],
     };
     expect(structural(model(ring("irreflexive", badStep)))).toEqual(["constraint/join-bad-step"]);
@@ -270,8 +270,8 @@ describe("diff and merge", () => {
       id: "ft-parent",
       name: "Person is child of Person",
       roles: [
-        { id: "r-child", name: "is child of", playerId: "person-2" },
-        { id: "r-parent", name: "is parent of", playerId: "person-2" },
+        { id: "r.child", name: "is child of", playerId: "person-2" },
+        { id: "r.parent", name: "is parent of", playerId: "person-2" },
       ],
       readings: ["{0} is child of {1}"],
     });

@@ -217,7 +217,7 @@ describe("OrmModel.getConstraint", () => {
 });
 
 describe("FactType.addConstraint", () => {
-  it("fills a missing id from the generator and keeps a stated one (barwise-nkq)", () => {
+  it("leaves a constraint it cannot name unnamed, and keeps a stated id (decision 19)", () => {
     const { model, inBuilding } = rooms();
     inBuilding.addConstraint({
       type: "ring",
@@ -227,10 +227,11 @@ describe("FactType.addConstraint", () => {
     });
     inBuilding.addConstraint({ id: "c-stated", type: "mandatory", roleId: "r-2" });
 
-    const [filled, stated] = inBuilding.internalConstraints.slice(-2);
-    expect(filled!.id).toEqual(expect.any(String));
-    expect(filled!.id).not.toBe("");
+    // A ring over two players has no sentence to mint a name from; no
+    // generated id stands in.
+    const [unnamed, stated] = inBuilding.internalConstraints.slice(-2);
+    expect(unnamed!.id).toBeUndefined();
     expect(stated!.id).toBe("c-stated");
-    expect(model.getConstraint(filled!.id!)).toBe(filled);
+    expect(model.getConstraint("c-stated")).toBe(stated);
   });
 });

@@ -37,7 +37,20 @@ export function claimsExport(model: OrmModel, exp: ManifestExport): boolean {
   return owns;
 }
 
+/**
+ * How the model holds a source id. An export that names no model was
+ * written before exports named theirs, so under the ids the model file
+ * stated then: for a model replayed from a 3.x file, the id the load
+ * replayed each one into (iri-identity WS6), never the id as it is, which
+ * may now be another element's.
+ */
 function holding(model: OrmModel, id: string): "owns" | "shadow" | "none" {
+  if (model.priorIds === undefined) return holdingAsIs(model, id);
+  const now = model.idFromPrior(id);
+  return now === undefined ? "none" : holdingAsIs(model, now);
+}
+
+function holdingAsIs(model: OrmModel, id: string): "owns" | "shadow" | "none" {
   const ot = model.getObjectType(id);
   if (ot) return ot.sourceContext === undefined ? "owns" : "shadow";
   const held = model.getFactType(id) ?? model.findRole(id) ?? model.getConstraint(id)

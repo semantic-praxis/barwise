@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: project-staffing
   object_types:
@@ -42,6 +42,7 @@ model:
           role_2: Employee_mentors_Employee.is_mentored_by
           ring_type: acyclic
           id: No_Employee_mentors_that_same_Employee,_directly_or_through_a_chain_of_such_relationships
+          minted_from: '{"type":"ring","role_1":[0,"mentors",{"name":"Employee mentors Employee","readings":["{0} mentors {1}","{1} is mentored by {0}"],"players":["Employee","Employee"]}],"role_2":[1,"is mentored by",{"name":"Employee mentors Employee","readings":["{0} mentors {1}","{1} is mentored by {0}"],"players":["Employee","Employee"]}],"ring_type":"acyclic","fact_type":{"name":"Employee mentors Employee","readings":["{0} mentors {1}","{1} is mentored by {0}"],"players":["Employee","Employee"]}}'
     - id: Employee_is_assigned_to_Project
       name: Employee is assigned to Project
       roles:
@@ -65,6 +66,7 @@ model:
           min: 1
           max: 3
           id: Each_Employee_that_is_assigned_to_some_Project_is_assigned_to_at_least_1_and_at_most_3_instances_of_Project
+          minted_from: '{"type":"frequency","role":[0,"is assigned to",{"name":"Employee is assigned to Project","readings":["{0} is assigned to {1}","{1} has assigned {0}"],"players":["Employee","Project"]}],"min":1,"max":3,"fact_type":{"name":"Employee is assigned to Project","readings":["{0} is assigned to {1}","{1} has assigned {0}"],"players":["Employee","Project"]}}'
     - id: Project_has_ProjectName
       name: Project has ProjectName
       roles:

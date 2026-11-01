@@ -6,7 +6,7 @@
  */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import schema from "../../schemas/orm-model-3.0.schema.json" with { type: "json" };
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
 import { fromJsonSchema } from "./jsonSchemaArbitrary.js";
 
@@ -38,7 +38,7 @@ describe("values drawn from the hand-written schema", () => {
   it.each(Object.keys(wrap))("%s: varied, and mostly valid", (name) => {
     const values = fc.sample(fromJsonSchema(root, defs[name]!), { numRuns: 400, seed: 5 });
     const valid = values.filter((v) =>
-      validator.validateModel({ orm_version: "3.0", ...(wrap[name]!(v) as object) }).valid
+      validator.validateModel30({ orm_version: "3.0", ...(wrap[name]!(v) as object) }).valid
     );
     expect(valid.length).toBeGreaterThan(values.length * 0.3);
     expect(valid.length).toBeLessThan(values.length);

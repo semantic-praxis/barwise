@@ -1,6 +1,6 @@
 /**
  * A format 4.0 document as Effect Schemas (iri-identity WS6, 6b-2b-1),
- * held to `schemas/orm-model-4.0.schema.json` by
+ * held to `schemas/orm-model.schema.json` by
  * `tests/decode/document40SchemaDrift.test.ts`.
  *
  * 4.0 differs from 3.0 in its ids (`ids.ts`): each of the shape its rule
@@ -13,9 +13,8 @@
  * orientation and the model's label are 3.0's own pieces, reused: a change
  * to one of them changes both formats.
  *
- * Nothing outside tests reads a 4.0 file yet: `planRead` still refuses
- * the version and the writer still writes 3.0, until 6b-2b-2 switches both
- * with the 3.x replay.
+ * The loader reads a 4.0 file through these (6b-2b-2b-2); a 3.0 file
+ * through the frozen 3.0 decoders, then the replay.
  */
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

@@ -56,6 +56,7 @@ export {
   type ValueConstraint,
   withoutSubtypeFacts,
 } from "./model/Constraint.js";
+export { constraintRef } from "./model/constraintRef.js";
 export {
   ContextMapping,
   type ContextMappingConfig,
@@ -208,6 +209,7 @@ export {
   OrmYamlSerializer,
   readDocument20,
   writeDocument,
+  writeDocument40,
 } from "./serialization/OrmYamlSerializer.js";
 export {
   assembleProject,

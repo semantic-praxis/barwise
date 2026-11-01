@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: incident-response
   object_types:
@@ -144,6 +144,7 @@ model:
         - type: mandatory
           role: Incident_has_IncidentNumber.has
           id: Each_Incident_has_at_least_one_IncidentNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Incident has IncidentNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Incident","IncidentNumber"]}],"fact_type":{"name":"Incident has IncidentNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Incident","IncidentNumber"]}}'
     - id: Incident_has_Severity
       name: Incident has Severity
       roles:
@@ -164,6 +165,7 @@ model:
         - type: mandatory
           role: Incident_has_Severity.has
           id: Each_Incident_has_at_least_one_Severity
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Incident has Severity","readings":["{0} has {1}","{1} is the severity of {0}"],"players":["Incident","Severity"]}],"fact_type":{"name":"Incident has Severity","readings":["{0} has {1}","{1} is the severity of {0}"],"players":["Incident","Severity"]}}'
     - id: Incident_has_Priority
       name: Incident has Priority
       roles:
@@ -184,6 +186,7 @@ model:
         - type: mandatory
           role: Incident_has_Priority.has
           id: Each_Incident_has_at_least_one_Priority
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Incident has Priority","readings":["{0} has {1}","{1} is the priority of {0}"],"players":["Incident","Priority"]}],"fact_type":{"name":"Incident has Priority","readings":["{0} has {1}","{1} is the priority of {0}"],"players":["Incident","Priority"]}}'
     - id: Incident_is_in_IncidentState
       name: Incident is in IncidentState
       roles:
@@ -204,6 +207,7 @@ model:
         - type: mandatory
           role: Incident_is_in_IncidentState.is_in
           id: Each_Incident_is_in_at_least_one_IncidentState
+          minted_from: '{"type":"mandatory","role":[0,"is in",{"name":"Incident is in IncidentState","readings":["{0} is in {1}","{1} is the current state of {0}"],"players":["Incident","IncidentState"]}],"fact_type":{"name":"Incident is in IncidentState","readings":["{0} is in {1}","{1} is the current state of {0}"],"players":["Incident","IncidentState"]}}'
     - id: Alert_has_AlertId
       name: Alert has AlertId
       roles:
@@ -228,6 +232,7 @@ model:
         - type: mandatory
           role: Alert_has_AlertId.has
           id: Each_Alert_has_at_least_one_AlertId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Alert has AlertId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Alert","AlertId"]}],"fact_type":{"name":"Alert has AlertId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Alert","AlertId"]}}'
     - id: Ticket_has_TicketNumber
       name: Ticket has TicketNumber
       roles:
@@ -252,6 +257,7 @@ model:
         - type: mandatory
           role: Ticket_has_TicketNumber.has
           id: Each_Ticket_has_at_least_one_TicketNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Ticket has TicketNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Ticket","TicketNumber"]}],"fact_type":{"name":"Ticket has TicketNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Ticket","TicketNumber"]}}'
     - id: Service_has_ServiceName
       name: Service has ServiceName
       roles:
@@ -276,6 +282,7 @@ model:
         - type: mandatory
           role: Service_has_ServiceName.has
           id: Each_Service_has_at_least_one_ServiceName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Service has ServiceName","readings":["{0} has {1}","{1} identifies {0}"],"players":["Service","ServiceName"]}],"fact_type":{"name":"Service has ServiceName","readings":["{0} has {1}","{1} identifies {0}"],"players":["Service","ServiceName"]}}'
     - id: Team_has_TeamName
       name: Team has TeamName
       roles:
@@ -300,6 +307,7 @@ model:
         - type: mandatory
           role: Team_has_TeamName.has
           id: Each_Team_has_at_least_one_TeamName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Team has TeamName","readings":["{0} has {1}","{1} identifies {0}"],"players":["Team","TeamName"]}],"fact_type":{"name":"Team has TeamName","readings":["{0} has {1}","{1} identifies {0}"],"players":["Team","TeamName"]}}'
     - id: Person_has_PersonId
       name: Person has PersonId
       roles:
@@ -324,6 +332,7 @@ model:
         - type: mandatory
           role: Person_has_PersonId.has
           id: Each_Person_has_at_least_one_PersonId
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Person has PersonId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Person","PersonId"]}],"fact_type":{"name":"Person has PersonId","readings":["{0} has {1}","{1} identifies {0}"],"players":["Person","PersonId"]}}'
     - id: Incident_originates_from_Alert
       name: Incident originates from Alert
       roles:
@@ -385,6 +394,7 @@ model:
         - type: mandatory
           role: Service_is_owned_by_Team.is_owned_by
           id: Each_Service_is_owned_by_at_least_one_Team
+          minted_from: '{"type":"mandatory","role":[0,"is owned by",{"name":"Service is owned by Team","readings":["{0} is owned by {1}","{1} owns {0}"],"players":["Service","Team"]}],"fact_type":{"name":"Service is owned by Team","readings":["{0} is owned by {1}","{1} owns {0}"],"players":["Service","Team"]}}'
     - id: Incident_is_commanded_by_Person
       name: Incident is commanded by Person
       roles:
@@ -424,8 +434,10 @@ model:
           role_2: Incident_is_duplicate_of_Incident.is_primary_for
           ring_type: irreflexive
           id: No_Incident_is_a_duplicate_of_that_same_Incident
+          minted_from: '{"type":"ring","role_1":[0,"is duplicate of",{"name":"Incident is duplicate of Incident","readings":["{0} is a duplicate of {1}","{1} is the primary incident for {0}"],"players":["Incident","Incident"]}],"role_2":[1,"is primary for",{"name":"Incident is duplicate of Incident","readings":["{0} is a duplicate of {1}","{1} is the primary incident for {0}"],"players":["Incident","Incident"]}],"ring_type":"irreflexive","fact_type":{"name":"Incident is duplicate of Incident","readings":["{0} is a duplicate of {1}","{1} is the primary incident for {0}"],"players":["Incident","Incident"]}}'
         - type: ring
           role_1: Incident_is_duplicate_of_Incident.is_duplicate_of
           role_2: Incident_is_duplicate_of_Incident.is_primary_for
           ring_type: acyclic
           id: No_Incident_is_a_duplicate_of_that_same_Incident,_directly_or_through_a_chain_of_such_relationships
+          minted_from: '{"type":"ring","role_1":[0,"is duplicate of",{"name":"Incident is duplicate of Incident","readings":["{0} is a duplicate of {1}","{1} is the primary incident for {0}"],"players":["Incident","Incident"]}],"role_2":[1,"is primary for",{"name":"Incident is duplicate of Incident","readings":["{0} is a duplicate of {1}","{1} is the primary incident for {0}"],"players":["Incident","Incident"]}],"ring_type":"acyclic","fact_type":{"name":"Incident is duplicate of Incident","readings":["{0} is a duplicate of {1}","{1} is the primary incident for {0}"],"players":["Incident","Incident"]}}'

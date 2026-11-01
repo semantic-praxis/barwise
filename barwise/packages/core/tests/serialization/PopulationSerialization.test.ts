@@ -29,20 +29,20 @@ function makeModelWithPopulation(): OrmModel {
   const ft = model.addFactType({
     name: "Customer places Order",
     roles: [
-      { name: "places", playerId: customer.id, id: "r1" },
-      { name: "is placed by", playerId: order.id, id: "r2" },
+      { name: "places", playerId: customer.id, id: "f.r1" },
+      { name: "is placed by", playerId: order.id, id: "f.r2" },
     ],
     readings: ["{0} places {1}"],
   });
 
   const pop = model.addPopulation({
-    id: "pop-1",
+    id: "f.pop1",
     factTypeId: ft.id,
     description: "Sample orders",
   });
-  pop.addInstance({ id: "inst-1", roleValues: { r1: "C001", r2: "O123" } });
-  pop.addInstance({ id: "inst-2", roleValues: { r1: "C001", r2: "O124" } });
-  pop.addInstance({ id: "inst-3", roleValues: { r1: "C002", r2: "O125" } });
+  pop.addInstance({ id: "f.pop.1", roleValues: { "f.r1": "C001", "f.r2": "O123" } });
+  pop.addInstance({ id: "f.pop.2", roleValues: { "f.r1": "C001", "f.r2": "O124" } });
+  pop.addInstance({ id: "f.pop.3", roleValues: { "f.r1": "C002", "f.r2": "O125" } });
 
   return model;
 }
@@ -66,7 +66,7 @@ describe("Population serialization", () => {
       const doc = parse(yaml);
 
       const pop = doc.model.populations[0];
-      expect(pop.id).toBe("pop-1");
+      expect(pop.id).toBe("f.pop1");
       expect(pop.fact_type).toBe(
         model.getFactTypeByName("Customer places Order")!.id,
       );
@@ -80,10 +80,10 @@ describe("Population serialization", () => {
       const doc = parse(yaml);
 
       const instances = doc.model.populations[0].instances;
-      expect(instances[0].id).toBe("inst-1");
-      expect(instances[0].role_values).toEqual({ r1: "C001", r2: "O123" });
-      expect(instances[1].id).toBe("inst-2");
-      expect(instances[2].id).toBe("inst-3");
+      expect(instances[0].id).toBe("f.pop.1");
+      expect(instances[0].role_values).toEqual({ "f.r1": "C001", "f.r2": "O123" });
+      expect(instances[1].id).toBe("f.pop.2");
+      expect(instances[2].id).toBe("f.pop.3");
     });
 
     it("omits populations when none exist", () => {
@@ -108,10 +108,10 @@ describe("Population serialization", () => {
       });
       const ft = model.addFactType({
         name: "X exists",
-        roles: [{ name: "exists", playerId: ot.id, id: "r1" }],
+        roles: [{ name: "exists", playerId: ot.id, id: "f.r1" }],
         readings: ["{0} exists"],
       });
-      model.addPopulation({ id: "pop-1", factTypeId: ft.id });
+      model.addPopulation({ id: "f.pop1", factTypeId: ft.id });
       const yaml = serializer.serialize(model);
       const doc = parse(yaml);
 
@@ -127,10 +127,10 @@ describe("Population serialization", () => {
       });
       const ft = model.addFactType({
         name: "X exists",
-        roles: [{ name: "exists", playerId: ot.id, id: "r1" }],
+        roles: [{ name: "exists", playerId: ot.id, id: "f.r1" }],
         readings: ["{0} exists"],
       });
-      model.addPopulation({ id: "pop-1", factTypeId: ft.id });
+      model.addPopulation({ id: "f.pop1", factTypeId: ft.id });
       const yaml = serializer.serialize(model);
       const doc = parse(yaml);
 
@@ -147,7 +147,7 @@ describe("Population serialization", () => {
       expect(restored.populations).toHaveLength(1);
 
       const pop = restored.populations[0]!;
-      expect(pop.id).toBe("pop-1");
+      expect(pop.id).toBe("f.pop1");
       expect(pop.factTypeId).toBe(
         restored.getFactTypeByName("Customer places Order")!.id,
       );
@@ -161,9 +161,9 @@ describe("Population serialization", () => {
 
       const restored = serializer.deserialize(yaml);
       const pop = restored.populations[0]!;
-      const inst = pop.getInstance("inst-1")!;
+      const inst = pop.getInstance("f.pop.1")!;
       expect(inst).toBeDefined();
-      expect(inst.roleValues).toEqual({ r1: "C001", r2: "O123" });
+      expect(inst.roleValues).toEqual({ "f.r1": "C001", "f.r2": "O123" });
     });
 
     it("handles YAML with no populations", () => {
@@ -266,11 +266,11 @@ model:
       const model = makeModelWithPopulation();
       const ft = model.getFactTypeByName("Customer places Order")!;
       const pop2 = model.addPopulation({
-        id: "pop-2",
+        id: "f.pop2",
         factTypeId: ft.id,
         description: "More orders",
       });
-      pop2.addInstance({ id: "inst-4", roleValues: { r1: "C003", r2: "O126" } });
+      pop2.addInstance({ id: "f.pop.4", roleValues: { "f.r1": "C003", "f.r2": "O126" } });
 
       const yaml = serializer.serialize(model);
       const restored = serializer.deserialize(yaml);

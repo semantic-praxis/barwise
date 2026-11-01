@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ExternalConstraint, JoinOperand } from "../../src/model/Constraint.js";
+import { constraintRef } from "../../src/model/constraintRef.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { joinConstraintRules } from "../../src/validation/rules/joinConstraintRules.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
@@ -135,7 +136,7 @@ describe("joinConstraintRules", () => {
       .toContain("constraint/join-empty-projection");
   });
 
-  it("reports a malformed join constraint added in code under the id addConstraint gives it", () => {
+  it("reports a malformed join constraint added in code, which the model leaves unnamed", () => {
     const model = new OrmModel({ name: "Test" });
     const person = model.addObjectType({
       id: "ot-person",
@@ -152,16 +153,18 @@ describe("joinConstraintRules", () => {
       ],
       readings: ["{0} is citizen of {1}"],
     });
-    // addConstraint fills a missing id (barwise-nkq), so the diagnostic
-    // names the constraint, not a fact type.
+    // Its root dangles, so it has no sentence to mint a name from and stays
+    // unnamed (iri-identity decision 19); the diagnostic still names the
+    // constraint, by the reference constraintRef builds, not a fact type.
     const bad: JoinOperand = { path: { root: "ot-missing", steps: [] }, projection: [0] };
     model.addConstraint({ type: "join_equality", operands: [bad, citizenOf] });
-    const filled = model.constraints.at(-1)!.id;
-    expect(filled).toEqual(expect.any(String));
+    const added = model.constraints.at(-1)!;
+    expect(added.id).toBeUndefined();
 
     const diags = unresolvedDiagnostics(model);
     const unknownRoot = diags.find((d) => d.ruleId === "constraint/join-unknown-root");
     expect(unknownRoot).toBeDefined();
-    expect(unknownRoot!.elementId).toBe(filled);
+    expect(unknownRoot!.elementId).toBe(constraintRef(added));
+    expect(unknownRoot!.elementId).toMatch(/^unnamed:join_equality</);
   });
 });

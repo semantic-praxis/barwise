@@ -16,6 +16,7 @@ import {
   type OrmVersionMigration,
   planMigration,
   planRead,
+  PREVIOUS_ORM_VERSION,
   type ReadVersions,
 } from "../../src/serialization/schemaVersion.js";
 
@@ -122,7 +123,7 @@ describe("the registered migrations", () => {
 // be refused as a version no release wrote.
 const AT_3_1: ReadVersions = {
   current: "3.1",
-  legacy: "2.0",
+  legacy: ["2.0"],
   migrations: [bump("1.0", "1.1"), bump("1.1", "2.0"), bump("3.0", "3.1")],
 };
 
@@ -204,5 +205,25 @@ describe("this build's versions", () => {
       target: CURRENT_ORM_VERSION,
       steps: [],
     });
+  });
+
+  it("read each earlier major with its own legacy reader, and nothing between them", () => {
+    // Two legacy slots since 4.0 (iri-identity WS6): 3.0 by the frozen 3.0
+    // decoders, 2.0 and older by the 2.0 reader, both then replayed.
+    expect(planRead(PREVIOUS_ORM_VERSION)).toEqual({
+      ok: true,
+      reader: "legacy",
+      target: PREVIOUS_ORM_VERSION,
+      steps: [],
+    });
+    expect(planRead(LEGACY_ORM_VERSION)).toEqual({
+      ok: true,
+      reader: "legacy",
+      target: LEGACY_ORM_VERSION,
+      steps: [],
+    });
+    expect(planRead("1.0")).toMatchObject({ ok: true, reader: "legacy", target: "2.0" });
+    expect(planRead("3.1")).toEqual({ ok: false, reason: "unknown" });
+    expect(planRead("2.5")).toEqual({ ok: false, reason: "unknown" });
   });
 });

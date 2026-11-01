@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
+import schema from "../../schemas/orm-model-3.0.schema.json" with { type: "json" };
 import { DecodeError } from "../../src/decode/decoder.js";
 import { ObjectTypeFile, runObjectTypeDecode } from "../../src/decode/objectType.js";
 import { createObjectType } from "../../src/model/ObjectType.js";
@@ -29,7 +29,7 @@ const todays = (doc: OrmYamlObjectType) => createObjectType(deserializeObjectTyp
 /** Whether today's reader accepts one object type, and the record it builds. */
 function todaysReading(value: unknown): { ok: true; record: unknown; } | { ok: false; } {
   const doc = { orm_version: "3.0", model: { name: "M", object_types: [value] } };
-  if (!validator.validateModel(doc).valid) return { ok: false };
+  if (!validator.validateModel30(doc).valid) return { ok: false };
   try {
     return { ok: true, record: todays(value as OrmYamlObjectType) };
   } catch {
@@ -106,7 +106,7 @@ describe("the object type decoder, against today's reader", () => {
     const validator = new SchemaValidator();
     for (const value of values) {
       const doc = { orm_version: "3.0", model: { name: "M", object_types: [value] } };
-      expect(validator.validateModel(doc).errors).toEqual([]);
+      expect(validator.validateModel30(doc).errors).toEqual([]);
       expect(runObjectTypeDecode(value).record).toEqual(todays(value as OrmYamlObjectType));
     }
   });

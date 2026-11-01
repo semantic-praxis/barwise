@@ -16,7 +16,8 @@ const fixtures = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 const importNorma = (xml: string) => new NormaImportFormat().parse(xml).model;
 const roomXml = () =>
   new NormaExportFormat().export(
-    new OrmYamlSerializer().deserialize(
+    // As the 3.0 reader builds it: the tests name the fixture's ids.
+    new OrmYamlSerializer().deserializeAsWritten(
       readFileSync(join(fixtures, "externalIdentifier.orm.yaml"), "utf8"),
     ),
   ).text;

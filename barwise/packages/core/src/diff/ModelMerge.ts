@@ -47,6 +47,7 @@ import { report, RULE_ID } from "../validation/ruleId.js";
 import { structuralRules, structuralWellFormedness } from "../validation/rules/structural.js";
 import { type DeltaKind, elementName, type ModelDiffResult, renamePairing } from "./deltas.js";
 import { isDanglingFactType, isDanglingPlayer } from "./elementDiff.js";
+import { fromBasePrior } from "./identity.js";
 import type {
   ConstraintDelta,
   DefinitionDelta,
@@ -134,6 +135,16 @@ export function mergeModels(
   // (barwise-941). Only an accepted modification rewrites roles; every
   // other outcome keeps the existing fact type and needs no entry.
   const roleIdMap = new Map<string, string | null>();
+
+  // A fragment replayed from a 3.x file names the base's elements it does
+  // not restate by the 3.x ids, which the base, replayed too, now holds
+  // under 4.0's (iri-identity WS6): read those through the base's map
+  // back, as every other cross-model reference is read (barwise-957).
+  for (const [old, now] of fromBasePrior(existing, incoming)) {
+    if (existing.getObjectType(now)) incomingIdToMergedId.set(old, now);
+    else if (existing.getFactType(now)) incomingFtIdToMergedId.set(old, now);
+    else if (existing.findRole(now)) incomingRoleIdToMergedId.set(old, now);
+  }
 
   // Phase 1: object types (must be added before fact types).
   const otDeltas = deltas
@@ -635,7 +646,36 @@ export function mergeModels(
   // Phase 7: the one kind the diff deliberately does not model.
   carryUnmodelledElements(merged, existing);
 
+  // Phase 8: the key each minted id was minted from (iri-identity decision
+  // 14). The merged model is built fresh and holds none, and a merge that
+  // dropped them would turn every minted name into one a person chose, never
+  // reported stale.
+  carryMintedKeys(merged, existing, incoming);
+
   return merged;
+}
+
+/**
+ * Give each id the merged model holds the key it was minted from: the
+ * base's for an id the base holds, which is what a kept or modified
+ * element keeps (iri-identity 6d) -- none, when the base's id was chosen
+ * by a person, so a draft cannot turn it into a minted one -- else the
+ * incoming side's, for an element the merge added. An id the merged model
+ * minted itself already has its own.
+ */
+function carryMintedKeys(merged: OrmModel, existing: OrmModel, incoming: OrmModel): void {
+  const ids = [
+    ...merged.everyConstraint().map(([c]) => c.id),
+    ...merged.subtypeFacts.map((sf) => sf.id),
+    ...merged.objectifiedFactTypes.map((o) => o.id),
+  ];
+  for (const id of ids) {
+    if (id === undefined || merged.mintedFromOf(id) !== undefined) continue;
+    const key = existing.idKindsHolding(id).length > 0
+      ? existing.mintedFromOf(id)
+      : incoming.mintedFromOf(id);
+    if (key !== undefined) merged.recordMintedFrom(id, key);
+  }
 }
 
 /**

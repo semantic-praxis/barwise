@@ -17,7 +17,8 @@ implemented 2026-10-30 (the 4.0 reader, unwired); 6b-4a implemented
 2026-10-30 (the importers off role ids); 6b-2b-2a implemented 2026-10-31
 (decisions 19 and 20, the cross-kind refusal, the 3.x and 2.0 replay and
 diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
-(the 4.0 writer and stored `minted_from`, unwired); 6b-2b-2b-2, 6b-2b-2b-3,
+(the 4.0 writer and stored `minted_from`, unwired); 6b-2b-2b-2 implemented
+2026-10-31 (the switch to format 4.0, with its fixture and golden churn);
 6b-3, 6b-4b, 6c to 6f and WS7 to come
 
 Created: 2026-10-28
@@ -1573,15 +1574,58 @@ sites.
           (owner, 2026-10-31). Only role references are reshaped: no
           tracked file today's loader accepts holds another kind of
           dangling reference 4.0 refuses (barwise-wcg.1tf tracks the rest).
-        - _6b-2b-2b-2, the switch._ The 3.0 schema frozen as
-          `orm-model-3.0.schema.json` and the 4.0 one renamed to
-          `orm-model.schema.json` (the MCP schema resource moves with
-          it); `planRead`'s two legacy slots, 3.x and 2.0 through the
-          replay; `serialize` writes 4.0; the constraint fallback dropped, so
-          the replay too leaves an unmintable constraint unnamed rather
-          than keeping its old id; barwise-wcg.1tf settled first.
-        - _6b-2b-2b-3, the fixture and golden churn_, if it does not fit
-          in 6b-2b-2b-2.
+        - _6b-2b-2b-2, the switch, with the fixture and golden churn_
+          (owner, 2026-10-31: 6b-2b-2b-3 folded in, because the switch
+          cannot pass CI without it; one PR across sessions). The 3.0
+          schema frozen as `orm-model-3.0.schema.json` and the 4.0 one
+          renamed to `orm-model.schema.json`, which the MCP schema resource
+          serves; `SchemaValidator.validateModel30` holds the frozen 3.0
+          decoders to the frozen file. `planRead`'s one legacy slot
+          becomes an ordered list, 3.0 then 2.0, both replayed;
+          `serialize`, split, rename and MCP's model resource write 4.0,
+          and the 3.0 writer stamps 3.0. The constraint fallback is
+          dropped, so the model and the replay leave an unmintable
+          constraint unnamed, referred to where a string is needed by
+          `constraintRef` (`unnamed:<type><<roles>>#<8 hex of what it states>`), as decision 19 has
+          it. barwise-wcg.1tf settled (owner, 2026-10-31): a dangling
+          reference of any kind 4.0 could not read back takes its old id's
+          local name (a role `unresolved.<local name>`).
+          - _What else the switch reached._ A file that refers to a 3.x
+            model's elements by id still states the 3.x ids, so the model
+            answers `idFromPrior` (`priorIds` read backwards, undefined
+            when two kinds stated one id), and the consumers that hold such
+            references read through it: a tutorial step's constraint
+            (`learn`), an editor diagnostic's position and a hover
+            (`vscode`), and the claim of a lineage export that names no
+            model (`attribution.ts`). Merge carries the minted keys
+            (`carryMintedKeys`, the base's first), the part of 6d a
+            switched build needs at once, or a no-op merge changed the
+            file. Ossie's export check rebuilds the read-back model through
+            a document read as written (`deserializeAsWritten`), not
+            through the replay, which renamed what it aligned. Diff and
+            merge read a 3.x fragment's reference to a base element it does
+            not restate through the base's map back (`fromBasePrior`),
+            barwise-957's rule applied to 3.x ids, when both sides were
+            replayed. NORMA, which states every constraint's id, gives an
+            unnamed one `unnamed_<type>_<hash>` from `constraintRef`'s hash.
+            A preferred identifier that named a constraint the replay left
+            unnamed takes its old id's local name under the suffix rule, so
+            it names nothing in a shape 4.0 reads.
+          - _Tests._ A test whose subject is not the read or the replay
+            loads its 3.x fixture as the frozen reader builds it
+            (`deserializeAsWritten`): the nesting helpers, identification,
+            NORMA and diff tests. One whose subject is the load path, a
+            surface, or rename takes the replayed ids, or a fixture
+            restated as 4.0. The four test builders give
+            `<localName(ft)>.roleN` and `<localName(ft)>_preferred`, so a
+            built model writes a 4.0 file that reads back. The corpus that
+            holds the decoders and the replay is read as written. Regenerated:
+            the diagram-ui SVG goldens (ids, and the layout two of them
+            sort by player id), the CLI DDL goldens (source comments), and
+            promptlab's references (version and `minted_from`).
+          - Filed: barwise-wcg.frh (a 3.x file's diagnostics name elements
+            by their 4.0 ids), barwise-wcg.v5k (`lineage impact` by a 3.x
+            id finds nothing; 6e).
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
   `imports`.

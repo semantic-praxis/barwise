@@ -248,7 +248,7 @@ describe("barwise_export_model carries the constraint report", () => {
 });
 
 describe("barwise_rename_element", () => {
-  const MODEL = 'orm_version: "3.0"\nmodel:\n  name: Shop\n  object_types:\n'
+  const MODEL = 'orm_version: "4.0"\nmodel:\n  name: Shop\n  object_types:\n'
     + "    - { id: o, name: Order, kind: entity, reference_mode: order_nr }\n";
 
   async function rename(path: string, extra: Record<string, unknown> = {}) {

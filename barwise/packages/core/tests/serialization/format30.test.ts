@@ -17,11 +17,14 @@ import { OrmModel } from "../../src/model/OrmModel.js";
 import {
   DeserializationError,
   OrmYamlSerializer,
+  writeDocument,
 } from "../../src/serialization/OrmYamlSerializer.js";
 
 const yaml = new OrmYamlSerializer();
+/** A model as a 3.0 file states it: what the frozen 3.0 reader reads. */
+const text30 = (model: OrmModel) => stringify(writeDocument(model));
 const schema = JSON.parse(
-  readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../schemas/orm-model-3.0.schema.json", import.meta.url), "utf8"),
 ) as { definitions: Record<string, unknown>; };
 
 /** Every `type` const anywhere under a schema node. */
@@ -88,7 +91,7 @@ describe("the 3.0 schema places each constraint kind as PLACEMENT does", () => {
 
 describe("a 3.0 document that misplaces a constraint", () => {
   const load = (edit: (doc: any) => void) => {
-    const doc = parse(yaml.serialize(shop()));
+    const doc = parse(text30(shop()));
     edit(doc);
     return () => yaml.deserialize(stringify(doc));
   };
@@ -130,15 +133,19 @@ describe("a 3.0 document that misplaces a constraint", () => {
 });
 
 describe("a stored preferred identifier", () => {
-  it("survives a 3.0 save and load, and the load saves to the same bytes", () => {
-    const text = yaml.serialize(shop());
-    const back = yaml.deserialize(text);
-    expect(back.preferredIdentifierRefs).toEqual([["ot-c", "u-cid"]]);
-    expect(yaml.serialize(back)).toBe(text);
+  it("survives a 3.0 load, under the ids the replay gives, and a save and load after it", () => {
+    const back = yaml.deserialize(text30(shop()));
+    const prior = back.priorIds!;
+    expect(back.preferredIdentifierRefs.map((pair) => pair.map((id) => prior.get(id)))).toEqual([[
+      "ot-c",
+      "u-cid",
+    ]]);
+    const text = yaml.serialize(back);
+    expect(yaml.serialize(yaml.deserialize(text))).toBe(text);
   });
 
   it("is refused on a value type in a 3.0 document", () => {
-    const doc = parse(yaml.serialize(shop()));
+    const doc = parse(text30(shop()));
     doc.model.object_types[1].preferred_identifier = "u-cid";
     expect(() => yaml.deserialize(stringify(doc))).toThrow(DeserializationError);
   });
@@ -186,10 +193,10 @@ describe("a stored preferred identifier", () => {
 
 describe("a version between 2.0 and 3.0", () => {
   it("is refused as one no release wrote, not as one from a newer build", () => {
-    const doc = parse(yaml.serialize(shop()));
+    const doc = parse(text30(shop()));
     doc.orm_version = "2.1";
     expect(() => yaml.deserialize(stringify(doc))).toThrow(
-      'Unsupported orm_version "2.1" (this build reads 3.0): no migration path is available; '
+      'Unsupported orm_version "2.1" (this build reads 4.0): no migration path is available; '
         + "re-export from a compatible version.",
     );
   });
@@ -220,7 +227,8 @@ model:
 `;
 
   it("derives the ids earlier releases gave it, the flag included", () => {
-    const model = yaml.deserialize(v20);
+    // The 2.0 reader's model, before the replay renames everything.
+    const model = yaml.deserializeAsWritten(v20);
     expect(model.getFactType("ft-nr")!.internalConstraints.map((c) => c.id)).toEqual([
       "b55e8e65-fa16-8edd-92ed-08d0a611508e",
       "bb330124-3808-8a8f-9650-02c81dfc37f0",
@@ -275,11 +283,13 @@ model:
       { kind: "flag-dropped", factType: "Customer has Name", constraintId: "u-cn" },
       { kind: "identifier-chosen", entity: "Customer", kept: "u-nr", others: ["u-e"] },
     ]);
-    expect(result.model.preferredIdentifierOf("ot-c")).toBe("u-nr");
+    // The notes name the file's own ids; the model holds the replayed ones.
+    const kept = result.model.preferredIdentifierOf("Customer")!;
+    expect(result.model.priorIds!.get(kept)).toBe("u-nr");
   });
 
   it("reports nothing for a 3.0 file, and the same model deserialize gives", () => {
-    const text = yaml.serialize(shop());
+    const text = text30(shop());
     const result = yaml.migrate(text);
     expect(result.from).toBe("3.0");
     expect(result.notes).toEqual([]);

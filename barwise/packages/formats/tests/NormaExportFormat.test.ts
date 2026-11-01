@@ -15,7 +15,7 @@
 import {
   clearFormats,
   getExporter,
-  type OrmModel,
+  OrmModel,
   registerFormat,
   subtypeFlagsFromConstraints,
 } from "@barwise/core";
@@ -209,5 +209,39 @@ describe("NormaExportFormat", () => {
         expect(getExporter("norma")).toBeDefined();
       });
     });
+  });
+});
+
+describe("NORMA export of a constraint the model leaves unnamed", () => {
+  it("states an id NORMA reads, the same on every export, rather than throwing", () => {
+    // A ring over two players has no sentence to mint a name from, so the
+    // model leaves it unnamed (iri-identity decision 19); NORMA states
+    // every constraint's id.
+    const build = () => {
+      const m = new OrmModel({ name: "M" });
+      m.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "a_id" });
+      m.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "b_id" });
+      m.addFactType({
+        id: "f",
+        name: "A owns B",
+        roles: [{ id: "f.owns", name: "owns", playerId: "a" }, {
+          id: "f.owned",
+          name: "is owned by",
+          playerId: "b",
+        }],
+        readings: ["{0} owns {1}"],
+        constraints: [{
+          type: "ring",
+          roleId1: "f.owns",
+          roleId2: "f.owned",
+          ringType: "irreflexive",
+        }],
+      });
+      return m;
+    };
+    const text = new NormaExportFormat().export(build()).text;
+    const id = /id="(_unnamed_ring_[0-9a-f]{8})"/.exec(text)?.[1];
+    expect(id).toBeDefined();
+    expect(new NormaExportFormat().export(build()).text).toBe(text);
   });
 });

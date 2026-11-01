@@ -139,15 +139,18 @@ function renderMotivation(step: LoadedTutorialStep, prior: OrmModel | undefined)
   }
 
   const constraintId = step.motivation.constraintId;
+  // A step names the constraint by its id in the snapshot file, which a
+  // 3.x snapshot states and the load replays into a 4.0 name.
+  const now = (model: OrmModel) => model.idFromPrior(constraintId) ?? constraintId;
   // The constraint with its fact type when it lives in one, and with none
   // when it spans fact types (orm-format-3, Open decision 9).
-  const found = step.modelInstance.getConstraintInView(constraintId);
+  const found = step.modelInstance.getConstraintInView(now(step.modelInstance));
   if (!found) {
     throw new TutorialRenderError(
       `step "${step.id}": constraint "${constraintId}" not found in its model snapshot`,
     );
   }
-  if (prior?.getConstraint(constraintId)) {
+  if (prior?.getConstraint(now(prior))) {
     throw new TutorialRenderError(
       `step "${step.id}": constraint "${constraintId}" already exists in the prior `
         + `step's model -- the motivation would be false`,

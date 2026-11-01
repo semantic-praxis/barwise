@@ -3,7 +3,7 @@
  * a role, rewrite what names it, and refuse what would break the model.
  */
 import { describe, expect, it } from "vitest";
-import type { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmModel } from "../../src/model/OrmModel.js";
 import { RenameError, renameInModel } from "../../src/rename/renameInModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
@@ -15,7 +15,7 @@ const serializer = new OrmYamlSerializer();
  * reference-mode string without playing CustomerId, which the mapper never
  * ties to it.
  */
-const SHOP = `orm_version: "3.0"
+const SHOP = `orm_version: "4.0"
 model:
   name: Shop
   object_types:
@@ -28,23 +28,23 @@ model:
     - id: ft-cid
       name: Customer has CustomerId
       roles:
-        - { id: r1, player: ot-customer, role_name: has }
-        - { id: r2, player: ot-cid, role_name: of }
+        - { id: ft-cid.r1, player: ot-customer, role_name: has }
+        - { id: ft-cid.r2, player: ot-cid, role_name: of }
       readings: ["{0} has {1}"]
     - id: ft-email
       name: Customer has Email
       roles:
-        - { id: r3, player: ot-customer, role_name: has }
-        - { id: r4, player: ot-email, role_name: has }
+        - { id: ft-email.r3, player: ot-customer, role_name: has }
+        - { id: ft-email.r4, player: ot-email, role_name: has }
       readings: ["{0} has {1}"]
     - id: ft-places
       name: Customer places Order
       roles:
-        - { id: r5, player: ot-customer, role_name: places }
-        - { id: r6, player: ot-order, role_name: placed by }
+        - { id: ft-places.r5, player: ot-customer, role_name: places }
+        - { id: ft-places.r6, player: ot-order, role_name: placed by }
       readings: ["{0} places {1}"]
   populations:
-    - { id: pop-places, fact_type: ft-places, instances: [] }
+    - { id: ft-places.population, fact_type: ft-places, instances: [] }
   definitions:
     - { term: Customer, definition: "A person who buys." }
     - { term: Order, definition: "A request to buy." }
@@ -156,10 +156,10 @@ describe("renameInModel", () => {
       // CustomerId to ClientKey rewrites the mode to client_key, which both
       // value types then match, whichever binary comes first.
       const binaries = [
-        '    - id: ft-cid\n      name: Customer has CustomerId\n      roles:\n        - { id: r1, player: c, role_name: has }\n        - { id: r2, player: cid, role_name: of }\n      readings: ["{0} has {1}"]\n',
-        '    - id: ft-ck\n      name: Customer has Client_Key\n      roles:\n        - { id: r3, player: c, role_name: has }\n        - { id: r4, player: ck, role_name: of }\n      readings: ["{0} has {1}"]\n',
+        '    - id: ft-cid\n      name: Customer has CustomerId\n      roles:\n        - { id: ft-cid.r1, player: c, role_name: has }\n        - { id: ft-cid.r2, player: cid, role_name: of }\n      readings: ["{0} has {1}"]\n',
+        '    - id: ft-ck\n      name: Customer has Client_Key\n      roles:\n        - { id: ft-ck.r3, player: c, role_name: has }\n        - { id: ft-ck.r4, player: ck, role_name: of }\n      readings: ["{0} has {1}"]\n',
       ];
-      const yaml = `orm_version: "3.0"
+      const yaml = `orm_version: "4.0"
 model:
   name: M
   object_types:
@@ -179,34 +179,18 @@ ${(swapped ? [...binaries].reverse() : binaries).join("")}`;
   );
 
   it("refuses a model whose current-version form would not load, in migrate's words", () => {
-    // A 2.0 file can hold two constraints sharing an id, which 3.0 refuses.
-    const twice = serializer.deserialize(`orm_version: "2.0"
-model:
-  name: Shop
-  object_types:
-    - { id: ot-c, name: Customer, kind: entity, reference_mode: nr }
-    - { id: ot-nr, name: CustomerNr, kind: value }
-    - { id: ot-n, name: Name, kind: value }
-  fact_types:
-    - id: ft-nr
-      name: Customer has CustomerNr
-      roles:
-        - { id: r-c, player: ot-c, role_name: has }
-        - { id: r-nr, player: ot-nr, role_name: is of }
-      readings: ["{0} has {1}"]
-      constraints:
-        - { id: u-nr, type: internal_uniqueness, roles: [r-nr], is_preferred: true }
-    - id: ft-n
-      name: Customer has Name
-      roles:
-        - { id: r-cn, player: ot-c, role_name: has }
-        - { id: r-n, player: ot-n, role_name: is of }
-      readings: ["{0} has {1}"]
-      constraints:
-        - { id: u-nr, type: internal_uniqueness, roles: [r-cn], is_preferred: true }
-`);
-    expect(() => renameInModel(twice, { kind: "objectType", name: "Name" }, "FullName")).toThrow(
-      /^Not renamed: its 3\.0 form would not load: Constraint ids are held by more than one constraint/,
+    // A model built in code may give two kinds one id, which 4.0 refuses:
+    // in 4.0 an id names one element (iri-identity WS6).
+    const twice = new OrmModel({ name: "M" });
+    twice.addObjectType({ id: "x", name: "Order", kind: "entity", referenceMode: "nr" });
+    twice.addFactType({
+      id: "x",
+      name: "Order ships",
+      roles: [{ id: "x.ships", name: "ships", playerId: "x" }],
+      readings: ["{0} ships"],
+    });
+    expect(() => renameInModel(twice, { kind: "objectType", name: "Order" }, "Purchase")).toThrow(
+      /^Not renamed: its 4\.0 form would not load: Ids are stated by more than one element/,
     );
   });
 
@@ -291,7 +275,7 @@ model:
 
   it("renames a model that loaded leniently with a dangling reference", () => {
     const dangling = serializer.deserialize(
-      `orm_version: "3.0"
+      `orm_version: "4.0"
 model:
   name: M
   object_types:
@@ -300,8 +284,8 @@ model:
     - id: f
       name: A likes Ghost
       roles:
-        - { id: r1, player: a, role_name: likes }
-        - { id: r2, player: ghost, role_name: liked by }
+        - { id: f.r1, player: a, role_name: likes }
+        - { id: f.r2, player: ghost, role_name: liked by }
       readings: ["{0} likes {1}"]
 `,
       { lenient: true },

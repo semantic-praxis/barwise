@@ -470,20 +470,30 @@ model:
   it("names each constraint by every fact type it applies to, and counts it under each", () => {
     const parsed = JSON.parse(executeDescribeDomain(roomsModel, "Room").content[0]!.text);
     const constraints = parsed.constraints as Record<string, unknown>[];
+    // A 1.0 file, read through the replay into 4.0's ids: each constraint
+    // is named from its sentence (iri-identity WS6).
     expect(constraints.map((c) => [c.id, c.type, c.factTypes, c.factTypeIds])).toEqual([
-      ["c-one-building", "internal_uniqueness", ["Room is in Building"], ["ft-in"]],
+      ["Each_Room_is_in_at_most_one_Building", "internal_uniqueness", ["Room is in Building"], [
+        "Room_is_in_Building",
+      ]],
       [
-        "c-room-key",
+        "The_combination_of_Building_and_RoomNumber_is_unique_across_fact_types",
         "external_uniqueness",
         ["Room is in Building", "Room has RoomNumber"],
-        ["ft-in", "ft-nr"],
+        ["Room_is_in_Building", "Room_has_RoomNumber"],
       ],
-      ["c-one-nr", "internal_uniqueness", ["Room has RoomNumber"], ["ft-nr"]],
+      ["Each_Room_has_at_most_one_RoomNumber", "internal_uniqueness", ["Room has RoomNumber"], [
+        "Room_has_RoomNumber",
+      ]],
     ]);
     for (const c of constraints) expect(c).not.toHaveProperty("affectedFactType");
     expect(
       (parsed.factTypes as { id: string; name: string; constraintCount: number; }[])
         .map((ft) => [ft.id, ft.name, ft.constraintCount]),
-    ).toEqual([["ft-in", "Room is in Building", 2], ["ft-nr", "Room has RoomNumber", 2]]);
+    ).toEqual([["Room_is_in_Building", "Room is in Building", 2], [
+      "Room_has_RoomNumber",
+      "Room has RoomNumber",
+      2,
+    ]]);
   });
 });

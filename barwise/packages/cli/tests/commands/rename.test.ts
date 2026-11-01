@@ -41,7 +41,7 @@ function migrateDomains(project: string): void {
   }
 }
 
-const MODEL = `orm_version: "3.0"
+const MODEL = `orm_version: "4.0"
 model:
   name: Shop
   object_types:
@@ -51,8 +51,8 @@ model:
     - id: ft-places
       name: Customer places Order
       roles:
-        - { id: r1, player: ot-c, role_name: places }
-        - { id: r2, player: ot-o, role_name: placed by }
+        - { id: ft-places.r1, player: ot-c, role_name: places }
+        - { id: ft-places.r2, player: ot-o, role_name: placed by }
       readings: ["{0} places {1}"]
 `;
 
@@ -165,7 +165,7 @@ describe("barwise rename", () => {
   });
 
   it("refuses a 2.x file rather than migrating it silently, writing nothing", async () => {
-    const old = MODEL.replace(`orm_version: "3.0"`, `orm_version: "2.0"`);
+    const old = MODEL.replace(`orm_version: "4.0"`, `orm_version: "2.0"`);
     const path = file("shop.orm.yaml", old);
     const result = await runCli(["rename", path, "--object-type", "Order", "--to", "Purchase"]);
     expect(result.exitCode).toBe(2);

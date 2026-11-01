@@ -7,6 +7,7 @@
  * `UriTemplate` matching the URI's string form -- so a path the URI encodes
  * (a space, a non-ASCII letter) is tested as a client would send it.
  */
+import { CURRENT_ORM_VERSION } from "@barwise/core";
 import { UriTemplate } from "@modelcontextprotocol/sdk/shared/uriTemplate.js";
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -52,6 +53,9 @@ describe("orm-model resource", () => {
     // The document a save writes, so every element is there: the model's
     // own fields are Maps, which JSON.stringify writes as {}.
     const doc = JSON.parse(contents[0]!.text);
+    // The document a save would write: the current format, 4.0 since the
+    // switch (iri-identity WS6), not the 3.0 the fixture states.
+    expect(doc.orm_version).toBe(CURRENT_ORM_VERSION);
     expect(doc.model.name).toBe("Simple Test");
     expect(doc.model.object_types).toHaveLength(2);
     expect(doc.model.fact_types).toHaveLength(1);

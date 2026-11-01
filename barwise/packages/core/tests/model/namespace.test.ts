@@ -48,7 +48,9 @@ describe("the IRI patterns", () => {
       compiled(schema("orm-project.schema.json").properties.project.properties.iri_base.pattern),
     )
       .toBe(IRI_BASE_PATTERN.source);
-    expect(compiled(schema("orm-model.schema.json").properties.model.properties.namespace.pattern))
+    expect(
+      compiled(schema("orm-model-3.0.schema.json").properties.model.properties.namespace.pattern),
+    )
       .toBe(NAMESPACE_PATTERN.source);
   });
 

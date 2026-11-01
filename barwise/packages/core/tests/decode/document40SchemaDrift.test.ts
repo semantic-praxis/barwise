@@ -1,5 +1,5 @@
 /**
- * The 4.0 decoders and `schemas/orm-model-4.0.schema.json` state the same
+ * The 4.0 decoders and `schemas/orm-model.schema.json` state the same
  * format (iri-identity WS6, 6b-2b-1): each element's fields and which are
  * required, every constraint kind's, the id patterns (`model/name.ts`
  * states them once; the file must hold the same sources), and, because a
@@ -9,7 +9,7 @@
 import Ajv from "ajv";
 import type * as SchemaAST from "effect/SchemaAST";
 import { describe, expect, it } from "vitest";
-import schema from "../../schemas/orm-model-4.0.schema.json" with { type: "json" };
+import schema from "../../schemas/orm-model.schema.json" with { type: "json" };
 import { constraintKindFiles } from "../../src/decode/constraint.js";
 import { DecodeError } from "../../src/decode/decoder.js";
 import { Document40File, runDocument40Decode } from "../../src/decode/document40.js";
@@ -64,7 +64,7 @@ const VARIANTS: [string, JsonObject][] = [
   ...defs.external_constraint!.oneOf!,
 ].map((v) => [v.properties!.type!.const!, v]);
 
-describe("the 4.0 decoders state what orm-model-4.0.schema.json states", () => {
+describe("the 4.0 decoders state what orm-model.schema.json states", () => {
   it("the root: its version and its model", () => {
     expect(document.allowed).toEqual(Object.keys(root.properties!).sort());
     expect(document.required).toEqual([...root.required!].sort());

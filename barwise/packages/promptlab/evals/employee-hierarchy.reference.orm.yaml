@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: employee-hierarchy
   object_types:
@@ -47,6 +47,7 @@ model:
         - type: mandatory
           role: Employee_works_in_Department.works_in
           id: Each_Employee_works_in_at_least_one_Department
+          minted_from: '{"type":"mandatory","role":[0,"works in",{"name":"Employee works in Department","readings":["{0} works in {1}","{1} has {0}"],"players":["Employee","Department"]}],"fact_type":{"name":"Employee works in Department","readings":["{0} works in {1}","{1} has {0}"],"players":["Employee","Department"]}}'
     - id: Manager_manages_Department
       name: Manager manages Department
       roles:
@@ -83,9 +84,11 @@ model:
           id: 00000000-0000-7003-ab72-7980878e959c
   subtype_facts:
     - id: Employee_is_a_subtype_of_Person
+      minted_from: '{"subtype":"Employee","supertype":"Person","defining_rule":null}'
       subtype: Employee
       supertype: Person
       provides_identification: false
     - id: Manager_is_a_subtype_of_Employee
+      minted_from: '{"subtype":"Manager","supertype":"Employee","defining_rule":null}'
       subtype: Manager
       supertype: Employee

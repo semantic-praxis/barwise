@@ -43,8 +43,9 @@ export class HoverProvider {
       return this.objectTypeHover(ot, model);
     }
 
-    // Check if the word matches an object type id (for player references).
-    const otById = model.getObjectType(word);
+    // Check if the word matches an object type id (for player references):
+    // in a 3.x file, the id it states, which the load replayed into 4.0's.
+    const otById = model.getObjectType(model.idFromPrior(word) ?? word);
     if (otById) {
       return this.objectTypeHover(otById, model);
     }

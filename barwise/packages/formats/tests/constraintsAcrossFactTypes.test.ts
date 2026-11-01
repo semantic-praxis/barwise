@@ -10,6 +10,7 @@ import {
   type OrmModel,
   OrmYamlSerializer,
   setIdGenerator,
+  writeDocument,
 } from "@barwise/core";
 import { RelationalMapper, resolveDialectProfile, routeConstraints } from "@barwise/core/mapping";
 import { readFileSync } from "node:fs";
@@ -86,15 +87,16 @@ function build(host: Host): OrmModel {
 /**
  * `model` read back from a 2.0 file that nests the constraints `ids`
  * under `host`, after its own: in memory such a constraint belongs to the
- * model (WS3c), so the nesting is only a 2.0 file's to vary. A save writes
- * 3.0, which lists them in the model and names each preferred identifier on
- * its entity; the 2.0 form nests the one and flags the other.
+ * model (WS3c), so the nesting is only a 2.0 file's to vary. The 3.0 form
+ * lists them in the model and names each preferred identifier on its
+ * entity; the 2.0 form nests the one and flags the other. Read back as the
+ * 2.0 reader builds it, before the replay into 4.0's ids (iri-identity WS6).
  */
 function nestedUnder(model: OrmModel, host: Host, ids: readonly string[]): OrmModel {
   const yaml = new OrmYamlSerializer();
   type Raw = { id: string; is_preferred?: boolean; };
   type NestedFactType = { name: string; constraints?: Raw[]; };
-  const doc = parse(yaml.serialize(model)) as {
+  const doc = parse(stringify(writeDocument(model))) as {
     orm_version: string;
     model: {
       fact_types: NestedFactType[];
@@ -116,7 +118,7 @@ function nestedUnder(model: OrmModel, host: Host, ids: readonly string[]): OrmMo
     const c = ref === undefined ? undefined : byId.get(ref);
     if (c) c.is_preferred = true;
   }
-  return yaml.deserialize(stringify(doc));
+  return yaml.deserializeAsWritten(stringify(doc));
 }
 
 describe("constraints across fact types in DDL routing", () => {

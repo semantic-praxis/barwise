@@ -15,13 +15,21 @@ import { migrateDiagramReferencesToIds } from "./migrations/diagramReferencesToI
  * this onto every document it produces, and the JSON Schema pins its
  * `orm_version` `const` to the same value.
  */
-export const CURRENT_ORM_VERSION = "3.0";
+export const CURRENT_ORM_VERSION = "4.0";
 
 /**
- * The version before the current one, which this build still reads: a 2.0
- * file is read by the 2.0 reader (`readDocument20`) straight into the
- * model, against the 2.0 schema frozen when 3.0 landed, and is written as
- * 3.0 when saved (orm-format-3 WS4b). Older versions migrate to it first.
+ * The previous major, which this build still reads: a 3.0 file is read by
+ * the frozen 3.0 decoders and replayed into 4.0's ids
+ * (`serialization/replay.ts`, iri-identity WS6), and is written as 4.0
+ * when saved.
+ */
+export const PREVIOUS_ORM_VERSION = "3.0";
+
+/**
+ * The oldest major this build reads: a 2.0 file is read by the 2.0 reader
+ * (`readDocument20`) straight into a model, against the 2.0 schema frozen
+ * when 3.0 landed, and replayed as a 3.0 one is (iri-identity decision
+ * 18). Older versions migrate to it first.
  */
 export const LEGACY_ORM_VERSION = "2.0";
 
@@ -160,20 +168,26 @@ export function applyMigrations(
 /** The versions {@link planRead} decides between; injectable for tests. */
 export interface ReadVersions {
   readonly current: string;
-  readonly legacy: string;
+  /**
+   * The earlier majors a reader exists for, newest first, each stated as
+   * the version its reader reads: older versions of the last one migrate
+   * to it, and nothing else migrates between majors.
+   */
+  readonly legacy: readonly string[];
   readonly migrations: readonly OrmVersionMigration[];
 }
 
 const THIS_BUILD: ReadVersions = {
   current: CURRENT_ORM_VERSION,
-  legacy: LEGACY_ORM_VERSION,
+  legacy: [PREVIOUS_ORM_VERSION, LEGACY_ORM_VERSION],
   migrations: ORM_VERSION_MIGRATIONS,
 };
 
 /**
  * How a document stating a version is read: the raw-document steps to
- * apply first, then the reader -- the current one, or the previous major's
- * -- and the version the document states once the steps have run. A
+ * apply first, then the reader -- the current one, or an earlier major's,
+ * named by `target` -- and the version the document states once the steps
+ * have run. A
  * refusal is a newer version; a version between the two majors, or one no
  * chain reaches (`unknown`); a looping registry (`cycle`); or a version
  * of the current major that a release wrote -- the major's first, or one a
@@ -208,9 +222,16 @@ export function planRead(version: string, versions: ReadVersions = THIS_BUILD): 
       || migrations.some((m) => m.from === version || m.to === version);
     return plan.reason === "unknown" && named ? { ok: false, reason: "unregistered" } : plan;
   }
-  if (compareOrmVersions(version, legacy) > 0) return { ok: false, reason: "unknown" };
-  const plan = planMigration(version, legacy, migrations);
-  return plan.ok ? { ok: true, reader: "legacy", target: legacy, steps: plan.steps } : plan;
+  // Newest major first. A version past a legacy reader's, below the next
+  // major, has no reader; one of the oldest major or before migrates to it.
+  for (const [i, target] of legacy.entries()) {
+    if (compareOrmVersions(version, target) > 0) return { ok: false, reason: "unknown" };
+    const oldest = i === legacy.length - 1;
+    if (!oldest && compareOrmVersions(version, majorFirst(target)) < 0) continue;
+    const plan = planMigration(version, target, migrations);
+    return plan.ok ? { ok: true, reader: "legacy", target, steps: plan.steps } : plan;
+  }
+  return { ok: false, reason: "unknown" };
 }
 
 /**
@@ -244,7 +265,7 @@ export function formatVersionProblem(doc: unknown, current: string): string | un
   if (typeof doc !== "object" || doc === null) return undefined;
   const version = (doc as Record<string, unknown>).format_version;
   if (typeof version !== "string") return undefined;
-  const plan = planRead(version, { current, legacy: majorFirst(current), migrations: [] });
+  const plan = planRead(version, { current, legacy: [], migrations: [] });
   if (plan.ok) return undefined;
   return unsupportedVersionMessage("format_version", version, current, plan.reason);
 }

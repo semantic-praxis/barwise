@@ -125,22 +125,26 @@ model:
     - { id: sf-f, subtype: f, supertype: p, is_exclusive: true, is_exhaustive: true }
 `;
 
+  // Loaded through the replay, each subtype fact takes its minted name.
+  const MALE = "Male_is_a_subtype_of_Person";
+  const FEMALE = "Female_is_a_subtype_of_Person";
+
   it("loads to a constraint over its subtype facts", () => {
     const model = serializer.deserialize(yaml);
     expect(model.constraints).toHaveLength(1);
     expect(model.constraints[0]).toMatchObject({
       type: "exclusive_or",
-      subtypeFactIds: ["sf-m", "sf-f"],
+      subtypeFactIds: [MALE, FEMALE],
     });
   });
 
-  it("saves it as a 3.0 constraint over the subtype facts, and reloads to the same id", () => {
+  it("saves it as a constraint over the subtype facts, and reloads to the same id", () => {
     const model = serializer.deserialize(yaml);
     const saved = serializer.serialize(model);
     expect(saved).not.toContain("is_exclusive");
     expect(saved).not.toContain("is_exhaustive");
     expect(saved).toContain(
-      "  constraints:\n    - type: exclusive_or\n      subtype_facts:\n        - sf-m\n        - sf-f\n      id: ",
+      `  constraints:\n    - type: exclusive_or\n      subtype_facts:\n        - ${MALE}\n        - ${FEMALE}\n      id: `,
     );
     const again = serializer.deserialize(saved);
     expect(again.constraints.map((c) => c.id)).toEqual(model.constraints.map((c) => c.id));
@@ -160,7 +164,7 @@ model:
 
   it("drops the constraint when removing a subtype leaves an exclusive-or over one", () => {
     const model = serializer.deserialize(yaml);
-    model.removeSubtypeFact("sf-m");
+    model.removeSubtypeFact(MALE);
     expect(model.constraints).toEqual([]);
   });
 });

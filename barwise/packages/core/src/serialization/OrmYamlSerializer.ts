@@ -17,12 +17,14 @@ import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import { DeserializationError, refusingHeldIds } from "./deserializationError.js";
 import { type MigrationNote, migrationNotes, readLegacy } from "./reader20.js";
+import { replayInto40 } from "./replay.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
   applyMigrations,
   CURRENT_ORM_VERSION,
   LEGACY_ORM_VERSION,
   planRead,
+  PREVIOUS_ORM_VERSION,
   unsupportedVersionMessage,
 } from "./schemaVersion.js";
 import { type OrmYamlConstraint, serializeConstraint } from "./yaml/constraint.js";
@@ -53,10 +55,11 @@ export interface MigrationResult {
  * Serializes OrmModel instances to YAML strings and deserializes
  * YAML strings back to OrmModel instances.
  *
- * The serializer produces YAML that conforms to the orm-model.schema.json
- * schema. The deserializer reads a 3.0 file through the Effect decoders in
- * `src/decode/`, and a file below 3.0 through the 2.0 reader, which
- * validates it against the frozen 2.0 schema, before constructing the model.
+ * The serializer produces format 4.0, which orm-model.schema.json states.
+ * The deserializer reads a 4.0 file through the Effect decoders in
+ * `src/decode/`; a 3.0 file through the frozen 3.0 decoders, and a file
+ * below 3.0 through the 2.0 reader, which validates it against the frozen
+ * 2.0 schema; and replays either into 4.0's ids (`replay.ts`).
  */
 export class OrmYamlSerializer {
   /**
@@ -90,9 +93,10 @@ export class OrmYamlSerializer {
   /**
    * Deserialize a YAML string into an OrmModel.
    *
-   * A 3.0 document is first decoded by the Effect decoders, and a document
-   * below 3.0 validated against the frozen 2.0 schema. If either fails, a
-   * DeserializationError is thrown with every problem found.
+   * A 4.0 or 3.0 document is first decoded by its Effect decoders, and a
+   * document below 3.0 validated against the frozen 2.0 schema. If either
+   * fails, a DeserializationError is thrown with every problem found. A 3.0
+   * or older model is then replayed into 4.0's ids.
    *
    * The model is then constructed from the decoded document. A held id or a
    * repeated constraint id is thrown as DeserializationError; a check only an
@@ -128,27 +132,53 @@ export class OrmYamlSerializer {
    * them; every other caller wants only the model (orm-format-3 WS4b-iii).
    */
   migrate(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
-    return refusingHeldIds(() => this.read(yaml, options));
+    return refusingHeldIds(() => this.read(yaml, options, true));
   }
 
-  private read(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
+  /**
+   * The model a file states under its own ids: a 3.x or 2.0 file as the
+   * frozen readers build it, before the replay into 4.0's ids; a 4.0 file
+   * as `deserialize` reads it. For a document whose ids are the point: the
+   * tests that hold the frozen readers and the replay to the tracked corpus,
+   * and Ossie's export check, which reads back a model under its source's
+   * ids. Not for a file a person opened: that is `deserialize`'s.
+   */
+  deserializeAsWritten(yaml: string, options?: { lenient?: boolean; }): OrmModel {
+    return refusingHeldIds(() => this.read(yaml, options, false)).model;
+  }
+
+  private read(
+    yaml: string,
+    options: { lenient?: boolean; } | undefined,
+    replay: boolean,
+  ): MigrationResult {
+    const into40 = (model: OrmModel) => (replay ? replayInto40(model) : model);
     const raw = parse(yaml) as unknown;
     const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
     // A 2.0 file is read by the 2.0 reader, against the 2.0 schema frozen
-    // when 3.0 landed; a 3.0 file by the 3.0 reader. Reading 2.0 directly
-    // into the model is the migration: the model is what both formats
-    // state, and a 2.0 file saved writes 3.0 (orm-format-3 WS4b).
+    // when 3.0 landed, and a 3.0 file by the frozen 3.0 decoders; each
+    // model is then replayed into 4.0's ids (iri-identity WS6, decision
+    // 18), and saved as 4.0. A note names an element by its id in the file
+    // read, which is what it describes.
     if (version === LEGACY_ORM_VERSION) {
       this.check(this.validator.validateLegacyModel(doc));
       const { model, placed, flags } = readLegacy(doc as OrmYamlDocument, options);
-      return { model, from: from!, notes: migrationNotes(model, placed, flags) };
+      const notes = migrationNotes(model, placed, flags);
+      return { model: into40(model), from: from!, notes };
     }
-    // Every other document is read as 3.0, by the Effect decoders alone
+    if (version === PREVIOUS_ORM_VERSION) {
+      return {
+        model: into40(fromDecoded(decodeOrRefuse(doc), options)),
+        from: from!,
+        notes: [],
+      };
+    }
+    // Every other document is read as 4.0, by the Effect decoders alone
     // (effect-adoption 1r, R4): every problem the file has, each named by
     // its element and field, in one pass. A document with no orm_version
     // comes here too, and is told it is missing.
-    return { model: fromDecoded(decodeOrRefuse(doc), options), from: from!, notes: [] };
+    return { model: readDocument40(doc, options), from: from!, notes: [] };
   }
 
   private check(result: SchemaValidationResult): void {
@@ -164,12 +194,13 @@ export class OrmYamlSerializer {
 
   /**
    * Bring a freshly parsed document to a version a reader exists for:
-   * the current version, which earlier minors of its major migrate to, or
-   * 2.0, which older documents migrate to first (`planRead`).
+   * the current version, which earlier minors of its major migrate to;
+   * 3.0; or 2.0, which older documents migrate to first (`planRead`).
    *
    * Documents whose `orm_version` is missing or malformed are passed
    * through untouched so that the reader reports them: the decoders for
-   * 3.0, which name the missing or malformed version as a problem. A present-but-unsupported version throws a
+   * 4.0, which name the missing or malformed version as a problem. A
+   * present-but-unsupported version throws a
    * {@link DeserializationError} describing whether the file is too new or
    * simply unreachable.
    */
@@ -197,8 +228,8 @@ export class OrmYamlSerializer {
 
   // -- Internal: model -> document --
 
-  private toDocument(model: OrmModel): OrmYamlDocument {
-    return writeDocument(model);
+  private toDocument(model: OrmModel): OrmYamlDocument40 {
+    return writeDocument40(model);
   }
 }
 
@@ -339,9 +370,6 @@ function addDecoded(
  * one element; the rest are reserved for the load, so a name the model
  * mints for an element the file gives no id skips them, and the element
  * stating each takes it wherever it sits in the file.
- *
- * Not yet reached from `deserialize`: `planRead` refuses 4.0 until 6b-2b-2
- * writes it, so a 4.0 file is never saved as 3.0.
  */
 export function readDocument40(doc: unknown, options?: { lenient?: boolean; }): OrmModel {
   const decoded = decodeOrRefuse(doc, runDocument40Decode, "4.0");
@@ -395,7 +423,7 @@ function statedIds40(doc: DecodedDocument40): (readonly [string, IdKind])[] {
  * and each entity's preferred identifier by constraint id.
  */
 export function writeDocument(model: OrmModel): OrmYamlDocument {
-  return documentOf(model, CURRENT_ORM_VERSION, {
+  return documentOf(model, PREVIOUS_ORM_VERSION, {
     constraint: (c) => {
       if (c.id === undefined) {
         throw new Error(
@@ -417,10 +445,6 @@ export function writeDocument(model: OrmModel): OrmYamlDocument {
  * left unnamed written without an id (decision 19), and beside each id the
  * model minted, or read with one, the key it was minted from
  * (`minted_from`, decision 14).
- *
- * Not yet reached from `serialize`, which writes 3.0 until the switch
- * reads 3.x through the replay, so no file is written in a format the
- * loader refuses.
  */
 export function writeDocument40(model: OrmModel): OrmYamlDocument40 {
   // A constraint's written form types no id (`serializeConstraint` sets
@@ -436,7 +460,7 @@ export function writeDocument40(model: OrmModel): OrmYamlDocument40 {
       ),
     ) as R & { minted_from: string; };
   };
-  return documentOf(model, "4.0", {
+  return documentOf(model, CURRENT_ORM_VERSION, {
     constraint: (c) => minted(serializeConstraint(c)),
     subtypeFact: (sf) => minted(serializeSubtypeFact40(sf)),
     objectification: (o) => minted(serializeObjectifiedFactType40(o)),

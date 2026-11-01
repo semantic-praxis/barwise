@@ -7,7 +7,6 @@
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import type { ExternalConstraint, InternalConstraint } from "../../src/model/Constraint.js";
-import { setIdGenerator } from "../../src/model/id.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
@@ -24,21 +23,21 @@ function rooms(across: ExternalConstraint[] = []): OrmModel {
     id: "ft-in",
     name: "Room is in Building",
     roles: [
-      { id: "r-room-in", name: "is in", playerId: "ot-room" },
-      { id: "r-b", name: "houses", playerId: "ot-b" },
+      { id: "r.room-in", name: "is in", playerId: "ot-room" },
+      { id: "r.b", name: "houses", playerId: "ot-b" },
     ],
     readings: ["{0} is in {1}"],
-    constraints: [{ id: "c-in", type: "internal_uniqueness", roleIds: ["r-room-in"] }],
+    constraints: [{ id: "c-in", type: "internal_uniqueness", roleIds: ["r.room-in"] }],
   });
   model.addFactType({
     id: "ft-nr",
     name: "Room has RoomNumber",
     roles: [
-      { id: "r-room-nr", name: "has", playerId: "ot-room" },
-      { id: "r-n", name: "is of", playerId: "ot-nr" },
+      { id: "r.room-nr", name: "has", playerId: "ot-room" },
+      { id: "r.n", name: "is of", playerId: "ot-nr" },
     ],
     readings: ["{0} has {1}"],
-    constraints: [{ id: "c-nr", type: "internal_uniqueness", roleIds: ["r-room-nr"] }],
+    constraints: [{ id: "c-nr", type: "internal_uniqueness", roleIds: ["r.room-nr"] }],
   });
   for (const c of across) model.addConstraint(c);
   return model;
@@ -47,7 +46,7 @@ function rooms(across: ExternalConstraint[] = []): OrmModel {
 const key: ExternalConstraint = {
   id: "c-key",
   type: "external_uniqueness",
-  roleIds: ["r-b", "r-n"],
+  roleIds: ["r.b", "r.n"],
 };
 
 describe("constraints across fact types on the model", () => {
@@ -61,7 +60,7 @@ describe("constraints across fact types on the model", () => {
       model.addFactType({
         id: "ft-x",
         name: "Room is wide",
-        roles: [{ id: "r-w", name: "is wide", playerId: "ot-room" }],
+        roles: [{ id: "r.w", name: "is wide", playerId: "ot-room" }],
         readings: ["{0} is wide"],
         constraints: [asserted],
       })
@@ -77,18 +76,15 @@ describe("constraints across fact types on the model", () => {
     expect(model.constraints).toEqual([]);
   });
 
-  it("gives one added without an id a fresh id, in the order added", () => {
-    let n = 0;
-    setIdGenerator(() => `gen-${++n}`);
-    try {
-      const model = rooms();
-      const first = model.addConstraint({ type: "exclusion", roleIds: ["r-b", "r-n"] });
-      model.addConstraint(key);
-      expect(first.id).toBe("gen-1");
-      expect(model.constraints.map((c) => c.id)).toEqual(["gen-1", "c-key"]);
-    } finally {
-      setIdGenerator(undefined);
-    }
+  it("leaves one added without an id it cannot name unnamed, in the order added", () => {
+    // An exclusion over roles of two players has no sentence to mint a name
+    // from, so it stays unnamed (iri-identity decision 19) and validation
+    // reports it; no generated id stands in.
+    const model = rooms();
+    const first = model.addConstraint({ type: "exclusion", roleIds: ["r.b", "r.n"] });
+    model.addConstraint(key);
+    expect(first.id).toBeUndefined();
+    expect(model.constraints.map((c) => c.id)).toEqual([undefined, "c-key"]);
   });
 
   it("finds one by id with no fact type", () => {
@@ -103,7 +99,7 @@ describe("constraints across fact types on the model", () => {
     const inside: ExternalConstraint = {
       id: "c-inside",
       type: "exclusion",
-      roleIds: ["r-room-in", "r-b"],
+      roleIds: ["r.room-in", "r.b"],
     };
     const model = rooms([key, inside]);
     model.removeFactType("ft-in");
@@ -153,7 +149,7 @@ describe("a 3.0 save of constraints across fact types", () => {
     // A lenient load reads one and merge carries one through; validation
     // reports it, and the file must not lose it.
     const model = rooms();
-    model.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] });
+    model.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r.x", "r.y"] });
     const text = yaml.serialize(model);
     expect(listed(text).model).toEqual(["c-gone"]);
     expect(yaml.deserialize(text, { lenient: true }).constraints.map((c) => c.id)).toEqual([
@@ -163,7 +159,7 @@ describe("a 3.0 save of constraints across fact types", () => {
 
   it("saves one in a model with no fact type, which 2.0 had nowhere to put", () => {
     const model = new OrmModel({ name: "Empty" });
-    model.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r-x", "r-y"] });
+    model.addConstraint({ id: "c-gone", type: "exclusion", roleIds: ["r.x", "r.y"] });
     expect(listed(yaml.serialize(model)).model).toEqual(["c-gone"]);
   });
 });

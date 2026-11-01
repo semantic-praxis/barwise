@@ -58,8 +58,10 @@ export function rooms(extra: ExternalConstraint[] = []): OrmModel {
 
 /**
  * `rooms()` as a 2.0 file states it with the key nested under `host`,
- * read back. Nesting exists only in the file: in memory the key belongs to
- * the model (WS3c). The document is JSON, which is YAML.
+ * read back as the 2.0 reader builds it, before the replay into 4.0's ids
+ * renames everything (iri-identity WS6). Nesting exists only in the file:
+ * in memory the key belongs to the model (WS3c). The document is JSON,
+ * which is YAML.
  */
 export function roomsFile(host: Host): OrmModel {
   const key = { id: "c-key", type: "external_uniqueness", roles: ["r-b", "r-n"] };
@@ -105,5 +107,5 @@ export function roomsFile(host: Host): OrmModel {
       ],
     },
   };
-  return new OrmYamlSerializer().deserialize(JSON.stringify(doc));
+  return new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(doc));
 }

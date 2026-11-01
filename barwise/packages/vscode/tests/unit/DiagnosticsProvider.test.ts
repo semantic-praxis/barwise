@@ -114,9 +114,12 @@ describe("DiagnosticsProvider", () => {
 
     // The constraint error references ft-has-age which contains an
     // internal uniqueness constraint pointing at a role from another
-    // fact type. ft-has-age is at line 30 (0-indexed) in the fixture.
+    // fact type. ft-has-age is at line 30 (0-indexed) in the fixture. The
+    // fixture is 3.x, replayed at load, so the message names the role
+    // r-person-name by its 4.0 id, and the position is found by the id the
+    // file states (iri-identity WS6).
     const constraintError = errors.find((d: { message: string; }) =>
-      d.message.includes("r-person-name")
+      d.message.includes("Person_has_Name.has")
     );
     expect(constraintError).toBeDefined();
     expect(constraintError.range.start.line).toBeGreaterThan(0);

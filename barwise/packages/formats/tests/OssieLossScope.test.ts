@@ -335,3 +335,29 @@ describe("Ossie export: a constraint naming another fact type's role (barwise-5x
     expect(result.constraintSpecs![0]!.verbalization).toMatch(/Person/);
   });
 });
+
+describe("Ossie export of constraints the model leaves unnamed", () => {
+  it("keys each one's loss apart, by its reference", () => {
+    // An exclusion over roles of two players has no sentence to mint a name
+    // from, so the model leaves each unnamed (iri-identity decision 19), and
+    // a loss keyed by id alone would give both one key.
+    const m = new OrmModel({ name: "M" });
+    m.addObjectType({ id: "a", name: "A", kind: "entity", referenceMode: "a_id" });
+    m.addObjectType({ id: "b", name: "B", kind: "entity", referenceMode: "b_id" });
+    const unary = (id: string, name: string, player: string) =>
+      m.addFactType({
+        id,
+        name,
+        roles: [{ id: `${id}.r`, name: name.split(" ")[1]!, playerId: player }],
+        readings: [`{0} ${name.split(" ")[1]}`],
+      });
+    unary("f1", "A runs", "a");
+    unary("f2", "B walks", "b");
+    m.addConstraint({ type: "exclusion", roleIds: ["f1.r", "f2.r"] });
+    m.addConstraint({ type: "exclusion", roleIds: ["f2.r", "f1.r"] });
+    expect(m.constraints.map((c) => c.id)).toEqual([undefined, undefined]);
+    const keys = [...writeOssie(m).covers.keys()].filter((k) => k.startsWith("constraint:"));
+    expect(new Set(keys).size).toBe(2);
+    expect(() => new OssieExportFormat().export(m)).not.toThrow();
+  });
+});

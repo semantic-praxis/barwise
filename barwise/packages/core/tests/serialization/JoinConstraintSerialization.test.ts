@@ -14,11 +14,11 @@ import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js"
 const serializer = new OrmYamlSerializer();
 
 const bornIn: JoinOperand = {
-  path: { root: "ot-person", steps: [{ entry: "pb-person", exit: "pb-country" }] },
+  path: { root: "ot-person", steps: [{ entry: "pb.person", exit: "pb.country" }] },
   projection: [0, 1],
 };
 const citizenOf: JoinOperand = {
-  path: { root: "ot-person", steps: [{ entry: "pc-person", exit: "pc-country" }] },
+  path: { root: "ot-person", steps: [{ entry: "pc.person", exit: "pc.country" }] },
   projection: [0, 1],
 };
 
@@ -38,16 +38,16 @@ function buildModel(constraint: ExternalConstraint): OrmModel {
   model.addFactType({
     name: "Person was born in Country",
     roles: [
-      { name: "was born in", playerId: person.id, id: "pb-person" },
-      { name: "is birthplace of", playerId: country.id, id: "pb-country" },
+      { name: "was born in", playerId: person.id, id: "pb.person" },
+      { name: "is birthplace of", playerId: country.id, id: "pb.country" },
     ],
     readings: ["{0} was born in {1}"],
   });
   model.addFactType({
     name: "Person is citizen of Country",
     roles: [
-      { name: "is citizen of", playerId: person.id, id: "pc-person" },
-      { name: "has citizen", playerId: country.id, id: "pc-country" },
+      { name: "is citizen of", playerId: person.id, id: "pc.person" },
+      { name: "has citizen", playerId: country.id, id: "pc.country" },
     ],
     readings: ["{0} is citizen of {1}"],
   });

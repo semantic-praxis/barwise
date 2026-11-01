@@ -1,4 +1,4 @@
-orm_version: "3.0"
+orm_version: "4.0"
 model:
   name: vendor-onboarding
   object_types:
@@ -175,6 +175,7 @@ model:
         - type: mandatory
           role: Vendor_has_VendorNumber.has
           id: Each_Vendor_has_at_least_one_VendorNumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has VendorNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Vendor","VendorNumber"]}],"fact_type":{"name":"Vendor has VendorNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Vendor","VendorNumber"]}}'
     - id: Vendor_has_LegalName
       name: Vendor has LegalName
       roles:
@@ -195,6 +196,7 @@ model:
         - type: mandatory
           role: Vendor_has_LegalName.has
           id: Each_Vendor_has_at_least_one_LegalName
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","LegalName"]}],"fact_type":{"name":"Vendor has LegalName","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","LegalName"]}}'
     - id: Vendor_has_TaxID
       name: Vendor has TaxID
       roles:
@@ -215,6 +217,7 @@ model:
         - type: mandatory
           role: Vendor_has_TaxID.has
           id: Each_Vendor_has_at_least_one_TaxID
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has TaxID","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","TaxID"]}],"fact_type":{"name":"Vendor has TaxID","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","TaxID"]}}'
     - id: Vendor_has_VendorStatus
       name: Vendor has VendorStatus
       roles:
@@ -235,6 +238,7 @@ model:
         - type: mandatory
           role: Vendor_has_VendorStatus.has
           id: Each_Vendor_has_at_least_one_VendorStatus
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has VendorStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","VendorStatus"]}],"fact_type":{"name":"Vendor has VendorStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","VendorStatus"]}}'
     - id: Vendor_has_SpendTier
       name: Vendor has SpendTier
       roles:
@@ -255,6 +259,7 @@ model:
         - type: mandatory
           role: Vendor_has_SpendTier.has
           id: Each_Vendor_has_at_least_one_SpendTier
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Vendor has SpendTier","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","SpendTier"]}],"fact_type":{"name":"Vendor has SpendTier","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","SpendTier"]}}'
     - id: Vendor_has_RiskTier
       name: Vendor has RiskTier
       roles:
@@ -296,6 +301,7 @@ model:
         - type: mandatory
           role: Region_has_RegionCode.has
           id: Each_Region_has_at_least_one_RegionCode
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"Region has RegionCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Region","RegionCode"]}],"fact_type":{"name":"Region has RegionCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Region","RegionCode"]}}'
     - id: Vendor_operates_in_Region_with_Contact
       name: Vendor operates in Region with Contact
       roles:
@@ -346,6 +352,7 @@ model:
         - type: mandatory
           role: RiskReview_has_ReviewID.has
           id: Each_RiskReview_has_at_least_one_ReviewID
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"RiskReview has ReviewID","readings":["{0} has {1}","{1} identifies {0}"],"players":["RiskReview","ReviewID"]}],"fact_type":{"name":"RiskReview has ReviewID","readings":["{0} has {1}","{1} identifies {0}"],"players":["RiskReview","ReviewID"]}}'
     - id: RiskReview_is_for_Vendor
       name: RiskReview is for Vendor
       roles:
@@ -387,6 +394,7 @@ model:
         - type: mandatory
           role: PurchaseOrder_has_PONumber.has
           id: Each_PurchaseOrder_has_at_least_one_PONumber
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PurchaseOrder has PONumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["PurchaseOrder","PONumber"]}],"fact_type":{"name":"PurchaseOrder has PONumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["PurchaseOrder","PONumber"]}}'
     - id: PurchaseOrder_is_raised_against_Vendor
       name: PurchaseOrder is raised against Vendor
       roles:
@@ -407,6 +415,7 @@ model:
         - type: mandatory
           role: PurchaseOrder_is_raised_against_Vendor.is_raised_against
           id: Each_PurchaseOrder_is_raised_against_at_least_one_Vendor
+          minted_from: '{"type":"mandatory","role":[0,"is raised against",{"name":"PurchaseOrder is raised against Vendor","readings":["{0} is raised against {1}","{1} has {0}"],"players":["PurchaseOrder","Vendor"]}],"fact_type":{"name":"PurchaseOrder is raised against Vendor","readings":["{0} is raised against {1}","{1} has {0}"],"players":["PurchaseOrder","Vendor"]}}'
     - id: PurchaseOrder_has_Amount
       name: PurchaseOrder has Amount
       roles:
@@ -427,6 +436,7 @@ model:
         - type: mandatory
           role: PurchaseOrder_has_Amount.has
           id: Each_PurchaseOrder_has_at_least_one_Amount
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PurchaseOrder has Amount","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","Amount"]}],"fact_type":{"name":"PurchaseOrder has Amount","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","Amount"]}}'
     - id: PurchaseOrder_has_RaisedDate
       name: PurchaseOrder has RaisedDate
       roles:
@@ -447,6 +457,7 @@ model:
         - type: mandatory
           role: PurchaseOrder_has_RaisedDate.has
           id: Each_PurchaseOrder_has_at_least_one_RaisedDate
+          minted_from: '{"type":"mandatory","role":[0,"has",{"name":"PurchaseOrder has RaisedDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","RaisedDate"]}],"fact_type":{"name":"PurchaseOrder has RaisedDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PurchaseOrder","RaisedDate"]}}'
   constraints:
     - type: subset
       subset_roles:
@@ -454,3 +465,4 @@ model:
       superset_roles:
         - Vendor_has_VendorStatus.has
       id: If_Vendor_in_PurchaseOrder_is_raised_against_Vendor_then_Vendor_in_Vendor_has_VendorStatus
+      minted_from: '{"type":"subset","subset_roles":[[1,"has",{"name":"PurchaseOrder is raised against Vendor","readings":["{0} is raised against {1}","{1} has {0}"],"players":["PurchaseOrder","Vendor"]}]],"superset_roles":[[0,"has",{"name":"Vendor has VendorStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Vendor","VendorStatus"]}]]}'

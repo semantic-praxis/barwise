@@ -15,7 +15,7 @@ import { createObjectType, VALUE_ONLY_FIELDS } from "../../src/model/ObjectType.
 import { SchemaValidator } from "../../src/serialization/SchemaValidator.js";
 
 const schema = JSON.parse(
-  readFileSync(new URL("../../schemas/orm-model.schema.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../schemas/orm-model-3.0.schema.json", import.meta.url), "utf8"),
 ) as { definitions: { object_type: { then: { properties: Record<string, unknown>; }; }; }; };
 
 const snake = (field: string) => field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
@@ -57,7 +57,7 @@ describe("value-only fields", () => {
     });
 
     it(`the schema rejects ${snake(field)} on an entity type, naming the type and the field`, () => {
-      const result = validator.validateModel({
+      const result = validator.validateModel30({
         orm_version: "3.0",
         model: {
           name: "Test",
@@ -95,7 +95,7 @@ describe("value-only fields", () => {
     const fields = Object.fromEntries(
       VALUE_ONLY_FIELDS.map(([f]) => [snake(f), SAMPLES[f]!.yaml]),
     );
-    const result = validator.validateModel({
+    const result = validator.validateModel30({
       orm_version: "3.0",
       model: {
         name: "Test",
