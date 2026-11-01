@@ -5,7 +5,6 @@ export {
   CONSTRAINT_TYPES,
   type ConstraintBase,
   type ConstraintModality,
-  constraintRef,
   type DisjunctiveMandatoryConstraint,
   type EqualityConstraint,
   type ExclusionConstraint,
@@ -57,6 +56,7 @@ export {
   type ValueConstraint,
   withoutSubtypeFacts,
 } from "./model/Constraint.js";
+export { constraintRef } from "./model/constraintRef.js";
 export {
   ContextMapping,
   type ContextMappingConfig,

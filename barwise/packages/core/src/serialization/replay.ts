@@ -24,12 +24,8 @@ import {
   constraintRecord,
   modelConstraint,
 } from "../decode/constraint.js";
-import {
-  type Constraint,
-  constraintRef,
-  type ExternalConstraint,
-  type InternalConstraint,
-} from "../model/Constraint.js";
+import type { Constraint, ExternalConstraint, InternalConstraint } from "../model/Constraint.js";
+import { constraintRef } from "../model/constraintRef.js";
 import { toFactTypeConfig } from "../model/FactType.js";
 import { mapConstraintReferences, type Reference } from "../model/mint.js";
 import {

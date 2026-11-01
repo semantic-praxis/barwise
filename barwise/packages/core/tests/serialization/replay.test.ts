@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import { IDS_40 } from "../../src/decode/ids.js";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { constraintRef } from "../../src/model/Constraint.js";
+import { constraintRef } from "../../src/model/constraintRef.js";
 import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import {

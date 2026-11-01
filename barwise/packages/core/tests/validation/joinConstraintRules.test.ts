@@ -7,11 +7,8 @@
  * satisfaction is a separate rule.
  */
 import { describe, expect, it } from "vitest";
-import {
-  constraintRef,
-  type ExternalConstraint,
-  type JoinOperand,
-} from "../../src/model/Constraint.js";
+import type { ExternalConstraint, JoinOperand } from "../../src/model/Constraint.js";
+import { constraintRef } from "../../src/model/constraintRef.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { joinConstraintRules } from "../../src/validation/rules/joinConstraintRules.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";

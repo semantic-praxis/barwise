@@ -1,4 +1,5 @@
-import { type Constraint, constraintRef, roleIdsOf } from "../model/Constraint.js";
+import { type Constraint, roleIdsOf } from "../model/Constraint.js";
+import { constraintRef } from "../model/constraintRef.js";
 import type { FactType } from "../model/FactType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 
