@@ -204,6 +204,8 @@ export class OrmModel implements ConstraintModel {
    * stated ids it checked across kinds before holding them.
    */
   private _addingFactType = false;
+  /** See `unstoredIds`. */
+  private _unstored: ReadonlySet<string> = new Set();
   /** See `priorIds`. */
   private _priorIds: ReadonlyMap<string, string> | undefined;
   /** `priorIds` backwards, built on first use by `idFromPrior`. */
@@ -265,6 +267,27 @@ export class OrmModel implements ConstraintModel {
     if (named?.id !== undefined && named.key !== undefined) {
       this._mintedFrom.set(named.id, named.key);
     }
+  }
+
+  /**
+   * The ids the 4.0 file this model was read from does not state, which
+   * the load minted and every load of that file will mint again (decision
+   * 17). Until the file states one, nothing outside the model can refer to
+   * it by id, and decision 14's stale check cannot fire on it, because
+   * there is no stored key to compare. An id goes from the list when its
+   * element does. Empty for any model not read from a 4.0 file.
+   */
+  get unstoredIds(): readonly string[] {
+    return [...this._unstored].filter((id) => this._mintedFrom.has(id));
+  }
+
+  /**
+   * Set by the 4.0 reader once every element is added and before the keys
+   * the file states are recorded: every id with a key then was minted by
+   * the load.
+   */
+  recordUnstoredIds(): void {
+    this._unstored = new Set(this._mintedFrom.keys());
   }
 
   /** Set once, by the replay that built this model. */

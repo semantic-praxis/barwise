@@ -19,7 +19,9 @@ implemented 2026-10-30 (the 4.0 reader, unwired); 6b-4a implemented
 diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
 (the 4.0 writer and stored `minted_from`, unwired); 6b-2b-2b-2 implemented
 2026-10-31 (the switch to format 4.0, with its fixture and golden churn);
-6b-3, 6b-4b, 6c to 6f and WS7 to come
+6b-3a implemented 2026-11-02 (`migrate` for projects and unstored ids,
+the editor's "Store ids", the 3.x note); 6b-3b, 6b-3c, 6b-4b, 6c to 6f
+and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-10-31
@@ -1628,7 +1630,26 @@ sites.
             id finds nothing; 6e).
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
-  `imports`.
+  `imports`. Three PRs (owner, 2026-11-02): 6b-3a `migrate` and unstored
+  ids, 6b-3b the rules, 6b-3c `iriOf` and the header.
+  - _6b-3a notes._
+    - `migrate` given a `.orm-project.yaml` replays each domain once on its
+      own, which gives every owned object type its id, then again with
+      `ReplayOptions.ownerId`, so a shadow takes `<context>:<owner's id>`.
+      Every domain goes in one staged write, and one refused domain
+      refuses the project. A domain already at 4.0 keeps its shadows' ids;
+      the project-load check this spec gives reports one that names the
+      wrong owner.
+    - A current file with unstored ids is written by `storeIds`, which
+      edits the file's own YAML and keeps comments, rather than writing
+      from the model; the editor's "Store ids" quick fix calls the same
+      function. `OrmModel.unstoredIds` lists them, set by the 4.0 reader
+      from the keys its load minted before recording those the file states.
+    - Two rules: `structural/unstored-id` (warning, per id, placed on its
+      element by document path) and `structural/replayed-ids` (info, once,
+      on any file before 4.0). The second is the owner's decision on
+      barwise-wcg.frh (2026-11-02): messages keep 4.0 ids, and the note says
+      why and names `barwise migrate`.
 - _6b-4, importers and retirement._ The importers switch off
   `generateId` (role ids first, as 6b-4a above), and `generateId`, its
   installs and promptlab's deterministic ids go (6b-4b). Until then an

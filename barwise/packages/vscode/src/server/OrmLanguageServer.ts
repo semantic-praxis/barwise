@@ -1,5 +1,7 @@
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
+  type CodeAction,
+  type CodeActionParams,
   type CompletionItem,
   createConnection,
   type Hover,
@@ -10,6 +12,7 @@ import {
   TextDocuments,
   TextDocumentSyncKind,
 } from "vscode-languageserver/node";
+import { storeIdsAction } from "./CodeActionProvider.js";
 import { CompletionProvider } from "./CompletionProvider.js";
 import { DiagnosticsProvider } from "./DiagnosticsProvider.js";
 import { HoverProvider } from "./HoverProvider.js";
@@ -39,6 +42,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
         triggerCharacters: ['"', ":", " "],
       },
       hoverProvider: true,
+      codeActionProvider: true,
     },
   };
 });
@@ -79,6 +83,13 @@ connection.onHover(
     return hoverProvider.provideHover(doc, params.position);
   },
 );
+
+// Code actions: storing the ids a file leaves to the load.
+connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc || !isOrmYaml(doc.uri)) return [];
+  return storeIdsAction(doc, params.context.diagnostics);
+});
 
 function isOrmYaml(uri: string): boolean {
   return uri.endsWith(".orm.yaml");

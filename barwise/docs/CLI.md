@@ -262,11 +262,13 @@ Options:
 
 ### migrate
 
-Rewrite `.orm.yaml` files in place as the current format (4.0).
+Rewrite `.orm.yaml` files in place as the current format (4.0), or
+every domain of a project.
 
 ```sh
 barwise migrate model.orm.yaml
 barwise migrate domains/*.orm.yaml
+barwise migrate shop.orm-project.yaml
 barwise migrate --check models/*.orm.yaml
 ```
 
@@ -278,11 +280,29 @@ reading each one changed beyond the format. A 2.0 `is_preferred` flag that ident
 no entity type is dropped, and of two flags that name one entity type,
 one is kept. Each is printed under its file. Run `barwise validate` with
 your 2.x build first if you want to see those cases before they are
-resolved.
+resolved. Until a file is migrated, `barwise validate` and the editor name
+its elements by their 4.0 ids, which the file does not state, and say so
+once, at the top of the file.
 
-This is one of the two commands that modify their inputs, with `rename`. The file is written
-from the model, so YAML comments and hand layout in it are not kept. A
-file already at 4.0 is left untouched. A file is not written, and is
+Migrate a project's domains through its `.orm-project.yaml` rather than
+one at a time. A shadow (an object type another domain owns) takes its
+owner's 4.0 id, and a domain's own file cannot tell when the owner's id
+took a suffix (`Order_Line_2`, because another type in that domain already
+had `Order_Line`); alone, the shadow would name the other type. Given the
+manifest, `migrate` reads every domain first and gives each shadow the id
+its owner holds, then writes all the domains in one staged write. If any
+domain cannot be migrated, none is written.
+
+A 4.0 file can also leave an id to the load: a constraint, subtype fact or
+objectification typed without one is given an id each time the file is
+read, and nothing else can refer to it by that id until the file states
+it. `migrate` writes those ids into such a file, each with the key it was
+named from, and keeps the file's comments and layout; the editor's "Store
+ids" quick fix does the same for the open file. A 4.0 file that states every
+id is left untouched.
+
+This is one of the two commands that modify their inputs, with `rename`. A file before 4.0
+is written from the model, so YAML comments and hand layout in it are not kept. A file is not written, and is
 reported, when it cannot be read or does not load, when its 4.0 form would
 not load back, or when it
 names elements it does not define (a fragment) and carries `is_preferred`

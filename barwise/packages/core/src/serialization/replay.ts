@@ -51,11 +51,26 @@ type Kind =
   | "population"
   | "instance";
 
+/** What a replay may be told beyond its one file. */
+export interface ReplayOptions {
+  /**
+   * The id a shadow's owner holds in its own domain, by the owner's
+   * context and the shadow's name; undefined when that domain does not
+   * say. A file alone cannot see an owner whose local name took a suffix,
+   * so `barwise migrate` given a project replays its domains first, then
+   * replays each domain with shadows again with this, so the shadow names
+   * its owner rather than whichever element holds the unsuffixed local
+   * name (iri-identity, Requirements: the 3.x read).
+   */
+  readonly ownerId?: (context: string, name: string) => string | undefined;
+}
+
 /**
- * Replay a 3.x model into format 4.0's ids. Pure: one model gives one
- * result. The returned model's `priorIds` maps each new id back to the old.
+ * Replay a 3.x model into format 4.0's ids. Pure: one model and one set of
+ * options give one result. The returned model's `priorIds` maps each new
+ * id back to the old.
  */
-export function replayInto40(source: OrmModel): OrmModel {
+export function replayInto40(source: OrmModel, options: ReplayOptions = {}): OrmModel {
   const target = new OrmModel({
     name: source.name,
     ...(source.domainContext !== undefined ? { domainContext: source.domainContext } : {}),
@@ -155,11 +170,14 @@ export function replayInto40(source: OrmModel): OrmModel {
   target.withReserved(reserved, () => {
     // Object types first: everything else refers to them. A shadow, which
     // holds another domain's element, takes `<context>:<local name>`, its
-    // context a local name too, as a 4.0 alias is.
+    // context a local name too, as a 4.0 alias is; or the owner's own id,
+    // when the caller knows it (`ReplayOptions.ownerId`).
     for (const ot of source.objectTypes) {
       const { id: _old, ...config } = ot as ObjectTypeConfig & { readonly id: string; };
       const id = ot.sourceContext !== undefined
-        ? `${localName(ot.sourceContext)}:${localName(ot.name)}`
+        ? `${localName(ot.sourceContext)}:${
+          options.ownerId?.(ot.sourceContext, ot.name) ?? localName(ot.name)
+        }`
         : undefined;
       record("objectType", ot.id, target.addObjectType({ ...config, ...(id ? { id } : {}) }).id);
     }

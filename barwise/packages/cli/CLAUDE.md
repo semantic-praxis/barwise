@@ -28,7 +28,8 @@ src/
     diagram.ts          barwise diagram <file>
     diff.ts             barwise diff <file1> <file2>
     merge.ts            barwise merge <base> <incoming> (non-interactive; stdout by default)
-    migrate.ts          barwise migrate <files...> (rewrites .orm.yaml files in place as 4.0)
+    migrate.ts          barwise migrate <files...> (rewrites .orm.yaml files in place as 4.0;
+                        a .orm-project.yaml migrates every domain in one write)
     rename.ts           barwise rename (an element, in a file or across a project; rewrites)
     review.ts           barwise review <file> (LLM semantic review; always exits 0)
     gym.ts              barwise gym list|show|check (modeling gym; miss-card

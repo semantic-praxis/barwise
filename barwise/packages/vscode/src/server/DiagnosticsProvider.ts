@@ -2,6 +2,7 @@ import {
   type Diagnostic as OrmDiagnostic,
   OrmYamlSerializer,
   ProjectSerializer,
+  storeIds,
   ValidationEngine,
 } from "@barwise/core";
 import type { TextDocument } from "vscode-languageserver-textdocument";
@@ -45,11 +46,19 @@ export class DiagnosticsProvider {
       // a reason to show nothing but a parse error (barwise-977).
       const model = this.serializer.deserialize(text, { lenient: true });
       const ormDiagnostics = this.validationEngine.validate(model);
+      // An id the file does not state is found by where its element sits
+      // (decision 17); asked only when there is one, since it reads again.
+      const unstoredAt = model.unstoredIds.length === 0
+        ? new Map<string, readonly (string | number)[]>()
+        : new Map(storeIds(text).stored.map((s) => [s.id, s.path] as const));
 
       for (const d of ormDiagnostics) {
         // A 3.x file states the id the element had before the load replayed
         // it into 4.0's (iri-identity WS6), so that is the one its text holds.
-        const pos = sourceMap.getPosition(model.priorIds?.get(d.elementId) ?? d.elementId);
+        const path = unstoredAt.get(d.elementId);
+        const pos = path !== undefined
+          ? sourceMap.getPathPosition(path)
+          : sourceMap.getPosition(model.priorIds?.get(d.elementId) ?? d.elementId);
         const range = pos
           ? {
             start: { line: pos.line, character: pos.character },

@@ -17,7 +17,7 @@ import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { groupRepeats } from "../util/groupRepeats.js";
 import { DeserializationError, refusingHeldIds } from "./deserializationError.js";
 import { type MigrationNote, migrationNotes, readLegacy } from "./reader20.js";
-import { replayInto40 } from "./replay.js";
+import { replayInto40, type ReplayOptions } from "./replay.js";
 import { type SchemaValidationResult, SchemaValidator } from "./SchemaValidator.js";
 import {
   applyMigrations,
@@ -131,7 +131,7 @@ export class OrmYamlSerializer {
    * (`MigrationNote`). A 3.0 file has no notes. `barwise migrate` reports
    * them; every other caller wants only the model (orm-format-3 WS4b-iii).
    */
-  migrate(yaml: string, options?: { lenient?: boolean; }): MigrationResult {
+  migrate(yaml: string, options?: { lenient?: boolean; } & ReplayOptions): MigrationResult {
     return refusingHeldIds(() => this.read(yaml, options, true));
   }
 
@@ -149,10 +149,10 @@ export class OrmYamlSerializer {
 
   private read(
     yaml: string,
-    options: { lenient?: boolean; } | undefined,
+    options: ({ lenient?: boolean; } & ReplayOptions) | undefined,
     replay: boolean,
   ): MigrationResult {
-    const into40 = (model: OrmModel) => (replay ? replayInto40(model) : model);
+    const into40 = (model: OrmModel) => (replay ? replayInto40(model, options) : model);
     const raw = parse(yaml) as unknown;
     const { doc, version, stated: from } = this.bringToReadableVersion(raw);
 
@@ -385,6 +385,9 @@ export function readDocument40(doc: unknown, options?: { lenient?: boolean; }): 
   // across kinds as well, for an id added in code after the load.
   return refusingHeldIds(() => {
     const model = fromDecoded(decoded, options, stated.map(([id]) => id), true);
+    // Every key held now was minted by this load, for an element the file
+    // gives no id; the keys the file states are recorded after.
+    model.recordUnstoredIds();
     for (const [id, key] of decoded.mintedFrom) model.recordMintedFrom(id, key);
     return model;
   });
