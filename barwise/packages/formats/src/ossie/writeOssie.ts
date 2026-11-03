@@ -80,9 +80,10 @@ export interface OssieWriteResult {
 export type LossKey = ObjectTypeLossKey | OtherLossKey;
 type ObjectTypeLossKey = { readonly kind: "object_type"; readonly id: string; };
 type OtherLossKey =
-  | { readonly kind: Exclude<ElementType, "object_type">; readonly id: string; }
-  // `diffModels` has no model-level delta, so the model's own fields (name,
-  // note, domain context) are checked by the writer's predictions alone.
+  | { readonly kind: Exclude<ElementType, "object_type" | "model_header">; readonly id: string; }
+  // The model's own fields: name, note and domain context, which diff does
+  // not compare and only the writer's predictions check; and the header
+  // (namespace, imports), whose delta `verifyOssie` keys here.
   | { readonly kind: "model"; };
 
 /** The changes a loss line explains: some kinds, or every difference on its element. */
@@ -365,6 +366,11 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     // An element's identity IRI needs local-name ids, which arrive with
     // format 4.0 (iri-identity WS6); until then the namespace is a loss.
     lose("model", `namespace ${model.namespace} not written`, { kind: "model" });
+  }
+  if (model.imports.size > 0) {
+    // Ossie has no aliases; a shadow is written by its owner's name.
+    const aliases = [...model.imports.keys()].join(", ");
+    lose("model", `imports ${aliases} not written`, { kind: "model" });
   }
 
   if (ontology.length === 0) {

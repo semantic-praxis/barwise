@@ -21,8 +21,9 @@ diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
 2026-10-31 (the switch to format 4.0, with its fixture and golden churn);
 6b-3a implemented 2026-11-02 (`migrate` for projects and unstored ids,
 the editor's "Store ids", the 3.x note); 6b-3b implemented 2026-11-03 (the
-rules, `imports` on the model, rename rewriting ids); 6b-3c, 6b-4b, 6c to
-6f and WS7 to come
+rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
+2026-11-03 (`iriOf`, the model header delta); 6b-4b, 6c to 6f and WS7 to
+come
 
 Created: 2026-10-28
 Last-updated: 2026-11-03
@@ -1687,6 +1688,28 @@ sites.
       manifests through the id map the rename returns.
     - Filed: barwise-wcg.4v7 (the test builders' `<ft>.roleN` role ids,
       which `id-not-from-name` reports).
+    - For 6d (from 6b-3b's last pr-review pass): through a project, a
+      same-name repair of an owner whose shadow already holds the right id
+      is refused, because the shadow's domain has nothing to repair.
+      Reachable only by a hand edit until split writes alias ids.
+  - _6b-3c notes._
+    - `iriOf(model, id, domain?)` sits beside `namespaceOf` in
+      `model/namespace.ts`. A local id expands from the model's namespace,
+      or the one the project gives the domain. An `alias:local` id
+      resolves through `imports` to a context the project holds or to an
+      absolute namespace IRI, and is undefined without a project, as this
+      section says, even for an alias bound to an IRI.
+    - The header is diff's `model_header` delta, first in every diff,
+      with `namespace` and `importBinding` changes, both `caution`.
+      Merge takes an accepted one's new and rebound values and never
+      removes. Every surface's non-interactive merge accepts all added and
+      modified deltas and never acts on a removal, and a transcript import
+      has no namespace and no imports, so taking removals would strip both
+      from the model merged into. An accepted header change also settles a
+      clash on one alias, which merge otherwise refuses.
+    - Ossie's export check keys the header delta under the model's own
+      prediction, and the writer now predicts dropped imports beside the
+      dropped namespace.
 - _6b-4, importers and retirement._ The importers switch off
   `generateId` (role ids first, as 6b-4a above), and `generateId`, its
   installs and promptlab's deterministic ids go (6b-4b). Until then an

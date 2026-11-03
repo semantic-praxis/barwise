@@ -171,6 +171,8 @@ function reId(value: unknown, ids: ReadonlyMap<string, string>): unknown {
 function sourceKey(delta: ModelDelta): string | undefined {
   if (delta.kind === "added") return undefined;
   if (delta.elementType === "definition") return lossKey({ kind: "definition", id: delta.term });
+  // The model's own header is predicted under the model's key.
+  if (delta.elementType === "model_header") return lossKey({ kind: "model" });
   // An unnamed constraint's key is its reference, as `writeOssie` keys it.
   const id = delta.elementType === "constraint" && delta.existing
     ? constraintRef(delta.existing as Constraint)

@@ -62,6 +62,14 @@ const GOLDENS: ReadonlyArray<{ sample: ChangeDescription; text: string; }> = [
     text: `source context: "(none)" -> "Sales"`,
   },
   {
+    sample: { change: "namespace", from: "https://a.example/", to: "https://b.example/" },
+    text: `namespace: "https://a.example/" -> "https://b.example/"`,
+  },
+  {
+    sample: { change: "importBinding", alias: "crm", from: "crm", to: undefined },
+    text: `import "crm": "crm" -> "(none)"`,
+  },
+  {
     sample: { change: "valueConstraint", from: undefined, to: { values: ["A", "B"] } },
     text: "value constraint changed",
   },

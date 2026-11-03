@@ -66,6 +66,19 @@ export interface FactTypeDelta extends DeltaCommon {
   readonly incoming?: FactType;
 }
 
+/**
+ * The model's own header: the `namespace` its element IRIs start with and
+ * the `imports` its aliases bind (iri-identity WS6, 6b-3c). Neither changes
+ * an id or a pairing, so diff has no other place to show an edit to them;
+ * `iriOf`'s answers are what move. Always `modified` or `unchanged`: both
+ * models have a header.
+ */
+export interface ModelHeaderDelta extends DeltaCommon {
+  readonly elementType: "model_header";
+  /** The existing model's name, which the delta is about. */
+  readonly name: string;
+}
+
 export interface DefinitionDelta extends DeltaCommon {
   readonly elementType: "definition";
   readonly term: string;
@@ -177,6 +190,7 @@ export interface ConstraintDelta extends DeltaCommon {
 }
 
 export type ModelDelta =
+  | ModelHeaderDelta
   | ObjectTypeDelta
   | FactTypeDelta
   | DefinitionDelta
@@ -213,6 +227,7 @@ export type ElementType = ModelDelta["elementType"];
  * The same shape as `CHANGE_LEVEL` next door, for the same reason.
  */
 const ELEMENT_LABEL = {
+  model_header: "Model header",
   object_type: "Object type",
   fact_type: "Fact type",
   definition: "Definition",
@@ -263,6 +278,7 @@ export function elementName(delta: ModelDelta): string {
   switch (delta.elementType) {
     case "definition":
       return delta.term;
+    case "model_header":
     case "object_type":
     case "fact_type":
       return delta.name;

@@ -97,11 +97,20 @@ export function mergeModels(
   refuseUnmergeablePairing(diff);
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
-  refuseImportClashes(existing, incoming);
+  // An accepted header delta takes the incoming side's namespace and
+  // bindings (iri-identity 6b-3c), which settles a clash on one alias. It
+  // never removes: every surface's non-interactive policy accepts what was
+  // added or changed and never acts on a removal, and a transcript import,
+  // which has no namespace and no imports, would otherwise strip both
+  // from the model it is merged into.
+  const headerAccepted = deltas.some((d, i) =>
+    d.elementType === "model_header" && d.kind === "modified" && accepted.has(i)
+  );
+  if (!headerAccepted) refuseImportClashes(existing, incoming);
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
-    namespace: existing.namespace,
+    namespace: headerAccepted ? incoming.namespace ?? existing.namespace : existing.namespace,
     // The note was dropped for as long as this function has existed:
     // the merge names the fields it carries, so a field nobody listed
     // is a field nobody keeps (barwise-937).
@@ -112,8 +121,13 @@ export function mergeModels(
     // An alias both bind keeps the base's binding.
     // The base's come first, in its order, so a merge that adds none
     // writes the base's imports unchanged.
+    // An accepted header delta rebinds each alias both sides bind to the
+    // incoming target, in the base's order; a base alias the incoming side
+    // lacks stays, as a removal is never taken.
     imports: Object.fromEntries([
-      ...existing.imports,
+      ...[...existing.imports].map(([alias, target]) =>
+        [alias, headerAccepted ? incoming.imports.get(alias) ?? target : target] as const
+      ),
       ...[...incoming.imports].filter(([alias]) => !existing.imports.has(alias)),
     ]),
   });
@@ -666,7 +680,8 @@ export function mergeModels(
   // Phase 9: an alias only the incoming side bound, which no merged shadow
   // uses, would only raise project/imported-context-missing; drop it.
   for (const alias of [...merged.imports.keys()]) {
-    if (existing.imports.has(alias)) continue;
+    // One the person accepted as a header change stays.
+    if (existing.imports.has(alias) || headerAccepted) continue;
     if (!merged.objectTypes.some((ot) => ot.id.startsWith(`${alias}:`))) merged.removeImport(alias);
   }
 

@@ -3,8 +3,10 @@
  * an IRI and never dereferences one.
  */
 
+import { ABSOLUTE_IRI_PATTERN } from "./iri.js";
 import { localName } from "./name.js";
 import type { OrmModel } from "./OrmModel.js";
+import type { OrmProject } from "./OrmProject.js";
 
 /**
  * A domain's place in a project, as values rather than a project to look
@@ -41,4 +43,51 @@ export function namespaceOf(
     return `${domain.iriBase}${localName(domain.context)}/`;
   }
   return model?.namespace;
+}
+
+/**
+ * An element's IRI (iri-identity WS6): its namespace followed by its id.
+ * A local id (`Customer`, `Customer_places_Order.places`) expands from the
+ * model's own namespace, or, given its project, the namespace the project
+ * gives the domain (`namespaceOf`). An `alias:local` id names another
+ * domain's element: given the project, the alias resolves through the
+ * model's `imports`, to a context the project holds (that domain's
+ * namespace) or to an absolute namespace IRI. Undefined where the answer
+ * is not known: no namespace (decision 11), an alias the model does not
+ * import or whose context the project does not hold, and any alias id
+ * without a project.
+ *
+ * It does not search for a project: a caller that has one passes it, and
+ * the file the editor opened does not decide which project it belongs to
+ * (explicit over implicit). Pure; core forms an IRI and does not check
+ * the model holds the id, or dereference anything.
+ */
+export function iriOf(
+  model: OrmModel,
+  id: string,
+  domain?: { readonly project: OrmProject; readonly context: string; },
+): string | undefined {
+  const colon = id.indexOf(":");
+  const iriBase = domain?.project.iriBase;
+  if (colon < 0) {
+    const ns = namespaceOf(
+      model,
+      domain
+        ? { ...(iriBase !== undefined ? { iriBase } : {}), context: domain.context }
+        : undefined,
+    );
+    return ns === undefined ? undefined : `${ns}${id}`;
+  }
+  if (domain === undefined) return undefined;
+  const target = model.imports.get(id.slice(0, colon));
+  if (target === undefined) return undefined;
+  const local = id.slice(colon + 1);
+  if (ABSOLUTE_IRI_PATTERN.test(target)) return `${target}${local}`;
+  const owner = domain.project.getDomain(target);
+  if (owner === undefined) return undefined;
+  const ns = namespaceOf(owner.model, {
+    ...(iriBase !== undefined ? { iriBase } : {}),
+    context: owner.context,
+  });
+  return ns === undefined ? undefined : `${ns}${local}`;
 }

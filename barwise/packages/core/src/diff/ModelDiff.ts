@@ -14,7 +14,7 @@ import type { OrmModel } from "../model/OrmModel.js";
 import type { Population } from "../model/Population.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { classifyBreakingLevel } from "./breakingLevel.js";
-import { describeChange } from "./changeDescription.js";
+import { type ChangeDescription, describeChange } from "./changeDescription.js";
 import type { BreakingLevel, DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
 import {
   constraintPairing,
@@ -118,6 +118,42 @@ function pairedLevel(
  * @param options How constraints are paired; id-first by default.
  * @returns A list of deltas covering every element in either model.
  */
+/**
+ * The header's delta: `namespace`, then each alias either side imports,
+ * in the existing side's order and then the incoming side's new ones.
+ */
+function headerDelta(existing: OrmModel, incoming: OrmModel): ModelDelta {
+  const changes: ChangeDescription[] = [];
+  if (existing.namespace !== incoming.namespace) {
+    changes.push({
+      change: "namespace",
+      ...(existing.namespace !== undefined ? { from: existing.namespace } : {}),
+      ...(incoming.namespace !== undefined ? { to: incoming.namespace } : {}),
+    });
+  }
+  const aliases = [...new Set([...existing.imports.keys(), ...incoming.imports.keys()])];
+  for (const alias of aliases) {
+    const from = existing.imports.get(alias);
+    const to = incoming.imports.get(alias);
+    if (from === to) continue;
+    changes.push({
+      change: "importBinding",
+      alias,
+      ...(from !== undefined ? { from } : {}),
+      ...(to !== undefined ? { to } : {}),
+    });
+  }
+  const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
+  return {
+    kind,
+    elementType: "model_header",
+    name: existing.name,
+    changes,
+    changeDescriptions: changes.map(describeChange),
+    breakingLevel: classifyBreakingLevel(kind, changes, "model_header"),
+  };
+}
+
 export function diffModels(
   existing: OrmModel,
   incoming: OrmModel,
@@ -130,7 +166,7 @@ export function diffModels(
     renames: options.renames ?? [],
   });
   const { identity } = pairing;
-  const deltas: ModelDelta[] = [];
+  const deltas: ModelDelta[] = [headerDelta(existing, incoming)];
 
   // --- Object types ---
   // Paired by id first, then name (`DiffIdentity`). A paired delta is
