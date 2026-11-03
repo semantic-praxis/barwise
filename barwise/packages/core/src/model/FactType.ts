@@ -7,8 +7,8 @@ import {
   isInternalConstraint,
 } from "./Constraint.js";
 import type { ConstraintAdmission } from "./constraintAdmission.js";
-import { withId } from "./id.js";
 import { ModelElement } from "./ModelElement.js";
+import { localName } from "./name.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
 import { Role, type RoleConfig } from "./Role.js";
 
@@ -101,7 +101,17 @@ export class FactType extends ModelElement {
       );
     }
 
-    this._roles = config.roles.map((rc) => new Role(rc));
+    // A role given no id takes its fact type's and its role name's, under
+    // the suffix rule for a repeated name, as a model gives it (decision 5).
+    const taken = new Set(config.roles.flatMap((rc) => (rc.id !== undefined ? [rc.id] : [])));
+    this._roles = config.roles.map((rc) => {
+      if (rc.id !== undefined) return new Role(rc);
+      const base = `${this.id}.${localName(rc.name)}`;
+      let id = base;
+      for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
+      taken.add(id);
+      return new Role({ ...rc, id });
+    });
 
     // Validate reading templates against role count.
     const errors: string[] = [];
@@ -237,8 +247,9 @@ export class FactType extends ModelElement {
   addConstraint(constraint: InternalConstraint): InternalConstraint {
     const c = checkInternalConstraint(constraint, this.name);
     // In a model, the model names it and enters its id in the model's
-    // index; standalone, the fact type gives it an id itself.
-    const stored = this._admission?.admitConstraint(c, this.id) ?? withId(c);
+    // index; standalone, it keeps the id it was given, or none, as a
+    // constraint a model cannot name has none (decision 19).
+    const stored = this._admission?.admitConstraint(c, this.id) ?? c;
     this._constraints.push(stored);
     return stored;
   }

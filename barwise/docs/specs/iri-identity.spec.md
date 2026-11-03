@@ -22,7 +22,8 @@ diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
 6b-3a implemented 2026-11-02 (`migrate` for projects and unstored ids,
 the editor's "Store ids", the 3.x note); 6b-3b implemented 2026-11-03 (the
 rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
-2026-11-03 (`iriOf`, the model header delta); 6b-4b, 6c to 6f and WS7 to
+2026-11-03 (`iriOf`, the model header delta); 6b-4b implemented
+2026-11-03 (`generateId` and its installs retired); 6c to 6f and WS7 to
 come
 
 Created: 2026-10-28
@@ -1723,6 +1724,29 @@ sites.
   installs and promptlab's deterministic ids go (6b-4b). Until then an
   importer states UUID ids for the other kinds, which a 4.0 file accepts
   as local names.
+  - _6b-4b notes._
+    - An element built outside a model takes the id the format's rules
+      give it from its name: `localName(name)` for an object type and a
+      fact type (`ModelElement`, `createObjectType`), `<fact type>.<role>`
+      under the suffix rule for a stand-alone fact type's roles, and
+      `<fact type>.population` for a population. A constraint given to a
+      fact type outside a model keeps the id it is given or none, as one a
+      model cannot name has none (decision 19); `withId` went with the
+      generator. `formatUuid` stays in `model/id.ts` for `derivedId`.
+    - Ossie's importer and the LLM parser leave every id to the model and
+      read a constraint's id back from what was stored. The surfaces' three
+      installs and promptlab's `withDeterministicIds` are gone; the
+      references were regenerated (`npm run regen:references`), and their
+      ids are now names.
+    - Found by retiring it: Ossie's export check aligned the read-back to
+      the source by replacing every string equal to an id, which rewrote
+      names once ids were names. It now goes through `remapIds`, exported
+      from `@barwise/core/rename`.
+    - Tests: `core/tests/model/id.test.ts` keeps `formatUuid` and tests the
+      defaults; `cli/tests/entryIdGenerator.test.ts` and
+      `vscode/tests/unit/activateIdGenerator.test.ts` are deleted; MCP's
+      spawned-server test now checks that an import's ids are names, none a
+      UUID; `cli/tests/importerIds.test.ts` checks the naming rules alone.
 
 **Sizes, roughly.** 6a: about 400 lines of source for diff, 300 for the
 rest, each with tests. 6b: about 25 core files and 1,500 to 2,000 lines,

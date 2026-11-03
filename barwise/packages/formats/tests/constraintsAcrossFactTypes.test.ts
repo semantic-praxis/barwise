@@ -9,7 +9,6 @@ import {
   type ExternalConstraint,
   type OrmModel,
   OrmYamlSerializer,
-  setIdGenerator,
   writeDocument,
 } from "@barwise/core";
 import { RelationalMapper, resolveDialectProfile, routeConstraints } from "@barwise/core/mapping";
@@ -42,14 +41,8 @@ type Host = typeof leads | typeof sponsors;
  * uniqueness group holds both placements.
  */
 function projects(host: Host): OrmModel {
-  // Element ids from a counter, so two builds differ only where `host` does.
-  let n = 0;
-  setIdGenerator(() => `id-${++n}`);
-  try {
-    return build(host);
-  } finally {
-    setIdGenerator(undefined);
-  }
+  // Ids from names, so two builds differ only where `host` does.
+  return build(host);
 }
 
 function build(host: Host): OrmModel {

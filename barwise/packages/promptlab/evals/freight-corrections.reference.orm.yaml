@@ -45,7 +45,8 @@ model:
           roles:
             - Shipment_contains_Product_in_Quantity.contains
             - Shipment_contains_Product_in_Quantity.is_contained_in
-          id: 00000000-0000-7001-ad34-3b424950575e
+          id: For_each_Shipment_and_Product_combination,_at_most_one_Quantity_applies
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"contains",{"name":"Shipment contains Product in Quantity","readings":["{0} contains {1} in quantity {2}"],"players":["Shipment","Product","Quantity"]}],[1,"is contained in",{"name":"Shipment contains Product in Quantity","readings":["{0} contains {1} in quantity {2}"],"players":["Shipment","Product","Quantity"]}]],"fact_type":{"name":"Shipment contains Product in Quantity","readings":["{0} contains {1} in quantity {2}"],"players":["Shipment","Product","Quantity"]}}'
     - id: Shipment_is_stored_in_Warehouse
       name: Shipment is stored in Warehouse
       roles:
@@ -63,7 +64,8 @@ model:
           roles:
             - Shipment_is_stored_in_Warehouse.is_stored_in
             - Shipment_is_stored_in_Warehouse.stores
-          id: 00000000-0000-7002-8c53-5a61686f767d
+          id: Each_combination_of_Shipment_and_Warehouse_is_unique_in_Shipment_is_stored_in_Warehouse
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is stored in",{"name":"Shipment is stored in Warehouse","readings":["{0} is stored in {1}","{1} stores {0}"],"players":["Shipment","Warehouse"]}],[1,"stores",{"name":"Shipment is stored in Warehouse","readings":["{0} is stored in {1}","{1} stores {0}"],"players":["Shipment","Warehouse"]}]],"fact_type":{"name":"Shipment is stored in Warehouse","readings":["{0} is stored in {1}","{1} stores {0}"],"players":["Shipment","Warehouse"]}}'
         - type: frequency
           role: Shipment_is_stored_in_Warehouse.is_stored_in
           min: 1

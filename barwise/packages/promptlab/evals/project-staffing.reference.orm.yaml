@@ -36,7 +36,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Employee_mentors_Employee.is_mentored_by
-          id: 00000000-0000-7001-ad34-3b424950575e
+          id: Each_Employee_is_mentored_by_at_most_one_Employee
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"is mentored by",{"name":"Employee mentors Employee","readings":["{0} mentors {1}","{1} is mentored by {0}"],"players":["Employee","Employee"]}]],"fact_type":{"name":"Employee mentors Employee","readings":["{0} mentors {1}","{1} is mentored by {0}"],"players":["Employee","Employee"]}}'
         - type: ring
           role_1: Employee_mentors_Employee.mentors
           role_2: Employee_mentors_Employee.is_mentored_by
@@ -60,7 +61,8 @@ model:
           roles:
             - Employee_is_assigned_to_Project.is_assigned_to
             - Employee_is_assigned_to_Project.has_assigned
-          id: 00000000-0000-7002-8c53-5a61686f767d
+          id: Each_combination_of_Employee_and_Project_is_unique_in_Employee_is_assigned_to_Project
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is assigned to",{"name":"Employee is assigned to Project","readings":["{0} is assigned to {1}","{1} has assigned {0}"],"players":["Employee","Project"]}],[1,"has assigned",{"name":"Employee is assigned to Project","readings":["{0} is assigned to {1}","{1} has assigned {0}"],"players":["Employee","Project"]}]],"fact_type":{"name":"Employee is assigned to Project","readings":["{0} is assigned to {1}","{1} has assigned {0}"],"players":["Employee","Project"]}}'
         - type: frequency
           role: Employee_is_assigned_to_Project.is_assigned_to
           min: 1
@@ -83,4 +85,5 @@ model:
         - type: internal_uniqueness
           roles:
             - Project_has_ProjectName.has
-          id: 00000000-0000-7003-ab72-7980878e959c
+          id: Each_Project_has_at_most_one_ProjectName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Project has ProjectName","readings":["{0} has {1}","{1} is of {0}"],"players":["Project","ProjectName"]}]],"fact_type":{"name":"Project has ProjectName","readings":["{0} has {1}","{1} is of {0}"],"players":["Project","ProjectName"]}}'

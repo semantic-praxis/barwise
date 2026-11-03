@@ -200,7 +200,17 @@ describe("Ossie export: the read-back check", () => {
     );
     const first = exporter.export(m).text;
     expect(minted.length).toBeGreaterThan(0);
-    for (const mintedId of minted) expect(first).not.toContain(mintedId);
+    // The read-back's ids are local names now (iri-identity 6b-4b), so one
+    // can equal a name or an id the source holds, which the text may show.
+    // An id only the read-back holds must not reach the text.
+    const sourceWords = new Set([
+      ...m.objectTypes.flatMap((o) => [o.id, o.name]),
+      ...m.factTypes.flatMap((f) => [f.id, f.name, ...f.roles.flatMap((r) => [r.id, r.name])]),
+      ...m.everyConstraint().flatMap(([c]) => (c.id ? [c.id] : [])),
+    ]);
+    const own = minted.filter((id) => !sourceWords.has(id));
+    expect(own.length).toBeGreaterThan(0);
+    for (const mintedId of own) expect(first).not.toContain(mintedId);
     expect(exporter.export(m).text).toBe(first);
   });
 

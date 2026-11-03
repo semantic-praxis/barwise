@@ -7,10 +7,10 @@
  * by whichever core constructor first trips over it with a message about
  * barwise internals.
  *
- * Role ids are the model's `<fact type>.<role key>` (iri-identity 6b-4a);
- * its other ids come from `generateId()` until 6b-4b retires it -- the
- * only importer that still states generated ids; NORMA's keeps its
- * source's (`docs/specs/importer-role-ids.spec.md`, R1). Elements are found again
+ * Every id is the model's: role ids `<fact type>.<role key>` (iri-identity
+ * 6b-4a), and every other element named by the model from its name or its
+ * sentence (6b-4b, which retired `generateId()`); NORMA's importer keeps
+ * its source's (`docs/specs/importer-role-ids.spec.md`, R1). Elements are found again
  * by name -- Ossie concept names are unique, and a relationship imports as
  * `Concept.rel` -- never by an id built from one. A re-import diffs by
  * content, which diff falls back to when ids differ.
@@ -18,7 +18,6 @@
 import {
   type ConceptualDataTypeName,
   type FactType,
-  generateId,
   identifyingRoles,
   type IdentifyingUniqueness,
   type InternalConstraint,
@@ -363,7 +362,6 @@ function playerId(model: OrmModel, name: string): string {
   // checkRelationship has refused any player that is neither declared nor built in.
   const builtin = name as keyof typeof OSSIE_BUILTIN_VALUE_TYPES;
   return model.addObjectType({
-    id: generateId(),
     name,
     kind: "value",
     dataType: { name: OSSIE_BUILTIN_VALUE_TYPES[builtin] },
@@ -380,7 +378,6 @@ function addConcept(
   warnings: string[],
 ): void {
   const base = {
-    id: generateId(),
     name: c.concept,
     ...(c.description ? { definition: c.description } : {}),
   };
@@ -544,7 +541,6 @@ function addRelationship(
   for (const expr of requires) warnings.push(kept(name, expr));
   const note = notes(requires, []);
   model.addFactType({
-    id: generateId(),
     name,
     roles,
     readings,
@@ -618,7 +614,6 @@ function multiplicityConstraints(
 ): InternalConstraint[] {
   const uc = (ids: readonly string[]): InternalConstraint => ({
     type: "internal_uniqueness",
-    id: generateId(),
     roleIds: ids,
   });
   if (multiplicity === "OneToOne") {
@@ -643,7 +638,6 @@ function addSubtypes(model: OrmModel, c: OssieConcept): void {
     : undefined;
   supertypes(c).forEach((s, i) => {
     model.addSubtypeFact({
-      id: generateId(),
       subtypeId: conceptId(model, c.concept),
       supertypeId: conceptId(model, s),
       providesIdentification: i === 0 && !hasIdentifyBy(c),
@@ -672,38 +666,38 @@ function addIdentifier(model: OrmModel, c: OssieConcept, warnings: string[]): vo
     const held = ft.internalConstraints.find((k) =>
       k.type === "internal_uniqueness" && k.roleIds.length === 1 && k.roleIds[0] === farRoles[0]
     );
-    const id = held?.id ?? generateId();
+    // identify_by states the far role is unique even where the
+    // multiplicity did not (a ManyToOne identifying relationship); one
+    // added takes the id the model names it with.
+    const id = held?.id
+      ?? ft.addConstraint({ type: "internal_uniqueness", roleIds: farRoles }).id;
     if (!held) {
-      // identify_by states the far role is unique even where the
-      // multiplicity did not (a ManyToOne identifying relationship).
-      ft.addConstraint({ type: "internal_uniqueness", id, roleIds: farRoles });
       warnings.push(
         `${c.concept}: identify_by ${names[0]} implies each ${ft.roles[1]!.name} identifies at `
           + `most one ${c.concept}; added that uniqueness, which the multiplicity did not state.`,
       );
     }
-    model.setPreferredIdentifier(conceptId(model, c.concept), id);
+    if (id !== undefined) model.setPreferredIdentifier(conceptId(model, c.concept), id);
     return;
   }
   for (const [i, ft] of facts.entries()) {
     const near = ft.roles[0]!.id;
     if (isUniqueAlone(ft, near)) continue;
-    ft.addConstraint({ type: "internal_uniqueness", id: generateId(), roleIds: [near] });
+    ft.addConstraint({ type: "internal_uniqueness", roleIds: [near] });
     warnings.push(
       `${c.concept}: identify_by [${names.join(", ")}] implies each ${c.concept} has at most `
         + `one ${names[i]}; added that uniqueness, which the multiplicity did not state.`,
     );
   }
-  const id = generateId();
-  model.addConstraint({ type: "external_uniqueness", id, roleIds: farRoles });
-  model.setPreferredIdentifier(conceptId(model, c.concept), id);
+  const { id } = model.addConstraint({ type: "external_uniqueness", roleIds: farRoles });
+  if (id !== undefined) model.setPreferredIdentifier(conceptId(model, c.concept), id);
 }
 
 /** The mandatory first roles an entity's `requires` states. */
 function addMandatoryRoles(model: OrmModel, c: OssieConcept, split: RequiresSplit): void {
   for (const rel of split.mandatory) {
     const ft = relationshipFact(model, c.concept, rel);
-    ft.addConstraint({ type: "mandatory", id: generateId(), roleId: ft.roles[0]!.id });
+    ft.addConstraint({ type: "mandatory", roleId: ft.roles[0]!.id });
   }
 }
 
@@ -734,7 +728,7 @@ function addIdentifierMandatories(model: OrmModel, c: OssieConcept): void {
   const resolved = resolvePreferredIdentifier(model, conceptId(model, c.concept));
   if (!resolved.ok) return;
   for (const { factType, role } of impliedMandatoryRoles(resolved.at)) {
-    factType.addConstraint({ type: "mandatory", id: generateId(), roleId: role.id });
+    factType.addConstraint({ type: "mandatory", roleId: role.id });
   }
 }
 

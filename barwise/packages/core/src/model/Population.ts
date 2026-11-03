@@ -6,7 +6,6 @@
  * an instance might be { "role-customer": "C001", "role-order": "O123" }.
  */
 import type { Complete } from "../util/complete.js";
-import { generateId } from "./id.js";
 export interface FactInstance {
   /** Unique identifier for this instance. */
   readonly id: string;
@@ -92,7 +91,8 @@ export class Population {
   private _next = 1;
 
   constructor(config: PopulationConfig) {
-    this.id = config.id ?? generateId();
+    // Outside a model, its fact type's id and `.population` (decision 7).
+    this.id = config.id ?? `${config.factTypeId}.population`;
     this.factTypeId = config.factTypeId;
     this.description = config.description;
     this.sample = config.sample ?? false;

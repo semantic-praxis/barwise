@@ -6,7 +6,6 @@ import {
   type Constraint,
   type ExternalConstraint,
   type FactType,
-  generateId,
   type InternalConstraint,
   isExternalConstraint,
   type OrmModel,
@@ -50,11 +49,9 @@ export function parseConstraints(
       // Find the role(s) by player name or role name.
       const roleIds = resolveRolesByPlayerName(ft, ic.roles, model, warnings, ic.description);
       if (roleIds.length > 0) {
-        const constraint: InternalConstraint = {
-          id: generateId(),
-          type: "internal_uniqueness",
-          roleIds,
-        };
+        // No id: the model names it from its sentence (iri-identity 6b),
+        // and the id it gives is read back from what was stored.
+        const constraint: InternalConstraint = { type: "internal_uniqueness", roleIds };
 
         // Skip duplicate constraints (LLMs often emit the same constraint
         // in multiple phrasings, e.g. "each X has at most one Y" and
@@ -73,8 +70,8 @@ export function parseConstraints(
             skipReason: "Duplicate constraint (identical type and roles already present).",
           });
         } else {
-          ft.addConstraint(constraint);
-          if (ic.is_preferred) preferred.add(constraint.id!);
+          const stored = ft.addConstraint(constraint);
+          if (ic.is_preferred && stored.id !== undefined) preferred.add(stored.id);
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,

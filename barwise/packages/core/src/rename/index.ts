@@ -1,3 +1,4 @@
+export { remapIds } from "./remapIds.js";
 export {
   RenameError,
   renameInModel,

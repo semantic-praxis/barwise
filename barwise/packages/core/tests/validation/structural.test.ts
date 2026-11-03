@@ -108,8 +108,19 @@ describe("structuralRules", () => {
 
     it("detects duplicate object type names", () => {
       // OrmModel.addObjectType prevents duplicates, so we inject directly.
-      const ot1 = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid1" });
-      const ot2 = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid2" });
+      // Two ids, as two random ones were: a name gives one id now.
+      const ot1 = createObjectType({
+        id: "c1",
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "cid1",
+      });
+      const ot2 = createObjectType({
+        id: "c2",
+        name: "Customer",
+        kind: "entity",
+        referenceMode: "cid2",
+      });
 
       const model = new OrmModel({ name: "Test" });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,11 +139,13 @@ describe("structuralRules", () => {
     it("detects duplicate fact type names", () => {
       const ot = createObjectType({ name: "Customer", kind: "entity", referenceMode: "cid" });
       const ft1 = new FactType({
+        id: "f1",
         name: "Customer exists",
         roles: [{ name: "exists", playerId: ot.id }],
         readings: ["{0} exists"],
       });
       const ft2 = new FactType({
+        id: "f2",
         name: "Customer exists",
         roles: [{ name: "exists", playerId: ot.id }],
         readings: ["{0} exists"],
@@ -470,8 +483,8 @@ describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
 
   it("leaves an exact repeat within one kind to duplicate-object-type-name", () => {
     const model = new OrmModel({ name: "Test" });
-    const a = createObjectType({ name: "Customer", kind: "entity", referenceMode: "nr" });
-    const b = createObjectType({ name: "Customer", kind: "entity", referenceMode: "nr" });
+    const a = createObjectType({ id: "c1", name: "Customer", kind: "entity", referenceMode: "nr" });
+    const b = createObjectType({ id: "c2", name: "Customer", kind: "entity", referenceMode: "nr" });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (model as any)._objectTypes.set(a);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

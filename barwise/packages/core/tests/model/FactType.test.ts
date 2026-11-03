@@ -162,7 +162,7 @@ describe("FactType", () => {
     expect(ft.internalConstraints).toEqual([]);
   });
 
-  it("returns the constraint as stored, id included, so a caller can name it at once", () => {
+  it("returns the constraint as stored, with the id it was given or none", () => {
     // A preferred identifier set right after the add needs the id
     // (iri-identity 6a); the caller's own object never gets one.
     const ft = new FactType({
@@ -175,9 +175,13 @@ describe("FactType", () => {
     });
     const given = { type: "internal_uniqueness" as const, roleIds: ["role-1"] };
     const stored = ft.addConstraint(given);
-    expect(stored.id).toEqual(expect.any(String));
+    // Outside a model nothing names it (iri-identity 6b-4b): no id, as a
+    // constraint a model cannot name has none, and the input is untouched.
+    expect(stored.id).toBeUndefined();
     expect(given).not.toHaveProperty("id");
     expect(ft.internalConstraints).toContain(stored);
+    const named = ft.addConstraint({ type: "mandatory", id: "c-given", roleId: "role-2" });
+    expect(named.id).toBe("c-given");
   });
 
   it("allows adding constraints after construction", () => {
