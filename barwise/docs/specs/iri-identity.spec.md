@@ -1399,6 +1399,12 @@ version-1 manifest would go silently empty for impact analysis.
       replay's map); `NormaLocalNames.test.ts` tests the names. A NORMA
       round trip now gives back every id, from the names. NORMA is no
       longer exempt in `cli/tests/importerIds.test.ts`.
+    - Found by /code-review: NORMA writes most roles with `Name=""`, and
+      the importer named such a role by its NORMA id, which became part of
+      its 4.0 id (`PersonHasPersonId._D6CB...`). An unnamed role now takes
+      its player's name, as NORMA shows it, with the suffix rule for a
+      repeat. An importer choice, not a format rule: the DDL and dbt
+      importers name theirs "has" and "is of".
     - A constraint with no sentence (a cardinality on one role of a
       binary, an exclusion over one role) is imported unnamed, as decision
       19 says; NORMA's export writes it under an id derived from its

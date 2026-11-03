@@ -45,8 +45,9 @@ describe("a NORMA import's ids", () => {
       ...model.subtypeFacts.flatMap((sf) => sf.id ?? []),
     ];
     expect(ids.length).toBeGreaterThan(0);
-    // NORMA writes "_" and a GUID, or "_" and a short token in hand-made files.
-    expect(ids.filter((id) => id.startsWith("_"))).toEqual([]);
+    // NORMA writes "_" and a GUID, or "_" and a short token in hand-made
+    // files; a role's id is two parts, and either could carry one.
+    expect(ids.filter((id) => id.split(".").some((part) => part.startsWith("_")))).toEqual([]);
   });
 
   it.each(FIXTURES)("%s: are the same on every import", (fixture) => {
@@ -60,6 +61,30 @@ describe("a NORMA import's ids", () => {
     expect(employee.id).toBe("Employee");
     const ft = model.getFactTypeByName("Employee has RoleName")!;
     expect(ft.roles.map((r) => r.id)).toContain("Employee_has_RoleName.is_of");
+  });
+
+  it("name a role NORMA leaves unnamed after its player, suffixing a repeat", () => {
+    // NORMA writes most roles with Name="" and shows each by its player.
+    const doc = parseNormaXml(
+      readFileSync(resolve(here, "fixtures", "personCountryDemo.orm"), "utf-8"),
+    );
+    const named = mapNormaToOrm(doc);
+    expect(named.getFactType("PersonLivesInCountry")!.roles.map((r) => r.id)).toEqual([
+      "PersonLivesInCountry.Person",
+      "PersonLivesInCountry.Country",
+    ]);
+    // Both roles played by Person, as a ring's are.
+    const lives = doc.factTypes.find((ft) => ft.name === "PersonLivesInCountry")!;
+    const ring = {
+      ...doc,
+      factTypes: doc.factTypes.map((ft) =>
+        ft === lives
+          ? { ...ft, roles: ft.roles.map((r) => ({ ...r, playerRef: lives.roles[0]!.playerRef })) }
+          : ft
+      ),
+    };
+    expect(mapNormaToOrm(ring).getFactType("PersonLivesInCountry")!.roles.map((r) => r.id))
+      .toEqual(["PersonLivesInCountry.Person", "PersonLivesInCountry.Person_2"]);
   });
 
   it("name an external constraint from its sentence, though NORMA lists it under its first fact type", () => {

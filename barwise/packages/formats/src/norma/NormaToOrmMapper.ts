@@ -103,9 +103,11 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
 }
 
 /**
- * `mapNormaToOrm`, with the map from each local name back to the NORMA id
- * it was built under: what a caller needs to say which NORMA element became
- * which. Never recorded on the model, which was not read from a 3.x file.
+ * `mapNormaToOrm`, with the map from each new id back to the NORMA id it
+ * was built under: what a caller needs to say which NORMA element became
+ * which. An unnamed constraint is keyed by its reference instead, and two
+ * identical ones share an entry. Never recorded on the model, which was
+ * not read from a 3.x file.
  */
 export function mapNormaToOrmWithIds(doc: NormaDocument): ReplayedIds {
   const model = new OrmModel({

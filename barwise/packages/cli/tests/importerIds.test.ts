@@ -71,16 +71,23 @@ CREATE TABLE customer_suppliers (
 `;
 
 /**
- * The SQL importer reads query patterns, not CREATE TABLE: a JOIN gives it
- * two entities and a fact type between them.
+ * A NORMA fixture from the formats package whose roles are unnamed, as NORMA
+ * writes most. This oracle asks only that each id follow from its name;
+ * what an unnamed role is named (its player's name, so no NORMA token
+ * reaches the id) is `formats/tests/NormaLocalNames.test.ts`'s to check.
  */
-// The formats package's own NORMA fixture: external uniqueness, a role value
-// constraint, internal uniqueness and mandatory constraints.
 const NORMA = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), "../../formats/tests/fixtures/employeeProject.orm"),
+  join(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../formats/tests/fixtures/personCountryDemo.orm",
+  ),
   "utf8",
 );
 
+/**
+ * The SQL importer reads query patterns, not CREATE TABLE: a JOIN gives it
+ * two entities and a fact type between them.
+ */
 const SQL = `
 SELECT o.id, c.name
 FROM orders o

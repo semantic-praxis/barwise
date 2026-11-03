@@ -77,8 +77,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   // object-type ids so the entity loop can skip them.
   const objectifiedObjectTypeIds = new Set<string>();
   const objectifiedByObjectType = new Map<string, string>(); // objectTypeId -> factTypeId
-  // objectTypeId -> the link's own id, written on NestedPredicate so a
-  // round trip keeps it.
+  // objectTypeId -> the link's own id, written on NestedPredicate.
   const objectificationIdByObjectType = new Map<string, string>();
   for (const oft of model.objectifiedFactTypes) {
     objectifiedObjectTypeIds.add(oft.objectTypeId);
@@ -772,9 +771,9 @@ function writeSubtypeFacts(
   // disjunctive mandatory, as NORMA states a partition. A group of one is
   // not written: NORMA reads a mandatory over one role as a simple one, and
   // an exclusion over one states nothing. "Each Person is an Employee" is
-  // therefore lost on export (barwise-yx8). The ids keep the shape the
-  // flag-based writer gave them, so an export of a 2.0 file does not move;
-  // a second constraint of one kind over one supertype takes its own id.
+  // therefore lost on export (barwise-yx8). Each id is derived from its
+  // kind and supertype, so one model exports it the same every time; a
+  // second constraint of one kind over one supertype takes its own id.
   const used = new Set<string>();
   const idFor = (kind: "excl" | "exh", supertypeId: string, c: Constraint) => {
     const byGroup = toNormaId(`subtype_${kind}_${supertypeId}`);

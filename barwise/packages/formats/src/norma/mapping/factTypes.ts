@@ -37,7 +37,12 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
         );
       }
       return {
-        name: nr.name || nr.id,
+        // NORMA leaves most roles unnamed and shows one by its player. A
+        // role's id is `<fact type>.<role name>` (iri-identity 6c), so the
+        // NORMA id this once fell back to became part of the role's id; the
+        // player's name reads as NORMA shows it, and the replay suffixes a
+        // repeat (a ring's two Person roles: Person, Person_2).
+        name: nr.name || model.getObjectType(playerId)!.name,
         playerId,
         id: nr.id, // NORMA's role id, which the constraints name.
       };
