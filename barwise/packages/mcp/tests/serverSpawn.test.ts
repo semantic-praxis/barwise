@@ -82,15 +82,12 @@ describe("MCP server stdio spawn", () => {
     expect(JSON.parse(text)).toMatchObject({ valid: true });
   });
 
-  it("mints UUIDv7 ids, so the entry point installed the generator", async () => {
-    // The generator is tested in core with a fake clock; this is the
-    // wiring core cannot see. Without the install line in src/index.ts
-    // the import still succeeds, with v4 ids
-    // (docs/specs/uuid7-generator-factory.spec.md).
+  it("imports with the ids the model gives, and no generated id", async () => {
+    // The entry point installs no id generator: 6b-4b retired it, and every
+    // element id is one the model gives from its name or its sentence
+    // (iri-identity decision 13). The spawned server is the wiring.
     const result = await client.callTool({
       name: "import_model",
-      // Ossie, because it still states generated ids for object types until
-      // 6b-4b retires the generator; the DDL importer no longer calls it.
       arguments: {
         source:
           "version: 0.2.0.dev0\nname: T\nontology:\n  - { concept: Customer, type: EntityType }\n",
@@ -98,16 +95,12 @@ describe("MCP server stdio spawn", () => {
       },
     });
     const text = (result.content as Array<{ type: string; text: string; }>)[0]!.text;
-    // Elements the model names take local names (iri-identity 6b); the ids
-    // the importer still states come from the generator, and must be v7.
     const ids = [...text.matchAll(/^\s*(?:- )?id: (\S+)$/gm)].map((m) => m[1]!);
-    const generated = ids.filter((id) =>
+    expect(ids).toContain("Customer");
+    const uuids = ids.filter((id) =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)
     );
-    expect(generated.length).toBeGreaterThan(0);
-    for (const id of generated) {
-      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    }
+    expect(uuids).toEqual([]);
   });
 
   it("lists resources", async () => {

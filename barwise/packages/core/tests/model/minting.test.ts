@@ -10,7 +10,6 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Constraint } from "../../src/model/Constraint.js";
-import { setIdGenerator } from "../../src/model/id.js";
 import { DuplicateIdError, OrmModel } from "../../src/model/OrmModel.js";
 import { subtypeFactRef } from "../../src/model/SubtypeFact.js";
 
@@ -460,28 +459,22 @@ describe("a model naming what it is given", () => {
     // verbalized, so it takes no id rather than a generated one: the same
     // input gives the same model. It is still in the model, in order, for
     // validation to report its dangling reference.
-    setIdGenerator(() => "generated");
-    try {
-      const m = new OrmModel({ name: "M" });
-      m.addObjectType({ name: "Person", kind: "entity", referenceMode: "nr" });
-      m.addObjectType({ name: "Driver", kind: "entity", referenceMode: "nr" });
-      const sf = m.addSubtypeFact({ subtypeId: "gone", supertypeId: "also-gone" }, {
-        skipPlayerValidation: true,
-      });
-      m.addSubtypeFact({ subtypeId: "Driver", supertypeId: "Person" });
-      const oft = m.addObjectifiedFactType({ factTypeId: "no-ft", objectTypeId: "no-ot" }, {
-        skipPlayerValidation: true,
-      });
-      expect(sf.id).toBeUndefined();
-      expect(oft.id).toBeUndefined();
-      expect(m.subtypeFacts.map(subtypeFactRef)).toEqual([
-        "unnamed:gone<also-gone",
-        "Driver_is_a_subtype_of_Person",
-      ]);
-      expect(m.objectifiedFactTypes).toEqual([oft]);
-      expect(m.idKindsHolding("generated")).toEqual([]);
-    } finally {
-      setIdGenerator(undefined);
-    }
+    const m = new OrmModel({ name: "M" });
+    m.addObjectType({ name: "Person", kind: "entity", referenceMode: "nr" });
+    m.addObjectType({ name: "Driver", kind: "entity", referenceMode: "nr" });
+    const sf = m.addSubtypeFact({ subtypeId: "gone", supertypeId: "also-gone" }, {
+      skipPlayerValidation: true,
+    });
+    m.addSubtypeFact({ subtypeId: "Driver", supertypeId: "Person" });
+    const oft = m.addObjectifiedFactType({ factTypeId: "no-ft", objectTypeId: "no-ot" }, {
+      skipPlayerValidation: true,
+    });
+    expect(sf.id).toBeUndefined();
+    expect(oft.id).toBeUndefined();
+    expect(m.subtypeFacts.map(subtypeFactRef)).toEqual([
+      "unnamed:gone<also-gone",
+      "Driver_is_a_subtype_of_Person",
+    ]);
+    expect(m.objectifiedFactTypes).toEqual([oft]);
   });
 });

@@ -33,13 +33,12 @@
  * ground. Do not read a green run of this file as the references being
  * sound.
  */
-import { generateId } from "@barwise/core";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { defaultSuitePath, loadSuite } from "../src/evalcase/loadSuite.js";
-import { renderReference, withDeterministicIds } from "../src/evalcase/renderReference.js";
+import { renderReference } from "../src/evalcase/renderReference.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EVALS = resolve(__dirname, "../evals");
@@ -72,48 +71,14 @@ describe("committed reference models", () => {
   }
 });
 
-describe("withDeterministicIds", () => {
+describe("renderReference", () => {
   it("renders the same bytes twice", () => {
-    // The property the byte comparison above rests on. Without it the
-    // drift test would fail on every run for reasons that mean nothing.
+    // The property the byte comparison above rests on. It holds with no
+    // shim now: every id is one the model gives from a name or a sentence
+    // (iri-identity 6b-4b), so one payload renders one file.
     const payload = readFileSync(join(PAYLOADS, "order-management.json"), "utf8");
 
     expect(renderReference(payload, "order-management"))
       .toBe(renderReference(payload, "order-management"));
-  });
-
-  it("mints the same id sequence on every entry", () => {
-    // Directly, not through renderReference. The counter resets per
-    // call, so two independent renders start from the same id -- which
-    // is what keeps a file's contents independent of how many other
-    // files were rendered before it.
-    const once = withDeterministicIds(() => [generateId(), generateId()]);
-    const twice = withDeterministicIds(() => [generateId(), generateId()]);
-
-    expect(once).toEqual(twice);
-    expect(once[0]).not.toBe(once[1]);
-  });
-
-  it("restores the ambient id generator afterwards", () => {
-    // `setIdGenerator` is process-wide. A leak would leave every later
-    // test in this worker minting fixture ids and still passing, then
-    // surface as an inexplicable diff in some unrelated file days
-    // later.
-    withDeterministicIds(() => generateId());
-
-    expect(generateId()).not.toMatch(/^00000000-0000-7/);
-  });
-
-  it("restores it even when the body throws", () => {
-    // The leak that matters: a render that fails mid-way must not take
-    // the process's id generator down with it. A `try` without the
-    // `finally` passes the test above and fails this one.
-    expect(() =>
-      withDeterministicIds(() => {
-        throw new Error("boom");
-      })
-    ).toThrow("boom");
-
-    expect(generateId()).not.toMatch(/^00000000-0000-7/);
   });
 });

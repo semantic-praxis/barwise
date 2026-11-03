@@ -5,7 +5,7 @@ import type { DerivationRule } from "./FactType.js";
  * Configuration for creating a new SubtypeFact.
  */
 export interface SubtypeFactConfig {
-  /** Optional stable identifier. In a model, its minted name if omitted; standalone, generated. */
+  /** Optional stable identifier. In a model, its minted name if omitted; standalone, none. */
   readonly id?: string;
   /** The id of the subtype (child) entity type. */
   readonly subtypeId: string;

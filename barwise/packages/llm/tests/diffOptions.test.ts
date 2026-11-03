@@ -1,10 +1,10 @@
 /**
  * Independent LLM samples are compared with content-only element
  * matching (orm-format-3, Open decision 4 as revised; barwise-18n). Their
- * ids are unrelated by construction. Under the default random generator
- * they never coincide, but under a deterministic one (tests, promptlab's
- * withDeterministicIds) they do by mint order, and id-first matching would
- * then pair two different elements; core's
+ * ids are unrelated by construction. Each is a local name the model gives
+ * from a name or a sentence (iri-identity 6b-4b), so two samples that name
+ * different elements alike share an id, and id-first matching would then
+ * pair two different elements; core's
  * `constraintMatching.test.ts` shows content-only never does. This pins
  * that both sample comparisons ask for it: the medoid fold and its
  * per-sample diffs, and an alternative framing's diff against the primary.

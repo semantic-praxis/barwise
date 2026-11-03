@@ -24,6 +24,7 @@ import {
 type OrmYamlDocument = ReturnType<typeof writeDocument>;
 import { buildConstraintSpec } from "@barwise/core/annotation";
 import { type ChangeKind, deltaLabel, diffModels, type ModelDelta } from "@barwise/core/diff";
+import { remapIds } from "@barwise/core/rename";
 import { ConstraintVerbalizer } from "@barwise/core/verbalization";
 import { stringify } from "yaml";
 import { lossKey, type OssieCorrespondence } from "./writeOssie.js";
@@ -118,14 +119,20 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
     ftDoc.name = src.name;
   }
 
-  // An id is a whole string, as a value or a key, wherever the document
-  // refers to its element, so replacing every string equal to a minted id
-  // reaches each reference without a list of the fields that hold one. Done on the
-  // document, not its text: a minted id may be a prefix of another, and a
-  // source id may need quoting in YAML ("1", "true"). Read as written: the
-  // point is the source's ids, which a load would replay into 4.0's
-  // (iri-identity WS6), and a model built in code may hold ids 4.0 refuses.
-  const aligned = new OrmYamlSerializer().deserializeAsWritten(stringify(reId(doc, ids)));
+  // The ids go through the model, not the document's strings: in format 4.0
+  // an id is its element's name (decision 13), so replacing every string
+  // equal to one rewrote names and readings too, which replacing UUIDs
+  // never could (iri-identity 6b-4b). Read as written first: the point is
+  // the source's ids, which a load would replay into 4.0's, and a model
+  // built in code may hold ids 4.0 refuses.
+  // Across kinds as a 3.x model allows: a source built in code may give an
+  // object type and a fact type one id, and an element only the read-back
+  // holds (a constraint it named from its sentence) may hold an id a source
+  // element of another kind does, now that ids are names. Within one kind
+  // the read-back holds only what maps to the source, so none collides.
+  const aligned = remapIds(new OrmYamlSerializer().deserializeAsWritten(stringify(doc)), ids, {
+    idsAcrossKinds: false,
+  });
   // 3.0 has no imports, so `document30` left them out; they are the
   // read-back's, and the header deltas compare them.
   for (const [alias, target] of back.imports) aligned.setImport(alias, target);
@@ -161,18 +168,6 @@ function document30(back: OrmModel): OrmYamlDocument {
   delete doc.model["imports"];
   doc.orm_version = "3.0";
   return doc as unknown as OrmYamlDocument;
-}
-
-function reId(value: unknown, ids: ReadonlyMap<string, string>): unknown {
-  if (typeof value === "string") return ids.get(value) ?? value;
-  if (Array.isArray(value)) return value.map((v) => reId(v, ids));
-  if (value !== null && typeof value === "object") {
-    // Keys too: a population's role values are keyed by role id.
-    return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [ids.get(k) ?? k, reId(v, ids)]),
-    );
-  }
-  return value;
 }
 
 /** The key of a delta's source side, as `lossKey` spells it; none for an added element. */

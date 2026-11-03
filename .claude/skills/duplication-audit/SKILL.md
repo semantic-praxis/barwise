@@ -56,7 +56,7 @@ call sites can reach, unless that couples packages.
 
 **2. When the copy must stay a copy, register it or test it in the
 same commit.** Cross-package parallelism that orthogonality demands
-(the `SqlglotBridge` pair, the surface `idGenerator`s) is legitimate
+(the `SqlglotBridge` pair) is legitimate
 -- with an entry in `parity.manifest.json` (checked by
 `npm run check:parity`) or a drift test alongside. Never a comment: "Must match X" is the author knowing
 the invariant and writing it where nothing can enforce it.

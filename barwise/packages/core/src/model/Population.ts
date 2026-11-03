@@ -6,7 +6,7 @@
  * an instance might be { "role-customer": "C001", "role-order": "O123" }.
  */
 import type { Complete } from "../util/complete.js";
-import { generateId } from "./id.js";
+import { populationIdBase } from "./idRules.js";
 export interface FactInstance {
   /** Unique identifier for this instance. */
   readonly id: string;
@@ -31,7 +31,7 @@ export interface FactInstanceConfig {
  * Configuration for creating a new Population.
  */
 export interface PopulationConfig {
-  /** Optional stable identifier. In a model, `<fact type>.population` if omitted; standalone, generated. */
+  /** Optional stable identifier. In a model, `<fact type>.population` if omitted; standalone, the same. */
   readonly id?: string;
   /** The id of the fact type this population samples. */
   readonly factTypeId: string;
@@ -92,7 +92,8 @@ export class Population {
   private _next = 1;
 
   constructor(config: PopulationConfig) {
-    this.id = config.id ?? generateId();
+    // Outside a model, its fact type's id and `.population` (decision 7).
+    this.id = config.id ?? populationIdBase(config.factTypeId);
     this.factTypeId = config.factTypeId;
     this.description = config.description;
     this.sample = config.sample ?? false;

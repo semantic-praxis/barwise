@@ -41,7 +41,8 @@ model:
           roles:
             - Reviewer_reviews_Paper.reviews
             - Reviewer_reviews_Paper.is_reviewed_by
-          id: 00000000-0000-7001-ad34-3b424950575e
+          id: Each_combination_of_Reviewer_and_Paper_is_unique_in_Reviewer_reviews_Paper
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"reviews",{"name":"Reviewer reviews Paper","readings":["{0} reviews {1}","{1} is reviewed by {0}"],"players":["Reviewer","Paper"]}],[1,"is reviewed by",{"name":"Reviewer reviews Paper","readings":["{0} reviews {1}","{1} is reviewed by {0}"],"players":["Reviewer","Paper"]}]],"fact_type":{"name":"Reviewer reviews Paper","readings":["{0} reviews {1}","{1} is reviewed by {0}"],"players":["Reviewer","Paper"]}}'
     - id: Review_has_ReviewScore
       name: Review has ReviewScore
       roles:
@@ -58,7 +59,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Review_has_ReviewScore.has
-          id: 00000000-0000-7002-8c53-5a61686f767d
+          id: Each_Review_has_at_most_one_ReviewScore
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Review has ReviewScore","readings":["{0} has {1}","{1} is of {0}"],"players":["Review","ReviewScore"]}]],"fact_type":{"name":"Review has ReviewScore","readings":["{0} has {1}","{1} is of {0}"],"players":["Review","ReviewScore"]}}'
         - type: mandatory
           role: Review_has_ReviewScore.has
           id: Each_Review_has_at_least_one_ReviewScore

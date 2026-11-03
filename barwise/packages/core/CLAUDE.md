@@ -110,27 +110,27 @@ it, so knip sees an unused file where there is a live edge.
 
 ## Key Conventions
 
-- Every model element gets a UUID default id at creation via
-  `generateId()` (`src/model/id.ts`): v4 `randomUUID()` unless a
-  surface entry point installed the UUIDv7 generator (see
-  `docs/specs/archive/uuid7-identifiers.spec.md`). Never add the `uuid` npm
-  package; the v7 bit layout is core's pure `uuidv7FromParts`, and the
-  counter around it is `createUuidv7Generator({ now, randomBytes })`,
-  which reads the clock and randomness only through those arguments. A
-  surface installs it in one line, `setIdGenerator(createUuidv7Generator({
-  now: Date.now, randomBytes }))`; do not wrap that in a named installer
-  (`docs/specs/uuid7-generator-factory.spec.md`, D2).
+- An element's id is a local name, never a random one
+  (`docs/specs/iri-identity.spec.md`, decision 13). A model names what it
+  is given: an object type or fact type from its name, a role
+  `<fact type>.<role>`, a constraint, subtype fact or objectification
+  from its sentence. An element built outside a model takes the same id
+  from its name (`ModelElement`, `createObjectType`, `Population`'s
+  `<fact type>.population`), and a constraint there keeps the id it is
+  given or none. Core mints no random id and reads no clock:
+  `generateId`, `setIdGenerator` and the UUIDv7 factory retired with
+  WS6's 6b-4b, so an importer leaves ids to the model. `formatUuid`
+  (`src/model/id.ts`) remains for `derivedId`'s v8.
 - **A constraint id a file omits is derived, not minted.** On load,
   `serialization/derivedId.ts` gives an id-less constraint a UUIDv8 hashed
   from its fact type id and its content, so one unchanged file always loads
-  to the same ids; the generator fills only constraints built in code,
-  through the `FactType` constructor or `addConstraint` (barwise-nkq), so
-  every constraint in a model has an id
-  (`docs/specs/orm-format-3.spec.md`, WS2 and WS3). Do not move the derivation into
-  `FactType`'s constructor: it runs per fact type and cannot see the ids
-  the rest of the file states. And do not let a loaded constraint reach
-  the constructor's random fill: that is what made two NORMA exports of
-  one file differ.
+  to the same ids (`docs/specs/orm-format-3.spec.md`, WS2 and WS3). A
+  constraint added in code is named by the model from its sentence, or
+  left unnamed when the sentence cannot be built (decision 19); one built
+  outside a model keeps the id it is given or has none, so `c.id` is never
+  safe to assert. Do not move the derivation into `FactType`'s
+  constructor: it runs per fact type and cannot see the ids the rest of
+  the file states.
 - **Where a constraint lives is decided by its kind, in one table.**
   `PLACEMENT` in `model/Constraint.ts` classifies every kind as internal
   (it lives in its fact type; every role is one of its roles) or external

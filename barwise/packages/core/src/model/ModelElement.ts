@@ -1,12 +1,13 @@
-import { generateId } from "./id.js";
+import { nameIdBase } from "./idRules.js";
 import { requireName } from "./name.js";
 
 /**
  * Base class for all ORM model elements.
  *
- * Every element has a stable UUID assigned at creation and a human-readable
- * name. The id is the primary identity used for references between elements;
- * names can change without breaking references.
+ * Every element has an id and a human-readable name. The id is the
+ * identity references use; in format 4.0 it is the name's local name when
+ * none is given (iri-identity decision 13). Setting `name` here leaves the
+ * id as it is: a rename that changes both is `renameInModel`'s.
  */
 export class ModelElement {
   readonly id: string;
@@ -14,7 +15,9 @@ export class ModelElement {
 
   constructor(name: string, id?: string) {
     this._name = requireName(name);
-    this.id = id ?? generateId();
+    // Outside a model, the id its name gives (decision 13); a model names
+    // what it is given itself, before this runs.
+    this.id = id ?? nameIdBase(this._name);
   }
 
   get name(): string {

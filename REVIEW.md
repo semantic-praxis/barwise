@@ -158,9 +158,11 @@ checklist groups whose trigger the diff meets.
    same-named tables in different schemas (5aaf1fde, 18a6a8a1,
    barwise-yvx).
 7. **ORM shape.** Loops over roles handle unary and n-ary fact types, not
-   only binary (bb9b4660). Random ids come from `generateId` and
-   deterministic ones from `derivedId`, never assembled from names
-   (35ee5c4a); a constructor and its mutator establish the same
+   only binary (bb9b4660). An id is the one the model's rules give
+   (`core/src/model/idRules.ts`, or a minted sentence), or `derivedId`'s
+   for a constraint a 2.0 file omits; an importer or a caller never builds
+   one by hand (35ee5c4a, iri-identity 6b-4b, which retired the random
+   `generateId`); a constructor and its mutator establish the same
    invariants (barwise-nkq).
 8. **PR description claims.** Each claim about the code matches it
    (barwise-tms). Barwise PR descriptions carry a reading guide that

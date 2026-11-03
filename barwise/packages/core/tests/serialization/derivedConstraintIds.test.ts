@@ -9,7 +9,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { FactType } from "../../src/model/FactType.js";
-import { setIdGenerator } from "../../src/model/id.js";
 import { canonicalJson, CONSTRAINT_ID_TAG, derivedId } from "../../src/serialization/derivedId.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 
@@ -70,20 +69,14 @@ function constraintIds(yaml: string): string[] {
 
 describe("constraint ids a 2.0 file omits", () => {
   it("are the same on every load of one unchanged file", () => {
-    // Counters make any generator-minted id visible: if the loader still
-    // filled ids from the generator, the two loads would disagree.
-    let n = 0;
-    setIdGenerator(() => `minted-${++n}`);
-    try {
-      const shop = readFileSync(shopPath, "utf-8");
-      const first = constraintIds(shop);
-      const second = constraintIds(shop);
-      expect(first.length).toBeGreaterThan(0);
-      expect(second).toEqual(first);
-      expect(first.every((id) => UUID_V8.test(id))).toBe(true);
-    } finally {
-      setIdGenerator(undefined);
-    }
+    // No generator remains to fill them, so the two loads agree because
+    // each derives every omitted id from the file.
+    const shop = readFileSync(shopPath, "utf-8");
+    const first = constraintIds(shop);
+    const second = constraintIds(shop);
+    expect(first.length).toBeGreaterThan(0);
+    expect(second).toEqual(first);
+    expect(first.every((id) => UUID_V8.test(id))).toBe(true);
   });
 
   it("keeps an id the file states, and derives one for a missing or empty id", () => {
@@ -230,26 +223,21 @@ describe("constraint ids a 2.0 file omits", () => {
 `)).toEqual(["db9511fc-9703-8533-8786-bac29c9aff87"]);
   });
 
-  it("leaves code-built constraints to the generator, as before", () => {
-    // A constraint built in code is new, so a fresh id is right; only a
-    // file's omitted ids are derived.
-    let n = 0;
-    setIdGenerator(() => `minted-${++n}`);
-    try {
-      const ft = new FactType({
-        id: "ft-code",
-        name: "Person has Name",
-        roles: [
-          { id: "r-1", name: "has", playerId: "ot-p" },
-          { id: "r-2", name: "is of", playerId: "ot-n" },
-        ],
-        readings: ["{0} has {1}"],
-        constraints: [{ type: "mandatory", roleId: "r-1" }],
-      });
-      expect(ft.internalConstraints[0]!.id).toBe("minted-1");
-    } finally {
-      setIdGenerator(undefined);
-    }
+  it("leaves a code-built constraint outside a model unnamed, as no generator remains", () => {
+    // Only a file's omitted ids are derived; a model names its constraints
+    // itself, and outside one a constraint keeps the id it is given or none
+    // (iri-identity 6b-4b).
+    const ft = new FactType({
+      id: "ft-code",
+      name: "Person has Name",
+      roles: [
+        { id: "r-1", name: "has", playerId: "ot-p" },
+        { id: "r-2", name: "is of", playerId: "ot-n" },
+      ],
+      readings: ["{0} has {1}"],
+      constraints: [{ type: "mandatory", roleId: "r-1" }],
+    });
+    expect(ft.internalConstraints[0]!.id).toBeUndefined();
   });
 });
 

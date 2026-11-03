@@ -23,14 +23,14 @@ pinned by the `@barwise/formats` test suite (`NormaExportFormat`,
 
 ## Design intent
 
-|                   | NORMA XML (`.orm`)                            | barwise (`.orm.yaml`)                |
-| ----------------- | --------------------------------------------- | ------------------------------------ |
-| Primary author    | The NORMA GUI                                 | A human or an LLM                    |
-| Optimised for     | Tool round-trip, full standard, diagram state | Reading, editing, diffing, reasoning |
-| Identity          | GUIDs                                         | UUIDs (UUIDv7, creation-ordered)     |
-| Layout/geometry   | Persisted in-file, fully styled               | Named layouts, positions-first       |
-| Derived artifacts | OIAL, relational bridge persisted in-file     | Recomputed deterministically by core |
-| Verbosity         | High (namespaced, separated elements)         | Low (inline, dense)                  |
+|                   | NORMA XML (`.orm`)                            | barwise (`.orm.yaml`)                 |
+| ----------------- | --------------------------------------------- | ------------------------------------- |
+| Primary author    | The NORMA GUI                                 | A human or an LLM                     |
+| Optimised for     | Tool round-trip, full standard, diagram state | Reading, editing, diffing, reasoning  |
+| Identity          | GUIDs                                         | Local names (from the element's name) |
+| Layout/geometry   | Persisted in-file, fully styled               | Named layouts, positions-first        |
+| Derived artifacts | OIAL, relational bridge persisted in-file     | Recomputed deterministically by core  |
+| Verbosity         | High (namespaced, separated elements)         | Low (inline, dense)                   |
 
 NORMA is effectively the reference implementation of ORM 2 -- Terry
 Halpin's own ecosystem -- and its XML carries layers barwise does not

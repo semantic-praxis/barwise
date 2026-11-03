@@ -1,21 +1,19 @@
 /**
- * Every registered importer gives element ids through `generateId()`, or
- * leaves the id to the model, which names the element by its rule
- * (docs/specs/importer-role-ids.spec.md; iri-identity 6b).
+ * Every registered importer leaves element ids to the model, which names
+ * each element by its rule (docs/specs/importer-role-ids.spec.md;
+ * iri-identity 6b, and 6b-4b, which retired `generateId()`).
  *
- * The id policy lives in one place, core's `generateId`, and the surfaces
- * install UUIDv7 behind it. An importer that passes a hand-built `id` to a
- * role config bypasses it silently: the dbt, DDL and OpenAPI importers did,
- * writing `Customers has CustomerName::role1` and `<uuid>-has-Name-role`,
- * and the DDL/OpenAPI form collided across tables that share a column name.
+ * The id policy lives in one place, the model's naming rules. An importer
+ * that passes a hand-built `id` bypasses it silently: the dbt, DDL and
+ * OpenAPI importers did, writing `Customers has CustomerName::role1` and
+ * `<uuid>-has-Name-role`, and the DDL/OpenAPI form collided across tables
+ * that share a column name.
  *
- * So the oracle is the generator and the model's naming rule: install a
- * generator that mints `gen-1`, `gen-2`, ..., run each importer, and
- * require every object type, fact type, role and constraint id to be one
- * it minted or the one the model's rule gives the element (its local name;
- * `<fact type>.<role>`; its minted sentence), with the suffix rule's `_N`,
- * and no repeats. Any hand-built id -- textual, or a real UUID with a
- * suffix -- fails.
+ * So the oracle is the model's naming rule: run each importer and require
+ * every object type, fact type, role and constraint id to be the one the
+ * rule gives the element (its local name; `<fact type>.<role>`; its minted
+ * sentence), with the suffix rule's `_N`, and no repeats. Any hand-built
+ * id -- textual, or a UUID -- fails.
  *
  * The test iterates the format registry rather than a list of its own, and
  * an importer with neither a fixture nor an exemption below fails, so a new
@@ -24,21 +22,19 @@
  */
 import { registerCodeFormats } from "@barwise/code-analysis";
 import {
-  generateId,
   type ImportFormat,
   listImporters,
   localName,
   mintedName,
   type OrmModel,
   ROLE_ID_PATTERN,
-  setIdGenerator,
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 registerStandardFormats();
 registerDbtFormats();
@@ -299,43 +295,21 @@ function byRule(id: string, rule: string | undefined): boolean {
   return id === rule || (id.startsWith(`${rule}_`) && /^\d+$/.test(id.slice(rule.length + 1)));
 }
 
-let minted: Set<string>;
-function installCountingGenerator(): void {
-  minted = new Set();
-  let n = 0;
-  setIdGenerator(() => {
-    const id = `gen-${++n}`;
-    minted.add(id);
-    return id;
-  });
-}
-
-afterEach(() => {
-  setIdGenerator(undefined);
-});
-
-describe("importer ids come from generateId", () => {
+describe("importer ids come from the model's naming rules", () => {
   it("every registered importer has a fixture or a stated exemption", () => {
     const registered = listImporters().map((d) => d.name).sort();
     const accounted = [...Object.keys(FIXTURES), ...Object.keys(EXEMPT)].sort();
     expect(registered).toEqual(accounted);
   });
 
-  it("the counting generator is what generateId uses", () => {
-    installCountingGenerator();
-    expect(generateId()).toBe("gen-1");
-  });
-
   for (const name of Object.keys(FIXTURES)) {
-    it(`${name}: every element id was minted by the generator, and none repeats`, async () => {
-      installCountingGenerator();
+    it(`${name}: every element id is the one its rule gives, and none repeats`, async () => {
       const model = await FIXTURES[name]!();
       const ids = allIds(model);
       expect(ids.length, `${name} produced no elements`).toBeGreaterThan(0);
 
-      const handBuilt = ids.filter((e) => !minted.has(e.id) && !byRule(e.id, e.rule))
-        .map((e) => e.label);
-      expect(handBuilt, `${name} gave ids neither the generator nor the model gave`).toEqual([]);
+      const handBuilt = ids.filter((e) => !byRule(e.id, e.rule)).map((e) => e.label);
+      expect(handBuilt, `${name} gave ids the model's rules do not`).toEqual([]);
 
       const values = ids.map((e) => e.id);
       expect(new Set(values).size, `${name} emitted a repeated id`).toBe(values.length);

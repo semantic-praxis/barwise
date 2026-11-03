@@ -6,7 +6,7 @@ model:
       name: Account
       kind: entity
       reference_mode: account_number
-      preferred_identifier: 00000000-0000-7002-8c53-5a61686f767d
+      preferred_identifier: Each_AccountNumber_identifies_at_most_one_Account
       definition: A customer account in the system, identified by an account number. Every account has a unique 6-digit sequential identifier that is never reused; if an account closes and the same company returns, they receive a new account number.
     - id: AccountNumber
       name: AccountNumber
@@ -19,7 +19,7 @@ model:
       name: Subscription
       kind: entity
       reference_mode: subscription_id
-      preferred_identifier: 00000000-0000-7004-8a91-989fa6adb4bb
+      preferred_identifier: Each_SubscriptionID_identifies_at_most_one_Subscription
       definition: The agreement that an account pays a specified amount on a specified billing cycle for a specified product. Identified by a subscription ID prefixed with SUB.
     - id: SubscriptionID
       name: SubscriptionID
@@ -32,7 +32,7 @@ model:
       name: Product
       kind: entity
       reference_mode: product_code
-      preferred_identifier: 00000000-0000-7006-88cf-d6dde4ebf2f9
+      preferred_identifier: Each_ProductCode_identifies_at_most_one_Product
       definition: "A product offered by the company. Currently three products exist: CORE, ANALYTICS, and CONNECT."
     - id: ProductCode
       name: ProductCode
@@ -50,7 +50,7 @@ model:
       name: PricePlan
       kind: entity
       reference_mode: plan_code
-      preferred_identifier: 00000000-0000-7008-860d-141b22293037
+      preferred_identifier: Each_PlanCode_identifies_at_most_one_PricePlan
       definition: The billing artefact that specifies the price and billing frequency. Identified by plan code (e.g., CORE-MO-49, CORE-AN-490). Each price plan entitles exactly one feature bundle.
       aliases:
         - billing plan
@@ -65,7 +65,7 @@ model:
       name: FeatureBundle
       kind: entity
       reference_mode: bundle_name
-      preferred_identifier: 00000000-0000-700a-844b-525960676e75
+      preferred_identifier: Each_BundleName_identifies_at_most_one_FeatureBundle
       definition: The feature set or tier that a customer receives. Identified by name. Examples include Starter, Professional, and Enterprise. Each bundle specifies how many seats, whether API access is included, whether SSO is included, etc.
     - id: BundleName
       name: BundleName
@@ -78,7 +78,7 @@ model:
       name: PlanChange
       kind: entity
       reference_mode: change_id
-      preferred_identifier: 00000000-0000-700c-8289-90979ea5acb3
+      preferred_identifier: Each_ChangeID_identifies_at_most_one_PlanChange
       definition: A record of a subscription plan change, capturing the subscription, the new price plan, the effective date, the date it was requested, and who requested it. Allows subscription plan history to be tracked.
     - id: ChangeID
       name: ChangeID
@@ -153,11 +153,13 @@ model:
         - type: internal_uniqueness
           roles:
             - Account_has_AccountNumber.has
-          id: 00000000-0000-7001-ad34-3b424950575e
+          id: Each_Account_has_at_most_one_AccountNumber
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountNumber"]}]],"fact_type":{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountNumber"]}}'
         - type: internal_uniqueness
           roles:
             - Account_has_AccountNumber.identifies
-          id: 00000000-0000-7002-8c53-5a61686f767d
+          id: Each_AccountNumber_identifies_at_most_one_Account
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountNumber"]}]],"fact_type":{"name":"Account has AccountNumber","readings":["{0} has {1}","{1} identifies {0}"],"players":["Account","AccountNumber"]}}'
         - type: mandatory
           role: Account_has_AccountNumber.has
           id: Each_Account_has_at_least_one_AccountNumber
@@ -178,11 +180,13 @@ model:
         - type: internal_uniqueness
           roles:
             - Subscription_has_SubscriptionID.has
-          id: 00000000-0000-7003-ab72-7980878e959c
+          id: Each_Subscription_has_at_most_one_SubscriptionID
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Subscription has SubscriptionID","readings":["{0} has {1}","{1} identifies {0}"],"players":["Subscription","SubscriptionID"]}]],"fact_type":{"name":"Subscription has SubscriptionID","readings":["{0} has {1}","{1} identifies {0}"],"players":["Subscription","SubscriptionID"]}}'
         - type: internal_uniqueness
           roles:
             - Subscription_has_SubscriptionID.identifies
-          id: 00000000-0000-7004-8a91-989fa6adb4bb
+          id: Each_SubscriptionID_identifies_at_most_one_Subscription
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Subscription has SubscriptionID","readings":["{0} has {1}","{1} identifies {0}"],"players":["Subscription","SubscriptionID"]}]],"fact_type":{"name":"Subscription has SubscriptionID","readings":["{0} has {1}","{1} identifies {0}"],"players":["Subscription","SubscriptionID"]}}'
         - type: mandatory
           role: Subscription_has_SubscriptionID.has
           id: Each_Subscription_has_at_least_one_SubscriptionID
@@ -203,11 +207,13 @@ model:
         - type: internal_uniqueness
           roles:
             - Product_has_ProductCode.has
-          id: 00000000-0000-7005-a9b0-b7bec5ccd3da
+          id: Each_Product_has_at_most_one_ProductCode
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Product has ProductCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Product","ProductCode"]}]],"fact_type":{"name":"Product has ProductCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Product","ProductCode"]}}'
         - type: internal_uniqueness
           roles:
             - Product_has_ProductCode.identifies
-          id: 00000000-0000-7006-88cf-d6dde4ebf2f9
+          id: Each_ProductCode_identifies_at_most_one_Product
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"Product has ProductCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Product","ProductCode"]}]],"fact_type":{"name":"Product has ProductCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["Product","ProductCode"]}}'
         - type: mandatory
           role: Product_has_ProductCode.has
           id: Each_Product_has_at_least_one_ProductCode
@@ -228,11 +234,13 @@ model:
         - type: internal_uniqueness
           roles:
             - PricePlan_has_PlanCode.has
-          id: 00000000-0000-7007-a7ee-f5fc030a1118
+          id: Each_PricePlan_has_at_most_one_PlanCode
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"PricePlan has PlanCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["PricePlan","PlanCode"]}]],"fact_type":{"name":"PricePlan has PlanCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["PricePlan","PlanCode"]}}'
         - type: internal_uniqueness
           roles:
             - PricePlan_has_PlanCode.identifies
-          id: 00000000-0000-7008-860d-141b22293037
+          id: Each_PlanCode_identifies_at_most_one_PricePlan
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"PricePlan has PlanCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["PricePlan","PlanCode"]}]],"fact_type":{"name":"PricePlan has PlanCode","readings":["{0} has {1}","{1} identifies {0}"],"players":["PricePlan","PlanCode"]}}'
         - type: mandatory
           role: PricePlan_has_PlanCode.has
           id: Each_PricePlan_has_at_least_one_PlanCode
@@ -253,11 +261,13 @@ model:
         - type: internal_uniqueness
           roles:
             - FeatureBundle_has_BundleName.has
-          id: 00000000-0000-7009-a52c-333a41484f56
+          id: Each_FeatureBundle_has_at_most_one_BundleName
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"FeatureBundle has BundleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["FeatureBundle","BundleName"]}]],"fact_type":{"name":"FeatureBundle has BundleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["FeatureBundle","BundleName"]}}'
         - type: internal_uniqueness
           roles:
             - FeatureBundle_has_BundleName.identifies
-          id: 00000000-0000-700a-844b-525960676e75
+          id: Each_BundleName_identifies_at_most_one_FeatureBundle
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"FeatureBundle has BundleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["FeatureBundle","BundleName"]}]],"fact_type":{"name":"FeatureBundle has BundleName","readings":["{0} has {1}","{1} identifies {0}"],"players":["FeatureBundle","BundleName"]}}'
         - type: mandatory
           role: FeatureBundle_has_BundleName.has
           id: Each_FeatureBundle_has_at_least_one_BundleName
@@ -278,11 +288,13 @@ model:
         - type: internal_uniqueness
           roles:
             - PlanChange_has_ChangeID.has
-          id: 00000000-0000-700b-a36a-71787f868d94
+          id: Each_PlanChange_has_at_most_one_ChangeID
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"PlanChange has ChangeID","readings":["{0} has {1}","{1} identifies {0}"],"players":["PlanChange","ChangeID"]}]],"fact_type":{"name":"PlanChange has ChangeID","readings":["{0} has {1}","{1} identifies {0}"],"players":["PlanChange","ChangeID"]}}'
         - type: internal_uniqueness
           roles:
             - PlanChange_has_ChangeID.identifies
-          id: 00000000-0000-700c-8289-90979ea5acb3
+          id: Each_ChangeID_identifies_at_most_one_PlanChange
+          minted_from: '{"type":"internal_uniqueness","roles":[[1,"identifies",{"name":"PlanChange has ChangeID","readings":["{0} has {1}","{1} identifies {0}"],"players":["PlanChange","ChangeID"]}]],"fact_type":{"name":"PlanChange has ChangeID","readings":["{0} has {1}","{1} identifies {0}"],"players":["PlanChange","ChangeID"]}}'
         - type: mandatory
           role: PlanChange_has_ChangeID.has
           id: Each_PlanChange_has_at_least_one_ChangeID
@@ -307,7 +319,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Subscription_belongs_to_Account.belongs_to
-          id: 00000000-0000-700d-a1a8-afb6bdc4cbd2
+          id: Each_Subscription_belongs_to_at_most_one_Account
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"belongs to",{"name":"Subscription belongs to Account","readings":["{0} belongs to {1}","{1} has {0}"],"players":["Subscription","Account"]}]],"fact_type":{"name":"Subscription belongs to Account","readings":["{0} belongs to {1}","{1} has {0}"],"players":["Subscription","Account"]}}'
     - id: Subscription_is_for_Product
       name: Subscription is for Product
       roles:
@@ -328,7 +341,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Subscription_is_for_Product.is_for
-          id: 00000000-0000-700e-80c7-ced5dce3eaf1
+          id: Each_Subscription_is_for_at_most_one_Product
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is for",{"name":"Subscription is for Product","readings":["{0} is for {1}","{1} has {0}"],"players":["Subscription","Product"]}]],"fact_type":{"name":"Subscription is for Product","readings":["{0} is for {1}","{1} has {0}"],"players":["Subscription","Product"]}}'
     - id: Subscription_uses_PricePlan
       name: Subscription uses PricePlan
       roles:
@@ -349,7 +363,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Subscription_uses_PricePlan.uses
-          id: 00000000-0000-700f-9fe6-edf4fb020910
+          id: Each_Subscription_uses_at_most_one_PricePlan
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"uses",{"name":"Subscription uses PricePlan","readings":["{0} uses {1}","{1} is used by {0}"],"players":["Subscription","PricePlan"]}]],"fact_type":{"name":"Subscription uses PricePlan","readings":["{0} uses {1}","{1} is used by {0}"],"players":["Subscription","PricePlan"]}}'
     - id: Subscription_has_StartDate
       name: Subscription has StartDate
       roles:
@@ -370,7 +385,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Subscription_has_StartDate.has
-          id: 00000000-0000-7010-be05-0c131a21282f
+          id: Each_Subscription_has_at_most_one_StartDate
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Subscription has StartDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","StartDate"]}]],"fact_type":{"name":"Subscription has StartDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","StartDate"]}}'
     - id: Subscription_has_EndDate
       name: Subscription has EndDate
       roles:
@@ -387,7 +403,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Subscription_has_EndDate.has
-          id: 00000000-0000-7011-9d24-2b323940474e
+          id: Each_Subscription_has_at_most_one_EndDate
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Subscription has EndDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","EndDate"]}]],"fact_type":{"name":"Subscription has EndDate","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","EndDate"]}}'
     - id: Subscription_has_BillingPeriod
       name: Subscription has BillingPeriod
       roles:
@@ -408,7 +425,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Subscription_has_BillingPeriod.has
-          id: 00000000-0000-7012-bc43-4a51585f666d
+          id: Each_Subscription_has_at_most_one_BillingPeriod
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Subscription has BillingPeriod","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","BillingPeriod"]}]],"fact_type":{"name":"Subscription has BillingPeriod","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","BillingPeriod"]}}'
     - id: Subscription_has_SubscriptionStatus
       name: Subscription has SubscriptionStatus
       roles:
@@ -429,7 +447,8 @@ model:
         - type: internal_uniqueness
           roles:
             - Subscription_has_SubscriptionStatus.has
-          id: 00000000-0000-7013-9b62-6970777e858c
+          id: Each_Subscription_has_at_most_one_SubscriptionStatus
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"Subscription has SubscriptionStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","SubscriptionStatus"]}]],"fact_type":{"name":"Subscription has SubscriptionStatus","readings":["{0} has {1}","{1} is of {0}"],"players":["Subscription","SubscriptionStatus"]}}'
     - id: PricePlan_entitles_FeatureBundle
       name: PricePlan entitles FeatureBundle
       roles:
@@ -450,7 +469,8 @@ model:
         - type: internal_uniqueness
           roles:
             - PricePlan_entitles_FeatureBundle.entitles
-          id: 00000000-0000-7014-ba81-888f969da4ab
+          id: Each_PricePlan_entitles_at_most_one_FeatureBundle
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"entitles",{"name":"PricePlan entitles FeatureBundle","readings":["{0} entitles {1}","{1} is entitled by {0}"],"players":["PricePlan","FeatureBundle"]}]],"fact_type":{"name":"PricePlan entitles FeatureBundle","readings":["{0} entitles {1}","{1} is entitled by {0}"],"players":["PricePlan","FeatureBundle"]}}'
     - id: PlanChange_is_for_Subscription
       name: PlanChange is for Subscription
       roles:
@@ -471,7 +491,8 @@ model:
         - type: internal_uniqueness
           roles:
             - PlanChange_is_for_Subscription.is_for
-          id: 00000000-0000-7015-99a0-a7aeb5bcc3ca
+          id: Each_PlanChange_is_for_at_most_one_Subscription
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"is for",{"name":"PlanChange is for Subscription","readings":["{0} is for {1}","{1} has {0}"],"players":["PlanChange","Subscription"]}]],"fact_type":{"name":"PlanChange is for Subscription","readings":["{0} is for {1}","{1} has {0}"],"players":["PlanChange","Subscription"]}}'
     - id: PlanChange_specifies_PricePlan
       name: PlanChange specifies PricePlan
       roles:
@@ -492,7 +513,8 @@ model:
         - type: internal_uniqueness
           roles:
             - PlanChange_specifies_PricePlan.specifies
-          id: 00000000-0000-7016-b8bf-c6cdd4dbe2e9
+          id: Each_PlanChange_specifies_at_most_one_PricePlan
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"specifies",{"name":"PlanChange specifies PricePlan","readings":["{0} specifies {1}","{1} is specified by {0}"],"players":["PlanChange","PricePlan"]}]],"fact_type":{"name":"PlanChange specifies PricePlan","readings":["{0} specifies {1}","{1} is specified by {0}"],"players":["PlanChange","PricePlan"]}}'
     - id: PlanChange_has_EffectiveDate
       name: PlanChange has EffectiveDate
       roles:
@@ -513,7 +535,8 @@ model:
         - type: internal_uniqueness
           roles:
             - PlanChange_has_EffectiveDate.has
-          id: 00000000-0000-7017-97de-e5ecf3fa0108
+          id: Each_PlanChange_has_at_most_one_EffectiveDate
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"PlanChange has EffectiveDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PlanChange","EffectiveDate"]}]],"fact_type":{"name":"PlanChange has EffectiveDate","readings":["{0} has {1}","{1} is of {0}"],"players":["PlanChange","EffectiveDate"]}}'
     - id: PlanChange_has_Requester
       name: PlanChange has Requester
       roles:
@@ -534,4 +557,5 @@ model:
         - type: internal_uniqueness
           roles:
             - PlanChange_has_Requester.has
-          id: 00000000-0000-7018-b6fd-040b12192027
+          id: Each_PlanChange_has_at_most_one_Requester
+          minted_from: '{"type":"internal_uniqueness","roles":[[0,"has",{"name":"PlanChange has Requester","readings":["{0} has {1}","{1} requested {0}"],"players":["PlanChange","Requester"]}]],"fact_type":{"name":"PlanChange has Requester","readings":["{0} has {1}","{1} requested {0}"],"players":["PlanChange","Requester"]}}'

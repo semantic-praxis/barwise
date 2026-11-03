@@ -157,8 +157,10 @@ recorded in barwise-wcg's spec, `docs/specs/iri-identity.spec.md`.
   comparison of subtype and derivation rules with `derived_by`. Decision 2's exclusion
   of mapping documents is likewise not final: whether barwise reads them
   for barwise-pf2.3 is open.
-- Decision 5 is not built. barwise mints UUIDs (`generateId()` in
-  `core/src/model/id.ts`) until barwise-wcg ships, so today an Ossie
+- Decision 5 is not built. (Since iri-identity WS6, 6b-4b, barwise ids
+  are local names and `generateId()` is retired; barwise-wcg.vlv tracks
+  bringing this ADR and the determinism ADR up to date.) barwise minted
+  UUIDs (`generateId()` in `core/src/model/id.ts`) until barwise-wcg, so an Ossie
   `iri` or `prefixes` map is named in the import warnings and dropped.
   The change is a major `.orm.yaml` version with a migration
   (`docs/adr/schema-versioning.md`). Two rules in force today contradict

@@ -1,4 +1,4 @@
-import { generateId } from "./id.js";
+import { nameIdBase } from "./idRules.js";
 import { requireName } from "./name.js";
 
 /**
@@ -307,7 +307,7 @@ export function createObjectType(config: ObjectTypeConfig): ObjectType {
   }
 
   const base = {
-    id: config.id ?? generateId(),
+    id: config.id ?? nameIdBase(name),
     name,
     aliases: Object.freeze([...(config.aliases ?? [])]),
     independent: config.independent ?? false,

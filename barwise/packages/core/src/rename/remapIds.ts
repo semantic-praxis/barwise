@@ -28,12 +28,18 @@ import { toSubtypeFactConfig } from "../model/SubtypeFact.js";
 
 /**
  * The model with each id in `ids` replaced by its value, everywhere it is
- * held or referred to. An id not in the map is kept. The model must be one
- * whose ids name one element across kinds, as every 4.0 model's do, so one
- * map serves every kind; and the map must not give two elements one id,
- * which the new model refuses.
+ * held or referred to. An id not in the map is kept. One map serves every
+ * kind, so the source's ids must name one element each, as every 4.0
+ * model's do; and the map must not give two elements one id, which the new
+ * model refuses. `idsAcrossKinds` is the new model's rule (default on, as
+ * 4.0's): off lets a mapped-to id be shared across kinds, as a model built
+ * in code may share one.
  */
-export function remapIds(source: OrmModel, ids: ReadonlyMap<string, string>): OrmModel {
+export function remapIds(
+  source: OrmModel,
+  ids: ReadonlyMap<string, string>,
+  options: { readonly idsAcrossKinds?: boolean; } = {},
+): OrmModel {
   const to = (id: string): string => ids.get(id) ?? id;
   const target = new OrmModel({
     name: source.name,
@@ -41,7 +47,7 @@ export function remapIds(source: OrmModel, ids: ReadonlyMap<string, string>): Or
     ...(source.note !== undefined ? { note: source.note } : {}),
     ...(source.namespace !== undefined ? { namespace: source.namespace } : {}),
     ...(source.imports.size > 0 ? { imports: Object.fromEntries(source.imports) } : {}),
-    idsAcrossKinds: true,
+    idsAcrossKinds: options.idsAcrossKinds ?? true,
   });
   /** A constraint over the new ids, keeping its own id or its lack of one. */
   const remap = <C extends Constraint>(c: C): C => {
