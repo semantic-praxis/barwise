@@ -7,8 +7,8 @@ import {
   isInternalConstraint,
 } from "./Constraint.js";
 import type { ConstraintAdmission } from "./constraintAdmission.js";
+import { roleIdBase, suffixed } from "./idRules.js";
 import { ModelElement } from "./ModelElement.js";
-import { localName } from "./name.js";
 import { type ReadingOrder, validateReadingTemplate } from "./ReadingOrder.js";
 import { Role, type RoleConfig } from "./Role.js";
 
@@ -101,14 +101,15 @@ export class FactType extends ModelElement {
       );
     }
 
-    // A role given no id takes its fact type's and its role name's, under
-    // the suffix rule for a repeated name, as a model gives it (decision 5).
+    // A role given no id takes the rule's (`idRules.ts`), suffixed past
+    // its siblings. Outside a model a repeated role name is suffixed rather
+    // than refused, as a migration's is: refusing it is the model's rule
+    // for new authoring (decision 5), and a fact type built on its own is
+    // not authoring into a model.
     const taken = new Set(config.roles.flatMap((rc) => (rc.id !== undefined ? [rc.id] : [])));
     this._roles = config.roles.map((rc) => {
       if (rc.id !== undefined) return new Role(rc);
-      const base = `${this.id}.${localName(rc.name)}`;
-      let id = base;
-      for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
+      const id = suffixed(roleIdBase(this.id, rc.name), (candidate) => !taken.has(candidate));
       taken.add(id);
       return new Role({ ...rc, id });
     });
@@ -225,24 +226,22 @@ export class FactType extends ModelElement {
   }
 
   /**
-   * Add a constraint to this fact type, giving it an id when it has none:
-   * in a model, its minted name (iri-identity, decision 17); standalone, one
-   * from the installed generator, as the constructor does (barwise-nkq).
-   * Without one, every
-   * output that names a constraint by id would have nothing to name it by
-   * until the model was saved and reloaded.
+   * Add a constraint to this fact type. In a model, one given no id takes
+   * its minted name (iri-identity, decision 17). Outside a model nothing
+   * names it, and it keeps the id it was given or none (6b-4b): no random
+   * id remains to give it, and a constraint a model cannot name has none
+   * either (decision 19).
    *
    * A constraint across fact types lives in the model
    * (`OrmModel.addConstraint`). The type says so; the check is for a
    * value whose type was asserted, such as a parsed file, which would
    * otherwise be stored where no reader of the model's constraints looks.
    *
-   * Returns the constraint as stored, which is a copy carrying its id, as
+   * Returns the constraint as stored, carrying the id the model gave it, as
    * `OrmModel.addConstraint` does: a caller that needs the id right away
-   * -- a preferred identifier set just after the add -- reads it here
-   * (iri-identity 6a; in 6b the id may be minted rather than generated).
-   * In a model that refuses ids across kinds (a 4.0 model), one whose
-   * sentence cannot be minted comes back with no id (decision 19).
+   * -- a preferred identifier set just after the add -- reads it here. It
+   * comes back with no id outside a model, and in one when its sentence
+   * cannot be minted (decision 19), so such a caller checks.
    */
   addConstraint(constraint: InternalConstraint): InternalConstraint {
     const c = checkInternalConstraint(constraint, this.name);

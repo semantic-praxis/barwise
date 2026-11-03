@@ -1,4 +1,5 @@
-import { localName, requireName } from "./name.js";
+import { nameIdBase } from "./idRules.js";
+import { requireName } from "./name.js";
 
 /**
  * Whether the object type is an entity (identified by a reference scheme)
@@ -306,7 +307,7 @@ export function createObjectType(config: ObjectTypeConfig): ObjectType {
   }
 
   const base = {
-    id: config.id ?? localName(name),
+    id: config.id ?? nameIdBase(name),
     name,
     aliases: Object.freeze([...(config.aliases ?? [])]),
     independent: config.independent ?? false,

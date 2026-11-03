@@ -125,7 +125,14 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
   // never could (iri-identity 6b-4b). Read as written first: the point is
   // the source's ids, which a load would replay into 4.0's, and a model
   // built in code may hold ids 4.0 refuses.
-  const aligned = remapIds(new OrmYamlSerializer().deserializeAsWritten(stringify(doc)), ids);
+  // Across kinds as a 3.x model allows: a source built in code may give an
+  // object type and a fact type one id, and an element only the read-back
+  // holds (a constraint it named from its sentence) may hold an id a source
+  // element of another kind does, now that ids are names. Within one kind
+  // the read-back holds only what maps to the source, so none collides.
+  const aligned = remapIds(new OrmYamlSerializer().deserializeAsWritten(stringify(doc)), ids, {
+    idsAcrossKinds: false,
+  });
   // 3.0 has no imports, so `document30` left them out; they are the
   // read-back's, and the header deltas compare them.
   for (const [alias, target] of back.imports) aligned.setImport(alias, target);

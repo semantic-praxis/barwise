@@ -76,25 +76,21 @@ function xorModel(): OrmModel {
 describe("NORMA import keeps constraint ids", () => {
   it.each(FIXTURES)("%s: every constraint keeps a NORMA constraint id", (fixture) => {
     // No generator remains, so every id is one the importer read or the model gave.
-    {
-      const doc = parseNormaXml(readFileSync(resolve(here, "fixtures", fixture), "utf-8"));
-      const normaIds = new Set<string>(doc.constraints.map((c) => c.id));
-      const ids = constraintIds(mapNormaToOrm(doc));
-      expect(ids.length).toBeGreaterThan(0);
-      for (const id of ids) expect(normaIds).toContain(id);
-      expect(new Set(ids).size).toBe(ids.length);
-    }
+    const doc = parseNormaXml(readFileSync(resolve(here, "fixtures", fixture), "utf-8"));
+    const normaIds = new Set<string>(doc.constraints.map((c) => c.id));
+    const ids = constraintIds(mapNormaToOrm(doc));
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) expect(normaIds).toContain(id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it.each(FIXTURES)("%s: imports to the same model every time", (fixture) => {
     // Fact types and subtype facts used to take generator ids, so two
     // imports of one file differed on every fact type id.
-    {
-      const xml = readFileSync(resolve(here, "fixtures", fixture), "utf-8");
-      const yaml = () => new OrmYamlSerializer().serialize(mapNormaToOrm(parseNormaXml(xml)));
-      const first = yaml();
-      expect(yaml()).toBe(first);
-    }
+    const xml = readFileSync(resolve(here, "fixtures", fixture), "utf-8");
+    const yaml = () => new OrmYamlSerializer().serialize(mapNormaToOrm(parseNormaXml(xml)));
+    const first = yaml();
+    expect(yaml()).toBe(first);
   });
 
   it("imports a file with sample data to the same model every time", () => {
@@ -131,12 +127,10 @@ describe("NORMA import keeps constraint ids", () => {
       instances: [{ roleValues: { "r-manager": "p1", "r-managed": "p2" } }],
     });
     const xml = exportXml(model);
-    {
-      const yaml = () => new OrmYamlSerializer().serialize(mapNormaToOrm(parseNormaXml(xml)));
-      const first = yaml();
-      expect(first).toContain("populations:");
-      expect(yaml()).toBe(first);
-    }
+    const yaml = () => new OrmYamlSerializer().serialize(mapNormaToOrm(parseNormaXml(xml)));
+    const first = yaml();
+    expect(first).toContain("populations:");
+    expect(yaml()).toBe(first);
   });
 
   it("gives an objectification link without a NestedPredicate id one that survives a round trip", () => {
@@ -742,23 +736,21 @@ describe("NORMA import keeps constraint ids", () => {
       ...doc,
       constraints: [...doc.constraints, anonymous(free[0]!), anonymous(free[1]!)],
     };
-    {
-      const first = constraintIds(mapNormaToOrm(withAnonymous));
-      const second = constraintIds(mapNormaToOrm(withAnonymous));
-      expect(second).toEqual(first);
-      expect(first).not.toContain("");
-      expect(new Set(first).size).toBe(first.length);
-      const derived = first.filter((id) => !normaIdsOf(doc).has(id!));
-      expect(derived).toHaveLength(2);
-      for (const id of derived) expect(id).toMatch(/^_[0-9a-f]{8}-[0-9a-f]{4}-8/);
+    const first = constraintIds(mapNormaToOrm(withAnonymous));
+    const second = constraintIds(mapNormaToOrm(withAnonymous));
+    expect(second).toEqual(first);
+    expect(first).not.toContain("");
+    expect(new Set(first).size).toBe(first.length);
+    const derived = first.filter((id) => !normaIdsOf(doc).has(id!));
+    expect(derived).toHaveLength(2);
+    for (const id of derived) expect(id).toMatch(/^_[0-9a-f]{8}-[0-9a-f]{4}-8/);
 
-      // Inserting another id-less constraint before them moves neither id.
-      const inserted = {
-        ...withAnonymous,
-        constraints: [anonymous(free[2]!), ...withAnonymous.constraints],
-      };
-      expect(constraintIds(mapNormaToOrm(inserted))).toEqual(expect.arrayContaining(derived));
-    }
+    // Inserting another id-less constraint before them moves neither id.
+    const inserted = {
+      ...withAnonymous,
+      constraints: [anonymous(free[2]!), ...withAnonymous.constraints],
+    };
+    expect(constraintIds(mapNormaToOrm(inserted))).toEqual(expect.arrayContaining(derived));
   });
 
   /** The xor model's document with a second, distinct pair over the same roles. */
@@ -1136,10 +1128,8 @@ describe("NORMA export of a file that omits constraint ids", () => {
       resolve(here, "../../../examples/getting-started/shop.orm.yaml"),
       "utf-8",
     );
-    {
-      const first = exportXml(new OrmYamlSerializer().deserialize(shop));
-      const second = exportXml(new OrmYamlSerializer().deserialize(shop));
-      expect(second).toBe(first);
-    }
+    const first = exportXml(new OrmYamlSerializer().deserialize(shop));
+    const second = exportXml(new OrmYamlSerializer().deserialize(shop));
+    expect(second).toBe(first);
   });
 });

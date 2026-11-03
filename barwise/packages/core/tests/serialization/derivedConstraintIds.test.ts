@@ -71,14 +71,12 @@ describe("constraint ids a 2.0 file omits", () => {
   it("are the same on every load of one unchanged file", () => {
     // No generator remains to fill them, so the two loads agree because
     // each derives every omitted id from the file.
-    {
-      const shop = readFileSync(shopPath, "utf-8");
-      const first = constraintIds(shop);
-      const second = constraintIds(shop);
-      expect(first.length).toBeGreaterThan(0);
-      expect(second).toEqual(first);
-      expect(first.every((id) => UUID_V8.test(id))).toBe(true);
-    }
+    const shop = readFileSync(shopPath, "utf-8");
+    const first = constraintIds(shop);
+    const second = constraintIds(shop);
+    expect(first.length).toBeGreaterThan(0);
+    expect(second).toEqual(first);
+    expect(first.every((id) => UUID_V8.test(id))).toBe(true);
   });
 
   it("keeps an id the file states, and derives one for a missing or empty id", () => {
@@ -229,19 +227,17 @@ describe("constraint ids a 2.0 file omits", () => {
     // Only a file's omitted ids are derived; a model names its constraints
     // itself, and outside one a constraint keeps the id it is given or none
     // (iri-identity 6b-4b).
-    {
-      const ft = new FactType({
-        id: "ft-code",
-        name: "Person has Name",
-        roles: [
-          { id: "r-1", name: "has", playerId: "ot-p" },
-          { id: "r-2", name: "is of", playerId: "ot-n" },
-        ],
-        readings: ["{0} has {1}"],
-        constraints: [{ type: "mandatory", roleId: "r-1" }],
-      });
-      expect(ft.internalConstraints[0]!.id).toBeUndefined();
-    }
+    const ft = new FactType({
+      id: "ft-code",
+      name: "Person has Name",
+      roles: [
+        { id: "r-1", name: "has", playerId: "ot-p" },
+        { id: "r-2", name: "is of", playerId: "ot-n" },
+      ],
+      readings: ["{0} has {1}"],
+      constraints: [{ type: "mandatory", roleId: "r-1" }],
+    });
+    expect(ft.internalConstraints[0]!.id).toBeUndefined();
   });
 });
 

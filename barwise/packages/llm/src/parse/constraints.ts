@@ -72,6 +72,14 @@ export function parseConstraints(
         } else {
           const stored = ft.addConstraint(constraint);
           if (ic.is_preferred && stored.id !== undefined) preferred.add(stored.id);
+          else if (ic.is_preferred) {
+            // A preferred identifier names a constraint by id, and one the
+            // model could not name (decision 19) has none to name it by.
+            warnings.push(
+              `Uniqueness "${ic.description}" was marked preferred, but the model could not name `
+                + `it from its sentence, so it is not set as the preferred identifier.`,
+            );
+          }
           constraintProvenance.push({
             description: ic.description,
             confidence: ic.confidence,

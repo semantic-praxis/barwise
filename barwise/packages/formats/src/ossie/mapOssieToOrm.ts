@@ -669,15 +669,18 @@ function addIdentifier(model: OrmModel, c: OssieConcept, warnings: string[]): vo
     // identify_by states the far role is unique even where the
     // multiplicity did not (a ManyToOne identifying relationship); one
     // added takes the id the model names it with.
-    const id = held?.id
-      ?? ft.addConstraint({ type: "internal_uniqueness", roleIds: farRoles }).id;
+    // A held one is the identifier whether or not the model could name it:
+    // adding a second over the same role would only repeat it.
+    const id = held
+      ? held.id
+      : ft.addConstraint({ type: "internal_uniqueness", roleIds: farRoles }).id;
     if (!held) {
       warnings.push(
         `${c.concept}: identify_by ${names[0]} implies each ${ft.roles[1]!.name} identifies at `
           + `most one ${c.concept}; added that uniqueness, which the multiplicity did not state.`,
       );
     }
-    if (id !== undefined) model.setPreferredIdentifier(conceptId(model, c.concept), id);
+    preferIdentifier(model, c.concept, id, warnings);
     return;
   }
   for (const [i, ft] of facts.entries()) {
@@ -690,7 +693,28 @@ function addIdentifier(model: OrmModel, c: OssieConcept, warnings: string[]): vo
     );
   }
   const { id } = model.addConstraint({ type: "external_uniqueness", roleIds: farRoles });
-  if (id !== undefined) model.setPreferredIdentifier(conceptId(model, c.concept), id);
+  preferIdentifier(model, c.concept, id, warnings);
+}
+
+/**
+ * Make the identifier `identify_by` names the concept's preferred one, or
+ * say why not: a preferred identifier names a constraint by id, and one the
+ * model could not name (decision 19) has none to name it by.
+ */
+function preferIdentifier(
+  model: OrmModel,
+  concept: string,
+  id: string | undefined,
+  warnings: string[],
+): void {
+  if (id !== undefined) {
+    model.setPreferredIdentifier(conceptId(model, concept), id);
+    return;
+  }
+  warnings.push(
+    `${concept}: identify_by names a uniqueness the model could not name from its sentence, `
+      + `so it is not set as the preferred identifier.`,
+  );
 }
 
 /** The mandatory first roles an entity's `requires` states. */

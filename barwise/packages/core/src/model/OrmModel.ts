@@ -12,6 +12,7 @@ import type { Definition } from "./Definition.js";
 import { type DiagramLayout, withoutDiagramReferences } from "./DiagramLayout.js";
 import { checkInternalConstraint, FactType, type FactTypeConfig } from "./FactType.js";
 import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.js";
+import { nameIdBase, populationIdBase, roleIdBase, suffixed } from "./idRules.js";
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { mint, type Mintable } from "./mint.js";
 import { LOCAL_NAME_PATTERN, localName } from "./name.js";
@@ -452,11 +453,10 @@ export class OrmModel implements ConstraintModel {
    * load gives are a function of its input.
    */
   private mintedId(base: string, taken: ReadonlySet<string> = new Set()): string {
-    const free = (id: string) => !this._ids.holds(id) && !this._reserved.has(id) && !taken.has(id);
-    if (free(base)) return base;
-    for (let n = 2;; n++) {
-      if (free(`${base}_${n}`)) return `${base}_${n}`;
-    }
+    return suffixed(
+      base,
+      (id) => !this._ids.holds(id) && !this._reserved.has(id) && !taken.has(id),
+    );
   }
 
   /**
@@ -510,7 +510,7 @@ export class OrmModel implements ConstraintModel {
       );
     }
     const ot = createObjectType(
-      config.id === undefined ? { ...config, id: this.mintedId(localName(config.name)) } : config,
+      config.id === undefined ? { ...config, id: this.mintedId(nameIdBase(config.name)) } : config,
     );
     this._objectTypes.set(ot);
     return ot;
@@ -1000,7 +1000,7 @@ export class OrmModel implements ConstraintModel {
     const taken = new Set(stated);
     return config.roles.map((r) => {
       if (r.id !== undefined) return r;
-      const id = this.mintedId(`${factTypeId}.${localName(r.name)}`, taken);
+      const id = this.mintedId(roleIdBase(factTypeId, r.name), taken);
       taken.add(id);
       return { ...r, id };
     });
@@ -1389,7 +1389,7 @@ export class OrmModel implements ConstraintModel {
     // Its fact type's id and `.population`, under the suffix rule (decision 7).
     const pop = new Population(
       config.id === undefined
-        ? { ...config, id: this.mintedId(`${config.factTypeId}.population`) }
+        ? { ...config, id: this.mintedId(populationIdBase(config.factTypeId)) }
         : config,
     );
     this._populations.set(pop);

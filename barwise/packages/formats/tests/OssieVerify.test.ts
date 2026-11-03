@@ -334,3 +334,53 @@ describe("Ossie export: the read-back check", () => {
     });
   }
 });
+
+describe("the read-back check's alignment, with ids that are names (6b-4b)", () => {
+  /** Customer places Order, each Customer placing some Order. */
+  function shop(extra: (m: OrmModel) => void = () => {}): OrmModel {
+    const m = new OrmModel({ name: "Shop" });
+    m.addObjectType({ id: "Customer", name: "Customer", kind: "entity", referenceMode: "nr" });
+    m.addObjectType({ id: "Order", name: "Order", kind: "entity", referenceMode: "nr" });
+    const ft = m.addFactType({
+      id: "Customer_places_Order",
+      name: "Customer places Order",
+      roles: [
+        { id: "Customer_places_Order.places", name: "places", playerId: "Customer" },
+        { id: "Customer_places_Order.is_placed_by", name: "is placed by", playerId: "Order" },
+      ],
+      readings: ["{0} places {1}"],
+    });
+    ft.addConstraint({ type: "mandatory", id: "c-mand", roleId: "Customer_places_Order.places" });
+    extra(m);
+    return m;
+  }
+
+  it("reports, rather than throws, when a source id equals an id only the read-back holds", () => {
+    // The read-back names the mandatory constraint from its sentence; the
+    // source states another id for it, and gives that sentence's id to a
+    // value type of its own. Before the fix the remap collided.
+    const minted = "Each_Customer_places_at_least_one_Order";
+    const m = shop((model) => model.addObjectType({ id: minted, name: "Tag", kind: "value" }));
+    // The export turns a failed comparison into a loss line, so the
+    // check is that line's absence.
+    expect(exporter.export(m).text).not.toContain("could not be compared");
+  });
+
+  it("aligns a model built in code that gives an object type and a fact type one id", () => {
+    const m = new OrmModel({ name: "Shared" });
+    m.addObjectType({ id: "X", name: "Person", kind: "entity", referenceMode: "nr" });
+    m.addObjectType({ id: "car", name: "Car", kind: "entity", referenceMode: "vin" });
+    m.addFactType({
+      id: "X",
+      name: "Person owns Car",
+      roles: [
+        { id: "X.owns", name: "owns", playerId: "X" },
+        { id: "X.is_owned_by", name: "is owned by", playerId: "car" },
+      ],
+      readings: ["{0} owns {1}"],
+    });
+    // The export turns a failed comparison into a loss line, so the
+    // check is that line's absence.
+    expect(exporter.export(m).text).not.toContain("could not be compared");
+  });
+});
