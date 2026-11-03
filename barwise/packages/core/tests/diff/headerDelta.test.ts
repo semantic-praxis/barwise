@@ -1,9 +1,11 @@
 /**
  * The model header in diff and merge (iri-identity WS6, 6b-3c): an edit to
- * `namespace` or `imports` changes no id and no pairing, so the header is
- * its own delta, and a merge that accepts it takes the incoming header.
+ * `namespace` or `imports` changes no id and no pairing, so each part of
+ * the header is a delta of its own, added, removed or modified like any
+ * element, and a merge applies the ones accepted by their kind.
  */
 import { describe, expect, it } from "vitest";
+import type { ModelDelta } from "../../src/diff/deltas.js";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
@@ -13,68 +15,92 @@ const model = (config: { namespace?: string; imports?: Record<string, string>; }
   m.addObjectType({ id: "Customer", name: "Customer", kind: "entity", referenceMode: "nr" });
   return m;
 };
-const header = (a: OrmModel, b: OrmModel) =>
-  diffModels(a, b, MERGE_DIFF_OPTIONS).deltas.find((d) => d.elementType === "model_header")!;
+const headers = (deltas: readonly ModelDelta[]) =>
+  deltas.filter((d) => d.elementType === "model_header");
+/** What every surface's non-interactive merge accepts: added and modified. */
+const surfacePolicy = (deltas: readonly ModelDelta[]) =>
+  new Set(deltas.flatMap((d, i) => (d.kind === "added" || d.kind === "modified" ? [i] : [])));
 
-describe("the model header delta", () => {
-  it("never removes a namespace or an import, as a transcript import's header would", () => {
-    // Every surface accepts all added and modified deltas without asking.
-    const base = model({ namespace: "https://a.example/", imports: { crm: "crm" } });
-    const transcript = model();
-    const diff = diffModels(base, transcript, MERGE_DIFF_OPTIONS);
-    const all = new Set(diff.deltas.flatMap((d, i) => (d.kind === "modified" ? [i] : [])));
-    expect(all.size).toBeGreaterThan(0);
-    const merged = mergeModels(base, transcript, diff, all);
-    expect([merged.namespace, [...merged.imports]]).toEqual(["https://a.example/", [[
-      "crm",
-      "crm",
-    ]]]);
-  });
-
-  it("is unchanged, first, and leaves hasChanges alone when the headers agree", () => {
+describe("the model header deltas", () => {
+  it("are none when the headers agree, so a diff of equal models has no changes", () => {
     const same = { namespace: "https://a.example/", imports: { crm: "crm" } };
     const diff = diffModels(model(same), model(same));
-    expect(diff.deltas[0]).toMatchObject({ elementType: "model_header", kind: "unchanged" });
+    expect(headers(diff.deltas)).toEqual([]);
     expect(diff.hasChanges).toBe(false);
   });
 
-  it("reports a namespace and each import added, rebound or removed, as caution", () => {
+  it("are one per part, each added, removed or modified, first in the diff", () => {
     const before = model({ namespace: "https://a.example/", imports: { crm: "crm", hr: "hr" } });
-    const after = model({ namespace: "https://b.example/", imports: { crm: "sales", ops: "ops" } });
-    const d = header(before, after);
-    expect([d.kind, d.breakingLevel]).toEqual(["modified", "caution"]);
-    expect(d.changeDescriptions).toEqual([
-      'namespace: "https://a.example/" -> "https://b.example/"',
-      'import "crm": "crm" -> "sales"',
-      'import "hr": "hr" -> "(none)"',
-      'import "ops": "(none)" -> "ops"',
+    const after = model({ imports: { crm: "sales", ops: "ops" } });
+    const diff = diffModels(before, after);
+    expect(diff.deltas.slice(0, 4).map((d) => [d.elementType, d.kind, d.changeDescriptions]))
+      .toEqual([
+        ["model_header", "removed", ['namespace: "https://a.example/" -> "(none)"']],
+        ["model_header", "modified", ['import "crm": "crm" -> "sales"']],
+        ["model_header", "removed", ['import "hr": "hr" -> "(none)"']],
+        ["model_header", "added", ['import "ops": "(none)" -> "ops"']],
+      ]);
+    expect(headers(diff.deltas).map((d) => d.breakingLevel)).toEqual([
+      "caution",
+      "caution",
+      "caution",
+      "safe",
     ]);
-    expect(diffModels(before, after).hasChanges).toBe(true);
+  });
+});
+
+describe("a merge of header deltas", () => {
+  it("takes additions under the surfaces' policy, and leaves removals, as a transcript's would be", () => {
+    // A transcript import has no namespace and no imports of its own.
+    const base = model({ namespace: "https://a.example/", imports: { crm: "crm" } });
+    const transcript = model({ imports: { ops: "ops" } });
+    const diff = diffModels(base, transcript, MERGE_DIFF_OPTIONS);
+    const merged = mergeModels(base, transcript, diff, surfacePolicy(diff.deltas));
+    expect([merged.namespace, [...merged.imports]]).toEqual([
+      "https://a.example/",
+      [["crm", "crm"], ["ops", "ops"]],
+    ]);
   });
 
-  it("is taken by a merge that accepts it, and left when it does not", () => {
-    const before = model({ namespace: "https://a.example/", imports: { crm: "crm", hr: "hr" } });
-    const after = model({ namespace: "https://b.example/", imports: { crm: "sales", ops: "ops" } });
-    const diff = diffModels(before, after, MERGE_DIFF_OPTIONS);
-    const index = diff.deltas.findIndex((d) => d.elementType === "model_header");
-    const taken = mergeModels(before, after, diff, new Set([index]));
-    // Rebound and added; "hr", which the incoming side lacks, stays.
-    expect([taken.namespace, [...taken.imports]]).toEqual([
+  it("takes a removal a person accepted", () => {
+    const base = model({ namespace: "https://a.example/", imports: { crm: "crm", hr: "hr" } });
+    const incoming = model({ imports: { crm: "crm" } });
+    const diff = diffModels(base, incoming, MERGE_DIFF_OPTIONS);
+    const all = new Set(diff.deltas.map((_, i) => i));
+    const merged = mergeModels(base, incoming, diff, all);
+    expect([merged.namespace, [...merged.imports]]).toEqual([undefined, [["crm", "crm"]]]);
+  });
+
+  it("takes a namespace changed on the incoming side when that delta is accepted", () => {
+    const base = model({ namespace: "https://a.example/" });
+    const incoming = model({ namespace: "https://b.example/" });
+    const diff = diffModels(base, incoming, MERGE_DIFF_OPTIONS);
+    expect(mergeModels(base, incoming, diff, surfacePolicy(diff.deltas)).namespace).toBe(
       "https://b.example/",
-      [["crm", "sales"], ["hr", "hr"], ["ops", "ops"]],
-    ]);
-    // Not accepted: the rebinding of "crm" is a clash the merge refuses.
-    expect(() => mergeModels(before, after, diff, new Set())).toThrow(/the alias "crm" is bound/);
-    const quiet = model({ namespace: "https://b.example/" });
-    const kept = mergeModels(
-      before,
-      quiet,
-      diffModels(before, quiet, MERGE_DIFF_OPTIONS),
-      new Set(),
     );
-    expect([kept.namespace, [...kept.imports]]).toEqual([
-      "https://a.example/",
-      [["crm", "crm"], ["hr", "hr"]],
-    ]);
+    expect(mergeModels(base, incoming, diff, new Set()).namespace).toBe("https://a.example/");
+  });
+
+  it("refuses a rebound alias, accepted or not, since the base's shadows would change meaning", () => {
+    const base = model({ imports: { x: "crm" } });
+    const incoming = model({ imports: { x: "billing" } });
+    const diff = diffModels(base, incoming, MERGE_DIFF_OPTIONS);
+    for (const accepted of [surfacePolicy(diff.deltas), new Set<number>()]) {
+      expect(() => mergeModels(base, incoming, diff, accepted)).toThrow(
+        /the alias "x" is bound to "crm" in the base and to "billing" in the incoming model/,
+      );
+    }
+  });
+
+  it("gives an accepted incoming shadow its import even when the header delta is not taken", () => {
+    const base = model();
+    const incoming = model({ imports: { crm: "crm" } });
+    incoming.addObjectType({ id: "crm:Lead", name: "Lead", kind: "entity", referenceMode: "nr" });
+    const diff = diffModels(base, incoming, MERGE_DIFF_OPTIONS);
+    const lead = diff.deltas.findIndex((d) =>
+      d.elementType === "object_type" && d.kind === "added"
+    );
+    const merged = mergeModels(base, incoming, diff, new Set([lead]));
+    expect([...merged.imports]).toEqual([["crm", "crm"]]);
   });
 });

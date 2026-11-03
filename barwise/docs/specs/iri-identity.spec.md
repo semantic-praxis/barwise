@@ -1699,17 +1699,23 @@ sites.
       resolves through `imports` to a context the project holds or to an
       absolute namespace IRI, and is undefined without a project, as this
       section says, even for an alias bound to an IRI.
-    - The header is diff's `model_header` delta, first in every diff,
-      with `namespace` and `importBinding` changes, both `caution`.
-      Merge takes an accepted one's new and rebound values and never
-      removes. Every surface's non-interactive merge accepts all added and
-      modified deltas and never acts on a removal, and a transcript import
-      has no namespace and no imports, so taking removals would strip both
-      from the model merged into. An accepted header change also settles a
-      clash on one alias, which merge otherwise refuses.
-    - Ossie's export check keys the header delta under the model's own
-      prediction, and the writer now predicts dropped imports beside the
-      dropped namespace.
+    - The header is diff's `model_header` deltas: one for `namespace` and
+      one per alias, each `added`, `removed` or `modified`, first in the
+      diff, none for a part both sides state alike. One delta for the whole
+      header was the first version, and `/code-review` found it forced
+      special cases into merge: every surface's non-interactive merge
+      accepts all added and modified deltas and never removals, and one
+      bundled delta cannot tell a removal (a transcript import has no
+      namespace and no imports) from an addition. Per part, the policy
+      applies unchanged. A person who accepts a removal in the editor gets
+      it. A rebound alias is still refused, accepted or not, since the
+      base's shadows behind it would change meaning. An incoming alias is
+      carried when its delta is accepted or a merged shadow needs it.
+    - Ossie's export check keys header deltas under their own
+      `model_header` prediction, scoped per change kind (`namespace`,
+      `importBinding`), and the writer now predicts dropped imports beside
+      the dropped namespace. The read-back's imports, which the 3.0-shaped
+      intermediate cannot hold, are put back on the aligned model.
 - _6b-4, importers and retirement._ The importers switch off
   `generateId` (role ids first, as 6b-4a above), and `generateId`, its
   installs and promptlab's deterministic ids go (6b-4b). Until then an

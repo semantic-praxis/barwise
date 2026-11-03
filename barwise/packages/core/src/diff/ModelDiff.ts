@@ -111,6 +111,71 @@ function pairedLevel(
 }
 
 /**
+ * The header's deltas: one for `namespace` and one for each alias either
+ * side imports (the existing side's order, then the incoming side's new
+ * ones), each `added`, `removed` or `modified` like any element, so a
+ * surface's policy for those kinds applies to them as it does to the rest.
+ * A part both sides state alike has no delta: there is nothing in a header
+ * to pair or to keep.
+ */
+function headerDeltas(existing: OrmModel, incoming: OrmModel): ModelDelta[] {
+  const delta = (
+    field: "namespace" | "import",
+    name: string,
+    change: ChangeDescription,
+    from: string | undefined,
+    to: string | undefined,
+  ): ModelDelta => {
+    const kind: DeltaKind = from === undefined
+      ? "added"
+      : to === undefined
+      ? "removed"
+      : "modified";
+    return {
+      kind,
+      elementType: "model_header",
+      field,
+      name,
+      changes: [change],
+      changeDescriptions: [describeChange(change)],
+      breakingLevel: classifyBreakingLevel(kind, [change], "model_header"),
+    };
+  };
+  const out: ModelDelta[] = [];
+  const [ns, nsNow] = [existing.namespace, incoming.namespace];
+  if (ns !== nsNow) {
+    out.push(delta(
+      "namespace",
+      "namespace",
+      {
+        change: "namespace",
+        ...(ns !== undefined ? { from: ns } : {}),
+        ...(nsNow !== undefined ? { to: nsNow } : {}),
+      },
+      ns,
+      nsNow,
+    ));
+  }
+  for (const alias of new Set([...existing.imports.keys(), ...incoming.imports.keys()])) {
+    const [from, to] = [existing.imports.get(alias), incoming.imports.get(alias)];
+    if (from === to) continue;
+    out.push(delta(
+      "import",
+      `import ${alias}`,
+      {
+        change: "importBinding",
+        alias,
+        ...(from !== undefined ? { from } : {}),
+        ...(to !== undefined ? { to } : {}),
+      },
+      from,
+      to,
+    ));
+  }
+  return out;
+}
+
+/**
  * Diff two ORM models, pairing elements by id and then by name.
  *
  * @param existing The model already on disk (reviewed/approved).
@@ -118,42 +183,6 @@ function pairedLevel(
  * @param options How constraints are paired; id-first by default.
  * @returns A list of deltas covering every element in either model.
  */
-/**
- * The header's delta: `namespace`, then each alias either side imports,
- * in the existing side's order and then the incoming side's new ones.
- */
-function headerDelta(existing: OrmModel, incoming: OrmModel): ModelDelta {
-  const changes: ChangeDescription[] = [];
-  if (existing.namespace !== incoming.namespace) {
-    changes.push({
-      change: "namespace",
-      ...(existing.namespace !== undefined ? { from: existing.namespace } : {}),
-      ...(incoming.namespace !== undefined ? { to: incoming.namespace } : {}),
-    });
-  }
-  const aliases = [...new Set([...existing.imports.keys(), ...incoming.imports.keys()])];
-  for (const alias of aliases) {
-    const from = existing.imports.get(alias);
-    const to = incoming.imports.get(alias);
-    if (from === to) continue;
-    changes.push({
-      change: "importBinding",
-      alias,
-      ...(from !== undefined ? { from } : {}),
-      ...(to !== undefined ? { to } : {}),
-    });
-  }
-  const kind: DeltaKind = changes.length > 0 ? "modified" : "unchanged";
-  return {
-    kind,
-    elementType: "model_header",
-    name: existing.name,
-    changes,
-    changeDescriptions: changes.map(describeChange),
-    breakingLevel: classifyBreakingLevel(kind, changes, "model_header"),
-  };
-}
-
 export function diffModels(
   existing: OrmModel,
   incoming: OrmModel,
@@ -166,7 +195,7 @@ export function diffModels(
     renames: options.renames ?? [],
   });
   const { identity } = pairing;
-  const deltas: ModelDelta[] = [headerDelta(existing, incoming)];
+  const deltas: ModelDelta[] = headerDeltas(existing, incoming);
 
   // --- Object types ---
   // Paired by id first, then name (`DiffIdentity`). A paired delta is

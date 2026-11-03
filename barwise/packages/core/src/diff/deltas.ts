@@ -67,15 +67,16 @@ export interface FactTypeDelta extends DeltaCommon {
 }
 
 /**
- * The model's own header: the `namespace` its element IRIs start with and
- * the `imports` its aliases bind (iri-identity WS6, 6b-3c). Neither changes
- * an id or a pairing, so diff has no other place to show an edit to them;
- * `iriOf`'s answers are what move. Always `modified` or `unchanged`: both
- * models have a header.
+ * One part of the model's own header: the `namespace` its element IRIs
+ * start with, or one alias its `imports` bind (iri-identity WS6, 6b-3c).
+ * Neither changes an id or a pairing, so diff has no other place to show an
+ * edit to them; `iriOf`'s answers are what move. One delta per part, so
+ * that adding, rebinding and removing are told apart as for any element.
  */
 export interface ModelHeaderDelta extends DeltaCommon {
   readonly elementType: "model_header";
-  /** The existing model's name, which the delta is about. */
+  readonly field: "namespace" | "import";
+  /** `namespace`, or `import <alias>`: what the delta is about. */
   readonly name: string;
 }
 

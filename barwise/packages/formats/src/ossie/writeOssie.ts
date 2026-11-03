@@ -82,15 +82,18 @@ type ObjectTypeLossKey = { readonly kind: "object_type"; readonly id: string; };
 type OtherLossKey =
   | { readonly kind: Exclude<ElementType, "object_type" | "model_header">; readonly id: string; }
   // The model's own fields: name, note and domain context, which diff does
-  // not compare and only the writer's predictions check; and the header
-  // (namespace, imports), whose delta `verifyOssie` keys here.
-  | { readonly kind: "model"; };
+  // not compare and only the writer's predictions check.
+  | { readonly kind: "model"; }
+  // Its header (namespace, imports), which diff reports as `model_header`
+  // deltas; each prediction names the change kinds it explains, so one
+  // cannot cover a header change it did not predict.
+  | { readonly kind: "model_header"; };
 
 /** The changes a loss line explains: some kinds, or every difference on its element. */
 type Explains = readonly ChangeKind[] | "all";
 
 export function lossKey(key: LossKey): string {
-  return key.kind === "model" ? "model" : `${key.kind}:${key.id}`;
+  return key.kind === "model" || key.kind === "model_header" ? key.kind : `${key.kind}:${key.id}`;
 }
 
 /** What the importer will call each source element it reads back. */
@@ -365,12 +368,16 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   if (model.namespace) {
     // An element's identity IRI needs local-name ids, which arrive with
     // format 4.0 (iri-identity WS6); until then the namespace is a loss.
-    lose("model", `namespace ${model.namespace} not written`, { kind: "model" });
+    lose("model", `namespace ${model.namespace} not written`, { kind: "model_header" }, [
+      "namespace",
+    ]);
   }
   if (model.imports.size > 0) {
     // Ossie has no aliases; a shadow is written by its owner's name.
     const aliases = [...model.imports.keys()].join(", ");
-    lose("model", `imports ${aliases} not written`, { kind: "model" });
+    lose("model", `imports ${aliases} not written`, { kind: "model_header" }, [
+      "importBinding",
+    ]);
   }
 
   if (ontology.length === 0) {

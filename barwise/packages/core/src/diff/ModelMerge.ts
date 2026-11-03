@@ -97,38 +97,29 @@ export function mergeModels(
   refuseUnmergeablePairing(diff);
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
-  // An accepted header delta takes the incoming side's namespace and
-  // bindings (iri-identity 6b-3c), which settles a clash on one alias. It
-  // never removes: every surface's non-interactive policy accepts what was
-  // added or changed and never acts on a removal, and a transcript import,
-  // which has no namespace and no imports, would otherwise strip both
-  // from the model it is merged into.
-  const headerAccepted = deltas.some((d, i) =>
-    d.elementType === "model_header" && d.kind === "modified" && accepted.has(i)
-  );
-  if (!headerAccepted) refuseImportClashes(existing, incoming);
+  // A rebound alias is refused, accepted or not: the base's shadows behind
+  // it would come to name another context, which no review of the header
+  // line shows (iri-identity WS6).
+  refuseImportClashes(existing, incoming);
+  const header = acceptedHeader(deltas, accepted);
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
-    namespace: headerAccepted ? incoming.namespace ?? existing.namespace : existing.namespace,
+    // An accepted namespace delta, added, changed or removed, leaves the
+    // incoming side's.
+    namespace: header.namespace ? incoming.namespace : existing.namespace,
     // The note was dropped for as long as this function has existed:
     // the merge names the fields it carries, so a field nobody listed
     // is a field nobody keeps (barwise-937).
     note: existing.note,
-    // The base's aliases, and each the incoming side adds: an accepted
-    // shadow from the incoming side needs its import (iri-identity WS6).
-    // Phase 9 drops the incoming ones no merged shadow uses.
-    // An alias both bind keeps the base's binding.
-    // The base's come first, in its order, so a merge that adds none
-    // writes the base's imports unchanged.
-    // An accepted header delta rebinds each alias both sides bind to the
-    // incoming target, in the base's order; a base alias the incoming side
-    // lacks stays, as a removal is never taken.
+    // The base's come first, in its order, so a merge that takes no header
+    // change writes the base's imports unchanged.
+    // The base's aliases, less each whose removal was accepted, then each
+    // added alias that was accepted; phase 9 adds any other a merged
+    // shadow needs.
     imports: Object.fromEntries([
-      ...[...existing.imports].map(([alias, target]) =>
-        [alias, headerAccepted ? incoming.imports.get(alias) ?? target : target] as const
-      ),
-      ...[...incoming.imports].filter(([alias]) => !existing.imports.has(alias)),
+      ...[...existing.imports].filter(([alias]) => !header.removedImports.has(alias)),
+      ...[...incoming.imports].filter(([alias]) => header.addedImports.has(alias)),
     ]),
   });
 
@@ -677,12 +668,14 @@ export function mergeModels(
   // reported stale.
   carryMintedKeys(merged, existing, incoming);
 
-  // Phase 9: an alias only the incoming side bound, which no merged shadow
-  // uses, would only raise project/imported-context-missing; drop it.
-  for (const alias of [...merged.imports.keys()]) {
-    // One the person accepted as a header change stays.
-    if (existing.imports.has(alias) || headerAccepted) continue;
-    if (!merged.objectTypes.some((ot) => ot.id.startsWith(`${alias}:`))) merged.removeImport(alias);
+  // Phase 9: a merged shadow from the incoming side needs its alias, which
+  // the base may not import and the header delta may not have been taken.
+  for (const ot of merged.objectTypes) {
+    const colon = ot.id.indexOf(":");
+    if (colon < 0) continue;
+    const alias = ot.id.slice(0, colon);
+    const target = incoming.imports.get(alias);
+    if (!merged.imports.has(alias) && target !== undefined) merged.setImport(alias, target);
   }
 
   return merged;
@@ -972,6 +965,34 @@ function refuseUnmergeablePairing(diff: MergeInput): void {
  * `refuseUnmergeablePairing` refuses it first, so nothing here guards an
  * id that diff's name pass left unpaired.
  */
+/**
+ * What the accepted header deltas take: whether the namespace delta was
+ * accepted, and which aliases were added or removed. A rebinding never
+ * gets here (`refuseImportClashes`).
+ */
+function acceptedHeader(
+  deltas: readonly ModelDelta[],
+  accepted: ReadonlySet<number>,
+): {
+  namespace: boolean;
+  addedImports: ReadonlySet<string>;
+  removedImports: ReadonlySet<string>;
+} {
+  let namespace = false;
+  const addedImports = new Set<string>();
+  const removedImports = new Set<string>();
+  deltas.forEach((d, i) => {
+    if (d.elementType !== "model_header" || !accepted.has(i) || d.kind === "unchanged") return;
+    const removed = d.kind === "removed";
+    const [change] = d.changes;
+    if (change?.change === "namespace") namespace = true;
+    else if (change?.change === "importBinding") {
+      (removed ? removedImports : addedImports).add(change.alias);
+    }
+  });
+  return { namespace, addedImports, removedImports };
+}
+
 /**
  * Refuse a merge whose two sides bind one alias to different targets: the
  * incoming side's shadows behind it would come to name the base's context,

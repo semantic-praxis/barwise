@@ -138,8 +138,8 @@ export function classifyChange(change: ChangeDescription): BreakingLevel {
  * population sees the sample removed on every pass.
  */
 const REMOVAL_LEVEL = {
-  // Never removed: both models have a header.
-  model_header: "safe",
+  // A namespace or an import removed moves IRIs or unbinds an alias.
+  model_header: "caution",
   object_type: "breaking",
   fact_type: "breaking",
   definition: "breaking",

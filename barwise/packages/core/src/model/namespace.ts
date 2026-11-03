@@ -69,13 +69,13 @@ export function iriOf(
 ): string | undefined {
   const colon = id.indexOf(":");
   const iriBase = domain?.project.iriBase;
+  /** The project's place for a context, as `namespaceOf` takes it. */
+  const ref = (context: string): DomainRef => ({
+    ...(iriBase !== undefined ? { iriBase } : {}),
+    context,
+  });
   if (colon < 0) {
-    const ns = namespaceOf(
-      model,
-      domain
-        ? { ...(iriBase !== undefined ? { iriBase } : {}), context: domain.context }
-        : undefined,
-    );
+    const ns = namespaceOf(model, domain ? ref(domain.context) : undefined);
     return ns === undefined ? undefined : `${ns}${id}`;
   }
   if (domain === undefined) return undefined;
@@ -85,9 +85,6 @@ export function iriOf(
   if (ABSOLUTE_IRI_PATTERN.test(target)) return `${target}${local}`;
   const owner = domain.project.getDomain(target);
   if (owner === undefined) return undefined;
-  const ns = namespaceOf(owner.model, {
-    ...(iriBase !== undefined ? { iriBase } : {}),
-    context: owner.context,
-  });
+  const ns = namespaceOf(owner.model, ref(owner.context));
   return ns === undefined ? undefined : `${ns}${local}`;
 }

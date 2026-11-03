@@ -131,12 +131,13 @@ const SAMPLES: ReadonlyArray<{ delta: ModelDelta; label: string; }> = [
     delta: {
       kind: "modified",
       elementType: "model_header",
-      name: "Shop",
+      field: "namespace",
+      name: "namespace",
       changes: [],
       changeDescriptions: [],
       breakingLevel: "caution",
     },
-    label: "Model header: Shop",
+    label: "Model header: namespace",
   },
 ];
 
