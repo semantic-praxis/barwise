@@ -1,9 +1,10 @@
 import { storeIds } from "@barwise/core";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 import { type CodeAction, CodeActionKind, type Diagnostic } from "vscode-languageserver/node";
+import { diagnosticSource } from "./DiagnosticsProvider.js";
 
 /** The diagnostic source the "Store ids" action answers. */
-export const UNSTORED_ID_SOURCE = "barwise (structural/unstored-id)";
+export const UNSTORED_ID_SOURCE = diagnosticSource("structural/unstored-id");
 
 /**
  * The editor action that stores the ids a 4.0 file leaves to the load
@@ -28,7 +29,8 @@ export function storeIdsAction(
   }
   if (result.stored.length === 0) return [];
   return [{
-    title: result.stored.length === 1 ? "Store this id" : `Store ${result.stored.length} ids`,
+    // One title whatever the count, so the diagnostic can name it.
+    title: "Store ids",
     kind: CodeActionKind.QuickFix,
     diagnostics: answered,
     isPreferred: true,

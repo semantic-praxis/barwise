@@ -311,6 +311,15 @@ project:
       expect(readFileSync(join(dir, "sales.orm.yaml"), "utf-8")).toBe(SALES);
     });
 
+    it("reports a current domain as current when another domain is refused", async () => {
+      file("sales.orm.yaml", SALES);
+      await runCli(["migrate", join(dir, "sales.orm.yaml")]);
+      file("billing.orm.yaml", "not: [a model");
+      const result = await runCli(["migrate", manifest()]);
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toContain(`${join(dir, "sales.orm.yaml")}: already 4.0\n`);
+    });
+
     it("reports a manifest that does not load, and exits 2", async () => {
       const path = file("bad.orm-project.yaml", "project: [");
       const result = await runCli(["migrate", path]);

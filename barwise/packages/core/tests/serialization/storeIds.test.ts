@@ -4,7 +4,7 @@
  * by `storeIds` and reported until they are; the one note a file before
  * 4.0 gets (barwise-wcg.frh); and a shadow replayed with its owner's id.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { storeIds } from "../../src/serialization/storeIds.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
@@ -76,6 +76,38 @@ describe("ids a 4.0 file does not state", () => {
     );
     // Everything else is as it was.
     expect(serializer.serialize(model)).toBe(serializer.serialize(read(typed)));
+  });
+
+  it("are stored in a file that states an empty list, which the writer leaves out", () => {
+    // Found by the 6b-3a /code-review: the writer omits `constraints: []`,
+    // and the list match then refused the whole file.
+    const withEmpty = typed.replace(
+      "  subtype_facts:",
+      `    - id: Person_runs
+      name: Person runs
+      roles:
+        - { id: Person_runs.runs, player: Person, role_name: runs }
+      readings: ["{0} runs"]
+      constraints: []
+  constraints: []
+  subtype_facts:`,
+    );
+    expect(storeIds(withEmpty).stored.map((s) => s.id)).toEqual([
+      "Each_Person_smokes",
+      "Smoker_is_a_subtype_of_Person",
+    ]);
+  });
+
+  it("are found from a model the caller already loaded, without loading the file again", () => {
+    const model = read(typed);
+    const spy = vi.spyOn(OrmYamlSerializer.prototype, "deserialize");
+    try {
+      expect(storeIds(typed, model)).toEqual(storeIds(typed));
+      // Once, for the call without a model; none for the call with one.
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("leave a file that states every id as it is", () => {

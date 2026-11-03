@@ -25,7 +25,8 @@ src/
   client/
     extension.ts              VS Code activate/deactivate entry point
   server/
-    OrmLanguageServer.ts      LSP server (diagnostics, completion, hover)
+    OrmLanguageServer.ts      LSP server (diagnostics, completion, hover, code actions)
+    CodeActionProvider.ts     "Store ids" quick fix for ids a 4.0 file leaves to the load
     CompletionProvider.ts     Autocomplete for .orm.yaml files
     DiagnosticsProvider.ts    Maps validation diagnostics to LSP
     HoverProvider.ts          Hover info for object type references

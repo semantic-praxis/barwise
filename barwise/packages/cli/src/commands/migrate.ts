@@ -92,13 +92,27 @@ export function registerMigrateCommand(program: Command): void {
  * What migrating one file would do, writing nothing. `ownerId` is the
  * project's, when the file is one of its domains.
  */
-function planFile(file: string, ownerId?: ReplayOptions["ownerId"]): Planned {
+function planFile(file: string): Planned {
   try {
     const raw = readFile(file);
-    // Leniently, as `barwise validate` loads: a format rewrite carries a
-    // dangling reference across for validation to report, rather than
-    // refusing a fragment that names elements it does not define.
-    const result = serializer.migrate(raw, { lenient: true, ...(ownerId ? { ownerId } : {}) });
+    return planRead(file, raw, read(raw));
+  } catch (err) {
+    return { outcome: { file, status: "error", error: (err as Error).message } };
+  }
+}
+
+/**
+ * Leniently, as `barwise validate` loads: a format rewrite carries a
+ * dangling reference across for validation to report, rather than
+ * refusing a fragment that names elements it does not define.
+ */
+function read(raw: string, ownerId?: ReplayOptions["ownerId"]): MigrationResult {
+  return serializer.migrate(raw, { lenient: true, ...(ownerId ? { ownerId } : {}) });
+}
+
+/** What migrating one file, read as `result`, would do. */
+function planRead(file: string, raw: string, result: MigrationResult): Planned {
+  try {
     if (result.from === CURRENT_ORM_VERSION) return planCurrent(file, raw);
     const unplaceable = result.notes.find((n) => n.kind === "flags-unplaceable");
     if (unplaceable) return refused(file, note(unplaceable));
@@ -197,28 +211,47 @@ function migrateProject(manifest: string, check: boolean): FileOutcome[] {
   const base = dirname(manifest);
   const files = domains.map((d) => ({ context: d.context, file: join(base, d.path) }));
 
-  const owners = new Map<string, ReadonlyMap<string, string>>();
-  for (const { context, file } of files) {
+  // Each file read once; a domain that does not read is refused below.
+  const first = files.map(({ context, file }) => {
     try {
-      const { model } = serializer.migrate(readFile(file), { lenient: true });
-      owners.set(
-        context,
-        new Map(
-          model.objectTypes
-            .filter((ot) => ot.sourceContext === undefined)
-            .map((ot) => [ot.name, ot.id] as const),
-        ),
-      );
-    } catch {
-      // planFile below reports it.
+      const raw = readFile(file);
+      return { context, file, raw, result: read(raw) };
+    } catch (err) {
+      return { context, file, error: (err as Error).message };
     }
+  });
+  const owners = new Map<string, ReadonlyMap<string, string>>();
+  for (const d of first) {
+    if (d.result === undefined) continue;
+    owners.set(
+      d.context,
+      new Map(
+        d.result.model.objectTypes
+          .filter((ot) => ot.sourceContext === undefined)
+          .map((ot) => [ot.name, ot.id] as const),
+      ),
+    );
   }
   const ownerId = (context: string, name: string) => owners.get(context)?.get(name);
 
-  const planned = files.map(({ file }) => planFile(file, ownerId));
+  // Replayed again only where it can change something: a domain before
+  // 4.0 that holds a shadow.
+  const planned = first.map((d): Planned => {
+    if (d.result === undefined) {
+      return { outcome: { file: d.file, status: "error", error: d.error! } };
+    }
+    const replayAgain = d.result.from !== CURRENT_ORM_VERSION
+      && d.result.model.objectTypes.some((ot) => ot.sourceContext !== undefined);
+    try {
+      return planRead(d.file, d.raw, replayAgain ? read(d.raw, ownerId) : d.result);
+    } catch (err) {
+      return { outcome: { file: d.file, status: "error", error: (err as Error).message } };
+    }
+  });
   if (planned.some((p) => p.outcome.status === "error")) {
+    // A domain with nothing to write stays as it is reported.
     return planned.map(({ outcome }) =>
-      outcome.status === "error" ? outcome : {
+      outcome.status === "error" || outcome.status === "current" ? outcome : {
         file: outcome.file,
         status: "error",
         error: "not migrated: another domain of the project was refused, and a project "

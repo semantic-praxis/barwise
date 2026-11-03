@@ -9,6 +9,7 @@
  */
 
 import { isMap, isSeq, parseDocument, type YAMLMap } from "yaml";
+import type { OrmModel } from "../model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument40 } from "./OrmYamlSerializer.js";
 
 /** An id the file did not state, now written at `path`. */
@@ -42,17 +43,22 @@ function unnamedLists(factTypes: number): (string | number)[][] {
  * nothing stored: it states no 4.0 id at all, and `barwise migrate`
  * rewrites it whole.
  *
+ * @param loaded - The model `yaml` loads to, leniently, when the caller
+ *   already holds it: the editor, which loads the file on every change
+ *   and must not load it twice. A model read from other text gives wrong
+ *   paths, which is why it is not taken from anywhere else.
  * @throws when the file does not load.
  */
-export function storeIds(yaml: string): StoreIdsResult {
-  const model = new OrmYamlSerializer().deserialize(yaml, { lenient: true });
+export function storeIds(yaml: string, loaded?: OrmModel): StoreIdsResult {
+  const model = loaded ?? new OrmYamlSerializer().deserialize(yaml, { lenient: true });
   const unstored = new Set(model.unstoredIds);
   if (unstored.size === 0) return { text: yaml, stored: [] };
 
   const doc = parseDocument(yaml);
   // The writer lists elements in the model's order, which is the file's:
   // the reader adds each list in order and drops nothing, so index i in one
-  // is index i in the other.
+  // is index i in the other. It leaves an empty list out, which the file
+  // may state (`constraints: []`).
   const written = writeDocument40(model) as unknown as Record<string, unknown>;
   const stored: StoredId[] = [];
   for (const path of unnamedLists(model.factTypes.length)) {
@@ -61,8 +67,8 @@ export function storeIds(yaml: string): StoreIdsResult {
     const wrote = path.reduce<unknown>(
       (at, key) => (at as Record<string | number, unknown> | undefined)?.[key],
       written,
-    ) as readonly { id?: string; minted_from?: string; }[] | undefined;
-    if (wrote?.length !== seq.items.length) {
+    ) as readonly { id?: string; minted_from?: string; }[] | undefined ?? [];
+    if (wrote.length !== seq.items.length) {
       throw new Error(
         `The file and its model disagree on how many elements ${path.join(".")} holds.`,
       );

@@ -47,7 +47,7 @@ describe("an id the file does not state, in the editor", () => {
   it("is stored by the action, which replaces the text with the file plus its ids", () => {
     const diagnostics = diagnosticsOf(TYPED).filter((d) => d.source === UNSTORED_ID_SOURCE);
     const [action] = storeIdsAction(doc(TYPED), diagnostics as never);
-    expect(action!.title).toBe("Store this id");
+    expect(action!.title).toBe("Store ids");
     const [edit] = action!.edit!.changes!["file:///m.orm.yaml"]!;
     expect(edit!.range.start).toEqual({ line: 0, character: 0 });
     expect(edit!.range.end).toEqual(doc(TYPED).positionAt(TYPED.length));

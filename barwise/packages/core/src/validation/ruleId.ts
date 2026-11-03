@@ -1017,7 +1017,7 @@ const RULE_DESCRIPTORS = {
       default: (id: string): string =>
         `"${id}" is not stored in the file: the element is given it again on every load, so `
         + `nothing else may refer to it by that id yet. Store it with the editor's `
-        + `"Store ids" action or \`barwise migrate\`.`,
+        + `"Store ids" quick fix or \`barwise migrate\`.`,
     },
   },
   [RULE_ID.duplicateObjectification]: {
