@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { importNormaXml } from "../src/norma/NormaXmlImporter.js";
 import { parseNormaXml } from "../src/norma/NormaXmlParser.js";
+import { mapUnderNormaIds } from "./helpers/underNormaIds.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -51,7 +52,8 @@ describe("NORMA join path parsing", () => {
 });
 
 describe("NORMA join path import", () => {
-  const model = importNormaXml(loadFixture("personCountryDemo.orm"));
+  // Under the NORMA ids it was built with, which the role constants name.
+  const model = mapUnderNormaIds(parseNormaXml(loadFixture("personCountryDemo.orm")));
 
   function findJoinEquality() {
     return model.constraints.find(isJoinEquality);
@@ -81,9 +83,14 @@ describe("NORMA join path import", () => {
     expect(citizen!.projection).toEqual([0, 1]);
   });
 
-  it("preserves NORMA object-type ids so the path root is id-stable", () => {
-    const person = model.getObjectTypeByName("Person")!;
-    expect(person.id).toBe("_08FCB217-4D5A-4D6E-BB08-033359BFEF51");
+  it("gives the path root and its hops the ids their names give (iri-identity 6c)", () => {
+    const named = importNormaXml(loadFixture("personCountryDemo.orm"));
+    const [bornIn] = named.constraints.find(isJoinEquality)!.operands;
+    expect(bornIn!.path.root).toBe("Person");
+    const entry = bornIn!.path.steps[0]!.entry;
+    expect(named.factTypes.find((ft) => ft.getRoleById(entry))?.id).toBe(
+      "PersonWasBornInCountry",
+    );
   });
 
   it("keeps the imported model valid", () => {
@@ -203,7 +210,7 @@ describe("NORMA join path fallbacks", () => {
   it("converts the flat side of a mixed flat/join comparison to a one-hop operand", () => {
     // Only the second sequence declares a join path; the first (flat,
     // two roles in one fact type) converts to the equivalent operand.
-    const model = importNormaXml(equalityXml("", validJoinRule));
+    const model = mapUnderNormaIds(parseNormaXml(equalityXml("", validJoinRule)));
     const joins = model.constraints.filter(isJoinEquality);
     expect(joins).toHaveLength(1);
     expect(joins[0]!.operands).toHaveLength(2);

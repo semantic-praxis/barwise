@@ -34,7 +34,7 @@ export function mapSubtypeFacts(ctx: NormaMappingContext): void {
     }
 
     const added = model.addSubtypeFact({
-      // NORMA's own id, as for every other element the importer maps.
+      // NORMA's own id, as for every other element, until the replay names it.
       ...(sf.id ? { id: sf.id } : {}),
       subtypeId,
       supertypeId,

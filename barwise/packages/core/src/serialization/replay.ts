@@ -68,9 +68,29 @@ export interface ReplayOptions {
 /**
  * Replay a 3.x model into format 4.0's ids. Pure: one model and one set of
  * options give one result. The returned model's `priorIds` maps each new
- * id back to the old.
+ * id back to the old, which tells validation and diff it was read from a
+ * file before 4.0.
  */
 export function replayInto40(source: OrmModel, options: ReplayOptions = {}): OrmModel {
+  const { model, priorIds } = replayIds(source, options);
+  model.recordPriorIds(priorIds);
+  return model;
+}
+
+/** A model given format 4.0's ids, and its map from each new id to the old. */
+export interface ReplayedIds {
+  readonly model: OrmModel;
+  readonly priorIds: ReadonlyMap<string, string>;
+}
+
+/**
+ * The replay, with the map back beside the model rather than recorded on
+ * it: for an importer that builds a model under its source's ids and gives
+ * it local names in one pass (NORMA, iri-identity 6c). Such a model was
+ * not read from a 3.x file, so it must not say it was (`replayed-ids`),
+ * and diff must not pair by ids no file of it ever stated.
+ */
+export function replayIds(source: OrmModel, options: ReplayOptions = {}): ReplayedIds {
   const target = new OrmModel({
     name: source.name,
     ...(source.domainContext !== undefined ? { domainContext: source.domainContext } : {}),
@@ -303,8 +323,7 @@ export function replayInto40(source: OrmModel, options: ReplayOptions = {}): Orm
   for (const m of maps.values()) for (const [from, now] of m) back.set(now, from);
   // Two identical unnamed constraints share a reference, and keep one here.
   for (const [c, old] of unnamedPrior) back.set(constraintRef(c), old);
-  target.recordPriorIds(back);
-  return target;
+  return { model: target, priorIds: back };
 }
 
 /** The fact type part of a reshaped dangling role reference. */

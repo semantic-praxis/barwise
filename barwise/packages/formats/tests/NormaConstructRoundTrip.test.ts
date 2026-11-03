@@ -7,10 +7,10 @@
  */
 import { OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
-import { mapNormaToOrm } from "../src/norma/NormaToOrmMapper.js";
 import { parseNormaXml } from "../src/norma/NormaXmlParser.js";
 import { serializeNormaDocument } from "../src/norma/NormaXmlSerializer.js";
 import { writeOrmToNorma } from "../src/norma/NormaXmlWriter.js";
+import { mapUnderNormaIds } from "./helpers/underNormaIds.js";
 
 function buildModel(): OrmModel {
   const model = new OrmModel({ name: "Constructs" });
@@ -87,7 +87,7 @@ function buildModel(): OrmModel {
 
 function roundTrip(model: OrmModel): { xml: string; back: OrmModel; } {
   const xml = serializeNormaDocument(writeOrmToNorma(model));
-  return { xml, back: mapNormaToOrm(parseNormaXml(xml)) };
+  return { xml, back: mapUnderNormaIds(parseNormaXml(xml)) };
 }
 
 describe("NORMA construct round-trip (WS3)", () => {
@@ -240,7 +240,7 @@ describe("exclusive-or round-trip (norma-round-trip-completion WS1)", () => {
     expect(oneSided).not.toContain("ExclusiveOrMandatoryConstraint");
     expect(oneSided).toContain("ExclusiveOrExclusionConstraint");
 
-    const back = mapNormaToOrm(parseNormaXml(oneSided));
+    const back = mapUnderNormaIds(parseNormaXml(oneSided));
     const all = back.everyConstraint().map(([c]) => c);
     expect(all.filter((c) => c.type === "exclusive_or")).toHaveLength(1);
     expect(all.some((c) => c.type === "exclusion")).toBe(false);
@@ -583,7 +583,7 @@ describe("sample-population round-trip (norma-round-trip-completion WS4)", () =>
   </orm:ORMModel>
 </ormRoot:ORM2>`;
 
-    const model = mapNormaToOrm(parseNormaXml(xml));
+    const model = mapUnderNormaIds(parseNormaXml(xml));
     const drinks = model.factTypes.find((f) => f.name === "PersonDrinksBeverage")!;
     const pops = model.populations.filter((p) => p.factTypeId === drinks.id);
     expect(pops).toHaveLength(1);
@@ -659,7 +659,7 @@ describe("note round-trip (norma-notes)", () => {
     </orm:ModelNotes>
   </orm:ORMModel>
 </ormRoot:ORM2>`;
-    const model = mapNormaToOrm(parseNormaXml(xml));
+    const model = mapUnderNormaIds(parseNormaXml(xml));
     expect(model.note).toBe("Own note.\n\nFloating note one.\n\nFloating note two.");
   });
 });

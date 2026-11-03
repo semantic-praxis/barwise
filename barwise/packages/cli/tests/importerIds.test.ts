@@ -31,9 +31,10 @@ import {
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 registerStandardFormats();
@@ -73,6 +74,13 @@ CREATE TABLE customer_suppliers (
  * The SQL importer reads query patterns, not CREATE TABLE: a JOIN gives it
  * two entities and a fact type between them.
  */
+// The formats package's own NORMA fixture: external uniqueness, a role value
+// constraint, internal uniqueness and mandatory constraints.
+const NORMA = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "../../formats/tests/fixtures/employeeProject.orm"),
+  "utf8",
+);
+
 const SQL = `
 SELECT o.id, c.name
 FROM orders o
@@ -224,20 +232,17 @@ const FIXTURES: Record<string, () => Promise<OrmModel>> = {
   openapi: async () => text("openapi", OPENAPI),
   sql: async () => text("sql", SQL),
   ossie: async () => text("ossie", OSSIE),
+  // A NORMA file states an id for every element; the import names each
+  // from its name or sentence all the same (iri-identity 6c).
+  norma: async () => text("norma", NORMA),
   dbt: async () => directory("dbt", dbtProject()),
   typescript: async () => directory("typescript", codeProject()),
   java: async () => directory("java", codeProject()),
   kotlin: async () => directory("kotlin", codeProject()),
 };
 
-/** Importers deliberately not run here, each with the reason. */
-const EXEMPT: Record<string, string> = {
-  norma:
-    "keeps the source .orm file's ids on purpose -- object types, fact types, roles, subtype facts, "
-    + "constraints and fact instances -- and derives the rest from them, so one file imports to one "
-    + "model (orm-format-3.spec.md WS2, which also lists what a round trip does not keep); "
-    + "barwise-1070 asks whether role ids should be re-minted",
-};
+/** Importers deliberately not run here, each with the reason. None since 6c. */
+const EXEMPT: Record<string, string> = {};
 
 function importerFor(name: string): ImportFormat {
   const importer = listImporters().find((d) => d.name === name)?.importer;

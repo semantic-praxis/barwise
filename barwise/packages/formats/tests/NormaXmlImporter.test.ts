@@ -444,10 +444,11 @@ describe("NORMA XML Import integration", () => {
 
       const extUc = extUcs[0]!;
       if (extUc.type === "external_uniqueness") {
-        // Should reference roles from both the FirstName and LastName fact types.
+        // Roles from both the FirstName and LastName fact types, under the ids
+        // their fact types and names give (iri-identity 6c).
         expect(extUc.roleIds).toHaveLength(2);
-        expect(extUc.roleIds).toContain("_r_fn_of");
-        expect(extUc.roleIds).toContain("_r_ln_of");
+        expect(extUc.roleIds).toContain("Employee_has_FirstName.is_of");
+        expect(extUc.roleIds).toContain("Employee_has_LastName.is_of");
       }
     });
 
@@ -458,7 +459,7 @@ describe("NORMA XML Import integration", () => {
 
       const vc = vcs[0]!;
       if (vc.type === "value_constraint") {
-        expect(vc.roleId).toBe("_r_role_of");
+        expect(vc.roleId).toBe("Employee_has_RoleName.is_of");
         expect(vc.values).toEqual(["dev", "qa", "pm"]);
       }
     });

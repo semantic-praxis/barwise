@@ -19,7 +19,7 @@ import {
   readDocument40,
   writeDocument40,
 } from "../../src/serialization/OrmYamlSerializer.js";
-import { replayInto40, RESHAPE } from "../../src/serialization/replay.js";
+import { replayIds, replayInto40, RESHAPE } from "../../src/serialization/replay.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
 /** Fields whose string value, or each string in whose list, is an id. */
@@ -621,6 +621,22 @@ model:
       ]);
     }
   });
+});
+
+describe("replayIds, the replay without recording the map", () => {
+  // For an importer that builds under its source's ids (NORMA, 6c): the same
+  // model and map, with nothing on the model saying it was read from 3.x.
+  it.each(modelCorpus().slice(0, 12).map((c) => [c.file, c] as const))(
+    "%s gives replayInto40's model and map, the map left off the model",
+    (_, c) => {
+      const read = () => new OrmYamlSerializer().deserializeAsWritten(JSON.stringify(c.doc));
+      const recorded = replayInto40(read());
+      const { model, priorIds } = replayIds(read());
+      expect(model.priorIds).toBeUndefined();
+      expect([...priorIds]).toEqual([...recorded.priorIds!]);
+      expect(asText(model)).toEqual(asText(recorded));
+    },
+  );
 });
 
 describe("the replay's reshape table, against the 4.0 decoders", () => {

@@ -843,7 +843,6 @@ const conceptualToNormaKind: Record<ConceptualDataTypeName, string> = {
   other: "variable_length_text",
 };
 
-/** Stable DataType element id for a conceptual type. */
 /** Object-type population cardinality -> NORMA CardinalityRestriction. */
 function writeCardinality(ot: ObjectType): NormaCardinality | undefined {
   const c = ot.cardinality;
@@ -1037,8 +1036,12 @@ function writeDiagrams(model: OrmModel): NormaDiagram[] {
   });
 }
 
+/**
+ * Not a model id, so not through `toNormaId`: a token in NORMA space that
+ * `collectDataTypes` reads the kind back out of. Every kind is an NCName.
+ */
 function dataTypeIdFor(name: ConceptualDataTypeName): NormaId {
-  return toNormaId(`dt_${conceptualToNormaKind[name]}`);
+  return asNormaId(`_dt_${conceptualToNormaKind[name]}`);
 }
 
 /** Collect the distinct DataType definitions referenced by value types. */

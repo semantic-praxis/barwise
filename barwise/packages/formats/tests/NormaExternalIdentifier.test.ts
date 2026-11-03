@@ -10,17 +10,22 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { NormaExportFormat } from "../src/norma/NormaExportFormat.js";
-import { NormaImportFormat } from "../src/norma/NormaImportFormat.js";
+import { parseNormaXml } from "../src/norma/NormaXmlParser.js";
+import { readableNormaIds } from "./helpers/readableNormaIds.js";
+import { mapUnderNormaIds } from "./helpers/underNormaIds.js";
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
-const importNorma = (xml: string) => new NormaImportFormat().parse(xml).model;
-const roomXml = () =>
-  new NormaExportFormat().export(
-    // As the 3.0 reader builds it: the tests name the fixture's ids.
-    new OrmYamlSerializer().deserializeAsWritten(
-      readFileSync(join(fixtures, "externalIdentifier.orm.yaml"), "utf8"),
-    ),
-  ).text;
+// Read back under the NORMA ids each element was built under, which is
+// what these tests name (iri-identity 6c).
+const importNorma = (xml: string) => mapUnderNormaIds(parseNormaXml(xml));
+const roomXml = () => {
+  // As the 3.0 reader builds it: the tests name the fixture's ids, and the
+  // XML is spelled with them.
+  const model = new OrmYamlSerializer().deserializeAsWritten(
+    readFileSync(join(fixtures, "externalIdentifier.orm.yaml"), "utf8"),
+  );
+  return readableNormaIds(new NormaExportFormat().export(model).text, model);
+};
 
 describe("NORMA and an external preferred identifier", () => {
   it("reads NORMA's own PreferredIdentifierFor on an external uniqueness", () => {

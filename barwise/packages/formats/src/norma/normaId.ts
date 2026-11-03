@@ -1,16 +1,16 @@
 /**
  * The NORMA id space, separated from the model id space at compile time.
  *
- * NORMA accepts any unique token and conventionally prefixes ids with
- * "_". A model id converted for output becomes `_<model-id>`; an id that
- * already carries the prefix passes through unchanged, because ids
- * IMPORTED from NORMA keep their original token all the way into the
- * model (`mapping/objectTypes.ts` assigns `id: et.id` verbatim) and would
- * otherwise be prefixed twice on a round trip.
+ * NORMA types every id `xs:ID` and every reference `xs:IDREF`
+ * (`ORM2Core.xsd`, ormsolutions/NORMA at c458441b), so an id is an XML
+ * NCName, and conventionally starts with "_". A model id is a local name,
+ * which may hold `%`, `:` and characters an NCName refuses, so it is never
+ * written as it is: the writer derives a NORMA id from it (iri-identity,
+ * decision 12(a)), the same for one model however it was loaded.
  *
- * That overlap is why the brand runs one way only. A `NormaId` is
- * assignable to `string`, so the import path can keep handing NORMA ids
- * to model-id positions, which is what it has always done. A bare
+ * The brand runs one way only. A `NormaId` is assignable to `string`, so
+ * the import path can hand NORMA ids to model-id positions while it builds
+ * the model under them, before the replay gives it local names. A bare
  * `string` is NOT assignable to `NormaId`, which is the direction worth
  * enforcing: every value reaching NORMA output has to pass through
  * `toNormaId` or `asNormaId`, and forgetting is a compile error rather
@@ -31,13 +31,24 @@ declare const normaIdBrand: unique symbol;
 export type NormaId = string & { readonly [normaIdBrand]: "NormaId"; };
 
 /**
- * Convert a model id into a NORMA id, prefixing "_" unless it is already
- * there. Idempotent, which is what makes a NORMA -> model -> NORMA round
- * trip stable.
+ * The NORMA id a model id is written under: "_" and core's `derivedId` of
+ * it, a UUID, so an NCName whatever the local name holds. One model id
+ * always gives one NORMA id, and two give two, so every reference the
+ * writer derives from an id meets the element written under it. A NORMA
+ * round trip therefore gets new ids (decision 12(a)): the import names each
+ * element from its name, and the export derives from that. No id passes
+ * through as it is, not even one starting with "_" (a local name such as
+ * `_internal` is still a local name).
  */
 export function toNormaId(modelId: string): NormaId {
-  return (modelId.startsWith("_") ? modelId : `_${modelId}`) as NormaId;
+  return `_${derivedId(NORMA_EXPORT_ID_TAG, [modelId])}` as NormaId;
 }
+
+/**
+ * The domain tag `toNormaId` derives under. Part of every id barwise writes
+ * to NORMA, so editing it changes every export; pinned by a test.
+ */
+export const NORMA_EXPORT_ID_TAG = "barwise.norma-export";
 
 /**
  * Accept a token that is already in NORMA's id space -- one read from a

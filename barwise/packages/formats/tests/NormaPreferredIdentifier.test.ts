@@ -11,6 +11,7 @@
  */
 import { type InternalConstraint, OrmModel, storePreferredFlags } from "@barwise/core";
 import { describe, expect, it } from "vitest";
+import { toNormaId } from "../src/norma/normaId.js";
 import { writeOrmToNorma } from "../src/norma/NormaXmlWriter.js";
 
 function customer(flagOn: "entity" | "value"): OrmModel {
@@ -51,7 +52,9 @@ describe("NORMA export of a preferred identifier", () => {
       const entity = doc.entityTypes.find((e) => e.name === "Customer")!;
       const preferred = doc.constraints.filter((c) => c.type === "uniqueness" && c.isPreferred);
       expect(preferred.map((c) => c.id)).toEqual([entity.preferredIdentifier]);
-      expect(preferred[0]!.type === "uniqueness" && preferred[0]!.roleRefs).toEqual(["_r-nr"]);
+      expect(preferred[0]!.type === "uniqueness" && preferred[0]!.roleRefs).toEqual([
+        toNormaId("r-nr"),
+      ]);
     });
   }
 
@@ -128,7 +131,7 @@ describe("NORMA export of a preferred identifier", () => {
     // exactly one entity's PreferredIdentifier.
     const doc = writeOrmToNorma(model);
     const room = doc.entityTypes.find((e) => e.name === "Room")!;
-    expect(room.preferredIdentifier).toBe("_u-b");
+    expect(room.preferredIdentifier).toBe(toNormaId("u-b"));
     const preferred = doc.constraints
       .filter((c) => c.type === "uniqueness" && c.isPreferred)
       .map((c) => c.id)

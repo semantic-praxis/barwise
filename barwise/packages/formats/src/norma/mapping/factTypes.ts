@@ -1,8 +1,10 @@
 /**
  * Phase 2 of the NORMA mapping: fact types.
  *
- * Creates each fact type with its roles (preserving NORMA role ids),
- * readings, and the constraints its InternalConstraints section references.
+ * Creates each fact type with its roles, readings, and the constraints its
+ * InternalConstraints section references, all under NORMA's ids, which the
+ * later phases resolve references through. The replay at the end of
+ * `mapNormaToOrm` gives every element its local name (iri-identity 6c).
  */
 import {
   type Constraint,
@@ -37,7 +39,7 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
       return {
         name: nr.name || nr.id,
         playerId,
-        id: nr.id, // Preserve NORMA role id for constraint mapping.
+        id: nr.id, // NORMA's role id, which the constraints name.
       };
     });
 
@@ -55,8 +57,7 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
     constraints.push(...roleCardinalityConstraints(nft, ctx.constraintIds));
 
     const ft = model.addFactType({
-      // NORMA's own id, as object types keep theirs, so one file imports to
-      // one model every time and exports back under the ids it had.
+      // NORMA's own id, as object types take theirs, until the replay names it.
       ...(nft.id ? { id: nft.id } : {}),
       name: nft.name || generateFactTypeName(nft, objectTypeIdMap, model),
       roles,
@@ -85,10 +86,8 @@ export function mapFactTypes(ctx: NormaMappingContext): void {
 
     factTypeIdMap.set(nft.id, ft.id);
 
-    // Record role id mappings (NORMA id -> Barwise id).
-    // Since we pass NORMA role ids as the id in RoleConfig, the
-    // Barwise role ids will be the same NORMA ids (FactType constructor
-    // uses the provided id).
+    // Record role id mappings (NORMA id -> the id the role is built under,
+    // NORMA's own, since RoleConfig states it).
     for (const nr of nft.roles) {
       const role = ft.getRoleById(nr.id);
       if (role) {

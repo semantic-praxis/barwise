@@ -23,8 +23,9 @@ diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
 the editor's "Store ids", the 3.x note); 6b-3b implemented 2026-11-03 (the
 rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-03 (`iriOf`, the model header delta); 6b-4b implemented
-2026-11-03 (`generateId` and its installs retired); 6c to 6f and WS7 to
-come
+2026-11-03 (`generateId` and its installs retired); 6c implemented
+2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d to 6f
+and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-11-03
@@ -1376,6 +1377,32 @@ version-1 manifest would go silently empty for impact analysis.
   and a shadow's id holds `:`. The repo models no NORMA id syntax
   (`NormaId` is a branded string), so the check is against NORMA's XSD
   before 6c lands.
+  - _6c notes._
+    - NORMA's XSD (`ORMModel/ObjectModel/ORM2Core.xsd`, ormsolutions/NORMA
+      at c458441b) types every `id` `xs:ID` and every `ref` `xs:IDREF`,
+      so an id is an NCName; 12(c) is not viable, as recorded.
+    - Not a map threaded through the phases, as planned: the phases still
+      build the model under NORMA's ids, which every reference between
+      them resolves through, and one replay (`replayIds`, the 3.x replay
+      without recording its map on the model) gives every element its
+      local name, in the order a 4.0 file is read. That order names an
+      external constraint after every fact type it spans, so no separate
+      externals pass is needed; the naming rules stay in one place, the
+      replay, which the 3.x reader already holds to the corpus. The map is
+      left off the model because the model was not read from a 3.x file:
+      recorded, it would report `replayed-ids` and pair diffs by NORMA ids.
+    - Export: `toNormaId` is `_` and `derivedId` of the model id, with
+      no pass-through. The DataType element's id (`_dt_<kind>`) is not a
+      model id, and stays as it is: the writer reads the kind back from it.
+    - Tests: the mapper's tests read its choices back under NORMA ids
+      (`formats/tests/helpers/underNormaIds.ts`, `remapIds` over the
+      replay's map); `NormaLocalNames.test.ts` tests the names. A NORMA
+      round trip now gives back every id, from the names. NORMA is no
+      longer exempt in `cli/tests/importerIds.test.ts`.
+    - A constraint with no sentence (a cardinality on one role of a
+      binary, an exclusion over one role) is imported unnamed, as decision
+      19 says; NORMA's export writes it under an id derived from its
+      content, as before.
 - **6d, merge and split.** Merge keeps the base's fact type id on a
   modification and rewrites the incoming roles to `<base>.<role>`, where
   today it takes the incoming roles (`mergeModels`, the role handling at
@@ -1747,9 +1774,8 @@ sites.
       `vscode/tests/unit/activateIdGenerator.test.ts` are deleted; MCP's
       spawned-server test now checks that an import's ids are names, none a
       UUID; `cli/tests/importerIds.test.ts` checks the naming rules alone. NORMA
-      stays exempt there, as against the Retired list's "no longer
-      exempt": its importer still keeps NORMA's ids until 6c gives it local
-      names (barwise-1070).
+      stayed exempt there, as against the Retired list's "no longer
+      exempt", until 6c gave its importer local names (barwise-1070).
 
 **Sizes, roughly.** 6a: about 400 lines of source for diff, 300 for the
 rest, each with tests. 6b: about 25 core files and 1,500 to 2,000 lines,
