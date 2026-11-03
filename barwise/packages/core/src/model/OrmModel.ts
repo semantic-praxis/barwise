@@ -936,7 +936,7 @@ export class OrmModel implements ConstraintModel {
         config.roles.map((r) => this._objectTypes.get(r.playerId)?.name ?? r.playerId),
       )
       : config.name;
-    const id = config.id ?? this.mintedId(localName(base), stated);
+    const id = config.id ?? this.mintedId(nameIdBase(base), stated);
     const ft = new FactType({
       ...config,
       id,

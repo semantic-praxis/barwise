@@ -124,14 +124,13 @@ it, so knip sees an unused file where there is a live edge.
 - **A constraint id a file omits is derived, not minted.** On load,
   `serialization/derivedId.ts` gives an id-less constraint a UUIDv8 hashed
   from its fact type id and its content, so one unchanged file always loads
-  to the same ids; the generator fills only constraints built in code,
-  through the `FactType` constructor or `addConstraint` (barwise-nkq), so
-  every constraint in a model has an id
-  (`docs/specs/orm-format-3.spec.md`, WS2 and WS3). Do not move the derivation into
-  `FactType`'s constructor: it runs per fact type and cannot see the ids
-  the rest of the file states. And do not let a loaded constraint reach
-  the constructor's random fill: that is what made two NORMA exports of
-  one file differ.
+  to the same ids (`docs/specs/orm-format-3.spec.md`, WS2 and WS3). A
+  constraint added in code is named by the model from its sentence, or
+  left unnamed when the sentence cannot be built (decision 19); one built
+  outside a model keeps the id it is given or has none, so `c.id` is never
+  safe to assert. Do not move the derivation into `FactType`'s
+  constructor: it runs per fact type and cannot see the ids the rest of
+  the file states.
 - **Where a constraint lives is decided by its kind, in one table.**
   `PLACEMENT` in `model/Constraint.ts` classifies every kind as internal
   (it lives in its fact type; every role is one of its roles) or external

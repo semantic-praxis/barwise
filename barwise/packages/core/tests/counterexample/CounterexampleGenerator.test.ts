@@ -317,6 +317,23 @@ describe("generateCounterexamples (model-wide)", () => {
     };
     expect(readings()).toEqual(readings());
   });
+
+  it("gives the same counterexamples, populations and ids included, on every call (barwise-uam)", () => {
+    const model = new ModelBuilder()
+      .withEntityType("Customer")
+      .withEntityType("Order")
+      .withBinaryFactType("Customer places Order", {
+        role1: { player: "Customer", name: "places" },
+        role2: { player: "Order", name: "is placed by" },
+        uniqueness: "role2",
+      })
+      .build();
+    const first = generateCounterexamples(model);
+    expect(first).toEqual(generateCounterexamples(model));
+    const ids = first.flatMap((c) => c.forbidden.map((p) => p.id));
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) expect(id).toMatch(/\.population$/);
+  });
 });
 
 describe("cross-fact-type counterexamples", () => {

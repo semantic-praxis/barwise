@@ -31,7 +31,7 @@ export interface FactInstanceConfig {
  * Configuration for creating a new Population.
  */
 export interface PopulationConfig {
-  /** Optional stable identifier. In a model, `<fact type>.population` if omitted; standalone, generated. */
+  /** Optional stable identifier. In a model, `<fact type>.population` if omitted; standalone, the same. */
   readonly id?: string;
   /** The id of the fact type this population samples. */
   readonly factTypeId: string;

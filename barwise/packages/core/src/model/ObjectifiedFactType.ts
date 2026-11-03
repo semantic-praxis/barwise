@@ -4,7 +4,7 @@ import type { Complete } from "../util/complete.js";
  * Configuration for creating a new ObjectifiedFactType.
  */
 export interface ObjectifiedFactTypeConfig {
-  /** Optional stable identifier. In a model, its minted name if omitted; standalone, generated. */
+  /** Optional stable identifier. In a model, its minted name if omitted; standalone, none. */
   readonly id?: string;
   /** The id of the fact type being objectified. */
   readonly factTypeId: string;

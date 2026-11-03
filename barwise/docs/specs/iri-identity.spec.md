@@ -1746,7 +1746,10 @@ sites.
       defaults; `cli/tests/entryIdGenerator.test.ts` and
       `vscode/tests/unit/activateIdGenerator.test.ts` are deleted; MCP's
       spawned-server test now checks that an import's ids are names, none a
-      UUID; `cli/tests/importerIds.test.ts` checks the naming rules alone.
+      UUID; `cli/tests/importerIds.test.ts` checks the naming rules alone. NORMA
+      stays exempt there, as against the Retired list's "no longer
+      exempt": its importer still keeps NORMA's ids until 6c gives it local
+      names (barwise-1070).
 
 **Sizes, roughly.** 6a: about 400 lines of source for diff, 300 for the
 rest, each with tests. 6b: about 25 core files and 1,500 to 2,000 lines,
