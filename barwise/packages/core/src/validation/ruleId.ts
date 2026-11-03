@@ -1000,6 +1000,12 @@ const RULE_DESCRIPTORS = {
         `The ${kind} "${name}" has the id "${id}", where its name gives "${expected}". Renaming it, even to the name it has, gives it that id.`,
       suffixed: (kind: string, name: string, id: string, expected: string): string =>
         `The ${kind} "${name}" has the suffixed id "${id}", because another element holds "${expected}", the id its name gives. Rename one of them so each name gives its own id.`,
+      // A population has no name of its own: decision 7 gives its id from
+      // its fact type's, and the fact type is what a person renames.
+      population: (factType: string, id: string, expected: string): string =>
+        `The population of fact type "${factType}" has the id "${id}", where its fact type gives "${expected}". Renaming the fact type, even to the name it has, gives it that id.`,
+      populationSuffixed: (factType: string, id: string, expected: string): string =>
+        `The population of fact type "${factType}" has the suffixed id "${id}", because a role holds "${expected}", the id its fact type gives. Rename the role, and the population takes that id.`,
     },
   },
   [RULE_ID.staleMintedName]: {

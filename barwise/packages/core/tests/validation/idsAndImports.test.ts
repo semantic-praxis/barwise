@@ -20,6 +20,23 @@ const read = (yaml: string) => serializer.deserialize(yaml, { lenient: true });
 const found = (model: OrmModel, rule: string) =>
   new ValidationEngine().validate(model).filter((d) => d.ruleId === rule);
 
+/** A 3.x fact type with a role named `population`, and a population. */
+const CITY = `orm_version: "3.0"
+model:
+  name: M
+  object_types:
+    - { id: u1, name: City, kind: entity, reference_mode: name }
+  fact_types:
+    - id: f1
+      name: City has Count
+      roles:
+        - { id: r1, player: u1, role_name: has }
+        - { id: r2, player: u1, role_name: population }
+      readings: ["{0} has {1}"]
+  populations:
+    - { id: p1, fact_type: f1, instances: [{ id: p1.1, role_values: { r1: Oslo, r2: Bergen } }] }
+`;
+
 const SMOKERS = `orm_version: "4.0"
 model:
   name: M
@@ -83,23 +100,9 @@ model:
   it("reports a population whose id took a suffix because a role held it, and rename repairs it", () => {
     // 6b-3b's pr-review: main's name-based check warned here, and the
     // id-based one had nothing until populations were checked (decision 7).
-    const model = read(`orm_version: "3.0"
-model:
-  name: M
-  object_types:
-    - { id: u1, name: City, kind: entity, reference_mode: name }
-  fact_types:
-    - id: f1
-      name: City has Count
-      roles:
-        - { id: r1, player: u1, role_name: has }
-        - { id: r2, player: u1, role_name: population }
-      readings: ["{0} has {1}"]
-  populations:
-    - { id: p1, fact_type: f1, instances: [{ id: p1.1, role_values: { r1: Oslo, r2: Bergen } }] }
-`);
+    const model = read(CITY);
     expect(found(model, "structural/id-not-from-name").map((d) => d.message)).toEqual([
-      'The population of fact type "City has Count" has the suffixed id "City_has_Count.population_2", because another element holds "City_has_Count.population", the id its name gives. Rename one of them so each name gives its own id.',
+      'The population of fact type "City has Count" has the suffixed id "City_has_Count.population_2", because a role holds "City_has_Count.population", the id its fact type gives. Rename the role, and the population takes that id.',
     ]);
     const { model: renamed } = renameInModel(model, {
       kind: "role",
@@ -109,6 +112,86 @@ model:
     expect(renamed.populations[0]).toMatchObject({ id: "City_has_Count.population" });
     expect(renamed.populations[0]!.instances[0]!.id).toBe("City_has_Count.population.1");
     expect(found(renamed, "structural/id-not-from-name")).toEqual([]);
+  });
+
+  it("keeps a renamed fact type's population suffixed while its role still holds the id", () => {
+    // The guard against mapping the role and the population onto one id.
+    const model = read(CITY);
+    const { model: renamed } = renameInModel(
+      model,
+      { kind: "factType", name: "City has Count" },
+      "Town has Count",
+    );
+    expect(renamed.getFactType("Town_has_Count")!.roles[1]!.id).toBe("Town_has_Count.population");
+    expect(renamed.populations[0]!.id).toBe("Town_has_Count.population_2");
+  });
+
+  it("refuses a rename to the name it has that repairs nothing", () => {
+    // The role still holds <ft>.population, so the population cannot move.
+    const model = read(CITY);
+    expect(() =>
+      renameInModel(model, { kind: "factType", name: "City has Count" }, "City has Count")
+    ).toThrow(/already named "City has Count", and holds the id it gives/);
+  });
+
+  it("repairs a population whose id came from elsewhere by renaming its fact type to the name it has", () => {
+    const model = read(`orm_version: "4.0"
+model:
+  name: M
+  object_types:
+    - { id: City, name: City, kind: entity, reference_mode: name }
+  fact_types:
+    - id: City_exists
+      name: City exists
+      roles:
+        - { id: City_exists.exists, player: City, role_name: exists }
+      readings: ["{0} exists"]
+  populations:
+    - { id: Census.population, fact_type: City_exists, instances: [{ id: Census.population.1, role_values: { City_exists.exists: Oslo } }] }
+`);
+    expect(found(model, "structural/id-not-from-name").map((d) => d.message)).toEqual([
+      'The population of fact type "City exists" has the id "Census.population", where its fact type gives "City_exists.population". Renaming the fact type, even to the name it has, gives it that id.',
+    ]);
+    const { model: renamed } = renameInModel(
+      model,
+      { kind: "factType", name: "City exists" },
+      "City exists",
+    );
+    expect(renamed.populations[0]!.id).toBe("City_exists.population");
+    expect(renamed.populations[0]!.instances[0]!.id).toBe("City_exists.population.1");
+  });
+
+  it("does not give two instances one id when repairing a population", () => {
+    // A second population states, by hand, the id the first's instance
+    // would take; instance ids are not in the model's id index. 4.0, since
+    // the replay re-mints every instance id.
+    const model = read(`orm_version: "4.0"
+model:
+  name: M
+  object_types:
+    - { id: City, name: City, kind: entity, reference_mode: name }
+  fact_types:
+    - id: City_has_Count
+      name: City has Count
+      roles:
+        - { id: City_has_Count.has, player: City, role_name: has }
+        - { id: City_has_Count.population, player: City, role_name: population }
+      readings: ["{0} has {1}"]
+  populations:
+    - id: City_has_Count.population_2
+      fact_type: City_has_Count
+      instances: [{ id: City_has_Count.population_2.1, role_values: { City_has_Count.has: Oslo } }]
+    - id: City_has_Count.population_3
+      fact_type: City_has_Count
+      instances: [{ id: City_has_Count.population.1, role_values: { City_has_Count.has: Rome } }]
+`);
+    const { model: renamed } = renameInModel(model, {
+      kind: "role",
+      factType: "City has Count",
+      role: "population",
+    }, "residents");
+    const instanceIds = renamed.populations.flatMap((p) => p.instances.map((i) => i.id));
+    expect(new Set(instanceIds).size).toBe(instanceIds.length);
   });
 
   it("does not report a fact type's second population, which the suffix rule names", () => {

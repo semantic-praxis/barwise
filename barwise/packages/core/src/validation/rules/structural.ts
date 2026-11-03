@@ -376,7 +376,20 @@ function checkIdsFromNames(model: OrmModel): Diagnostic[] {
     const pops = model.populations.filter((p) => p.factTypeId === ft.id);
     const expected = `${ft.id}.population`;
     if (!pops.some((p) => p.id === expected)) {
-      for (const pop of pops) check("population of fact type", ft.name, pop.id, expected);
+      for (const pop of pops) {
+        const suffixed = pop.id.startsWith(`${expected}_`)
+          && /^\d+$/.test(pop.id.slice(expected.length + 1));
+        diagnostics.push(
+          report(
+            RULE_ID.idNotFromName,
+            suffixed ? "populationSuffixed" : "population",
+            pop.id,
+            ft.name,
+            pop.id,
+            expected,
+          ),
+        );
+      }
     }
   }
   return diagnostics;

@@ -142,7 +142,12 @@ function idDiffersFromName(
   const ownId = objectifier?.objectTypeId !== local && element.id !== local;
   // A population whose id took a suffix is repaired by the same rename.
   const pops = model.populations.filter((p) => p.factTypeId === element.id);
-  return ownId || (pops.length > 0 && !pops.some((p) => p.id === `${element.id}.population`));
+  // Only when `<ft>.population` is free: a role still holding it blocks
+  // the repair, and the rename would change nothing.
+  const want = `${element.id}.population`;
+  return ownId
+    || (pops.length > 0 && !pops.some((p) => p.id === want)
+      && model.idKindsHolding(want).length === 0);
 }
 
 /**
@@ -156,16 +161,24 @@ function repairPopulations(model: OrmModel, plan: RenamePlan, ids: Map<string, s
   const want = `${ftNow}.population`;
   const heldAfter = (id: string) =>
     (model.idKindsHolding(id).length > 0 && !ids.has(id)) || [...ids.values()].includes(id);
-  // The first only: a second population of one fact type is suffixed by rule.
-  for (const pop of model.populations.filter((p) => p.factTypeId === ftId).slice(0, 1)) {
-    if ((ids.get(pop.id) ?? pop.id) === want || heldAfter(want)) continue;
-    ids.set(pop.id, want);
-    for (const inst of pop.instances) {
-      if (inst.id.startsWith(`${pop.id}.`)) {
-        ids.set(inst.id, `${want}.${inst.id.slice(pop.id.length + 1)}`);
-      }
-    }
-  }
+  // The first only: a second population of one fact type is suffixed by
+  // rule, and `heldAfter` already stops it taking the id the first does.
+  const [pop] = model.populations.filter((p) => p.factTypeId === ftId);
+  if (pop === undefined || (ids.get(pop.id) ?? pop.id) === want || heldAfter(want)) return;
+  const moved = new Map(
+    pop.instances
+      .filter((inst) => inst.id.startsWith(`${pop.id}.`))
+      .map((inst) => [inst.id, `${want}.${inst.id.slice(pop.id.length + 1)}`] as const),
+  );
+  // Instance ids are not in the model's id index, so check them here: an
+  // instance of another population stating one of the new ids keeps the
+  // repair from happening, rather than giving two instances one id.
+  const others = new Set(
+    model.populations.filter((p) => p !== pop).flatMap((p) => p.instances.map((i) => i.id)),
+  );
+  if ([...moved.values()].some((id) => others.has(id))) return;
+  ids.set(pop.id, want);
+  for (const [from, now] of moved) ids.set(from, now);
 }
 
 /** The model under the new ids, each change said in `changes`. */
