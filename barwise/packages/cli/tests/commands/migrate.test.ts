@@ -198,4 +198,188 @@ describe("barwise migrate", () => {
       notes: [{ kind: "flag-dropped", factType: "Customer has Name", constraintId: "u-cn" }],
     }]);
   });
+
+  describe("a current file whose load mints ids (iri-identity decision 17)", () => {
+    const TYPED = `orm_version: "4.0"
+model:
+  name: M
+  object_types:
+    - { id: Person, name: Person, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: Person_smokes
+      name: Person smokes
+      roles:
+        - { id: Person_smokes.smokes, player: Person, role_name: smokes }
+      readings: ["{0} smokes"]
+      constraints:
+        # typed without an id
+        - { type: mandatory, role: Person_smokes.smokes }
+`;
+
+    it("is written with those ids, its comments kept, and is current afterwards", async () => {
+      const path = file("m.orm.yaml", TYPED);
+      const result = await runCli(["migrate", path]);
+      expect([result.exitCode, result.stdout]).toEqual([
+        0,
+        `${path}: 4.0 -> 4.0\n  stored "Each_Person_smokes", which the file did not state\n`,
+      ]);
+      const written = readFileSync(path, "utf-8");
+      expect(written).toContain("# typed without an id");
+      expect(written).toContain("id: Each_Person_smokes");
+      expect(written).toContain("minted_from:");
+      expect((await runCli(["migrate", path])).stdout).toBe(`${path}: already 4.0\n`);
+    });
+
+    it("is reported, not written, under --check, which exits 1", async () => {
+      const path = file("m.orm.yaml", TYPED);
+      const result = await runCli(["migrate", "--check", "--format", "json", path]);
+      expect(result.exitCode).toBe(1);
+      expect(JSON.parse(result.stdout)).toEqual([{
+        file: path,
+        status: "would-migrate",
+        from: "4.0",
+        notes: [],
+        stored: ["Each_Person_smokes"],
+      }]);
+      expect(readFileSync(path, "utf-8")).toBe(TYPED);
+    });
+  });
+
+  describe("a project (iri-identity WS6)", () => {
+    // In sales, "Order Line" takes a suffixed id, because "Order_Line"
+    // came first with the same local name; billing's shadow of it cannot
+    // see that from its own file.
+    const SALES = `orm_version: "3.0"
+model:
+  name: sales
+  domain_context: sales
+  object_types:
+    - { id: u1, name: Order_Line, kind: entity, reference_mode: nr }
+    - { id: u2, name: Order Line, kind: entity, reference_mode: nr }
+`;
+    const BILLING = `orm_version: "3.0"
+model:
+  name: billing
+  domain_context: billing
+  object_types:
+    - { id: s1, name: Order Line, kind: entity, reference_mode: nr, source_context: sales }
+`;
+    const manifest = () =>
+      file(
+        "shop.orm-project.yaml",
+        `format_version: "1.0"
+project:
+  name: Shop
+  domains:
+    - { path: sales.orm.yaml, context: sales }
+    - { path: billing.orm.yaml, context: billing }
+`,
+      );
+
+    it("migrates every domain, and a shadow names the id its owner's domain gave", async () => {
+      file("sales.orm.yaml", SALES);
+      file("billing.orm.yaml", BILLING);
+      const result = await runCli(["migrate", manifest()]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toBe(
+        `${join(dir, "sales.orm.yaml")}: 3.0 -> 4.0\n${
+          join(dir, "billing.orm.yaml")
+        }: 3.0 -> 4.0\n`,
+      );
+      expect(readFileSync(join(dir, "sales.orm.yaml"), "utf-8")).toContain("id: Order_Line_2");
+      expect(readFileSync(join(dir, "billing.orm.yaml"), "utf-8")).toContain(
+        "id: sales:Order_Line_2",
+      );
+    });
+
+    it("settles a domain whose shadows of both owners collide when read alone", async () => {
+      // Found by 6b-3a's pr-review: alone, both shadows take
+      // "sales:Order_Line" and the read refuses the file, so the project
+      // must retry it with the owners' ids known rather than refuse it.
+      file("sales.orm.yaml", SALES);
+      const both =
+        `${BILLING}    - { id: s2, name: Order_Line, kind: entity, reference_mode: nr, source_context: sales }
+`;
+      const billing = file("billing.orm.yaml", both);
+      expect((await runCli(["migrate", "--check", billing])).exitCode).toBe(2);
+      const result = await runCli(["migrate", manifest()]);
+      expect([result.exitCode, result.stdout]).toEqual([
+        0,
+        `${join(dir, "sales.orm.yaml")}: 3.0 -> 4.0\n${billing}: 3.0 -> 4.0\n`,
+      ]);
+      const written = readFileSync(billing, "utf-8");
+      expect(written).toContain("id: sales:Order_Line_2\n");
+      expect(written).toContain("id: sales:Order_Line\n");
+    });
+
+    it("settles two domains that each shadow the other's suffixed types", async () => {
+      // Neither reads alone, so neither can learn the other's ids from a
+      // read of the other alone (6b-3a's second pr-review pass).
+      file(
+        "sales.orm.yaml",
+        `${SALES}    - { id: s3, name: Invoice_Line, kind: entity, reference_mode: nr, source_context: billing }
+    - { id: s4, name: Invoice Line, kind: entity, reference_mode: nr, source_context: billing }
+`,
+      );
+      const billing = file(
+        "billing.orm.yaml",
+        `${BILLING}    - { id: s2, name: Order_Line, kind: entity, reference_mode: nr, source_context: sales }
+    - { id: b1, name: Invoice_Line, kind: entity, reference_mode: nr }
+    - { id: b2, name: Invoice Line, kind: entity, reference_mode: nr }
+`,
+      );
+      const result = await runCli(["migrate", manifest()]);
+      expect(result.exitCode).toBe(0);
+      const sales = readFileSync(join(dir, "sales.orm.yaml"), "utf-8");
+      expect(sales).toContain("id: billing:Invoice_Line\n");
+      expect(sales).toContain("id: billing:Invoice_Line_2\n");
+      expect(readFileSync(billing, "utf-8")).toContain("id: sales:Order_Line_2\n");
+    });
+
+    it("migrates a domain named beside its manifest through the manifest only", async () => {
+      file("sales.orm.yaml", SALES);
+      const billing = file("billing.orm.yaml", BILLING);
+      const result = await runCli(["migrate", billing, manifest()]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.split(billing).length - 1).toBe(1);
+      expect(readFileSync(billing, "utf-8")).toContain("id: sales:Order_Line_2");
+    });
+
+    it("gives the shadow the unsuffixed id when its file is migrated alone", async () => {
+      // The case the project form exists for: alone, the shadow names
+      // whichever owner holds the unsuffixed local name.
+      const path = file("billing.orm.yaml", BILLING);
+      await runCli(["migrate", path]);
+      expect(readFileSync(path, "utf-8")).toContain("id: sales:Order_Line\n");
+    });
+
+    it("writes no domain when one is refused, and exits 2", async () => {
+      file("sales.orm.yaml", SALES);
+      file("billing.orm.yaml", "not: [a model");
+      const result = await runCli(["migrate", manifest()]);
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toContain(
+        `${join(dir, "sales.orm.yaml")}: not migrated: another domain of the project was refused`,
+      );
+      expect(readFileSync(join(dir, "sales.orm.yaml"), "utf-8")).toBe(SALES);
+    });
+
+    it("reports a current domain as current when another domain is refused", async () => {
+      file("sales.orm.yaml", SALES);
+      await runCli(["migrate", join(dir, "sales.orm.yaml")]);
+      file("billing.orm.yaml", "not: [a model");
+      const result = await runCli(["migrate", manifest()]);
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toContain(`${join(dir, "sales.orm.yaml")}: already 4.0\n`);
+    });
+
+    it("reports a manifest that does not load, and exits 2", async () => {
+      const path = file("bad.orm-project.yaml", "project: [");
+      const result = await runCli(["migrate", path]);
+      expect(result.exitCode).toBe(2);
+      expect(result.stdout).toMatch(
+        new RegExp(`^${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}: `),
+      );
+    });
+  });
 });

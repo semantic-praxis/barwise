@@ -224,12 +224,14 @@ export {
   ProjectDeserializationError,
   ProjectSerializer,
 } from "./serialization/ProjectSerializer.js";
+export type { ReplayOptions } from "./serialization/replay.js";
 export {
   type SchemaError,
   type SchemaValidationResult,
   SchemaValidator,
 } from "./serialization/SchemaValidator.js";
 export { CURRENT_ORM_VERSION, type OrmVersionMigration } from "./serialization/schemaVersion.js";
+export { type StoredId, storeIds, type StoreIdsResult } from "./serialization/storeIds.js";
 export {
   type FlaggedSubtypeFact,
   subtypeConstraintsFromFlags,

@@ -19,10 +19,12 @@ implemented 2026-10-30 (the 4.0 reader, unwired); 6b-4a implemented
 diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
 (the 4.0 writer and stored `minted_from`, unwired); 6b-2b-2b-2 implemented
 2026-10-31 (the switch to format 4.0, with its fixture and golden churn);
-6b-3, 6b-4b, 6c to 6f and WS7 to come
+6b-3a implemented 2026-11-02 (`migrate` for projects and unstored ids,
+the editor's "Store ids", the 3.x note); 6b-3b, 6b-3c, 6b-4b, 6c to 6f
+and WS7 to come
 
 Created: 2026-10-28
-Last-updated: 2026-10-31
+Last-updated: 2026-11-03
 Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: 15d6f18e (pr-review x5, code-review x3; re-pointed after WS6 was grounded and decisions 18 to 20 taken)
 Touches: barwise/packages/core/src/model/,
@@ -1628,7 +1630,32 @@ sites.
             id finds nothing; 6e).
 - _6b-3, the tools and rules._ `barwise migrate`, unstored ids, the rules
   this format needs, `iriOf`, and the header change for `namespace` and
-  `imports`.
+  `imports`. Three PRs (owner, 2026-11-02): 6b-3a `migrate` and unstored
+  ids, 6b-3b the rules, 6b-3c `iriOf` and the header.
+  - _6b-3a notes._
+    - `migrate` given a `.orm-project.yaml` replays each domain once on its
+      own, which gives every owned object type its id, then again with
+      `ReplayOptions.ownerId`, so a shadow takes `<context>:<owner's id>`.
+      The first replay gives each shadow a throwaway id, which no owned id
+      depends on, so shadows of a suffixed owner and of the owner it
+      shadows cannot collide before the owners' ids are known, even when
+      two domains each shadow the other's.
+      Every domain goes in one staged write, and one refused domain
+      refuses the project; a domain file named beside its manifest in one
+      run is migrated through the manifest only. A domain already at 4.0 keeps its shadows' ids;
+      the project-load check this spec gives reports one that names the
+      wrong owner.
+    - A current file with unstored ids is written by `storeIds`, which
+      splices each `id` and `minted_from` into the file's own text, where
+      the 4.0 writer puts them (after a constraint's content, first in a
+      subtype fact or objectification), and changes no other byte; the
+      editor's "Store ids" quick fix applies the same insertions as edits. `OrmModel.unstoredIds` lists them, set by the 4.0 reader
+      from the keys its load minted before recording those the file states.
+    - Two rules: `structural/unstored-id` (warning, per id, placed on its
+      element by document path) and `structural/replayed-ids` (info, once,
+      on any file before 4.0). The second is the owner's decision on
+      barwise-wcg.frh (2026-11-02): messages keep 4.0 ids, and the note says
+      why and names `barwise migrate`.
 - _6b-4, importers and retirement._ The importers switch off
   `generateId` (role ids first, as 6b-4a above), and `generateId`, its
   installs and promptlab's deterministic ids go (6b-4b). Until then an

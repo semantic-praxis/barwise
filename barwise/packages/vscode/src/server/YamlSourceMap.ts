@@ -19,6 +19,9 @@ export interface SourcePosition {
  */
 export class YamlSourceMap {
   private readonly positions = new Map<string, SourcePosition>();
+  /** Where the node at a document path starts; see `getPathPosition`. */
+  private pathPosition: (path: readonly (string | number)[]) => SourcePosition | undefined = () =>
+    undefined;
 
   constructor(yamlText: string) {
     this.build(yamlText);
@@ -30,6 +33,15 @@ export class YamlSourceMap {
    */
   getPosition(elementId: string): SourcePosition | undefined {
     return this.positions.get(elementId);
+  }
+
+  /**
+   * The source position of the node at a document path, such as
+   * `["model", "constraints", 0]`: for an element the file gives no id,
+   * which `getPosition` cannot find.
+   */
+  getPathPosition(path: readonly (string | number)[]): SourcePosition | undefined {
+    return this.pathPosition(path);
   }
 
   /**
@@ -52,6 +64,14 @@ export class YamlSourceMap {
     }
 
     if (!doc.contents) return;
+
+    const parsed = doc;
+    this.pathPosition = (path) => {
+      const node = parsed.getIn(path, true) as { range?: [number, number, number]; } | undefined;
+      if (!node?.range) return undefined;
+      const pos = lineCounter.linePos(node.range[0]);
+      return { line: pos.line - 1, character: pos.col - 1 };
+    };
 
     const positions = this.positions;
 

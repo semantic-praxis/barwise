@@ -131,6 +131,8 @@ export const RULE_ID = {
   subtypeDanglingSubtype: "structural/subtype-dangling-subtype",
   subtypeDanglingSupertype: "structural/subtype-dangling-supertype",
   subtypeNotEntity: "structural/subtype-not-entity",
+  replayedIds: "structural/replayed-ids",
+  unstoredId: "structural/unstored-id",
   joinSubsetViolation: "population/join-subset-violation",
   joinEqualityViolation: "population/join-equality-violation",
   joinExclusionViolation: "population/join-exclusion-violation",
@@ -994,6 +996,29 @@ const RULE_DESCRIPTORS = {
     messages: {
       default: (kind: string, name: string, id: string): string =>
         `The ${kind} "${name}" will take the id "${id}" in format 4.0, with its reserved or unsafe characters percent-encoded.`,
+    },
+  },
+  [RULE_ID.replayedIds]: {
+    severity: "info",
+    description:
+      "The file is in a format before 4.0, so it loads under format 4.0's ids, which are not the ones it states.",
+    messages: {
+      default: (): string =>
+        `This file is in a format before 4.0. It loads under format 4.0's ids, which these `
+        + `diagnostics use and the file does not state. Run \`barwise migrate\` on it to write `
+        + `them into the file, or on its project's .orm-project.yaml when it is a domain of `
+        + `one, so its shadows name their owners' ids.`,
+    },
+  },
+  [RULE_ID.unstoredId]: {
+    severity: "warning",
+    description:
+      "An element the file gives no id is named again on every load, so nothing outside the model can refer to it by id until the file states it.",
+    messages: {
+      default: (id: string): string =>
+        `"${id}" is not stored in the file: the element is given it again on every load, so `
+        + `nothing else may refer to it by that id yet. Store it with the editor's `
+        + `"Store ids" quick fix or \`barwise migrate\`.`,
     },
   },
   [RULE_ID.duplicateObjectification]: {

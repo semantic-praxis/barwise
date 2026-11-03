@@ -68,8 +68,21 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkDiagramReferences(model));
   diagnostics.push(...checkDuplicateConstraintIds(model));
   diagnostics.push(...checkDuplicateSubtypeFacts(model));
+  diagnostics.push(...checkStoredIds(model));
 
   return diagnostics;
+}
+
+/**
+ * What the file states of the ids its model holds (iri-identity WS6): a
+ * file before 4.0 states none of them, once, at the top of the file; a
+ * 4.0 file that gives an element no id, each one (decision 17). The
+ * first is the owner's choice for barwise-wcg.frh: every message names
+ * elements by their 4.0 ids, and this one says why and how to move on.
+ */
+function checkStoredIds(model: OrmModel): Diagnostic[] {
+  if (model.priorIds !== undefined) return [report(RULE_ID.replayedIds, "default", "")];
+  return model.unstoredIds.map((id) => report(RULE_ID.unstoredId, "default", id, id));
 }
 
 /**
