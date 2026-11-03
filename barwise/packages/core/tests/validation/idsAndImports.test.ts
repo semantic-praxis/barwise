@@ -37,6 +37,27 @@ model:
     - { id: p1, fact_type: f1, instances: [{ id: p1.1, role_values: { r1: Oslo, r2: Bergen } }] }
 `;
 
+/** Two populations; the second states the id the first's instance would take. */
+const TWO_POPULATIONS = `orm_version: "4.0"
+model:
+  name: M
+  object_types:
+    - { id: City, name: City, kind: entity, reference_mode: name }
+  fact_types:
+    - id: City_exists
+      name: City exists
+      roles:
+        - { id: City_exists.exists, player: City, role_name: exists }
+      readings: ["{0} exists"]
+  populations:
+    - id: City_exists.population_2
+      fact_type: City_exists
+      instances: [{ id: City_exists.population_2.1, role_values: { City_exists.exists: Oslo } }]
+    - id: City_exists.population_3
+      fact_type: City_exists
+      instances: [{ id: City_exists.population.1, role_values: { City_exists.exists: Rome } }]
+`;
+
 const SMOKERS = `orm_version: "4.0"
 model:
   name: M
@@ -192,6 +213,32 @@ model:
     }, "residents");
     const instanceIds = renamed.populations.flatMap((p) => p.instances.map((i) => i.id));
     expect(new Set(instanceIds).size).toBe(instanceIds.length);
+  });
+
+  it("keeps instance ids apart when a fact type rename moves both populations", () => {
+    // 6b-3b's third pr-review pass: the clash check must see the other
+    // population's instance ids as the rename leaves them.
+    const model = read(TWO_POPULATIONS);
+    const { model: renamed } = renameInModel(
+      model,
+      { kind: "factType", name: "City exists" },
+      "Town exists",
+    );
+    const instanceIds = renamed.populations.flatMap((p) => p.instances.map((i) => i.id));
+    expect(new Set(instanceIds).size).toBe(instanceIds.length);
+  });
+
+  it("refuses a rename to the name it has when the repair is skipped", () => {
+    expect(() =>
+      renameInModel(read(TWO_POPULATIONS), { kind: "factType", name: "City exists" }, "City exists")
+    ).toThrow(/would leave fact type "City exists" as it is/);
+  });
+
+  it("does not blame a role for a lone suffixed population when no role holds the id", () => {
+    const lone = read(TWO_POPULATIONS.replace(/ {4}- id: City_exists\.population_3[\s\S]*$/, ""));
+    expect(found(lone, "structural/id-not-from-name").map((d) => d.message)).toEqual([
+      'The population of fact type "City exists" has the id "City_exists.population_2", where its fact type gives "City_exists.population". Renaming the fact type, even to the name it has, gives it that id.',
+    ]);
   });
 
   it("does not report a fact type's second population, which the suffix rule names", () => {

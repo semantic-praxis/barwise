@@ -103,6 +103,15 @@ export function idsForRename(model: OrmModel, plan: RenamePlan): Map<string, str
     }
   }
   if (plan.kind !== "objectType") repairPopulations(model, plan, ids);
+  // A rename to the name it has exists only to repair an id; one whose
+  // repair was skipped (an instance id another population states) would
+  // change nothing, and is refused rather than written as a change.
+  if (plan.from === plan.to && [...ids].every(([from, now]) => from === now)) {
+    throw new RenameError(
+      `The rename would leave ${plan.label} as it is: its name is unchanged, and the id it `
+        + `should take is not free.`,
+    );
+  }
   // A dangling reference names an id no element holds; taking it would
   // make the reference resolve to the renamed element, which nobody wrote.
   // The replay reserves the same ids for the same reason.
@@ -173,8 +182,12 @@ function repairPopulations(model: OrmModel, plan: RenamePlan, ids: Map<string, s
   // Instance ids are not in the model's id index, so check them here: an
   // instance of another population stating one of the new ids keeps the
   // repair from happening, rather than giving two instances one id.
+  // Each as the rename leaves it: a fact type rename moves the other
+  // populations' instance ids too.
   const others = new Set(
-    model.populations.filter((p) => p !== pop).flatMap((p) => p.instances.map((i) => i.id)),
+    model.populations.filter((p) => p !== pop).flatMap((p) =>
+      p.instances.map((i) => ids.get(i.id) ?? i.id)
+    ),
   );
   if ([...moved.values()].some((id) => others.has(id))) return;
   ids.set(pop.id, want);

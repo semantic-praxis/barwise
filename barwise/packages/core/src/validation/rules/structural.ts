@@ -377,8 +377,9 @@ function checkIdsFromNames(model: OrmModel): Diagnostic[] {
     const expected = `${ft.id}.population`;
     if (!pops.some((p) => p.id === expected)) {
       for (const pop of pops) {
-        const suffixed = pop.id.startsWith(`${expected}_`)
-          && /^\d+$/.test(pop.id.slice(expected.length + 1));
+        // Said to be a role's doing only when a role holds the id; a lone
+        // `_2` whose first population was removed is the plain case.
+        const suffixed = model.idKindsHolding(expected).includes("role");
         diagnostics.push(
           report(
             RULE_ID.idNotFromName,
