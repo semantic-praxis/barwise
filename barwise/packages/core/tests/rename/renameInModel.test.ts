@@ -44,7 +44,10 @@ model:
         - { id: ft-places.r6, player: ot-order, role_name: placed by }
       readings: ["{0} places {1}"]
   populations:
-    - { id: ft-places.population, fact_type: ft-places, instances: [] }
+    - id: ft-places.population
+      fact_type: ft-places
+      instances:
+        - { id: ft-places.population.1, role_values: { ft-places.r5: c1, ft-places.r6: o1 } }
   definitions:
     - { term: Customer, definition: "A person who buys." }
     - { term: Order, definition: "A request to buy." }
@@ -53,15 +56,93 @@ model:
 const shop = (): OrmModel => serializer.deserialize(SHOP);
 
 describe("renameInModel", () => {
-  it("renames an object type, keeps every id, and leaves its input alone", () => {
+  it("renames an object type, gives it the id its new name gives, and leaves its input alone", () => {
     const before = shop();
-    const { model, ids } = renameInModel(before, { kind: "objectType", name: "Order" }, "Purchase");
-    expect(model.getObjectTypeByName("Purchase")?.id).toBe("ot-order");
+    const { model, ids, changes } = renameInModel(
+      before,
+      { kind: "objectType", name: "Order" },
+      "Purchase",
+    );
+    // Decision 13: the id is the name through localName, and the rename
+    // repairs an id that differed, as `ot-order` did.
+    expect(model.getObjectTypeByName("Purchase")?.id).toBe("Purchase");
     expect(model.getObjectTypeByName("Order")).toBeUndefined();
     expect(before.getObjectTypeByName("Order")?.id).toBe("ot-order");
-    expect(ids.size).toBe(0);
-    // Every reference is an id, so the fact type still holds it.
-    expect(model.getFactType("ft-places")?.roles[1]?.playerId).toBe("ot-order");
+    expect([...ids]).toEqual([["ot-order", "Purchase"]]);
+    expect(changes).toContain('Changed the id "ot-order" to "Purchase".');
+    // Every reference follows.
+    expect(model.getFactType("ft-places")?.roles[1]?.playerId).toBe("Purchase");
+  });
+
+  it("gives a renamed fact type's roles, population and instances its new id", () => {
+    const { model, ids } = renameInModel(
+      shop(),
+      { kind: "factType", name: "Customer places Order" },
+      "Customer orders",
+    );
+    expect(Object.fromEntries(ids)).toEqual({
+      "ft-places": "Customer_orders",
+      "ft-places.r5": "Customer_orders.r5",
+      "ft-places.r6": "Customer_orders.r6",
+      "ft-places.population": "Customer_orders.population",
+      "ft-places.population.1": "Customer_orders.population.1",
+    });
+    expect(model.populations[0]!.instances[0]).toMatchObject({
+      id: "Customer_orders.population.1",
+      roleValues: { "Customer_orders.r5": "c1", "Customer_orders.r6": "o1" },
+    });
+    expect(model.populations[0]).toMatchObject({
+      id: "Customer_orders.population",
+      factTypeId: "Customer_orders",
+    });
+  });
+
+  it("repairs an id that differs from its name when renamed to the name it has", () => {
+    // Decision 13: the repair `id-not-from-name` points at.
+    const { model, ids } = renameInModel(shop(), { kind: "objectType", name: "Order" }, "Order");
+    expect([...ids]).toEqual([["ot-order", "Order"]]);
+    expect(model.getObjectTypeByName("Order")?.id).toBe("Order");
+  });
+
+  it("refuses a rename to the name it has when its id is already the one that name gives", () => {
+    const { model } = renameInModel(shop(), { kind: "objectType", name: "Order" }, "Order");
+    expect(() => renameInModel(model, { kind: "objectType", name: "Order" }, "Order")).toThrow(
+      /already named "Order", and holds the id it gives/,
+    );
+  });
+
+  it("refuses a name whose id a dangling reference names", () => {
+    const dangling = serializer.deserialize(
+      `orm_version: "4.0"
+model:
+  name: M
+  object_types:
+    - { id: A, name: A, kind: entity, reference_mode: a_id }
+  fact_types:
+    - id: f
+      name: A likes Ghost
+      roles:
+        - { id: f.likes, player: A, role_name: likes }
+        - { id: f.liked_by, player: Ghost, role_name: liked by }
+      readings: ["{0} likes {1}"]
+`,
+      { lenient: true },
+    );
+    expect(() => renameInModel(dangling, { kind: "objectType", name: "A" }, "Ghost")).toThrow(
+      /the id "Ghost", which a reference in the model names and no element defines/,
+    );
+  });
+
+  it("refuses a name whose id another element holds", () => {
+    // "Customer pays" is free as a name, and its id, "Customer_pays", is
+    // held by an object type of another name.
+    const m = shop();
+    m.addObjectType({ id: "Customer_pays", name: "Payer", kind: "entity", referenceMode: "p" });
+    expect(() =>
+      renameInModel(m, { kind: "factType", name: "Customer places Order" }, "Customer pays")
+    ).toThrow(
+      /would give fact type "Customer places Order" the id "Customer_pays", which another element holds/,
+    );
   });
 
   it("renames a fact type and a role, by name or by position", () => {
@@ -70,14 +151,22 @@ describe("renameInModel", () => {
       { kind: "factType", name: "Customer places Order" },
       "Customer orders",
     );
-    expect(ft.model.getFactType("ft-places")?.name).toBe("Customer orders");
+    expect(ft.model.getFactType("Customer_orders")?.name).toBe("Customer orders");
 
     const byName = renameInModel(shop(), {
       kind: "role",
       factType: "Customer places Order",
       role: "places",
     }, "orders");
-    expect(byName.model.getFactType("ft-places")?.roles[0]?.name).toBe("orders");
+    expect(byName.model.getFactType("ft-places")?.roles[0]).toMatchObject({
+      name: "orders",
+      id: "ft-places.orders",
+    });
+    // An instance's values follow the role they are keyed by.
+    expect(byName.model.populations[0]!.instances[0]!.roleValues).toEqual({
+      "ft-places.orders": "c1",
+      "ft-places.r6": "o1",
+    });
 
     const byPosition = renameInModel(shop(), {
       kind: "role",
@@ -99,7 +188,7 @@ describe("renameInModel", () => {
   it("round-trips: the result serializes and loads again", () => {
     const { model } = renameInModel(shop(), { kind: "objectType", name: "Customer" }, "Client");
     const again = serializer.deserialize(serializer.serialize(model));
-    expect(again.getObjectTypeByName("Client")?.id).toBe("ot-customer");
+    expect(again.getObjectTypeByName("Client")?.id).toBe("Client");
   });
 
   it("rewrites the element's definition, and leaves it when the new term exists", () => {
@@ -212,7 +301,7 @@ ${(swapped ? [...binaries].reverse() : binaries).join("")}`;
 
   it("leaves an entity's reference mode alone when the entity itself is renamed", () => {
     const { model } = renameInModel(shop(), { kind: "objectType", name: "Customer" }, "Client");
-    expect(model.getObjectType("ot-customer")).toMatchObject({ referenceMode: "customer_id" });
+    expect(model.getObjectType("Client")).toMatchObject({ referenceMode: "customer_id" });
   });
 
   it("leaves free text alone", () => {
@@ -227,7 +316,6 @@ ${(swapped ? [...binaries].reverse() : binaries).join("")}`;
       [{ kind: "objectType", name: "Nobody" }, "X", /No object type named "Nobody"/],
       [{ kind: "factType", name: "Nobody" }, "X", /No fact type named "Nobody"/],
       [{ kind: "objectType", name: "Order" }, "  ", /The new name is empty/],
-      [{ kind: "objectType", name: "Order" }, "Order", /already named "Order"/],
       [
         { kind: "objectType", name: "Order" },
         "Customer",
@@ -291,6 +379,8 @@ model:
       { lenient: true },
     );
     const { model } = renameInModel(dangling, { kind: "objectType", name: "A" }, "B");
-    expect(model.getObjectTypeByName("B")?.id).toBe("a");
+    expect(model.getObjectTypeByName("B")?.id).toBe("B");
+    // The dangling reference is carried across as it was.
+    expect(model.getFactType("f")?.roles[1]?.playerId).toBe("ghost");
   });
 });

@@ -12,6 +12,9 @@
  */
 const ABSOLUTE_IRI = "^[A-Za-z][A-Za-z0-9+.-]*:\\S*";
 
+/** Any absolute IRI, as an `imports` target that names a namespace is. */
+export const ABSOLUTE_IRI_PATTERN = new RegExp(`${ABSOLUTE_IRI}$`, "u");
+
 /** A project's `iri_base`: an absolute IRI ending in `/`. */
 export const IRI_BASE_PATTERN = new RegExp(`${ABSOLUTE_IRI}/$`, "u");
 

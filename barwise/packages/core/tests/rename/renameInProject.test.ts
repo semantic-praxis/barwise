@@ -86,6 +86,16 @@ describe("renameInProject", () => {
     expect(crm.getObjectTypeByName("Client")).toBeDefined();
     expect(billing.getObjectTypeByName("Client")).toMatchObject({ sourceContext: "crm" });
     expect(billing.getObjectTypeByName("Customer")).toBeUndefined();
+    // The shadow keeps whatever alias its id had, and takes its owner's new
+    // id behind it; every role it plays follows (6b-3b's pr-review).
+    const was = before.getDomain("billing")!.model!.getObjectTypeByName("Customer")!.id;
+    const shadowId = `${was.slice(0, was.indexOf(":") + 1)}Client`;
+    expect(billing.getObjectTypeByName("Client")!.id).toBe(shadowId);
+    expect(crm.getObjectTypeByName("Client")!.id).toBe("Client");
+    const played = (m: typeof billing, id: string) =>
+      m.factTypes.flatMap((ft) => ft.roles).filter((r) => r.playerId === id).length;
+    expect(played(billing, shadowId)).toBe(played(before.getDomain("billing")!.model!, was));
+    expect(played(billing, was)).toBe(0);
 
     const mapping = project.mappings.find((m) =>
       m.sourceContext === "crm" && m.targetContext === "billing"
@@ -333,5 +343,45 @@ describe("renameInProject", () => {
     expect(() => renameInProject(project, "a", { kind: "objectType", name: "X" }, "Y")).toThrow(
       /is not loaded/,
     );
+  });
+});
+
+describe("renameInProject, with a 4.0 shadow behind an alias (6b-3b)", () => {
+  it("gives the shadow its owner's new id behind its alias, and its roles follow", () => {
+    const serializer = new OrmYamlSerializer();
+    const crm = serializer.deserialize(`orm_version: "4.0"
+model:
+  name: crm
+  domain_context: crm
+  object_types:
+    - { id: Customer, name: Customer, kind: entity, reference_mode: nr }
+`);
+    const billing = serializer.deserialize(`orm_version: "4.0"
+model:
+  name: billing
+  domain_context: billing
+  imports: { crm: crm }
+  object_types:
+    - { id: "crm:Customer", name: Customer, kind: entity, reference_mode: nr, source_context: crm }
+    - { id: Invoice, name: Invoice, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: Invoice_bills_Customer
+      name: Invoice bills Customer
+      roles:
+        - { id: Invoice_bills_Customer.bills, player: Invoice, role_name: bills }
+        - { id: Invoice_bills_Customer.billed_by, player: "crm:Customer", role_name: billed by }
+      readings: ["{0} bills {1}"]
+`);
+    const project = new OrmProject({ name: "P" });
+    project.addDomain({ path: "crm.orm.yaml", context: "crm" }).setModel(crm);
+    project.addDomain({ path: "billing.orm.yaml", context: "billing" }).setModel(billing);
+    const { project: renamed, ids } = renameInProject(project, "crm", {
+      kind: "objectType",
+      name: "Customer",
+    }, "Client");
+    expect(Object.fromEntries(ids)).toEqual({ Customer: "Client", "crm:Customer": "crm:Client" });
+    const after = renamed.getDomain("billing")!.model!;
+    expect(after.getObjectTypeByName("Client")!.id).toBe("crm:Client");
+    expect(after.getFactType("Invoice_bills_Customer")!.roles[1]!.playerId).toBe("crm:Client");
   });
 });

@@ -7,8 +7,10 @@
  * every field without listing them (a field nobody listed is a field
  * nobody keeps, barwise-937), and it is the only way to rename an object
  * type, which `createObjectType` returns as a frozen record with no name
- * setter. In 3.x every reference between elements is an id, so a rename
- * changes names and keeps every id; WS6 fills `ids` when ids become names.
+ * setter. In format 4.0 an element's id is its name through `localName`
+ * (decision 13), so the rename then gives the element the id its new name
+ * gives, and every id that embeds it follows (a fact type's roles,
+ * populations and instances), through `remapIds`; `ids` says which.
  */
 
 import { stringify } from "yaml";
@@ -19,8 +21,10 @@ import { localName } from "../model/name.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument40 } from "../serialization/OrmYamlSerializer.js";
+import { danglingReferences } from "../serialization/replay.js";
 import { CURRENT_ORM_VERSION } from "../serialization/schemaVersion.js";
 import type { OrmYamlDocument40 as OrmYamlDocument } from "../serialization/yaml/document.js";
+import { remapIds } from "./remapIds.js";
 
 /**
  * What to rename. Explicit by kind, because an object type and a fact type
@@ -34,7 +38,7 @@ export type RenameTarget =
 export interface RenameResult {
   /** The renamed model; the input is unchanged. */
   readonly model: OrmModel;
-  /** Old id to new id. Empty on 3.x, where a rename keeps every id. */
+  /** Old id to new id: the renamed element's and each that embeds it. */
   readonly ids: ReadonlyMap<string, string>;
   /** Every rewrite, in plain words, for a surface to print. */
   readonly changes: readonly string[];
@@ -65,7 +69,149 @@ export function renameInModel(model: OrmModel, target: RenameTarget, to: string)
   });
   const renamed = readBack(doc);
   if (plan.kind === "objectType") refuseKeyShift(model, renamed);
-  return { model: renamed, ids: new Map(), changes };
+  const ids = idsForRename(renamed, plan);
+  return { model: withIds(renamed, ids, changes), ids, changes };
+}
+
+/**
+ * The ids a rename changes, old to new, in the model as renamed: the
+ * element's own, the one its new name gives (decision 13); for a fact
+ * type, every id beneath it, which holds its id and a `.` (its roles, its
+ * populations and their instances; no local name holds a `.`). A fact
+ * type's population whose id took a suffix (`<ft>.population_2`, because
+ * a role held `<ft>.population` when it was read) takes `<ft>.population`
+ * once the rename frees it (decision 7). A fact type renamed to the name
+ * of the object type objectifying it would take an id that type holds,
+ * and is refused, as `planRename`'s local-name check already refuses it.
+ *
+ * @throws {RenameError} when another element already holds a new id.
+ */
+export function idsForRename(model: OrmModel, plan: RenamePlan): Map<string, string> {
+  const ids = new Map<string, string>();
+  const local = localName(plan.to);
+  if (plan.kind === "role") {
+    ids.set(plan.elementId, `${plan.factTypeId}.${local}`);
+  } else if (plan.kind === "objectType") {
+    const colon = plan.elementId.indexOf(":");
+    // A shadow keeps its alias; its local name is its owner's new id.
+    ids.set(plan.elementId, colon < 0 ? local : `${plan.elementId.slice(0, colon)}:${local}`);
+  } else {
+    ids.set(plan.elementId, local);
+    const prefix = `${plan.elementId}.`;
+    for (const id of heldIds(model)) {
+      if (id.startsWith(prefix)) ids.set(id, `${local}.${id.slice(prefix.length)}`);
+    }
+  }
+  if (plan.kind !== "objectType") repairPopulations(model, plan, ids);
+  // A rename to the name it has exists only to repair an id; one whose
+  // repair was skipped (an instance id another population states) would
+  // change nothing, and is refused rather than written as a change.
+  if (plan.from === plan.to && [...ids].every(([from, now]) => from === now)) {
+    throw new RenameError(
+      `The rename would leave ${plan.label} as it is: its name is unchanged, and the id it `
+        + `should take is not free.`,
+    );
+  }
+  // A dangling reference names an id no element holds; taking it would
+  // make the reference resolve to the renamed element, which nobody wrote.
+  // The replay reserves the same ids for the same reason.
+  const dangling = danglingReferences(model).ids;
+  for (const [from, now] of ids) {
+    if (from === now) ids.delete(from);
+    else if (model.idKindsHolding(now).length > 0 && !ids.has(now)) {
+      throw new RenameError(
+        `The rename would give ${plan.label} the id "${now}", which another element holds. `
+          + `Choose a name whose id is free.`,
+      );
+    } else if (dangling.has(now)) {
+      throw new RenameError(
+        `The rename would give ${plan.label} the id "${now}", which a reference in the model `
+          + `names and no element defines, so that reference would come to name it. Choose another `
+          + `name, or fix the reference first.`,
+      );
+    }
+  }
+  return ids;
+}
+
+/**
+ * Whether an object type's or fact type's id is not the one its name gives,
+ * as `structural/id-not-from-name` judges it: a shadow by the local part
+ * behind its alias, and a fact type named like its objectifying type, whose
+ * id decision 20 gave from its first reading, never.
+ */
+function idDiffersFromName(
+  model: OrmModel,
+  kind: "objectType" | "factType",
+  element: { readonly id: string; readonly name: string; },
+): boolean {
+  const local = localName(element.name);
+  if (kind === "objectType") return element.id.slice(element.id.indexOf(":") + 1) !== local;
+  const objectifier = model.objectifiedFactTypes.find((o) => o.factTypeId === element.id);
+  const ownId = objectifier?.objectTypeId !== local && element.id !== local;
+  // A population whose id took a suffix is repaired by the same rename.
+  const pops = model.populations.filter((p) => p.factTypeId === element.id);
+  // Only when `<ft>.population` is free: a role still holding it blocks
+  // the repair, and the rename would change nothing.
+  const want = `${element.id}.population`;
+  return ownId
+    || (pops.length > 0 && !pops.some((p) => p.id === want)
+      && model.idKindsHolding(want).length === 0);
+}
+
+/**
+ * Give each population of the renamed fact type, or of the renamed role's,
+ * `<fact type>.population` when its id is another and that one is free
+ * once the rename's ids are applied, and its instances the new prefix.
+ */
+function repairPopulations(model: OrmModel, plan: RenamePlan, ids: Map<string, string>): void {
+  const ftId = plan.kind === "role" ? plan.factTypeId! : plan.elementId;
+  const ftNow = ids.get(ftId) ?? ftId;
+  const want = `${ftNow}.population`;
+  const heldAfter = (id: string) =>
+    (model.idKindsHolding(id).length > 0 && !ids.has(id)) || [...ids.values()].includes(id);
+  // The first only: a second population of one fact type is suffixed by
+  // rule, and `heldAfter` already stops it taking the id the first does.
+  const [pop] = model.populations.filter((p) => p.factTypeId === ftId);
+  if (pop === undefined || (ids.get(pop.id) ?? pop.id) === want || heldAfter(want)) return;
+  const moved = new Map(
+    pop.instances
+      .filter((inst) => inst.id.startsWith(`${pop.id}.`))
+      .map((inst) => [inst.id, `${want}.${inst.id.slice(pop.id.length + 1)}`] as const),
+  );
+  // Instance ids are not in the model's id index, so check them here: an
+  // instance of another population stating one of the new ids keeps the
+  // repair from happening, rather than giving two instances one id.
+  // Each as the rename leaves it: a fact type rename moves the other
+  // populations' instance ids too.
+  const others = new Set(
+    model.populations.filter((p) => p !== pop).flatMap((p) =>
+      p.instances.map((i) => ids.get(i.id) ?? i.id)
+    ),
+  );
+  if ([...moved.values()].some((id) => others.has(id))) return;
+  ids.set(pop.id, want);
+  for (const [from, now] of moved) ids.set(from, now);
+}
+
+/** The model under the new ids, each change said in `changes`. */
+export function withIds(
+  model: OrmModel,
+  ids: ReadonlyMap<string, string>,
+  changes: string[],
+  where = "",
+): OrmModel {
+  if (ids.size === 0) return model;
+  for (const [from, now] of ids) changes.push(`Changed the id "${from}" to "${now}"${where}.`);
+  return remapIds(model, ids);
+}
+
+/** Every id the model holds, of every kind a rename can change. */
+function heldIds(model: OrmModel): string[] {
+  return [
+    ...model.factTypes.flatMap((ft) => ft.roles.map((r) => r.id)),
+    ...model.populations.flatMap((p) => [p.id, ...p.instances.map((i) => i.id)]),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +255,12 @@ export function planRename(
   if (!element) {
     throw new RenameError(`No ${what} named "${target.name}" in model "${model.name}".`);
   }
-  if (name === element.name) throw new RenameError(`The ${what} is already named "${name}".`);
+  // A rename to the name it has is how an id that differs from its name
+  // is repaired (decision 13), so it is refused only when there is
+  // nothing to repair.
+  if (name === element.name && !idDiffersFromName(model, target.kind, element)) {
+    throw new RenameError(`The ${what} is already named "${name}", and holds the id it gives.`);
+  }
   if (target.kind === "objectType" && options.shadow === "refuse") {
     const context = (element as ObjectType).sourceContext;
     if (context !== undefined) {
@@ -241,7 +392,9 @@ function planRoleRename(
   }
   const index = roleIndex(ft, target.role);
   const role = ft.roles[index]!;
-  if (name === role.name) throw new RenameError(`The role is already named "${name}".`);
+  if (name === role.name && role.id === `${ft.id}.${localName(name)}`) {
+    throw new RenameError(`The role is already named "${name}", and holds the id it gives.`);
+  }
   const taken = ft.roles.find((r, i) => i !== index && localName(r.name) === localName(name));
   if (taken) {
     throw new RenameError(

@@ -20,6 +20,7 @@ import type { OrmYamlDocument40 as OrmYamlDocument } from "../serialization/yaml
 import {
   applyToDocument,
   definitionLeftBecause,
+  idsForRename,
   planRename,
   readBack,
   refuseKeyShift,
@@ -27,12 +28,13 @@ import {
   RenameError,
   type RenamePlan,
   type RenameTarget,
+  withIds,
 } from "./renameInModel.js";
 
 export interface ProjectRenameResult {
   /** The renamed project; the input is unchanged. */
   readonly project: OrmProject;
-  /** Old id to new id. Empty on 3.x, where a rename keeps every id. */
+  /** Old id to new id, in every domain the rename reached. */
   readonly ids: ReadonlyMap<string, string>;
   /** Every rewrite, in plain words, for a surface to print. */
   readonly changes: readonly string[];
@@ -119,6 +121,7 @@ export function renameInProject(
   });
 
   const renamedModels = new Map<string, OrmModel>();
+  const ids = new Map<string, string>();
   for (const [ctx, doc] of docs) {
     const where = `In domain "${ctx}": `;
     let model: OrmModel;
@@ -129,7 +132,18 @@ export function renameInProject(
       throw err;
     }
     if (plan.kind === "objectType") refuseKeyShift(models.get(ctx)!, model, where);
-    renamedModels.set(ctx, model);
+    // The renamed element's domain and each shadow's take the new ids; a
+    // domain reached only for a definition or a reference mode keeps its.
+    const reached = renamed.find((r) => r.context === ctx);
+    let domainIds = new Map<string, string>();
+    try {
+      if (reached) domainIds = idsForRename(model, reached.plan);
+    } catch (err) {
+      if (err instanceof RenameError) throw new RenameError(where + err.message);
+      throw err;
+    }
+    for (const [from, now] of domainIds) ids.set(from, now);
+    renamedModels.set(ctx, withIds(model, domainIds, changes, ` in domain "${ctx}"`));
   }
 
   const next = new OrmProject({
@@ -159,7 +173,7 @@ export function renameInProject(
     ...project.domains.filter((d) => renamedModels.has(d.context)).map((d) => d.path),
     ...mappings.filter((m) => m.changed).map((m) => m.config.path),
   ];
-  return { project: next, ids: new Map(), changes, files };
+  return { project: next, ids, changes, files };
 }
 
 /** Every domain's model, refusing a project with a domain not loaded. */

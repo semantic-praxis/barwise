@@ -97,6 +97,7 @@ export function mergeModels(
   refuseUnmergeablePairing(diff);
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
+  refuseImportClashes(existing, incoming);
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
@@ -105,6 +106,16 @@ export function mergeModels(
     // the merge names the fields it carries, so a field nobody listed
     // is a field nobody keeps (barwise-937).
     note: existing.note,
+    // The base's aliases, and each the incoming side adds: an accepted
+    // shadow from the incoming side needs its import (iri-identity WS6).
+    // Phase 9 drops the incoming ones no merged shadow uses.
+    // An alias both bind keeps the base's binding.
+    // The base's come first, in its order, so a merge that adds none
+    // writes the base's imports unchanged.
+    imports: Object.fromEntries([
+      ...existing.imports,
+      ...[...incoming.imports].filter(([alias]) => !existing.imports.has(alias)),
+    ]),
   });
 
   // We need to build a mapping from incoming object type ids to the ids
@@ -652,6 +663,13 @@ export function mergeModels(
   // reported stale.
   carryMintedKeys(merged, existing, incoming);
 
+  // Phase 9: an alias only the incoming side bound, which no merged shadow
+  // uses, would only raise project/imported-context-missing; drop it.
+  for (const alias of [...merged.imports.keys()]) {
+    if (existing.imports.has(alias)) continue;
+    if (!merged.objectTypes.some((ot) => ot.id.startsWith(`${alias}:`))) merged.removeImport(alias);
+  }
+
   return merged;
 }
 
@@ -939,6 +957,28 @@ function refuseUnmergeablePairing(diff: MergeInput): void {
  * `refuseUnmergeablePairing` refuses it first, so nothing here guards an
  * id that diff's name pass left unpaired.
  */
+/**
+ * Refuse a merge whose two sides bind one alias to different targets: the
+ * incoming side's shadows behind it would come to name the base's context,
+ * and no rule could tell (iri-identity WS6).
+ */
+function refuseImportClashes(existing: OrmModel, incoming: OrmModel): void {
+  const clashes = [...incoming.imports].filter(([alias, target]) => {
+    const base = existing.imports.get(alias);
+    return base !== undefined && base !== target;
+  });
+  if (clashes.length === 0) return;
+  throw new Error(
+    `Cannot merge: ${
+      clashes.map(([alias, target]) =>
+        `the alias "${alias}" is bound to "${
+          existing.imports.get(alias)
+        }" in the base and to "${target}" in the incoming model`
+      ).join("; ")
+    }. Bind it to one context on both sides first.`,
+  );
+}
+
 function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
   const kept = deltas.flatMap((d, i) => {
     if (d.elementType !== "object_type" && d.elementType !== "fact_type") return [];

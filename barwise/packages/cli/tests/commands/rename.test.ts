@@ -129,7 +129,11 @@ describe("barwise rename", () => {
     expect(JSON.parse(result.stdout)).toEqual({
       status: "would-rename",
       files: [path],
-      changes: [`Renamed object type "Order" to "Purchase".`],
+      // In 4.0 the rename also gives the id its new name gives (decision 13).
+      changes: [
+        `Renamed object type "Order" to "Purchase".`,
+        `Changed the id "ot-o" to "Purchase".`,
+      ],
       warnings: [],
     });
   });

@@ -497,3 +497,29 @@ describe("minting over generated models", () => {
     expect(minted).toBeGreaterThan(0);
   });
 });
+
+describe("mintedKey without the sentence (6b-3b)", () => {
+  it("is undefined for an element that cannot be minted, as mint() is", () => {
+    // `stale-minted-name` reads the key alone; it must refuse what `mint`
+    // refuses rather than read a reference that is not there.
+    const model = new OrmModel({ name: "M" });
+    model.addObjectType({ id: "Person", name: "Person", kind: "entity", referenceMode: "nr" });
+    const sf: Mintable = {
+      kind: "subtypeFact",
+      subtypeFact: { id: "", subtypeId: "Ghost", supertypeId: "Person" },
+    };
+    expect([mint(sf, model), mintedKey(sf, model)]).toEqual([undefined, undefined]);
+  });
+
+  it("agrees with mint()'s key on every element of generated models", () => {
+    fc.assert(
+      fc.property(arbOrmModel(), (model) => {
+        for (const inView of model.everyConstraint()) {
+          const element: Mintable = { kind: "constraint", inView };
+          expect(mintedKey(element, model)).toBe(mint(element, model)?.key);
+        }
+      }),
+      { numRuns: 100 },
+    );
+  });
+});

@@ -282,10 +282,7 @@ function fromDecoded(
   reserved: Iterable<string> = [],
   idsAcrossKinds = false,
 ): OrmModel {
-  // `imports` is decoded and not yet kept: the model carries it with 6b-3's
-  // header change (iri-identity WS6), and nothing writes a 4.0 file yet.
-  const { imports: _notKept, ...header } = doc.header as DecodedDocument40["header"];
-  const model = new OrmModel({ ...header, idsAcrossKinds });
+  const model = new OrmModel({ ...doc.header, idsAcrossKinds });
   return model.withReserved(reserved, () => addDecoded(model, doc, options));
 }
 
@@ -463,11 +460,24 @@ export function writeDocument40(model: OrmModel): OrmYamlDocument40 {
       ),
     ) as R & { minted_from: string; };
   };
-  return documentOf(model, CURRENT_ORM_VERSION, {
+  const doc = documentOf(model, CURRENT_ORM_VERSION, {
     constraint: (c) => minted(serializeConstraint(c)),
     subtypeFact: (sf) => minted(serializeSubtypeFact40(sf)),
     objectification: (o) => minted(serializeObjectifiedFactType40(o)),
   });
+  if (model.imports.size === 0) return doc;
+  // After `namespace`, where the schema lists it; 3.0 has no imports.
+  const { name, domain_context, namespace, ...rest } = doc.model;
+  return {
+    ...doc,
+    model: {
+      name,
+      ...(domain_context !== undefined ? { domain_context } : {}),
+      ...(namespace !== undefined ? { namespace } : {}),
+      imports: Object.fromEntries(model.imports),
+      ...rest,
+    },
+  };
 }
 
 /** How one format writes the elements its ids differ on. */

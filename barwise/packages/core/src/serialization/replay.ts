@@ -76,6 +76,7 @@ export function replayInto40(source: OrmModel, options: ReplayOptions = {}): Orm
     ...(source.domainContext !== undefined ? { domainContext: source.domainContext } : {}),
     ...(source.note !== undefined ? { note: source.note } : {}),
     ...(source.namespace !== undefined ? { namespace: source.namespace } : {}),
+    ...(source.imports.size > 0 ? { imports: Object.fromEntries(source.imports) } : {}),
     idsAcrossKinds: true,
   });
   // One map per kind: an object type and a fact type sharing an old id are
@@ -167,6 +168,24 @@ export function replayInto40(source: OrmModel, options: ReplayOptions = {}): Orm
     }
   }
   const reserved = [...dangling, ...reshaped, ...(rolesReshaped ? [UNRESOLVED] : [])];
+  /**
+   * The alias a shadow's context takes, with the import it needs: the
+   * context's local name, or that with `_N` when another context already
+   * holds it ("Sales Ops" and "Sales_Ops"), so no two contexts share one
+   * alias and a shadow never names the wrong one.
+   */
+  const aliasFor = (context: string): string => {
+    const base = localName(context);
+    for (let n = 1;; n++) {
+      const alias = n === 1 ? base : `${base}_${n}`;
+      const bound = target.imports.get(alias);
+      if (bound === context) return alias;
+      if (bound === undefined) {
+        target.setImport(alias, context);
+        return alias;
+      }
+    }
+  };
   target.withReserved(reserved, () => {
     // Object types first: everything else refers to them. A shadow, which
     // holds another domain's element, takes `<context>:<local name>`, its
@@ -175,7 +194,7 @@ export function replayInto40(source: OrmModel, options: ReplayOptions = {}): Orm
     for (const ot of source.objectTypes) {
       const { id: _old, ...config } = ot as ObjectTypeConfig & { readonly id: string; };
       const id = ot.sourceContext !== undefined
-        ? `${localName(ot.sourceContext)}:${
+        ? `${aliasFor(ot.sourceContext)}:${
           options.ownerId?.(ot.sourceContext, ot.name) ?? localName(ot.name)
         }`
         : undefined;
@@ -316,7 +335,7 @@ export const RESHAPE: Record<DanglingKind, { pattern: RegExp; shape: (local: str
  * load admits one where it does not check the reference, as for a
  * constraint's roles or a preferred identifier.
  */
-function danglingReferences(
+export function danglingReferences(
   model: OrmModel,
 ): { ids: Set<string>; byKind: Map<DanglingKind, Set<string>>; } {
   const out = new Set<string>();
