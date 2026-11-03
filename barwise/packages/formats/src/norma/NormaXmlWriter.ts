@@ -153,7 +153,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   const seenConstraintIds = new Set<string>();
 
   for (const ft of model.factTypes) {
-    const { norma } = writeFactType(ft, constraints, seenConstraintIds, popGraph, preferred);
+    const { norma } = writeFactType(model, ft, constraints, seenConstraintIds, popGraph, preferred);
     factTypes.push(norma);
   }
   // Constraints across fact types are top-level only, written once each
@@ -301,13 +301,14 @@ function toInlineValueConstraint(
 // ---------------------------------------------------------------------------
 
 function writeFactType(
+  model: OrmModel,
   ft: FactType,
   constraints: NormaConstraint[],
   seen: Set<string>,
   popGraph: PopulationGraph,
   preferred: ReadonlySet<string>,
 ): { norma: NormaFactType; internalRefs: string[]; } {
-  const roles: NormaRole[] = ft.roles.map((role) => writeRole(ft, role, popGraph));
+  const roles: NormaRole[] = ft.roles.map((role) => writeRole(model, ft, role, popGraph));
   const factInstances = popGraph.factInstancesByFact.get(toNormaId(ft.id));
   const readingOrders: NormaReadingOrder[] = ft.readings.map((reading, i) => ({
     id: derivedNormaId(toNormaId(ft.id), `_ro${i}`),
@@ -401,7 +402,12 @@ function writeTopLevel(
   return written.id;
 }
 
-function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRole {
+function writeRole(
+  model: OrmModel,
+  ft: FactType,
+  role: Role,
+  popGraph: PopulationGraph,
+): NormaRole {
   const isMandatory = ft.internalConstraints.some(
     (c) => c.type === "mandatory" && c.roleId === role.id,
   );
@@ -411,7 +417,10 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
   const roleInstances = popGraph.roleDeclsByRole.get(toNormaId(role.id));
   return {
     id: toNormaId(role.id),
-    name: role.name,
+    // A role named as its player is how the importer names one NORMA left
+    // unnamed (iri-identity 6c), so it is written unnamed again: NORMA shows
+    // it by its player all the same, and a round trip leaves Name="" as is.
+    name: role.name === model.getObjectType(role.playerId)?.name ? "" : role.name,
     playerRef: toNormaId(role.playerId),
     isMandatory,
     multiplicity: "Unspecified",

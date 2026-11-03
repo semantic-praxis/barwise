@@ -81,8 +81,8 @@ export function mapObjectifiedTypes(ctx: NormaMappingContext): void {
  * sequences are all meta-roles is an exclusion, and a non-simple, non-implied
  * MandatoryConstraint over them a disjunctive mandatory. An exclusion and a
  * mandatory over the same subtypes, with one modality, are one exclusive-or,
- * as NORMA draws a partition. Each keeps NORMA's modality and, through the
- * allocator, its id.
+ * as NORMA draws a partition. Each keeps NORMA's modality, and is built
+ * under the allocator's id until the replay names it.
  *
  * One NORMA constraint is one model constraint. This replaced reading them
  * as flags on each subtype fact, which merged two exclusions over one

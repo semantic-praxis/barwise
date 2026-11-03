@@ -1404,7 +1404,12 @@ version-1 manifest would go silently empty for impact analysis.
       its 4.0 id (`PersonHasPersonId._D6CB...`). An unnamed role now takes
       its player's name, as NORMA shows it, with the suffix rule for a
       repeat. An importer choice, not a format rule: the DDL and dbt
-      importers name theirs "has" and "is of".
+      importers name theirs "has" and "is of", which would misname most
+      NORMA predicates. The writer writes a role named as its player with
+      `Name=""`, so a NORMA round trip leaves NORMA's unnamed roles
+      unnamed. This is barwise-981's importer half; the tracked files that
+      already carry GUID role names are its other half, still open. The
+      verbalizer can read a role name as a predicate (barwise-v70).
     - A constraint with no sentence (a cardinality on one role of a
       binary, an exclusion over one role) is imported unnamed, as decision
       19 says; NORMA's export writes it under an id derived from its

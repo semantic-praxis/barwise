@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { mapNormaToOrm } from "../src/norma/NormaToOrmMapper.js";
 import { parseNormaXml } from "../src/norma/NormaXmlParser.js";
+import { serializeNormaDocument } from "../src/norma/NormaXmlSerializer.js";
+import { writeOrmToNorma } from "../src/norma/NormaXmlWriter.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = [
@@ -85,6 +87,16 @@ describe("a NORMA import's ids", () => {
     };
     expect(mapNormaToOrm(ring).getFactType("PersonLivesInCountry")!.roles.map((r) => r.id))
       .toEqual(["PersonLivesInCountry.Person", "PersonLivesInCountry.Person_2"]);
+  });
+
+  it('write a role named as its player unnamed again, so a NORMA round trip keeps Name=""', () => {
+    const xml = readFileSync(resolve(here, "fixtures", "personCountryDemo.orm"), "utf-8");
+    const names = (d: ReturnType<typeof parseNormaXml>) =>
+      d.factTypes.flatMap((ft) => ft.roles.map((r) => r.name));
+    const source = parseNormaXml(xml);
+    const back = parseNormaXml(serializeNormaDocument(writeOrmToNorma(mapNormaToOrm(source))));
+    expect(names(source).every((n) => n === "")).toBe(true);
+    expect(names(back)).toEqual(names(source));
   });
 
   it("name an external constraint from its sentence, though NORMA lists it under its first fact type", () => {
