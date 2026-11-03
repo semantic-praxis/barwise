@@ -29,8 +29,8 @@ export function mapDiagrams(ctx: NormaMappingContext): void {
     // A Set: NORMA allows several shapes of one object type on a diagram.
     const shown = new Set<string>();
     for (const shape of diagram.shapes) {
-      // Object-type ids pass through the mapper; fact types get fresh
-      // model ids, so both resolve through the context id maps.
+      // Shapes name elements by NORMA id; both kinds resolve through the
+      // context id maps to the id each is built under.
       const mappedId = shape.kind === "object_type"
         ? objectTypeIdMap.get(shape.subjectRef) ?? shape.subjectRef
         : factTypeIdMap.get(shape.subjectRef);

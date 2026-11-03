@@ -77,8 +77,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   // object-type ids so the entity loop can skip them.
   const objectifiedObjectTypeIds = new Set<string>();
   const objectifiedByObjectType = new Map<string, string>(); // objectTypeId -> factTypeId
-  // objectTypeId -> the link's own id, written on NestedPredicate so a
-  // round trip keeps it.
+  // objectTypeId -> the link's own id, written on NestedPredicate.
   const objectificationIdByObjectType = new Map<string, string>();
   for (const oft of model.objectifiedFactTypes) {
     objectifiedObjectTypeIds.add(oft.objectTypeId);
@@ -154,7 +153,7 @@ export function writeOrmToNorma(model: OrmModel): NormaDocument {
   const seenConstraintIds = new Set<string>();
 
   for (const ft of model.factTypes) {
-    const { norma } = writeFactType(ft, constraints, seenConstraintIds, popGraph, preferred);
+    const { norma } = writeFactType(model, ft, constraints, seenConstraintIds, popGraph, preferred);
     factTypes.push(norma);
   }
   // Constraints across fact types are top-level only, written once each
@@ -302,13 +301,14 @@ function toInlineValueConstraint(
 // ---------------------------------------------------------------------------
 
 function writeFactType(
+  model: OrmModel,
   ft: FactType,
   constraints: NormaConstraint[],
   seen: Set<string>,
   popGraph: PopulationGraph,
   preferred: ReadonlySet<string>,
 ): { norma: NormaFactType; internalRefs: string[]; } {
-  const roles: NormaRole[] = ft.roles.map((role) => writeRole(ft, role, popGraph));
+  const roles: NormaRole[] = ft.roles.map((role) => writeRole(model, ft, role, popGraph));
   const factInstances = popGraph.factInstancesByFact.get(toNormaId(ft.id));
   const readingOrders: NormaReadingOrder[] = ft.readings.map((reading, i) => ({
     id: derivedNormaId(toNormaId(ft.id), `_ro${i}`),
@@ -402,7 +402,12 @@ function writeTopLevel(
   return written.id;
 }
 
-function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRole {
+function writeRole(
+  model: OrmModel,
+  ft: FactType,
+  role: Role,
+  popGraph: PopulationGraph,
+): NormaRole {
   const isMandatory = ft.internalConstraints.some(
     (c) => c.type === "mandatory" && c.roleId === role.id,
   );
@@ -412,7 +417,10 @@ function writeRole(ft: FactType, role: Role, popGraph: PopulationGraph): NormaRo
   const roleInstances = popGraph.roleDeclsByRole.get(toNormaId(role.id));
   return {
     id: toNormaId(role.id),
-    name: role.name,
+    // A role named as its player is how the importer names one NORMA left
+    // unnamed (iri-identity 6c), so it is written unnamed again: NORMA shows
+    // it by its player all the same, and a round trip leaves Name="" as is.
+    name: role.name === model.getObjectType(role.playerId)?.name ? "" : role.name,
     playerRef: toNormaId(role.playerId),
     isMandatory,
     multiplicity: "Unspecified",
@@ -772,9 +780,9 @@ function writeSubtypeFacts(
   // disjunctive mandatory, as NORMA states a partition. A group of one is
   // not written: NORMA reads a mandatory over one role as a simple one, and
   // an exclusion over one states nothing. "Each Person is an Employee" is
-  // therefore lost on export (barwise-yx8). The ids keep the shape the
-  // flag-based writer gave them, so an export of a 2.0 file does not move;
-  // a second constraint of one kind over one supertype takes its own id.
+  // therefore lost on export (barwise-yx8). Each id is derived from its
+  // kind and supertype, so one model exports it the same every time; a
+  // second constraint of one kind over one supertype takes its own id.
   const used = new Set<string>();
   const idFor = (kind: "excl" | "exh", supertypeId: string, c: Constraint) => {
     const byGroup = toNormaId(`subtype_${kind}_${supertypeId}`);
@@ -843,7 +851,6 @@ const conceptualToNormaKind: Record<ConceptualDataTypeName, string> = {
   other: "variable_length_text",
 };
 
-/** Stable DataType element id for a conceptual type. */
 /** Object-type population cardinality -> NORMA CardinalityRestriction. */
 function writeCardinality(ot: ObjectType): NormaCardinality | undefined {
   const c = ot.cardinality;
@@ -1037,8 +1044,12 @@ function writeDiagrams(model: OrmModel): NormaDiagram[] {
   });
 }
 
+/**
+ * Not a model id, so not through `toNormaId`: a token in NORMA space that
+ * `collectDataTypes` reads the kind back out of. Every kind is an NCName.
+ */
 function dataTypeIdFor(name: ConceptualDataTypeName): NormaId {
-  return toNormaId(`dt_${conceptualToNormaKind[name]}`);
+  return asNormaId(`_dt_${conceptualToNormaKind[name]}`);
 }
 
 /** Collect the distinct DataType definitions referenced by value types. */

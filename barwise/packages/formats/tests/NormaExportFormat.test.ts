@@ -240,8 +240,9 @@ describe("NORMA export of a constraint the model leaves unnamed", () => {
       return m;
     };
     const text = new NormaExportFormat().export(build()).text;
-    const id = /id="(_unnamed_ring_[0-9a-f]{8})"/.exec(text)?.[1];
-    expect(id).toBeDefined();
+    // Written under an id derived from its content (decision 12(a)), an NCName.
+    const id = /<orm:RingConstraint [^>]*id="([^"]*)"/.exec(text)?.[1];
+    expect(id).toMatch(/^_[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(new NormaExportFormat().export(build()).text).toBe(text);
   });
 });

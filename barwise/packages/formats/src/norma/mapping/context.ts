@@ -46,9 +46,12 @@ export interface NormaMappingContext {
 }
 
 /**
- * Hands out the id of every constraint the mapper builds, so a NORMA
- * round trip keeps constraint identity as it keeps object type identity
- * (`docs/specs/orm-format-3.spec.md`, WS2).
+ * Hands out the id every constraint the mapper builds is built under: one
+ * unique id in NORMA's space, which the later phases resolve through and
+ * which decides what is kept once. The replay at the end of the mapping
+ * then names each constraint from its sentence, so none of these ids
+ * reaches the model (iri-identity 6c; first written for
+ * `docs/specs/orm-format-3.spec.md`, WS2).
  *
  * Every mapping site goes through this one object rather than spelling an
  * id itself, so these rules hold by construction:

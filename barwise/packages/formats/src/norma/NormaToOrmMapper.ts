@@ -15,6 +15,8 @@ import {
   isExternalUniqueness,
   OrmModel,
   placePreferredFlags,
+  type ReplayedIds,
+  replayIds,
 } from "@barwise/core";
 import { runConstraintPasses } from "./mapping/constraintPasses.js";
 import {
@@ -87,7 +89,27 @@ function mapPreferredIdentifiers(ctx: NormaMappingContext): void {
   }
 }
 
+/**
+ * Map a parsed NORMA document to a model whose ids are local names
+ * (iri-identity 6c). The phases build it under NORMA's own ids, which every
+ * reference between them resolves through, and one replay then gives each
+ * element the id its name or sentence gives, in the order a 4.0 file is
+ * read: an external constraint is named after every fact type it spans
+ * exists, whichever fact type NORMA lists it under. A NORMA round trip
+ * therefore gets new ids (decision 12(a)).
+ */
 export function mapNormaToOrm(doc: NormaDocument): OrmModel {
+  return mapNormaToOrmWithIds(doc).model;
+}
+
+/**
+ * `mapNormaToOrm`, with the map from each new id back to the NORMA id it
+ * was built under, which a test needs to say which NORMA element became
+ * which (`tests/helpers/underNormaIds.ts`; not in the package index). An unnamed constraint is keyed by its reference instead, and two
+ * identical ones share an entry. Never recorded on the model, which was
+ * not read from a 3.x file.
+ */
+export function mapNormaToOrmWithIds(doc: NormaDocument): ReplayedIds {
   const model = new OrmModel({
     name: doc.modelName,
     ...(doc.modelNote !== undefined ? { note: doc.modelNote } : {}),
@@ -127,5 +149,5 @@ export function mapNormaToOrm(doc: NormaDocument): OrmModel {
 
   mapDiagrams(ctx);
 
-  return model;
+  return replayIds(model);
 }

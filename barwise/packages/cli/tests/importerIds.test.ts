@@ -31,9 +31,10 @@ import {
 } from "@barwise/core";
 import { registerDbtFormats } from "@barwise/dbt";
 import { registerStandardFormats } from "@barwise/formats";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 registerStandardFormats();
@@ -68,6 +69,20 @@ CREATE TABLE customer_suppliers (
   FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)
 );
 `;
+
+/**
+ * A NORMA fixture from the formats package whose roles are unnamed, as NORMA
+ * writes most. This oracle asks only that each id follow from its name;
+ * what an unnamed role is named (its player's name, so no NORMA token
+ * reaches the id) is `formats/tests/NormaLocalNames.test.ts`'s to check.
+ */
+const NORMA = readFileSync(
+  join(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../formats/tests/fixtures/personCountryDemo.orm",
+  ),
+  "utf8",
+);
 
 /**
  * The SQL importer reads query patterns, not CREATE TABLE: a JOIN gives it
@@ -224,20 +239,17 @@ const FIXTURES: Record<string, () => Promise<OrmModel>> = {
   openapi: async () => text("openapi", OPENAPI),
   sql: async () => text("sql", SQL),
   ossie: async () => text("ossie", OSSIE),
+  // A NORMA file states an id for every element; the import names each
+  // from its name or sentence all the same (iri-identity 6c).
+  norma: async () => text("norma", NORMA),
   dbt: async () => directory("dbt", dbtProject()),
   typescript: async () => directory("typescript", codeProject()),
   java: async () => directory("java", codeProject()),
   kotlin: async () => directory("kotlin", codeProject()),
 };
 
-/** Importers deliberately not run here, each with the reason. */
-const EXEMPT: Record<string, string> = {
-  norma:
-    "keeps the source .orm file's ids on purpose -- object types, fact types, roles, subtype facts, "
-    + "constraints and fact instances -- and derives the rest from them, so one file imports to one "
-    + "model (orm-format-3.spec.md WS2, which also lists what a round trip does not keep); "
-    + "barwise-1070 asks whether role ids should be re-minted",
-};
+/** Importers deliberately not run here, each with the reason. None since 6c. */
+const EXEMPT: Record<string, string> = {};
 
 function importerFor(name: string): ImportFormat {
   const importer = listImporters().find((d) => d.name === name)?.importer;

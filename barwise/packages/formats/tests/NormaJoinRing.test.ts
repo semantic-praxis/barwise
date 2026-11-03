@@ -13,8 +13,10 @@
 import { type JoinRingConstraint, OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
 import { importNormaXml } from "../src/norma/NormaXmlImporter.js";
+import { parseNormaXml } from "../src/norma/NormaXmlParser.js";
 import { serializeNormaDocument } from "../src/norma/NormaXmlSerializer.js";
 import { writeOrmToNorma } from "../src/norma/NormaXmlWriter.js";
+import { mapUnderNormaIds } from "./helpers/underNormaIds.js";
 
 /** Child then parent, joined to itself: the grandparent relation. */
 const GRANDPARENT = `<orm:JoinRule>
@@ -213,7 +215,7 @@ describe("a NORMA ring over a join path", () => {
 
   // From the review of WS2: each of these reproduced against its first draft.
   it("maps a one-hop ring listed under another fact type onto its hop's fact type", () => {
-    const model = importNormaXml(document(PARENT, ["_F2"]));
+    const model = mapUnderNormaIds(parseNormaXml(document(PARENT, ["_F2"])));
     expect(model.getFactType("_F1")?.internalConstraints.filter((c) => c.type === "ring"))
       .toHaveLength(1);
     expect(rings(model)).toHaveLength(1);

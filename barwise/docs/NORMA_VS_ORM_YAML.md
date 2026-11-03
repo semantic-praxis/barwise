@@ -308,9 +308,19 @@ NORMA can express a genuine conceptual rule barwise cannot hold at all.
 
 ### Normalizations (same meaning, different bytes)
 
-Three constructs round-trip semantically but not byte-identically, by
+Five things round-trip semantically but not byte-identically, by
 design:
 
+- **Unnamed roles.** NORMA leaves most roles unnamed (`Name=""`). An
+  import names such a role after its player, so its id reads
+  `<fact type>.<player>`, and an export writes a role named as its player
+  unnamed again.
+- **Ids.** NORMA's GUIDs are not kept. An import names every element
+  from its name or sentence, as a `.orm.yaml` file does, and an export
+  writes each element under `_` and a UUID derived from its local name
+  (NORMA requires an XML NCName). So a NORMA file re-exported gets new
+  GUIDs, and a re-import gets back the same local names
+  (`docs/specs/iri-identity.spec.md`, decision 12).
 - **Conceptual data types.** Several NORMA type tags collapse to one
   conceptual name on import (`FixedLengthText` and `VariableLengthText`
   are both `text`); export picks one representative tag per name. The

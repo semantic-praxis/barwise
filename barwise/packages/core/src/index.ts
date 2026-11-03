@@ -216,7 +216,7 @@ export {
   ProjectDeserializationError,
   ProjectSerializer,
 } from "./serialization/ProjectSerializer.js";
-export type { ReplayOptions } from "./serialization/replay.js";
+export { type ReplayedIds, replayIds, type ReplayOptions } from "./serialization/replay.js";
 export {
   type SchemaError,
   type SchemaValidationResult,

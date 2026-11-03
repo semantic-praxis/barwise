@@ -1,8 +1,12 @@
 /**
  * Constraint identity across NORMA import and export
- * (docs/specs/orm-format-3.spec.md, WS2). The importer keeps NORMA's
- * constraint ids, as it keeps object type ids, and an exported model whose
- * file omitted constraint ids exports the same document every time.
+ * (docs/specs/orm-format-3.spec.md, WS2; iri-identity 6c). The importer
+ * builds each constraint under one NORMA id -- the file's, or one derived
+ * from its content -- which decides what is kept once and what twice; most
+ * tests here read that choice back under those ids (`mapUnderNormaIds`).
+ * The model it returns names every element from its name or sentence, so
+ * a NORMA round trip gives back the same ids, and an export writes the
+ * same document every time.
  */
 import { OrmModel, OrmYamlSerializer } from "@barwise/core";
 import { readFileSync } from "node:fs";
@@ -13,8 +17,14 @@ import {
   collectExclusiveOrPairs,
   createConstraintIdAllocator,
 } from "../src/norma/mapping/context.js";
-import { asNormaId, cardinalityId, NORMA_ID_TAGS, type NormaId } from "../src/norma/normaId.js";
-import { mapNormaToOrm } from "../src/norma/NormaToOrmMapper.js";
+import {
+  asNormaId,
+  cardinalityId,
+  NORMA_ID_TAGS,
+  type NormaId,
+  toNormaId,
+} from "../src/norma/normaId.js";
+import { mapNormaToOrm, mapNormaToOrmWithIds } from "../src/norma/NormaToOrmMapper.js";
 import { parseNormaXml } from "../src/norma/NormaXmlParser.js";
 import { serializeNormaDocument } from "../src/norma/NormaXmlSerializer.js";
 import type {
@@ -26,6 +36,8 @@ import type {
   NormaUniquenessConstraint,
 } from "../src/norma/NormaXmlTypes.js";
 import { writeOrmToNorma } from "../src/norma/NormaXmlWriter.js";
+import { readableNormaIds } from "./helpers/readableNormaIds.js";
+import { mapUnderNormaIds } from "./helpers/underNormaIds.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -44,8 +56,9 @@ function normaIdsOf(doc: { constraints: readonly { id: string; }[]; }): Set<stri
   return new Set(doc.constraints.map((c) => c.id));
 }
 
+/** The NORMA export, spelled with the model's ids so the tests can name them. */
 function exportXml(model: OrmModel): string {
-  return serializeNormaDocument(writeOrmToNorma(model));
+  return readableNormaIds(serializeNormaDocument(writeOrmToNorma(model)), model);
 }
 
 /** Two unary fact types joined by an exclusive-or, id c-xor. */
@@ -73,12 +86,12 @@ function xorModel(): OrmModel {
   return model;
 }
 
-describe("NORMA import keeps constraint ids", () => {
+describe("NORMA import builds each constraint under one NORMA id", () => {
   it.each(FIXTURES)("%s: every constraint keeps a NORMA constraint id", (fixture) => {
     // No generator remains, so every id is one the importer read or the model gave.
     const doc = parseNormaXml(readFileSync(resolve(here, "fixtures", fixture), "utf-8"));
     const normaIds = new Set<string>(doc.constraints.map((c) => c.id));
-    const ids = constraintIds(mapNormaToOrm(doc));
+    const ids = constraintIds(mapUnderNormaIds(doc));
     expect(ids.length).toBeGreaterThan(0);
     for (const id of ids) expect(normaIds).toContain(id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -88,7 +101,7 @@ describe("NORMA import keeps constraint ids", () => {
     // Fact types and subtype facts used to take generator ids, so two
     // imports of one file differed on every fact type id.
     const xml = readFileSync(resolve(here, "fixtures", fixture), "utf-8");
-    const yaml = () => new OrmYamlSerializer().serialize(mapNormaToOrm(parseNormaXml(xml)));
+    const yaml = () => new OrmYamlSerializer().serialize(mapUnderNormaIds(parseNormaXml(xml)));
     const first = yaml();
     expect(yaml()).toBe(first);
   });
@@ -127,52 +140,54 @@ describe("NORMA import keeps constraint ids", () => {
       instances: [{ roleValues: { "r-manager": "p1", "r-managed": "p2" } }],
     });
     const xml = exportXml(model);
-    const yaml = () => new OrmYamlSerializer().serialize(mapNormaToOrm(parseNormaXml(xml)));
+    const yaml = () => new OrmYamlSerializer().serialize(mapUnderNormaIds(parseNormaXml(xml)));
     const first = yaml();
     expect(first).toContain("populations:");
     expect(yaml()).toBe(first);
   });
 
-  it("gives an objectification link without a NestedPredicate id one that survives a round trip", () => {
-    // The derived id must carry NORMA's _ prefix, or the export adds one and
-    // the next import reads a different id.
-    const xml = readFileSync(resolve(here, "fixtures", "universityEnrollment.orm"), "utf-8");
-    const first = mapNormaToOrm(parseNormaXml(xml));
-    const again = mapNormaToOrm(parseNormaXml(exportXml(first)));
-    expect(again.objectifiedFactTypes.map((o) => o.id)).toEqual(
-      first.objectifiedFactTypes.map((o) => o.id),
-    );
-  });
-
-  it("keeps a NestedPredicate's own id for the objectification link when the file gives one", () => {
+  it("names an objectification link from its sentence, whatever id the file gives it", () => {
+    // iri-identity 6c: the link takes the id the model gives it, so a
+    // NestedPredicate's own id, or its absence, changes nothing.
     const xml = readFileSync(resolve(here, "fixtures", "universityEnrollment.orm"), "utf-8");
     const withId = xml.replace(
       "<orm:NestedPredicate ref=",
       '<orm:NestedPredicate id="_np_enrolls" ref=',
     );
     expect(withId).not.toBe(xml);
-    const first = mapNormaToOrm(parseNormaXml(withId));
-    expect(first.objectifiedFactTypes.map((o) => o.id)).toEqual(["_np_enrolls"]);
-    // ... and the export writes it back, so the next import agrees.
-    const again = mapNormaToOrm(parseNormaXml(exportXml(first)));
-    expect(again.objectifiedFactTypes.map((o) => o.id)).toEqual(["_np_enrolls"]);
+    const links = (text: string) =>
+      mapNormaToOrm(parseNormaXml(text)).objectifiedFactTypes.map((o) => o.id);
+    expect(links(withId)).toEqual(links(xml));
+    expect(links(xml)).toHaveLength(1);
+    expect(links(xml)[0]).not.toMatch(/^_/);
   });
 
   it("keeps a named constraint's id verbatim", () => {
     const doc = parseNormaXml(
       readFileSync(resolve(here, "fixtures", "employeeProject.orm"), "utf-8"),
     );
-    expect(constraintIds(mapNormaToOrm(doc))).toEqual(
+    expect(constraintIds(mapUnderNormaIds(doc))).toEqual(
       expect.arrayContaining(["_uc_emp_fn", "_mc_emp_fn"]),
     );
   });
 
-  it.each(FIXTURES)("%s: a NORMA round trip keeps every constraint id", (fixture) => {
+  it.each(FIXTURES)("%s: a NORMA round trip gives back every id", (fixture) => {
+    // NORMA's ids do not survive (decision 12(a)): the import names each
+    // element from its name or sentence, so the second import names them
+    // as the first did.
     const first = mapNormaToOrm(
       parseNormaXml(readFileSync(resolve(here, "fixtures", fixture), "utf-8")),
     );
-    const second = mapNormaToOrm(parseNormaXml(exportXml(first)));
-    expect([...constraintIds(second)].sort()).toEqual([...constraintIds(first)].sort());
+    const second = mapNormaToOrm(parseNormaXml(serializeNormaDocument(writeOrmToNorma(first))));
+    const ids = (m: OrmModel) =>
+      [
+        ...m.objectTypes.map((ot) => ot.id),
+        ...m.factTypes.flatMap((ft) => [ft.id, ...ft.roles.map((r) => r.id)]),
+        ...constraintIds(m).map(String),
+        ...m.subtypeFacts.map((sf) => String(sf.id)),
+        ...m.objectifiedFactTypes.map((o) => String(o.id)),
+      ].sort();
+    expect(ids(second)).toEqual(ids(first));
   });
 
   it("never gives one id to two constraints when one NORMA constraint maps twice", () => {
@@ -183,7 +198,7 @@ describe("NORMA import keeps constraint ids", () => {
     );
     // Two roles, in different fact types, that no mandatory covers yet; the
     // importer skips a mandatory a role already has.
-    const base = mapNormaToOrm(doc);
+    const base = mapUnderNormaIds(doc);
     const free = base.factTypes.map((ft) =>
       ft.roles.find((r) =>
         !ft.internalConstraints.some((c) => c.type === "mandatory" && c.roleId === r.id)
@@ -200,7 +215,9 @@ describe("NORMA import keeps constraint ids", () => {
       isImplied: false,
       roleRefs: [first!, second!],
     };
-    const ids = constraintIds(mapNormaToOrm({ ...doc, constraints: [...doc.constraints, twice] }));
+    const ids = constraintIds(
+      mapUnderNormaIds({ ...doc, constraints: [...doc.constraints, twice] }),
+    );
     expect(ids).toEqual(expect.arrayContaining(["_mc_twice", "_mc_twice_2"]));
     expect(ids).not.toContain(undefined);
     expect(new Set(ids).size).toBe(ids.length);
@@ -234,7 +251,7 @@ describe("NORMA import keeps constraint ids", () => {
         ...doc.factTypes.slice(2),
       ],
     };
-    const ids = constraintIds(mapNormaToOrm(listedTwice));
+    const ids = constraintIds(mapUnderNormaIds(listedTwice));
     expect(ids).toEqual(expect.arrayContaining(["_uc_split", "_uc_split_2"]));
     expect(ids).not.toContain(undefined);
     expect(new Set(ids).size).toBe(ids.length);
@@ -246,7 +263,7 @@ describe("NORMA import keeps constraint ids", () => {
     const doc = parseNormaXml(
       readFileSync(resolve(here, "fixtures", "employeeProject.orm"), "utf-8"),
     );
-    const base = mapNormaToOrm(doc);
+    const base = mapUnderNormaIds(doc);
     const free = base.factTypes.map((ft) =>
       ft.roles.find((r) =>
         !ft.internalConstraints.some((c) => c.type === "mandatory" && c.roleId === r.id)
@@ -268,13 +285,13 @@ describe("NORMA import keeps constraint ids", () => {
     };
     // The squatter comes later in the document, so it claims after the duplicate.
     const ids = constraintIds(
-      mapNormaToOrm({ ...doc, constraints: [...doc.constraints, twice, squatter] }),
+      mapUnderNormaIds({ ...doc, constraints: [...doc.constraints, twice, squatter] }),
     );
     expect(ids).toEqual(expect.arrayContaining(["_mc_twice", "_mc_twice_2", "_mc_twice_3"]));
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("gives an inline cardinality without an id one from its role, the same every time", () => {
+  it("builds an inline cardinality without an id under one from its role, and leaves it unnamed", () => {
     const doc = parseNormaXml(
       readFileSync(resolve(here, "fixtures", "employeeProject.orm"), "utf-8"),
     );
@@ -293,10 +310,14 @@ describe("NORMA import keeps constraint ids", () => {
         ...rest,
       ],
     };
-    const cardinalityOf = (m: OrmModel) =>
-      m.everyConstraint().map(([c]) => c).find((c) => c.type === "cardinality")?.id;
-    // The importer's derived id for a cardinality NORMA wrote without one.
-    expect(cardinalityOf(mapNormaToOrm(withCard))).toBe(cardinalityId(role!.id));
+    // Built under the id the importer derives from its role; the model then
+    // leaves it unnamed, since one role of a binary gives a cardinality no
+    // sentence (iri-identity, decision 19).
+    const { model, priorIds } = mapNormaToOrmWithIds(withCard);
+    const cardinalities = model.everyConstraint().map(([c]) => c)
+      .filter((c) => c.type === "cardinality");
+    expect(cardinalities.map((c) => c.id)).toEqual([undefined]);
+    expect([...priorIds.values()]).toContain(cardinalityId(role!.id));
 
     // ... unless a real constraint holds that id; then it steps aside, and
     // the real constraint keeps its own whichever claims first.
@@ -330,7 +351,7 @@ describe("NORMA import keeps constraint ids", () => {
           ...doc.factTypes.slice(2),
         ],
       };
-      const xors = mapNormaToOrm(listed).everyConstraint().map(([c]) => c).filter((c) =>
+      const xors = mapUnderNormaIds(listed).everyConstraint().map(([c]) => c).filter((c) =>
         c.type === "exclusive_or"
       );
       expect(xors.map((c) => c.id)).toEqual(["_c-xor"]);
@@ -348,7 +369,7 @@ describe("NORMA import keeps constraint ids", () => {
     const rival = { ...exclusion, id: asNormaId("_rival"), exclusiveOrMandatoryRef: mandatory.id };
     const others = doc.constraints.filter((c) => c !== exclusion && c !== mandatory);
     for (const order of [[mandatory, exclusion, rival], [rival, exclusion, mandatory]]) {
-      const xors = mapNormaToOrm({ ...doc, constraints: [...others, ...order] })
+      const xors = mapUnderNormaIds({ ...doc, constraints: [...others, ...order] })
         .everyConstraint().map(([c]) => c).filter((c) => c.type === "exclusive_or");
       expect(xors.map((c) => c.id)).toEqual(["_c-xor"]);
     }
@@ -366,7 +387,7 @@ describe("NORMA import keeps constraint ids", () => {
     )! as NormaMandatoryConstraint;
     const others = doc.constraints.filter((c) => c !== exclusion && c !== mandatory);
     const xorIds = (constraints: NormaConstraint[]) =>
-      mapNormaToOrm({ ...doc, constraints }).everyConstraint().map(([c]) => c)
+      mapUnderNormaIds({ ...doc, constraints }).everyConstraint().map(([c]) => c)
         .filter((c) => c.type === "exclusive_or").map((c) => c.id);
 
     // The mandatory is gone.
@@ -387,7 +408,7 @@ describe("NORMA import keeps constraint ids", () => {
       id: asNormaId("_rival"),
       roleSequences: exclusion.roleSequences.slice(0, 1),
     };
-    const withRival = mapNormaToOrm({
+    const withRival = mapUnderNormaIds({
       ...doc,
       constraints: [...others, mandatory, exclusion, rival],
     })
@@ -395,7 +416,8 @@ describe("NORMA import keeps constraint ids", () => {
     expect(withRival.filter((c) => c.type === "exclusive_or").map((c) => c.id)).toEqual([
       exclusion.id,
     ]);
-    expect(withRival.find((c) => c.id === "_rival")?.type).toBe("exclusion");
+    // Over one role it has no sentence, so the model leaves it unnamed.
+    expect(withRival.filter((c) => c.type === "exclusion").map((c) => c.id)).toEqual([undefined]);
   });
 
   it("keeps a coupled constraint that cannot be an exclusive-or under its own id", () => {
@@ -413,7 +435,7 @@ describe("NORMA import keeps constraint ids", () => {
       roleRefs: [role],
       exclusiveOrExclusionRef: exclusion.id,
     };
-    const all = mapNormaToOrm({ ...doc, constraints: [...doc.constraints, simple] })
+    const all = mapUnderNormaIds({ ...doc, constraints: [...doc.constraints, simple] })
       .everyConstraint().map(([c]) => c);
     expect(all.find((c) => c.type === "mandatory")?.id).toBe("_mc_simple");
   });
@@ -454,7 +476,7 @@ describe("NORMA import keeps constraint ids", () => {
       ],
     ];
     for (const factTypes of listed) {
-      const all = mapNormaToOrm({ ...doc, constraints, factTypes })
+      const all = mapUnderNormaIds({ ...doc, constraints, factTypes })
         .everyConstraint().map(([c]) => c);
       expect(all.filter((c) => c.type === "exclusion" || c.type === "join_exclusion")).toEqual([]);
       expect(all.filter((c) => c.type === "exclusive_or").map((c) => c.id)).toEqual(["_c-xor"]);
@@ -483,7 +505,7 @@ describe("NORMA import keeps constraint ids", () => {
       { ...first!, internalConstraintRefs: [...first!.internalConstraintRefs, exclusion.id] },
       ...rest,
     ];
-    const xors = mapNormaToOrm({ ...doc, constraints, factTypes })
+    const xors = mapUnderNormaIds({ ...doc, constraints, factTypes })
       .everyConstraint().map(([c]) => c).filter((c) => c.type === "exclusive_or");
     expect(xors).toHaveLength(1);
     expect(xors[0]).toMatchObject({ id: "_c-xor", roleIds: mandatory.roleRefs });
@@ -541,7 +563,7 @@ describe("NORMA import keeps constraint ids", () => {
       id: asNormaId("_m_second"),
       modality: "deontic",
     };
-    const xors = mapNormaToOrm({ ...doc, constraints: [...doc.constraints, second] })
+    const xors = mapUnderNormaIds({ ...doc, constraints: [...doc.constraints, second] })
       .everyConstraint().map(([c]) => c).filter((c) => c.type === "exclusive_or");
     expect(xors.map((c) => c.id)).toEqual(expect.arrayContaining(["_c-xor", "_m_second"]));
   });
@@ -585,7 +607,7 @@ describe("NORMA import keeps constraint ids", () => {
         ...doc.factTypes.slice(2),
       ],
     };
-    const xors = mapNormaToOrm(listed).everyConstraint().map(([c]) => c).filter((c) =>
+    const xors = mapUnderNormaIds(listed).everyConstraint().map(([c]) => c).filter((c) =>
       c.type === "exclusive_or"
     );
     expect(xors).toHaveLength(1);
@@ -690,7 +712,7 @@ describe("NORMA import keeps constraint ids", () => {
             ...rest,
           ],
         };
-        const all = mapNormaToOrm(listed).everyConstraint().map(([c]) => c);
+        const all = mapUnderNormaIds(listed).everyConstraint().map(([c]) => c);
         expect(all.filter((c) => c.type === "exclusion" || c.type === "disjunctive_mandatory"))
           .toEqual([]);
         expect(all.filter((c) => c.type === "exclusive_or").map((c) => c.id)).toEqual(["_c-xor"]);
@@ -717,7 +739,7 @@ describe("NORMA import keeps constraint ids", () => {
     const doc = parseNormaXml(
       readFileSync(resolve(here, "fixtures", "employeeProject.orm"), "utf-8"),
     );
-    const base = mapNormaToOrm(doc);
+    const base = mapUnderNormaIds(doc);
     const free = base.factTypes.map((ft) =>
       ft.roles.find((r) =>
         !ft.internalConstraints.some((c) => c.type === "mandatory" && c.roleId === r.id)
@@ -736,8 +758,8 @@ describe("NORMA import keeps constraint ids", () => {
       ...doc,
       constraints: [...doc.constraints, anonymous(free[0]!), anonymous(free[1]!)],
     };
-    const first = constraintIds(mapNormaToOrm(withAnonymous));
-    const second = constraintIds(mapNormaToOrm(withAnonymous));
+    const first = constraintIds(mapUnderNormaIds(withAnonymous));
+    const second = constraintIds(mapUnderNormaIds(withAnonymous));
     expect(second).toEqual(first);
     expect(first).not.toContain("");
     expect(new Set(first).size).toBe(first.length);
@@ -750,7 +772,7 @@ describe("NORMA import keeps constraint ids", () => {
       ...withAnonymous,
       constraints: [anonymous(free[2]!), ...withAnonymous.constraints],
     };
-    expect(constraintIds(mapNormaToOrm(inserted))).toEqual(expect.arrayContaining(derived));
+    expect(constraintIds(mapUnderNormaIds(inserted))).toEqual(expect.arrayContaining(derived));
   });
 
   /** The xor model's document with a second, distinct pair over the same roles. */
@@ -787,7 +809,7 @@ describe("NORMA import keeps constraint ids", () => {
         ...rest,
       ],
     };
-    const xors = mapNormaToOrm(listed).everyConstraint().map(([c]) => c).filter((c) =>
+    const xors = mapUnderNormaIds(listed).everyConstraint().map(([c]) => c).filter((c) =>
       c.type === "exclusive_or"
     );
     expect(xors.map((c) => c.id)).toEqual(["_c-xor"]);
@@ -804,7 +826,7 @@ describe("NORMA import keeps constraint ids", () => {
         { ...mandatory2, modality: "deontic" as const },
       ],
     };
-    const xors = mapNormaToOrm(deontic).everyConstraint().map(([c]) => c).filter((c) =>
+    const xors = mapUnderNormaIds(deontic).everyConstraint().map(([c]) => c).filter((c) =>
       c.type === "exclusive_or"
     );
     expect(xors.map((c) => [c.id, c.modality ?? "alethic"])).toEqual([
@@ -828,7 +850,7 @@ describe("NORMA import keeps constraint ids", () => {
         ...rest,
       ],
     };
-    const xors = mapNormaToOrm(listed).everyConstraint().map(([c]) => c).filter((c) =>
+    const xors = mapUnderNormaIds(listed).everyConstraint().map(([c]) => c).filter((c) =>
       c.type === "exclusive_or"
     );
     expect(xors.map((c) => c.id)).toEqual(["_c-xor"]);
@@ -860,7 +882,7 @@ describe("NORMA import keeps constraint ids", () => {
       roleIds: ["r-employed", "r-retired"],
     });
     const xml = exportXml(model);
-    const back = mapNormaToOrm(parseNormaXml(xml));
+    const back = mapUnderNormaIds(parseNormaXml(xml));
     const xor = back.everyConstraint().map(([c]) => c).find((c) => c.type === "exclusive_or");
     expect(xor?.id).toBe("_c-xor");
     expect(xml).toContain('id="_c-xor"');
@@ -868,14 +890,14 @@ describe("NORMA import keeps constraint ids", () => {
     // A hand-authored file may carry only the mandatory side's coupler.
     const mandatoryOnly = xml.replace(/<orm:ExclusiveOrMandatoryConstraint[^>]*\/>/g, "");
     expect(mandatoryOnly).not.toBe(xml);
-    const back2 = mapNormaToOrm(parseNormaXml(mandatoryOnly));
+    const back2 = mapUnderNormaIds(parseNormaXml(mandatoryOnly));
     const xor2 = back2.everyConstraint().map(([c]) => c).find((c) => c.type === "exclusive_or");
     expect(xor2?.id).toBe("_c-xor");
 
     // ... or only the exclusion side's.
     const exclusionOnly = xml.replace(/<orm:ExclusiveOrExclusionConstraint[^>]*\/>/g, "");
     expect(exclusionOnly).not.toBe(xml);
-    const back3 = mapNormaToOrm(parseNormaXml(exclusionOnly));
+    const back3 = mapUnderNormaIds(parseNormaXml(exclusionOnly));
     const xor3 = back3.everyConstraint().map(([c]) => c).find((c) => c.type === "exclusive_or");
     expect(xor3?.id).toBe("_c-xor");
   });
@@ -904,7 +926,7 @@ describe("NORMA import keeps modality in every phase", () => {
     const deontic = constraints.map((c) =>
       c.type === "exclusion" ? { ...c, modality: "deontic" as const } : c
     );
-    const exclusion = mapNormaToOrm({ ...doc, constraints: deontic })
+    const exclusion = mapUnderNormaIds({ ...doc, constraints: deontic })
       .everyConstraint().map(([c]) => c).find((c) => c.type === "exclusion");
     expect(exclusion?.modality).toBe("deontic");
   });
@@ -921,7 +943,7 @@ describe("NORMA import keeps modality in every phase", () => {
       roleRefs,
       ...(modality ? { modality } : {}),
     });
-    const all = mapNormaToOrm({
+    const all = mapUnderNormaIds({
       ...doc,
       constraints: [...constraints, external("_eu_a"), external("_eu_d", "deontic")],
     }).everyConstraint().map(([c]) => c).filter((c) => c.type === "external_uniqueness");
@@ -935,7 +957,7 @@ describe("NORMA import keeps modality in every phase", () => {
     const { doc, constraints } = uncoupled();
     const plain = constraints.find((c) => c.type === "mandatory" && !c.isSimple)!;
     const deontic = { ...plain, id: asNormaId("_dm_deontic"), modality: "deontic" as const };
-    const disjunctive = mapNormaToOrm({ ...doc, constraints: [...constraints, deontic] })
+    const disjunctive = mapUnderNormaIds({ ...doc, constraints: [...constraints, deontic] })
       .everyConstraint().map(([c]) => c).filter((c) => c.type === "disjunctive_mandatory");
     expect(disjunctive.map((c) => c.modality ?? "alethic").sort()).toEqual(["alethic", "deontic"]);
   });
@@ -972,7 +994,7 @@ describe("NORMA import keeps every distinct constraint", () => {
   }
 
   const ids = (doc: ReturnType<typeof people>, extra: NormaConstraint[]) =>
-    mapNormaToOrm({ ...doc, constraints: [...doc.constraints, ...extra] })
+    mapUnderNormaIds({ ...doc, constraints: [...doc.constraints, ...extra] })
       .everyConstraint().map(([c]) => c).map((c) => c.id);
 
   it("keeps two subsets from one role into different roles", () => {
@@ -1027,7 +1049,7 @@ describe("NORMA import keeps every distinct constraint", () => {
     const ft = doc.factTypes.find((f) => f.roles.some((r) => r.id === role))!;
     // Neither listed, one listed, both listed.
     for (const listed of [[], ["_u1"], ["_u1", "_u2"]]) {
-      const all = mapNormaToOrm({
+      const all = mapUnderNormaIds({
         ...doc,
         constraints: [...doc.constraints, mc("_u1"), mc("_u2")],
         factTypes: doc.factTypes.map((f) =>
@@ -1104,8 +1126,8 @@ describe("NORMA export of a file that omits constraint ids", () => {
       ],
     });
     const doc = writeOrmToNorma(model);
-    expect(doc.factTypes[0]!.internalConstraintRefs).toEqual(["_c-dup"]);
-    expect(doc.constraints.filter((c) => c.id === "_c-dup")).toHaveLength(1);
+    expect(doc.factTypes[0]!.internalConstraintRefs).toEqual([toNormaId("c-dup")]);
+    expect(doc.constraints.filter((c) => c.id === toNormaId("c-dup"))).toHaveLength(1);
   });
 
   it("exports a constraint added in code under the id addConstraint gave it (barwise-nkq)", () => {
@@ -1119,7 +1141,7 @@ describe("NORMA export of a file that omits constraint ids", () => {
     expect(filled).toEqual(expect.any(String));
 
     const doc = writeOrmToNorma(model);
-    expect(normaIdsOf(doc).has(`_${filled}`)).toBe(true);
+    expect(normaIdsOf(doc).has(toNormaId(filled))).toBe(true);
     expect([...normaIdsOf(doc)].some((id) => /_c\d+$/.test(id))).toBe(false);
   });
 

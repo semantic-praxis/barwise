@@ -18,12 +18,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parse, stringify } from "yaml";
 import { asNormaId } from "../src/norma/normaId.js";
-import { mapNormaToOrm } from "../src/norma/NormaToOrmMapper.js";
+import { toNormaId } from "../src/norma/normaId.js";
 import { parseNormaXml } from "../src/norma/NormaXmlParser.js";
 import { serializeNormaDocument } from "../src/norma/NormaXmlSerializer.js";
 import type { NormaUniquenessConstraint } from "../src/norma/NormaXmlTypes.js";
 import { writeOrmToNorma } from "../src/norma/NormaXmlWriter.js";
 import { ModelBuilder } from "./helpers/ModelBuilder.js";
+import { mapUnderNormaIds } from "./helpers/underNormaIds.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -161,8 +162,9 @@ describe("constraints across fact types in NORMA", () => {
     // the uniqueness group's order followed the host.
     const xml = exportXml(projects(leads));
     expect(exportXml(projects(sponsors))).toBe(xml);
-    expect(xml.match(/id="_c-lead-or-sponsor"/g)).toHaveLength(1);
-    expect(xml.match(/id="_c-led-and-sponsored"/g)).toHaveLength(1);
+    for (const id of ["c-lead-or-sponsor", "c-led-and-sponsored"]) {
+      expect(xml.split(`id="${toNormaId(id)}"`)).toHaveLength(2);
+    }
   });
 
   it("imports one copy of a rule two hosts would each have kept", () => {
@@ -183,7 +185,7 @@ describe("constraints across fact types in NORMA", () => {
     });
     const listed = spanning("_uc_listed");
     const copy = spanning("_uc_copy");
-    const model = mapNormaToOrm({
+    const model = mapUnderNormaIds({
       ...doc,
       constraints: [...doc.constraints, listed, copy],
       factTypes: [

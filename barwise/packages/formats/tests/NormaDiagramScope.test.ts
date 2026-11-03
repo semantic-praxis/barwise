@@ -8,6 +8,7 @@
  */
 import { type DiagramLayout, OrmModel } from "@barwise/core";
 import { describe, expect, it } from "vitest";
+import { toNormaId } from "../src/norma/normaId.js";
 import { mapNormaToOrm } from "../src/norma/NormaToOrmMapper.js";
 import { parseNormaXml } from "../src/norma/NormaXmlParser.js";
 import { serializeNormaDocument } from "../src/norma/NormaXmlSerializer.js";
@@ -59,23 +60,47 @@ function diagram(model: OrmModel, name: string): NormaDiagram {
   return writeOrmToNorma(model).diagrams!.find((d) => d.name === name)!;
 }
 
-/** Subject refs by shape kind, sorted. */
+/**
+ * The model ids these tests build, by the NORMA id each is written under
+ * (decision 12(a)): the shapes name elements by NORMA id, the tests by
+ * model id.
+ */
+const MODEL_ID_BY_NORMA = new Map(
+  [
+    "ft-ab",
+    "ft-active",
+    "ft-has-id",
+    "ft-includes",
+    "ft-places",
+    "ot-a",
+    "ot-b",
+    "ot-customer",
+    "ot-order",
+    "ot-product",
+    "ot-sale",
+    "ot-wide",
+    "vt-customer-id",
+  ].map((id) => [toNormaId(id) as string, id]),
+);
+const modelIdOf = (ref: string) => MODEL_ID_BY_NORMA.get(ref) ?? ref;
+
+/** Subjects by shape kind, as model ids, sorted. */
 function subjects(d: NormaDiagram): { objects: string[]; facts: string[]; } {
   const of = (kind: string) =>
-    d.shapes.filter((s) => s.kind === kind).map((s) => s.subjectRef).sort();
+    d.shapes.filter((s) => s.kind === kind).map((s) => modelIdOf(s.subjectRef)).sort();
   return { objects: of("object_type"), facts: of("fact_type") };
 }
 
 /** Horizontal gap, in pixels, between two shapes (left edge of b minus right edge of a). */
 function gapPx(d: NormaDiagram, a: string, b: string): number {
-  const sa = d.shapes.find((sh) => sh.subjectRef === a)!;
-  const sb = d.shapes.find((sh) => sh.subjectRef === b)!;
+  const sa = d.shapes.find((sh) => sh.subjectRef === toNormaId(a))!;
+  const sb = d.shapes.find((sh) => sh.subjectRef === toNormaId(b))!;
   return Math.round((sb.x - (sa.x + sa.width)) * PX_PER_INCH);
 }
 
 /** A shape's center in barwise pixels, recovered from its NORMA bounds. */
-function center(d: NormaDiagram, subjectRef: string): { x: number; y: number; } {
-  const s = d.shapes.find((sh) => sh.subjectRef === subjectRef)!;
+function center(d: NormaDiagram, id: string): { x: number; y: number; } {
+  const s = d.shapes.find((sh) => sh.subjectRef === toNormaId(id))!;
   return {
     x: Math.round((s.x + s.width / 2) * PX_PER_INCH),
     y: Math.round((s.y + s.height / 2) * PX_PER_INCH),
@@ -88,8 +113,8 @@ describe("NORMA export: view membership", () => {
   it("draws a view created without positions (Create View), not an empty diagram", () => {
     const d = diagram(shop([{ name: "V", elements: ["ot-customer", "ot-order"], ...none }]), "V");
     expect(subjects(d)).toEqual({
-      objects: ["_ot-customer", "_ot-order"],
-      facts: ["_ft-active", "_ft-places"],
+      objects: ["ot-customer", "ot-order"],
+      facts: ["ft-active", "ft-places"],
     });
   });
 
@@ -107,7 +132,7 @@ describe("NORMA export: view membership", () => {
       }]),
       "V",
     );
-    expect(subjects(d).objects).toEqual(["_ot-customer", "_ot-order"]);
+    expect(subjects(d).objects).toEqual(["ot-customer", "ot-order"]);
   });
 
   it("draws every fact type in a show-all view, not only moved ones", () => {
@@ -120,8 +145,8 @@ describe("NORMA export: view membership", () => {
       "All",
     );
     expect(subjects(d)).toEqual({
-      objects: ["_ot-customer", "_ot-order", "_ot-product"],
-      facts: ["_ft-active", "_ft-includes", "_ft-places"],
+      objects: ["ot-customer", "ot-order", "ot-product"],
+      facts: ["ft-active", "ft-includes", "ft-places"],
     });
   });
 
@@ -149,8 +174,8 @@ describe("NORMA export: placement of members without a saved position", () => {
       }]),
       "V",
     );
-    expect(center(d, "_ot-customer")).toEqual({ x: 192, y: 96 });
-    expect(center(d, "_ft-places")).toEqual({ x: 336, y: 96 });
+    expect(center(d, "ot-customer")).toEqual({ x: 192, y: 96 });
+    expect(center(d, "ft-places")).toEqual({ x: 336, y: 96 });
   });
 
   it("places unpositioned object types in a row below the positioned ones, in model order", () => {
@@ -160,16 +185,16 @@ describe("NORMA export: placement of members without a saved position", () => {
     );
     // Row starts at the leftmost positioned x, 150 below the lowest, and
     // each box starts 60 px after the previous one ends.
-    expect(center(d, "_ot-customer")).toEqual({ x: 400, y: 250 });
-    expect(center(d, "_ot-product").y).toBe(250);
-    expect(gapPx(d, "_ot-customer", "_ot-product")).toBe(60);
+    expect(center(d, "ot-customer")).toEqual({ x: 400, y: 250 });
+    expect(center(d, "ot-product").y).toBe(250);
+    expect(gapPx(d, "ot-customer", "ot-product")).toBe(60);
   });
 
   it("starts the row at (100, 100) when nothing is positioned", () => {
     const d = diagram(shop([{ name: "V", ...none }]), "V");
-    expect(center(d, "_ot-customer")).toEqual({ x: 100, y: 100 });
-    expect(gapPx(d, "_ot-customer", "_ot-order")).toBe(60);
-    expect(gapPx(d, "_ot-order", "_ot-product")).toBe(60);
+    expect(center(d, "ot-customer")).toEqual({ x: 100, y: 100 });
+    expect(gapPx(d, "ot-customer", "ot-order")).toBe(60);
+    expect(gapPx(d, "ot-order", "ot-product")).toBe(60);
   });
 
   it("centers an unpositioned fact type between its players", () => {
@@ -181,7 +206,7 @@ describe("NORMA export: placement of members without a saved position", () => {
       }]),
       "V",
     );
-    expect(center(d, "_ft-places")).toEqual({ x: 250, y: 200 });
+    expect(center(d, "ft-places")).toEqual({ x: 250, y: 200 });
   });
 
   it("moves a generated center off a taken one, so a unary does not cover its player", () => {
@@ -189,7 +214,7 @@ describe("NORMA export: placement of members without a saved position", () => {
       shop([{ name: "V", positions: { "ot-customer": { x: 100, y: 100 } }, orientations: {} }]),
       "V",
     );
-    expect(center(d, "_ft-active")).toEqual({ x: 100, y: 140 });
+    expect(center(d, "ft-active")).toEqual({ x: 100, y: 140 });
   });
 });
 
@@ -205,7 +230,7 @@ describe("NORMA export: shapes do not overlap or double up", () => {
       });
     }
     model.addDiagramLayout({ name: "V", ...none });
-    expect(gapPx(diagram(model, "V"), "_ot-a", "_ot-b")).toBe(60);
+    expect(gapPx(diagram(model, "V"), "ot-a", "ot-b")).toBe(60);
   });
 
   it("nudges a generated center that is near, not only equal to, a taken one", () => {
@@ -223,7 +248,7 @@ describe("NORMA export: shapes do not overlap or double up", () => {
       }]),
       "V",
     );
-    expect(center(d, "_ft-places")).toEqual({ x: 200, y: 140 });
+    expect(center(d, "ft-places")).toEqual({ x: 200, y: 140 });
   });
 
   it("draws an entity that only objectifies a fact type as that fact type, not twice", () => {
@@ -231,8 +256,8 @@ describe("NORMA export: shapes do not overlap or double up", () => {
     model.addObjectType({ id: "ot-sale", name: "Sale", kind: "entity", referenceMode: "sale_nr" });
     model.addObjectifiedFactType({ factTypeId: "ft-places", objectTypeId: "ot-sale" });
     const s = subjects(diagram(model, "All"));
-    expect(s.objects).not.toContain("_ot-sale");
-    expect(s.facts).toContain("_ft-places");
+    expect(s.objects).not.toContain("ot-sale");
+    expect(s.facts).toContain("ft-places");
   });
 });
 
@@ -290,8 +315,8 @@ function withRefMode(layout: DiagramLayout): OrmModel {
 describe("NORMA export: what the panel folds away is not drawn", () => {
   it("draws a reference-mode value type as the entity's label, not as its own shapes", () => {
     const s = subjects(diagram(withRefMode({ name: "All", ...none }), "All"));
-    expect(s.objects).toEqual(["_ot-customer", "_ot-order"]);
-    expect(s.facts).toEqual(["_ft-places"]);
+    expect(s.objects).toEqual(["ot-customer", "ot-order"]);
+    expect(s.facts).toEqual(["ft-places"]);
   });
 
   it("keeps folding the identifying fact type when its value type stays drawn", () => {
@@ -305,8 +330,8 @@ describe("NORMA export: what the panel folds away is not drawn", () => {
       readings: ["{0} is legacy"],
     });
     const s = subjects(diagram(model, "All"));
-    expect(s.objects).toContain("_vt-customer-id");
-    expect(s.facts).not.toContain("_ft-has-id");
+    expect(s.objects).toContain("vt-customer-id");
+    expect(s.facts).not.toContain("ft-has-id");
   });
 
   it("moves a fact type whose midpoint falls inside a wide box", () => {
@@ -340,8 +365,8 @@ describe("NORMA export: what the panel folds away is not drawn", () => {
       orientations: {},
     });
     const d = diagram(model, "V");
-    const wide = d.shapes.find((sh) => sh.subjectRef === "_ot-wide")!;
-    const fact = d.shapes.find((sh) => sh.subjectRef === "_ft-ab")!;
+    const wide = d.shapes.find((sh) => sh.subjectRef === toNormaId("ot-wide"))!;
+    const fact = d.shapes.find((sh) => sh.subjectRef === toNormaId("ft-ab"))!;
     expect(fact.y).toBeGreaterThanOrEqual(wide.y + wide.height);
   });
 });
@@ -370,7 +395,7 @@ describe("NORMA import: shapes that stand for something else", () => {
     const v = doc.diagrams!.find((d) => d.name === "V")!;
     const noSaleBox = {
       ...doc,
-      diagrams: [{ ...v, shapes: v.shapes.filter((sh) => sh.subjectRef !== "_ot-sale") }],
+      diagrams: [{ ...v, shapes: v.shapes.filter((sh) => sh.subjectRef !== toNormaId("ot-sale")) }],
     };
     const back = toModel(serializeNormaDocument(noSaleBox));
     expect(back.getDiagramLayout("V")!.elements).toContain(back.getObjectTypeByName("Sale")!.id);
@@ -381,7 +406,7 @@ describe("NORMA import: shapes that stand for something else", () => {
       shop([{ name: "V", elements: ["ot-customer", "ot-order"], ...none }]),
     );
     const v = doc.diagrams!.find((d) => d.name === "V")!;
-    const dup = v.shapes.find((sh) => sh.subjectRef === "_ot-customer")!;
+    const dup = v.shapes.find((sh) => sh.subjectRef === toNormaId("ot-customer"))!;
     const twice = {
       ...doc,
       diagrams: [{ ...v, shapes: [...v.shapes, { ...dup, id: `${dup.id}_2` as typeof dup.id }] }],
