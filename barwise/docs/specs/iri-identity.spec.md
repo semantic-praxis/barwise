@@ -1709,7 +1709,8 @@ sites.
       bundled delta cannot tell a removal (a transcript import has no
       namespace and no imports) from an addition. Per part, the policy
       applies unchanged. A person who accepts a removal in the editor gets
-      it. A rebound alias is still refused, accepted or not, since the
+      it, unless a merged shadow still uses the alias, whose import is
+      kept so the model never names an alias it does not import. A rebound alias is still refused, accepted or not, since the
       base's shadows behind it would change meaning. An incoming alias is
       carried when its delta is accepted or a merged shadow needs it.
     - Ossie's export check keys header deltas under their own
