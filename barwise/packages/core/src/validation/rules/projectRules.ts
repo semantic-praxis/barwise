@@ -21,6 +21,10 @@ export type ProjectValidationRule = (project: OrmProject) => Diagnostic[];
  * - Product dependencies reference existing domains and mappings.
  * - Each domain has one namespace source and its own namespace
  *   (iri-identity WS4).
+ * - Each alias a domain imports names a context the project supplies, or
+ *   an absolute namespace IRI (iri-identity WS6). A domain loaded on its
+ *   own has no project, so this is a warning here and not a refusal at
+ *   load, and a standalone domain still loads.
  */
 export function projectRules(project: OrmProject): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -29,8 +33,31 @@ export function projectRules(project: OrmProject): Diagnostic[] {
   diagnostics.push(...checkEntityMappingReferences(project));
   diagnostics.push(...checkProductDependencies(project));
   diagnostics.push(...checkNamespaces(project));
+  diagnostics.push(...checkImports(project));
 
   return diagnostics;
+}
+
+/** An import bound to an absolute IRI names a namespace, not a context. */
+const ABSOLUTE_IRI = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+
+function checkImports(project: OrmProject): Diagnostic[] {
+  const contexts = new Set(project.domains.map((d) => d.context));
+  return project.domains.flatMap((domain) =>
+    [...(domain.model?.imports ?? [])]
+      .filter(([, target]) => !ABSOLUTE_IRI.test(target) && !contexts.has(target))
+      .map(([alias, target]) =>
+        report(
+          RULE_ID.importedContextMissing,
+          "default",
+          domain.path,
+          domain.path,
+          domain.context,
+          alias,
+          target,
+        )
+      )
+  );
 }
 
 /**

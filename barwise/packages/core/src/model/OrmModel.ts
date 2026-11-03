@@ -14,7 +14,7 @@ import { checkInternalConstraint, FactType, type FactTypeConfig } from "./FactTy
 import { IdIndex, type IdKeyedKind, IdKeyedStore, type IdKind } from "./idIndex.js";
 import { checkedIri, NAMESPACE_PATTERN } from "./iri.js";
 import { mint, type Mintable } from "./mint.js";
-import { localName } from "./name.js";
+import { LOCAL_NAME_PATTERN, localName } from "./name.js";
 import {
   objectificationRef,
   ObjectifiedFactType,
@@ -69,6 +69,12 @@ export interface OrmModelConfig {
    * iri-identity WS4). Ends in `/` or `#`.
    */
   readonly namespace?: string;
+  /**
+   * Each alias this model's references may use, bound to the context it
+   * names or to an absolute namespace IRI (format 4.0's `imports`). A
+   * shadow's id is `<alias>:<local name>`, and its alias must be here.
+   */
+  readonly imports?: Readonly<Record<string, string>>;
   /**
    * Refuse a stated id any element holds, of any kind: format 4.0's rule,
    * where every id is a local name and names one element (iri-identity
@@ -204,6 +210,8 @@ export class OrmModel implements ConstraintModel {
    * stated ids it checked across kinds before holding them.
    */
   private _addingFactType = false;
+  /** See `imports`. */
+  private readonly _imports = new Map<string, string>();
   /** See `unstoredIds`. */
   private _unstored: ReadonlySet<string> = new Set();
   /** See `priorIds`. */
@@ -225,6 +233,9 @@ export class OrmModel implements ConstraintModel {
     this._note = config.note;
     this._namespace = checkedIri(config.namespace, NAMESPACE_PATTERN, "namespace");
     this._idsAcrossKinds = config.idsAcrossKinds ?? false;
+    for (const [alias, target] of Object.entries(config.imports ?? {})) {
+      this.setImport(alias, target);
+    }
   }
 
   get name(): string {
@@ -341,6 +352,30 @@ export class OrmModel implements ConstraintModel {
 
   set namespace(value: string | undefined) {
     this._namespace = checkedIri(value, NAMESPACE_PATTERN, "namespace");
+  }
+
+  /**
+   * Each alias this model imports, bound to a context name or an absolute
+   * namespace IRI (`OrmModelConfig.imports`), in the order they were given.
+   */
+  get imports(): ReadonlyMap<string, string> {
+    return this._imports;
+  }
+
+  /** Bind an alias, replacing what it was bound to. */
+  setImport(alias: string, target: string): void {
+    if (!LOCAL_NAME_PATTERN.test(alias)) {
+      throw new Error(`The alias "${alias}" is not a local name.`);
+    }
+    if (target.trim().length === 0) {
+      throw new Error(`The alias "${alias}" is bound to nothing.`);
+    }
+    this._imports.set(alias, target);
+  }
+
+  /** Unbind an alias; a no-op for one this model does not import. */
+  removeImport(alias: string): void {
+    this._imports.delete(alias);
   }
 
   // ---- Object Types ----

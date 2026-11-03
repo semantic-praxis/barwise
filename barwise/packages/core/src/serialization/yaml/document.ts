@@ -47,6 +47,8 @@ export interface OrmYamlDocument40 {
       "fact_types" | "constraints" | "subtype_facts" | "objectified_fact_types"
     >
     & {
+      /** Each alias the model's references use, bound to a context or a namespace IRI. */
+      imports?: Record<string, string>;
       fact_types?: (Omit<OrmYamlFactType, "constraints"> & {
         constraints?: Minted40<OrmYamlConstraint>[];
       })[];

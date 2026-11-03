@@ -7,8 +7,10 @@
  * every field without listing them (a field nobody listed is a field
  * nobody keeps, barwise-937), and it is the only way to rename an object
  * type, which `createObjectType` returns as a frozen record with no name
- * setter. In 3.x every reference between elements is an id, so a rename
- * changes names and keeps every id; WS6 fills `ids` when ids become names.
+ * setter. In format 4.0 an element's id is its name through `localName`
+ * (decision 13), so the rename then gives the element the id its new name
+ * gives, and every id that embeds it follows (a fact type's roles,
+ * populations and instances), through `remapIds`; `ids` says which.
  */
 
 import { stringify } from "yaml";
@@ -21,6 +23,7 @@ import type { OrmModel } from "../model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument40 } from "../serialization/OrmYamlSerializer.js";
 import { CURRENT_ORM_VERSION } from "../serialization/schemaVersion.js";
 import type { OrmYamlDocument40 as OrmYamlDocument } from "../serialization/yaml/document.js";
+import { remapIds } from "./remapIds.js";
 
 /**
  * What to rename. Explicit by kind, because an object type and a fact type
@@ -34,7 +37,7 @@ export type RenameTarget =
 export interface RenameResult {
   /** The renamed model; the input is unchanged. */
   readonly model: OrmModel;
-  /** Old id to new id. Empty on 3.x, where a rename keeps every id. */
+  /** Old id to new id: the renamed element's and each that embeds it. */
   readonly ids: ReadonlyMap<string, string>;
   /** Every rewrite, in plain words, for a surface to print. */
   readonly changes: readonly string[];
@@ -65,7 +68,69 @@ export function renameInModel(model: OrmModel, target: RenameTarget, to: string)
   });
   const renamed = readBack(doc);
   if (plan.kind === "objectType") refuseKeyShift(model, renamed);
-  return { model: renamed, ids: new Map(), changes };
+  const ids = idsForRename(renamed, plan);
+  return { model: withIds(renamed, ids, changes), ids, changes };
+}
+
+/**
+ * The ids a rename changes, old to new, in the model as renamed: the
+ * element's own, the one its new name gives (decision 13); for a fact
+ * type, every id beneath it, which holds its id and a `.` (its roles, its
+ * populations and their instances; no local name holds a `.`). A fact
+ * type its objectifying type's name would collide with keeps its id,
+ * which decision 20 gave from its first reading.
+ *
+ * @throws {RenameError} when another element already holds a new id.
+ */
+export function idsForRename(model: OrmModel, plan: RenamePlan): Map<string, string> {
+  const ids = new Map<string, string>();
+  const local = localName(plan.to);
+  if (plan.kind === "role") {
+    ids.set(plan.elementId, `${plan.factTypeId}.${local}`);
+  } else if (plan.kind === "objectType") {
+    const colon = plan.elementId.indexOf(":");
+    // A shadow keeps its alias; its local name is its owner's new id.
+    ids.set(plan.elementId, colon < 0 ? local : `${plan.elementId.slice(0, colon)}:${local}`);
+  } else {
+    const objectifier = model.objectifiedFactTypes.find((o) => o.factTypeId === plan.elementId);
+    if (objectifier?.objectTypeId !== local) {
+      ids.set(plan.elementId, local);
+      const prefix = `${plan.elementId}.`;
+      for (const id of heldIds(model)) {
+        if (id.startsWith(prefix)) ids.set(id, `${local}.${id.slice(prefix.length)}`);
+      }
+    }
+  }
+  for (const [from, now] of ids) {
+    if (from === now) ids.delete(from);
+    else if (model.idKindsHolding(now).length > 0 && !ids.has(now)) {
+      throw new RenameError(
+        `The rename would give ${plan.label} the id "${now}", which another element holds. `
+          + `Choose a name whose id is free.`,
+      );
+    }
+  }
+  return ids;
+}
+
+/** The model under the new ids, each change said in `changes`. */
+export function withIds(
+  model: OrmModel,
+  ids: ReadonlyMap<string, string>,
+  changes: string[],
+  where = "",
+): OrmModel {
+  if (ids.size === 0) return model;
+  for (const [from, now] of ids) changes.push(`Changed the id "${from}" to "${now}"${where}.`);
+  return remapIds(model, ids);
+}
+
+/** Every id the model holds, of every kind a rename can change. */
+function heldIds(model: OrmModel): string[] {
+  return [
+    ...model.factTypes.flatMap((ft) => ft.roles.map((r) => r.id)),
+    ...model.populations.flatMap((p) => [p.id, ...p.instances.map((i) => i.id)]),
+  ];
 }
 
 // ---------------------------------------------------------------------------

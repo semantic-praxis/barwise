@@ -332,8 +332,15 @@ barwise rename shop.orm.yaml --fact-type "Customer places Order" --role-position
 barwise rename --project project.orm-project.yaml --domain crm --object-type Customer --to Client
 ```
 
-Every reference between elements is an id, so a rename keeps every id and
-changes names. Beyond the element's own name it rewrites its definition,
+In format 4.0 an element's id is its name, so a rename also gives the
+element the id its new name gives (`Order` becomes `Purchase`), and every
+id that embeds it follows: a renamed fact type's roles, populations and
+instances, and, through a project, each shadow's id in the other domains.
+Every reference to a changed id is rewritten, and each change is printed. A
+rename whose new id another element already holds is refused. A minted id,
+such as a constraint's, is kept, and `barwise validate` reports one whose
+element now says something else (`structural/stale-minted-name`). Beyond
+the element's own name it rewrites its definition,
 when the term is the element's alone and the new term is not already
 defined, and the reference mode of each entity whose key the relational
 mapper types from a renamed value type. Notes, aliases and other free text
@@ -344,7 +351,8 @@ file, and writes exactly the files it changed.
 
 It refuses, and writes nothing, when the element does not exist or a role
 name is shared (name it by `--role-position`), when the new name or its
-local name is already taken, when the element is a shadow (rename its
+local name is already taken, when another element holds an id the rename
+would give, when the element is a shadow (rename its
 owner, through the project), when the rename would change which value type
 keys an entity, when a project did not load cleanly, or when the file, or
 any domain of the project, is not at the current format (run `barwise

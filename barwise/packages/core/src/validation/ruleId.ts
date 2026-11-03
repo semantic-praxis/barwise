@@ -102,6 +102,7 @@ export const RULE_ID = {
   valueTypeDomainViolation: "population/value-type-domain-violation",
   valueTypeDataTypeViolation: "population/value-type-data-type-violation",
   domainNamespaceOverridden: "project/domain-namespace-overridden",
+  importedContextMissing: "project/imported-context-missing",
   duplicateNamespace: "project/duplicate-namespace",
   entityMappingSourceMissing: "project/entity-mapping-source-missing",
   entityMappingTargetMissing: "project/entity-mapping-target-missing",
@@ -132,6 +133,9 @@ export const RULE_ID = {
   subtypeDanglingSupertype: "structural/subtype-dangling-supertype",
   subtypeNotEntity: "structural/subtype-not-entity",
   replayedIds: "structural/replayed-ids",
+  idNotFromName: "structural/id-not-from-name",
+  staleMintedName: "structural/stale-minted-name",
+  aliasNotImported: "structural/alias-not-imported",
   unstoredId: "structural/unstored-id",
   joinSubsetViolation: "population/join-subset-violation",
   joinEqualityViolation: "population/join-equality-violation",
@@ -809,6 +813,15 @@ const RULE_DESCRIPTORS = {
         `Domain "${context}" (${domainPath}) declares namespace "${own}", but the project's iri_base gives it "${projects}", which is the one used. Delete the domain's namespace line.`,
     },
   },
+  [RULE_ID.importedContextMissing]: {
+    severity: "warning",
+    description:
+      "A domain imports an alias bound to a context no domain of the project supplies, so references through that alias resolve to nothing in the project.",
+    messages: {
+      default: (domainPath: string, context: string, alias: string, target: string): string =>
+        `Domain "${context}" (${domainPath}) imports "${alias}" as the context "${target}", which no domain of this project supplies. Add that domain to the project, or bind "${alias}" to a context the project holds.`,
+    },
+  },
   [RULE_ID.duplicateNamespace]: {
     severity: "error",
     description: "Two domains of a project have one namespace, so their elements would share IRIs.",
@@ -970,14 +983,41 @@ const RULE_DESCRIPTORS = {
   [RULE_ID.localNameCollision]: {
     severity: "warning",
     description:
-      "Two elements whose names differ would take one id in format 4.0, where an element's id is its local name (iri-identity.spec.md).",
+      "Two elements hold one id, which a model built in code can allow; in format 4.0 an id names one element, and a file holding the repeat does not load (iri-identity.spec.md).",
     messages: {
       default: (name: string, kind: string, other: string, otherKind: string, id: string): string =>
-        `The ${kind} "${name}" and the ${otherKind} "${other}" would both take the id "${id}" in format 4.0; rename one, or the migration will add a suffix.`,
-      objectified: (name: string, objectType: string, id: string): string =>
-        `The fact type "${name}" and the object type "${objectType}" that objectifies it would both take the id "${id}" in format 4.0; the migration will rename the fact type to its first reading.`,
+        `The ${kind} "${name}" and the ${otherKind} "${other}" both hold the id "${id}"; in format 4.0 an id names one element. Give one of them another id.`,
       population: (factType: string, id: string): string =>
-        `Fact type "${factType}" has a role named "population" and a population, which would both take the id "${id}" in format 4.0; the migration will add a suffix to the population. Rename the role to avoid it.`,
+        `Fact type "${factType}" has a role and a population that both hold the id "${id}"; in format 4.0 an id names one element. Rename the role.`,
+    },
+  },
+  [RULE_ID.idNotFromName]: {
+    severity: "warning",
+    description:
+      "An element's id is not the one its name gives, so a reader of the file cannot tell the element from its id (iri-identity decision 13).",
+    messages: {
+      default: (kind: string, name: string, id: string, expected: string): string =>
+        `The ${kind} "${name}" has the id "${id}", where its name gives "${expected}". A rename gives it the id its name gives.`,
+      suffixed: (kind: string, name: string, id: string, expected: string): string =>
+        `The ${kind} "${name}" has the suffixed id "${id}", because another element holds "${expected}", the id its name gives. Rename one of them so each name gives its own id.`,
+    },
+  },
+  [RULE_ID.staleMintedName]: {
+    severity: "warning",
+    description:
+      "An id was named from what its element said when it was named, and the element now says something else (iri-identity decision 14).",
+    messages: {
+      default: (kind: string, id: string): string =>
+        `The ${kind} "${id}" was named from what it said when it was named, and it now says something else, so its id may describe it wrongly. State an id that says what it does now, or remove its minted_from to keep this one as chosen.`,
+    },
+  },
+  [RULE_ID.aliasNotImported]: {
+    severity: "error",
+    description:
+      "An id or reference names another context by an alias the model does not import, so nothing says which context the alias means.",
+    messages: {
+      default: (id: string, alias: string): string =>
+        `"${id}" names the alias "${alias}", which the model does not import. Add "${alias}" to its imports, bound to the context it means.`,
     },
   },
   [RULE_ID.duplicateRoleName]: {

@@ -17,13 +17,14 @@ import { isScopedView } from "../../src/model/DiagramLayout.js";
 import { FactType } from "../../src/model/FactType.js";
 import { createObjectType } from "../../src/model/ObjectType.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
+import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import {
   structuralRules,
   structuralWellFormedness,
 } from "../../src/validation/rules/structural.js";
 import { graphFor, unresolvedDiagnostics } from "../helpers/graphFor.js";
 import { injectFactType } from "../helpers/injectFactType.js";
-import { ModelBuilder, roleId } from "../helpers/ModelBuilder.js";
+import { ModelBuilder } from "../helpers/ModelBuilder.js";
 
 describe("structuralRules", () => {
   it("produces no diagnostics for a valid model", () => {
@@ -443,38 +444,28 @@ describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
   const ids = (model: OrmModel, rule: string) =>
     structuralWellFormedness(model).filter((d) => d.ruleId === rule);
 
-  it("warns when an object type and a fact type would take one id", () => {
-    const model = new ModelBuilder("Test")
-      .withEntityType("Order Line", { referenceMode: "nr" })
-      .withEntityType("Order", { referenceMode: "nr" })
-      .withBinaryFactType("Order_Line", {
-        role1: { player: "Order", name: "has" },
-        role2: { player: "Order Line", name: "is of" },
-      })
-      .build();
+  it("warns when an object type and a fact type hold one id, as a model built in code may", () => {
+    // A 4.0 load refuses this; a model that admits a repeat across kinds
+    // (3.x semantics, built in code) is the one place it can arise.
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({
+      id: "Order_Line",
+      name: "Order Line",
+      kind: "entity",
+      referenceMode: "nr",
+    });
+    model.addObjectType({ id: "Order", name: "Order", kind: "entity", referenceMode: "nr" });
+    model.addFactType({
+      id: "Order_Line",
+      name: "Order_Line",
+      roles: [{ id: "Order_Line.has", name: "has", playerId: "Order" }],
+      readings: ["{0} has"],
+    });
     const found = ids(model, "structural/local-name-collision");
-    expect(found).toHaveLength(1);
-    expect(found[0]!.severity).toBe("warning");
-    expect(found[0]!.message).toBe(
-      'The fact type "Order_Line" and the object type "Order Line" would both take the id "Order_Line" in format 4.0; rename one, or the migration will add a suffix.',
-    );
-  });
-
-  it("names the objectification case and what the migration will do", () => {
-    const model = new ModelBuilder("Test")
-      .withEntityType("Person", { referenceMode: "nr" })
-      .withEntityType("Marriage", { referenceMode: "nr" })
-      .withBinaryFactType("Marriage", {
-        role1: { player: "Person", name: "marries" },
-        role2: { player: "Person", name: "is married to" },
-        uniqueness: "spanning",
-      })
-      .withObjectifiedFactType("Marriage", "Marriage")
-      .build();
-    const found = ids(model, "structural/local-name-collision");
-    expect(found.map((d) => d.message)).toEqual([
-      'The fact type "Marriage" and the object type "Marriage" that objectifies it would both take the id "Marriage" in format 4.0; the migration will rename the fact type to its first reading.',
-    ]);
+    expect(found.map((d) => [d.severity, d.message])).toEqual([[
+      "warning",
+      'The fact type "Order_Line" and the object type "Order Line" both hold the id "Order_Line"; in format 4.0 an id names one element. Give one of them another id.',
+    ]]);
   });
 
   it("leaves an exact repeat within one kind to duplicate-object-type-name", () => {
@@ -498,9 +489,11 @@ describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
       })
       .build();
     const found = ids(model, "structural/duplicate-role-name");
+    // The id is built from the fact type's id, not its name's local name.
+    const ftId = model.getFactTypeByName("Person knows Person")!.id;
     expect(found.map((d) => [d.severity, d.message])).toEqual([[
       "warning",
-      'Fact type "Person knows Person" has roles "knows", "knows" that would all take the id "Person_knows_Person.knows" in format 4.0, so the migration will add a suffix to all but the first and new authoring will refuse them. Give each a different role name.',
+      `Fact type "Person knows Person" has roles "knows", "knows" that would all take the id "${ftId}.knows" in format 4.0, so the migration will add a suffix to all but the first and new authoring will refuse them. Give each a different role name.`,
     ]]);
   });
 
@@ -532,42 +525,37 @@ describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
     expect(structuralWellFormedness(model).filter((d) => rules.includes(d.ruleId))).toEqual([]);
   });
 
-  it("finds the objectification case when another object type holds the id first", () => {
-    const model = new ModelBuilder("Test")
-      .withEntityType("Order  Line", { referenceMode: "nr" })
-      .withEntityType("Order Line", { referenceMode: "nr" })
-      .withEntityType("Order", { referenceMode: "nr" })
-      .withBinaryFactType("Order_Line", {
-        role1: { player: "Order", name: "has" },
-        role2: { player: "Order", name: "is of" },
-        uniqueness: "spanning",
-      })
-      .withObjectifiedFactType("Order_Line", "Order Line")
-      .build();
-    const messages = ids(model, "structural/local-name-collision").map((d) => d.message);
-    expect(messages).toContain(
-      'The fact type "Order_Line" and the object type "Order Line" that objectifies it would both take the id "Order_Line" in format 4.0; the migration will rename the fact type to its first reading.',
-    );
+  it("does not call two names with one local name a collision once their ids differ", () => {
+    // The replay gives the second its suffixed id, which id-not-from-name
+    // reports; the 22 corpus pairs and NORMA imports stop warning here.
+    const model = new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+model:
+  name: Test
+  object_types:
+    - { id: u1, name: Order Line, kind: entity, reference_mode: nr }
+    - { id: u2, name: Order_Line, kind: entity, reference_mode: nr }
+`);
+    expect(ids(model, "structural/local-name-collision")).toEqual([]);
+    expect(ids(model, "structural/id-not-from-name").map((d) => d.elementId)).toEqual([
+      "Order_Line_2",
+    ]);
   });
 
-  it("reports a role named population on a populated fact type", () => {
-    const model = new ModelBuilder("Test")
-      .withEntityType("City", { referenceMode: "name" })
-      .withValueType("Count", { dataType: { name: "integer" } })
-      .withBinaryFactType("City has Count", {
-        role1: { player: "City", name: "has" },
-        role2: { player: "Count", name: "population" },
-        uniqueness: "role1",
-      })
-      .withPopulation("City has Count", [{
-        roleValues: {
-          [roleId("City has Count", 1)]: "Oslo",
-          [roleId("City has Count", 2)]: "700000",
-        },
-      }])
-      .build();
+  it("reports a role whose id a population holds", () => {
+    const model = new OrmModel({ name: "Test" });
+    model.addObjectType({ id: "City", name: "City", kind: "entity", referenceMode: "name" });
+    model.addFactType({
+      id: "City_has_Count",
+      name: "City has Count",
+      roles: [
+        { id: "City_has_Count.has", name: "has", playerId: "City" },
+        { id: "City_has_Count.population", name: "population", playerId: "City" },
+      ],
+      readings: ["{0} has {1}"],
+    });
+    model.addPopulation({ id: "City_has_Count.population", factTypeId: "City_has_Count" });
     expect(ids(model, "structural/local-name-collision").map((d) => d.message)).toEqual([
-      'Fact type "City has Count" has a role named "population" and a population, which would both take the id "City_has_Count.population" in format 4.0; the migration will add a suffix to the population. Rename the role to avoid it.',
+      'Fact type "City has Count" has a role and a population that both hold the id "City_has_Count.population"; in format 4.0 an id names one element. Rename the role.',
     ]);
   });
 

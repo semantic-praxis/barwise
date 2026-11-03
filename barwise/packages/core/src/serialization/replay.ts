@@ -76,6 +76,7 @@ export function replayInto40(source: OrmModel, options: ReplayOptions = {}): Orm
     ...(source.domainContext !== undefined ? { domainContext: source.domainContext } : {}),
     ...(source.note !== undefined ? { note: source.note } : {}),
     ...(source.namespace !== undefined ? { namespace: source.namespace } : {}),
+    ...(source.imports.size > 0 ? { imports: Object.fromEntries(source.imports) } : {}),
     idsAcrossKinds: true,
   });
   // One map per kind: an object type and a fact type sharing an old id are
@@ -180,6 +181,13 @@ export function replayInto40(source: OrmModel, options: ReplayOptions = {}): Orm
         }`
         : undefined;
       record("objectType", ot.id, target.addObjectType({ ...config, ...(id ? { id } : {}) }).id);
+      // The import that alias needs, bound to the context it abbreviates.
+      // Two contexts with one local name share an alias; the first keeps
+      // it, and `structural/alias-not-imported` cannot tell them apart.
+      if (ot.sourceContext !== undefined) {
+        const alias = localName(ot.sourceContext);
+        if (!target.imports.has(alias)) target.setImport(alias, ot.sourceContext);
+      }
     }
 
     // Which object type objectifies each fact type, for decision 20.

@@ -20,8 +20,9 @@ diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
 (the 4.0 writer and stored `minted_from`, unwired); 6b-2b-2b-2 implemented
 2026-10-31 (the switch to format 4.0, with its fixture and golden churn);
 6b-3a implemented 2026-11-02 (`migrate` for projects and unstored ids,
-the editor's "Store ids", the 3.x note); 6b-3b, 6b-3c, 6b-4b, 6c to 6f
-and WS7 to come
+the editor's "Store ids", the 3.x note); 6b-3b implemented 2026-11-03 (the
+rules, `imports` on the model, rename rewriting ids); 6b-3c, 6b-4b, 6c to
+6f and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-11-03
@@ -1656,6 +1657,36 @@ sites.
       on any file before 4.0). The second is the owner's decision on
       barwise-wcg.frh (2026-11-02): messages keep 4.0 ids, and the note says
       why and names `barwise migrate`.
+  - _6b-3b notes._
+    - Two things the rules need, which the spec states and no sub-step
+      held, ride here: `imports` on the model (the reader keeps it, the
+      4.0 writer writes it after `namespace`, the replay adds the import
+      each shadow's alias needs, merge carries the base's and then each the
+      incoming side adds), and rename rewriting ids, which decision 13
+      names as the repair `id-not-from-name` points at. Rename rebuilds
+      the model through `rename/remapIds.ts` with an old-to-new map: the
+      element takes `localName(new name)`; a fact type's roles,
+      populations and instances take its new id as prefix; a role takes
+      `<fact type>.<local name>`; through a project, each shadow takes
+      `<alias>:<owner's new id>`. A new id another element holds is
+      refused. A minted id is kept with its key, so a rename of a type a
+      constraint's sentence names makes that id stale, which
+      `stale-minted-name` reports (decision 14 as written; whether rename
+      should re-mint such ids is the owner's to decide).
+    - Rules: `structural/id-not-from-name` (warning; `suffixed` when the
+      id is the expected one plus `_N`; shadows and decision 20's fact
+      type exempt); `structural/local-name-collision` now compares ids,
+      so only a model built in code reaches it, and its objectified
+      variant is gone, because an objectification refuses one id for both
+      sides; `duplicate-role-name` builds ids from the fact type's id;
+      `structural/stale-minted-name` (warning, graph rule);
+      `structural/alias-not-imported` (error, on a shadow's id);
+      `project/imported-context-missing` (warning; an import bound to an
+      absolute IRI is not a context).
+    - Left for 6e: the surfaces' rename does not yet rewrite lineage
+      manifests through the id map the rename returns.
+    - Filed: barwise-wcg.4v7 (the test builders' `<ft>.roleN` role ids,
+      which `id-not-from-name` reports).
 - _6b-4, importers and retirement._ The importers switch off
   `generateId` (role ids first, as 6b-4a above), and `generateId`, its
   installs and promptlab's deterministic ids go (6b-4b). Until then an

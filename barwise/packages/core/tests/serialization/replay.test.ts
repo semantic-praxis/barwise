@@ -71,8 +71,8 @@ const oldToNew = (model: OrmModel) => new Map([...model.priorIds!].map(([now, ol
 
 /**
  * The model as a 3.0-shaped document: the 4.0 writer's, which has 3.0's
- * layout, without the keys a name was minted from, which 3.0 has no field
- * for. The 4.0 writer, because a constraint the replay leaves unnamed has
+ * layout, without the keys a name was minted from and the imports the
+ * replay adds for its shadows' aliases, which 3.0 has no field for. The 4.0 writer, because a constraint the replay leaves unnamed has
  * no id, which the 3.0 writer refuses.
  */
 const asText = (model: OrmModel) => {
@@ -84,8 +84,11 @@ const asText = (model: OrmModel) => {
         Object.entries(v).filter(([k]) => k !== "minted_from").map(([k, x]) => [k, strip(x)]),
       )
       : v;
-  const doc = strip(JSON.parse(JSON.stringify(writeDocument40(model)))) as Record<string, unknown>;
-  return { ...doc, orm_version: "3.0" };
+  const doc = strip(JSON.parse(JSON.stringify(writeDocument40(model)))) as {
+    model: Record<string, unknown>;
+  };
+  const { imports: _added, ...header } = doc.model;
+  return { ...doc, model: header, orm_version: "3.0" };
 };
 
 /** The document without the ids of the constraints the replay left unnamed. */
@@ -145,6 +148,14 @@ describe("replaying a 3.x model into format 4.0", () => {
         ...model.populations.map((p) => [p.id, ROLE_ID_PATTERN] as const),
       ].filter(([id, pattern]) => !pattern.test(id)).map(([id]) => id);
       expect(off).toEqual([]);
+      // Each shadow's alias is imported, bound to the context it stood for.
+      const shadows = source.objectTypes.filter((o) => o.sourceContext !== undefined);
+      expect(
+        shadows.map((o) => {
+          const id = ids.get(o.id)!;
+          return [id, model.imports.get(id.slice(0, id.indexOf(":")))];
+        }),
+      ).toEqual(shadows.map((o) => [ids.get(o.id), o.sourceContext]));
       // No reference left on an old id: an unmapped one maps back to itself,
       // so the comparison above cannot see it.
       const fresh = new Set(ids.values());

@@ -105,6 +105,15 @@ export function mergeModels(
     // the merge names the fields it carries, so a field nobody listed
     // is a field nobody keeps (barwise-937).
     note: existing.note,
+    // The base's aliases, and each the incoming side adds: an accepted
+    // shadow from the incoming side needs its import (iri-identity WS6).
+    // An alias both bind keeps the base's binding.
+    // The base's come first, in its order, so a merge that adds none
+    // writes the base's imports unchanged.
+    imports: Object.fromEntries([
+      ...existing.imports,
+      ...[...incoming.imports].filter(([alias]) => !existing.imports.has(alias)),
+    ]),
   });
 
   // We need to build a mapping from incoming object type ids to the ids

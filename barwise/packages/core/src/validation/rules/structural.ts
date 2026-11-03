@@ -2,6 +2,7 @@ import { describeConstraintRepeat } from "../../model/Constraint.js";
 import { isScopedView } from "../../model/DiagramLayout.js";
 import type { ModelGraph } from "../../model/graph.js";
 import { identificationOrder } from "../../model/identification.js";
+import { type Mintable, mintedKey } from "../../model/mint.js";
 import { localName, localNameEncodes } from "../../model/name.js";
 import { objectificationRef } from "../../model/ObjectifiedFactType.js";
 import type { OrmModel } from "../../model/OrmModel.js";
@@ -49,6 +50,7 @@ export function structuralRules(model: OrmModel, graph: ModelGraph): Diagnostic[
   diagnostics.push(...checkSubtypeFactKinds(model, graph));
   diagnostics.push(...checkObjectifiedFactTypeKinds(model, graph));
   diagnostics.push(...checkIdentificationCycles(model, graph));
+  diagnostics.push(...checkStaleMintedNames(model));
 
   return diagnostics;
 }
@@ -63,6 +65,8 @@ export function structuralWellFormedness(model: OrmModel): Diagnostic[] {
   diagnostics.push(...checkDuplicateObjectTypeNames(model));
   diagnostics.push(...checkDuplicateFactTypeNames(model));
   diagnostics.push(...checkLocalNames(model));
+  diagnostics.push(...checkIdsFromNames(model));
+  diagnostics.push(...checkAliases(model));
   diagnostics.push(...checkBinaryFactTypeReadings(model));
   diagnostics.push(...checkSubtypeCycles(model));
   diagnostics.push(...checkDiagramReferences(model));
@@ -234,68 +238,55 @@ function checkDuplicateFactTypeNames(model: OrmModel): Diagnostic[] {
 }
 
 /**
- * What format 4.0 will do to this model's names, reported on 3.x so a
- * modeller sees it before the migration does it
- * (docs/specs/iri-identity.spec.md, WS2). In 4.0 an element's id is its
- * name through `localName`, object types and fact types share one
- * namespace, a role's id is its fact type's and its role name, and a
- * population's is its fact type's and `.population` (decision 7). So:
+ * Ids and names, in format 4.0, where an element's id is its name through
+ * `localName` (decision 13), object types and fact types share one
+ * namespace, and a role's id is its fact type's id and its role name:
  *
- * - two object types or fact types whose local names are equal, though
- *   their names are not (an exact repeat within a kind is already
- *   `duplicate-*-name`), collide; a fact type that collides with the type
- *   objectifying it is decision 4's case, which the migration renames;
- * - roles of one fact type with one local name collide, reported once per
- *   group, and so does a role named `population` with its fact type's
- *   population;
+ * - two elements holding one id collide. A 4.0 load refuses that, so only
+ *   a model built in code reaches this. (A fact type and the object type
+ *   objectifying it cannot share one: the objectification refuses it.);
+ * - roles of one fact type whose role names give one id collide, reported
+ *   once per group, and so does a role whose id a population holds;
  * - a name whose local name is more than its whitespace turned to `_`
  *   gets an encoded id, which is worth seeing once.
  *
- * Roles of different fact types cannot collide, and no role collides with
- * an object type or a fact type: a role's local name holds a `.`, which no
- * other local name can.
+ * Two names with one local name no longer collide: the second element
+ * takes a suffixed id, which `checkIdsFromNames` reports.
  */
 function checkLocalNames(model: OrmModel): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const objectifier = new Map(
-    model.objectifiedFactTypes.map((o) => [o.factTypeId, o.objectTypeId] as const),
-  );
   const elements = [
     ...model.objectTypes.map((e) => ({ kind: "object type", id: e.id, name: e.name })),
     ...model.factTypes.map((e) => ({ kind: "fact type", id: e.id, name: e.name })),
   ];
   const seen = new Map<string, { kind: string; id: string; name: string; }>();
   for (const e of elements) {
-    const local = localName(e.name);
     if (localNameEncodes(e.name)) {
-      diagnostics.push(report(RULE_ID.encodedLocalName, "default", e.id, e.kind, e.name, local));
+      diagnostics.push(
+        report(RULE_ID.encodedLocalName, "default", e.id, e.kind, e.name, localName(e.name)),
+      );
     }
-    const first = seen.get(local);
+    const first = seen.get(e.id);
     if (!first) {
-      seen.set(local, e);
+      seen.set(e.id, e);
       continue;
     }
-    if (first.kind === e.kind && first.name === e.name) continue;
-    const objectType = model.getObjectType(objectifier.get(e.id) ?? "");
     diagnostics.push(
-      objectType && localName(objectType.name) === local
-        ? report(RULE_ID.localNameCollision, "objectified", e.id, e.name, objectType.name, local)
-        : report(
-          RULE_ID.localNameCollision,
-          "default",
-          e.id,
-          e.name,
-          e.kind,
-          first.name,
-          first.kind,
-          local,
-        ),
+      report(
+        RULE_ID.localNameCollision,
+        "default",
+        e.id,
+        e.name,
+        e.kind,
+        first.name,
+        first.kind,
+        e.id,
+      ),
     );
   }
 
-  const populated = new Set(model.populations.map((p) => p.factTypeId));
+  const populationIds = new Set(model.populations.map((p) => p.id));
   for (const ft of model.factTypes) {
-    const ftLocal = localName(ft.name);
     const groups = new Map<string, { id: string; name: string; }[]>();
     for (const role of ft.roles) {
       const local = localName(role.name);
@@ -307,28 +298,123 @@ function checkLocalNames(model: OrmModel): Diagnostic[] {
             role.id,
             "role",
             role.name,
-            `${ftLocal}.${local}`,
+            `${ft.id}.${local}`,
           ),
         );
       }
       groups.set(local, [...(groups.get(local) ?? []), { id: role.id, name: role.name }]);
+      if (populationIds.has(role.id)) {
+        diagnostics.push(
+          report(RULE_ID.localNameCollision, "population", role.id, ft.name, role.id),
+        );
+      }
     }
     for (const [local, roles] of groups) {
-      const id = `${ftLocal}.${local}`;
-      if (roles.length > 1) {
-        const names = roles.map((r) => `"${r.name}"`).join(", ");
-        diagnostics.push(
-          report(RULE_ID.duplicateRoleName, "default", roles[1]!.id, ft.name, names, id),
-        );
-      }
-      if (local === "population" && populated.has(ft.id)) {
-        diagnostics.push(
-          report(RULE_ID.localNameCollision, "population", roles[0]!.id, ft.name, id),
-        );
-      }
+      if (roles.length < 2) continue;
+      const names = roles.map((r) => `"${r.name}"`).join(", ");
+      diagnostics.push(
+        report(
+          RULE_ID.duplicateRoleName,
+          "default",
+          roles[1]!.id,
+          ft.name,
+          names,
+          `${ft.id}.${local}`,
+        ),
+      );
     }
   }
   return diagnostics;
+}
+
+/**
+ * Each object type, fact type and role whose id is not the one its name
+ * gives (decision 13): `localName(name)`, and a role's fact type id, a
+ * `.`, and its role name's. A suffixed id, which a load or an add gives
+ * when the id is taken, is said to be one. Exempt: a shadow, whose id is
+ * its owner's behind an alias; and a fact type its objectifying type's
+ * name would collide with, whose id comes from its first reading
+ * (decision 20), until a rename of either type ends the collision.
+ */
+function checkIdsFromNames(model: OrmModel): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const check = (kind: string, name: string, id: string, expected: string) => {
+    if (id === expected) return;
+    const suffixed = id.startsWith(`${expected}_`) && /^\d+$/.test(id.slice(expected.length + 1));
+    diagnostics.push(
+      report(
+        RULE_ID.idNotFromName,
+        suffixed ? "suffixed" : "default",
+        id,
+        kind,
+        name,
+        id,
+        expected,
+      ),
+    );
+  };
+  const objectifier = new Map(
+    model.objectifiedFactTypes.map((o) => [o.factTypeId, o.objectTypeId] as const),
+  );
+  for (const ot of model.objectTypes) {
+    if (!ot.id.includes(":")) check("object type", ot.name, ot.id, localName(ot.name));
+  }
+  for (const ft of model.factTypes) {
+    const exempt = localName(ft.name) === objectifier.get(ft.id);
+    if (!exempt) check("fact type", ft.name, ft.id, localName(ft.name));
+    for (const role of ft.roles) {
+      check("role", role.name, role.id, `${ft.id}.${localName(role.name)}`);
+    }
+  }
+  return diagnostics;
+}
+
+/**
+ * Each object type whose id names an alias the model does not import: a
+ * shadow's id is `<alias>:<local name>`, and nothing else says which
+ * context the alias means. Not a refusal at the add, because the lenient
+ * loads (validate, the editor, merge's incoming side) must load such a
+ * file to report it.
+ */
+function checkAliases(model: OrmModel): Diagnostic[] {
+  return model.objectTypes.flatMap((ot) => {
+    const colon = ot.id.indexOf(":");
+    if (colon < 0) return [];
+    const alias = ot.id.slice(0, colon);
+    return model.imports.has(alias)
+      ? []
+      : [report(RULE_ID.aliasNotImported, "default", ot.id, ot.id, alias)];
+  });
+}
+
+/**
+ * Each minted id whose element now says something other than what it was
+ * minted from (decision 14): its stored key against the key minting it now
+ * would give. A graph rule, run only when the graph builds, so a dangling
+ * reference is reported once, as itself. An id with no stored key was
+ * written by a person or a tool and is never stale.
+ */
+function checkStaleMintedNames(model: OrmModel): Diagnostic[] {
+  const stale = (kind: string, id: string | undefined, element: Mintable) => {
+    if (id === undefined) return [];
+    const stored = model.mintedFromOf(id);
+    if (stored === undefined) return [];
+    const now = mintedKey(element, model);
+    return now === undefined || now === stored
+      ? []
+      : [report(RULE_ID.staleMintedName, "default", id, kind, id)];
+  };
+  return [
+    ...model.everyConstraint().flatMap((inView) =>
+      stale("constraint", inView[0].id, { kind: "constraint", inView })
+    ),
+    ...model.subtypeFacts.flatMap((sf) =>
+      stale("subtype fact", sf.id, { kind: "subtypeFact", subtypeFact: sf })
+    ),
+    ...model.objectifiedFactTypes.flatMap((o) =>
+      stale("objectification", o.id, { kind: "objectification", objectification: o })
+    ),
+  ];
 }
 
 /**

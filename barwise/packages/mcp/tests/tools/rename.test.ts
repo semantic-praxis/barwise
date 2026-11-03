@@ -60,7 +60,10 @@ describe("rename_element", () => {
   it("returns the renamed model for inline YAML, writing nothing", () => {
     const result = body(executeRename({ source: MODEL, objectType: "Order", to: "Purchase" }));
     expect(result.yaml).toContain("name: Purchase");
-    expect(result.changes).toEqual([`Renamed object type "Order" to "Purchase".`]);
+    expect(result.changes).toEqual([
+      `Renamed object type "Order" to "Purchase".`,
+      `Changed the id "ot-o" to "Purchase".`,
+    ]);
     expect(result.writtenTo).toBeUndefined();
   });
 
