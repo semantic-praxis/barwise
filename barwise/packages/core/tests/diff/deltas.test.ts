@@ -127,6 +127,17 @@ const SAMPLES: ReadonlyArray<{ delta: ModelDelta; label: string; }> = [
     label:
       "Constraint: external uniqueness over Room is in Building (houses), Room has RoomNumber (is of)",
   },
+  {
+    delta: {
+      kind: "modified",
+      elementType: "model_header",
+      name: "namespace",
+      changes: [{ change: "namespace", to: "https://a.example/" }],
+      changeDescriptions: [],
+      breakingLevel: "caution",
+    },
+    label: "Model header: namespace",
+  },
 ];
 
 describe("labelling a delta", () => {

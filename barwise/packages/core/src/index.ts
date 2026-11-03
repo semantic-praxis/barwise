@@ -121,7 +121,7 @@ export {
 export { type Mintable, mintedName } from "./model/mint.js";
 export { ModelElement } from "./model/ModelElement.js";
 export { localName, ROLE_ID_PATTERN } from "./model/name.js";
-export { type DomainRef, namespaceOf } from "./model/namespace.js";
+export { type DomainRef, iriOf, namespaceOf } from "./model/namespace.js";
 export {
   objectificationRef,
   ObjectifiedFactType,

@@ -184,6 +184,14 @@ renders just the named domain as a single SVG.
 
 Compare two ORM model files and report structural deltas.
 
+A change to the model's own `namespace`, or to one alias its `imports`
+bind, is reported as a `Model header` delta of its own: added, removed or
+modified like any element. It changes no id and no pairing, only the IRIs
+the model's elements expand to. `barwise merge` takes added and changed
+ones and, as for every element, never acts on a removal. An alias the two
+models bind to different contexts is refused: the base's shadows behind it
+would come to name another context.
+
 ```sh
 barwise diff old.orm.yaml new.orm.yaml
 barwise diff old.orm.yaml new.orm.yaml --format json

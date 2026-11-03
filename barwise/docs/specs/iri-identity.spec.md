@@ -21,8 +21,9 @@ diff's pairing by old ids, unwired); 6b-2b-2b-1 implemented 2026-10-31
 2026-10-31 (the switch to format 4.0, with its fixture and golden churn);
 6b-3a implemented 2026-11-02 (`migrate` for projects and unstored ids,
 the editor's "Store ids", the 3.x note); 6b-3b implemented 2026-11-03 (the
-rules, `imports` on the model, rename rewriting ids); 6b-3c, 6b-4b, 6c to
-6f and WS7 to come
+rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
+2026-11-03 (`iriOf`, the model header delta); 6b-4b, 6c to 6f and WS7 to
+come
 
 Created: 2026-10-28
 Last-updated: 2026-11-03
@@ -1439,11 +1440,12 @@ version-1 manifest would go silently empty for impact analysis.
   becomes a map per domain, because a shadow's id changes in each domain
   that holds it.
 - **6f, the outputs.** DDL comments (`DdlExportFormat.ts:185`), Ossie's
-  loss block (`lose`, `writeOssie.ts:156`; the namespace line at `:361-364`) and SVG `data-id`
+  loss block (`lose`, `writeOssie.ts:156`; the `model_header` namespace and imports lines, added in 6b-3c) and SVG `data-id`
   (`diagram-ui/src/parts/*Node.tsx`) print local names with no code
   change. The Ossie writer puts `iriOf`'s identity IRI, or
   `equivalent_iri` when present, into Ossie's `iri` (decision 1), and the
-  namespace leaves its loss block (WS4).
+  namespace leaves its loss block (WS4). The imports line stays: Ossie
+  has no aliases, and a shadow is written by its owner's name.
 
 **6b ships in four parts** (owner, 2026-10-30), each merged on its own,
 with no release until 6f, because 6b alone is more than a session: the
@@ -1687,6 +1689,35 @@ sites.
       manifests through the id map the rename returns.
     - Filed: barwise-wcg.4v7 (the test builders' `<ft>.roleN` role ids,
       which `id-not-from-name` reports).
+    - For 6d (from 6b-3b's last pr-review pass): through a project, a
+      same-name repair of an owner whose shadow already holds the right id
+      is refused, because the shadow's domain has nothing to repair.
+      Reachable only by a hand edit until split writes alias ids.
+  - _6b-3c notes._
+    - `iriOf(model, id, domain?)` sits beside `namespaceOf` in
+      `model/namespace.ts`. A local id expands from the model's namespace,
+      or the one the project gives the domain. An `alias:local` id
+      resolves through `imports` to a context the project holds or to an
+      absolute namespace IRI, and is undefined without a project, as this
+      section says, even for an alias bound to an IRI.
+    - The header is diff's `model_header` deltas: one for `namespace` and
+      one per alias, each `added`, `removed` or `modified`, first in the
+      diff, none for a part both sides state alike. One delta for the whole
+      header was the first version, and `/code-review` found it forced
+      special cases into merge: every surface's non-interactive merge
+      accepts all added and modified deltas and never removals, and one
+      bundled delta cannot tell a removal (a transcript import has no
+      namespace and no imports) from an addition. Per part, the policy
+      applies unchanged. A person who accepts a removal in the editor gets
+      it, unless a merged shadow still uses the alias, whose import is
+      kept so the model never names an alias it does not import. A rebound alias is still refused, accepted or not, since the
+      base's shadows behind it would change meaning. An incoming alias is
+      carried when its delta is accepted or a merged shadow needs it.
+    - Ossie's export check keys header deltas under their own
+      `model_header` prediction, scoped per change kind (`namespace`,
+      `importBinding`), and the writer now predicts dropped imports beside
+      the dropped namespace. The read-back's imports, which the 3.0-shaped
+      intermediate cannot hold, are put back on the aligned model.
 - _6b-4, importers and retirement._ The importers switch off
   `generateId` (role ids first, as 6b-4a above), and `generateId`, its
   installs and promptlab's deterministic ids go (6b-4b). Until then an

@@ -97,24 +97,29 @@ export function mergeModels(
   refuseUnmergeablePairing(diff);
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
+  // A rebound alias is refused, accepted or not: the base's shadows behind
+  // it would come to name another context, which no review of the header
+  // line shows (iri-identity WS6).
   refuseImportClashes(existing, incoming);
+  const header = acceptedHeader(deltas, accepted);
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
-    namespace: existing.namespace,
+    // An accepted namespace delta, added, changed or removed, leaves the
+    // incoming side's.
+    namespace: header.namespace ? incoming.namespace : existing.namespace,
     // The note was dropped for as long as this function has existed:
     // the merge names the fields it carries, so a field nobody listed
     // is a field nobody keeps (barwise-937).
     note: existing.note,
-    // The base's aliases, and each the incoming side adds: an accepted
-    // shadow from the incoming side needs its import (iri-identity WS6).
-    // Phase 9 drops the incoming ones no merged shadow uses.
-    // An alias both bind keeps the base's binding.
-    // The base's come first, in its order, so a merge that adds none
-    // writes the base's imports unchanged.
+    // The base's come first, in its order, so a merge that takes no header
+    // change writes the base's imports unchanged.
+    // The base's aliases, less each whose removal was accepted, then each
+    // added alias that was accepted; phase 9 adds any other a merged
+    // shadow needs.
     imports: Object.fromEntries([
-      ...existing.imports,
-      ...[...incoming.imports].filter(([alias]) => !existing.imports.has(alias)),
+      ...[...existing.imports].filter(([alias]) => !header.removedImports.has(alias)),
+      ...[...incoming.imports].filter(([alias]) => header.addedImports.has(alias)),
     ]),
   });
 
@@ -663,11 +668,18 @@ export function mergeModels(
   // reported stale.
   carryMintedKeys(merged, existing, incoming);
 
-  // Phase 9: an alias only the incoming side bound, which no merged shadow
-  // uses, would only raise project/imported-context-missing; drop it.
-  for (const alias of [...merged.imports.keys()]) {
-    if (existing.imports.has(alias)) continue;
-    if (!merged.objectTypes.some((ot) => ot.id.startsWith(`${alias}:`))) merged.removeImport(alias);
+  // Phase 9: every merged shadow keeps its alias. One from the incoming
+  // side needs the incoming binding, which the base may lack and whose
+  // header delta may not have been taken; one kept from the base needs the
+  // base's, even when the removal of that import was accepted, or the
+  // merged model would name an alias it does not import. An alias the
+  // merged model still uses cannot be removed out from under it.
+  for (const ot of merged.objectTypes) {
+    const colon = ot.id.indexOf(":");
+    if (colon < 0) continue;
+    const alias = ot.id.slice(0, colon);
+    const target = incoming.imports.get(alias) ?? existing.imports.get(alias);
+    if (!merged.imports.has(alias) && target !== undefined) merged.setImport(alias, target);
   }
 
   return merged;
@@ -942,21 +954,30 @@ function refuseUnmergeablePairing(diff: MergeInput): void {
 }
 
 /**
- * Refuse a merge that would give two object types, or two fact types, one
- * name, before anything is built.
- *
- * The diff pairs a shared id as one element (model invariants, decision
- * 1), so an accepted addition cannot collide with an id the merge keeps;
- * what is left is a NAME clash: two elements that exchanged names under
- * kept ids, with one rename accepted and the other not. Which one should
- * win is not the merge's call, so it names both and stops, and
- * `mergeAndValidate` reports it as `merge-error`. Before, `addObjectType`
- * threw a bare "already exists" halfway through the build, naming one.
- *
- * A content-matching diff never reaches this point:
- * `refuseUnmergeablePairing` refuses it first, so nothing here guards an
- * id that diff's name pass left unpaired.
+ * What the accepted header deltas take: whether the namespace delta was
+ * accepted, and which aliases were added or removed. A rebinding never
+ * gets here (`refuseImportClashes`).
  */
+function acceptedHeader(
+  deltas: readonly ModelDelta[],
+  accepted: ReadonlySet<number>,
+): {
+  namespace: boolean;
+  addedImports: ReadonlySet<string>;
+  removedImports: ReadonlySet<string>;
+} {
+  let namespace = false;
+  const addedImports = new Set<string>();
+  const removedImports = new Set<string>();
+  deltas.forEach((d, i) => {
+    if (d.elementType !== "model_header" || !accepted.has(i) || d.kind === "unchanged") return;
+    const [change] = d.changes;
+    if (change.change === "namespace") namespace = true;
+    else (d.kind === "removed" ? removedImports : addedImports).add(change.alias);
+  });
+  return { namespace, addedImports, removedImports };
+}
+
 /**
  * Refuse a merge whose two sides bind one alias to different targets: the
  * incoming side's shadows behind it would come to name the base's context,
@@ -979,6 +1000,22 @@ function refuseImportClashes(existing: OrmModel, incoming: OrmModel): void {
   );
 }
 
+/**
+ * Refuse a merge that would give two object types, or two fact types, one
+ * name, before anything is built.
+ *
+ * The diff pairs a shared id as one element (model invariants, decision
+ * 1), so an accepted addition cannot collide with an id the merge keeps;
+ * what is left is a NAME clash: two elements that exchanged names under
+ * kept ids, with one rename accepted and the other not. Which one should
+ * win is not the merge's call, so it names both and stops, and
+ * `mergeAndValidate` reports it as `merge-error`. Before, `addObjectType`
+ * threw a bare "already exists" halfway through the build, naming one.
+ *
+ * A content-matching diff never reaches this point:
+ * `refuseUnmergeablePairing` refuses it first, so nothing here guards an
+ * id that diff's name pass left unpaired.
+ */
 function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
   const kept = deltas.flatMap((d, i) => {
     if (d.elementType !== "object_type" && d.elementType !== "fact_type") return [];

@@ -61,8 +61,11 @@ export function verifyOssie(
     if (covered === "all") continue;
     let changes = delta.changeDescriptions;
     // A scoped line explains changes, never an element that does not come
-    // back or comes back added.
-    if (covered !== undefined && delta.kind === "modified") {
+    // back or comes back added; but a header part has no element, and its
+    // not coming back is the change a line predicts.
+    if (
+      covered !== undefined && (delta.kind === "modified" || delta.elementType === "model_header")
+    ) {
       changes = delta.changeDescriptions.filter((_, i) => !covered.has(delta.changes[i]!.change));
       if (changes.length === 0) continue;
     }
@@ -122,7 +125,11 @@ function align(source: OrmModel, back: OrmModel, written: OssieCorrespondence): 
   // source id may need quoting in YAML ("1", "true"). Read as written: the
   // point is the source's ids, which a load would replay into 4.0's
   // (iri-identity WS6), and a model built in code may hold ids 4.0 refuses.
-  return new OrmYamlSerializer().deserializeAsWritten(stringify(reId(doc, ids)));
+  const aligned = new OrmYamlSerializer().deserializeAsWritten(stringify(reId(doc, ids)));
+  // 3.0 has no imports, so `document30` left them out; they are the
+  // read-back's, and the header deltas compare them.
+  for (const [alias, target] of back.imports) aligned.setImport(alias, target);
+  return aligned;
 }
 
 /**
@@ -151,6 +158,7 @@ function document30(back: OrmModel): OrmYamlDocument {
   fill(doc.model["constraints"]);
   fill(doc.model["subtype_facts"]);
   fill(doc.model["objectified_fact_types"]);
+  delete doc.model["imports"];
   doc.orm_version = "3.0";
   return doc as unknown as OrmYamlDocument;
 }
@@ -171,6 +179,8 @@ function reId(value: unknown, ids: ReadonlyMap<string, string>): unknown {
 function sourceKey(delta: ModelDelta): string | undefined {
   if (delta.kind === "added") return undefined;
   if (delta.elementType === "definition") return lossKey({ kind: "definition", id: delta.term });
+  // The model's header is predicted under its own key, per change kind.
+  if (delta.elementType === "model_header") return lossKey({ kind: "model_header" });
   // An unnamed constraint's key is its reference, as `writeOssie` keys it.
   const id = delta.elementType === "constraint" && delta.existing
     ? constraintRef(delta.existing as Constraint)

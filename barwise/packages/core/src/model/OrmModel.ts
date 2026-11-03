@@ -375,11 +375,6 @@ export class OrmModel implements ConstraintModel {
     this._imports.set(alias, target);
   }
 
-  /** Unbind an alias; a no-op for one this model does not import. */
-  removeImport(alias: string): void {
-    this._imports.delete(alias);
-  }
-
   // ---- Object Types ----
 
   /** All object types in the model. */

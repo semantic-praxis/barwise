@@ -37,6 +37,11 @@ const CHANGE_LEVEL = {
   aliases: "safe",
   sourceContext: "safe",
   context: "safe",
+  // A model's namespace and its imports change no id and no pairing, but
+  // every IRI `iriOf` forms from them moves, and an export or a shadow
+  // read through a rebound alias names something else.
+  namespace: "caution",
+  importBinding: "caution",
   readings: "safe",
   roleName: "safe",
   // A rename under a kept id (model-invariants): naming, like roleName,
@@ -133,6 +138,8 @@ export function classifyChange(change: ChangeDescription): BreakingLevel {
  * population sees the sample removed on every pass.
  */
 const REMOVAL_LEVEL = {
+  // A namespace or an import removed moves IRIs or unbinds an alias.
+  model_header: "caution",
   object_type: "breaking",
   fact_type: "breaking",
   definition: "breaking",

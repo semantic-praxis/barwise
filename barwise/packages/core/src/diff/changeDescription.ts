@@ -69,6 +69,14 @@ export type ChangeDescription =
   | { readonly change: "referenceMode"; readonly from?: string; readonly to?: string; }
   | { readonly change: "preferredIdentifier"; readonly from?: string; readonly to?: string; }
   | { readonly change: "sourceContext"; readonly from?: string; readonly to?: string; }
+  // --- The model header (iri-identity WS6) ---
+  | { readonly change: "namespace"; readonly from?: string; readonly to?: string; }
+  | {
+    readonly change: "importBinding";
+    readonly alias: string;
+    readonly from?: string;
+    readonly to?: string;
+  }
   | {
     readonly change: "valueConstraint";
     readonly from?: ValueConstraintDef;
@@ -217,6 +225,10 @@ export function describeChange(change: ChangeDescription): string {
       return `preferred identifier: ${change.from ?? NONE} -> ${change.to ?? NONE}`;
     case "sourceContext":
       return `source context: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+    case "namespace":
+      return `namespace: "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
+    case "importBinding":
+      return `import "${change.alias}": "${change.from ?? NONE}" -> "${change.to ?? NONE}"`;
     case "valueConstraint":
       return "value constraint changed";
     case "cardinality":

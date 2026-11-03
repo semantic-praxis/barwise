@@ -449,6 +449,21 @@ describe("Ossie export: the loss report", () => {
     );
   });
 
+  it("names a model's imports as not written, and reports no header change past the prediction", () => {
+    // The model header is a diff delta now (iri-identity 6b-3c); the
+    // export's own check keys it under the model's prediction, so the
+    // namespace and imports it predicts are not reported a second time.
+    const m = new OrmModel({
+      name: "M",
+      namespace: "https://data.acme.com/sales/",
+      imports: { crm: "crm", ext: "https://ext.example/" },
+    });
+    entity(m, "Customer");
+    const { losses } = exported(m);
+    expect(losses).toContain("model: imports crm, ext not written");
+    expect(losses.filter((l) => l.startsWith("Model header"))).toEqual([]);
+  });
+
   it("does not write a composite identifier over a ring binary, which the importer refuses", () => {
     const m = new OrmModel({ name: "M" });
     const p = entity(m, "Person");
