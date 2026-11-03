@@ -8,8 +8,9 @@ export const UNSTORED_ID_SOURCE = diagnosticSource("structural/unstored-id");
 
 /**
  * The editor action that stores the ids a 4.0 file leaves to the load
- * (iri-identity decision 17): each is written into the file's own text,
- * comments and layout kept, as `barwise migrate` writes it. Offered when
+ * (iri-identity decision 17): each is inserted into the file's own text,
+ * as `barwise migrate` writes it, one edit per id, so nothing else in the
+ * file changes and undo takes back exactly what was added. Offered when
  * the request carries an unstored-id diagnostic, and it fixes all of them
  * at once, since storing one id and not the next leaves the file in the
  * same state.
@@ -36,13 +37,10 @@ export function storeIdsAction(
     isPreferred: true,
     edit: {
       changes: {
-        [document.uri]: [{
-          range: {
-            start: { line: 0, character: 0 },
-            end: document.positionAt(Number.MAX_SAFE_INTEGER),
-          },
-          newText: result.text,
-        }],
+        [document.uri]: result.stored.map(({ insert }) => {
+          const at = document.positionAt(insert.offset);
+          return { range: { start: at, end: at }, newText: insert.text };
+        }),
       },
     },
   }];

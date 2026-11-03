@@ -1006,7 +1006,8 @@ const RULE_DESCRIPTORS = {
       default: (): string =>
         `This file is in a format before 4.0. It loads under format 4.0's ids, which these `
         + `diagnostics use and the file does not state. Run \`barwise migrate\` on it to write `
-        + `them into the file.`,
+        + `them into the file, or on its project's .orm-project.yaml when it is a domain of `
+        + `one, so its shadows name their owners' ids.`,
     },
   },
   [RULE_ID.unstoredId]: {

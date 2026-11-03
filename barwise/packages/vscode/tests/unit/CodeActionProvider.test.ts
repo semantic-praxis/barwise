@@ -48,12 +48,15 @@ describe("an id the file does not state, in the editor", () => {
     const diagnostics = diagnosticsOf(TYPED).filter((d) => d.source === UNSTORED_ID_SOURCE);
     const [action] = storeIdsAction(doc(TYPED), diagnostics as never);
     expect(action!.title).toBe("Store ids");
-    const [edit] = action!.edit!.changes!["file:///m.orm.yaml"]!;
-    expect(edit!.range.start).toEqual({ line: 0, character: 0 });
-    expect(edit!.range.end).toEqual(doc(TYPED).positionAt(TYPED.length));
-    expect(edit!.newText).toContain("# typed without an id");
-    expect(edit!.newText).toContain("id: Each_Person_smokes");
-    expect(diagnosticsOf(edit!.newText).map((d) => d.source)).not.toContain(UNSTORED_ID_SOURCE);
+    const edits = action!.edit!.changes!["file:///m.orm.yaml"]!;
+    // One insertion, after the constraint's last key, and nothing replaced.
+    expect(edits).toHaveLength(1);
+    const [edit] = edits;
+    expect(edit!.range.start).toEqual(edit!.range.end);
+    expect(edit!.newText).toMatch(/^, id: Each_Person_smokes, minted_from: /);
+    const after = TextDocument.applyEdits(doc(TYPED), edits);
+    expect(after).toContain("# typed without an id");
+    expect(diagnosticsOf(after).map((d) => d.source)).not.toContain(UNSTORED_ID_SOURCE);
   });
 
   it("is not offered without the diagnostic it answers", () => {

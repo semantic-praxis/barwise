@@ -4,11 +4,14 @@
  * without an id is given one on every load, and until the file states it
  * nothing else can refer to it. This writes each such id, with the key it
  * was minted from, into the file's own text, so the editor's "Store ids"
- * action and `barwise migrate` keep a person's comments and layout rather
- * than rewriting the file from the model.
+ * action and `barwise migrate` change nothing else in a file a person
+ * wrote: the new lines are spliced in, and every other byte stays.
+ * Re-printing the document from its syntax tree, which the first version
+ * did, kept comments but reformatted flow collections, comment spacing and
+ * line endings across the whole file (6b-3a's pr-review).
  */
 
-import { isMap, isSeq, parseDocument, type YAMLMap } from "yaml";
+import { isMap, isScalar, isSeq, type Pair, parseDocument, stringify, type YAMLMap } from "yaml";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument40 } from "./OrmYamlSerializer.js";
 
@@ -17,6 +20,8 @@ export interface StoredId {
   readonly id: string;
   /** Where in the document the element sits: `["model", "constraints", 0]`. */
   readonly path: readonly (string | number)[];
+  /** The text inserted, at `offset` in the input, to store it. */
+  readonly insert: { readonly offset: number; readonly text: string; };
 }
 
 export interface StoreIdsResult {
@@ -37,8 +42,10 @@ function unnamedLists(factTypes: number): (string | number)[][] {
 
 /**
  * Write into a 4.0 file every id its load minted (`OrmModel.unstoredIds`),
- * each as the element's first key with its `minted_from` after it, as the
- * 4.0 writer places them. The file is read leniently, as the editor and
+ * with its `minted_from` after it, where the 4.0 writer places them: after
+ * the key the writer puts before `id` (a constraint's content), or first
+ * when the writer puts `id` first (a subtype fact, an objectification), so
+ * a later save by any surface does not move them. The file is read leniently, as the editor and
  * `barwise validate` read it. A file before 4.0 is returned unchanged with
  * nothing stored: it states no 4.0 id at all, and `barwise migrate`
  * rewrites it whole.
@@ -74,15 +81,83 @@ export function storeIds(yaml: string, loaded?: OrmModel): StoreIdsResult {
       );
     }
     seq.items.forEach((item, i) => {
-      const { id, minted_from } = wrote[i]!;
+      const element = wrote[i]!;
+      const { id, minted_from } = element;
       if (!isMap(item) || item.has("id") || id === undefined || !unstored.has(id)) return;
-      const map = item as YAMLMap;
-      const pairs = [doc.createPair("id", id)];
-      if (minted_from !== undefined) pairs.push(doc.createPair("minted_from", minted_from));
-      map.items.unshift(...pairs);
-      stored.push({ id, path: [...path, i] });
+      const keys = Object.keys(element);
+      const before = keys[keys.indexOf("id") - 1];
+      const fields: [string, string][] = [["id", id]];
+      if (minted_from !== undefined) fields.push(["minted_from", minted_from]);
+      stored.push({ id, path: [...path, i], insert: insertion(yaml, item, before, fields) });
     });
   }
-  // lineWidth 0: never fold a long line the person wrote on one.
-  return { text: doc.toString({ lineWidth: 0 }), stored };
+  // Spliced from the end, so each offset still names the input's text.
+  let text = yaml;
+  for (const { insert } of [...stored].sort((a, b) => b.insert.offset - a.insert.offset)) {
+    text = text.slice(0, insert.offset) + insert.text + text.slice(insert.offset);
+  }
+  return { text, stored };
+}
+
+/**
+ * Where and what to insert to give `map` these fields: after the pair
+ * keyed `after` when the map holds it, otherwise before its first pair. A
+ * block map takes them as lines at its own indentation and line ending; a
+ * flow map (`{ type: mandatory, role: X }`) takes them as entries.
+ */
+function insertion(
+  text: string,
+  map: YAMLMap,
+  after: string | undefined,
+  fields: readonly (readonly [string, string])[],
+): { offset: number; text: string; } {
+  const pairs = map.items as Pair[];
+  const anchor = after === undefined
+    ? undefined
+    : pairs.find((p) => isScalar(p.key) && p.key.value === after);
+  const first = pairs[0]!;
+  const keyStart = (anchor ?? first).key as { range?: [number, number, number]; };
+  const start = keyStart.range![0];
+
+  if (map.flow) {
+    const entries = fields.map(([k, v]) => `${k}: ${flowScalar(v)}`).join(", ");
+    if (anchor === undefined) return { offset: start, text: `${entries}, ` };
+    const end = endOf(anchor);
+    return { offset: end, text: `, ${entries}` };
+  }
+
+  const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+  const indent = " ".repeat(start - lineStart);
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = fields.map(([k, v]) => `${k}: ${blockScalar(v)}`);
+  if (anchor === undefined) {
+    return { offset: start, text: lines.map((l) => `${l}${eol}${indent}`).join("") };
+  }
+  // After the anchor's value, at the end of its last line, so a comment on
+  // that line stays with it.
+  const valueEnd = endOf(anchor);
+  if (text[valueEnd - 1] === "\n") {
+    return { offset: valueEnd, text: lines.map((l) => `${indent}${l}${eol}`).join("") };
+  }
+  let lineEnd = text.indexOf("\n", valueEnd);
+  if (lineEnd === -1) lineEnd = text.length;
+  else if (text[lineEnd - 1] === "\r") lineEnd -= 1;
+  return { offset: lineEnd, text: lines.map((l) => `${eol}${indent}${l}`).join("") };
+}
+
+/** Where a pair's value ends; its key's end when it has no value (`role:`). */
+function endOf(pair: Pair): number {
+  const node = (pair.value ?? pair.key) as { range: [number, number, number]; };
+  return node.range[1];
+}
+
+/** A scalar as a block mapping value, as the `yaml` library would write it. */
+function blockScalar(value: string): string {
+  return stringify(value, { lineWidth: 0 }).trimEnd();
+}
+
+/** A scalar safe inside a flow mapping, where `,`, `{`, `}`, `[`, `]` end it. */
+function flowScalar(value: string): string {
+  const plain = blockScalar(value);
+  return /[,[\]{}]/.test(plain) && !/^['"]/.test(plain) ? JSON.stringify(value) : plain;
 }

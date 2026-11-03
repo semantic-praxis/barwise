@@ -267,7 +267,6 @@ every domain of a project.
 
 ```sh
 barwise migrate model.orm.yaml
-barwise migrate domains/*.orm.yaml
 barwise migrate shop.orm-project.yaml
 barwise migrate --check models/*.orm.yaml
 ```
@@ -291,14 +290,15 @@ took a suffix (`Order_Line_2`, because another type in that domain already
 had `Order_Line`); alone, the shadow would name the other type. Given the
 manifest, `migrate` reads every domain first and gives each shadow the id
 its owner holds, then writes all the domains in one staged write. If any
-domain cannot be migrated, none is written.
+domain cannot be migrated, none is written. A domain file named in the same
+run as its manifest is migrated through the manifest only.
 
 A 4.0 file can also leave an id to the load: a constraint, subtype fact or
 objectification typed without one is given an id each time the file is
 read, and nothing else can refer to it by that id until the file states
 it. `migrate` writes those ids into such a file, each with the key it was
-named from, and keeps the file's comments and layout; the editor's "Store
-ids" quick fix does the same for the open file. A 4.0 file that states every
+named from, where a save would put them, and changes nothing else in the
+file; the editor's "Store ids" quick fix does the same for the open file. A 4.0 file that states every
 id is left untouched.
 
 This is one of the two commands that modify their inputs, with `rename`. A file before 4.0

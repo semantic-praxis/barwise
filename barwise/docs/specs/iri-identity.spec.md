@@ -24,7 +24,7 @@ the editor's "Store ids", the 3.x note); 6b-3b, 6b-3c, 6b-4b, 6c to 6f
 and WS7 to come
 
 Created: 2026-10-28
-Last-updated: 2026-10-31
+Last-updated: 2026-11-03
 Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: 15d6f18e (pr-review x5, code-review x3; re-pointed after WS6 was grounded and decisions 18 to 20 taken)
 Touches: barwise/packages/core/src/model/,
@@ -1636,14 +1636,18 @@ sites.
     - `migrate` given a `.orm-project.yaml` replays each domain once on its
       own, which gives every owned object type its id, then again with
       `ReplayOptions.ownerId`, so a shadow takes `<context>:<owner's id>`.
+      A domain that fails alone, because shadows of a suffixed owner and of
+      the owner it shadows take one id, is retried with the owners known.
       Every domain goes in one staged write, and one refused domain
-      refuses the project. A domain already at 4.0 keeps its shadows' ids;
+      refuses the project; a domain file named beside its manifest in one
+      run is migrated through the manifest only. A domain already at 4.0 keeps its shadows' ids;
       the project-load check this spec gives reports one that names the
       wrong owner.
     - A current file with unstored ids is written by `storeIds`, which
-      edits the file's own YAML and keeps comments, rather than writing
-      from the model; the editor's "Store ids" quick fix calls the same
-      function. `OrmModel.unstoredIds` lists them, set by the 4.0 reader
+      splices each `id` and `minted_from` into the file's own text, where
+      the 4.0 writer puts them (after a constraint's content, first in a
+      subtype fact or objectification), and changes no other byte; the
+      editor's "Store ids" quick fix applies the same insertions as edits. `OrmModel.unstoredIds` lists them, set by the 4.0 reader
       from the keys its load minted before recording those the file states.
     - Two rules: `structural/unstored-id` (warning, per id, placed on its
       element by document path) and `structural/replayed-ids` (info, once,

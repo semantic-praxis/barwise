@@ -21,6 +21,7 @@ import {
   storeIds,
 } from "@barwise/core";
 import type { Command } from "commander";
+import { realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { readFile, serializer } from "../workspace/io.js";
 import {
@@ -70,11 +71,23 @@ export function registerMigrateCommand(program: Command): void {
         return;
       }
       const check = opts.check === true;
-      const outcomes = files.flatMap((file) =>
-        file.endsWith(".orm-project.yaml")
-          ? migrateProject(file, check)
-          : write([planFile(file)], check)
+      // A file that is a domain of a manifest named in the same run is
+      // migrated through that manifest only: alone first, its shadows would
+      // be written under ids the project then keeps as 4.0.
+      const throughProject = new Set(
+        files.filter(isManifest).flatMap((m) => {
+          try {
+            return projectDomains(m).map((d) => realPath(d.file));
+          } catch {
+            return []; // reported when the manifest itself is migrated
+          }
+        }),
       );
+      const outcomes = files.flatMap((file) => {
+        if (isManifest(file)) return migrateProject(file, check);
+        if (throughProject.has(realPath(file))) return [];
+        return write([planFile(file)], check);
+      });
       process.stdout.write(
         opts.format === "json"
           ? `${JSON.stringify(outcomes, null, 2)}\n`
@@ -88,10 +101,7 @@ export function registerMigrateCommand(program: Command): void {
     });
 }
 
-/**
- * What migrating one file would do, writing nothing. `ownerId` is the
- * project's, when the file is one of its domains.
- */
+/** What migrating one file on its own would do, writing nothing. */
 function planFile(file: string): Planned {
   try {
     const raw = readFile(file);
@@ -129,6 +139,10 @@ function planRead(file: string, raw: string, result: MigrationResult): Planned {
 function planCurrent(file: string, raw: string): Planned {
   const { text, stored } = storeIds(raw);
   if (stored.length === 0) return { outcome: { file, status: "current" } };
+  // A guard on the splice, which no test reaches: `storeIds` inserts text
+  // the YAML parser could read differently than meant (a flow scalar it
+  // ends early, a line at the wrong indentation), and writing that would
+  // turn a file that loads into one that does not, or still mints.
   const unstored = serializer.deserialize(text, { lenient: true }).unstoredIds;
   if (unstored.length > 0) {
     return refused(file, `its ids could not all be stored (${unstored.join(", ")} still are not)`);
@@ -202,48 +216,67 @@ function write(planned: readonly Planned[], check: boolean): FileOutcome[] {
  * leave shadows naming ids nobody checked.
  */
 function migrateProject(manifest: string, check: boolean): FileOutcome[] {
-  let domains: readonly { path: string; context: string; }[];
+  let files: readonly { context: string; file: string; }[];
   try {
-    domains = new ProjectSerializer().deserialize(readFile(manifest)).domains;
+    files = projectDomains(manifest);
   } catch (err) {
     return [{ file: manifest, status: "error", error: (err as Error).message }];
   }
-  const base = dirname(manifest);
-  const files = domains.map((d) => ({ context: d.context, file: join(base, d.path) }));
 
   // Each file read once; a domain that does not read is refused below.
   const first = files.map(({ context, file }) => {
     try {
-      const raw = readFile(file);
-      return { context, file, raw, result: read(raw) };
+      return { context, file, raw: readFile(file) };
     } catch (err) {
       return { context, file, error: (err as Error).message };
     }
   });
   const owners = new Map<string, ReadonlyMap<string, string>>();
-  for (const d of first) {
-    if (d.result === undefined) continue;
-    owners.set(
-      d.context,
-      new Map(
-        d.result.model.objectTypes
-          .filter((ot) => ot.sourceContext === undefined)
-          .map((ot) => [ot.name, ot.id] as const),
-      ),
-    );
-  }
   const ownerId = (context: string, name: string) => owners.get(context)?.get(name);
+  const results = new Map<number, MigrationResult>();
+  const failed = new Map<number, string>();
+  const replay = (i: number, withOwners: boolean) => {
+    try {
+      const result = read(first[i]!.raw!, withOwners ? ownerId : undefined);
+      results.set(i, result);
+      failed.delete(i);
+      owners.set(
+        first[i]!.context,
+        new Map(
+          result.model.objectTypes
+            .filter((ot) => ot.sourceContext === undefined)
+            .map((ot) => [ot.name, ot.id] as const),
+        ),
+      );
+      return true;
+    } catch (err) {
+      failed.set(i, (err as Error).message);
+      return false;
+    }
+  };
+  first.forEach((d, i) => {
+    if (d.raw !== undefined) replay(i, false);
+  });
+  // A domain can fail alone only because two shadows take one id there,
+  // which is the suffixed owner the project settles: retry each with the
+  // owners known, again while a retry adds an owner another may need.
+  let progress = true;
+  while (progress && failed.size > 0) {
+    progress = false;
+    for (const i of [...failed.keys()]) progress = replay(i, true) || progress;
+  }
 
   // Replayed again only where it can change something: a domain before
   // 4.0 that holds a shadow.
-  const planned = first.map((d): Planned => {
-    if (d.result === undefined) {
-      return { outcome: { file: d.file, status: "error", error: d.error! } };
+  const planned = first.map((d, i): Planned => {
+    const result = results.get(i);
+    if (d.raw === undefined || result === undefined) {
+      return { outcome: { file: d.file, status: "error", error: d.error ?? failed.get(i)! } };
     }
-    const replayAgain = d.result.from !== CURRENT_ORM_VERSION
-      && d.result.model.objectTypes.some((ot) => ot.sourceContext !== undefined);
+    const replayAgain = result.from !== CURRENT_ORM_VERSION
+      && result.model.objectTypes.some((ot) => ot.sourceContext !== undefined);
     try {
-      return planRead(d.file, d.raw, replayAgain ? read(d.raw, ownerId) : d.result);
+      return planRead(d.file, d.raw, replayAgain ? read(d.raw, ownerId) : result);
     } catch (err) {
       return { outcome: { file: d.file, status: "error", error: (err as Error).message } };
     }
@@ -260,6 +293,25 @@ function migrateProject(manifest: string, check: boolean): FileOutcome[] {
     );
   }
   return write(planned, check);
+}
+
+function isManifest(file: string): boolean {
+  return file.endsWith(".orm-project.yaml");
+}
+
+/** Each domain a manifest names, by its context and its path from here. */
+function projectDomains(manifest: string): { context: string; file: string; }[] {
+  const { domains } = new ProjectSerializer().deserialize(readFile(manifest));
+  return domains.map((d) => ({ context: d.context, file: join(dirname(manifest), d.path) }));
+}
+
+/** The file a path names, for telling two spellings of one file apart. */
+function realPath(file: string): string {
+  try {
+    return realpathSync(file);
+  } catch {
+    return file;
+  }
 }
 
 function describe(o: FileOutcome): string {

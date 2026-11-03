@@ -5,6 +5,7 @@
  * 4.0 gets (barwise-wcg.frh); and a shadow replayed with its owner's id.
  */
 import { describe, expect, it, vi } from "vitest";
+import { parse } from "yaml";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { storeIds } from "../../src/serialization/storeIds.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
@@ -60,22 +61,94 @@ describe("ids a 4.0 file does not state", () => {
     expect(model.unstoredIds).toEqual(["Each_Person_smokes"]);
   });
 
-  it("are written as each element's first keys, with its key, and the comments kept", () => {
+  it("are written where the 4.0 writer puts them, with the key the model holds", () => {
     const { text, stored } = storeIds(typed);
-    expect(stored).toEqual([
+    expect(stored.map(({ id, path }) => ({ id, path }))).toEqual([
       { id: "Each_Person_smokes", path: ["model", "fact_types", 0, "constraints", 0] },
       { id: "Smoker_is_a_subtype_of_Person", path: ["model", "subtype_facts", 0] },
     ]);
-    expect(text).toContain("# Typed in the editor; no id yet.");
-    expect(text).toMatch(/- id: Each_Person_smokes\n\s+minted_from: .+\n\s+type: mandatory/);
+    // A constraint's id follows its content; a subtype fact's leads it.
+    expect(text).toMatch(
+      /\n {10}role: Person_smokes\.smokes\n {10}id: Each_Person_smokes\n {10}minted_from: .+\n/,
+    );
+    expect(text).toMatch(
+      /\n {4}- id: Smoker_is_a_subtype_of_Person\n {6}minted_from: .+\n {6}subtype: Smoker\n/,
+    );
+    // So a later save by any surface leaves each element's keys in place.
+    const saved = parse(serializer.serialize(read(text))).model;
+    const here = parse(text).model;
+    expect(Object.keys(here.fact_types[0].constraints[0]))
+      .toEqual(Object.keys(saved.fact_types[0].constraints[0]));
+    expect(Object.keys(here.subtype_facts[0])).toEqual(Object.keys(saved.subtype_facts[0]));
     // The key stored is the one the model holds, so decision 14's check
     // has something to compare.
-    const model = read(text);
-    expect(model.mintedFromOf("Each_Person_smokes")).toBe(
+    expect(read(text).mintedFromOf("Each_Person_smokes")).toBe(
       read(typed).mintedFromOf("Each_Person_smokes"),
     );
-    // Everything else is as it was.
-    expect(serializer.serialize(model)).toBe(serializer.serialize(read(typed)));
+    expect(serializer.serialize(read(text))).toBe(serializer.serialize(read(typed)));
+  });
+
+  it("change no other byte of the file: layout, comments and spacing stay", () => {
+    // Hand-written: unpadded flow maps, a wide comment gap, a comment on
+    // the line the id goes after, and no newline at the end.
+    const hand = `orm_version: "4.0"
+model:
+  name: M
+  object_types:
+    - {id: Person, name: Person, kind: entity, reference_mode: nr}
+    - {id: Smoker, name: Smoker, kind: entity, reference_mode: nr}
+  fact_types:
+    - id: Person_smokes
+      name: Person smokes
+      roles:
+        - {id: Person_smokes.smokes, player: Person, role_name: smokes}
+      readings: ["{0} smokes"]
+      constraints:
+        - type: mandatory
+          role: Person_smokes.smokes      # the only role
+  subtype_facts:
+    - {subtype: Smoker, supertype: Person}`;
+    const { text, stored } = storeIds(hand);
+    expect(stored).toHaveLength(2);
+    const removed = stored.reduce((t, s) => t.replace(s.insert.text, ""), text);
+    expect(removed).toBe(hand);
+    expect(text).toContain(
+      "          role: Person_smokes.smokes      # the only role\n          id: Each_Person_smokes\n",
+    );
+    expect(text).toMatch(/- \{id: Smoker_is_a_subtype_of_Person, minted_from: .+, subtype: Smoker/);
+    expect(read(text).unstoredIds).toEqual([]);
+    expect(serializer.serialize(read(text))).toBe(serializer.serialize(read(hand)));
+  });
+
+  it("keep a file's CRLF line endings", () => {
+    const crlf = typed.replace(/\n/g, "\r\n");
+    const { text } = storeIds(crlf);
+    expect(text.replace(/\r\n/g, "")).not.toContain("\n");
+    expect(read(text).unstoredIds).toEqual([]);
+  });
+
+  it("quote an id that a flow map would otherwise end at a comma", () => {
+    const flow = `orm_version: "4.0"
+model:
+  name: M
+  object_types:
+    - { id: Customer, name: Customer, kind: entity, reference_mode: nr }
+    - { id: CustomerNr, name: CustomerNr, kind: value }
+  fact_types:
+    - id: Customer_has_CustomerNr
+      name: Customer has CustomerNr
+      roles:
+        - { id: Customer_has_CustomerNr.has, player: Customer, role_name: has }
+        - { id: Customer_has_CustomerNr.is_of, player: CustomerNr, role_name: is of }
+      readings: ["{0} has {1}"]
+      constraints:
+        - { type: internal_uniqueness, roles: [Customer_has_CustomerNr.is_of] }
+`;
+    const { text, stored } = storeIds(flow);
+    expect(stored[0]!.id).toContain(",");
+    expect(text).toContain(`id: ${JSON.stringify(stored[0]!.id)}`);
+    expect(read(text).unstoredIds).toEqual([]);
+    expect(read(text).factTypes[0]!.internalConstraints[0]!.id).toBe(stored[0]!.id);
   });
 
   it("are stored in a file that states an empty list, which the writer leaves out", () => {

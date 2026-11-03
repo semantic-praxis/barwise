@@ -292,6 +292,35 @@ project:
       );
     });
 
+    it("settles a domain whose shadows of both owners collide when read alone", async () => {
+      // Found by 6b-3a's pr-review: alone, both shadows take
+      // "sales:Order_Line" and the read refuses the file, so the project
+      // must retry it with the owners' ids known rather than refuse it.
+      file("sales.orm.yaml", SALES);
+      const both =
+        `${BILLING}    - { id: s2, name: Order_Line, kind: entity, reference_mode: nr, source_context: sales }
+`;
+      const billing = file("billing.orm.yaml", both);
+      expect((await runCli(["migrate", "--check", billing])).exitCode).toBe(2);
+      const result = await runCli(["migrate", manifest()]);
+      expect([result.exitCode, result.stdout]).toEqual([
+        0,
+        `${join(dir, "sales.orm.yaml")}: 3.0 -> 4.0\n${billing}: 3.0 -> 4.0\n`,
+      ]);
+      const written = readFileSync(billing, "utf-8");
+      expect(written).toContain("id: sales:Order_Line_2\n");
+      expect(written).toContain("id: sales:Order_Line\n");
+    });
+
+    it("migrates a domain named beside its manifest through the manifest only", async () => {
+      file("sales.orm.yaml", SALES);
+      const billing = file("billing.orm.yaml", BILLING);
+      const result = await runCli(["migrate", billing, manifest()]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.split(billing).length - 1).toBe(1);
+      expect(readFileSync(billing, "utf-8")).toContain("id: sales:Order_Line_2");
+    });
+
     it("gives the shadow the unsuffixed id when its file is migrated alone", async () => {
       // The case the project form exists for: alone, the shadow names
       // whichever owner holds the unsuffixed local name.
