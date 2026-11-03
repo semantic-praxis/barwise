@@ -668,13 +668,17 @@ export function mergeModels(
   // reported stale.
   carryMintedKeys(merged, existing, incoming);
 
-  // Phase 9: a merged shadow from the incoming side needs its alias, which
-  // the base may not import and the header delta may not have been taken.
+  // Phase 9: every merged shadow keeps its alias. One from the incoming
+  // side needs the incoming binding, which the base may lack and whose
+  // header delta may not have been taken; one kept from the base needs the
+  // base's, even when the removal of that import was accepted, or the
+  // merged model would name an alias it does not import. An alias the
+  // merged model still uses cannot be removed out from under it.
   for (const ot of merged.objectTypes) {
     const colon = ot.id.indexOf(":");
     if (colon < 0) continue;
     const alias = ot.id.slice(0, colon);
-    const target = incoming.imports.get(alias);
+    const target = incoming.imports.get(alias) ?? existing.imports.get(alias);
     if (!merged.imports.has(alias) && target !== undefined) merged.setImport(alias, target);
   }
 
@@ -950,22 +954,6 @@ function refuseUnmergeablePairing(diff: MergeInput): void {
 }
 
 /**
- * Refuse a merge that would give two object types, or two fact types, one
- * name, before anything is built.
- *
- * The diff pairs a shared id as one element (model invariants, decision
- * 1), so an accepted addition cannot collide with an id the merge keeps;
- * what is left is a NAME clash: two elements that exchanged names under
- * kept ids, with one rename accepted and the other not. Which one should
- * win is not the merge's call, so it names both and stops, and
- * `mergeAndValidate` reports it as `merge-error`. Before, `addObjectType`
- * threw a bare "already exists" halfway through the build, naming one.
- *
- * A content-matching diff never reaches this point:
- * `refuseUnmergeablePairing` refuses it first, so nothing here guards an
- * id that diff's name pass left unpaired.
- */
-/**
  * What the accepted header deltas take: whether the namespace delta was
  * accepted, and which aliases were added or removed. A rebinding never
  * gets here (`refuseImportClashes`).
@@ -983,12 +971,9 @@ function acceptedHeader(
   const removedImports = new Set<string>();
   deltas.forEach((d, i) => {
     if (d.elementType !== "model_header" || !accepted.has(i) || d.kind === "unchanged") return;
-    const removed = d.kind === "removed";
     const [change] = d.changes;
-    if (change?.change === "namespace") namespace = true;
-    else if (change?.change === "importBinding") {
-      (removed ? removedImports : addedImports).add(change.alias);
-    }
+    if (change.change === "namespace") namespace = true;
+    else (d.kind === "removed" ? removedImports : addedImports).add(change.alias);
   });
   return { namespace, addedImports, removedImports };
 }
@@ -1015,6 +1000,22 @@ function refuseImportClashes(existing: OrmModel, incoming: OrmModel): void {
   );
 }
 
+/**
+ * Refuse a merge that would give two object types, or two fact types, one
+ * name, before anything is built.
+ *
+ * The diff pairs a shared id as one element (model invariants, decision
+ * 1), so an accepted addition cannot collide with an id the merge keeps;
+ * what is left is a NAME clash: two elements that exchanged names under
+ * kept ids, with one rename accepted and the other not. Which one should
+ * win is not the merge's call, so it names both and stops, and
+ * `mergeAndValidate` reports it as `merge-error`. Before, `addObjectType`
+ * threw a bare "already exists" halfway through the build, naming one.
+ *
+ * A content-matching diff never reaches this point:
+ * `refuseUnmergeablePairing` refuses it first, so nothing here guards an
+ * id that diff's name pass left unpaired.
+ */
 function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
   const kept = deltas.flatMap((d, i) => {
     if (d.elementType !== "object_type" && d.elementType !== "fact_type") return [];

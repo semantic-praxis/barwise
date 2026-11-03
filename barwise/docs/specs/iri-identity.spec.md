@@ -1440,11 +1440,12 @@ version-1 manifest would go silently empty for impact analysis.
   becomes a map per domain, because a shadow's id changes in each domain
   that holds it.
 - **6f, the outputs.** DDL comments (`DdlExportFormat.ts:185`), Ossie's
-  loss block (`lose`, `writeOssie.ts:156`; the namespace line at `:361-364`) and SVG `data-id`
+  loss block (`lose`, `writeOssie.ts:156`; the `model_header` namespace and imports lines, added in 6b-3c) and SVG `data-id`
   (`diagram-ui/src/parts/*Node.tsx`) print local names with no code
   change. The Ossie writer puts `iriOf`'s identity IRI, or
   `equivalent_iri` when present, into Ossie's `iri` (decision 1), and the
-  namespace leaves its loss block (WS4).
+  namespace leaves its loss block (WS4). The imports line stays: Ossie
+  has no aliases, and a shadow is written by its owner's name.
 
 **6b ships in four parts** (owner, 2026-10-30), each merged on its own,
 with no release until 6f, because 6b alone is more than a session: the

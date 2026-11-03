@@ -25,7 +25,8 @@ export type BreakingLevel = "safe" | "caution" | "breaking";
 interface DeltaCommon {
   readonly kind: DeltaKind;
   /**
-   * What changed, as data (empty for add/remove).
+   * What changed, as data: empty for an element added or removed; one
+   * change for every model header delta, added and removed included.
    *
    * This is the authority; `changeDescriptions` is rendered from it.
    * Breaking-level classification reads these variants, so a change the
@@ -73,12 +74,16 @@ export interface FactTypeDelta extends DeltaCommon {
  * edit to them; `iriOf`'s answers are what move. One delta per part, so
  * that adding, rebinding and removing are told apart as for any element.
  */
-export interface ModelHeaderDelta extends DeltaCommon {
+export interface ModelHeaderDelta extends Omit<DeltaCommon, "changes"> {
   readonly elementType: "model_header";
-  readonly field: "namespace" | "import";
   /** `namespace`, or `import <alias>`: what the delta is about. */
   readonly name: string;
+  /** The one part that changed, so a reader need not guard for none. */
+  readonly changes: readonly [HeaderChange];
 }
+
+/** The change a model header delta carries. */
+export type HeaderChange = Extract<ChangeDescription, { change: "namespace" | "importBinding"; }>;
 
 export interface DefinitionDelta extends DeltaCommon {
   readonly elementType: "definition";

@@ -14,8 +14,14 @@ import type { OrmModel } from "../model/OrmModel.js";
 import type { Population } from "../model/Population.js";
 import type { SubtypeFact } from "../model/SubtypeFact.js";
 import { classifyBreakingLevel } from "./breakingLevel.js";
-import { type ChangeDescription, describeChange } from "./changeDescription.js";
-import type { BreakingLevel, DeltaKind, ModelDelta, ModelDiffResult } from "./deltas.js";
+import { describeChange } from "./changeDescription.js";
+import type {
+  BreakingLevel,
+  DeltaKind,
+  HeaderChange,
+  ModelDelta,
+  ModelDiffResult,
+} from "./deltas.js";
 import {
   constraintPairing,
   diffDefinition,
@@ -120,9 +126,8 @@ function pairedLevel(
  */
 function headerDeltas(existing: OrmModel, incoming: OrmModel): ModelDelta[] {
   const delta = (
-    field: "namespace" | "import",
     name: string,
-    change: ChangeDescription,
+    change: HeaderChange,
     from: string | undefined,
     to: string | undefined,
   ): ModelDelta => {
@@ -134,7 +139,6 @@ function headerDeltas(existing: OrmModel, incoming: OrmModel): ModelDelta[] {
     return {
       kind,
       elementType: "model_header",
-      field,
       name,
       changes: [change],
       changeDescriptions: [describeChange(change)],
@@ -145,7 +149,6 @@ function headerDeltas(existing: OrmModel, incoming: OrmModel): ModelDelta[] {
   const [ns, nsNow] = [existing.namespace, incoming.namespace];
   if (ns !== nsNow) {
     out.push(delta(
-      "namespace",
       "namespace",
       {
         change: "namespace",
@@ -160,7 +163,6 @@ function headerDeltas(existing: OrmModel, incoming: OrmModel): ModelDelta[] {
     const [from, to] = [existing.imports.get(alias), incoming.imports.get(alias)];
     if (from === to) continue;
     out.push(delta(
-      "import",
       `import ${alias}`,
       {
         change: "importBinding",

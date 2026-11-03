@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import type { ModelDelta } from "../../src/diff/deltas.js";
 import { diffModels } from "../../src/diff/ModelDiff.js";
-import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
+import { MERGE_DIFF_OPTIONS, mergeAndValidate, mergeModels } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 
 const model = (config: { namespace?: string; imports?: Record<string, string>; } = {}) => {
@@ -90,6 +90,23 @@ describe("a merge of header deltas", () => {
         /the alias "x" is bound to "crm" in the base and to "billing" in the incoming model/,
       );
     }
+  });
+
+  it("keeps an import a kept base shadow needs, even when its removal was accepted", () => {
+    // 6b-3c's pr-review: the removal accepted, the shadow's removal not.
+    const base = model({ namespace: "https://a.example/", imports: { crm: "crm" } });
+    base.addObjectType({ id: "crm:Lead", name: "Lead", kind: "entity", referenceMode: "nr" });
+    const incoming = model();
+    const diff = diffModels(base, incoming, MERGE_DIFF_OPTIONS);
+    const headerRemovals = new Set(
+      diff.deltas.flatMap((d, i) => (d.elementType === "model_header" ? [i] : [])),
+    );
+    const result = mergeAndValidate(base, incoming, diff, headerRemovals);
+    expect(result.isValid).toBe(true);
+    expect([result.model!.namespace, [...result.model!.imports]]).toEqual([
+      undefined,
+      [["crm", "crm"]],
+    ]);
   });
 
   it("gives an accepted incoming shadow its import even when the header delta is not taken", () => {
