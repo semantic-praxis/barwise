@@ -89,6 +89,42 @@ describe("renameInModel", () => {
     });
   });
 
+  it("repairs an id that differs from its name when renamed to the name it has", () => {
+    // Decision 13: the repair `id-not-from-name` points at.
+    const { model, ids } = renameInModel(shop(), { kind: "objectType", name: "Order" }, "Order");
+    expect([...ids]).toEqual([["ot-order", "Order"]]);
+    expect(model.getObjectTypeByName("Order")?.id).toBe("Order");
+  });
+
+  it("refuses a rename to the name it has when its id is already the one that name gives", () => {
+    const { model } = renameInModel(shop(), { kind: "objectType", name: "Order" }, "Order");
+    expect(() => renameInModel(model, { kind: "objectType", name: "Order" }, "Order")).toThrow(
+      /already named "Order", and holds the id it gives/,
+    );
+  });
+
+  it("refuses a name whose id a dangling reference names", () => {
+    const dangling = serializer.deserialize(
+      `orm_version: "4.0"
+model:
+  name: M
+  object_types:
+    - { id: A, name: A, kind: entity, reference_mode: a_id }
+  fact_types:
+    - id: f
+      name: A likes Ghost
+      roles:
+        - { id: f.likes, player: A, role_name: likes }
+        - { id: f.liked_by, player: Ghost, role_name: liked by }
+      readings: ["{0} likes {1}"]
+`,
+      { lenient: true },
+    );
+    expect(() => renameInModel(dangling, { kind: "objectType", name: "A" }, "Ghost")).toThrow(
+      /the id "Ghost", which a reference in the model names and no element defines/,
+    );
+  });
+
   it("refuses a name whose id another element holds", () => {
     // "Customer_has_Email" is free as a name, and is the id the fact type
     // "Customer has CustomerId" would take; give another element that id.
@@ -267,7 +303,6 @@ ${(swapped ? [...binaries].reverse() : binaries).join("")}`;
       [{ kind: "objectType", name: "Nobody" }, "X", /No object type named "Nobody"/],
       [{ kind: "factType", name: "Nobody" }, "X", /No fact type named "Nobody"/],
       [{ kind: "objectType", name: "Order" }, "  ", /The new name is empty/],
-      [{ kind: "objectType", name: "Order" }, "Order", /already named "Order"/],
       [
         { kind: "objectType", name: "Order" },
         "Customer",

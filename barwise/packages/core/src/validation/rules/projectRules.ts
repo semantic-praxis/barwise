@@ -1,4 +1,5 @@
 import type { DomainModel } from "../../model/DomainModel.js";
+import { ABSOLUTE_IRI_PATTERN } from "../../model/iri.js";
 import { namespaceOf } from "../../model/namespace.js";
 import type { OrmProject } from "../../model/OrmProject.js";
 import type { Diagnostic } from "../Diagnostic.js";
@@ -39,13 +40,11 @@ export function projectRules(project: OrmProject): Diagnostic[] {
 }
 
 /** An import bound to an absolute IRI names a namespace, not a context. */
-const ABSOLUTE_IRI = /^[A-Za-z][A-Za-z0-9+.-]*:/;
-
 function checkImports(project: OrmProject): Diagnostic[] {
   const contexts = new Set(project.domains.map((d) => d.context));
   return project.domains.flatMap((domain) =>
     [...(domain.model?.imports ?? [])]
-      .filter(([, target]) => !ABSOLUTE_IRI.test(target) && !contexts.has(target))
+      .filter(([, target]) => !ABSOLUTE_IRI_PATTERN.test(target) && !contexts.has(target))
       .map(([alias, target]) =>
         report(
           RULE_ID.importedContextMissing,

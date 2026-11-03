@@ -362,9 +362,13 @@ function checkIdsFromNames(model: OrmModel): Diagnostic[] {
   for (const ft of model.factTypes) {
     const exempt = localName(ft.name) === objectifier.get(ft.id);
     if (!exempt) check("fact type", ft.name, ft.id, localName(ft.name));
-    for (const role of ft.roles) {
-      check("role", role.name, role.id, `${ft.id}.${localName(role.name)}`);
-    }
+    // A role whose name another role of its fact type shares is reported
+    // once, by `duplicate-role-name`, which says why its id is suffixed.
+    const locals = ft.roles.map((r) => localName(r.name));
+    ft.roles.forEach((role, i) => {
+      if (locals.indexOf(locals[i]!) !== locals.lastIndexOf(locals[i]!)) return;
+      check("role", role.name, role.id, `${ft.id}.${locals[i]}`);
+    });
   }
   return diagnostics;
 }

@@ -78,7 +78,9 @@ export function mintedName(element: Mintable, model: ConstraintModel): string | 
  * the file, and a reader comparing the two reads one vocabulary.
  */
 export function mintedKey(element: Mintable, model: ConstraintModel): string | undefined {
-  return mint(element, model)?.key;
+  // Not `mint(...)?.key`: the key never reads the sentence, and
+  // `stale-minted-name` asks for every minted element on each validation.
+  return isMintable(element, model) ? JSON.stringify(key(element, model)) : undefined;
 }
 
 function key(element: Mintable, model: ConstraintModel): unknown {

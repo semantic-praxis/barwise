@@ -97,6 +97,7 @@ export function mergeModels(
   refuseUnmergeablePairing(diff);
   const deltas = diff.deltas;
   refuseNameClashes(deltas, accepted);
+  refuseImportClashes(existing, incoming);
   const merged = new OrmModel({
     name: existing.name,
     domainContext: existing.domainContext,
@@ -948,6 +949,28 @@ function refuseUnmergeablePairing(diff: MergeInput): void {
  * `refuseUnmergeablePairing` refuses it first, so nothing here guards an
  * id that diff's name pass left unpaired.
  */
+/**
+ * Refuse a merge whose two sides bind one alias to different targets: the
+ * incoming side's shadows behind it would come to name the base's context,
+ * and no rule could tell (iri-identity WS6).
+ */
+function refuseImportClashes(existing: OrmModel, incoming: OrmModel): void {
+  const clashes = [...incoming.imports].filter(([alias, target]) => {
+    const base = existing.imports.get(alias);
+    return base !== undefined && base !== target;
+  });
+  if (clashes.length === 0) return;
+  throw new Error(
+    `Cannot merge: ${
+      clashes.map(([alias, target]) =>
+        `the alias "${alias}" is bound to "${
+          existing.imports.get(alias)
+        }" in the base and to "${target}" in the incoming model`
+      ).join("; ")
+    }. Bind it to one context on both sides first.`,
+  );
+}
+
 function refuseNameClashes(deltas: readonly ModelDelta[], accepted: ReadonlySet<number>): void {
   const kept = deltas.flatMap((d, i) => {
     if (d.elementType !== "object_type" && d.elementType !== "fact_type") return [];

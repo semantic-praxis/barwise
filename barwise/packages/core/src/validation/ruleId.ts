@@ -997,7 +997,7 @@ const RULE_DESCRIPTORS = {
       "An element's id is not the one its name gives, so a reader of the file cannot tell the element from its id (iri-identity decision 13).",
     messages: {
       default: (kind: string, name: string, id: string, expected: string): string =>
-        `The ${kind} "${name}" has the id "${id}", where its name gives "${expected}". A rename gives it the id its name gives.`,
+        `The ${kind} "${name}" has the id "${id}", where its name gives "${expected}". Renaming it, even to the name it has, gives it that id.`,
       suffixed: (kind: string, name: string, id: string, expected: string): string =>
         `The ${kind} "${name}" has the suffixed id "${id}", because another element holds "${expected}", the id its name gives. Rename one of them so each name gives its own id.`,
     },
@@ -1023,10 +1023,10 @@ const RULE_DESCRIPTORS = {
   [RULE_ID.duplicateRoleName]: {
     severity: "warning",
     description:
-      "Two roles of one fact type share a role name, so in format 4.0, where a role's id is its fact type's and its role name, they would take one id.",
+      "Two roles of one fact type share a role name, so in format 4.0, where a role's id is its fact type's and its role name, their name gives them one id.",
     messages: {
       default: (factType: string, roles: string, id: string): string =>
-        `Fact type "${factType}" has roles ${roles} that would all take the id "${id}" in format 4.0, so the migration will add a suffix to all but the first and new authoring will refuse them. Give each a different role name.`,
+        `Fact type "${factType}" has roles ${roles} whose name gives each the id "${id}"; in format 4.0 all but the first hold a suffixed id, and new authoring refuses the repeat. Give each a different role name.`,
     },
   },
   [RULE_ID.encodedLocalName]: {

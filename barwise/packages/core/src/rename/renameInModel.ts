@@ -21,6 +21,7 @@ import { localName } from "../model/name.js";
 import type { ObjectType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument40 } from "../serialization/OrmYamlSerializer.js";
+import { danglingReferences } from "../serialization/replay.js";
 import { CURRENT_ORM_VERSION } from "../serialization/schemaVersion.js";
 import type { OrmYamlDocument40 as OrmYamlDocument } from "../serialization/yaml/document.js";
 import { remapIds } from "./remapIds.js";
@@ -101,6 +102,10 @@ export function idsForRename(model: OrmModel, plan: RenamePlan): Map<string, str
       }
     }
   }
+  // A dangling reference names an id no element holds; taking it would
+  // make the reference resolve to the renamed element, which nobody wrote.
+  // The replay reserves the same ids for the same reason.
+  const dangling = danglingReferences(model).ids;
   for (const [from, now] of ids) {
     if (from === now) ids.delete(from);
     else if (model.idKindsHolding(now).length > 0 && !ids.has(now)) {
@@ -108,9 +113,32 @@ export function idsForRename(model: OrmModel, plan: RenamePlan): Map<string, str
         `The rename would give ${plan.label} the id "${now}", which another element holds. `
           + `Choose a name whose id is free.`,
       );
+    } else if (dangling.has(now)) {
+      throw new RenameError(
+        `The rename would give ${plan.label} the id "${now}", which a reference in the model `
+          + `names and no element defines, so that reference would come to name it. Choose another `
+          + `name, or fix the reference first.`,
+      );
     }
   }
   return ids;
+}
+
+/**
+ * Whether an object type's or fact type's id is not the one its name gives,
+ * as `structural/id-not-from-name` judges it: a shadow by the local part
+ * behind its alias, and a fact type named like its objectifying type, whose
+ * id decision 20 gave from its first reading, never.
+ */
+function idDiffersFromName(
+  model: OrmModel,
+  kind: "objectType" | "factType",
+  element: { readonly id: string; readonly name: string; },
+): boolean {
+  const local = localName(element.name);
+  if (kind === "objectType") return element.id.slice(element.id.indexOf(":") + 1) !== local;
+  const objectifier = model.objectifiedFactTypes.find((o) => o.factTypeId === element.id);
+  return objectifier?.objectTypeId !== local && element.id !== local;
 }
 
 /** The model under the new ids, each change said in `changes`. */
@@ -174,7 +202,12 @@ export function planRename(
   if (!element) {
     throw new RenameError(`No ${what} named "${target.name}" in model "${model.name}".`);
   }
-  if (name === element.name) throw new RenameError(`The ${what} is already named "${name}".`);
+  // A rename to the name it has is how an id that differs from its name
+  // is repaired (decision 13), so it is refused only when there is
+  // nothing to repair.
+  if (name === element.name && !idDiffersFromName(model, target.kind, element)) {
+    throw new RenameError(`The ${what} is already named "${name}", and holds the id it gives.`);
+  }
   if (target.kind === "objectType" && options.shadow === "refuse") {
     const context = (element as ObjectType).sourceContext;
     if (context !== undefined) {
@@ -306,7 +339,9 @@ function planRoleRename(
   }
   const index = roleIndex(ft, target.role);
   const role = ft.roles[index]!;
-  if (name === role.name) throw new RenameError(`The role is already named "${name}".`);
+  if (name === role.name && role.id === `${ft.id}.${localName(name)}`) {
+    throw new RenameError(`The role is already named "${name}", and holds the id it gives.`);
+  }
   const taken = ft.roles.find((r, i) => i !== index && localName(r.name) === localName(name));
   if (taken) {
     throw new RenameError(

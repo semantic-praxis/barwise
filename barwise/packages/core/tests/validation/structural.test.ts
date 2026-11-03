@@ -489,11 +489,14 @@ describe("format 4.0 local names (iri-identity.spec.md WS2)", () => {
       })
       .build();
     const found = ids(model, "structural/duplicate-role-name");
+    // Said once: id-not-from-name leaves a repeated role name to this rule.
+    expect(ids(model, "structural/id-not-from-name").filter((d) => d.elementId.includes(".")))
+      .toEqual([]);
     // The id is built from the fact type's id, not its name's local name.
     const ftId = model.getFactTypeByName("Person knows Person")!.id;
     expect(found.map((d) => [d.severity, d.message])).toEqual([[
       "warning",
-      `Fact type "Person knows Person" has roles "knows", "knows" that would all take the id "${ftId}.knows" in format 4.0, so the migration will add a suffix to all but the first and new authoring will refuse them. Give each a different role name.`,
+      `Fact type "Person knows Person" has roles "knows", "knows" whose name gives each the id "${ftId}.knows"; in format 4.0 all but the first hold a suffixed id, and new authoring refuses the repeat. Give each a different role name.`,
     ]]);
   });
 

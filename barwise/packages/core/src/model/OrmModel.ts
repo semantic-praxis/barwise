@@ -367,7 +367,9 @@ export class OrmModel implements ConstraintModel {
     if (!LOCAL_NAME_PATTERN.test(alias)) {
       throw new Error(`The alias "${alias}" is not a local name.`);
     }
-    if (target.trim().length === 0) {
+    // Empty, as the 4.0 decoder refuses it (`nonEmpty`), so a file it
+    // accepts always builds.
+    if (target.length === 0) {
       throw new Error(`The alias "${alias}" is bound to nothing.`);
     }
     this._imports.set(alias, target);

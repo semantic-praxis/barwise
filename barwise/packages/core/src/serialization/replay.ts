@@ -168,6 +168,24 @@ export function replayInto40(source: OrmModel, options: ReplayOptions = {}): Orm
     }
   }
   const reserved = [...dangling, ...reshaped, ...(rolesReshaped ? [UNRESOLVED] : [])];
+  /**
+   * The alias a shadow's context takes, with the import it needs: the
+   * context's local name, or that with `_N` when another context already
+   * holds it ("Sales Ops" and "Sales_Ops"), so no two contexts share one
+   * alias and a shadow never names the wrong one.
+   */
+  const aliasFor = (context: string): string => {
+    const base = localName(context);
+    for (let n = 1;; n++) {
+      const alias = n === 1 ? base : `${base}_${n}`;
+      const bound = target.imports.get(alias);
+      if (bound === context) return alias;
+      if (bound === undefined) {
+        target.setImport(alias, context);
+        return alias;
+      }
+    }
+  };
   target.withReserved(reserved, () => {
     // Object types first: everything else refers to them. A shadow, which
     // holds another domain's element, takes `<context>:<local name>`, its
@@ -176,18 +194,11 @@ export function replayInto40(source: OrmModel, options: ReplayOptions = {}): Orm
     for (const ot of source.objectTypes) {
       const { id: _old, ...config } = ot as ObjectTypeConfig & { readonly id: string; };
       const id = ot.sourceContext !== undefined
-        ? `${localName(ot.sourceContext)}:${
+        ? `${aliasFor(ot.sourceContext)}:${
           options.ownerId?.(ot.sourceContext, ot.name) ?? localName(ot.name)
         }`
         : undefined;
       record("objectType", ot.id, target.addObjectType({ ...config, ...(id ? { id } : {}) }).id);
-      // The import that alias needs, bound to the context it abbreviates.
-      // Two contexts with one local name share an alias; the first keeps
-      // it, and `structural/alias-not-imported` cannot tell them apart.
-      if (ot.sourceContext !== undefined) {
-        const alias = localName(ot.sourceContext);
-        if (!target.imports.has(alias)) target.setImport(alias, ot.sourceContext);
-      }
     }
 
     // Which object type objectifies each fact type, for decision 20.
@@ -324,7 +335,7 @@ export const RESHAPE: Record<DanglingKind, { pattern: RegExp; shape: (local: str
  * load admits one where it does not check the reference, as for a
  * constraint's roles or a preferred identifier.
  */
-function danglingReferences(
+export function danglingReferences(
   model: OrmModel,
 ): { ids: Set<string>; byKind: Map<DanglingKind, Set<string>>; } {
   const out = new Set<string>();

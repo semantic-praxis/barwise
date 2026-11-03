@@ -56,12 +56,12 @@ describe("structural/id-not-from-name (decision 13)", () => {
       [
         "warning",
         "Human",
-        'The object type "Person" has the id "Human", where its name gives "Person". A rename gives it the id its name gives.',
+        'The object type "Person" has the id "Human", where its name gives "Person". Renaming it, even to the name it has, gives it that id.',
       ],
       [
         "warning",
         "Person_smokes.puffs",
-        'The role "smokes" has the id "Person_smokes.puffs", where its name gives "Person_smokes.smokes". A rename gives it the id its name gives.',
+        'The role "smokes" has the id "Person_smokes.puffs", where its name gives "Person_smokes.smokes". Renaming it, even to the name it has, gives it that id.',
       ],
     ]);
   });
@@ -180,7 +180,7 @@ model:
   it("refuses an alias that is not a local name, and an import bound to nothing", () => {
     const model = new OrmModel({ name: "M" });
     expect(() => model.setImport("a:b", "x")).toThrow(/not a local name/);
-    expect(() => model.setImport("a", " ")).toThrow(/bound to nothing/);
+    expect(() => model.setImport("a", "")).toThrow(/bound to nothing/);
   });
 
   it("is added by the replay for each shadow, bound to its context", () => {
@@ -200,7 +200,7 @@ model:
     const incoming = read(
       BILLING.replace(
         'imports: { sales: sales, ext: "https://example.com/ns/" }',
-        "imports: { sales: other, crm: crm }",
+        "imports: { sales: sales, crm: crm }",
       ),
     );
     const merged = mergeModels(
@@ -214,6 +214,38 @@ model:
       ["ext", "https://example.com/ns/"],
       ["crm", "crm"],
     ]);
+  });
+});
+
+describe("a merge whose sides bind one alias to different contexts", () => {
+  it("is refused, naming the alias and both bindings", () => {
+    const side = (target: string) =>
+      read(`orm_version: "4.0"
+model:
+  name: billing
+  imports: { x: ${target} }
+  object_types:
+    - { id: "x:Invoice", name: Invoice, kind: entity, reference_mode: nr }
+`);
+    const base = side("crm");
+    const incoming = side("billing");
+    expect(() =>
+      mergeModels(base, incoming, diffModels(base, incoming, MERGE_DIFF_OPTIONS), new Set())
+    ).toThrow(/the alias "x" is bound to "crm" in the base and to "billing" in the incoming model/);
+  });
+});
+
+describe("the replay, given two contexts with one local name", () => {
+  it("gives the second its own alias, so no shadow names the wrong context", () => {
+    const model = read(`orm_version: "3.0"
+model:
+  name: billing
+  object_types:
+    - { id: s1, name: Lead, kind: entity, reference_mode: nr, source_context: Sales Ops }
+    - { id: s2, name: Deal, kind: entity, reference_mode: nr, source_context: Sales_Ops }
+`);
+    expect(model.objectTypes.map((o) => o.id)).toEqual(["Sales_Ops:Lead", "Sales_Ops_2:Deal"]);
+    expect([...model.imports]).toEqual([["Sales_Ops", "Sales Ops"], ["Sales_Ops_2", "Sales_Ops"]]);
   });
 });
 
