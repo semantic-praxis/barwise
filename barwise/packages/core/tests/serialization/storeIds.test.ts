@@ -7,8 +7,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { parse } from "yaml";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
+import { replayInto40 } from "../../src/serialization/replay.js";
 import { storeIds } from "../../src/serialization/storeIds.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
+import { modelCorpus } from "../helpers/modelCorpus.js";
 
 const serializer = new OrmYamlSerializer();
 const read = (yaml: string) => serializer.deserialize(yaml, { lenient: true });
@@ -118,6 +120,44 @@ model:
     expect(text).toMatch(/- \{id: Smoker_is_a_subtype_of_Person, minted_from: .+, subtype: Smoker/);
     expect(read(text).unstoredIds).toEqual([]);
     expect(serializer.serialize(read(text))).toBe(serializer.serialize(read(hand)));
+  });
+
+  it("give back the bytes a save wrote, for every minted id in every tracked model", () => {
+    // Required by 6b-3a's second pr-review pass: each element barwise
+    // writes, with its id and key taken out, stored again. Most anchors
+    // here are block lists (a constraint's `roles:`), which no hand-built
+    // case above reached.
+    let sites = 0;
+    for (const c of modelCorpus()) {
+      const text = serializer.serialize(
+        replayInto40(serializer.deserializeAsWritten(JSON.stringify(c.doc))),
+      );
+      // Every minted id and its key out at once: one load per file, and
+      // the splices then have to agree with each other too.
+      const lines = text.split("\n");
+      const removed: string[] = [];
+      let here = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const id = /^(\s*)(- )?id: /.exec(lines[i]!);
+        if (!id || !/^\s*minted_from: /.test(lines[i + 1] ?? "")) {
+          removed.push(lines[i]!);
+          continue;
+        }
+        here++;
+        // Where `id` leads its item, the next key takes the `- `.
+        if (id[2]) {
+          removed.push(`${id[1]}- ${lines[i + 2]!.trimStart()}`);
+          i += 2;
+        } else {
+          i += 1;
+        }
+      }
+      if (here === 0) continue;
+      sites += here;
+      const back = storeIds(removed.join("\n"));
+      expect([c.file, back.stored.length, back.text]).toEqual([c.file, here, text]);
+    }
+    expect(sites).toBeGreaterThan(200);
   });
 
   it("keep a file's CRLF line endings", () => {

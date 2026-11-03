@@ -1636,8 +1636,10 @@ sites.
     - `migrate` given a `.orm-project.yaml` replays each domain once on its
       own, which gives every owned object type its id, then again with
       `ReplayOptions.ownerId`, so a shadow takes `<context>:<owner's id>`.
-      A domain that fails alone, because shadows of a suffixed owner and of
-      the owner it shadows take one id, is retried with the owners known.
+      The first replay gives each shadow a throwaway id, which no owned id
+      depends on, so shadows of a suffixed owner and of the owner it
+      shadows cannot collide before the owners' ids are known, even when
+      two domains each shadow the other's.
       Every domain goes in one staged write, and one refused domain
       refuses the project; a domain file named beside its manifest in one
       run is migrated through the manifest only. A domain already at 4.0 keeps its shadows' ids;

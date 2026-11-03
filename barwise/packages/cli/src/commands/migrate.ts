@@ -210,8 +210,9 @@ function write(planned: readonly Planned[], check: boolean): FileOutcome[] {
 /**
  * Every domain of a project, in one write (iri-identity WS6). A file alone
  * cannot see an owner whose local name took a suffix, so each domain is
- * replayed once on its own, which gives every owned object type its id,
- * and then again told those ids, so each shadow names its owner. A domain
+ * replayed once, which gives every owned object type its id, and each
+ * domain holding a shadow then again told those ids, so each shadow names
+ * its owner. A domain
  * that does not load refuses the whole project: writing the rest would
  * leave shadows naming ids nobody checked.
  */
@@ -231,43 +232,40 @@ function migrateProject(manifest: string, check: boolean): FileOutcome[] {
       return { context, file, error: (err as Error).message };
     }
   });
-  const owners = new Map<string, ReadonlyMap<string, string>>();
-  const ownerId = (context: string, name: string) => owners.get(context)?.get(name);
+  // The first read gives every shadow a throwaway id of its own. An owned
+  // object type's id never depends on a shadow's, which holds a `:` no
+  // local name can, so this read gives each owner's ids; and no two
+  // shadows can take one id in it, which two shadows of a suffixed owner
+  // and the owner it shadows do when told nothing. Without this, two
+  // domains that each shadow the other's suffixed types would each refuse
+  // to read, and neither could tell the other its ids.
+  let throwaway = 0;
+  const unknownOwner = () => `shadow${++throwaway}`;
   const results = new Map<number, MigrationResult>();
   const failed = new Map<number, string>();
-  const replay = (i: number, withOwners: boolean) => {
+  const owners = new Map<string, ReadonlyMap<string, string>>();
+  first.forEach((d, i) => {
+    if (d.raw === undefined) return;
     try {
-      const result = read(first[i]!.raw!, withOwners ? ownerId : undefined);
+      const result = read(d.raw, unknownOwner);
       results.set(i, result);
-      failed.delete(i);
       owners.set(
-        first[i]!.context,
+        d.context,
         new Map(
           result.model.objectTypes
             .filter((ot) => ot.sourceContext === undefined)
             .map((ot) => [ot.name, ot.id] as const),
         ),
       );
-      return true;
     } catch (err) {
       failed.set(i, (err as Error).message);
-      return false;
     }
-  };
-  first.forEach((d, i) => {
-    if (d.raw !== undefined) replay(i, false);
   });
-  // A domain can fail alone only because two shadows take one id there,
-  // which is the suffixed owner the project settles: retry each with the
-  // owners known, again while a retry adds an owner another may need.
-  let progress = true;
-  while (progress && failed.size > 0) {
-    progress = false;
-    for (const i of [...failed.keys()]) progress = replay(i, true) || progress;
-  }
+  const ownerId = (context: string, name: string) => owners.get(context)?.get(name);
 
-  // Replayed again only where it can change something: a domain before
-  // 4.0 that holds a shadow.
+  // Replayed again, told each owner's id, where the first read gave
+  // throwaway ids: a domain before 4.0 that holds a shadow. Any other
+  // domain's first read is its migration.
   const planned = first.map((d, i): Planned => {
     const result = results.get(i);
     if (d.raw === undefined || result === undefined) {

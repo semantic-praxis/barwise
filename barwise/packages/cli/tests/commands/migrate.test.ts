@@ -312,6 +312,30 @@ project:
       expect(written).toContain("id: sales:Order_Line\n");
     });
 
+    it("settles two domains that each shadow the other's suffixed types", async () => {
+      // Neither reads alone, so neither can learn the other's ids from a
+      // read of the other alone (6b-3a's second pr-review pass).
+      file(
+        "sales.orm.yaml",
+        `${SALES}    - { id: s3, name: Invoice_Line, kind: entity, reference_mode: nr, source_context: billing }
+    - { id: s4, name: Invoice Line, kind: entity, reference_mode: nr, source_context: billing }
+`,
+      );
+      const billing = file(
+        "billing.orm.yaml",
+        `${BILLING}    - { id: s2, name: Order_Line, kind: entity, reference_mode: nr, source_context: sales }
+    - { id: b1, name: Invoice_Line, kind: entity, reference_mode: nr }
+    - { id: b2, name: Invoice Line, kind: entity, reference_mode: nr }
+`,
+      );
+      const result = await runCli(["migrate", manifest()]);
+      expect(result.exitCode).toBe(0);
+      const sales = readFileSync(join(dir, "sales.orm.yaml"), "utf-8");
+      expect(sales).toContain("id: billing:Invoice_Line\n");
+      expect(sales).toContain("id: billing:Invoice_Line_2\n");
+      expect(readFileSync(billing, "utf-8")).toContain("id: sales:Order_Line_2\n");
+    });
+
     it("migrates a domain named beside its manifest through the manifest only", async () => {
       file("sales.orm.yaml", SALES);
       const billing = file("billing.orm.yaml", BILLING);
