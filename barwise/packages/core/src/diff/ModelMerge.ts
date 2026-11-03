@@ -108,6 +108,7 @@ export function mergeModels(
     note: existing.note,
     // The base's aliases, and each the incoming side adds: an accepted
     // shadow from the incoming side needs its import (iri-identity WS6).
+    // Phase 9 drops the incoming ones no merged shadow uses.
     // An alias both bind keeps the base's binding.
     // The base's come first, in its order, so a merge that adds none
     // writes the base's imports unchanged.
@@ -661,6 +662,13 @@ export function mergeModels(
   // dropped them would turn every minted name into one a person chose, never
   // reported stale.
   carryMintedKeys(merged, existing, incoming);
+
+  // Phase 9: an alias only the incoming side bound, which no merged shadow
+  // uses, would only raise project/imported-context-missing; drop it.
+  for (const alias of [...merged.imports.keys()]) {
+    if (existing.imports.has(alias)) continue;
+    if (!merged.objectTypes.some((ot) => ot.id.startsWith(`${alias}:`))) merged.removeImport(alias);
+  }
 
   return merged;
 }

@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { remapIds } from "../../src/rename/remapIds.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
-import { replayInto40 } from "../../src/serialization/replay.js";
+import { danglingReferences, replayInto40 } from "../../src/serialization/replay.js";
 import { modelCorpus } from "../helpers/modelCorpus.js";
 
 const serializer = new OrmYamlSerializer();
@@ -51,6 +51,12 @@ describe("remapIds over the corpus", () => {
       // And nothing still names an old id that was remapped.
       const written = serializer.deserialize(remapped, { lenient: true });
       expect(idsOf(written).filter((id) => ids.has(id))).toEqual([]);
+      // Nor does any reference: what dangled before dangles now under its
+      // own id, and nothing else dangles (6b-3b's pr-review: a forgotten
+      // reference round-trips unchanged above, so only this sees it).
+      expect([...danglingReferences(written).ids].sort()).toEqual(
+        [...danglingReferences(model).ids].map((id) => ids.get(id) ?? id).sort(),
+      );
     },
   );
 

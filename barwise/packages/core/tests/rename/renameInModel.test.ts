@@ -44,7 +44,10 @@ model:
         - { id: ft-places.r6, player: ot-order, role_name: placed by }
       readings: ["{0} places {1}"]
   populations:
-    - { id: ft-places.population, fact_type: ft-places, instances: [] }
+    - id: ft-places.population
+      fact_type: ft-places
+      instances:
+        - { id: ft-places.population.1, role_values: { ft-places.r5: c1, ft-places.r6: o1 } }
   definitions:
     - { term: Customer, definition: "A person who buys." }
     - { term: Order, definition: "A request to buy." }
@@ -82,6 +85,11 @@ describe("renameInModel", () => {
       "ft-places.r5": "Customer_orders.r5",
       "ft-places.r6": "Customer_orders.r6",
       "ft-places.population": "Customer_orders.population",
+      "ft-places.population.1": "Customer_orders.population.1",
+    });
+    expect(model.populations[0]!.instances[0]).toMatchObject({
+      id: "Customer_orders.population.1",
+      roleValues: { "Customer_orders.r5": "c1", "Customer_orders.r6": "o1" },
     });
     expect(model.populations[0]).toMatchObject({
       id: "Customer_orders.population",
@@ -126,8 +134,8 @@ model:
   });
 
   it("refuses a name whose id another element holds", () => {
-    // "Customer_has_Email" is free as a name, and is the id the fact type
-    // "Customer has CustomerId" would take; give another element that id.
+    // "Customer pays" is free as a name, and its id, "Customer_pays", is
+    // held by an object type of another name.
     const m = shop();
     m.addObjectType({ id: "Customer_pays", name: "Payer", kind: "entity", referenceMode: "p" });
     expect(() =>
@@ -153,6 +161,11 @@ model:
     expect(byName.model.getFactType("ft-places")?.roles[0]).toMatchObject({
       name: "orders",
       id: "ft-places.orders",
+    });
+    // An instance's values follow the role they are keyed by.
+    expect(byName.model.populations[0]!.instances[0]!.roleValues).toEqual({
+      "ft-places.orders": "c1",
+      "ft-places.r6": "o1",
     });
 
     const byPosition = renameInModel(shop(), {

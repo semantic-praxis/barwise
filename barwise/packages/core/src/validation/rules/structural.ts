@@ -328,8 +328,8 @@ function checkLocalNames(model: OrmModel): Diagnostic[] {
 }
 
 /**
- * Each object type, fact type and role whose id is not the one its name
- * gives (decision 13): `localName(name)`, and a role's fact type id, a
+ * Each object type, fact type, role and population whose id is not the one
+ * its name gives (decision 13; a population's is decision 7's): `localName(name)`, and a role's fact type id, a
  * `.`, and its role name's. A suffixed id, which a load or an add gives
  * when the id is taken, is said to be one. Exempt: a shadow, whose id is
  * its owner's behind an alias; and a fact type its objectifying type's
@@ -369,6 +369,15 @@ function checkIdsFromNames(model: OrmModel): Diagnostic[] {
       if (locals.indexOf(locals[i]!) !== locals.lastIndexOf(locals[i]!)) return;
       check("role", role.name, role.id, `${ft.id}.${locals[i]}`);
     });
+    // Decision 7: a fact type's population is `<fact type>.population`, a
+    // second one of the same fact type suffixed, which is the rule and not
+    // a defect. Reported only when no sibling holds the unsuffixed id: a
+    // role took it, or the population's id is another altogether.
+    const pops = model.populations.filter((p) => p.factTypeId === ft.id);
+    const expected = `${ft.id}.population`;
+    if (!pops.some((p) => p.id === expected)) {
+      for (const pop of pops) check("population of fact type", ft.name, pop.id, expected);
+    }
   }
   return diagnostics;
 }

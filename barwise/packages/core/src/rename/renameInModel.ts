@@ -78,8 +78,11 @@ export function renameInModel(model: OrmModel, target: RenameTarget, to: string)
  * element's own, the one its new name gives (decision 13); for a fact
  * type, every id beneath it, which holds its id and a `.` (its roles, its
  * populations and their instances; no local name holds a `.`). A fact
- * type its objectifying type's name would collide with keeps its id,
- * which decision 20 gave from its first reading.
+ * type's population whose id took a suffix (`<ft>.population_2`, because
+ * a role held `<ft>.population` when it was read) takes `<ft>.population`
+ * once the rename frees it (decision 7). A fact type renamed to the name
+ * of the object type objectifying it would take an id that type holds,
+ * and is refused, as `planRename`'s local-name check already refuses it.
  *
  * @throws {RenameError} when another element already holds a new id.
  */
@@ -93,15 +96,13 @@ export function idsForRename(model: OrmModel, plan: RenamePlan): Map<string, str
     // A shadow keeps its alias; its local name is its owner's new id.
     ids.set(plan.elementId, colon < 0 ? local : `${plan.elementId.slice(0, colon)}:${local}`);
   } else {
-    const objectifier = model.objectifiedFactTypes.find((o) => o.factTypeId === plan.elementId);
-    if (objectifier?.objectTypeId !== local) {
-      ids.set(plan.elementId, local);
-      const prefix = `${plan.elementId}.`;
-      for (const id of heldIds(model)) {
-        if (id.startsWith(prefix)) ids.set(id, `${local}.${id.slice(prefix.length)}`);
-      }
+    ids.set(plan.elementId, local);
+    const prefix = `${plan.elementId}.`;
+    for (const id of heldIds(model)) {
+      if (id.startsWith(prefix)) ids.set(id, `${local}.${id.slice(prefix.length)}`);
     }
   }
+  if (plan.kind !== "objectType") repairPopulations(model, plan, ids);
   // A dangling reference names an id no element holds; taking it would
   // make the reference resolve to the renamed element, which nobody wrote.
   // The replay reserves the same ids for the same reason.
@@ -138,7 +139,33 @@ function idDiffersFromName(
   const local = localName(element.name);
   if (kind === "objectType") return element.id.slice(element.id.indexOf(":") + 1) !== local;
   const objectifier = model.objectifiedFactTypes.find((o) => o.factTypeId === element.id);
-  return objectifier?.objectTypeId !== local && element.id !== local;
+  const ownId = objectifier?.objectTypeId !== local && element.id !== local;
+  // A population whose id took a suffix is repaired by the same rename.
+  const pops = model.populations.filter((p) => p.factTypeId === element.id);
+  return ownId || (pops.length > 0 && !pops.some((p) => p.id === `${element.id}.population`));
+}
+
+/**
+ * Give each population of the renamed fact type, or of the renamed role's,
+ * `<fact type>.population` when its id is another and that one is free
+ * once the rename's ids are applied, and its instances the new prefix.
+ */
+function repairPopulations(model: OrmModel, plan: RenamePlan, ids: Map<string, string>): void {
+  const ftId = plan.kind === "role" ? plan.factTypeId! : plan.elementId;
+  const ftNow = ids.get(ftId) ?? ftId;
+  const want = `${ftNow}.population`;
+  const heldAfter = (id: string) =>
+    (model.idKindsHolding(id).length > 0 && !ids.has(id)) || [...ids.values()].includes(id);
+  // The first only: a second population of one fact type is suffixed by rule.
+  for (const pop of model.populations.filter((p) => p.factTypeId === ftId).slice(0, 1)) {
+    if ((ids.get(pop.id) ?? pop.id) === want || heldAfter(want)) continue;
+    ids.set(pop.id, want);
+    for (const inst of pop.instances) {
+      if (inst.id.startsWith(`${pop.id}.`)) {
+        ids.set(inst.id, `${want}.${inst.id.slice(pop.id.length + 1)}`);
+      }
+    }
+  }
 }
 
 /** The model under the new ids, each change said in `changes`. */

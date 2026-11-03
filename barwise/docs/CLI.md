@@ -336,7 +336,7 @@ In format 4.0 an element's id is its name, so a rename also gives the
 element the id its new name gives (`Order` becomes `Purchase`), and every
 id that embeds it follows: a renamed fact type's roles, populations and
 instances, and, through a project, each shadow's id in the other domains.
-Every reference to a changed id is rewritten, and each change is printed. A
+Every reference to a changed id in the model files is rewritten, and each change is printed. Lineage manifests (`.barwise/lineage.yaml`) are not, so re-export what a renamed element was exported in. A
 rename whose new id another element already holds is refused. A minted id,
 such as a constraint's, is kept, and `barwise validate` reports one whose
 element now says something else (`structural/stale-minted-name`). Beyond

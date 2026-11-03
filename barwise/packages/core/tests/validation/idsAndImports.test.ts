@@ -10,6 +10,7 @@ import { diffModels } from "../../src/diff/ModelDiff.js";
 import { MERGE_DIFF_OPTIONS, mergeModels } from "../../src/diff/ModelMerge.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmProject } from "../../src/model/OrmProject.js";
+import { renameInModel } from "../../src/rename/renameInModel.js";
 import { OrmYamlSerializer } from "../../src/serialization/OrmYamlSerializer.js";
 import { projectRules } from "../../src/validation/rules/projectRules.js";
 import { ValidationEngine } from "../../src/validation/ValidationEngine.js";
@@ -77,6 +78,52 @@ model:
     expect(found(model, "structural/id-not-from-name").map((d) => d.message)).toEqual([
       'The object type "Order_Line" has the suffixed id "Order_Line_2", because another element holds "Order_Line", the id its name gives. Rename one of them so each name gives its own id.',
     ]);
+  });
+
+  it("reports a population whose id took a suffix because a role held it, and rename repairs it", () => {
+    // 6b-3b's pr-review: main's name-based check warned here, and the
+    // id-based one had nothing until populations were checked (decision 7).
+    const model = read(`orm_version: "3.0"
+model:
+  name: M
+  object_types:
+    - { id: u1, name: City, kind: entity, reference_mode: name }
+  fact_types:
+    - id: f1
+      name: City has Count
+      roles:
+        - { id: r1, player: u1, role_name: has }
+        - { id: r2, player: u1, role_name: population }
+      readings: ["{0} has {1}"]
+  populations:
+    - { id: p1, fact_type: f1, instances: [{ id: p1.1, role_values: { r1: Oslo, r2: Bergen } }] }
+`);
+    expect(found(model, "structural/id-not-from-name").map((d) => d.message)).toEqual([
+      'The population of fact type "City has Count" has the suffixed id "City_has_Count.population_2", because another element holds "City_has_Count.population", the id its name gives. Rename one of them so each name gives its own id.',
+    ]);
+    const { model: renamed } = renameInModel(model, {
+      kind: "role",
+      factType: "City has Count",
+      role: "population",
+    }, "residents");
+    expect(renamed.populations[0]).toMatchObject({ id: "City_has_Count.population" });
+    expect(renamed.populations[0]!.instances[0]!.id).toBe("City_has_Count.population.1");
+    expect(found(renamed, "structural/id-not-from-name")).toEqual([]);
+  });
+
+  it("does not report a fact type's second population, which the suffix rule names", () => {
+    const model = read(SMOKERS.replace(
+      "  subtype_facts:",
+      `  populations:
+    - { id: Person_smokes.population, fact_type: Person_smokes, instances: [] }
+    - { id: Person_smokes.population_2, fact_type: Person_smokes, instances: [] }
+  subtype_facts:`,
+    ));
+    expect(model.populations.map((p) => p.id)).toEqual([
+      "Person_smokes.population",
+      "Person_smokes.population_2",
+    ]);
+    expect(found(model, "structural/id-not-from-name")).toEqual([]);
   });
 
   it("exempts a shadow, whose id is its owner's behind an alias", () => {
@@ -195,24 +242,31 @@ model:
     expect(found(model, "structural/alias-not-imported")).toEqual([]);
   });
 
-  it("is carried by a merge, the base's first, then each the incoming side adds", () => {
+  it("is carried by a merge: the base's first, then each an accepted shadow uses", () => {
     const base = read(BILLING);
     const incoming = read(
       BILLING.replace(
         'imports: { sales: sales, ext: "https://example.com/ns/" }',
-        "imports: { sales: sales, crm: crm }",
+        "imports: { sales: sales, crm: crm, unused: hr }",
+      ).replace(
+        "    - { id: Invoice,",
+        '    - { id: "crm:Lead", name: Lead, kind: entity, reference_mode: nr }\n    - { id: Invoice,',
       ),
     );
-    const merged = mergeModels(
-      base,
-      incoming,
-      diffModels(base, incoming, MERGE_DIFF_OPTIONS),
-      new Set(),
+    const diff = diffModels(base, incoming, MERGE_DIFF_OPTIONS);
+    const lead = diff.deltas.findIndex((d) =>
+      d.elementType === "object_type" && d.kind === "added"
     );
-    expect([...merged.imports]).toEqual([
+    expect(lead).toBeGreaterThanOrEqual(0);
+    expect([...mergeModels(base, incoming, diff, new Set([lead])).imports]).toEqual([
       ["sales", "sales"],
       ["ext", "https://example.com/ns/"],
       ["crm", "crm"],
+    ]);
+    // Not accepted, the shadow is not merged, and neither is its alias.
+    expect([...mergeModels(base, incoming, diff, new Set()).imports]).toEqual([
+      ["sales", "sales"],
+      ["ext", "https://example.com/ns/"],
     ]);
   });
 });
@@ -236,6 +290,18 @@ model:
 });
 
 describe("the replay, given two contexts with one local name", () => {
+  it("gives two shadows of one context one alias and one import", () => {
+    const model = read(`orm_version: "3.0"
+model:
+  name: billing
+  object_types:
+    - { id: s1, name: Lead, kind: entity, reference_mode: nr, source_context: sales }
+    - { id: s2, name: Deal, kind: entity, reference_mode: nr, source_context: sales }
+`);
+    expect(model.objectTypes.map((o) => o.id)).toEqual(["sales:Lead", "sales:Deal"]);
+    expect([...model.imports]).toEqual([["sales", "sales"]]);
+  });
+
   it("gives the second its own alias, so no shadow names the wrong context", () => {
     const model = read(`orm_version: "3.0"
 model:
