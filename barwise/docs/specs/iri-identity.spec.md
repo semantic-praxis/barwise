@@ -1446,6 +1446,28 @@ version-1 manifest would go silently empty for impact analysis.
   (`serialization/yaml/objectType.ts:15,54-55`), its 3.0 decoder
   (`decode/objectType.ts`) and the 2.0 reader (`reader20.ts`). 21 tracked YAML
   files set `source_context` (WS7).
+  - _6d notes (merge)._
+    - An accepted fact type modification takes the incoming fact type's
+      content under the base's id, its roles rebased from
+      `<incoming>.<role>` to `<base>.<role>` (`rebaseRoles`; a role of
+      another shape, built in code, keeps its id). The map is built before
+      any fact type is added, since an incoming join constraint may name a
+      rebased role; existing and incoming populations and constraints
+      across fact types follow through the role remaps, by position as
+      before.
+    - Its internal constraints pair with the base fact type's by id, then
+      by content, one for one (`pairFactTypeConstraints`, beside
+      `pairModelConstraints` in `elementDiff.ts` and sharing its pairing),
+      and a paired one keeps the base's id, so `carryMintedKeys` keeps the
+      base's `minted_from`. An unpaired one keeps its own.
+    - `mergedId` takes the suffix rule over every id the merged model
+      holds, of any kind; `MERGE_ID_TAG` is gone. A suffixed population is
+      what `id-not-from-name` reports. A subtype fact or objectification is
+      named from its sentence, so two that clash say the same thing, which
+      `duplicate-subtype-fact` or the objectification's refusal reports.
+    - `refuseNameClashes` also refuses an object type and a fact type the
+      merge would give one id: the diff pairs ids within one kind only.
+
 - **6e, lineage.** The manifest goes to `version: 2` (`types.ts:55`)
   and `canonicalizeIds` goes (`manifest.ts:124-`). The marker is per
   export, because `updateManifest` keeps every export it does not

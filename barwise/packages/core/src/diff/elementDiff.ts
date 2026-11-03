@@ -604,14 +604,62 @@ export function pairModelConstraints(
     existing,
     pairing.identity,
   );
-  const pairOf = new Map<ExternalConstraint, ConstraintPair>();
-  const taken = new Set<ExternalConstraint>();
+  return pairOneToOne(a, b, keysA, keysB, holders, pairing);
+}
+
+/** One of a fact type's own constraints matched, or not, between two models. */
+export interface InternalConstraintPair {
+  readonly existing?: Constraint;
+  readonly incoming?: Constraint;
+  /** Paired by id and saying something different. */
+  readonly modified: boolean;
+}
+
+/**
+ * Match the constraints of two versions of one fact type one to one, as
+ * `pairModelConstraints` matches the model's: by id first, as
+ * `diffConstraints` does, then by content, each role keyed by its
+ * position in the fact type. For a merge that keeps the base's id and
+ * stored key for each pair (iri-identity 6d). `diffConstraints` compares
+ * the content keys as sets, since it reports only changes; this takes
+ * them one for one, so a second identical copy reads as added or removed.
+ */
+export function pairFactTypeConstraints(
+  a: FactType,
+  b: FactType,
+  holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; },
+  pairing: ConstraintPairing,
+): InternalConstraintPair[] {
+  const keysA = roleKeys(a.roles, holders.existing, holders.incoming, pairing.homeKey);
+  const keysB = roleKeys(b.roles, holders.incoming, holders.existing, pairing.homeKey);
+  return pairOneToOne(
+    a.internalConstraints,
+    b.internalConstraints,
+    keysA,
+    keysB,
+    holders,
+    pairing,
+  );
+}
+
+/** By id where `pairById` pairs, then by content key one for one. */
+function pairOneToOne<C extends Constraint>(
+  a: readonly C[],
+  b: readonly C[],
+  keysA: RoleKeys,
+  keysB: RoleKeys,
+  holders: { readonly existing: RoleHolders; readonly incoming: RoleHolders; },
+  pairing: ConstraintPairing,
+): { readonly existing?: C; readonly incoming?: C; readonly modified: boolean; }[] {
+  type Pair = { readonly existing?: C; readonly incoming?: C; readonly modified: boolean; };
+  const pairOf = new Map<C, Pair>();
+  const taken = new Set<C>();
   const byId = pairById(a, b, keysA, keysB, holders.existing, holders.incoming, pairing);
   for (const [ca, { to, changed }] of byId) {
     taken.add(to);
     pairOf.set(ca, { existing: ca, incoming: to, modified: changed });
   }
-  const byKeyB = new Map<string, ExternalConstraint[]>();
+  const byKeyB = new Map<string, C[]>();
   for (const cb of b) {
     if (taken.has(cb)) continue;
     const key = constraintKey(cb, keysB);

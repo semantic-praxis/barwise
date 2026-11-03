@@ -200,3 +200,24 @@ describe("a shared id is the same element", () => {
     ).toEqual(["ot0", "ot1", "ft0"]);
   });
 });
+
+describe("one id across kinds", () => {
+  it("refuses an added fact type under a kept object type's id, naming both (iri-identity 6d)", () => {
+    const base = new OrmModel({ name: "M" });
+    base.addObjectType({ id: "Order", name: "Order", kind: "entity", referenceMode: "nr" });
+    const incoming = new OrmModel({ name: "M" });
+    incoming.addObjectType({ id: "Order", name: "Order", kind: "entity", referenceMode: "nr" });
+    incoming.addFactType({
+      id: "Order",
+      name: "Order is open",
+      roles: [{ name: "is open", playerId: "Order" }],
+      readings: ["{0} is open"],
+    });
+    const diff = diffModels(base, incoming, MERGE_DIFF_OPTIONS);
+    const result = mergeAndValidate(base, incoming, diff, new Set(diff.deltas.map((_, i) => i)));
+    expect(result.model).toBeNull();
+    expect(result.diagnostics[0]!.message).toContain(
+      'two elements would take one id: "Order": object type "Order", fact type "Order is open"',
+    );
+  });
+});
