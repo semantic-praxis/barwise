@@ -784,8 +784,9 @@ than leaving them out, since they may depend on it under its old id.
 Given a 3.x model file, `impact` also finds an element by the id that file
 states. When the model does not load, `impact` says so (`modelDidNotLoad`
 with `--format json`), since the id is then read as a 4.0 id. A 3.x id the
-file stated for more than one element is reported as naming each of them,
-rather than matched.
+file stated for more than one element is reported as naming each of them:
+exports written under 3.x ids are not matched by it, while exports written
+under 4.0 ids still match the element that holds it now.
 
 `status` exits 1, as it does for a stale artifact, on two kinds of export
 it cannot check:

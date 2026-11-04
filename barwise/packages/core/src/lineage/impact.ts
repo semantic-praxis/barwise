@@ -33,8 +33,10 @@ export interface ImpactReport {
   /**
    * The 4.0 ids of the elements the asked id names, present when it is a
    * 3.x id the file stated for more than one element, which 3.x allowed and
-   * no lookup by the id alone can tell apart (iri-identity 6e). Nothing is
-   * matched then: ask again by one of these.
+   * no lookup by the id alone can tell apart (iri-identity 6e). Exports
+   * written under 3.x ids are then not matched by it, and those holding it
+   * are listed in `exportsBefore40`; exports written under 4.0 ids still
+   * match the element whose 4.0 id it is, if any.
    */
   readonly ambiguous?: readonly string[];
 }
@@ -91,7 +93,10 @@ export function analyzeImpact(
         && (!exp.idsBefore40 || beforeTypes === undefined || beforeTypes.has(src.elementType))
       );
     // With the element's 3.x id unknown, a marked export cannot be read.
-    if (!sourceRef && exp.idsBefore40 && before === undefined) {
+    // An ambiguous id lists only the marked exports that hold it.
+    const holdsAsked = ambiguous === undefined
+      || exp.sources.some((s) => s.elementId === elementId);
+    if (!sourceRef && exp.idsBefore40 && before === undefined && holdsAsked) {
       exportsBefore40.push(exp.artifact);
     }
 
@@ -132,9 +137,10 @@ type SourceType = SourceReference["elementType"];
  * nothing is matched and the candidates are returned as `ambiguous`; its
  * marked exports are listed as unknown. Asked by one element's 4.0 id, the
  * shared 3.x id is matched only in sources of that element's kind
- * (`beforeTypes`), since the id alone names each; for an element of a
- * kind lineage never records, it is not read at all, and marked exports
- * are listed as unknown.
+ * (`beforeTypes`), since the id alone names each; an element of a kind
+ * lineage never records matches no source. Asked by a shared id that an
+ * element also holds as its 4.0 id, exports written under 4.0 ids still
+ * match that element; only the marked exports holding the id are listed.
  */
 function idsByGeneration(
   elementId: string,
@@ -151,18 +157,28 @@ function idsByGeneration(
   if (fromFile !== undefined) return { now: fromFile, before: elementId, ...plain };
   const sharing = [...model.priorIds].filter(([, p]) => p === elementId).map(([id]) => id);
   if (sharing.length > 1) {
-    return { now: undefined, before: undefined, beforeTypes: undefined, ambiguous: sharing };
+    // Exports a 4.0 build wrote still match the element that holds this id
+    // now, which may be one of the candidates or another element (the
+    // pr-review on 6e); only the 3.x reading is ambiguous.
+    const holds = model.priorIds.has(elementId);
+    return {
+      now: holds ? elementId : undefined,
+      before: undefined,
+      beforeTypes: undefined,
+      ambiguous: sharing,
+    };
   }
   const prior = model.priorIds.get(elementId);
   // `idFromPrior` is undefined for a prior id exactly when it is shared.
   if (prior === undefined || model.idFromPrior(prior) !== undefined) {
     return { now: elementId, before: prior, ...plain };
   }
-  const types = sourceTypesOf(model, elementId);
+  // A kind lineage never records (a population) matches no source, and
+  // since none can hold it, none is listed as unknown either.
   return {
     now: elementId,
-    before: types === undefined ? undefined : prior,
-    beforeTypes: types,
+    before: prior,
+    beforeTypes: sourceTypesOf(model, elementId) ?? new Set(),
     ambiguous: undefined,
   };
 }

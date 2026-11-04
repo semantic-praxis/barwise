@@ -820,7 +820,10 @@ file, they are matched by the id that file states; inline, there is no
 model to read 3.x ids through, so each is listed. Given a path whose model
 does not load, the report adds `modelDidNotLoad: true`, since the id is
 then read as a 4.0 id. Asked by a 3.x id the file stated for more than one
-element, nothing is matched and `ambiguous` names those elements' 4.0 ids.
+element, `ambiguous` names those elements' 4.0 ids: exports written under
+3.x ids are not matched by it, and those holding it are listed in
+`exportsBefore40`; exports written under 4.0 ids still match the element
+that holds it as its 4.0 id, if any.
 
 ---
 

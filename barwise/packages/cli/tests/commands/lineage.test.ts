@@ -473,7 +473,7 @@ model:
       // The export does depend on ot-1 (Customer's 3.x id), so the answer
       // must not read as "nothing depends" (the pr-review on 6e).
       expect(result.stdout).not.toContain("No artifacts depend");
-      expect(result.stdout).toContain("No artifact records this id.");
+      expect(result.stdout).toContain("No artifact records this id under a 4.0 id.");
     });
 
     it("names the elements a shared 3.x id names, rather than saying none depend", async () => {
@@ -502,7 +502,7 @@ model:
       const result = await runCli(["lineage", "impact", modelPath, "--element", "x1"]);
       expect(result.stdout).not.toContain("No artifacts depend");
       expect(result.stdout).toContain(
-        '"x1" names more than one element in this file (Person, Person_smokes)',
+        '"x1" is a 3.x id the file states for more than one element (Person, Person_smokes)',
       );
     });
 

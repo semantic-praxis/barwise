@@ -158,6 +158,13 @@ export function registerLineageCommand(program: Command): void {
                 + "id is read as a 4.0 id.\n\n",
             );
           }
+          if (report.ambiguous !== undefined) {
+            process.stdout.write(
+              `"${report.changedElement}" is a 3.x id the file states for more than one `
+                + `element (${report.ambiguous.join(", ")}), so exports written under 3.x ids `
+                + "are not matched by it.\n\n",
+            );
+          }
 
           const before40 = () => {
             if (report.exportsBefore40.length === 0) return;
@@ -172,12 +179,9 @@ export function registerLineageCommand(program: Command): void {
             // model did not load, or an id naming two elements, "none" would
             // read as safe.
             process.stdout.write(
-              report.ambiguous !== undefined
-                ? `"${report.changedElement}" names more than one element in this file `
-                  + `(${report.ambiguous.join(", ")}); ask by one of those ids.\n`
-                : modelDidNotLoad
-                ? "No artifact records this id.\n"
-                : report.exportsBefore40.length === 0
+              modelDidNotLoad
+                ? "No artifact records this id under a 4.0 id.\n"
+                : report.exportsBefore40.length === 0 && report.ambiguous === undefined
                 ? "No artifacts depend on this element.\n"
                 : "No artifact recorded under 4.0 ids depends on this element.\n",
             );
