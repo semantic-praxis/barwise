@@ -344,12 +344,23 @@ function reportDropped(
 function readNamespace(doc: OssieDocument, model: OrmModel, warnings: string[]): void {
   const concepts: { readonly name: string; readonly iri: string; readonly id: string; }[] = [];
   const relationships: typeof concepts = [];
+  // An element this read cannot find by its Ossie text is one the model
+  // stored under another name: core trims names, so `" Customer "` is
+  // `Customer` (Copilot, on 6f). Its IRI is dropped with a warning, not
+  // read, and nothing else about the import changes (barwise-x8y).
+  const unread: { readonly name: string; readonly iri: string; }[] = [];
   for (const c of doc.ontology) {
-    if (c.iri) concepts.push({ name: c.concept, iri: c.iri, id: conceptId(model, c.concept) });
+    if (c.iri) {
+      const ot = model.getObjectTypeByName(c.concept);
+      if (ot) concepts.push({ name: c.concept, iri: c.iri, id: ot.id });
+      else unread.push({ name: c.concept, iri: c.iri });
+    }
     for (const r of c.relationships ?? []) {
       if (!r.iri) continue;
-      const ft = relationshipFact(model, c.concept, r.name);
-      relationships.push({ name: ft.name, iri: r.iri, id: ft.id });
+      const name = ossieFactTypeName(c.concept, r.name);
+      const ft = model.getFactTypeByName(name);
+      if (ft) relationships.push({ name: ft.name, iri: r.iri, id: ft.id });
+      else unread.push({ name, iri: r.iri });
     }
   }
   let namespace = namespaceOfIris(concepts);
@@ -364,8 +375,8 @@ function readNamespace(doc: OssieDocument, model: OrmModel, warnings: string[]):
       namespace = undefined;
     }
   }
-  for (const s of [...concepts, ...relationships]) {
-    if (namespace !== undefined && s.iri === `${namespace}${s.id}`) continue;
+  for (const s of [...concepts, ...relationships, ...unread]) {
+    if (namespace !== undefined && "id" in s && s.iri === `${namespace}${s.id}`) continue;
     warnings.push(
       `${s.name}: iri ${s.iri} dropped; barwise keeps an IRI only as the model's namespace `
         + "followed by the element's id.",
@@ -373,22 +384,14 @@ function readNamespace(doc: OssieDocument, model: OrmModel, warnings: string[]):
   }
 }
 
-/**
- * The object type a concept imported as; every concept is added before it
- * is looked up. Trimmed as the model trims the name it stores (Copilot, on
- * 6f: `" Customer "` imports as `Customer`).
- */
+/** The object type a concept imported as; every concept is added before it is looked up. */
 function conceptId(model: OrmModel, name: string): string {
-  return model.getObjectTypeByName(name.trim())!.id;
+  return model.getObjectTypeByName(name)!.id;
 }
 
-/**
- * The fact type a relationship imported as; every relationship is added
- * before it is looked up. Its whole generated name is trimmed, as the
- * model trims the name it stores.
- */
+/** The fact type a relationship imported as; every relationship is added before it is looked up. */
 function relationshipFact(model: OrmModel, concept: string, rel: string) {
-  return model.getFactTypeByName(ossieFactTypeName(concept, rel).trim())!;
+  return model.getFactTypeByName(ossieFactTypeName(concept, rel))!;
 }
 
 /**

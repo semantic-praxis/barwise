@@ -162,13 +162,21 @@ ontology:
     expect(warnings.filter((w) => w.includes("iri"))).toHaveLength(2);
   });
 
-  it("reads the IRI of a concept or relationship whose name has spaces around it (Copilot, on 6f)", () => {
+  it("drops, without crashing, the IRI of a name with spaces around it (Copilot, on 6f)", () => {
+    // The model stores the name trimmed, so the read cannot find it by its
+    // Ossie text; the import is otherwise as without an iri (barwise-x8y).
+    const dropped = (name: string, iri: string) =>
+      `${name}: iri ${iri} dropped; barwise keeps an IRI only as the model's namespace `
+      + "followed by the element's id.";
     const concept = new OssieImportFormat().parse(`version: 0.2.0.dev0
 name: Shop
 ontology:
   - { concept: " Customer ", type: EntityType, iri: "https://ex.org/shop#Customer" }
+  - { concept: Order, type: EntityType, iri: "https://ex.org/shop#Order" }
 `);
     expect(concept.model.namespace).toBe("https://ex.org/shop#");
+    expect(concept.model.objectTypes.map((o) => o.name).sort()).toEqual(["Customer", "Order"]);
+    expect(concept.warnings).toContain(dropped(" Customer ", "https://ex.org/shop#Customer"));
     const relationship = new OssieImportFormat().parse(`version: 0.2.0.dev0
 name: Shop
 ontology:
