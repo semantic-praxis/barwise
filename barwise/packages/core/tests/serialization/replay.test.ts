@@ -13,6 +13,7 @@ import { IDS_40 } from "../../src/decode/ids.js";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { constraintRef } from "../../src/model/constraintRef.js";
 import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
+import { ownerContextOf } from "../../src/model/namespace.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import {
   OrmYamlSerializer,
@@ -88,6 +89,15 @@ const asText = (model: OrmModel) => {
     model: Record<string, unknown>;
   };
   const { imports: _added, ...header } = doc.model;
+  // A 3.0 shadow states its owner in `source_context`; 4.0 in its id's
+  // alias, which the replay binds to that owner (iri-identity 6d).
+  const objectTypes = header["object_types"] as Record<string, unknown>[] | undefined;
+  if (objectTypes) {
+    header["object_types"] = objectTypes.map((ot) => {
+      const owner = ownerContextOf(model, ot["id"] as string);
+      return owner === undefined ? ot : { ...ot, source_context: owner };
+    });
+  }
   return { ...doc, model: header, orm_version: "3.0" };
 };
 

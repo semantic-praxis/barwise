@@ -143,3 +143,22 @@ describe("an object type's owner", () => {
     expect(objectTypes.map((d) => d.kind)).toEqual(["unchanged"]);
   });
 });
+
+describe("a rebased role", () => {
+  it("is read only where a constraint names a role, never in a literal (Copilot, on 6d)", () => {
+    const base = owns("Person_owns_Car", "{0} owns {1}");
+    const incoming = owns("Ownership", "{0} has {1}");
+    // An allowed value spelled like the role id the merge rebases.
+    incoming.getFactType("Ownership")!.addConstraint({
+      type: "value_constraint",
+      roleId: "Ownership.is_owned_by",
+      values: ["Ownership.is_owned_by", "other"],
+    });
+    const vc = takeAll(base, incoming).getFactType("Person_owns_Car")!.internalConstraints
+      .find((c) => c.type === "value_constraint")!;
+    expect(vc).toMatchObject({
+      roleId: "Person_owns_Car.is_owned_by",
+      values: ["Ownership.is_owned_by", "other"],
+    });
+  });
+});

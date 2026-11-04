@@ -26,10 +26,16 @@ import {
 
 /** Marks a subtype fact the merge left out, for `withoutSubtypeFacts`. */
 const LEFT_OUT = "\u0000left-out";
+import {
+  type ConstraintFileValue,
+  constraintRecord,
+  modelConstraint,
+} from "../decode/constraint.js";
 import { withoutDiagramReferences } from "../model/DiagramLayout.js";
 import { type FactTypeConfig, toFactTypeConfig } from "../model/FactType.js";
 import { graphOf } from "../model/graph.js";
 import { suffixed } from "../model/idRules.js";
+import { mapConstraintReferences } from "../model/mint.js";
 import { aliasOf } from "../model/namespace.js";
 import { toObjectifiedFactTypeConfig } from "../model/ObjectifiedFactType.js";
 import type { ObjectType } from "../model/ObjectType.js";
@@ -1291,30 +1297,30 @@ function remapConstraintIds<C extends import("../model/Constraint.js").Constrain
 
 /**
  * Rewrite every role id a constraint names through a role remap, in
- * whatever field its kind keeps them (join paths included): the walk is
- * over the constraint's values rather than a list of its fields, so a
- * kind added later is covered. A role mapped to null keeps its id, and
- * the caller's role check decides what that means. Only role ids are
- * keys of the map, so no other string can match.
+ * whatever field its kind keeps them (join paths included), through the
+ * one traversal of a constraint's references (`mapConstraintReferences`),
+ * which refuses a field it does not classify, so a kind added later cannot
+ * slip through. A literal is never read as a role: a value constraint's
+ * allowed value spelled like a rebased role id stays the value it was
+ * (Copilot, on 6d; the walk over every string this replaced rewrote it).
+ * A role mapped to null keeps its id, and the caller's role check decides
+ * what that means.
  */
 function mapRoleIds<C extends import("../model/Constraint.js").Constraint>(
   constraint: C,
   roleIdMap: ReadonlyMap<string, string | null>,
 ): C {
   if (roleIdMap.size === 0) return constraint;
-  const walk = (value: unknown, key: string | undefined): unknown => {
-    if (typeof value === "string") {
-      if (key === "id" || key === "type" || key === "modality") return value;
-      const mapped = roleIdMap.get(value);
-      return mapped === undefined || mapped === null ? value : mapped;
-    }
-    if (Array.isArray(value)) return value.map((v) => walk(v, key));
-    if (value !== null && typeof value === "object") {
-      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, walk(v, k)]));
-    }
-    return value;
-  };
-  return walk(constraint, undefined) as C;
+  const form = mapConstraintReferences(
+    constraint,
+    (ref) => (ref.kind === "role" ? roleIdMap.get(ref.id) ?? ref.id : ref.id),
+  );
+  const record = modelConstraint(
+    constraintRecord({ ...form, id: constraint.id ?? "" } as ConstraintFileValue),
+  );
+  if (constraint.id !== undefined) return record as unknown as C;
+  const { id: _none, ...unnamed } = record;
+  return unnamed as unknown as C;
 }
 
 /**

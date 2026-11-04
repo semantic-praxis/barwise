@@ -31,6 +31,13 @@ export interface OrmYamlObjectType {
 export function serializeObjectType(
   ot: ObjectType,
   preferredIdentifierId?: string,
+  options: {
+    /**
+     * Write a 3.x shadow's `source_context`: format 3.0 states the owner
+     * there, 4.0 in the id's alias and has no such field (iri-identity 6d).
+     */
+    readonly sourceContext?: boolean;
+  } = {},
 ): OrmYamlObjectType {
   const result: OrmYamlObjectType = {
     id: ot.id,
@@ -40,7 +47,7 @@ export function serializeObjectType(
 
   // Narrowed field by field rather than by grouping the variants, because
   // key INSERTION ORDER is what the golden bytes record: a value type's
-  // `value_constraint` and `data_type` sit between `definition` and
+  // `value_constraint` and `data_type` sit between `source_context` and
   // `aliases`, and moving them into a `kind` block would reorder every
   // serialized value type.
   const value = isValueType(ot) ? ot : undefined;
@@ -51,6 +58,9 @@ export function serializeObjectType(
   }
   if (ot.definition) {
     result.definition = ot.definition;
+  }
+  if (options.sourceContext && ot.sourceContext) {
+    result.source_context = ot.sourceContext;
   }
   if (value?.valueConstraint) {
     result.value_constraint = serializeValueConstraintBody(

@@ -222,3 +222,23 @@ describe("writing a format 4.0 document", () => {
     expect(stored.id).toBeUndefined();
   });
 });
+
+describe("a 3.x shadow's owner (iri-identity 6d)", () => {
+  // Read as written, so the model still holds the 3.0 field the replay
+  // would have moved into the id's alias.
+  const read = () =>
+    new OrmYamlSerializer().deserializeAsWritten(`orm_version: "3.0"
+model:
+  name: billing
+  object_types:
+    - { id: c, name: Customer, kind: entity, reference_mode: nr, source_context: crm }
+`);
+
+  it("is written by the 3.0 writer, which states it there", () => {
+    expect(writeDocument(read()).model.object_types?.[0]).toMatchObject({ source_context: "crm" });
+  });
+
+  it("is not written by the 4.0 writer, which has no such field", () => {
+    expect(writeDocument40(read()).model.object_types?.[0]).not.toHaveProperty("source_context");
+  });
+});
