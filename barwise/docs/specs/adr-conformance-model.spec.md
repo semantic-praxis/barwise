@@ -6,8 +6,7 @@ Created: 2026-11-04
 Last-updated: 2026-11-04
 Tracking: barwise-ym8.z9g (follows docs/specs/enforceable-adr-practice.spec.md)
 Touches: +barwise/docs/adr/governance.orm.yaml, +barwise/scripts/check-adr-model.mjs,
-+barwise/scripts/lib/adr-facts.mjs, barwise/scripts/check-adr-tests.mjs, barwise/scripts/lib/test-reports.mjs, +barwise/scripts/tests/adr-model.test.mjs,
-barwise/scripts/tests/expected-counts.json, barwise/package.json, package.json,
++barwise/scripts/lib/adr-facts.mjs, barwise/scripts/check-adr-tests.mjs, barwise/scripts/tests/gates.test.mjs, +barwise/scripts/tests/architecture-repo.mjs, +barwise/scripts/lib/test-evidence.mjs, +barwise/scripts/tests-built/adr-model.test.mjs, barwise/package.json, package.json,
 .github/workflows/ci.yml
 
 ## Principle
@@ -60,18 +59,22 @@ with `barwise validate`:
 In scope:
 
 - When `npm run check:adr-model` runs, the system shall extract the
-  governance facts from the ADR headers, the tracker, `ci.yml` and the
-  test reports through the parsers the gates use (`parseEnforcedBy`,
-  `decisionIds`, `ciStepOccurrences`, `tagsIn`, and the report readers
-  `check-adr-tests.mjs` uses), validate them against
+  governance facts from the tracked ADRs (`trackedPaths(root).filter(isAdr)`,
+  as the gates select them), the tracker, `ci.yml` and the test reports,
+  through the readers the gates use, validate them against
   `barwise/docs/adr/governance.orm.yaml` with `@barwise/core`, and exit 1
-  naming each violated constraint and the fact that violates it.
-- When an input cannot be read, or `@barwise/core` is not built, it shall
-  exit 2 and print no pass.
+  naming each violated constraint by its fact type and the instance that
+  violates it.
+- When an input cannot be read, `@barwise/core` is not built, or a
+  declared tested decision is unproven while a report is unread or its
+  tagged tests all skipped, it shall exit 2 and print no pass, as
+  `check:adr-tests` does for the same tree.
 - When the schema alone is validated, it shall have no error.
 - When a violation is planted in a fixture tree, `check:adr-model` and the
   gate that already holds that rule (`check:architecture` or
-  `check:adr-tests`) shall both exit 1; on a clean fixture both exit 0.
+  `check:adr-tests`) shall give the same exit code; on a clean fixture both
+  exit 0. Each rule in the WS1 schema has such a gate, so the drift test
+  covers every one of them.
 - When barwise verbalizes the schema, each governance rule shall read as
   one sentence; the schema carries those sentences as its documentation.
 
@@ -86,14 +89,16 @@ Out of scope:
 
 ## Inventory
 
-| Area                                        | Current state (verified 2026-11-04)                                                                                                     | Verdict                                                             |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| core population validation                  | checks uniqueness, mandatory, disjunctive mandatory, subset, equality, exclusion, ring and value constraints over a model's populations | used as is                                                          |
-| `barwise validate --format json`            | diagnostics with `severity`, `message`, `ruleId`, `elementId`; exit 1 on an error                                                       | the format the tests assert on                                      |
-| `@barwise/core` from a script               | `measure-comparison.mjs` imports it and refuses when it is not built                                                                    | WS1 follows that precedent                                          |
-| `adr-enforcement.mjs`, `ci-occurrences.mjs` | export the parsers the prototype used                                                                                                   | reused, not copied                                                  |
-| `check-adr-tests.mjs` report readers        | inline in the script                                                                                                                    | WS1 moves them to `scripts/lib/test-reports.mjs`, which both import |
-| ci.yml                                      | `npm run build` runs after `test:scripts`; `check:adr-tests` runs after `test:coverage`                                                 | WS2 adds the step after `check:adr-tests`                           |
+| Area                                        | Current state (verified 2026-11-04)                                                                                                     | Verdict                                                                                           |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| core population validation                  | checks uniqueness, mandatory, disjunctive mandatory, subset, equality, exclusion, ring and value constraints over a model's populations | used as is                                                                                        |
+| `barwise validate --format json`            | diagnostics with `severity`, `message`, `ruleId`, `elementId`; exit 1 on an error                                                       | the format the tests assert on                                                                    |
+| `@barwise/core` from a script               | `measure-comparison.mjs` imports it and refuses when it is not built                                                                    | WS1 follows that precedent                                                                        |
+| `adr-enforcement.mjs`, `ci-occurrences.mjs` | export the parsers the prototype used                                                                                                   | reused, not copied                                                                                |
+| `check-adr-tests.mjs` evidence              | the expected-report list, the report readers and the passed / failed / skipped reading are inline in the script                         | WS1 moves them to `scripts/lib/test-evidence.mjs`, which both import, so the two read a run alike |
+| `architectureRepo()`                        | the fixture builder for `check:architecture` cases, private to `gates.test.mjs`                                                         | WS1 moves it to `scripts/tests/architecture-repo.mjs`, which both test files import               |
+| `run-script-tests.mjs`                      | refuses a test file its manifest does not name; `test:scripts` runs before the build                                                    | the model's tests need the build, so they get their own step                                      |
+| ci.yml                                      | `npm run build` runs after `test:scripts`; `check:adr-tests` runs after `test:coverage`                                                 | WS2 adds the step after `check:adr-tests`                                                         |
 
 ## Target architecture
 
@@ -105,17 +110,24 @@ barwise/scripts/check-adr-model.mjs    load schema + rows into an OrmModel,
                                        ValidationEngine (pure, core),
                                        0 / 1 violations / 2 could not answer
 
-Rules in the schema (prototype, carried over):
-  Each Decision belongs to exactly one ADR.
+Rules in the WS1 schema, each also held by a gate (the drift test):
+  Each Decision belongs to exactly one ADR.            (check:architecture)
   Each Decision is held by some Gate, is declared tested by some ADR, or
-    has gap recorded by some GapIssue.               (header required)
-  If an ADR declares tests for a Decision, some Test proves it. (adr-tests)
+    has gap recorded by some GapIssue.                 (header required)
+  If an ADR declares tests for a Decision, some Test proves it.
+                                                       (check:adr-tests)
   Each GapIssue records the gap of at most one Decision.   (dedicated)
   Each Decision has gap recorded by at most one GapIssue.
-  Each GapIssue has exactly one IssueStatus, and it is open.
-  Each GapIssue carries the gap label.               (enforceable WS3)
+  Each GapIssue has exactly one IssueState, and it is "not closed".
+    The extractor maps the tracker's status to "closed" or "not closed",
+    as check:architecture reads it (status === "closed").
+  Each GapIssue carries the gap label. The extractor emits that fact only
+    for the label check:architecture requires; other labels are not facts.
   Each Gate runs as exactly one CiStep.
-  Decision conflicts with Decision: irreflexive and symmetric.
+
+Refusals are the extractor's, not constraints: an unread input, an
+unbuilt core, and a tested decision left unproven by an unread report or
+by skips (test-evidence.mjs, shared with check:adr-tests).
 ```
 
 ## Alternatives considered
@@ -136,26 +148,38 @@ Rules in the schema (prototype, carried over):
 
 ### 1. The governance model, on demand
 
-Lands after `enforceable-adr-practice.spec.md` WS3, whose label rule the
-schema states; before it, the real tree fails the model by 87 unlabelled
-gap issues. The schema moves from the prototype into
-`barwise/docs/adr/governance.orm.yaml` in the current format.
-`adr-facts.mjs` holds the extractor; the report readers move from
-`check-adr-tests.mjs` into `test-reports.mjs`, which both scripts import.
-`check-adr-model.mjs` and the `check:adr-model` npm script and root
-forwarder. `adr-model.test.mjs` covers: the schema validates clean; the
-real tree conforms; each of the six prototype probes, planted in a fixture
-tree, fails the model and the matching gate with one diagnostic naming the
-rule (`ruleId`); a missing input and an unbuilt core each exit 2.
-`expected-counts.json` is rewritten. The test needs `@barwise/core` built,
-so it skips without `dist` like the `audit-rubric` writer test; that is
-why WS2 runs the command itself in CI after the build.
+Lands after `enforceable-adr-practice.spec.md` WS3 (barwise-ym8.gxp.y5o),
+whose label rule the schema states; before it, the real tree fails the
+model by 87 unlabelled gap issues. The schema moves from the prototype into
+`barwise/docs/adr/governance.orm.yaml` in the current format, without the
+prototype's conflict fact type, which has no gate to agree with and no
+declared source (WS5). `adr-facts.mjs` holds the extractor. The test
+evidence -- expected reports, readers and the passed / failed / skipped
+reading -- moves from `check-adr-tests.mjs` into `test-evidence.mjs`, and
+`check:adr-tests` imports it unchanged in behaviour. `check-adr-model.mjs`,
+the `check:adr-model` npm script and its root forwarder, and a
+`test:adr-model` npm script that runs the model's tests.
+
+The model's tests need `@barwise/core` built, and `test:scripts` runs
+before the build and refuses a file outside its manifest, so they live in
+`barwise/scripts/tests-built/adr-model.test.mjs`, outside `test:scripts`.
+They cover: the schema validates clean; each of the five probes the
+prototype ran (all but the conflict), planted in a fixture tree built by
+the shared `architecture-repo.mjs`, gives the model and the matching gate
+the same exit code, with the model's diagnostic naming the planted fact
+type and instance in its message (`ruleId` alone cannot tell four
+mandatory constraints apart); a skip-only decision and an unread report
+give both exit 2; a missing input and an unbuilt core give the model 2.
+The real tree is not a unit-test case: the reports it needs are written by
+the test steps, so it is checked by WS2's CI step.
 
 ### 2. Run it in CI
 
-A ci.yml step `npm run check:adr-model` after `check:adr-tests`, under the
-same `docs_only` guard, so the model runs on every code change against the
-reports the test steps wrote. Nothing declares it in an ADR yet.
+Two ci.yml steps under the `docs_only` guard: `npm run test:adr-model`
+after `npm run build`, so the probes and the drift cases run on every code
+change; and `npm run check:adr-model` after `check:adr-tests`, so the
+real tree is checked against the reports the test steps wrote. Nothing
+declares either in an ADR yet.
 
 ### 3. The package graph as facts (provisional: not yet grounded)
 
@@ -177,9 +201,12 @@ where it is declared.
 ### 5. Relations between decisions (provisional: not yet grounded)
 
 Conflicts and restatements (barwise-ym8.gc9's notes) as declared facts,
-and queries over the model: which decisions a gate holds, which lose their
-enforcer if it goes. Grounding question: where the relations are declared
-(Open decisions).
+with the prototype's ring constraints (irreflexive, symmetric) on
+"Decision conflicts with Decision", and queries over the model: which
+decisions a gate holds, which lose their enforcer if it goes. No gate
+states these, so they are the first rules the model holds alone, and the
+first that need a probe of their own rather than a drift case. Grounding
+question: where the relations are declared (Open decisions).
 
 ## API and migration impact
 
