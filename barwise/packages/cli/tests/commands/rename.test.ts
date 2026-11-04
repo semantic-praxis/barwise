@@ -116,6 +116,15 @@ describe("barwise rename", () => {
     expect(result.stdout).toContain("stay stale until re-exported");
   });
 
+  it("takes an empty lineage file as no manifest, as lineage status does", async () => {
+    const path = file("shop.orm.yaml", MODEL);
+    mkdirSync(join(dir, ".barwise"));
+    writeFileSync(join(dir, ".barwise/lineage.yaml"), "");
+    const result = await runCli(["rename", path, "--object-type", "Order", "--to", "Purchase"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Wrote 1 file(s)");
+  });
+
   it("finds the lineage where an export recorded it, through a symlink", async () => {
     mkdirSync(join(dir, "real"));
     const real = join(dir, "real", "model.orm.yaml");

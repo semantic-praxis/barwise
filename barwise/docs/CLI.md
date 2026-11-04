@@ -348,7 +348,8 @@ Every reference to a changed id in the model files is rewritten, and each change
 the lineage manifest (`.barwise/lineage.yaml`) beside each changed file:
 the exports that model made name the new ids, in the same staged write.
 Their model hash is left as it was, so `barwise lineage status` reports
-them stale until they are re-exported. A
+them stale until they are re-exported. Exports made before format 4.0 are
+left as they are. A
 rename whose new id another element already holds is refused. A minted id,
 such as a constraint's, is kept, and `barwise validate` reports one whose
 element now says something else (`structural/stale-minted-name`). Beyond

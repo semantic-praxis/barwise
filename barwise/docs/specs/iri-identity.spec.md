@@ -1559,9 +1559,13 @@ version-1 manifest would go silently empty for impact analysis.
       (a replayed 3.x file), where a miss means the export does not
       depend on it. Only `version: 1` is upgraded: an empty file stays no
       manifest, and a version this build does not know is left as written.
-    - barwise-wcg.v5k: `analyzeImpact` takes the model when it loads,
-      and searches the id as asked, its 4.0 id for a 3.x one the file
-      states (`idFromPrior`), and its 3.x id for a 4.0 one (`priorIds`).
+    - barwise-wcg.v5k: `analyzeImpact` takes the model when it loads, and
+      matches each export by the element's id in that export's generation:
+      a marked export by its 3.x id, any other by its 4.0 id, never pooled,
+      because one 3.x id can be another element's 4.0 id (Copilot, on 6e).
+      An id the 3.x file states is read as that (`idFromPrior`), else as a
+      4.0 id (`priorIds`). A 4.0 model knows no 3.x id, so a marked export
+      is listed as unknown; with no model the id is tried in both.
       The CLI passes it, and MCP does given a path; inline, every model's
       exports are read, and one model's ids say nothing of another's.
     - `ProjectRenameResult.ids` is a map per domain context. The lineage
@@ -1571,6 +1575,8 @@ version-1 manifest would go silently empty for impact analysis.
       two spellings of one directory are one write. Under
       `--check` the manifest is listed with the files that would be
       written.
+    - A rename leaves a marked export: its ids are 3.x, which a 4.0 map can
+      collide with, and it reads stale until re-exported anyway.
     - An export that names no model (before 6a) is not rewritten by a
       rename. Only a version 1 manifest holds one, so it is marked, reads
       stale, and impact lists it in `exportsBefore40`.

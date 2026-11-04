@@ -192,6 +192,20 @@ describe("rename_element", () => {
       expect(readFileSync(join(project, "domains/billing.orm.yaml"), "utf-8")).toBe(billingBefore);
     });
 
+    it("rewrites the domains' lineage, one manifest for the directory (6e)", () => {
+      MANIFEST(join(project, "domains"), "Customer", "crm.orm.yaml");
+      const result = body(
+        executeRename({
+          source: join(project, "project.orm-project.yaml"),
+          domain: "crm",
+          objectType: "Customer",
+          to: "Client",
+        }),
+      );
+      expect(result.writtenTo).toContain(join(project, "domains/.barwise/lineage.yaml"));
+      expect(lineageIds(join(project, "domains"))).toEqual(["Client"]);
+    });
+
     it("needs a domain", () => {
       const manifest = join(project, "project.orm-project.yaml");
       expect(body(executeRename({ source: manifest, objectType: "Customer", to: "Client" })).error)

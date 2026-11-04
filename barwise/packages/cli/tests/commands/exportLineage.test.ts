@@ -183,8 +183,10 @@ describe("two models, one manifest", () => {
     });
     writeFileSync(
       manifestFile(),
+      // Version 1: the model is format 1.0, so its exports recorded 3.x ids,
+      // which impact matches by the model's 3.x id (6e).
       serializeManifest({
-        version: 2,
+        version: 1,
         sourceModel: "b.orm.yaml",
         sourceModelHash: "h",
         exports: [holding("a.sql", "a.orm.yaml"), holding("b.sql", "b.orm.yaml")],

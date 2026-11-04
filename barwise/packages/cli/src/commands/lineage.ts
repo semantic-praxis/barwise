@@ -155,7 +155,12 @@ export function registerLineageCommand(program: Command): void {
             );
           };
           if (report.affectedArtifacts.length === 0) {
-            process.stdout.write("No artifacts depend on this element.\n");
+            // With 3.x exports unaccounted for, "none" would read as safe.
+            process.stdout.write(
+              report.exportsBefore40.length === 0
+                ? "No artifacts depend on this element.\n"
+                : "No artifact recorded under 4.0 ids depends on this element.\n",
+            );
             before40();
             return;
           }

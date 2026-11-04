@@ -119,7 +119,8 @@ export function renameLineage(
   manifest: LineageManifest | undefined,
   rename: LineageRename,
 ): LineageManifest | undefined {
-  if (manifest === undefined) return undefined;
+  // An empty file parses to null: no manifest, as every other reader takes it.
+  if (!manifest) return undefined;
   let current = manifest;
   let changed = false;
   for (const { sourceModel, ids } of rename.models) {

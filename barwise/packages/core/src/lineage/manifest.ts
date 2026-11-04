@@ -147,7 +147,9 @@ export function renameInManifest(
 ): LineageManifest | undefined {
   let changed = false;
   const exports = manifest.exports.map((exp) => {
-    if (exp.sourceModel !== sourceModel) return exp;
+    // A marked export names 3.x ids, which a 4.0 rename map can collide
+    // with; it reads stale until re-exported anyway, so it is left.
+    if (exp.sourceModel !== sourceModel || exp.idsBefore40) return exp;
     const sources = exp.sources.map((src) => {
       const now = ids.get(src.elementId);
       if (now === undefined || now === src.elementId) return src;

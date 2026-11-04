@@ -287,8 +287,10 @@ describe("impact_analysis tool", () => {
     // b's file is there, so its export is b's and is skipped; were it
     // gone, the export would be read as a renamed model's.
     fs.copyFileSync(`${fixtures}/simple.orm.yaml`, path.join(tempDir, "b.orm.yaml"));
+    // Version 1: the model is format 1.0, so its exports recorded 3.x ids,
+    // which impact matches by the model's 3.x id (6e).
     const manifest = {
-      version: 2 as const,
+      version: 1 as const,
       sourceModel: "b.orm.yaml",
       sourceModelHash: "h",
       exports: [exportOf("a.sql", "a.orm.yaml"), exportOf("b.sql", "b.orm.yaml")],

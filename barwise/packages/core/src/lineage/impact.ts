@@ -61,18 +61,7 @@ export function analyzeImpact(
       exportsBefore40: [],
     };
   }
-  // The ids the element is known by: as asked, and, for a model replayed
-  // from a 3.x file, its 4.0 id for a 3.x one the file states and its 3.x
-  // id for a 4.0 one (barwise-wcg.v5k). An export records the ids of the
-  // model that wrote it, so either can be the one it holds.
-  const known = new Set([elementId]);
-  const now = model?.idFromPrior(elementId);
-  if (now !== undefined) known.add(now);
-  const before = model?.priorIds?.get(elementId);
-  if (before !== undefined) known.add(before);
-  // Where the element's 3.x id is known, a marked export that misses it
-  // does not depend on it, so only an unknown one is listed.
-  const priorKnown = model?.priorIds !== undefined && (now !== undefined || before !== undefined);
+  const { now, before, beforeKnown } = idsByGeneration(elementId, model);
   const exportsBefore40: string[] = [];
 
   if (scope) checkScope(scope);
@@ -84,8 +73,13 @@ export function analyzeImpact(
       scope !== undefined && exp.sourceModel !== undefined
       && exp.sourceModel !== scope.sourceModel && scope.modelsBeside.includes(exp.sourceModel)
     ) continue;
-    const sourceRef = exp.sources.find((src) => known.has(src.elementId));
-    if (!sourceRef && exp.idsBefore40 && !priorKnown) exportsBefore40.push(exp.artifact);
+    // An export is matched by the id of its own generation: one 3.x id can
+    // be another element's 4.0 id, so the two are never pooled.
+    const id = exp.idsBefore40 ? before : now;
+    const sourceRef = id === undefined
+      ? undefined
+      : exp.sources.find((src) => src.elementId === id);
+    if (!sourceRef && exp.idsBefore40 && !beforeKnown) exportsBefore40.push(exp.artifact);
 
     if (sourceRef) {
       affectedArtifacts.push({
@@ -102,6 +96,31 @@ export function analyzeImpact(
     affectedArtifacts,
     exportsBefore40,
   };
+}
+
+/**
+ * The element's id in each generation an export can record (iri-identity
+ * 6e, barwise-wcg.v5k). For a model replayed from a 3.x file both are
+ * known: an id the file states is read as that (its 4.0 id from
+ * `idFromPrior`), else as a 4.0 id (its 3.x id from `priorIds`); the
+ * file's reading wins where an id is both, since the file is what the
+ * caller is looking at. A 4.0 model knows no 3.x id, so a marked export
+ * cannot be matched and is listed as unknown. With no model there is no
+ * telling which generation the id is, so it is tried in both, and a marked
+ * export it misses is still listed.
+ */
+function idsByGeneration(
+  elementId: string,
+  model: OrmModel | undefined,
+): { now: string; before: string | undefined; beforeKnown: boolean; } {
+  if (model === undefined) return { now: elementId, before: elementId, beforeKnown: false };
+  if (model.priorIds === undefined) {
+    return { now: elementId, before: undefined, beforeKnown: false };
+  }
+  const fromFile = model.idFromPrior(elementId);
+  if (fromFile !== undefined) return { now: fromFile, before: elementId, beforeKnown: true };
+  const prior = model.priorIds.get(elementId);
+  return { now: elementId, before: prior, beforeKnown: prior !== undefined };
 }
 
 /**

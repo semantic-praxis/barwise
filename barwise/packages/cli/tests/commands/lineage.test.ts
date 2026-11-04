@@ -477,7 +477,9 @@ model:
         }),
       );
       const result = await runCli(["lineage", "impact", modelPath, "--element", "Customer"]);
-      expect(result.stdout).toContain("No artifacts depend on this element");
+      // Not "No artifacts depend", which would read as safe.
+      expect(result.stdout).not.toContain("No artifacts depend");
+      expect(result.stdout).toContain("No artifact recorded under 4.0 ids depends on this element");
       expect(result.stdout).toContain(
         "1 artifact(s) were exported under 3.x ids, so whether they depend on it is unknown; "
           + "re-export them: schema.sql",

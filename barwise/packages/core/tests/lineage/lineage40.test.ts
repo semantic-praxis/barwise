@@ -163,6 +163,39 @@ model:
   });
 });
 
+describe("impact across id generations (Copilot, on 6e)", () => {
+  // The type named Customer held the 3.x id Order; the type named Order held ot-order.
+  const model = () =>
+    new OrmYamlSerializer().deserialize(`orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: Order, name: Customer, kind: entity, reference_mode: nr }
+    - { id: ot-order, name: Order, kind: entity, reference_mode: nr }
+`);
+  const mixed: LineageManifest = {
+    version: 2,
+    sourceModel: "shop.orm.yaml",
+    sourceModelHash: "h",
+    exports: [
+      { ...exported("customers-3x.sql", "Order", "h"), idsBefore40: true },
+      exported("orders-40.sql", "Order", "h"),
+      exported("customers-40.sql", "Customer", "h"),
+    ],
+  };
+  const affected = (id: string) =>
+    analyzeImpact(mixed, id, undefined, model()).affectedArtifacts.map((a) => a.artifact);
+
+  it("matches each export by the id of its own generation, never pooled", () => {
+    expect(affected("Customer")).toEqual(["customers-3x.sql", "customers-40.sql"]);
+  });
+
+  it("reads an id that is both as the one the 3.x file states", () => {
+    // Order is Customer's 3.x id and, under 4.0, the Order type's id.
+    expect(affected("Order")).toEqual(["customers-3x.sql", "customers-40.sql"]);
+  });
+});
+
 describe("the model hash", () => {
   it("changes with a rename, since the names an artifact came from changed", () => {
     const { model: renamed } = renameInModel(
@@ -193,6 +226,23 @@ describe("a rename's lineage", () => {
     ]);
     expect(renameInManifest(manifest(), new Map([["Order", "Sale"]]), "shop.orm.yaml"))
       .toBeUndefined();
+  });
+
+  it("leaves an export written under 3.x ids, whose ids a 4.0 map can collide with", () => {
+    const marked: LineageManifest = {
+      ...manifest(),
+      exports: [{ ...exported("a.sql", "Customer", "h"), idsBefore40: true }],
+    };
+    expect(renameInManifest(marked, new Map([["Customer", "Client"]]), "shop.orm.yaml"))
+      .toBeUndefined();
+  });
+
+  it("takes an empty manifest file, which parses to null, as none", () => {
+    const renames = modelLineageRenames(
+      { dir: "/p", sourceModel: "shop.orm.yaml" },
+      new Map([["Customer", "Client"]]),
+    );
+    expect(lineageRenameWrites(renames, () => parseManifest("")).writes).toEqual([]);
   });
 
   it("is one write per manifest in a project, folding every domain beside it", () => {
