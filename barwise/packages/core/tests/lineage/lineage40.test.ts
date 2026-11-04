@@ -234,10 +234,92 @@ describe("impact over a 3.x id two kinds shared (Copilot, on 6e)", () => {
     expect(affected("Person_smokes")).toEqual(["smokers.sql"]);
   });
 
-  it("lists as unknown, never matches, when asked by the shared id itself", () => {
-    const report = analyzeImpact(m, "x1", undefined, model());
+  it("names the candidates, and matches nothing, when asked by the shared id itself", () => {
+    // A 4.0 export of either element is not matched either (the pr-review on 6e).
+    const both: LineageManifest = {
+      ...m,
+      exports: [...m.exports, exported("people-40.sql", "Person", "h")],
+    };
+    const report = analyzeImpact(both, "x1", undefined, model());
+    expect(report.ambiguous).toEqual(["Person", "Person_smokes"]);
     expect(report.affectedArtifacts).toEqual([]);
     expect(report.exportsBefore40).toEqual(["people.sql", "smokers.sql"]);
+  });
+
+  it("states no ambiguity for an id that names one element", () => {
+    expect(analyzeImpact(m, "Person", undefined, model())).not.toHaveProperty("ambiguous");
+  });
+
+  it("filters a value type's shared id to object type sources", () => {
+    const source = new OrmModel({ name: "Shared" });
+    source.addObjectType({ id: "x1", name: "Colour", kind: "value", dataType: { name: "text" } });
+    source.addFactType({
+      id: "x1",
+      name: "Colour is bright",
+      roles: [{ id: "r1", name: "is bright", playerId: "x1" }],
+      readings: ["{0} is bright"],
+    });
+    const asValue: ManifestExport = {
+      ...exported("colours.sql", "x1", "h"),
+      sources: [{ elementId: "x1", elementType: "ValueType", elementName: "Colour" }],
+    };
+    const report = analyzeImpact(
+      version1(asValue, asFactType),
+      "Colour",
+      undefined,
+      replayInto40(source),
+    );
+    expect(report.affectedArtifacts.map((a) => a.artifact)).toEqual(["colours.sql"]);
+  });
+
+  it("does not read a shared id for a kind lineage never records, such as a population", () => {
+    const source = new OrmModel({ name: "Shared" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addFactType({
+      id: "f1",
+      name: "Person smokes",
+      roles: [{ id: "r1", name: "smokes", playerId: "x1" }],
+      readings: ["{0} smokes"],
+    });
+    source.addPopulation({ id: "x1", factTypeId: "f1", instances: [{ roleValues: { r1: "p1" } }] });
+    const report = analyzeImpact(
+      version1(exported("people.sql", "x1", "h")),
+      "Person_smokes.population",
+      undefined,
+      replayInto40(source),
+    );
+    expect(report.affectedArtifacts).toEqual([]);
+    expect(report.exportsBefore40).toEqual(["people.sql"]);
+  });
+
+  it("filters a constraint's shared id to constraint sources", () => {
+    const source = new OrmModel({ name: "Shared" });
+    source.addObjectType({ id: "x1", name: "Person", kind: "entity", referenceMode: "nr" });
+    source.addObjectType({ id: "o2", name: "Car", kind: "entity", referenceMode: "vin" });
+    source.addFactType({
+      id: "f1",
+      name: "Person drives Car",
+      roles: [{ id: "r1", name: "drives", playerId: "x1" }, {
+        id: "r2",
+        name: "is driven by",
+        playerId: "o2",
+      }],
+      readings: ["{0} drives {1}"],
+      constraints: [{ type: "internal_uniqueness", id: "x1", roleIds: ["r1"] }],
+    });
+    const model = replayInto40(source);
+    const ucId = model.getFactType("Person_drives_Car")!.internalConstraints[0]!.id!;
+    const asConstraint: ManifestExport = {
+      ...exported("rules.sql", "x1", "h"),
+      sources: [{ elementId: "x1", elementType: "Constraint", elementName: "uc" }],
+    };
+    const report = analyzeImpact(
+      version1(exported("people.sql", "x1", "h"), asConstraint),
+      ucId,
+      undefined,
+      model,
+    );
+    expect(report.affectedArtifacts.map((a) => a.artifact)).toEqual(["rules.sql"]);
   });
 });
 

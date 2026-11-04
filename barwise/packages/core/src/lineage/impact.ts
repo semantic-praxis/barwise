@@ -30,6 +30,13 @@ export interface ImpactReport {
    * left out. Re-exporting answers it.
    */
   readonly exportsBefore40: readonly string[];
+  /**
+   * The 4.0 ids of the elements the asked id names, present when it is a
+   * 3.x id the file stated for more than one element, which 3.x allowed and
+   * no lookup by the id alone can tell apart (iri-identity 6e). Nothing is
+   * matched then: ask again by one of these.
+   */
+  readonly ambiguous?: readonly string[];
 }
 
 /**
@@ -62,7 +69,7 @@ export function analyzeImpact(
       exportsBefore40: [],
     };
   }
-  const { now, before, beforeTypes } = idsByGeneration(elementId, model);
+  const { now, before, beforeTypes, ambiguous } = idsByGeneration(elementId, model);
   const exportsBefore40: string[] = [];
 
   if (scope) checkScope(scope);
@@ -102,8 +109,11 @@ export function analyzeImpact(
     changedElement: elementId,
     affectedArtifacts,
     exportsBefore40,
+    ...(ambiguous !== undefined ? { ambiguous } : {}),
   };
 }
+
+type SourceType = SourceReference["elementType"];
 
 /**
  * The element's id in each generation an export can record (iri-identity
@@ -117,43 +127,57 @@ export function analyzeImpact(
  * is: trying it as a 3.x id too would pool the generations, and could name
  * another element's export.
  *
- * 3.x let an object type and a fact type state one id (Copilot, on 6e).
- * Asked by that id, `idFromPrior` cannot tell which is meant, so it is not
- * read as a 3.x id and its marked exports are listed as unknown. Asked by
- * either element's 4.0 id, the shared 3.x id is matched only in sources of
- * that element's kind (`beforeTypes`), since the id alone names both.
+ * 3.x let elements of different kinds state one id (Copilot and the
+ * pr-review, on 6e). Asked by that id, which is meant cannot be told, so
+ * nothing is matched and the candidates are returned as `ambiguous`; its
+ * marked exports are listed as unknown. Asked by one element's 4.0 id, the
+ * shared 3.x id is matched only in sources of that element's kind
+ * (`beforeTypes`), since the id alone names each; for an element of a
+ * kind lineage never records, it is not read at all, and marked exports
+ * are listed as unknown.
  */
 function idsByGeneration(
   elementId: string,
   model: OrmModel | undefined,
 ): {
-  now: string;
+  now: string | undefined;
   before: string | undefined;
-  beforeTypes: ReadonlySet<SourceReference["elementType"]> | undefined;
+  beforeTypes: ReadonlySet<SourceType> | undefined;
+  ambiguous: readonly string[] | undefined;
 } {
-  if (model?.priorIds === undefined) {
-    return { now: elementId, before: undefined, beforeTypes: undefined };
-  }
+  const plain = { beforeTypes: undefined, ambiguous: undefined };
+  if (model?.priorIds === undefined) return { now: elementId, before: undefined, ...plain };
   const fromFile = model.idFromPrior(elementId);
-  if (fromFile !== undefined) return { now: fromFile, before: elementId, beforeTypes: undefined };
+  if (fromFile !== undefined) return { now: fromFile, before: elementId, ...plain };
+  const sharing = [...model.priorIds].filter(([, p]) => p === elementId).map(([id]) => id);
+  if (sharing.length > 1) {
+    return { now: undefined, before: undefined, beforeTypes: undefined, ambiguous: sharing };
+  }
   const prior = model.priorIds.get(elementId);
-  const shared = prior !== undefined
-    && [...model.priorIds.values()].filter((p) => p === prior).length > 1;
+  // `idFromPrior` is undefined for a prior id exactly when it is shared.
+  if (prior === undefined || model.idFromPrior(prior) !== undefined) {
+    return { now: elementId, before: prior, ...plain };
+  }
+  const types = sourceTypesOf(model, elementId);
   return {
     now: elementId,
-    before: prior,
-    beforeTypes: shared ? sourceTypesOf(model, elementId) : undefined,
+    before: types === undefined ? undefined : prior,
+    beforeTypes: types,
+    ambiguous: undefined,
   };
 }
 
-/** The source types lineage records an element under, for the two kinds 3.x let share an id. */
-function sourceTypesOf(
-  model: OrmModel,
-  id: string,
-): ReadonlySet<SourceReference["elementType"]> | undefined {
-  const ot = model.getObjectType(id);
-  if (ot !== undefined) return new Set([ot.kind === "value" ? "ValueType" : "EntityType"]);
+/**
+ * The source types lineage records an element under. Either object type
+ * kind for an object type: one 3.x id cannot name two object types, and an
+ * export taken before its kind was edited still recorded the old one.
+ */
+function sourceTypesOf(model: OrmModel, id: string): ReadonlySet<SourceType> | undefined {
+  if (model.getObjectType(id) !== undefined) return new Set(["EntityType", "ValueType"]);
   if (model.getFactType(id) !== undefined) return new Set(["FactType"]);
+  if (model.getConstraint(id) !== undefined) return new Set(["Constraint"]);
+  if (model.getSubtypeFact(id) !== undefined) return new Set(["SubtypeFact"]);
+  if (model.factTypes.some((ft) => ft.roles.some((r) => r.id === id))) return new Set(["Role"]);
   return undefined;
 }
 

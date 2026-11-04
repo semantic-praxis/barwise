@@ -168,10 +168,16 @@ export function registerLineageCommand(program: Command): void {
             );
           };
           if (report.affectedArtifacts.length === 0) {
-            // With 3.x exports unaccounted for, or a 3.x id unread because
-            // the model did not load, "none" would read as safe.
+            // With 3.x exports unaccounted for, a 3.x id unread because the
+            // model did not load, or an id naming two elements, "none" would
+            // read as safe.
             process.stdout.write(
-              report.exportsBefore40.length === 0 && !modelDidNotLoad
+              report.ambiguous !== undefined
+                ? `"${report.changedElement}" names more than one element in this file `
+                  + `(${report.ambiguous.join(", ")}); ask by one of those ids.\n`
+                : modelDidNotLoad
+                ? "No artifact records this id.\n"
+                : report.exportsBefore40.length === 0
                 ? "No artifacts depend on this element.\n"
                 : "No artifact recorded under 4.0 ids depends on this element.\n",
             );

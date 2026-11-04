@@ -473,7 +473,37 @@ model:
       // The export does depend on ot-1 (Customer's 3.x id), so the answer
       // must not read as "nothing depends" (the pr-review on 6e).
       expect(result.stdout).not.toContain("No artifacts depend");
-      expect(result.stdout).toContain("No artifact recorded under 4.0 ids depends on this element");
+      expect(result.stdout).toContain("No artifact records this id.");
+    });
+
+    it("names the elements a shared 3.x id names, rather than saying none depend", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(
+        modelPath,
+        `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: x1, name: Person, kind: entity, reference_mode: nr }
+  fact_types:
+    - id: x1
+      name: Person smokes
+      roles:
+        - { id: r1, player: x1, role_name: smokes }
+      readings: ["{0} smokes"]
+`,
+      );
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "shop.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("Person")],
+      });
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "x1"]);
+      expect(result.stdout).not.toContain("No artifacts depend");
+      expect(result.stdout).toContain(
+        '"x1" names more than one element in this file (Person, Person_smokes)',
+      );
     });
 
     it("says the model did not load in json too (Copilot, on 6e)", async () => {

@@ -1567,9 +1567,12 @@ version-1 manifest would go silently empty for impact analysis.
       4.0 id (`priorIds`). A 4.0 model knows no 3.x id, so a marked export
       is listed as unknown, and so it is with no model (inline MCP, or a
       file that does not load), where the id is taken as a 4.0 id.
-      A 3.x id an object type and a fact type both stated is not read as a
-      3.x id; asked by either element's 4.0 id, it is matched only in
-      sources of that element's kind (Copilot, on 6e). The CLI's json and
+      A 3.x id two elements stated (3.x let any two kinds share one) is not
+      read as a 3.x id: asked by it, nothing is matched and `ambiguous`
+      names the elements' 4.0 ids. Asked by either element's 4.0 id, it is
+      matched only in sources of that element's kind, and not at all for a
+      kind lineage never records, such as a population (Copilot and the
+      pr-review, on 6e). The CLI's json and
       MCP add `modelDidNotLoad` when a path's model did not load.
       The CLI passes it, and MCP does given a path; inline, every model's
       exports are read, and one model's ids say nothing of another's.
