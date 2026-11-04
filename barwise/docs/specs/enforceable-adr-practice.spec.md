@@ -1,6 +1,6 @@
 # Enforceable ADR practice
 
-Status: Draft -- no workstream implemented
+Status: WS1 implemented 2026-11-04 (check:adr-tests refuses a decision whose tagged tests all skipped; credential-handling#gitleaks-detects declared through its probe tests). WS2-WS5 not started.
 
 Created: 2026-11-04
 Last-updated: 2026-11-04
