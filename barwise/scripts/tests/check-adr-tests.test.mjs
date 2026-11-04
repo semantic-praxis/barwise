@@ -115,6 +115,30 @@ test("check:adr-tests: a tagged test that did not pass is not evidence", () => {
   }
 });
 
+test("check:adr-tests: a skip-only decision beside an unproven one is one refusal and one finding", () => {
+  // Characterizes the judge before it moves into scripts/lib/adr-judge.mjs
+  // (adr-gate-reader-split.spec.md): the unread-report count is fixed
+  // before decisions are judged, so a skip refusal cannot turn the other
+  // decision's finding into a refusal.
+  withFixture(
+    {
+      core: vitest([["pins one [adr:a-concern#one]", "skipped"]]),
+      script: jsonl([["other", "passed"]]),
+    },
+    (_, r) => {
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(
+        r.stderr,
+        /FAIL -- 1 finding\(s\):\n\s+.*tests \(two\): no test carrying \[adr:a-concern#two\] passed/,
+      );
+      assert.match(
+        r.stderr,
+        /0 report\(s\) not read, 0 decision\(s\) left unproven by them, 1 decision\(s\) whose tagged tests all skipped/,
+      );
+    },
+  );
+});
+
 test("check:adr-tests: a decision whose tagged tests all skipped cannot be answered, unless one failed", () => {
   // A skip is a test that could not answer: the gitleaks probes skip where
   // gitleaks is absent, and that run cannot tell whether the decision holds.

@@ -7583,6 +7583,45 @@ test("check:architecture refuses, exit 2, only where it cannot tell, and lists i
   }
 });
 
+test("check:architecture: an unreadable root scripts file or ci.yml is a refusal, listed in the order the entries reach them", () => {
+  // Characterizes the declaration pass before its reads move into
+  // scripts/lib/adr-facts.mjs (adr-gate-reader-split.spec.md): what each
+  // unreadable input does, and the order the refusals are listed in.
+  const { dir } = enforcementRepo();
+  try {
+    const pkg = join(dir, "barwise", "package.json");
+    const ci = join(dir, CI_PATH);
+    // Scripts unreadable: no "has no script" finding, and the step check
+    // still runs (both gates qualify), so the answer is a refusal alone.
+    writeFileSync(pkg, "{ not json");
+    const noScripts = runArch(dir);
+    assert.equal(noScripts.status, 2, noScripts.stdout + noScripts.stderr);
+    assert.match(
+      noScripts.stderr,
+      /cannot answer for 1 declaration\(s\):\n\s+barwise\/package\.json: /,
+    );
+    assert.doesNotMatch(noScripts.stderr, /has no script/);
+    writeFileSync(pkg, ENFORCED_ROOT_PKG);
+    // ci.yml unreadable: no "no ci.yml step" finding, a refusal alone.
+    rmSync(ci);
+    const noCi = runArch(dir);
+    assert.equal(noCi.status, 2, noCi.stdout + noCi.stderr);
+    assert.match(noCi.stderr, /\.github\/workflows\/ci\.yml: ENOENT/);
+    assert.doesNotMatch(noCi.stderr, /no ci\.yml step/);
+    // Both unreadable: the scripts refusal first, as the first npm entry
+    // asks for the scripts before the steps.
+    writeFileSync(pkg, "{ not json");
+    const neither = runArch(dir);
+    assert.equal(neither.status, 2, neither.stdout + neither.stderr);
+    assert.match(
+      neither.stderr,
+      /cannot answer for 2 declaration\(s\):\n\s+barwise\/package\.json: .*\n\s+\.github\/workflows\/ci\.yml: ENOENT/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("check:architecture requires Enforced-by:, and reads no ci.yml, scripts or tracker no entry needs", () => {
   // The fixture has no ci.yml, root package.json or tracker, and every ADR
   // in it declares `tests` only, which needs none of them, so none is a

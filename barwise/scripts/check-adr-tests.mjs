@@ -42,61 +42,14 @@
  *
  * `--root <dir>` reads another tree, for this check's own tests.
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { decisionIds, parseEnforcedBy, tagsIn } from "./lib/adr-enforcement.mjs";
+import { readTestReports } from "./lib/adr-facts.mjs";
+import { judgeTestedDecisions } from "./lib/adr-judge.mjs";
 import { ADR_DIR, isAdr, readFiles, trackedPaths } from "./lib/architecture-section.mjs";
 import { opt } from "./lib/args.mjs";
-import { scriptReport, TRIAL_REPORT, vitestReport } from "./lib/test-reports.mjs";
 
-const findings = [];
-const refusals = [];
-
-/** Each test or suite a report says ran: `{ title, ancestors, type, status, from }`. */
-function readVitest(path, rel) {
-  const json = JSON.parse(readFileSync(path, "utf8"));
-  if (!Array.isArray(json?.testResults)) throw new Error("no testResults array");
-  const out = [];
-  for (const file of json.testResults) {
-    if (!Array.isArray(file?.assertionResults)) {
-      throw new Error("a testResults entry has no assertionResults");
-    }
-    for (const a of file.assertionResults) {
-      if (
-        typeof a?.title !== "string" || typeof a?.status !== "string"
-        || !Array.isArray(a.ancestorTitles)
-      ) {
-        throw new Error("an assertionResult has no title, status or ancestorTitles");
-      }
-      out.push({
-        title: a.title,
-        ancestors: a.ancestorTitles,
-        type: "test",
-        status: a.status,
-        from: rel,
-      });
-    }
-  }
-  return out;
-}
-
-function readNodeTest(path, rel) {
-  const out = [];
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    if (line.trim() === "") continue;
-    const r = JSON.parse(line);
-    if (
-      typeof r?.name !== "string" || typeof r?.status !== "string" || typeof r?.type !== "string"
-    ) {
-      throw new Error("a line has no name, status or type");
-    }
-    out.push({ title: r.name, ancestors: [], type: r.type, status: r.status, from: rel });
-  }
-  return out;
-}
-
-let root, adrs, ran;
+let root, adrs;
 try {
   root = resolve(opt("--root") ?? join(dirname(fileURLToPath(import.meta.url)), "..", ".."));
   adrs = readFiles(root, trackedPaths(root).filter(isAdr));
@@ -106,132 +59,19 @@ try {
   process.exit(2);
 }
 
-// The ADRs that declare tests. The reports are read even when none does:
-// a stale tag in a test is a finding whatever the headers say.
-const declaring = adrs
-  .map(({ f, text }) => ({
-    f,
-    name: f.slice(ADR_DIR.length, -".md".length),
-    text,
-    parsed: parseEnforcedBy(text),
-  }))
-  .filter((a) => a.parsed.present);
-const testedIds = (a) => a.parsed.entries.filter((e) => e.kind === "tests").flatMap((e) => e.ids);
-
-// Every report this run should have written.
-const expected = [];
+// Every report this run should have written, and the tests each says ran
+// (scripts/lib/adr-facts.mjs); the judging is scripts/lib/adr-judge.mjs.
+let reports;
 try {
-  const pkgs = join(root, "barwise", "packages");
-  for (const dir of readdirSync(pkgs, { withFileTypes: true })) {
-    if (!dir.isDirectory()) continue;
-    const manifest = join(pkgs, dir.name, "package.json");
-    if (!existsSync(manifest)) continue;
-    const scripts = JSON.parse(readFileSync(manifest, "utf8")).scripts ?? {};
-    if (Object.hasOwn(scripts, "test:coverage")) {
-      expected.push({ rel: vitestReport(dir.name), read: readVitest });
-    }
-  }
-  const counts = JSON.parse(
-    readFileSync(join(root, "barwise", "scripts", "tests", "expected-counts.json"), "utf8"),
-  );
-  for (const file of Object.keys(counts.counts ?? {})) {
-    expected.push({ rel: scriptReport(file), read: readNodeTest });
-  }
-  expected.push({ rel: TRIAL_REPORT, read: readNodeTest });
+  reports = readTestReports(root);
 } catch (err) {
   console.error(`check:adr-tests: cannot answer -- the list of reports: ${err.message}`);
   process.exit(2);
 }
-
-ran = [];
-for (const { rel, read } of expected) {
-  const path = join(root, rel);
-  if (!existsSync(path)) {
-    refusals.push(`${rel}: missing; did its test step run in this checkout?`);
-    continue;
-  }
-  try {
-    ran.push(...read(path, rel));
-  } catch (err) {
-    refusals.push(`${rel}: not a report this check reads (${err.message})`);
-  }
-}
-
-const unreadableReports = refusals.length;
-
-// Stale tags: on a test or a suite, in its own title or an enclosing one.
-const idsOf = new Map(
-  adrs.map(({ f, text }) => [
-    f.slice(ADR_DIR.length, -".md".length),
-    new Set(decisionIds(text).decisions.map((d) => d.id).filter(Boolean)),
-  ]),
-);
-const seenStale = new Set();
-for (const t of ran) {
-  for (const title of [t.title, ...t.ancestors]) {
-    for (const { adr, id } of tagsIn(title)) {
-      const key = `${adr}#${id}`;
-      if (seenStale.has(key)) continue;
-      const ids = idsOf.get(adr);
-      const why = ids === undefined
-        ? `names ADR ${adr}, which does not exist`
-        : !ids.has(id)
-        ? `names ${id}, which ${adr} has no decision with`
-        : null;
-      if (why === null) continue;
-      seenStale.add(key);
-      findings.push(`[adr:${key}] in "${title}" (${t.from}) ${why}`);
-    }
-  }
-}
-
-// The evidence: a test, by its own title, that passed. Beside it, by
-// decision, the tagged tests that failed (an answer) and that skipped (none).
-const passed = new Set();
-const failed = new Set();
-const skipped = new Map();
-for (const t of ran) {
-  if (t.type !== "test") continue;
-  for (const { adr, id } of tagsIn(t.title)) {
-    const key = `${adr}#${id}`;
-    if (t.status === "passed") passed.add(key);
-    else if (t.status === "failed") failed.add(key);
-    else if (t.status === "skipped" || t.status === "pending") {
-      if (!skipped.has(key)) skipped.set(key, []);
-      skipped.get(key).push(t.title);
-    }
-  }
-}
-let skipOnly = 0;
-const quoted = (titles) => titles.map((s) => `"${s}"`).join(", ");
-const suiteOnly = new Set(
-  ran.flatMap((t) => [...(t.type === "suite" ? [t.title] : []), ...t.ancestors])
-    .flatMap((title) => tagsIn(title).map(({ adr, id }) => `${adr}#${id}`)),
-);
-for (const a of declaring) {
-  for (const id of testedIds(a)) {
-    const key = `${a.name}#${id}`;
-    if (passed.has(key)) continue;
-    const hint = suiteOnly.has(key)
-      ? "; the tag is on a describe, and must be on the test itself"
-      : "";
-    const unproven =
-      `${a.f}: tests (${id}): no test carrying [adr:${key}] passed in this run${hint}`;
-    if (failed.has(key)) {
-      findings.push(`${a.f}: tests (${id}): a test carrying [adr:${key}] failed in this run`);
-    } else if (skipped.has(key)) {
-      skipOnly++;
-      refusals.push(
-        `${a.f}: tests (${id}): every test carrying [adr:${key}] skipped, so this run cannot`
-          + ` tell: ${quoted(skipped.get(key))}`,
-      );
-    } else if (unreadableReports > 0) {
-      // With a report missing or unreadable, its passing test may be the one
-      // not read: the answer is "cannot tell", never the finding code.
-      refusals.push(`${unproven}, and ${unreadableReports} report(s) were not read`);
-    } else findings.push(unproven);
-  }
-}
+// The report refusals come first, and the judge appends its own after them.
+const refusals = [...reports.refusals];
+const unreadableReports = reports.unreadable;
+const { findings, declaring, tested, skipOnly } = judgeTestedDecisions(adrs, reports, refusals);
 
 if (findings.length > 0) {
   console.error(`check:adr-tests: FAIL -- ${findings.length} finding(s):`);
@@ -247,8 +87,7 @@ if (refusals.length > 0) {
 }
 if (findings.length > 0) process.exit(1);
 if (refusals.length > 0) process.exit(2);
-const tested = declaring.reduce((n, a) => n + testedIds(a).length, 0);
 console.log(
-  `check:adr-tests: ${tested} tested decision(s) across ${declaring.length} ADR(s) each have a`
-    + ` passing tagged test, in ${expected.length} report(s) of ${ran.length} test(s). OK`,
+  `check:adr-tests: ${tested} tested decision(s) across ${declaring} ADR(s) each have a`
+    + ` passing tagged test, in ${reports.expected.length} report(s) of ${reports.ran.length} test(s). OK`,
 );
