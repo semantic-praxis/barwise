@@ -162,6 +162,26 @@ ontology:
     expect(warnings.filter((w) => w.includes("iri"))).toHaveLength(2);
   });
 
+  it("reads the IRI of a concept or relationship whose name has spaces around it (Copilot, on 6f)", () => {
+    const concept = new OssieImportFormat().parse(`version: 0.2.0.dev0
+name: Shop
+ontology:
+  - { concept: " Customer ", type: EntityType, iri: "https://ex.org/shop#Customer" }
+`);
+    expect(concept.model.namespace).toBe("https://ex.org/shop#");
+    const relationship = new OssieImportFormat().parse(`version: 0.2.0.dev0
+name: Shop
+ontology:
+  - concept: Person
+    type: EntityType
+    iri: "https://ex.org/shop#Person"
+    relationships:
+      - { name: "walks ", iri: "https://ex.org/shop#walks", verbalizes: ["{Person} walks"] }
+`);
+    expect(relationship.model.namespace).toBe("https://ex.org/shop#");
+    expect(relationship.warnings.filter((w) => w.includes("iri"))).toHaveLength(1);
+  });
+
   it("keeps the namespace most concepts agree on, naming an outside IRI dropped", () => {
     const { model, warnings } = new OssieImportFormat().parse(`version: 0.2.0.dev0
 name: Shop

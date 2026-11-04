@@ -373,14 +373,22 @@ function readNamespace(doc: OssieDocument, model: OrmModel, warnings: string[]):
   }
 }
 
-/** The object type a concept imported as; every concept is added before it is looked up. */
+/**
+ * The object type a concept imported as; every concept is added before it
+ * is looked up. Trimmed as the model trims the name it stores (Copilot, on
+ * 6f: `" Customer "` imports as `Customer`).
+ */
 function conceptId(model: OrmModel, name: string): string {
-  return model.getObjectTypeByName(name)!.id;
+  return model.getObjectTypeByName(name.trim())!.id;
 }
 
-/** The fact type a relationship imported as; every relationship is added before it is looked up. */
+/**
+ * The fact type a relationship imported as; every relationship is added
+ * before it is looked up. Its whole generated name is trimmed, as the
+ * model trims the name it stores.
+ */
 function relationshipFact(model: OrmModel, concept: string, rel: string) {
-  return model.getFactTypeByName(ossieFactTypeName(concept, rel))!;
+  return model.getFactTypeByName(ossieFactTypeName(concept, rel).trim())!;
 }
 
 /**

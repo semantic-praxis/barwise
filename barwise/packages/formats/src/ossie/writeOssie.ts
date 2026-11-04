@@ -21,7 +21,7 @@ import {
   type IdentifyingComponent,
   type IdentifyingUniqueness,
   iriOf,
-  localName,
+  nameIdBase,
   objectificationRef,
   type ObjectType,
   type OrmModel,
@@ -355,7 +355,7 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     }
     if (isBuiltin(ot.id)) continue;
     const iri = iriOf(model, ot.id);
-    const importedId = suffixed(localName(nameOf(ot.id)), (id) => !importedIds.has(id));
+    const importedId = suffixed(nameIdBase(nameOf(ot.id)), (id) => !importedIds.has(id));
     importedIds.add(importedId);
     if (iri !== undefined) conceptIris.push({ iri, id: importedId });
     ontology.push(withIri(
@@ -391,7 +391,8 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   // 6f) where the importer reads it back, which it does by the rule
   // predicted here. It is still a loss where it does not: every concept a
   // shadow (whose namespace is its owner's, which only the project knows),
-  // or too few ids that are their names' (`id-not-from-name`).
+  // or no concept whose IRI ends in the id the importer will give it (by
+  // the suffix rule, in written order).
   if (model.namespace && namespaceOfIris(conceptIris) !== model.namespace) {
     lose("model", `namespace ${model.namespace} not written`, { kind: "model_header" }, [
       "namespace",
