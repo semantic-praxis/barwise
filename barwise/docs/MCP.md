@@ -596,8 +596,10 @@ format: run `barwise migrate` on it first.
 
 **Like `merge_models`, this is an editing tool: a file source is written
 back.** Every changed file is staged before any is replaced, and files are
-written from the model, so YAML comments in them are lost. The CLI's
-`barwise rename` writes the same way.
+written from the model, so YAML comments in them are lost. The
+lineage manifest beside each changed file is rewritten in the same
+write, its exports naming the new ids and still stale until re-exported.
+The CLI's `barwise rename` writes the same way.
 
 ---
 
@@ -809,9 +811,19 @@ artifacts depend on it.
 in the lineage manifest that depend on the element. As with
 `lineage_status`, the manifest is located next to the model file when
 `source` is a path, and only that model's exports are read (with any
-that name no model). Given inline YAML, every export holding the id is
-read, and each affected artifact carries the `sourceModel` its export
-names.
+that name no model). Given inline YAML, every export holding the id as a
+4.0 id is read, and each affected artifact carries the `sourceModel` its
+export names. `exportsBefore40` lists the exports written under 3.x ids
+(a `version: 1` manifest) that impact could not match: they may depend
+on the element under its old id, so re-export them. Given a path to a 3.x
+file, they are matched by the id that file states; inline, there is no
+model to read 3.x ids through, so each is listed. Given a path whose model
+does not load, the report adds `modelDidNotLoad: true`, since the id is
+then read as a 4.0 id. Asked by a 3.x id the file stated for more than one
+element, `ambiguous` names those elements' 4.0 ids: exports written under
+3.x ids are not matched by it, and those holding it are listed in
+`exportsBefore40`; exports written under 4.0 ids still match the element
+that holds it as its 4.0 id, if any.
 
 ---
 

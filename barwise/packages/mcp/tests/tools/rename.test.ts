@@ -5,7 +5,16 @@
  * `error` in the result, never a write.
  */
 import { OrmYamlSerializer } from "@barwise/core";
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { parseManifest, serializeManifest } from "@barwise/core/lineage";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,6 +57,30 @@ model:
 
 const body = (result: ReturnType<typeof executeRename>) => JSON.parse(result.content[0]!.text);
 
+const MANIFEST = (dir: string, elementId: string, sourceModel: string) => {
+  mkdirSync(join(dir, ".barwise"), { recursive: true });
+  writeFileSync(
+    join(dir, ".barwise/lineage.yaml"),
+    serializeManifest({
+      version: 2,
+      sourceModel,
+      sourceModelHash: "h",
+      exports: [{
+        artifact: "out.sql",
+        format: "ddl",
+        exportedAt: "2026-11-04T00:00:00Z",
+        modelHash: "h",
+        sources: [{ elementId, elementType: "EntityType", elementName: "x" }],
+        sourceModel,
+      }],
+    }),
+  );
+};
+const lineageIds = (dir: string) =>
+  parseManifest(readFileSync(join(dir, ".barwise/lineage.yaml"), "utf-8")).exports.map((e) =>
+    e.sources[0]!.elementId
+  );
+
 describe("rename_element", () => {
   let dir: string;
   beforeEach(() => {
@@ -80,6 +113,19 @@ describe("rename_element", () => {
     const written = body(executeRename({ source: path, objectType: "Order", to: "Purchase" }));
     expect(written).toMatchObject({ written: true, writtenTo: [path] });
     expect(readFileSync(path, "utf-8")).toContain("name: Purchase");
+  });
+
+  it("rewrites the lineage beside a file source, and nothing under check (6e)", () => {
+    const path = join(dir, "shop.orm.yaml");
+    writeFileSync(path, MODEL, "utf-8");
+    MANIFEST(dir, "ot-o", "shop.orm.yaml");
+    const checked = body(
+      executeRename({ source: path, objectType: "Order", to: "Purchase", check: true }),
+    );
+    expect(checked.files).toEqual([path, join(dir, ".barwise/lineage.yaml")]);
+    expect(lineageIds(dir)).toEqual(["ot-o"]);
+    executeRename({ source: path, objectType: "Order", to: "Purchase" });
+    expect(lineageIds(dir)).toEqual(["Purchase"]);
   });
 
   it("renames a role by position", () => {
@@ -144,6 +190,20 @@ describe("rename_element", () => {
         "name: Client",
       );
       expect(readFileSync(join(project, "domains/billing.orm.yaml"), "utf-8")).toBe(billingBefore);
+    });
+
+    it("rewrites the domains' lineage, one manifest for the directory (6e)", () => {
+      MANIFEST(join(project, "domains"), "Customer", "crm.orm.yaml");
+      const result = body(
+        executeRename({
+          source: join(project, "project.orm-project.yaml"),
+          domain: "crm",
+          objectType: "Customer",
+          to: "Client",
+        }),
+      );
+      expect(result.writtenTo).toContain(join(project, "domains/.barwise/lineage.yaml"));
+      expect(lineageIds(join(project, "domains"))).toEqual(["Client"]);
     });
 
     it("needs a domain", () => {

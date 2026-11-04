@@ -43,7 +43,7 @@ describe("impact_analysis tool", () => {
     const modelHash = hashModel(model);
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -78,7 +78,7 @@ describe("impact_analysis tool", () => {
     const elementId = "550e8400-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -152,7 +152,7 @@ describe("impact_analysis tool", () => {
     const elementId = "550e8400-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -193,7 +193,7 @@ describe("impact_analysis tool", () => {
     const valueTypeId = "v2222222-e29b-41d4-a716-446655440000";
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -250,7 +250,7 @@ describe("impact_analysis tool", () => {
     const modelHash = hashModel(model);
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [],
@@ -287,6 +287,8 @@ describe("impact_analysis tool", () => {
     // b's file is there, so its export is b's and is skipped; were it
     // gone, the export would be read as a renamed model's.
     fs.copyFileSync(`${fixtures}/simple.orm.yaml`, path.join(tempDir, "b.orm.yaml"));
+    // Version 1: the model is format 1.0, so its exports recorded 3.x ids,
+    // which impact matches by the model's 3.x id (6e).
     const manifest = {
       version: 1 as const,
       sourceModel: "b.orm.yaml",
@@ -299,12 +301,58 @@ describe("impact_analysis tool", () => {
       "a.sql",
     ]);
 
-    writeManifest(ws.dir(), manifest);
+    // Inline there is no model to read 3.x ids through, so the id is a 4.0
+    // id, held by exports a 4.0 build wrote (version 2).
+    writeManifest(ws.dir(), {
+      ...manifest,
+      version: 2,
+      exports: manifest.exports.map((e) => ({
+        ...e,
+        sources: e.sources.map((s) => ({ ...s, elementId: "Customer" })),
+      })),
+    });
     const yaml = fs.readFileSync(`${fixtures}/simple.orm.yaml`, "utf-8");
-    const inline = JSON.parse(executeImpactAnalysis(yaml, "ot-customer").content[0]!.text);
+    const inline = JSON.parse(executeImpactAnalysis(yaml, "Customer").content[0]!.text);
     expect(inline.affectedArtifacts.map((a: { sourceModel: string; }) => a.sourceModel)).toEqual([
       "a.orm.yaml",
       "b.orm.yaml",
     ]);
+  });
+
+  it("finds by an id a 3.x file states the export that recorded its 4.0 id (6e)", () => {
+    const modelPath = path.join(tempDir, "shop.orm.yaml");
+    fs.writeFileSync(
+      modelPath,
+      `orm_version: "3.0"
+model:
+  name: Shop
+  object_types:
+    - { id: ot-1, name: Customer, kind: entity, reference_mode: nr }
+`,
+    );
+    writeManifest(tempDir, {
+      version: 2,
+      sourceModel: "shop.orm.yaml",
+      sourceModelHash: "h",
+      exports: [{
+        artifact: "a.sql",
+        format: "ddl",
+        exportedAt: "2026-11-04T00:00:00Z",
+        modelHash: "h",
+        sources: [{ elementId: "Customer", elementType: "EntityType", elementName: "Customer" }],
+        sourceModel: "shop.orm.yaml",
+      }],
+    });
+    const report = JSON.parse(executeImpactAnalysis(modelPath, "ot-1").content[0]!.text);
+    expect(report.affectedArtifacts.map((a: { artifact: string; }) => a.artifact)).toEqual([
+      "a.sql",
+    ]);
+    expect(report.exportsBefore40).toEqual([]);
+    expect(report).not.toHaveProperty("modelDidNotLoad");
+
+    // A model that does not load is said to have not loaded (Copilot, on 6e).
+    fs.writeFileSync(modelPath, "model: [not a model\n");
+    const unloaded = JSON.parse(executeImpactAnalysis(modelPath, "ot-1").content[0]!.text);
+    expect(unloaded.modelDidNotLoad).toBe(true);
   });
 });

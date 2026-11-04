@@ -85,7 +85,7 @@ describe("DDL lineage lists the constraints the routing placed", () => {
 
   it("words a placed constraint as stated, not enforced, in an impact report", () => {
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "m.orm.yaml",
       sourceModelHash: "h",
       exports: lineage(reporting()).map((e) => ({

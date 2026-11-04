@@ -299,7 +299,7 @@ model:
       const artifactPath = join(dir, "schema.sql");
       writeFileSync(artifactPath, "CREATE TABLE customer;", "utf-8");
       writeManifest(dir, {
-        version: 1,
+        version: 2,
         sourceModel: "model.orm.yaml",
         sourceModelHash: "abc123",
         exports: [
@@ -375,7 +375,7 @@ model:
       const artifactPath = join(dir, "schema.sql");
       writeFileSync(artifactPath, "CREATE TABLE x;", "utf-8");
       writeManifest(dir, {
-        version: 1,
+        version: 2,
         sourceModel: "does-not-exist.orm.yaml",
         sourceModelHash: "abc123",
         exports: [

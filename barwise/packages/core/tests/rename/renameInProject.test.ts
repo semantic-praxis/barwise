@@ -376,7 +376,10 @@ model:
       kind: "objectType",
       name: "Customer",
     }, "Client");
-    expect(Object.fromEntries(ids)).toEqual({ Customer: "Client", "crm:Customer": "crm:Client" });
+    expect(byDomain(ids)).toEqual({
+      crm: { Customer: "Client" },
+      billing: { "crm:Customer": "crm:Client" },
+    });
     const after = renamed.getDomain("billing")!.model!;
     expect(after.getObjectTypeByName("Client")!.id).toBe("crm:Client");
     expect(after.getFactType("Invoice_bills_Customer")!.roles[1]!.playerId).toBe("crm:Client");
@@ -400,7 +403,10 @@ describe("renameInProject, repairing an owner's id (iri-identity 6d)", () => {
 
   it("moves a shadow under the owner's old id to its new one", () => {
     const { project: after, ids } = repair(project("crm:Client"));
-    expect(Object.fromEntries(ids)).toEqual({ Client: "Customer", "crm:Client": "crm:Customer" });
+    expect(byDomain(ids)).toEqual({
+      crm: { Client: "Customer" },
+      billing: { "crm:Client": "crm:Customer" },
+    });
     expect(after.getDomain("billing")!.model!.objectTypes.map((o) => o.id)).toEqual([
       "crm:Customer",
     ]);
@@ -408,10 +414,15 @@ describe("renameInProject, repairing an owner's id (iri-identity 6d)", () => {
 
   it("leaves a shadow already under the repaired id, where it once refused", () => {
     const { project: after, ids } = repair(project("crm:Customer"));
-    expect(Object.fromEntries(ids)).toEqual({ Client: "Customer" });
+    expect(byDomain(ids)).toEqual({ crm: { Client: "Customer" } });
     expect(after.getDomain("crm")!.model!.objectTypes.map((o) => o.id)).toEqual(["Customer"]);
     expect(after.getDomain("billing")!.model!.objectTypes.map((o) => o.id)).toEqual([
       "crm:Customer",
     ]);
   });
 });
+
+/** A project rename's ids, one map per domain (iri-identity 6e), as plain objects. */
+function byDomain(ids: ReadonlyMap<string, ReadonlyMap<string, string>>) {
+  return Object.fromEntries([...ids].map(([context, map]) => [context, Object.fromEntries(map)]));
+}

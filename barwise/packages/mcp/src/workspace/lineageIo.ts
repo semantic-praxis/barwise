@@ -22,7 +22,7 @@ export function readManifest(dir: string): LineageManifest | undefined {
   if (!existsSync(filePath)) {
     return undefined;
   }
-  return parseManifest(readFileSync(filePath, "utf-8"));
+  return parseManifest(readFileSync(filePath, "utf-8")) ?? undefined;
 }
 
 /**

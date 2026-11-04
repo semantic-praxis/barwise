@@ -224,7 +224,7 @@ describe("barwise export (new format registry)", () => {
     // Manifest should be created next to the fixture.
     expect(existsSync(manifestPath)).toBe(true);
     const manifestContent = readFileSync(manifestPath, "utf-8");
-    expect(manifestContent).toContain("version: 1");
+    expect(manifestContent).toContain("version: 2");
     expect(manifestContent).toContain("format: ddl");
 
     // Clean up.

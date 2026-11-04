@@ -6,4 +6,13 @@ export {
   type RenameTarget,
 } from "./renameInModel.js";
 export { type ProjectRenameResult, renameInProject } from "./renameInProject.js";
-export { modelForRename, projectRenameWrites, type RenameWrite } from "./surfaceSupport.js";
+export {
+  type LineageRename,
+  lineageRenameWrites,
+  modelForRename,
+  modelLineageRenames,
+  projectLineageRenames,
+  projectRenameWrites,
+  renameLineage,
+  type RenameWrite,
+} from "./surfaceSupport.js";
