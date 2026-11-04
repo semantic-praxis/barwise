@@ -27,7 +27,8 @@ rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d implemented
 2026-11-04 (merge keeps the base's ids, split writes alias shadows,
 `source_context` leaves 4.0); 6e implemented 2026-11-04 (lineage manifest
-version 2, renames rewrite lineage); 6f and WS7 to come
+version 2, renames rewrite lineage); 6f implemented 2026-11-04 (Ossie's
+`iri`, the namespace read back), so WS6 is complete; WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-11-04
@@ -1598,6 +1599,29 @@ version-1 manifest would go silently empty for impact analysis.
   `equivalent_iri` when present, into Ossie's `iri` (decision 1), and the
   namespace leaves its loss block (WS4). The imports line stays: Ossie
   has no aliases, and a shadow is written by its owner's name.
+  - _6f notes._
+    - Each concept and relationship takes `iriOf(model, id)` as `iri`. A
+      shadow takes none: the export is of one model, and a shadow's
+      namespace is its owner's, which only the project knows. Decision 1's
+      `equivalent_iri` is a field no model, schema or decoder holds yet,
+      so the identity IRI is always the one written; adding the field is
+      filed as barwise-wcg.vn2.
+    - The namespace leaves the loss block only where it comes back. One
+      rule, `namespaceOfIris` (`formats/src/ossie/ossieNamespace.ts`), is
+      shared by the importer, which reads it, and the writer, which
+      predicts it: the namespace most concept IRIs agree on, each IRI that
+      ends in its concept's id at a `/` or `#` boundary, and none on a
+      tie. The model takes it if barwise can hold it (a warning says why
+      not), and each other IRI is named in the warnings and dropped. The
+      writer gives the rule the ids the importer will mint, by the suffix
+      rule in written order. So a model whose every concept is a shadow, or
+      none of whose concepts has the id the importer gives it
+      (`id-not-from-name`), still names its namespace as not written. A relationship's IRI is always dropped on import, since the
+      importer names its fact type from the Ossie name. The same rule
+      applies to an Ossie document from elsewhere: one whose concept IRIs
+      mostly agree on a namespace now imports with it.
+    - DDL comments and SVG `data-id` print local names with no change, as
+      planned (their goldens were regenerated in 6b).
 
 **6b ships in four parts** (owner, 2026-10-30), each merged on its own,
 with no release until 6f, because 6b alone is more than a session: the

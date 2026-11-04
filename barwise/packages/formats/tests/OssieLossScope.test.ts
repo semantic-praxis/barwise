@@ -366,12 +366,19 @@ describe("Ossie export of constraints the model leaves unnamed", () => {
 
 describe("the model header's loss lines (iri-identity 6b-3c)", () => {
   it("cover only the header change each predicts, and the model's other lines none", () => {
-    const m = new OrmModel({ name: "M", domainContext: "sales", namespace: "https://a.example/" });
+    // Imports, which Ossie cannot carry; a namespace now comes back through
+    // the concepts' IRIs (iri-identity 6f), so it predicts no header line.
+    const m = new OrmModel({
+      name: "M",
+      domainContext: "sales",
+      namespace: "https://a.example/",
+      imports: { crm: "crm" },
+    });
     m.addObjectType({ id: "Customer", name: "Customer", kind: "entity", referenceMode: "nr" });
     const written = writeOssie(m);
     expect(written.covers.get(lossKey({ kind: "model" }))).toBe("all");
     expect([...(written.covers.get(lossKey({ kind: "model_header" })) as Set<string>)]).toEqual([
-      "namespace",
+      "importBinding",
     ]);
     // A read-back that gained an import nobody predicted is reported, though
     // the domain context's line covers all of the model's own fields.

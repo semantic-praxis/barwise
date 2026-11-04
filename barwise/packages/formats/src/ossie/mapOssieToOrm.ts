@@ -30,6 +30,7 @@ import {
   type ValueConstraintDef,
 } from "@barwise/core";
 import { snakeCase } from "../naming.js";
+import { namespaceOfIris } from "./ossieNamespace.js";
 import {
   isOssieBuiltinValueType,
   OSSIE_ANY,
@@ -131,6 +132,7 @@ export function mapOssieToOrm(doc: OssieDocument, modelName?: string): OssieMapR
     addMandatoryRoles(model, c, resolved.requires.get(c)!);
     addIdentifierMandatories(model, c);
   }
+  readNamespace(doc, model, warnings);
   return { model, warnings };
 }
 
@@ -328,14 +330,57 @@ function reportDropped(
       }`,
     );
   }
+}
+
+/**
+ * The model's namespace, from the concept IRIs the ontology states
+ * (iri-identity 6f), by `namespaceOfIris`, the rule the export predicts
+ * with. Each IRI, a relationship's included, that is not that namespace
+ * followed by its element's id is named in `warnings` and dropped: barwise
+ * keeps one namespace per model, and no IRI per element. A relationship's
+ * IRI from a barwise export is always one of those, since the fact type
+ * this importer builds takes its id from its Ossie name.
+ */
+function readNamespace(doc: OssieDocument, model: OrmModel, warnings: string[]): void {
+  const concepts: { readonly name: string; readonly iri: string; readonly id: string; }[] = [];
+  const relationships: typeof concepts = [];
+  // An element this read cannot find by its Ossie text is one the model
+  // stored under another name: core trims names, so `" Customer "` is
+  // `Customer` (Copilot, on 6f). Its IRI is dropped with a warning, not
+  // read, and nothing else about the import changes (barwise-x8y).
+  const unread: { readonly name: string; readonly iri: string; }[] = [];
   for (const c of doc.ontology) {
-    if (c.iri) warnings.push(`${c.concept}: iri ${c.iri} dropped; barwise has no field for IRIs.`);
-    for (const r of c.relationships ?? []) {
-      if (r.iri) {
-        const name = ossieFactTypeName(c.concept, r.name);
-        warnings.push(`${name}: iri ${r.iri} dropped; barwise has no field for IRIs.`);
-      }
+    if (c.iri) {
+      const ot = model.getObjectTypeByName(c.concept);
+      if (ot) concepts.push({ name: c.concept, iri: c.iri, id: ot.id });
+      else unread.push({ name: c.concept, iri: c.iri });
     }
+    for (const r of c.relationships ?? []) {
+      if (!r.iri) continue;
+      const name = ossieFactTypeName(c.concept, r.name);
+      const ft = model.getFactTypeByName(name);
+      if (ft) relationships.push({ name: ft.name, iri: r.iri, id: ft.id });
+      else unread.push({ name, iri: r.iri });
+    }
+  }
+  let namespace = namespaceOfIris(concepts);
+  if (namespace !== undefined) {
+    try {
+      model.namespace = namespace;
+    } catch (e) {
+      warnings.push(
+        `namespace ${namespace}, which the concept IRIs state, is not one barwise can hold: `
+          + (e instanceof Error ? e.message : String(e)),
+      );
+      namespace = undefined;
+    }
+  }
+  for (const s of [...concepts, ...relationships, ...unread]) {
+    if (namespace !== undefined && "id" in s && s.iri === `${namespace}${s.id}`) continue;
+    warnings.push(
+      `${s.name}: iri ${s.iri} dropped; barwise keeps an IRI only as the model's namespace `
+        + "followed by the element's id.",
+    );
   }
 }
 
