@@ -33,6 +33,7 @@ package.json,
 .github/workflows/ci.yml,
 +barwise/scripts/audit-surfaces.mjs,
 +barwise/surface-parity-baseline.json
+Plan-reviewed: ada49d4a (code-review, pr-review; four passes on 2026-11-04, ada49d4a applies the last pass's two wording fixes)
 
 ## Principle
 
