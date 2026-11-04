@@ -12,6 +12,7 @@ barwise/docs/adr/credential-handling.md, barwise/docs/ARCHITECTURE.md,
 barwise/docs/specs/executable-adrs.spec.md, .beads/issues.jsonl,
 .claude/skills/spec-writer/SKILL.md, +.claude/skills/spec-writer/adr-writing.md,
 .claude/skills/spec-writer/template.adr.md, .claude/skills/pr-review/checklist.md
+Plan-reviewed: 1004b993 (code-review, pr-review)
 
 ## Principle
 
