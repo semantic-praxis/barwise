@@ -13,7 +13,6 @@ import { IDS_40 } from "../../src/decode/ids.js";
 import { diffModels } from "../../src/diff/ModelDiff.js";
 import { constraintRef } from "../../src/model/constraintRef.js";
 import { LOCAL_NAME_PATTERN, REFERENCE_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
-import { ownerContextOf } from "../../src/model/namespace.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import {
   OrmYamlSerializer,
@@ -90,11 +89,15 @@ const asText = (model: OrmModel) => {
   };
   const { imports: _added, ...header } = doc.model;
   // A 3.0 shadow states its owner in `source_context`; 4.0 in its id's
-  // alias, which the replay binds to that owner (iri-identity 6d).
+  // alias, which the replay binds to that owner (iri-identity 6d). Read
+  // off the id and the imports by hand, not through `ownerContextOf`, so
+  // the expectation does not move with the code it checks (the pr-review
+  // on 6d).
   const objectTypes = header["object_types"] as Record<string, unknown>[] | undefined;
   if (objectTypes) {
     header["object_types"] = objectTypes.map((ot) => {
-      const owner = ownerContextOf(model, ot["id"] as string);
+      const id = ot["id"] as string;
+      const owner = id.includes(":") ? model.imports.get(id.slice(0, id.indexOf(":"))) : undefined;
       return owner === undefined ? ot : { ...ot, source_context: owner };
     });
   }
