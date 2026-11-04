@@ -10,6 +10,25 @@ Tracking: barwise-0wa. Sources: `docs/cli-surface-audit-2026-10-12.md`
 below). The rules for the capability matrix are
 `docs/adr/surface-capability-parity.md`; this spec is how its open rows
 close.
+Touches: barwise/packages/core/src/diff/,
+barwise/packages/mcp/src/tools/,
+barwise/packages/mcp/src/server.ts,
+barwise/packages/mcp/tests/serverSpawn.test.ts,
+barwise/packages/vscode/src/mcp/ToolRegistration.ts,
+barwise/packages/vscode/src/commands/ImportDbtCommand.ts,
+barwise/packages/vscode/src/commands/ImportCodeCommand.ts,
+barwise/packages/vscode/package.json,
+barwise/packages/vscode/tests/unit/toolRegistration.test.ts,
+barwise/packages/cli/src/commands/merge.ts,
+barwise/packages/cli/src/commands/import/,
+barwise/packages/learn/src/exercise/catalog.ts,
+barwise/packages/promptlab/package.json,
+barwise/docs/adr/surface-capability-parity.md,
+barwise/docs/CLI.md,
+barwise/docs/MCP.md,
+CLAUDE.md,
++barwise/scripts/audit-surfaces.mjs,
++barwise/surface-parity-baseline.json
 
 ## Principle
 
