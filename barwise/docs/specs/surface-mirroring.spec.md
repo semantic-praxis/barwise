@@ -272,6 +272,7 @@ VS Code parameter pin in `toolRegistration.test.ts` lands with it.
 
 - `import_model`, `import_transcript` and `merge_models` gain an output path on MCP and VS Code. `executeImport` writes nothing today, so the transcript path is new in the shared function and its MCP registration, not only forwarded.
 - A new file is written directly. An existing file changes only through the reviewed change set (above), on every surface, and a target that cannot be read or merged is refused. That covers `barwise analyze --output`, which overwrites today (`analyze.ts`, `writeOutput`), and the `analyze_repository` output path workstream 7 adds.
+- The VS Code palette's transcript, dbt and code imports get the per-delta pick, with nothing pre-selected and nothing written when the user accepts none (owner, 2026-11-04).
 - The agent guidance moves with the behaviour: `chatPrompts.ts`'s merge instruction and `docs/MCP.md`'s `merge_models` section describe the two calls, in the commit that changes them.
 - `merge_models` keeps the base as its target and already discloses that (#637, barwise-xjf).
 - `export_model` writes the way `barwise export` does:
