@@ -61,7 +61,7 @@ export function analyzeImpact(
       exportsBefore40: [],
     };
   }
-  const { now, before, beforeKnown } = idsByGeneration(elementId, model);
+  const { now, before } = idsByGeneration(elementId, model);
   const exportsBefore40: string[] = [];
 
   if (scope) checkScope(scope);
@@ -79,7 +79,10 @@ export function analyzeImpact(
     const sourceRef = id === undefined
       ? undefined
       : exp.sources.find((src) => src.elementId === id);
-    if (!sourceRef && exp.idsBefore40 && !beforeKnown) exportsBefore40.push(exp.artifact);
+    // With the element's 3.x id unknown, a marked export cannot be read.
+    if (!sourceRef && exp.idsBefore40 && before === undefined) {
+      exportsBefore40.push(exp.artifact);
+    }
 
     if (sourceRef) {
       affectedArtifacts.push({
@@ -113,14 +116,14 @@ export function analyzeImpact(
 function idsByGeneration(
   elementId: string,
   model: OrmModel | undefined,
-): { now: string; before: string | undefined; beforeKnown: boolean; } {
+): { now: string; before: string | undefined; } {
   if (model?.priorIds === undefined) {
-    return { now: elementId, before: undefined, beforeKnown: false };
+    return { now: elementId, before: undefined };
   }
   const fromFile = model.idFromPrior(elementId);
-  if (fromFile !== undefined) return { now: fromFile, before: elementId, beforeKnown: true };
+  if (fromFile !== undefined) return { now: fromFile, before: elementId };
   const prior = model.priorIds.get(elementId);
-  return { now: elementId, before: prior, beforeKnown: prior !== undefined };
+  return { now: elementId, before: prior };
 }
 
 /**

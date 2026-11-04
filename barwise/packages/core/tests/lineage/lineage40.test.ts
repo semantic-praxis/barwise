@@ -109,7 +109,7 @@ describe("an export written under 3.x ids", () => {
     expect(report.freshArtifacts).toEqual([]);
   });
 
-  it("is named by impact analysis when its sources hold no id the element is known by", () => {
+  it("is named by impact analysis, not left out, when no model reads its 3.x ids", () => {
     const m = version1(exported("a.sql", "ot-1", "h"));
     const report = analyzeImpact(m, "Customer");
     expect(report.affectedArtifacts).toEqual([]);

@@ -459,6 +459,20 @@ model:
       expect(result.exitCode).toBe(0);
     });
 
+    it("says when the model did not load, since a 3.x id is then not read", async () => {
+      const modelPath = path.join(tempDir, "shop.orm.yaml");
+      fs.writeFileSync(modelPath, "model: [not a model\n");
+      writeManifest(tempDir, {
+        version: 2,
+        sourceModel: "shop.orm.yaml",
+        sourceModelHash: "h",
+        exports: [exportOf("Customer")],
+      });
+      const result = await runCli(["lineage", "impact", modelPath, "--element", "ot-1"]);
+      expect(result.stdout).toContain("The model did not load");
+      expect(result.stdout).toContain("No artifacts depend on this element");
+    });
+
     it("names the exports made under 3.x ids rather than reporting nothing", async () => {
       // A 4.0 model: it knows no 3.x id, so whether the export used one is unknown.
       const modelPath = path.join(tempDir, "shop.orm.yaml");

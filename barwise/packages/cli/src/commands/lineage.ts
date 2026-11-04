@@ -130,11 +130,12 @@ export function registerLineageCommand(program: Command): void {
           // The model, when it loads, so an id a 3.x file states finds the
           // exports that recorded its 4.0 id (barwise-wcg.v5k).
           const manifest = readManifest(dir);
+          const model = manifest === undefined ? undefined : modelIfItLoads(source);
           const report = analyzeImpact(
             manifest,
             opts.element,
             { sourceModel, modelsBeside: modelsBeside(dir) },
-            manifest === undefined ? undefined : modelIfItLoads(source),
+            model,
           );
 
           if (opts.format === "json") {
@@ -145,6 +146,14 @@ export function registerLineageCommand(program: Command): void {
           process.stdout.write(
             `Impact analysis for element: ${report.changedElement}\n\n`,
           );
+          // Without the model a 3.x id cannot be read, which changes the
+          // answer; say so rather than let a load error pass silently.
+          if (manifest !== undefined && model === undefined) {
+            process.stdout.write(
+              `The model did not load (run barwise validate ${source}), so the element's `
+                + "id is read as a 4.0 id.\n\n",
+            );
+          }
 
           const before40 = () => {
             if (report.exportsBefore40.length === 0) return;
