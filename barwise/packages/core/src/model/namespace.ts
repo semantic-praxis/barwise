@@ -88,3 +88,26 @@ export function iriOf(
   const ns = namespaceOf(owner.model, ref(owner.context));
   return ns === undefined ? undefined : `${ns}${local}`;
 }
+
+/**
+ * The alias an `alias:local` id names its owner's domain by, or undefined
+ * for a local id (iri-identity 6d). A shadow's id says whose element it
+ * is, so this replaces the `source_context` a 3.x file stated beside it:
+ * ownership is stated once.
+ */
+export function aliasOf(id: string): string | undefined {
+  const colon = id.indexOf(":");
+  return colon < 0 ? undefined : id.slice(0, colon);
+}
+
+/**
+ * The domain a shadow's owner lives in: what the model's `imports` binds
+ * the id's alias to, or the alias itself where the model imports nothing
+ * under it (a standalone file, whose alias names the context;
+ * `structural/alias-not-imported` reports it). Undefined for an element
+ * the model owns. An import bound to an absolute IRI gives that IRI.
+ */
+export function ownerContextOf(model: OrmModel, id: string): string | undefined {
+  const alias = aliasOf(id);
+  return alias === undefined ? undefined : model.imports.get(alias) ?? alias;
+}

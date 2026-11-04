@@ -29,7 +29,6 @@ model:
       reference_mode: customer_id
       preferred_identifier: c-customer-key
       definition: A party that buys.
-      source_context: sales
       aliases:
         - Client
         - Account
@@ -42,7 +41,6 @@ model:
       name: Rating
       kind: value
       definition: A score.
-      source_context: reviews
       value_constraint:
         values:
           - A
@@ -73,7 +71,6 @@ function fullyPopulatedModel(): OrmModel {
     kind: "entity",
     referenceMode: "customer_id",
     definition: "A party that buys.",
-    sourceContext: "sales",
     aliases: ["Client", "Account"],
     independent: true,
     note: "Imported from CRM.",
@@ -87,7 +84,6 @@ function fullyPopulatedModel(): OrmModel {
     name: "Rating",
     kind: "value",
     definition: "A score.",
-    sourceContext: "reviews",
     valueConstraint: {
       values: ["A", "B"],
       ranges: [{ min: "1", max: "5", minInclusive: false, maxInclusive: true }],

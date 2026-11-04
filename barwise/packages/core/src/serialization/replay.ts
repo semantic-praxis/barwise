@@ -212,7 +212,11 @@ export function replayIds(source: OrmModel, options: ReplayOptions = {}): Replay
     // context a local name too, as a 4.0 alias is; or the owner's own id,
     // when the caller knows it (`ReplayOptions.ownerId`).
     for (const ot of source.objectTypes) {
-      const { id: _old, ...config } = ot as ObjectTypeConfig & { readonly id: string; };
+      // The owner moves into the id's alias, and `source_context` goes
+      // (iri-identity 6d): a 4.0 model states ownership once.
+      const { id: _old, sourceContext: _owner, ...config } = ot as ObjectTypeConfig & {
+        readonly id: string;
+      };
       const id = ot.sourceContext !== undefined
         ? `${aliasFor(ot.sourceContext)}:${
           options.ownerId?.(ot.sourceContext, ot.name) ?? localName(ot.name)

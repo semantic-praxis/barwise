@@ -194,8 +194,14 @@ describe("splitModel", () => {
     const crmYaml = result.domains.find((d) => d.context === "crm")!.yaml;
     const crm = new OrmYamlSerializer().deserialize(crmYaml);
     const invoice = crm.getObjectTypeByName("Invoice");
-    expect(invoice).toBeDefined();
-    expect(crmYaml).toContain("source_context: billing");
+    // The shadow's id names its owner, through an import; nothing else
+    // states ownership (iri-identity 6d).
+    expect(invoice?.id).toBe("billing:Invoice");
+    expect([...crm.imports]).toEqual([["billing", "billing"]]);
+    expect(crmYaml).not.toContain("source_context");
+    // Every reference to it names the shadow.
+    expect(crm.getFactTypeByName("Customer pays Invoice")!.roles.map((r) => r.playerId))
+      .toContain("billing:Invoice");
 
     expect(result.mappings).toHaveLength(1);
     expect(result.mappings[0]?.fileName).toBe("mappings/billing-crm.map.yaml");

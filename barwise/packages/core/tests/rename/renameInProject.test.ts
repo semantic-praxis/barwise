@@ -4,6 +4,7 @@
  * across the project's domains.
  */
 import { describe, expect, it } from "vitest";
+import { ownerContextOf } from "../../src/model/namespace.js";
 import { OrmModel } from "../../src/model/OrmModel.js";
 import { OrmProject } from "../../src/model/OrmProject.js";
 import { splitModel } from "../../src/project/splitModel.js";
@@ -84,7 +85,7 @@ describe("renameInProject", () => {
     const crm = project.getDomain("crm")!.model!;
     const billing = project.getDomain("billing")!.model!;
     expect(crm.getObjectTypeByName("Client")).toBeDefined();
-    expect(billing.getObjectTypeByName("Client")).toMatchObject({ sourceContext: "crm" });
+    expect(ownerContextOf(billing, billing.getObjectTypeByName("Client")!.id)).toBe("crm");
     expect(billing.getObjectTypeByName("Customer")).toBeUndefined();
     // The shadow keeps whatever alias its id had, and takes its owner's new
     // id behind it; every role it plays follows (6b-3b's pr-review).
@@ -219,18 +220,13 @@ describe("renameInProject", () => {
     const a = new OrmModel({ name: "a" });
     a.addObjectType({ id: "c", name: "Customer", kind: "entity", referenceMode: "customer_id" });
     a.addObjectType({ id: "v", name: "CustomerId", kind: "value" });
-    const b = new OrmModel({ name: "b" });
-    b.addObjectType({
-      id: "c",
-      name: "Customer",
-      kind: "entity",
-      referenceMode: "customer_id",
-      sourceContext: "a",
-    });
-    b.addObjectType({ id: "v", name: "CustomerId", kind: "value", sourceContext: "a" });
+    // b shadows both, behind the alias its import binds to a.
+    const b = new OrmModel({ name: "b", imports: { a: "a" } });
+    b.addObjectType({ id: "a:c", name: "Customer", kind: "entity", referenceMode: "customer_id" });
+    b.addObjectType({ id: "a:v", name: "CustomerId", kind: "value" });
     b.addFactType({
       name: "Customer has CustomerId",
-      roles: [{ name: "has", playerId: "c" }, { name: "of", playerId: "v" }],
+      roles: [{ name: "has", playerId: "a:c" }, { name: "of", playerId: "a:v" }],
       readings: ["{0} has {1}"],
     });
     project.addDomain({ path: "a.orm.yaml", context: "a" }).setModel(a);
@@ -240,7 +236,7 @@ describe("renameInProject", () => {
       kind: "objectType",
       name: "CustomerId",
     }, "ClientKey");
-    expect(renamed.getDomain("b")!.model!.getObjectType("c")).toMatchObject({
+    expect(renamed.getDomain("b")!.model!.getObjectType("a:c")).toMatchObject({
       referenceMode: "client_key",
     });
     expect(renamed.getDomain("a")!.model!.getObjectType("c")).toMatchObject({
@@ -279,7 +275,8 @@ describe("renameInProject", () => {
     // a second match for Invoice's reference mode.
     const project = splitShop();
     const billing = project.getDomain("billing")!.model!;
-    const id = billing.addObjectType({ name: "CustomerId", kind: "value", sourceContext: "crm" });
+    billing.setImport("crm", "crm");
+    const id = billing.addObjectType({ id: "crm:CustomerId", name: "CustomerId", kind: "value" });
     const invoice = billing.getObjectTypeByName("Invoice")!;
     const nr = billing.addObjectType({ name: "Invoice_Nr", kind: "value" });
     billing.addFactType({
@@ -362,7 +359,7 @@ model:
   domain_context: billing
   imports: { crm: crm }
   object_types:
-    - { id: "crm:Customer", name: Customer, kind: entity, reference_mode: nr, source_context: crm }
+    - { id: "crm:Customer", name: Customer, kind: entity, reference_mode: nr }
     - { id: Invoice, name: Invoice, kind: entity, reference_mode: nr }
   fact_types:
     - id: Invoice_bills_Customer
@@ -383,5 +380,38 @@ model:
     const after = renamed.getDomain("billing")!.model!;
     expect(after.getObjectTypeByName("Client")!.id).toBe("crm:Client");
     expect(after.getFactType("Invoice_bills_Customer")!.roles[1]!.playerId).toBe("crm:Client");
+  });
+});
+
+describe("renameInProject, repairing an owner's id (iri-identity 6d)", () => {
+  const project = (shadowId: string) => {
+    const crm = new OrmModel({ name: "crm" });
+    // A name edited without a rename: the id no longer follows it.
+    crm.addObjectType({ id: "Client", name: "Customer", kind: "entity", referenceMode: "nr" });
+    const billing = new OrmModel({ name: "billing", imports: { crm: "crm" } });
+    billing.addObjectType({ id: shadowId, name: "Customer", kind: "entity", referenceMode: "nr" });
+    const p = new OrmProject({ name: "P" });
+    p.addDomain({ path: "crm.orm.yaml", context: "crm" }).setModel(crm);
+    p.addDomain({ path: "billing.orm.yaml", context: "billing" }).setModel(billing);
+    return p;
+  };
+  const repair = (p: OrmProject) =>
+    renameInProject(p, "crm", { kind: "objectType", name: "Customer" }, "Customer");
+
+  it("moves a shadow under the owner's old id to its new one", () => {
+    const { project: after, ids } = repair(project("crm:Client"));
+    expect(Object.fromEntries(ids)).toEqual({ Client: "Customer", "crm:Client": "crm:Customer" });
+    expect(after.getDomain("billing")!.model!.objectTypes.map((o) => o.id)).toEqual([
+      "crm:Customer",
+    ]);
+  });
+
+  it("leaves a shadow already under the repaired id, where it once refused", () => {
+    const { project: after, ids } = repair(project("crm:Customer"));
+    expect(Object.fromEntries(ids)).toEqual({ Client: "Customer" });
+    expect(after.getDomain("crm")!.model!.objectTypes.map((o) => o.id)).toEqual(["Customer"]);
+    expect(after.getDomain("billing")!.model!.objectTypes.map((o) => o.id)).toEqual([
+      "crm:Customer",
+    ]);
   });
 });

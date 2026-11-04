@@ -13,6 +13,7 @@
  */
 
 import {
+  aliasOf,
   CURRENT_ORM_VERSION,
   type MigrationNote,
   type MigrationResult,
@@ -253,7 +254,8 @@ function migrateProject(manifest: string, check: boolean): FileOutcome[] {
         d.context,
         new Map(
           result.model.objectTypes
-            .filter((ot) => ot.sourceContext === undefined)
+            // A shadow's id carries its alias (iri-identity 6d); an owned one's does not.
+            .filter((ot) => aliasOf(ot.id) === undefined)
             .map((ot) => [ot.name, ot.id] as const),
         ),
       );
@@ -272,7 +274,7 @@ function migrateProject(manifest: string, check: boolean): FileOutcome[] {
       return { outcome: { file: d.file, status: "error", error: d.error ?? failed.get(i)! } };
     }
     const replayAgain = result.from !== CURRENT_ORM_VERSION
-      && result.model.objectTypes.some((ot) => ot.sourceContext !== undefined);
+      && result.model.objectTypes.some((ot) => aliasOf(ot.id) !== undefined);
     try {
       return planRead(d.file, d.raw, replayAgain ? read(d.raw, ownerId) : result);
     } catch (err) {

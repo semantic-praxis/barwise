@@ -18,7 +18,7 @@ import { toSnake } from "../mapping/columnNames.js";
 import { referenceModeCandidates } from "../mapping/RelationalMapper.js";
 import type { FactType } from "../model/FactType.js";
 import { localName } from "../model/name.js";
-import type { ObjectType } from "../model/ObjectType.js";
+import { ownerContextOf } from "../model/namespace.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmYamlSerializer, writeDocument40 } from "../serialization/OrmYamlSerializer.js";
 import { danglingReferences } from "../serialization/replay.js";
@@ -262,7 +262,7 @@ export function planRename(
     throw new RenameError(`The ${what} is already named "${name}", and holds the id it gives.`);
   }
   if (target.kind === "objectType" && options.shadow === "refuse") {
-    const context = (element as ObjectType).sourceContext;
+    const context = ownerContextOf(model, element.id);
     if (context !== undefined) {
       throw new RenameError(
         `"${element.name}" is a shadow of an object type owned by "${context}"; `

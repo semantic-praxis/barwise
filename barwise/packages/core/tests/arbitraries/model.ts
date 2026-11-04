@@ -159,6 +159,11 @@ interface RawObjectType {
   readonly entity: boolean;
   readonly independent: boolean;
   readonly definition: string | null;
+  /**
+   * Drawn and not used: a 4.0 model states a shadow by its id's alias, not a
+   * field (iri-identity 6d). Kept so every other draw, and so each law's
+   * seeded corpus, stays what it was.
+   */
   readonly sourceContext: string | null;
   readonly note: string | null;
   readonly values: readonly string[] | null;
@@ -465,7 +470,6 @@ function toObjectTypes(raws: readonly RawObjectType[]): ObjectTypeConfig[] {
       // must; both are constructor invariants, not generator choices.
       ...(raw.entity ? { referenceMode: `t${i}_id` } : {}),
       ...(raw.definition !== null ? { definition: raw.definition } : {}),
-      ...(raw.sourceContext !== null ? { sourceContext: raw.sourceContext } : {}),
       ...(raw.note !== null ? { note: raw.note } : {}),
       // Value-only fields go on value types only: core refuses them on an
       // entity (barwise-5fg). Before that it dropped them, so this generator

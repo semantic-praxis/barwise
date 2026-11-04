@@ -13,6 +13,7 @@ import type { Constraint, ExternalConstraint } from "../model/Constraint.js";
 import type { Definition } from "../model/Definition.js";
 import type { DerivationRule, FactType } from "../model/FactType.js";
 import { resolvePreferredIdentifier } from "../model/identification.js";
+import { ownerContextOf } from "../model/namespace.js";
 import { isEntityType, isValueType, type ObjectType, type ValueType } from "../model/ObjectType.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import type { FactInstance, Population } from "../model/Population.js";
@@ -80,8 +81,12 @@ export function diffObjectType(
   if ((a.definition ?? "") !== (b.definition ?? "")) {
     changes.push({ change: "definition", from: a.definition, to: b.definition });
   }
-  if ((a.sourceContext ?? "") !== (b.sourceContext ?? "")) {
-    changes.push({ change: "sourceContext", from: a.sourceContext, to: b.sourceContext });
+  // Whose element it is, read from the id's alias (iri-identity 6d): an
+  // owned type and a shadow of one pair by name, under different ids.
+  const ownerA = ownerContextOf(existingModel, a.id);
+  const ownerB = ownerContextOf(incomingModel, b.id);
+  if ((ownerA ?? "") !== (ownerB ?? "")) {
+    changes.push({ change: "sourceContext", from: ownerA, to: ownerB });
   }
 
   if (valueConstraintKey(aValue?.valueConstraint) !== valueConstraintKey(bValue?.valueConstraint)) {

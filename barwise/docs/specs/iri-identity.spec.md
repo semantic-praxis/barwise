@@ -24,11 +24,12 @@ the editor's "Store ids", the 3.x note); 6b-3b implemented 2026-11-03 (the
 rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-03 (`iriOf`, the model header delta); 6b-4b implemented
 2026-11-03 (`generateId` and its installs retired); 6c implemented
-2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d to 6f
-and WS7 to come
+2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d implemented
+2026-11-04 (merge keeps the base's ids, split writes alias shadows,
+`source_context` leaves 4.0); 6e, 6f and WS7 to come
 
 Created: 2026-10-28
-Last-updated: 2026-11-03
+Last-updated: 2026-11-04
 Tracking: barwise-wcg, barwise-y1b
 Plan-reviewed: 15d6f18e (pr-review x5, code-review x3; re-pointed after WS6 was grounded and decisions 18 to 20 taken)
 Touches: barwise/packages/core/src/model/,
@@ -1467,6 +1468,29 @@ version-1 manifest would go silently empty for impact analysis.
       `duplicate-subtype-fact` or the objectification's refusal reports.
     - `refuseNameClashes` also refuses an object type and a fact type the
       merge would give one id: the diff pairs ids within one kind only.
+  - _6d notes (split and `aliasOf`)._
+    - Split gives each shadow `<alias>:<the owner's id>`, the alias the
+      owner's local name (as the 3.x reader builds it), imports it, and
+      rewrites each role player, subtype end, objectification and join
+      path root that names the shadowed type. `source_context` is not
+      written.
+    - `aliasOf(id)` and `ownerContextOf(model, id)` (`model/namespace.ts`)
+      replace the field for rename, lineage attribution, the diff's
+      `sourceContext` change kind (kept, now read from the two ids'
+      owners), `barwise migrate`'s owner map, MCP's split summary and
+      Ossie's writer. `ownerContextOf` falls back to the alias itself
+      where nothing imports it, as a standalone file's does.
+    - Format 4.0 has no `source_context`: the JSON schema drops it and the
+      4.0 object type decoder has no such field. The 3.0 decoder keeps it
+      (`objectTypeFileOf` takes it as an extra field), and so does
+      `ObjectType`, documented as the 3.x owner the replay builds the
+      alias from; the replay drops it from the model it builds.
+    - Ossie's "source context not written" line stays true and now
+      explains no change: the export check aligns the read-back to the
+      source's ids, alias included, so the lost owner never shows as one.
+    - The 6b-3b note is closed: a same-name repair through a project skips
+      a shadow already under `<alias>:<the owner's repaired id>` rather
+      than refusing in its domain.
 
 - **6e, lineage.** The manifest goes to `version: 2` (`types.ts:55`)
   and `canonicalizeIds` goes (`manifest.ts:124-`). The marker is per

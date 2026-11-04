@@ -15,6 +15,7 @@ import { type ConstraintFileValue, constraintRecord } from "../decode/constraint
 import { roleIdsOf, subtypeFactIdsOf } from "../model/Constraint.js";
 import { ContextMapping } from "../model/ContextMapping.js";
 import { IRI_BASE_PATTERN } from "../model/iri.js";
+import { localName } from "../model/name.js";
 import type { OrmModel } from "../model/OrmModel.js";
 import { OrmProject } from "../model/OrmProject.js";
 import { MappingSerializer } from "../serialization/MappingSerializer.js";
@@ -339,14 +340,24 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
 
     // Foreign references become shadows; record the seam. A shadow is
     // identified in its owner's domain, so it names no identifier here.
+    // Its id is `<owner>:<the owner's id>`, the alias bound to the owner
+    // by an import, so the id says whose element it is and `source_context`
+    // goes (iri-identity 6d). The alias is the owner's local name, as the
+    // 3.x reader builds it; the owner's id, not its name's local name, since
+    // the two differ for a suffixed id or a name edited without a rename.
     const shadows: RawObjectType[] = [];
+    const shadowIdOf = new Map<string, string>();
+    const imports: Record<string, string> = {};
     for (const id of referenced) {
       const owner = home.get(id);
       if (!owner || owner === ctx) continue;
       const ot = otById.get(id);
       if (!ot) continue;
       const { preferred_identifier: _owned, ...shadow } = ot;
-      shadows.push({ ...shadow, source_context: owner });
+      const alias = localName(owner);
+      imports[alias] = owner;
+      shadowIdOf.set(id, `${alias}:${id}`);
+      shadows.push({ ...shadow, id: `${alias}:${id}` });
       let byShadow = seams.get(owner);
       if (!byShadow) {
         byShadow = new Map();
@@ -419,16 +430,43 @@ export function splitModel(modelYaml: string, config: SplitConfig): SplitResult 
       warnings.push(`Domain "${ctx}" has no object types or fact types.`);
     }
 
-    const domainModel: RawModelDoc["model"] & { domain_context: string; } = {
+    const domainModel: RawModelDoc["model"] & {
+      domain_context: string;
+      imports?: Record<string, string>;
+    } = {
       name: ctx,
       domain_context: ctx,
+      ...(Object.keys(imports).length > 0 ? { imports } : {}),
     };
+    // Every reference to a shadowed type names the shadow: a role's player,
+    // a subtype fact's ends, an objectification's object type, and a join
+    // path's root.
+    const local = (id: string) => shadowIdOf.get(id) ?? id;
+    const withShadowRoots = (c: RawConstraint): RawConstraint =>
+      shadowIdOf.size === 0 ? c : rootsThrough(c, local) as RawConstraint;
     const allOts = [...identifiedOts, ...shadows];
     if (allOts.length > 0) domainModel.object_types = allOts;
-    if (cleanedFts.length > 0) domainModel.fact_types = cleanedFts;
-    if (keptConstraints.length > 0) domainModel.constraints = keptConstraints;
-    if (homedSubtypes.length > 0) domainModel.subtype_facts = homedSubtypes;
-    if (homedObjd.length > 0) domainModel.objectified_fact_types = homedObjd;
+    if (cleanedFts.length > 0) {
+      domainModel.fact_types = cleanedFts.map((ft) => ({
+        ...ft,
+        roles: ft.roles.map((r) => ({ ...r, player: local(r.player) })),
+        ...(ft.constraints ? { constraints: ft.constraints.map(withShadowRoots) } : {}),
+      }));
+    }
+    if (keptConstraints.length > 0) domainModel.constraints = keptConstraints.map(withShadowRoots);
+    if (homedSubtypes.length > 0) {
+      domainModel.subtype_facts = homedSubtypes.map((sf) => ({
+        ...sf,
+        subtype: local(sf.subtype),
+        supertype: local(sf.supertype),
+      }));
+    }
+    if (homedObjd.length > 0) {
+      domainModel.objectified_fact_types = homedObjd.map((o) => ({
+        ...o,
+        object_type: local(o.object_type),
+      }));
+    }
     if (homedPops.length > 0) domainModel.populations = homedPops;
     // Glossary definitions are not element-scoped; keep them with the
     // first domain so they are not lost.
@@ -682,6 +720,20 @@ function pickWinner(votes: ReadonlyMap<string, number>): string | undefined {
  * compile here until it is classified rather than falling through as
  * "no roles."
  */
+/**
+ * A constraint with each join path's `root` read through `local`, at any
+ * depth: the root is the one object type reference a constraint holds.
+ */
+function rootsThrough(value: unknown, local: (id: string) => string): unknown {
+  if (Array.isArray(value)) return value.map((v) => rootsThrough(v, local));
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map((
+      [k, v],
+    ) => [k, k === "root" && typeof v === "string" ? local(v) : rootsThrough(v, local)]),
+  );
+}
+
 function constraintRoleIds(constraint: RawConstraint): string[] {
   return roleIdsOf(constraintRecord(constraint as unknown as ConstraintFileValue));
 }

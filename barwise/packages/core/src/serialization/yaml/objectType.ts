@@ -12,6 +12,7 @@ export interface OrmYamlObjectType {
   /** An entity's preferred identifier: a uniqueness constraint's id (3.0). */
   preferred_identifier?: string;
   definition?: string;
+  /** A 2.0 or 3.0 shadow's owner; 4.0 states it in the id's alias (iri-identity 6d). */
   source_context?: string;
   value_constraint?: OrmYamlValueConstraintBody;
   data_type?: { name: string; length?: number; scale?: number; };
@@ -39,7 +40,7 @@ export function serializeObjectType(
 
   // Narrowed field by field rather than by grouping the variants, because
   // key INSERTION ORDER is what the golden bytes record: a value type's
-  // `value_constraint` and `data_type` sit between `source_context` and
+  // `value_constraint` and `data_type` sit between `definition` and
   // `aliases`, and moving them into a `kind` block would reorder every
   // serialized value type.
   const value = isValueType(ot) ? ot : undefined;
@@ -50,9 +51,6 @@ export function serializeObjectType(
   }
   if (ot.definition) {
     result.definition = ot.definition;
-  }
-  if (ot.sourceContext) {
-    result.source_context = ot.sourceContext;
   }
   if (value?.valueConstraint) {
     result.value_constraint = serializeValueConstraintBody(

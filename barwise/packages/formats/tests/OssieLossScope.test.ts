@@ -115,9 +115,11 @@ const CASES: readonly {
     model: () => coded({ cardinality: { min: 1, max: 5 } }),
   },
   {
+    // Explains nothing a diff sees: the check aligns ids, alias included.
     line: /source context .* not written/,
-    explains: ["sourceContext"],
-    model: () => coded({ sourceContext: "sales" }),
+    explains: [],
+    // A shadow: its id's alias names the owner (iri-identity 6d).
+    model: () => coded({ id: "sales:Thing" }),
   },
   {
     line: /note line not written/,

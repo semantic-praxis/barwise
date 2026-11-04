@@ -350,11 +350,12 @@ ${(swapped ? [...binaries].reverse() : binaries).join("")}`;
 
   it("refuses a shadow, which is renamed through its owner", () => {
     const m = shop();
+    m.setImport("billing", "billing");
     m.addObjectType({
+      id: "billing:Invoice",
       name: "Invoice",
       kind: "entity",
       referenceMode: "invoice_nr",
-      sourceContext: "billing",
     });
     expect(() => renameInModel(m, { kind: "objectType", name: "Invoice" }, "Bill")).toThrow(
       /shadow of an object type owned by "billing"/,

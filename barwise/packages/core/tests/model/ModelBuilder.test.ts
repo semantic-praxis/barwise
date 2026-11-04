@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 import { isInternalUniqueness, isMandatoryRole } from "../../src/model/Constraint.js";
 import { LOCAL_NAME_PATTERN, ROLE_ID_PATTERN } from "../../src/model/name.js";
+import { ownerContextOf } from "../../src/model/namespace.js";
 import { isEntityType, isValueType } from "../../src/model/ObjectType.js";
 import { expandReading } from "../../src/model/ReadingOrder.js";
 import { ModelBuilder, preferredId, roleId } from "../helpers/ModelBuilder.js";
@@ -69,7 +70,9 @@ describe("ModelBuilder", () => {
     expect(isEntityType(customer!)).toBe(true);
     expect(customer!.referenceMode).toBe("customer_id");
     expect(customer!.definition).toContain("placed at least one order");
-    expect(customer!.sourceContext).toBe("crm");
+    // A shadow of crm's Customer: its id's alias names the owner (iri-identity 6d).
+    expect(customer!.id).toBe("crm:Customer");
+    expect(ownerContextOf(model, customer!.id)).toBe("crm");
 
     const rating = model.getObjectTypeByName("Rating");
     expect(rating).toBeDefined();
