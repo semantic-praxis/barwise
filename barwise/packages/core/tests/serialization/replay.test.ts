@@ -136,6 +136,18 @@ describe("replaying a 3.x model into format 4.0", () => {
     expect(corpus.length).toBeGreaterThan(40);
   });
 
+  it("holds shadows, so the shadow cases below have something to read", () => {
+    // The corpus is written by the 3.0 writer; when a change stopped it
+    // writing `source_context`, every file lost its shadows and each case
+    // below still passed, on less (Copilot, on 6d). Counted, not assumed.
+    const shadows = corpus.flatMap((c) =>
+      (c.doc.model.object_types ?? []).filter((ot: Record<string, unknown>) =>
+        ot["source_context"] !== undefined
+      )
+    );
+    expect(shadows.length).toBeGreaterThan(20);
+  });
+
   it.each(corpus.map((c) => [c.file, c] as const))(
     "%s states the same model under new ids",
     (_, c) => {
