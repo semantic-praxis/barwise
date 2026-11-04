@@ -5,7 +5,7 @@ Status: Draft -- no workstream implemented
 Created: 2026-11-04
 Last-updated: 2026-11-04
 Tracking: barwise-ym8.gxp (barwise-ym8.krj, barwise-ym8.kva, barwise-ym8.gc9; follows docs/specs/executable-adrs.spec.md)
-Touches: barwise/scripts/check-adr-tests.mjs, barwise/scripts/check-architecture.mjs,
+Touches: barwise/scripts/check-adr-tests.mjs, barwise/scripts/check-architecture.mjs, barwise/scripts/lib/adr-enforcement.mjs,
 barwise/scripts/mutate.mjs, barwise/scripts/tests/check-adr-tests.test.mjs,
 barwise/scripts/tests/gates.test.mjs, barwise/scripts/tests/expected-counts.json,
 barwise/docs/adr/credential-handling.md, barwise/docs/ARCHITECTURE.md,
@@ -42,8 +42,7 @@ In scope:
 - When every test tagged for a tested decision is skipped, so none
   passed and none failed, `check:adr-tests` shall report that decision
   as a refusal (exit 2, unless a finding elsewhere makes it 1) naming the
-  skipped tests, not as a finding. A decision with a failed tagged test
-  stays a finding whatever else was skipped.
+  skipped tests, not as a finding. A decision with a failed tagged test stays a finding whatever else was skipped. A decision whose tags are skips and todos only follows the Open decision on that case: a refusal under the recommended answer.
 - When a `none` entry names an issue, `check:architecture` shall exit 1
   unless that issue carries the gap label (`adr-gap`, the recommended
   name; Open decisions), its title begins
@@ -77,18 +76,18 @@ Out of scope:
 
 ## Inventory
 
-| Area                                            | Current state (verified 2026-11-04)                                                                      | Verdict                                                  |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `check-adr-tests.mjs`                           | counts only `status === "passed"`; a decision with no passed tag is a finding when every report was read | WS1: a skip-only decision is a refusal                   |
-| `credential-handling.md`                        | `gitleaks-detects` is `none` only, because its probe tests skip without gitleaks (barwise-ym8.7zs)       | WS1: `tests` added, tags restored; the `none` stays      |
-| `check-architecture.mjs` OK line                | "... 20 declare Enforced-by:", always equal to the ADR count since the header became required            | WS2: the held-by breakdown                               |
-| `check-architecture.mjs` `none` entries         | checks only that the issue exists and is open                                                            | WS3: label, title and one-to-one rule                    |
-| `.beads/issues.jsonl` gap issues                | 87 under barwise-ym8, every title `Gap: <adr> decision <id> ...`, none labelled                          | WS3: `adr-gap` added to each                             |
-| `architectureRepo()` in `gates.test.mjs`        | rewrites each fixture ADR to `none (barwise-fx1: <all ids>)`                                             | WS3: defaults to `tests (<ids>)`, which needs no tracker |
-| `spec-writer` skill                             | `template.adr.md` names the entry forms and the owner's gate rule; no authoring step                     | WS4: `adr-writing.md` and pointers                       |
-| `pr-review/checklist.md`, "When an ADR changed" | three items; nothing on enforcement                                                                      | WS4: one item                                            |
-| `mutate.mjs`                                    | exit 0 when the command fails with the mutation applied, so a refusal (2) counts as caught               | WS5: an expected-exit option                             |
-| `executable-adrs.spec.md` WS5                   | provisional, ungrounded                                                                                  | replaced by a pointer here in this spec's own commit     |
+| Area                                            | Current state (verified 2026-11-04)                                                                      | Verdict                                                                           |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `check-adr-tests.mjs`                           | counts only `status === "passed"`; a decision with no passed tag is a finding when every report was read | WS1: a skip-only decision is a refusal                                            |
+| `credential-handling.md`                        | `gitleaks-detects` is `none` only, because its probe tests skip without gitleaks (barwise-ym8.7zs)       | WS1: `tests` added, tags restored; the `none` stays                               |
+| `check-architecture.mjs` OK line                | "... 20 declare Enforced-by:", always equal to the ADR count since the header became required            | WS2: the held-by breakdown                                                        |
+| `check-architecture.mjs` `none` entries         | checks only that the issue exists and is open                                                            | WS3: label, title and one-to-one rule                                             |
+| `.beads/issues.jsonl` gap issues                | 87 under barwise-ym8, every title `Gap: <adr> decision <id> ...`, none labelled                          | WS3: `adr-gap` added to each                                                      |
+| `architectureRepo()` in `gates.test.mjs`        | rewrites each fixture ADR to `none (barwise-fx1: <all ids>)`                                             | WS3: defaults to `tests (<ids>)`, which needs no tracker                          |
+| `spec-writer` skill                             | `template.adr.md` names the entry forms and the owner's gate rule; no authoring step                     | WS4: `adr-writing.md` and pointers                                                |
+| `pr-review/checklist.md`, "When an ADR changed" | three items; nothing on enforcement                                                                      | WS4: one item                                                                     |
+| `mutate.mjs`                                    | exit 0 when the command fails with the mutation applied, so a refusal (2) counts as caught               | WS5: an expected-exit option                                                      |
+| `executable-adrs.spec.md` WS5                   | provisional, ungrounded                                                                                  | replaced by a pointer here, in the commit after this spec's `Plan-reviewed:` line |
 
 The tracker's `labels` field is already supported: `beads-crud.mjs`
 takes `--labels` on `create` and `update`, and more than 400 issues carry
@@ -173,10 +172,8 @@ skips -- none passed, none failed -- goes to `refusals` with the skipped titles,
 a finding. A `todo` beside a skip does not change that reading: a
 decision whose tags are skips and todos only is a refusal (recommended;
 Open decisions). The refusal header line, which today counts only unread
-reports, says how many decisions were left unproven by skips. New cases in
-`check-adr-tests.test.mjs`: skip-only is exit 2 and names the test; skip
-plus pass is 0; skip plus fail is 1; skip plus todo is 2; a `todo`
-alone is 1. Then
+reports, says how many decisions were left unproven by skips. The existing case that expects exit 1 for a lone `skipped` test (it loops over skipped, todo and failed) drops `skipped`, and the script's header comment, which says a skipped test settles itself as not passed, names the new refusal. New cases in `check-adr-tests.test.mjs`: skip-only is exit 2 and names the test; skip
+plus pass is 0; skip plus fail is 1; skip plus todo is 2 under the recommended answer to the Open decision, 1 if the reviewer picks the other; a `todo` alone is 1. Then
 `credential-handling` adds `tests (gitleaks-detects)` beside its existing
 `none (barwise-ym8.7zs: gitleaks-detects)`, which stays: the probe tests
 catch a dropped default set or Anthropic rule, not a second local rule.
@@ -212,8 +209,7 @@ fixture issue carrying the label and a title of the required form.
 The `ADR_OK.replace("none (barwise-fx1: the-rule)", ...)` call in the
 no-tracker case (the one WS3 of `executable-adrs` added) then matches
 nothing and is removed. `template.adr.md`'s comment, which writes
-`none (<issue>: <ids>)` (its example header already has one id), and the
-check's own messages change to the one-id form. New cases: an unlabelled issue, a wrong title, two ids in
+`none (<issue>: <ids>)` (its example header already has one id), the check's own messages, and the parser's (`adr-enforcement.mjs`, its entry-form message and doc comment) change to the one-id form. The `none` branch checks in order: the issue exists, it is open, then label, title and one id, so a closed issue reports only that it is closed and the existing `barwise-shut` case keeps its one finding. New cases: an unlabelled issue, a wrong title, two ids in
 one entry, and one issue named twice, each exit 1 naming the entry; they
 join an existing case where they can, and `expected-counts.json` is
 rewritten with `--write` for whatever count changes.
@@ -237,8 +233,7 @@ plant record, and backfilling one is the refactor session's work
 
 ### 5. Discrimination probes (provisional: grounded in part)
 
-This replaces WS5 of `executable-adrs.spec.md`, whose section is now a
-pointer here. WS3 grounded two of its open questions. Process ADRs do
+This replaces WS5 of `executable-adrs.spec.md`, whose section becomes a pointer here after this spec's `Plan-reviewed:` line. WS3 grounded two of its open questions. Process ADRs do
 admit plants: an unpinned bootstrap line made `check:python-uv` exit 1,
 and a `TODO: classify` note made `audit:specs -- --check` exit 1, both
 recorded in #885 and #886. And `mutate.mjs` still counts any non-zero
