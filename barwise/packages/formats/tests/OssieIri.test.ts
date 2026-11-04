@@ -111,6 +111,28 @@ describe("an Ossie export's iri", () => {
   });
 });
 
+describe("the export's namespace line and the import (the pr-review on 6f)", () => {
+  // Two names with one local name: the importer gives the second `_2`.
+  const twoNames = (first: string, second: string) => {
+    const m = new OrmModel({ name: "Shop", namespace: NS });
+    m.addObjectType({ id: first, name: "Order Line", kind: "entity", referenceMode: "nr" });
+    m.addObjectType({ id: second, name: "Order_Line", kind: "entity", referenceMode: "nr" });
+    return m;
+  };
+
+  it.each([
+    ["swapped suffixes", "Order_Line_2", "Order_Line", false],
+    ["an old id beside the suffixed one", "legacy-1", "Order_Line_2", true],
+  ])("agree for %s", (_, first, second, carried) => {
+    const { text, losses } = exportOf(twoNames(first, second));
+    const lost = losses.includes(`# barwise: model: namespace ${NS} not written`);
+    const back = new OssieImportFormat().parse(text).model.namespace;
+    expect({ lost, back }).toEqual(
+      carried ? { lost: false, back: NS } : { lost: true, back: undefined },
+    );
+  });
+});
+
 describe("an Ossie import's iri", () => {
   const doc = (customerIri: string, orderIri: string) =>
     `version: 0.2.0.dev0

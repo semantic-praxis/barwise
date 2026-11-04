@@ -110,6 +110,7 @@ export {
   resolvePreferredIdentifier,
   storePreferredFlags,
 } from "./model/identification.js";
+export { suffixed } from "./model/idRules.js";
 export { type Mintable, mintedName } from "./model/mint.js";
 export { ModelElement } from "./model/ModelElement.js";
 export { localName, ROLE_ID_PATTERN } from "./model/name.js";

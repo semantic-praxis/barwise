@@ -31,6 +31,7 @@ import {
   resolvePreferredIdentifier,
   roleIdsOf,
   subtypeFactRef,
+  suffixed,
 } from "@barwise/core";
 import { buildConstraintSpec } from "@barwise/core/annotation";
 import type { ChangeKind, ElementType } from "@barwise/core/diff";
@@ -340,8 +341,11 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
   const ontology: OssieConcept[] = [];
   const played = new Set(written.flatMap((w) => w.ft.roles.map((r) => r.playerId)));
   // Each concept IRI written, with the id the importer will give that
-  // concept (the local name of its written name), for `namespaceOfIris`.
+  // concept, for `namespaceOfIris`: the local name of its written name, by
+  // the suffix rule in written order, as the importer adds them (the
+  // pr-review on 6f: two names can share a local name).
   const conceptIris: ConceptIri[] = [];
+  const importedIds = new Set<string>();
   for (const ot of model.objectTypes) {
     if (isBuiltin(ot.id) && !played.has(ot.id)) {
       lose(ot.name, "a built-in no role uses is not written; Ossie declares none", {
@@ -351,7 +355,9 @@ export function writeOssie(model: OrmModel): OssieWriteResult {
     }
     if (isBuiltin(ot.id)) continue;
     const iri = iriOf(model, ot.id);
-    if (iri !== undefined) conceptIris.push({ iri, id: localName(nameOf(ot.id)) });
+    const importedId = suffixed(localName(nameOf(ot.id)), (id) => !importedIds.has(id));
+    importedIds.add(importedId);
+    if (iri !== undefined) conceptIris.push({ iri, id: importedId });
     ontology.push(withIri(
       writeConcept(ot, {
         model,

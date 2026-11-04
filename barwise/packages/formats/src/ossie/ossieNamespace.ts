@@ -2,7 +2,10 @@
  * The namespace a set of concept IRIs states (iri-identity 6f). One rule,
  * shared by the importer, which reads the namespace back, and the export,
  * which predicts whether it will: the two must agree, or the export leaves
- * a namespace out of its loss block that the import then drops.
+ * a namespace out of its loss block that the import then drops. They agree
+ * when the export gives it the ids the importer will mint, which it works
+ * out by the same suffix rule; the export's read-back (`verifyOssie`)
+ * reports whatever a prediction still misses.
  */
 
 /** A concept's IRI, and the id the importer gives that concept. */

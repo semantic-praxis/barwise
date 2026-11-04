@@ -1612,10 +1612,11 @@ version-1 manifest would go silently empty for impact analysis.
       predicts it: the namespace most concept IRIs agree on, each IRI that
       ends in its concept's id at a `/` or `#` boundary, and none on a
       tie. The model takes it if barwise can hold it (a warning says why
-      not), and each other IRI is named in the warnings and dropped. So a
-      model whose every concept is a shadow, or with too few ids that are
-      their names' (`id-not-from-name`), still names its namespace as not
-      written. A relationship's IRI is always dropped on import, since the
+      not), and each other IRI is named in the warnings and dropped. The
+      writer gives the rule the ids the importer will mint, by the suffix
+      rule in written order. So a model whose every concept is a shadow, or
+      none of whose concepts has the id the importer gives it
+      (`id-not-from-name`), still names its namespace as not written. A relationship's IRI is always dropped on import, since the
       importer names its fact type from the Ossie name. The same rule
       applies to an Ossie document from elsewhere: one whose concept IRIs
       mostly agree on a namespace now imports with it.
