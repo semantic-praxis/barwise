@@ -11,6 +11,7 @@ barwise/scripts/check-adr-tests.mjs, +barwise/scripts/lib/adr-population.mjs,
 +barwise/scripts/tests/adr-model.test.mjs, barwise/scripts/tests/adr-facts.test.mjs, barwise/scripts/lib/adr-enforcement.mjs,
 barwise/scripts/run-script-tests.mjs, barwise/scripts/tests/expected-counts.json,
 barwise/package.json, package.json, .github/workflows/ci.yml
+Plan-reviewed: d8440ecb (code-review, pr-review)
 
 ## Principle
 
