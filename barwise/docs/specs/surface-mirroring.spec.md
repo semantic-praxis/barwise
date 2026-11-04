@@ -23,10 +23,8 @@ barwise/packages/cli/src/commands/merge.ts,
 barwise/packages/cli/src/commands/import/,
 barwise/packages/learn/src/exercise/catalog.ts,
 barwise/packages/promptlab/package.json,
-barwise/docs/adr/surface-capability-parity.md,
 barwise/docs/CLI.md,
 barwise/docs/MCP.md,
-CLAUDE.md,
 +barwise/scripts/audit-surfaces.mjs,
 +barwise/surface-parity-baseline.json
 
