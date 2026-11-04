@@ -183,6 +183,8 @@ describe("two models, one manifest", () => {
     });
     writeFileSync(
       manifestFile(),
+      // Version 1: the model is format 1.0, so its exports recorded 3.x ids,
+      // which impact matches by the model's 3.x id (6e).
       serializeManifest({
         version: 1,
         sourceModel: "b.orm.yaml",
@@ -208,7 +210,7 @@ describe("two models, one manifest", () => {
     writeFileSync(
       manifestFile(),
       serializeManifest({
-        version: 1,
+        version: 2,
         sourceModel: "b.orm.yaml",
         sourceModelHash: "old",
         exports: [legacy("old-a.sql", ["ot-customer"]), legacy("old-nolineage.sql", [])],
@@ -277,7 +279,7 @@ describe("two models, one manifest", () => {
     writeFileSync(
       manifestFile(),
       serializeManifest({
-        version: 1,
+        version: 2,
         sourceModel: "a.orm.yaml",
         sourceModelHash: "old",
         exports: [{ artifact: out, format: "ddl", exportedAt: "x", modelHash: "old", sources: [] }],

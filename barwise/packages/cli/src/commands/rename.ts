@@ -12,7 +12,10 @@
 
 import { OrmYamlSerializer } from "@barwise/core";
 import {
+  lineageRenameWrites,
   modelForRename,
+  modelLineageRenames,
+  projectLineageRenames,
   projectRenameWrites,
   renameInModel,
   renameInProject,
@@ -21,6 +24,7 @@ import {
 import type { Command } from "commander";
 import { dirname, resolve } from "node:path";
 import { readFile } from "../workspace/io.js";
+import { modelLocation, readManifest } from "../workspace/lineageIo.js";
 import { loadProject } from "../workspace/projectLoader.js";
 import {
   type FileWrite,
@@ -145,10 +149,15 @@ function renameFile(file: string, target: RenameTarget, opts: RenameOptions): Ou
     `${file} declares domain "${model.domainContext}". If it is a domain of a project, rename `
     + `it with --project and --domain instead, so its shadows and mapping files follow.`,
   ];
-  const { model: renamed, changes } = renameInModel(model, target, opts.to!);
+  const { model: renamed, changes, ids } = renameInModel(model, target, opts.to!);
+  // The lineage beside the file follows the new ids, staged with it (6e).
+  const lineage = lineageRenameWrites(
+    modelLineageRenames(modelLocation(file), ids),
+    readManifest,
+  );
   return write(
-    [{ path: file, text: new OrmYamlSerializer().serialize(renamed) }],
-    changes,
+    [{ path: file, text: new OrmYamlSerializer().serialize(renamed) }, ...lineage.writes],
+    [...changes, ...lineage.changes],
     warnings,
     opts,
   );
@@ -177,7 +186,12 @@ function renameProject(
     path: resolve(base, w.path),
     text: w.text,
   }));
-  return write(writes, result.changes, [], opts);
+  // Each changed domain's lineage, one write per manifest (6e).
+  const lineage = lineageRenameWrites(
+    projectLineageRenames(result, (p) => modelLocation(resolve(base, p))),
+    readManifest,
+  );
+  return write([...writes, ...lineage.writes], [...result.changes, ...lineage.changes], [], opts);
 }
 
 function write(

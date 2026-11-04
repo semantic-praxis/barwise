@@ -14,7 +14,7 @@ describe("Staleness Detection", () => {
 
     // Write a manifest with this model hash
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [
@@ -53,7 +53,7 @@ describe("Staleness Detection", () => {
 
     // Write a manifest with the original hash
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: originalHash,
       exports: [
@@ -127,7 +127,7 @@ describe("Staleness Detection", () => {
 
     // Write a manifest with one artifact using old hash, one using new hash
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: newHash,
       exports: [
@@ -166,7 +166,7 @@ describe("Staleness Detection", () => {
     const originalHash = hashModel(originalModel);
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: originalHash,
       exports: [
@@ -205,7 +205,7 @@ describe("Staleness Detection", () => {
     const modelHash = hashModel(model);
 
     const manifest: LineageManifest = {
-      version: 1,
+      version: 2,
       sourceModel: "test.orm.yaml",
       sourceModelHash: modelHash,
       exports: [],

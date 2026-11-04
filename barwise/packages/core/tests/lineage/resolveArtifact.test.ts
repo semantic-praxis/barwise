@@ -13,7 +13,7 @@ const artifactPath = "/project/output/schema.sql";
 
 function manifestWith(artifact: string): LineageManifest {
   return {
-    version: 1,
+    version: 2,
     sourceModel: "model.orm.yaml",
     sourceModelHash: "abc123",
     exports: [

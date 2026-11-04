@@ -4,6 +4,7 @@
  * `domain_context` warning, the refusals, and the staged write.
  */
 import { OrmYamlSerializer } from "@barwise/core";
+import { parseManifest, serializeManifest } from "@barwise/core/lineage";
 import {
   cpSync,
   existsSync,
@@ -56,6 +57,30 @@ model:
       readings: ["{0} places {1}"]
 `;
 
+const MANIFEST = (dir: string, elementId: string, sourceModel: string) => {
+  mkdirSync(join(dir, ".barwise"), { recursive: true });
+  writeFileSync(
+    join(dir, ".barwise/lineage.yaml"),
+    serializeManifest({
+      version: 2,
+      sourceModel,
+      sourceModelHash: "h",
+      exports: [{
+        artifact: "out.sql",
+        format: "ddl",
+        exportedAt: "2026-11-04T00:00:00Z",
+        modelHash: "h",
+        sources: [{ elementId, elementType: "EntityType", elementName: "x" }],
+        sourceModel,
+      }],
+    }),
+  );
+};
+const lineageIds = (dir: string) =>
+  parseManifest(readFileSync(join(dir, ".barwise/lineage.yaml"), "utf-8")).exports.map((e) =>
+    e.sources[0]!.elementId
+  );
+
 describe("barwise rename", () => {
   let dir: string;
   const file = (name: string, text: string) => {
@@ -79,6 +104,37 @@ describe("barwise rename", () => {
     expect(result.stdout).toContain(`Wrote 1 file(s): ${path}`);
     expect(readFileSync(path, "utf-8")).toContain("name: Purchase");
     expect(readdirSync(dir)).toEqual(["shop.orm.yaml"]);
+  });
+
+  it("rewrites the lineage beside the file to the new ids, staged with it (6e)", async () => {
+    const path = file("shop.orm.yaml", MODEL);
+    MANIFEST(dir, "ot-o", "shop.orm.yaml");
+    const result = await runCli(["rename", path, "--object-type", "Order", "--to", "Purchase"]);
+    expect(result.exitCode).toBe(0);
+    expect(lineageIds(dir)).toEqual(["Purchase"]);
+    expect(result.stdout).toContain("Wrote 2 file(s)");
+    expect(result.stdout).toContain("stay stale until re-exported");
+  });
+
+  it("takes an empty lineage file as no manifest, as lineage status does", async () => {
+    const path = file("shop.orm.yaml", MODEL);
+    mkdirSync(join(dir, ".barwise"));
+    writeFileSync(join(dir, ".barwise/lineage.yaml"), "");
+    const result = await runCli(["rename", path, "--object-type", "Order", "--to", "Purchase"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Wrote 1 file(s)");
+  });
+
+  it("finds the lineage where an export recorded it, through a symlink", async () => {
+    mkdirSync(join(dir, "real"));
+    const real = join(dir, "real", "model.orm.yaml");
+    writeFileSync(real, MODEL, "utf-8");
+    MANIFEST(join(dir, "real"), "ot-o", "model.orm.yaml");
+    const link = join(dir, "m.orm.yaml");
+    symlinkSync(real, link);
+    const result = await runCli(["rename", link, "--object-type", "Order", "--to", "Purchase"]);
+    expect(result.exitCode).toBe(0);
+    expect(lineageIds(join(dir, "real"))).toEqual(["Purchase"]);
   });
 
   it("renames a role by its position", async () => {
@@ -257,6 +313,24 @@ describe("barwise rename", () => {
       expect(mapping).toContain("target_object_type: Account");
       expect(readFileSync(join(project, "domains/billing.orm.yaml"), "utf-8")).toBe(billingBefore);
       expect(result.stdout).toContain("Wrote 2 file(s)");
+    });
+
+    it("rewrites the domains' lineage, one manifest for the directory (6e)", async () => {
+      MANIFEST(join(project, "domains"), "Customer", "crm.orm.yaml");
+      const result = await runCli([
+        "rename",
+        "--project",
+        join(project, "project.orm-project.yaml"),
+        "--domain",
+        "crm",
+        "--object-type",
+        "Customer",
+        "--to",
+        "Client",
+      ]);
+      expect(result.exitCode).toBe(0);
+      expect(lineageIds(join(project, "domains"))).toEqual(["Client"]);
+      expect(result.stdout).toContain("Wrote 3 file(s)");
     });
 
     it("refuses when any domain is not the current format, not only the one renamed", async () => {

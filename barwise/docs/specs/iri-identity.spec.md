@@ -26,7 +26,8 @@ rules, `imports` on the model, rename rewriting ids); 6b-3c implemented
 2026-11-03 (`generateId` and its installs retired); 6c implemented
 2026-11-03 (NORMA import names, export ids by decision 12(a)); 6d implemented
 2026-11-04 (merge keeps the base's ids, split writes alias shadows,
-`source_context` leaves 4.0); 6e, 6f and WS7 to come
+`source_context` leaves 4.0); 6e implemented 2026-11-04 (lineage manifest
+version 2, renames rewrite lineage); 6f and WS7 to come
 
 Created: 2026-10-28
 Last-updated: 2026-11-04
@@ -1545,6 +1546,51 @@ version-1 manifest would go silently empty for impact analysis.
   inherits MCP's). `ProjectRenameResult.ids` (`renameInProject.ts:36`)
   becomes a map per domain, because a shadow's id changes in each domain
   that holds it.
+  - _6e notes._
+    - The marker is applied when a manifest is read (`parseManifest`
+      through `upgradeManifest`), not only when a 4.0 build writes one,
+      so `lineage status` and `impact` see it on a manifest no 4.0
+      export has touched yet. The write keeps it: `updateManifest`
+      upgrades the manifest it is given, so each export it keeps stays
+      marked.
+    - A marked export is stale whatever its hash. Impact lists a marked
+      export in `exportsBefore40` when none of its sources holds an id
+      the element is known by, unless the model knows the element's 3.x id
+      (a replayed 3.x file), where a miss means the export does not
+      depend on it. Only `version: 1` is upgraded: an empty file stays no
+      manifest, and a version this build does not know is left as written.
+    - barwise-wcg.v5k: `analyzeImpact` takes the model when it loads, and
+      matches each export by the element's id in that export's generation:
+      a marked export by its 3.x id, any other by its 4.0 id, never pooled,
+      because one 3.x id can be another element's 4.0 id (Copilot, on 6e).
+      An id the 3.x file states is read as that (`idFromPrior`), else as a
+      4.0 id (`priorIds`). A 4.0 model knows no 3.x id, so a marked export
+      is listed as unknown, and so it is with no model (inline MCP, or a
+      file that does not load), where the id is taken as a 4.0 id.
+      A 3.x id two elements stated (3.x let any two kinds share one) is not
+      read as a 3.x id: asked by it, `ambiguous` names the elements' 4.0
+      ids, the marked exports holding it are listed as unknown, and exports
+      written under 4.0 ids still match the element that holds it now.
+      Asked by either element's 4.0 id, it is never matched, and the
+      marked exports holding it are listed as unknown. Telling the elements
+      apart by the kind a source records was tried and kept missing cases;
+      the owner chose listing over guessing (2026-11-04). Re-exporting
+      answers it. The CLI's json and
+      MCP add `modelDidNotLoad` when a path's model did not load.
+      The CLI passes it, and MCP does given a path; inline, every model's
+      exports are read, and one model's ids say nothing of another's.
+    - `ProjectRenameResult.ids` is a map per domain context. The lineage
+      step is one core helper, `lineageRenameWrites`, which both surfaces
+      call with their own manifest reader and locator (`modelLocation`,
+      which resolves symlinks as an export does), so core reads no file and
+      two spellings of one directory are one write. Under
+      `--check` the manifest is listed with the files that would be
+      written.
+    - A rename leaves a marked export: its ids are 3.x, which a 4.0 map can
+      collide with, and it reads stale until re-exported anyway.
+    - An export that names no model (before 6a) is not rewritten by a
+      rename. Only a version 1 manifest holds one, so it is marked, reads
+      stale, and impact lists it in `exportsBefore40`.
 - **6f, the outputs.** DDL comments (`DdlExportFormat.ts:185`), Ossie's
   loss block (`lose`, `writeOssie.ts:156`; the `model_header` namespace and imports lines, added in 6b-3c) and SVG `data-id`
   (`diagram-ui/src/parts/*Node.tsx`) print local names with no code

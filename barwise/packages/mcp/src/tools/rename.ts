@@ -12,7 +12,10 @@
 
 import { OrmYamlSerializer } from "@barwise/core";
 import {
+  lineageRenameWrites,
   modelForRename,
+  modelLineageRenames,
+  projectLineageRenames,
   projectRenameWrites,
   renameInModel,
   renameInProject,
@@ -22,6 +25,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
+import { modelLocation, readManifest } from "../workspace/lineageIo.js";
 import { loadProject } from "../workspace/projectLoader.js";
 import { isProjectSource, readSource, type SourceInput, sourcePath } from "../workspace/resolve.js";
 import { sourceInputSchema } from "../workspace/sourceSchema.js";
@@ -120,10 +124,20 @@ function renameModelSource(input: RenameElementInput, target: RenameTarget): Tex
     + `rename it through the .orm-project.yaml and domain instead, so its shadows and mapping `
     + `files follow.`,
   ];
-  const { model: renamed, changes } = renameInModel(model, target, input.to);
+  const { model: renamed, changes, ids } = renameInModel(model, target, input.to);
   const yaml = new OrmYamlSerializer().serialize(renamed);
   if (path === undefined) return json({ yaml, changes, warnings });
-  return writeBack([{ path, text: yaml }], changes, warnings, input.check === true);
+  // The lineage beside the file follows the new ids, staged with it (6e).
+  const lineage = lineageRenameWrites(
+    modelLineageRenames(modelLocation(path), ids),
+    readManifest,
+  );
+  return writeBack(
+    [{ path, text: yaml }, ...lineage.writes],
+    [...changes, ...lineage.changes],
+    warnings,
+    input.check === true,
+  );
 }
 
 function renameProjectSource(input: RenameElementInput, target: RenameTarget): TextResult {
@@ -147,7 +161,17 @@ function renameProjectSource(input: RenameElementInput, target: RenameTarget): T
     path: resolve(base, w.path),
     text: w.text,
   }));
-  return writeBack(writes, result.changes, [], input.check === true);
+  // Each changed domain's lineage, one write per manifest (6e).
+  const lineage = lineageRenameWrites(
+    projectLineageRenames(result, (p) => modelLocation(resolve(base, p))),
+    readManifest,
+  );
+  return writeBack(
+    [...writes, ...lineage.writes],
+    [...result.changes, ...lineage.changes],
+    [],
+    input.check === true,
+  );
 }
 
 function writeBack(
