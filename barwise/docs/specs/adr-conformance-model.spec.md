@@ -173,21 +173,20 @@ governance.orm.yaml + check-adr-model.mjs
 
 ## Workstreams (each independently shippable)
 
-### 1. Split each gate into a reader and a judge
+### 1. Split each gate into a reader and a judge (moved)
 
-No behaviour change. `adr-facts.mjs` takes over every governance read the
-declaration pass of `check-architecture.mjs` and all of
-`check-adr-tests.mjs` make, keeping their laziness: the judge asks, and the
-reader reads only then, memoizing. The skip-only, unread-report and
-unreadable-guard decisions move into the reader as "unknown" answers with
-their refusal text unchanged. `adr-judge.mjs` holds the rules, reading only
-answers. Each gate keeps its order of passes and its exit rule (any
-finding is 1, refusals alone are 2). The existing tests of both gates are
-the acceptance test and do not change; `adr-facts.test.mjs` pins the
-reader alone: an input read only when a question needs it, an unreadable
-input a refusal, each "unknown" case, and the order refusals are recorded.
+Built by `docs/specs/adr-gate-reader-split.spec.md` (barwise-ym8.pw0,
+#910), as its own step: the owner chose on 2026-11-04 to build the reader
+before planning the model against it, after this plan's reviews kept
+failing on predictions about a reader that did not exist. The reader that
+landed (`createGovernanceReader`, `readTestReports` in
+`scripts/lib/adr-facts.mjs`) differs from the one sketched below: it does
+not answer "unknown", and its loaders return the inputs as read, not
+normalized facts. WS2 onward are re-planned against it before any is
+implemented, and the review findings recorded on #907 are that
+re-plan's starting list.
 
-### 2. The model as a second judge, compared fact set by fact set
+### 2. The model as a second judge, compared fact set by fact set (provisional: to be re-planned against the reader)
 
 Lands after `enforceable-adr-practice.spec.md` WS3 (barwise-ym8.gxp.y5o),
 whose label and one-to-one rules move into the code judge first.
@@ -205,7 +204,7 @@ steps run it for real: `npm run test:scripts -- --only adr-model.test.mjs`
 after `npm run build`, and `npm run check:adr-model` after
 `check:adr-tests`, which judges the real tree.
 
-### 3. The model becomes the judge of the schema rules
+### 3. The model becomes the judge of the schema rules (provisional: to be re-planned against the reader)
 
 The schema rows' code leaves `adr-judge.mjs`, and the WS2 comparison
 retires with it. Because the model needs the built core, the judgment
