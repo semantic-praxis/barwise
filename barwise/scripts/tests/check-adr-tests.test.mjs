@@ -125,6 +125,8 @@ test("check:adr-tests: a decision whose tagged tests all skipped cannot be answe
       ["skip and a pass", [[T, "skipped"], [`${T} too`, "passed"]], 0],
       ["skip and a failure", [[T, "skipped"], [`${T} too`, "failed"]], 1],
       ["skip and a todo", [[T, "skipped"], [`${T} too`, "todo"]], 2],
+      // Vitest writes `pending` for a test queued or cut short: it never ran.
+      ["pending only", [[T, "pending"]], 2],
     ]
   ) {
     withFixture({ core: vitest(rows) }, (_, r) => {
@@ -142,6 +144,21 @@ test("check:adr-tests: a decision whose tagged tests all skipped cannot be answe
       }
     });
   }
+  // The node:test path, which the gitleaks probes take: its skip reaches the
+  // report through test-tag-reporter.mjs as `skipped` too.
+  withFixture({ script: jsonl([["pins two [adr:a-concern#two]", "skipped"]]) }, (_, r) => {
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /every test carrying \[adr:a-concern#two\] skipped/);
+  });
+  // An unread report and a skip-only decision together: the header keeps
+  // the two counts apart.
+  withFixture({ core: vitest([[T, "skipped"]]), trial: "not a report\n" }, (_, r) => {
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(
+      r.stderr,
+      /1 report\(s\) not read, 0 decision\(s\) left unproven by them, 1 decision\(s\) whose tagged tests all skipped/,
+    );
+  });
 });
 
 test("check:adr-tests: a tag on a describe is not a test, in either report, and says so", () => {

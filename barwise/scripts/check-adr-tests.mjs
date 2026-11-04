@@ -13,11 +13,14 @@
  * all skipped is a refusal, not a finding: the gitleaks probe tests skip in
  * a container without gitleaks, which cannot tell whether the decision
  * holds (docs/specs/enforceable-adr-practice.spec.md, WS1). A failed tagged
- * test is an answer, so it stays a finding.
+ * test is an answer, so with none passing it is a finding; one passing
+ * test still proves the decision, and the failing one fails its own test
+ * step. Vitest's `pending` (a test queued or cut short, never run) reads as
+ * a skip.
  *
  * Findings, exit 1:
- *   - a `tests` entry lists an id with a failed tagged test, or with no
- *     tagged test that passed or skipped, when every report was read (with
+ *   - a `tests` entry lists an id with no passed tagged test and a failed
+ *     one, or with none that passed or skipped, when every report was read (with
  *     one unread, that is a refusal);
  *   - a reported test or suite carries a tag naming an ADR that does not
  *     exist or an id that ADR does not have (a tag that outlived its
@@ -193,10 +196,14 @@ for (const t of ran) {
     const key = `${adr}#${id}`;
     if (t.status === "passed") passed.add(key);
     else if (t.status === "failed") failed.add(key);
-    else if (t.status === "skipped") skipped.set(key, [...(skipped.get(key) ?? []), t.title]);
+    else if (t.status === "skipped" || t.status === "pending") {
+      if (!skipped.has(key)) skipped.set(key, []);
+      skipped.get(key).push(t.title);
+    }
   }
 }
 let skipOnly = 0;
+const quoted = (titles) => titles.map((s) => `"${s}"`).join(", ");
 const suiteOnly = new Set(
   ran.flatMap((t) => [...(t.type === "suite" ? [t.title] : []), ...t.ancestors])
     .flatMap((title) => tagsIn(title).map(({ adr, id }) => `${adr}#${id}`)),
@@ -210,7 +217,6 @@ for (const a of declaring) {
       : "";
     const unproven =
       `${a.f}: tests (${id}): no test carrying [adr:${key}] passed in this run${hint}`;
-    const quoted = (titles) => titles.map((s) => `"${s}"`).join(", ");
     if (failed.has(key)) {
       findings.push(`${a.f}: tests (${id}): a test carrying [adr:${key}] failed in this run`);
     } else if (skipped.has(key)) {
